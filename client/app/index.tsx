@@ -16,7 +16,7 @@ export default function SplashScreen() {
   }, []);
 
   if (shouldRedirect) {
-    return <Redirect href="/onboarding/onboarding_1" />;
+    return <Redirect href="/onboarding" />;
   }
 
   return (
