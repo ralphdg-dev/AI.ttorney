@@ -150,6 +150,9 @@ export default function Onboarding() {
           useNativeDriver: true,
         }).start();
       });
+    } else {
+      // Navigate to role selection on last slide
+      router.push('/role-selection');
     }
   };
 
@@ -175,8 +178,8 @@ export default function Onboarding() {
   };
 
   const handleSkip = () => {
-    // TODO: Navigate to role selection screen
-    console.log('Skip to role selection');
+    // Navigate to role selection screen
+    router.push('/role-selection');
   };
 
   const CurrentSlideComponent = slides[currentSlide];
@@ -270,11 +273,11 @@ export default function Onboarding() {
               ))}
             </View>
 
-                                      {/* Next Button */}
-             <TouchableOpacity 
-               style={[tw`py-4 rounded-lg flex-row items-center justify-center mb-3`, { backgroundColor: Colors.primary.blue }]}
-               onPress={goToNextSlide}
-             >
+                                                         {/* Next Button */}
+                   <TouchableOpacity
+                     style={[tw`py-3 rounded-lg flex-row items-center justify-center mb-3`, { backgroundColor: Colors.primary.blue }]}
+                     onPress={goToNextSlide}
+                   >
                <Text style={tw`text-white font-semibold text-lg`}>
                  {currentSlide === slides.length - 1 ? 'Get Started' : 'Next'}
                </Text>
@@ -283,7 +286,12 @@ export default function Onboarding() {
              {/* Login Text */}
              <Text style={[tw`text-center mb-1`, { color: Colors.text.sub }]}>
                Already have an account?{' '}
-               <Text style={[tw`font-bold`, { color: Colors.primary.blue }]}>Login</Text>
+               <Text 
+                 style={[tw`font-bold`, { color: Colors.primary.blue }]}
+                 onPress={() => router.push('/login')}
+               >
+                 Login
+               </Text>
              </Text>
           </View>
         </View>
