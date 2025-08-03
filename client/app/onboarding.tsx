@@ -1,14 +1,19 @@
-import { View, Text, Image, TouchableOpacity, Animated } from 'react-native';
-import { router } from 'expo-router';
-import tw from 'tailwind-react-native-classnames';
-import onboarding1 from '../assets/images/onboarding1.png'
-import onboarding2 from '../assets/images/onboarding2.png'
-import onboarding3 from '../assets/images/onboarding3.png'
-import onboarding4 from '../assets/images/onboarding4.png'
-import { useEffect, useRef, useState } from 'react';
-import Colors from '../constants/Colors';
-import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, Image, TouchableOpacity, Animated } from "react-native";
+import { router } from "expo-router";
+import tw from "tailwind-react-native-classnames";
+import onboarding1 from "../assets/images/onboarding1.png";
+import onboarding2 from "../assets/images/onboarding2.png";
+import onboarding3 from "../assets/images/onboarding3.png";
+import onboarding4 from "../assets/images/onboarding4.png";
+import { useEffect, useRef, useState } from "react";
+import Colors from "../constants/Colors";
+import {
+  GestureHandlerRootView,
+  PanGestureHandler,
+  State,
+  PanGestureHandlerStateChangeEvent,
+} from "react-native-gesture-handler";
+import { Ionicons } from "@expo/vector-icons";
 
 interface SlideProps {
   slideAnim: Animated.Value;
@@ -48,8 +53,14 @@ const Slide1 = ({ slideAnim }: SlideProps) => (
     >
       Batas Para sa Lahat
     </Text>
-    <Text style={[tw`text-lg text-center mb-8 px-4`, { color: Colors.text.sub, lineHeight: 23 }]}>
-      Whether you&apos;re seeking advice or giving it, Ai.ttorney makes the law easier to understand.
+    <Text
+      style={[
+        tw`text-lg text-center mb-8 px-4`,
+        { color: Colors.text.sub, lineHeight: 23 },
+      ]}
+    >
+      Whether you&apos;re seeking advice or giving it, Ai.ttorney makes the law
+      easier to understand.
     </Text>
   </Animated.View>
 );
@@ -197,6 +208,8 @@ const slides = [Slide1, Slide2, Slide3, Slide4];
 export default function Onboarding() {
   const [currentSlide, setCurrentSlide] = useState(0);
 
+  // Initialize slideAnim
+  const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const progressAnims = useRef([
     new Animated.Value(0),
@@ -292,6 +305,8 @@ export default function Onboarding() {
     router.push("/role-selection");
   };
 
+  // Get the current slide component
+  const CurrentSlide = slides[currentSlide];
 
   return (
     <GestureHandlerRootView style={tw`flex-1`}>

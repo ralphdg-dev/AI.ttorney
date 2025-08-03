@@ -1,9 +1,87 @@
-import { View, Text, TouchableOpacity } from 'react-native';
-import { router } from 'expo-router';
-import tw from 'tailwind-react-native-classnames';
-import { useState } from 'react';
-import Colors from '../constants/Colors';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  Dimensions,
+} from "react-native";
+import { router } from "expo-router";
+import tw from "tailwind-react-native-classnames";
+import { useState } from "react";
+import Colors from "../constants/Colors";
+import { Ionicons } from "@expo/vector-icons";
+
+// Import your images (adjust paths as needed)
+import lawyer_selected from "../assets/images/lawyer_selected.png";
+import lawyer_notselected from "../assets/images/lawyer_notselected.png";
+import legalseeker_selected from "../assets/images/legalseeker_selected.png";
+import legalseeker_notselected from "../assets/images/legalseeker_notselected.png";
+
+// Get screen dimensions
+const { width, height } = Dimensions.get("window");
+
+// Define responsive breakpoints
+const isSmallScreen = width < 375;
+const isMediumScreen = width >= 375 && width < 414;
+const isShortScreen = height < 700;
+
+// Define types for responsive styles
+interface ResponsiveStyles {
+  container: {
+    paddingHorizontal: number;
+  };
+  topPadding: {
+    paddingTop: number;
+  };
+  headingContainer: {
+    marginBottom: number;
+    marginTop: number;
+  };
+  headingText: {
+    fontSize: number;
+    lineHeight: number;
+  };
+  cardContainer: {
+    paddingHorizontal: number;
+    flex: number;
+    justifyContent: "flex-start" | "center";
+  };
+  card: {
+    padding: number;
+    marginBottom: number;
+  };
+  iconContainer: {
+    width: number;
+    height: number;
+    marginBottom: number;
+  };
+  lawyerImage: {
+    width: number;
+    height: number;
+    marginBottom: number;
+  };
+  iconSize: number;
+  cardTitle: {
+    fontSize: number;
+    marginBottom: number;
+  };
+  cardDescription: {
+    fontSize: number;
+    lineHeight: number;
+  };
+  buttonContainer: {
+    paddingBottom: number;
+    paddingTop: number;
+  };
+  button: {
+    paddingVertical: number;
+    marginBottom: number;
+  };
+  buttonText: {
+    fontSize: number;
+  };
+}
 
 export default function RoleSelection() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
@@ -297,12 +375,6 @@ export default function RoleSelection() {
       <View style={tw`flex-row justify-between items-center px-6 pt-12 pb-4`}>
         <TouchableOpacity onPress={() => router.back()} style={tw`p-2`}>
           <Ionicons name="arrow-back" size={24} color="#A0A0A0" />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={handleSkip} style={tw`p-2`}>
-          <Text style={[tw`text-base font-medium`, { color: "#A0A0A0" }]}>
-            Skip
-          </Text>
         </TouchableOpacity>
       </View>
 
