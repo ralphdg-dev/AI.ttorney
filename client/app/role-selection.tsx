@@ -1,92 +1,9 @@
-<<<<<<< Updated upstream
 import { View, Text, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import tw from 'tailwind-react-native-classnames';
 import { useState } from 'react';
 import Colors from '../constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
-=======
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Dimensions,
-  ScrollView,
-  Image,
-} from "react-native";
-import { router } from "expo-router";
-import tw from "tailwind-react-native-classnames";
-import { useState } from "react";
-import Colors from "../constants/Colors";
-import { Ionicons } from "@expo/vector-icons";
-import lawyer_selected from "../assets/images/lawyer_selected.png";
-import legalseeker_selected from "../assets/images/legalseeker_selected.png";
-import lawyer_notselected from "../assets/images/lawyer_notselected.png";
-import legalseeker_notselected from "../assets/images/legalseeker_notselected.png";
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-
-interface ResponsiveStyles {
-  container: {
-    paddingHorizontal: number;
-  };
-  topPadding: {
-    paddingTop: number;
-  };
-  headingContainer: {
-    marginBottom: number;
-    marginTop: number;
-  };
-  headingText: {
-    fontSize: number;
-    lineHeight: number;
-  };
-  cardContainer: {
-    paddingHorizontal: number;
-    flex: number;
-    justifyContent: "flex-start" | "center";
-  };
-  card: {
-    padding: number;
-    marginBottom: number;
-  };
-  iconContainer: {
-    width: number;
-    height: number;
-    marginBottom: number;
-  };
-  lawyerImage: {
-    width: number;
-    height: number;
-    marginBottom: number;
-  };
-  iconSize: number;
-  cardTitle: {
-    fontSize: number;
-    marginBottom: number;
-  };
-  cardDescription: {
-    fontSize: number;
-    lineHeight: number;
-  };
-  buttonContainer: {
-    paddingBottom: number;
-    paddingTop: number;
-  };
-  button: {
-    paddingVertical: number;
-    marginBottom: number;
-  };
-  buttonText: {
-    fontSize: number;
-  };
-}
-
-const isSmallScreen = SCREEN_WIDTH < 375;
-const isMediumScreen = SCREEN_WIDTH >= 375 && SCREEN_WIDTH < 414;
-const isLargeScreen = SCREEN_WIDTH >= 414;
-const isShortScreen = SCREEN_HEIGHT < 700;
->>>>>>> Stashed changes
 
 export default function RoleSelection() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);

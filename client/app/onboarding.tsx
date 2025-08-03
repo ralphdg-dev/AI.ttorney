@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 import { View, Text, Image, TouchableOpacity, Animated } from 'react-native';
 import { router } from 'expo-router';
 import tw from 'tailwind-react-native-classnames';
@@ -10,24 +9,6 @@ import { useEffect, useRef, useState } from 'react';
 import Colors from '../constants/Colors';
 import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-=======
-import { View, Text, Image, TouchableOpacity, Animated } from "react-native";
-import { Link, router } from "expo-router";
-import tw from "tailwind-react-native-classnames";
-import onboarding1 from "../assets/images/onboarding1.png";
-import onboarding2 from "../assets/images/onboarding2.png";
-import onboarding3 from "../assets/images/onboarding3.png";
-import onboarding4 from "../assets/images/onboarding4.png";
-import { useEffect, useRef, useState } from "react";
-import Colors from "../constants/Colors";
-import {
-  GestureHandlerRootView,
-  PanGestureHandler,
-  State,
-  PanGestureHandlerStateChangeEvent,
-} from "react-native-gesture-handler";
-import { Ionicons } from "@expo/vector-icons";
->>>>>>> Stashed changes
 
 interface SlideProps {
   slideAnim: Animated.Value;
@@ -67,19 +48,8 @@ const Slide1 = ({ slideAnim }: SlideProps) => (
     >
       Batas Para sa Lahat
     </Text>
-<<<<<<< Updated upstream
     <Text style={[tw`text-lg text-center mb-8 px-4`, { color: Colors.text.sub, lineHeight: 23 }]}>
       Whether you&apos;re seeking advice or giving it, Ai.ttorney makes the law easier to understand.
-=======
-    <Text
-      style={[
-        tw`text-lg text-center mb-8 px-4`,
-        { color: Colors.text.sub, lineHeight: 23 },
-      ]}
-    >
-      Whether you&apos;re seeking advice or giving it, Ai.ttorney makes the law
-      easier to understand.
->>>>>>> Stashed changes
     </Text>
   </Animated.View>
 );
@@ -226,12 +196,8 @@ const slides = [Slide1, Slide2, Slide3, Slide4];
 
 export default function Onboarding() {
   const [currentSlide, setCurrentSlide] = useState(0);
-<<<<<<< Updated upstream
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
-=======
-  const slideAnim = useRef(new Animated.Value(0)).current;
->>>>>>> Stashed changes
   const progressAnims = useRef([
     new Animated.Value(0),
     new Animated.Value(0),
@@ -326,11 +292,6 @@ export default function Onboarding() {
     router.push("/role-selection");
   };
 
-<<<<<<< Updated upstream
-
-=======
-  const CurrentSlide = slides[currentSlide];
->>>>>>> Stashed changes
 
   return (
     <GestureHandlerRootView style={tw`flex-1`}>

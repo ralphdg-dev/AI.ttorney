@@ -1,21 +1,8 @@
-<<<<<<< Updated upstream
 import { Stack } from 'expo-router';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { AuthProvider } from '../lib/auth-context';
-=======
-import { Stack } from "expo-router";
-import {
-  useFonts,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from "@expo-google-fonts/inter";
-import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
->>>>>>> Stashed changes
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -39,7 +26,6 @@ export default function RootLayout() {
   }
 
   return (
-<<<<<<< Updated upstream
     <AuthProvider>
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false}} />
@@ -48,13 +34,5 @@ export default function RootLayout() {
         <Stack.Screen name="role-selection" options={{ headerShown: false }} />
       </Stack>
     </AuthProvider>
-=======
-    <Stack>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-      <Stack.Screen name="login" options={{ headerShown: false }} />
-      <Stack.Screen name="role-selection" options={{ headerShown: false }} />
-    </Stack>
->>>>>>> Stashed changes
   );
 }
