@@ -1,5 +1,5 @@
 import { View, Text, Image, TouchableOpacity, Animated } from 'react-native';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import tw from 'tailwind-react-native-classnames';
 import onboarding1 from '../assets/images/onboarding1.png'
 import onboarding2 from '../assets/images/onboarding2.png'
@@ -23,7 +23,7 @@ const Slide1 = () => (
       Batas Para sa Lahat
     </Text>
     <Text style={[tw`text-lg text-center mb-8 px-4`, { color: Colors.text.sub, lineHeight: 23 }]}>
-      Whether you're seeking advice or giving it, Ai.ttorney makes the law easier to understand.
+      Whether you&apos;re seeking advice or giving it, Ai.ttorney makes the law easier to understand.
     </Text>
   </View>
 );
@@ -83,7 +83,7 @@ const slides = [Slide1, Slide2, Slide3, Slide4];
 
 export default function Onboarding() {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const slideAnim = useRef(new Animated.Value(0)).current;
+
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const progressAnims = useRef([
     new Animated.Value(0), // Slide 0
@@ -95,7 +95,7 @@ export default function Onboarding() {
   // Initialize first progress dot as active
   useEffect(() => {
     progressAnims[0].setValue(1);
-  }, []);
+  }, [progressAnims]);
 
   const onGestureEvent = (event: any) => {
     // Only track gesture, don't navigate here
@@ -182,7 +182,7 @@ export default function Onboarding() {
     router.push('/role-selection');
   };
 
-  const CurrentSlideComponent = slides[currentSlide];
+
 
   return (
     <GestureHandlerRootView style={tw`flex-1`}>

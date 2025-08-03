@@ -1,50 +1,185 @@
-# Welcome to your Expo app 👋
+# AI.ttorney - Legal Assistant App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A comprehensive legal assistance application built with React Native, Expo, and Supabase.
 
-## Get started
+## 🚀 Quick Start
 
-1. Install dependencies
+### Prerequisites
+- Node.js (v18 or higher)
+- npm or yarn
+- Expo CLI (`npm install -g @expo/cli`)
+- iOS Simulator (for iOS development) or Android Studio (for Android development)
 
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd AI.ttorney/client
+   ```
+
+2. **Install dependencies**
    ```bash
    npm install
    ```
 
-2. Start the app
-
+3. **Configure environment variables**
+   
+   Copy the environment files and update with your Supabase credentials:
    ```bash
-   npx expo start
+   cp .env.example .env
+   cp .env.example .env.development
+   ```
+   
+   Update the files with your actual Supabase credentials:
+   ```env
+   EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
-In the output, you'll find options to open the app in a
+4. **Start the development server**
+   ```bash
+   npm start
+   ```
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+5. **Run on your preferred platform**
+   - Press `i` for iOS Simulator
+   - Press `a` for Android Emulator
+   - Press `w` for Web browser
+   - Scan QR code with Expo Go app on your phone
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## 📱 Features
 
-## Get a fresh project
+- **Authentication**: Secure user registration and login
+- **Role-based Access**: Different interfaces for lawyers and legal seekers
+- **AI Chatbot**: Legal assistance through intelligent chat
+- **Legal Forum**: Community-driven legal discussions
+- **Legal Articles**: Comprehensive legal guides and resources
+- **Lawyer Verification**: Professional lawyer onboarding system
+- **Consultation Requests**: Direct lawyer-client communication
 
-When you're ready, run:
+## 🏗️ Project Structure
 
-```bash
-npm run reset-project
+```
+client/
+├── app/                    # Expo Router screens
+│   ├── _layout.tsx        # Root layout with auth provider
+│   ├── index.tsx          # Home screen
+│   ├── login.tsx          # Login screen
+│   ├── onboarding.tsx     # Onboarding flow
+│   └── role-selection.tsx # User role selection
+├── components/            # Reusable UI components
+├── constants/             # App constants and colors
+├── hooks/                 # Custom React hooks
+├── lib/                   # Core libraries and configurations
+│   ├── supabase.ts        # Supabase client and database helpers
+│   └── auth-context.tsx   # Authentication context
+├── types/                 # TypeScript type definitions
+│   └── database.types.ts  # Auto-generated database types
+└── utils/                 # Utility functions
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 🗄️ Database Schema
 
-## Learn more
+The app uses Supabase with the following main tables:
 
-To learn more about developing your project with Expo, look at the following resources:
+- **users**: User accounts and profiles
+- **chatbot_logs**: AI chat interactions
+- **forum_posts**: Community forum posts
+- **legal_articles**: Legal content and guides
+- **lawyer_applications**: Lawyer verification process
+- **consultation_requests**: Lawyer-client consultations
+- **glossary_terms**: Legal terminology database
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## 🔧 Development
 
-## Join the community
+### Available Scripts
 
-Join our community of developers creating universal apps.
+- `npm start` - Start the development server
+- `npm run android` - Run on Android
+- `npm run ios` - Run on iOS
+- `npm run web` - Run on web
+- `npm run lint` - Run ESLint
+- `npm run reset-project` - Reset project configuration
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### Type Safety
+
+The project uses TypeScript with auto-generated database types. To regenerate types after schema changes:
+
+```bash
+# Install Supabase CLI
+npm install -g supabase
+
+# Generate types
+supabase gen types typescript --project-id YOUR_PROJECT_ID > types/database.types.ts
+```
+
+### Database Operations
+
+Use the provided database helpers in `lib/supabase.ts`:
+
+```typescript
+import { db } from '@/lib/supabase';
+
+// Get all users
+const { data: users } = await db.users.getAll();
+
+// Create a forum post
+const { data: post } = await db.forum.posts.create({
+  title: 'Legal Question',
+  body: 'Need help with...',
+  user_id: currentUser.id
+});
+```
+
+## 🎨 Styling
+
+The app uses:
+- **Tailwind CSS** for styling
+- **Custom color scheme** defined in `constants/Colors.ts`
+- **Themed components** for light/dark mode support
+
+## 🔐 Authentication
+
+Authentication is handled through Supabase Auth with:
+- Email/password authentication
+- Session management
+- Role-based access control
+- Secure token storage
+
+## 📦 Dependencies
+
+### Core
+- React Native
+- Expo
+- TypeScript
+- Supabase
+
+### UI/UX
+- Tailwind CSS
+- React Native Gesture Handler
+- Expo Vector Icons
+
+### Development
+- ESLint
+- Prettier
+- TypeScript
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 🆘 Support
+
+For support and questions:
+- Check the documentation
+- Open an issue on GitHub
+- Contact the development team

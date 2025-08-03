@@ -1,7 +1,7 @@
-import { View, Text, TextInput, TouchableOpacity, Image, Animated } from 'react-native';
-import { Link, router } from 'expo-router';
+import { View, Text, TextInput, TouchableOpacity, Image } from 'react-native';
+import { router } from 'expo-router';
 import tw from 'tailwind-react-native-classnames';
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import Colors from '../constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import logo from '../assets/images/logo.png';
@@ -164,7 +164,7 @@ export default function Login() {
       {/* Bottom Section */}
       <View style={tw`px-6 pb-8 items-center`}>
         <Text style={[tw`text-center`, { color: Colors.text.sub }]}>
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <Text style={[tw`font-bold`, { color: Colors.primary.blue }]}>Sign Up</Text>
         </Text>
       </View>
