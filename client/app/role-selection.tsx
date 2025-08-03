@@ -12,21 +12,19 @@ import { useState } from "react";
 import Colors from "../constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 
-// Import your images (adjust paths as needed)
 import lawyer_selected from "../assets/images/lawyer_selected.png";
 import lawyer_notselected from "../assets/images/lawyer_notselected.png";
 import legalseeker_selected from "../assets/images/legalseeker_selected.png";
 import legalseeker_notselected from "../assets/images/legalseeker_notselected.png";
 
-// Get screen dimensions
 const { width, height } = Dimensions.get("window");
 
-// Define responsive breakpoints
+// responsive breakpoints
 const isSmallScreen = width < 375;
 const isMediumScreen = width >= 375 && width < 414;
 const isShortScreen = height < 700;
 
-// Define types for responsive styles
+// types for responsive styles
 interface ResponsiveStyles {
   container: {
     paddingHorizontal: number;
