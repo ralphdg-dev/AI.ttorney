@@ -17,6 +17,8 @@ import { useState, useEffect, useRef } from "react";
 import Colors from "../constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import otpsent from "../assets/images/otpsent.png";
+import PrimaryButton from "../components/ui/PrimaryButton";
+import BackButton from "../components/ui/BackButton";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -31,6 +33,7 @@ export default function VerifyOTP() {
   const [resendTimer, setResendTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
   const [error, setError] = useState("");
+
 
   // Refs for OTP inputs
   const inputRefs = useRef([]);
@@ -248,21 +251,7 @@ export default function VerifyOTP() {
             paddingHorizontal: dimensions.containerPadding,
           }}
         >
-          <TouchableOpacity
-            onPress={goBack}
-            style={{
-              padding: 8,
-              marginLeft: -8,
-            }}
-            accessibilityLabel="Go back"
-            accessibilityRole="button"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={dimensions.backIconSize}
-              color="#A0A0A0"
-            />
-          </TouchableOpacity>
+          <BackButton onPress={goBack} />
         </View>
 
         {/* Main Content Container */}
@@ -304,39 +293,21 @@ export default function VerifyOTP() {
               Verify Your Email
             </Text>
 
-            <Text
-              style={{
-                fontSize: dimensions.subHeaderSize,
-                textAlign: "center",
-                lineHeight: dimensions.subHeaderSize * 1.4,
-                marginBottom: dimensions.smallVerticalSpacing / 2,
-                color: Colors.text.sub,
-              }}
-            >
-              We've sent a 6-digit code to your email.
-            </Text>
-
-            <Text
-              style={{
-                fontSize: dimensions.subHeaderSize,
-                textAlign: "center",
-                fontWeight: "600",
-                color: Colors.text.head,
-                marginBottom: dimensions.smallVerticalSpacing / 2,
-              }}
-            >
-              {maskEmail(email)}
-            </Text>
-
-            <Text
-              style={{
-                fontSize: dimensions.bodySize,
-                textAlign: "center",
-                color: Colors.text.sub,
-              }}
-            >
-              Enter it to continue.
-            </Text>
+                         <Text
+               style={{
+                 fontSize: dimensions.subHeaderSize,
+                 textAlign: "center",
+                 lineHeight: dimensions.subHeaderSize * 1.4,
+                 marginBottom: dimensions.smallVerticalSpacing / 2,
+                 color: Colors.text.sub,
+               }}
+             >
+               We've sent a code to{" "}
+               <Text style={{ fontWeight: "600", color: Colors.text.head }}>
+                 {maskEmail(email)}
+               </Text>
+               . Enter it below to continue.
+             </Text>
           </View>
 
           {/* OTP Input */}
@@ -359,7 +330,7 @@ export default function VerifyOTP() {
                   key={index}
                   ref={(ref) => (inputRefs.current[index] = ref)}
                   style={{
-                    width: dimensions.otpBoxSize,
+                                         width: dimensions.otpBoxSize * 0.8,
                     height: dimensions.otpBoxSize,
                     borderWidth: 2,
                     borderRadius: 12,
@@ -370,7 +341,7 @@ export default function VerifyOTP() {
                       : dimensions.isSmallScreen
                       ? 18
                       : 20,
-                    marginHorizontal: dimensions.otpBoxSpacing / 2,
+                                         marginHorizontal: dimensions.otpBoxSpacing / 2,
                     marginVertical: dimensions.isVerySmallScreen ? 4 : 0,
                     borderColor: error
                       ? "#EF4444"
@@ -382,6 +353,7 @@ export default function VerifyOTP() {
                   }}
                   value={digit}
                   onChangeText={(value) => handleOtpChange(index, value)}
+
                   onKeyPress={({ nativeEvent }) =>
                     handleKeyPress(index, nativeEvent.key)
                   }
@@ -408,106 +380,62 @@ export default function VerifyOTP() {
             )}
           </View>
 
-          {/* Resend Code */}
-          <View
-            style={{
-              alignItems: "center",
-              marginBottom: dimensions.verticalSpacing,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                flexWrap: "wrap",
-                justifyContent: "center",
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: dimensions.bodySize,
-                  color: Colors.text.sub,
-                }}
-              >
-                Didn't receive code?{" "}
-              </Text>
-              <TouchableOpacity
-                onPress={handleResendOTP}
-                disabled={!canResend}
-                accessibilityLabel="Resend verification code"
-                style={{ paddingVertical: 4, paddingHorizontal: 2 }}
-              >
-                <Text
-                  style={{
-                    fontSize: dimensions.bodySize,
-                    fontWeight: "600",
-                    color: canResend ? Colors.primary.blue : "#9CA3AF",
-                    textDecorationLine: canResend ? "underline" : "none",
-                  }}
-                >
-                  {canResend ? "Resend OTP" : `Resend OTP (${resendTimer}s)`}
-                </Text>
-              </TouchableOpacity>
-            </View>
+                                                      
           </View>
+        </ScrollView>
 
-          {/* Verify Button */}
-          <TouchableOpacity
-            style={{
-              height: dimensions.buttonHeight,
-              borderRadius: 12,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor:
-                isLoading || !isOtpComplete ? "#9CA3AF" : Colors.primary.blue,
-              opacity: isLoading || !isOtpComplete ? 0.7 : 1,
-            }}
-            onPress={handleVerifyOTP}
-            disabled={isLoading || !isOtpComplete}
-            accessibilityLabel="Verify email"
-            accessibilityRole="button"
-          >
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text
-                style={{
-                  color: "white",
-                  fontWeight: "600",
-                  fontSize: dimensions.buttonTextSize,
-                  marginRight: 8,
-                }}
-              >
-                {isLoading ? "Verifying..." : "Next"}
-              </Text>
-              {!isLoading && (
-                <Ionicons name="arrow-forward" size={20} color="white" />
-              )}
-            </View>
-          </TouchableOpacity>
+                {/* Bottom Section - Fixed at bottom like onboarding */}
+         <View style={tw`px-6 pb-12 mt-8`}>
+           {/* Resend Code */}
+           <View
+             style={{
+               alignItems: "center",
+               marginBottom: 8,
+             }}
+           >
+             <View
+               style={{
+                 flexDirection: "row",
+                 alignItems: "center",
+                 flexWrap: "wrap",
+                 justifyContent: "center",
+               }}
+             >
+               <Text
+                 style={{
+                   fontSize: dimensions.bodySize,
+                   color: Colors.text.sub,
+                 }}
+               >
+                 Didn't receive code?{" "}
+               </Text>
+               <TouchableOpacity
+                 onPress={handleResendOTP}
+                 disabled={!canResend}
+                 accessibilityLabel="Resend verification code"
+                 style={{ paddingVertical: 4, paddingHorizontal: 2 }}
+               >
+                 <Text
+                   style={{
+                     fontSize: dimensions.bodySize,
+                     fontWeight: "600",
+                     color: canResend ? "#3B82F6" : "#9CA3AF",
+                     textDecorationLine: "none",
+                   }}
+                 >
+                   {canResend ? "Resend OTP" : `Resend OTP (${resendTimer}s)`}
+                 </Text>
+               </TouchableOpacity>
+             </View>
+           </View>
 
-          {/* Help Text */}
-          <View
-            style={{
-              alignItems: "center",
-              marginTop: dimensions.smallVerticalSpacing,
-              paddingBottom:
-                dimensions.isLandscape && !dimensions.isTablet ? 20 : 40,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: dimensions.smallSize,
-                textAlign: "center",
-                lineHeight: dimensions.smallSize * 1.4,
-                color: Colors.text.sub,
-                paddingHorizontal: 20,
-              }}
-            >
-              Make sure to check your spam folder if you don&apos;t see the
-              email in your inbox.
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
-}
+           <PrimaryButton
+             title={isLoading ? "Verifying..." : "Verify"}
+             onPress={handleVerifyOTP}
+             disabled={isLoading || !isOtpComplete}
+             loading={isLoading}
+           />
+         </View>
+      </KeyboardAvoidingView>
+    );
+  }
