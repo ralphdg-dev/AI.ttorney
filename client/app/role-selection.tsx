@@ -10,7 +10,9 @@ import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { useState } from "react";
 import Colors from "../constants/Colors";
-import { Ionicons } from "@expo/vector-icons";
+import BackButton from "../components/ui/BackButton";
+import PrimaryButton from "../components/ui/PrimaryButton";
+import ActionLink from "../components/ui/ActionLink";
 
 import lawyer_selected from "../assets/images/lawyer_selected.png";
 import lawyer_notselected from "../assets/images/lawyer_notselected.png";
@@ -318,52 +320,18 @@ export default function RoleSelection() {
         </TouchableOpacity>
       </View>
 
-      {/* Bottom Section */}
-      <View style={responsiveStyles.buttonContainer}>
-        {/* Continue Button */}
-        <TouchableOpacity
-          style={[
-            tw`rounded-lg items-center justify-center`,
-            responsiveStyles.button,
-            {
-              backgroundColor: selectedRole ? Colors.primary.blue : "#D1D5DB",
-            },
-          ]}
-          onPress={handleContinue}
-          disabled={!selectedRole}
-        >
-          <Text
-            style={[
-              tw`font-semibold`,
-              {
-                color: selectedRole ? "white" : "#9CA3AF",
-                fontSize: responsiveStyles.buttonText.fontSize,
-              },
-            ]}
-          >
-            Continue
-          </Text>
-        </TouchableOpacity>
+                           {/* Bottom Section */}
+        <View style={tw`px-6 pb-12 mt-8 relative`}>
+                     {/* Continue Button */}
+           <PrimaryButton
+             title="Continue"
+             onPress={handleContinue}
+             disabled={!selectedRole}
+           />
 
-        {/* Continue as Guest */}
-        <Text
-          style={[
-            tw`text-center mb-1`,
-            {
-              color: Colors.text.sub,
-              fontSize: isSmallScreen ? 14 : 16,
-            },
-          ]}
-        >
-          Already have an account?{" "}
-          <Text
-            style={[tw`font-bold`, { color: Colors.primary.blue }]}
-            onPress={() => router.push("/login")}
-          >
-            Login
-          </Text>
-        </Text>
-      </View>
+          {/* Login Text */}
+          <ActionLink />
+        </View>
     </View>
   );
 
@@ -371,9 +339,7 @@ export default function RoleSelection() {
     <View style={tw`flex-1 bg-white`}>
       {/* Static Header - Same as Onboarding */}
       <View style={tw`flex-row justify-between items-center px-6 pt-12 pb-4`}>
-        <TouchableOpacity onPress={() => router.back()} style={tw`p-2`}>
-          <Ionicons name="arrow-back" size={24} color="#A0A0A0" />
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} />
       </View>
 
       {isShortScreen ? (

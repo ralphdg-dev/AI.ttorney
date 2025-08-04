@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
 import logo from "../assets/images/logo.png";
 import DateTimePicker from '@react-native-community/datetimepicker';
+import ActionLink from "../components/ui/ActionLink";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 const isTablet = screenWidth >= 768;
@@ -785,21 +786,8 @@ export default function NonLawReg() {
       </ScrollView>
 
       {/* Bottom Section */}
-      <View
-        style={[
-          tw`items-center pb-8`,
-          tw`${responsiveDimensions.containerPadding}`,
-        ]}
-      >
-        <Text style={[tw`text-center`, { color: Colors.text.sub }]}>
-          Already have an account?{" "}
-          <Text
-            style={[tw`font-bold`, { color: Colors.primary.blue }]}
-            onPress={handleSignIn}
-          >
-            Sign In
-          </Text>
-        </Text>
+      <View style={tw`px-6 pb-12 mt-8 relative`}>
+        <ActionLink text="Already have an account?" linkText="Sign In" onPress={handleSignIn} />
       </View>
     </KeyboardAvoidingView>
   );
