@@ -5,6 +5,7 @@ import { useState } from "react";
 import Colors from "../constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import logo from "../assets/images/logo.png";
+import { FontAwesome } from "@expo/vector-icons";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -152,10 +153,26 @@ export default function Login() {
             style={tw`py-3 rounded-lg items-center justify-center border border-gray-300 bg-white flex-row`}
             onPress={handleGoogleLogin}
           >
+            <FontAwesome name="google" size={22} style={tw`mr-2`} />
             <Text
-              style={[tw`font-semibold text-lg`, { color: Colors.text.head }]}
+              style={[tw`font-semibold text-lg`]}
             >
               Login with Google
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              tw`py-3 rounded-lg items-center justify-center border border-gray-300 bg-white mt-3 flex-row`,
+            ]}
+            onPress={() => {
+              // TODO: Implement guest login logic
+              console.log("Continue as Guest pressed");
+            }}
+          >
+            <Ionicons name="person-outline" size={22} color={Colors.text.head} style={tw`mr-2`} />
+            <Text style={[tw`font-semibold text-lg`, { color: Colors.text.head }]}>
+              Continue as Guest
             </Text>
           </TouchableOpacity>
         </View>
