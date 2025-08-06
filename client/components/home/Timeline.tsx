@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-nati
 import { Plus, Home, Search, Bell, Mail } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Post from './Post';
-import Colors from '../constants/Colors';
+import Colors from '../../constants/Colors';
 
 interface PostData {
   id: string;
@@ -109,7 +109,7 @@ const Timeline: React.FC = () => {
 
   const handlePostPress = (postId: string) => {
     console.log(`Post pressed for post ${postId}`);
-    router.push(`/post?postId=${postId}`);
+    router.push(`/home/post?postId=${postId}`);
   };
 
   const handleCreatePost = () => {

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Navbar from '../components/Navbar';
-import Timeline from '../components/Timeline';
+import Navbar from '../../components/Navbar';
+import Timeline from '../../components/home/Timeline';
 
 const HomePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'home' | 'learn' | 'ask' | 'find' | 'profile'>('home');

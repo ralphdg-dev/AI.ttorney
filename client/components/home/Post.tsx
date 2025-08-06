@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { MessageCircle, MoreHorizontal } from 'lucide-react-native';
-import Colors from '../constants/Colors';
+import Colors from '../../constants/Colors';
 
 interface PostProps {
   id: string;
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     alignItems: 'center',
   },
   actionButton: {
