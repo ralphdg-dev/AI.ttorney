@@ -9,6 +9,7 @@ import {
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { AuthProvider } from "../lib/auth-context";
+import DirectoryScreen from "./directory/screens/DirectoryScreen";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -40,6 +41,13 @@ export default function RootLayout() {
         <Stack.Screen name="role-selection" options={{ headerShown: false }} />
         <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
         <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="directory"
+          options={{
+            headerShown: false,
+            title: "Find Legal Help",
+          }}
+        />
       </Stack>
     </AuthProvider>
   );
