@@ -90,7 +90,7 @@ export default function RoleSelection() {
     if (selectedRole) {
       // Navigate based on selected role
       if (selectedRole === "lawyer") {
-        //	router.push("/lawyer-signup");
+        router.push("/lawyer-starting-page");
       } else if (selectedRole === "seeker") {
         router.push("/nonlaw-reg");
       }
