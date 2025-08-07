@@ -23,7 +23,7 @@ export default function LawyerStartingPage() {
   };
 
   const handleSignIn = () => {
-    navigation.navigate('Login');
+    navigation.navigate('login');
   };
 
 
