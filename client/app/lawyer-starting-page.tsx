@@ -19,7 +19,9 @@ import { useNavigation } from '@react-navigation/native';
 
 export default function LawyerStartingPage() {
   const navigation = useNavigation();
+
   const handleContinue = () => {
+    navigation.navigate('lawyer-reg');
   };
 
   const handleSignIn = () => {
@@ -132,7 +134,7 @@ export default function LawyerStartingPage() {
 
         {/* Terms Text */}
         <Text style={{
-          fontSize: 12,
+          fontSize: 14,
           lineHeight: 20,
           color: '#9ca3af',
         }}>
