@@ -1,4 +1,6 @@
 import { Stack } from "expo-router";
+import "@/global.css";
+import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
 import {
   useFonts,
   Inter_400Regular,
@@ -33,22 +35,22 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="role-selection" options={{ headerShown: false }} />
-        <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
-        <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="directory"
-          options={{
-            headerShown: false,
-            title: "Find Legal Help",
-          }}
-        />
-      </Stack>
-    </AuthProvider>
+    <GluestackUIProvider mode="light"><AuthProvider>
+        <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="role-selection" options={{ headerShown: false }} />
+          <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
+          <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="directory"
+            options={{
+              headerShown: false,
+              title: "Find Legal Help",
+            }}
+          />
+        </Stack>
+      </AuthProvider></GluestackUIProvider>
   );
 }
