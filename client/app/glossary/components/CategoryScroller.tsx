@@ -2,6 +2,14 @@ import React from "react";
 import { View, Text, TouchableOpacity, ScrollView, useWindowDimensions } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import Colors from "@/constants/Colors";
+import {
+  Library,
+  Users,
+  Briefcase,
+  ScrollText,
+  Gavel,
+  ShoppingCart,
+} from "lucide-react-native";
 
 interface Category {
   id: string;
@@ -27,6 +35,15 @@ export default function CategoryScroller({ activeCategory, onCategoryChange }: C
   const isSmallScreen = width < 450; // Increased threshold to accommodate 6 categories
   const shouldScroll = isSmallScreen;
 
+  const categoryIcons: Record<string, React.ComponentType<any>> = {
+    all: Library,
+    family: Users,
+    work: Briefcase,
+    civil: ScrollText,
+    criminal: Gavel,
+    consumer: ShoppingCart,
+  };
+
   return (
     <View style={tw`mb-4`}>
       {shouldScroll ? (
@@ -34,6 +51,7 @@ export default function CategoryScroller({ activeCategory, onCategoryChange }: C
           <View style={tw`flex-row`}>
             {categories.map((c) => {
               const isActive = activeCategory === c.id;
+              const Icon = categoryIcons[c.id];
               return (
                 <TouchableOpacity
                   key={c.id}
@@ -49,8 +67,11 @@ export default function CategoryScroller({ activeCategory, onCategoryChange }: C
                       },
                     ]}
                   >
-                    {/* Placeholder for category icon */}
-                    <View style={[tw`w-8 h-8 rounded-lg`, { backgroundColor: isActive ? Colors.primary.blue : "#d1d5db" }]} />
+                    {Icon ? (
+                      <Icon size={28} color={isActive ? Colors.primary.blue : "#9CA3AF"} strokeWidth={2} />
+                    ) : (
+                      <Library size={28} color={isActive ? Colors.primary.blue : "#9CA3AF"} strokeWidth={2} />
+                    )}
                   </View>
                   <Text style={[tw`mt-2 text-sm font-medium`, { color: isActive ? Colors.primary.blue : Colors.text.sub }]}>
                     {c.label}
@@ -64,6 +85,7 @@ export default function CategoryScroller({ activeCategory, onCategoryChange }: C
         <View style={tw`flex-row justify-between`}>
           {categories.map((c) => {
             const isActive = activeCategory === c.id;
+            const Icon = categoryIcons[c.id];
             return (
               <TouchableOpacity
                 key={c.id}
@@ -79,8 +101,11 @@ export default function CategoryScroller({ activeCategory, onCategoryChange }: C
                     },
                   ]}
                 >
-                  {/* Placeholder for category icon */}
-                  <View style={[tw`w-6 h-6 rounded-lg`, { backgroundColor: isActive ? Colors.primary.blue : "#d1d5db" }]} />
+                  {Icon ? (
+                    <Icon size={22} color={isActive ? Colors.primary.blue : "#9CA3AF"} strokeWidth={2} />
+                  ) : (
+                    <Library size={22} color={isActive ? Colors.primary.blue : "#9CA3AF"} strokeWidth={2} />
+                  )}
                 </View>
                 <Text style={[tw`mt-2 text-xs font-medium text-center`, { color: isActive ? Colors.primary.blue : Colors.text.sub }]}>
                   {c.label}
