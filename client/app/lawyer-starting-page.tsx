@@ -147,15 +147,15 @@ export default function LawyerStartingPage() {
       {/* Continue Button */}
       <View style={{
         paddingHorizontal: 24,
-        paddingBottom: 32,
+        paddingBottom: 20,
       }}>
         <TouchableOpacity
           style={{
-            backgroundColor: '#1d4ed8',
+            backgroundColor: '#023D7B',
             borderRadius: 12,
             paddingVertical: 20,
             alignItems: 'center',
-            marginBottom: 20,
+            marginBottom: 10,
           }}
           onPress={handleContinue}
         >
@@ -171,6 +171,7 @@ export default function LawyerStartingPage() {
           <Text style={{
             fontSize: 14,
             color: '#6b7280',
+            marginBottom: -20,
           }}>
             Already have an account? <Text style={{
               color: '#1d4ed8',

@@ -320,9 +320,9 @@ export default function RoleSelection() {
         </TouchableOpacity>
       </View>
 
-                           {/* Bottom Section */}
+       {/* Bottom Section */}
         <View style={tw`px-6 pb-12 mt-8 relative`}>
-                     {/* Continue Button */}
+       {/* Continue Button */}
            <PrimaryButton
              title="Continue"
              onPress={handleContinue}

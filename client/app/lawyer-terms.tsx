@@ -159,10 +159,10 @@ export default function TermsAndConditions() {
         
         {/* Stepper Dots */}
         <View style={styles.dotsContainer}>
-          <View style={[styles.dot, { backgroundColor: '#1d4ed8' }]} />
-          <View style={[styles.dot, { backgroundColor: '#1d4ed8' }]} />
-          <View style={[styles.dot, { backgroundColor: '#1d4ed8' }]} />
-          <View style={[styles.dot, { backgroundColor: '#1d4ed8' }]} />
+          <View style={[styles.dot, { backgroundColor: '#023D7B' }]} />
+          <View style={[styles.dot, { backgroundColor: '#023D7B' }]} />
+          <View style={[styles.dot, { backgroundColor: '#023D7B' }]} />
+          <View style={[styles.dot, { backgroundColor: '#023D7B' }]} />
         </View>
       </View>
     </SafeAreaView>
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
   },
   acceptButton: {
     flexDirection: 'row',
-    backgroundColor: '#1d4ed8',
+    backgroundColor: '#023D7B',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 36,
