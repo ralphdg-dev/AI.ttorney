@@ -11,7 +11,7 @@ import {
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { AuthProvider } from "../lib/auth-context";
-import DirectoryScreen from "./directory/screens/DirectoryScreen";
+import { SidebarProvider, SidebarWrapper } from "../components/AppSidebar";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -35,22 +35,28 @@ export default function RootLayout() {
   }
 
   return (
-    <GluestackUIProvider mode="light"><AuthProvider>
-        <Stack>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="role-selection" options={{ headerShown: false }} />
-          <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
-          <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="directory"
-            options={{
-              headerShown: false,
-              title: "Find Legal Help",
-            }}
-          />
-        </Stack>
-      </AuthProvider></GluestackUIProvider>
+    <GluestackUIProvider mode="light">
+      <AuthProvider>
+        <SidebarProvider>
+          <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="role-selection" options={{ headerShown: false }} />
+            <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
+            <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
+            <Stack.Screen name="home" options={{ headerShown: false, title: "" }} />
+            <Stack.Screen
+              name="directory"
+              options={{
+                headerShown: false,
+                title: "Find Legal Help",
+              }}
+            />
+          </Stack>
+          <SidebarWrapper />
+        </SidebarProvider>
+      </AuthProvider>
+    </GluestackUIProvider>
   );
 }
