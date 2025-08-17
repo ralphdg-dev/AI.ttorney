@@ -29,10 +29,6 @@ export default function LawyerStartingPage() {
   };
 
 
-  const openAuthenticationStatement = () => {
-    Linking.openURL('YOUR_WEBSITE_URL/authentication-statement');
-  };
-
   return (
     <SafeAreaView style={{
       flex: 1,
@@ -55,20 +51,20 @@ export default function LawyerStartingPage() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
+      <View
+        style={{
+          flex: 1,
           paddingHorizontal: 24,
           paddingBottom: 40,
-        }}
-        showsVerticalScrollIndicator={false}
+      }}
       >
+        showsVerticalScrollIndicator={false}
         {/* Title */}
         <Text style={{
           fontSize: 32,
           fontWeight: 'bold',
           color: '#000000',
-          marginBottom: 20,
+          marginBottom: 8,
         }}>Let's get started</Text>
 
         {/* Subtitle */}
@@ -76,7 +72,7 @@ export default function LawyerStartingPage() {
           fontSize: 14,
           lineHeight: 24,
           color: '#9ca3af',
-          marginBottom: 30,
+          marginBottom: 15,
         }}>
           You are signing up as a <Text style={{ fontWeight: 'bold', color: '#9ca3af' }}>Lawyer</Text>. To protect users
           and maintain the integrity of our platform, all
@@ -140,14 +136,13 @@ export default function LawyerStartingPage() {
         }}>
           Clicking the continue button means that I have read and
           agreed to the 
-          <TouchableOpacity onPress={openAuthenticationStatement}>
             <Text style={{
               color: '#000000',
               textDecorationLine: 'underline',
+              fontWeight: '500',
             }}> user identity authentication information statement</Text>
-          </TouchableOpacity>.
           </Text>
-      </ScrollView>
+      </View>
 
       {/* Continue Button */}
       <View style={{

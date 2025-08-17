@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,23 +7,25 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  Alert,
 } from 'react-native';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
-import { Camera } from 'expo-camera';
+import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
 
 export default function LawyerFaceVerification() {
   const navigation = useNavigation();
   const cameraRef = useRef(null);
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [isCameraReady, setIsCameraReady] = useState(false);
+  const [facing, setFacing] = useState<CameraType>('front');
 
-  React.useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
+  useEffect(() => {
+    // Check and request camera permission on component mount
+    if (!permission?.granted && permission?.canAskAgain) {
+      requestPermission();
+    }
+  }, [permission, requestPermission]);
 
   const handleBack = () => {
     navigation.goBack();
@@ -31,6 +33,53 @@ export default function LawyerFaceVerification() {
 
   const handleNext = () => {
     navigation.navigate('lawyer-terms');
+  };
+
+  const renderCameraContent = () => {
+    // Web platform check
+    if (Platform.OS === 'web') {
+      return (
+        <Text style={{ textAlign: 'center', color: '#9ca3af', padding: 20 }}>
+          Camera is not supported on web. Please use a mobile device.
+        </Text>
+      );
+    }
+
+    // Permission is still loading
+    if (!permission) {
+      return (
+        <Text style={{ textAlign: 'center', color: '#6b7280', padding: 20 }}>
+          Requesting camera permissions...
+        </Text>
+      );
+    }
+
+    // Permission denied
+    if (!permission.granted) {
+      return (
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <Text style={{ color: '#ef4444', textAlign: 'center', marginBottom: 16 }}>
+            Camera permission is required for face verification
+          </Text>
+          <TouchableOpacity 
+            style={styles.permissionButton}
+            onPress={requestPermission}
+          >
+            <Text style={styles.permissionButtonText}>Grant Permission</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // Camera is available and permission granted
+    return (
+      <CameraView
+        ref={cameraRef}
+        style={styles.avatarImg}
+        facing={facing}
+        onCameraReady={() => setIsCameraReady(true)}
+      />
+    );
   };
 
   return (
@@ -47,7 +96,7 @@ export default function LawyerFaceVerification() {
 
       {/* Stepper */}
       <View style={styles.stepperContainer}>
-        <Text style={styles.stepperStep}>Step 2 of 3</Text>
+        <Text style={styles.stepperStep}>Step 3 of 4</Text>
         <Text style={styles.stepperNext}>
           Next: <Text style={styles.stepperNextLink}>Terms & Conditions</Text>
         </Text>
@@ -55,29 +104,9 @@ export default function LawyerFaceVerification() {
 
       {/* Main Content */}
       <View style={styles.contentContainer}>
-            <View style={styles.avatarCircle}>
-    {Platform.OS === 'web' ? (
-        <Text style={{ textAlign: 'center', color: '#9ca3af' }}>
-        Camera is not supported on web. Please use a mobile device.
-        </Text>
-    ) : hasPermission === null ? (
-        <Text>Requesting camera...</Text>
-    ) : hasPermission === false ? (
-        <Text style={{ color: 'red', textAlign: 'center' }}>No access to camera</Text>
-    ) : Camera.Constants && Camera.Constants.Type ? (
-        <Camera
-        ref={cameraRef}
-        style={styles.avatarImg}
-        type={Camera.Constants.Type.front}
-        onCameraReady={() => setIsCameraReady(true)}
-        ratio="1:1"
-        />
-    ) : (
-        <Text style={{ color: 'red', textAlign: 'center' }}>
-        Camera is not available.
-        </Text>
-    )}
-    </View>
+        <View style={styles.avatarCircle}>
+          {renderCameraContent()}
+        </View>
 
         <Text style={styles.sectionTitle}>Live Photo Recognition</Text>
         <Text style={styles.sectionSubtitle}>
@@ -112,6 +141,7 @@ export default function LawyerFaceVerification() {
         </TouchableOpacity>
         {/* Stepper Dots */}
         <View style={styles.dotsContainer}>
+          <View style={[styles.dot, { backgroundColor: '#1d4ed8' }]} />
           <View style={[styles.dot, { backgroundColor: '#1d4ed8' }]} />
           <View style={[styles.dot, { backgroundColor: '#1d4ed8' }]} />
           <View style={[styles.dot, { backgroundColor: '#d1d5db' }]} />

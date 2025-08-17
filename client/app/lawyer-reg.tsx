@@ -37,7 +37,7 @@ export default function LawyerReg() {
 
   const handleNext = () => {
     // Implement navigation to next step (e.g., Live Selfie)
-    navigation.navigate('lawyer-face-verification');
+    navigation.navigate('lawyer-preface-recog');
   };
 
   return (
@@ -54,9 +54,9 @@ export default function LawyerReg() {
 
       {/* Stepper */}
       <View style={styles.stepperContainer}>
-        <Text style={styles.stepperStep}>Step 1 of 3</Text>
+        <Text style={styles.stepperStep}>Step 1 of 4</Text>
         <Text style={styles.stepperNext}>
-          Next: <Text style={styles.stepperNextLink}>Live Selfie</Text>
+          Next: <Text style={styles.stepperNextLink}>Facial Verification</Text>
         </Text>
       </View>
 
@@ -129,6 +129,7 @@ export default function LawyerReg() {
         {/* Stepper Dots */}
         <View style={styles.dotsContainer}>
           <View style={[styles.dot, { backgroundColor: '#1d4ed8' }]} />
+          <View style={[styles.dot, { backgroundColor: '#d1d5db' }]} />
           <View style={[styles.dot, { backgroundColor: '#d1d5db' }]} />
           <View style={[styles.dot, { backgroundColor: '#d1d5db' }]} />
         </View>

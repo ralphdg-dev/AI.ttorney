@@ -6,6 +6,7 @@ import Colors from "../constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import logo from "../assets/images/logo.png";
 import { FontAwesome } from "@expo/vector-icons";
+import googleLogo from "../assets/images/googleIcon.png"; 
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -150,16 +151,18 @@ export default function Login() {
 
           {/* Google Button */}
           <TouchableOpacity
-            style={tw`py-3 rounded-lg items-center justify-center border border-gray-300 bg-white flex-row`}
-            onPress={handleGoogleLogin}
-          >
-            <FontAwesome name="google" size={22} style={tw`mr-2`} />
-            <Text
-              style={[tw`font-semibold text-lg`]}
-            >
-              Login with Google
-            </Text>
-          </TouchableOpacity>
+  style={tw`py-3 rounded-lg items-center justify-center border border-gray-300 bg-white flex-row`}
+  onPress={handleGoogleLogin}
+>
+  <Image
+    source={googleLogo}
+    style={[tw`mr-2`, { width: 22, height: 22 }]}
+    resizeMode="contain"
+  />
+  <Text style={[tw`font-semibold text-lg`]}>
+    Login with Google
+  </Text>
+</TouchableOpacity>
 
           <TouchableOpacity
             style={[

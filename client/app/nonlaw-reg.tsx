@@ -783,12 +783,10 @@ export default function NonLawReg() {
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
-
-      {/* Bottom Section */}
-      <View style={tw`px-6 pb-12 mt-8 relative`}>
+        <View style={tw`px-6 pb-12 mt-8 relative`}>
         <ActionLink text="Already have an account?" linkText="Sign In" onPress={handleSignIn} />
       </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
