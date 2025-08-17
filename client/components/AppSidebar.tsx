@@ -20,7 +20,6 @@ import {
   LogOut,
   Bell,
   MessageSquare,
-  BookOpen,
   Star,
 } from 'lucide-react-native';
 import Colors from '../constants/Colors';
@@ -114,12 +113,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: 0,
-          duration: 300,
+          duration: 280,
           useNativeDriver: true,
         }),
         Animated.timing(overlayOpacity, {
           toValue: 0.5,
-          duration: 300,
+          duration: 280,
           useNativeDriver: true,
         }),
       ]).start();
@@ -127,12 +126,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: -SIDEBAR_WIDTH,
-          duration: 300,
+          duration: 280,
           useNativeDriver: true,
         }),
         Animated.timing(overlayOpacity, {
           toValue: 0,
-          duration: 300,
+          duration: 280,
           useNativeDriver: true,
         }),
       ]).start(() => {
