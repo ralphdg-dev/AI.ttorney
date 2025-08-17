@@ -1,5 +1,6 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import { View, FlatList, Alert, useWindowDimensions } from "react-native";
+import { useRouter } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import Header from "@/app/directory/components/Header";
 import { Box } from "@/components/ui/box";
@@ -14,6 +15,7 @@ import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function GlossaryScreen() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>("guides");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -30,83 +32,50 @@ export default function GlossaryScreen() {
     { id: "terms", label: "Legal Terms" },
   ];
 
-  // Sample data to showcase full UI; replace with API data later
+  // Sample data matching Supabase schema - replace with API data later
   const placeholderTerms: TermItem[] = useMemo(
-    () =>
-      [
-        {
-          id: "1",
-          title: "Annulment",
-          filipinoTerm: "Pagpapawalang-bisa",
-          summary:
-            "A court declaration that a marriage is invalid from the start.",
-          isFavorite: true,
-          category: "Family",
-        },
-        {
-          id: "2",
-          title: "Employment Contract",
-          filipinoTerm: "Kontrata sa Trabaho",
-          summary:
-            "A legally binding agreement between employer and employee that sets out terms of employment.",
-          isFavorite: false,
-          category: "Work",
-        },
-        {
-          id: "3",
-          title: "Damages",
-          filipinoTerm: "Danyos",
-          summary:
-            "Monetary compensation awarded for loss or injury caused by another's unlawful act.",
-          isFavorite: false,
-          category: "Civil",
-        },
-        {
-          id: "4",
-          title: "Probable Cause",
-          filipinoTerm: "Makatwirang Hinala",
-          summary:
-            "Sufficient reason based on facts to believe a crime has been committed.",
-          isFavorite: true,
-          category: "Criminal",
-        },
-        {
-          id: "5",
-          title: "Warranty",
-          filipinoTerm: "Garantiya",
-          summary:
-            "A promise regarding the quality or performance of goods or services.",
-          isFavorite: false,
-          category: "Consumer",
-        },
-        {
-          id: "6",
-          title: "Custody",
-          filipinoTerm: "Kustodiya",
-          summary:
-            "A legal right to care for and make decisions about a child.",
-          isFavorite: false,
-          category: "Family",
-        },
-        {
-          id: "7",
-          title: "Severance Pay",
-          filipinoTerm: "Bayad-Paghihiwalay",
-          summary:
-            "Compensation paid to an employee upon termination under certain conditions.",
-          isFavorite: false,
-          category: "Work",
-        },
-        {
-          id: "8",
-          title: "Lease",
-          filipinoTerm: "Upa",
-          summary:
-            "A contract granting use of property for a specified time in exchange for payment.",
-          isFavorite: false,
-          category: "Civil",
-        },
-      ],
+    () => [
+      {
+        id: "1",
+        title: "Annulment",
+        filipinoTerm: "Pagpapawalang-bisa",
+        summary: "A court declaration that a marriage is invalid from the start, as if it never existed. Unlike divorce, which ends a valid marriage, annulment treats the marriage as if it was never legally valid.",
+        isFavorite: true,
+        category: "Family",
+      },
+      {
+        id: "2",
+        title: "Employment Contract",
+        filipinoTerm: "Kontrata sa Trabaho",
+        summary: "A legally binding agreement between employer and employee that sets out the terms and conditions of employment, including duties, compensation, benefits, and termination procedures.",
+        isFavorite: false,
+        category: "Work",
+      },
+      {
+        id: "3",
+        title: "Damages",
+        filipinoTerm: "Danyos",
+        summary: "Monetary compensation awarded for loss or injury caused by another's unlawful act or negligence in civil cases.",
+        isFavorite: false,
+        category: "Civil",
+      },
+      {
+        id: "4",
+        title: "Probable Cause",
+        filipinoTerm: "Makatwirang Hinala",
+        summary: "Sufficient reason based on facts and circumstances to believe that a crime has been committed and that a particular person committed it, required for arrest warrants and search warrants.",
+        isFavorite: true,
+        category: "Criminal",
+      },
+      {
+        id: "5",
+        title: "Warranty",
+        filipinoTerm: "Garantiya",
+        summary: "A written or implied promise by a seller or manufacturer regarding the quality, performance, condition, or reliability of goods or services sold to consumers.",
+        isFavorite: false,
+        category: "Consumer",
+      }
+    ],
     []
   );
 
@@ -138,7 +107,7 @@ export default function GlossaryScreen() {
   };
 
   const handleTermPress = (item: TermItem): void => {
-    Alert.alert("Term", item.title);
+    router.push(`/glossary/${item.id}` as any);
   };
 
   const handleCategoryChange = (categoryId: string): void => {
@@ -173,7 +142,7 @@ export default function GlossaryScreen() {
 
   return (
     <View style={tw`flex-1 bg-gray-50`}>
-      <Header title="Understand the PH Law" onMenuPress={handleMenuPress} showMenu={true} />
+      <Header title="Legal Glossary" onMenuPress={handleMenuPress} showMenu={true} />
 
       <ToggleGroup
         options={tabOptions}
@@ -202,14 +171,14 @@ export default function GlossaryScreen() {
       <FlatList
         ref={flatListRef}
         data={termsToRender}
-        key={`${numColumns}-${activeCategory}`} // Add activeCategory to key to force re-render
+        key={`${numColumns}-${activeCategory}`}
         keyExtractor={(item) => item.id}
         numColumns={numColumns}
         ListHeaderComponent={renderListHeader}
         contentContainerStyle={{ 
           paddingHorizontal: 24, 
           paddingBottom: 24,
-          flexGrow: 1 // Ensure content takes up full space
+          flexGrow: 1
         }}
         columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
         renderItem={({ item }) => (
@@ -223,18 +192,11 @@ export default function GlossaryScreen() {
           />
         )}
         showsVerticalScrollIndicator={false}
-        // Always allow scrolling, even with little content
-        scrollEnabled={true}
-        bounces={true}
-        // Ensure FlatList fills remaining space
         style={{ flex: 1 }}
-        // Performance optimizations
         removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        updateCellsBatchingPeriod={50}
-        initialNumToRender={10}
-        windowSize={10}
-        // Add getItemLayout for better performance (optional)
+        maxToRenderPerBatch={8}
+        initialNumToRender={6}
+        windowSize={8}
         getItemLayout={numColumns === 1 ? getItemLayout : undefined}
       />
 

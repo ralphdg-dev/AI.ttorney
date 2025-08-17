@@ -8,11 +8,11 @@ import { Card } from "@/components/ui/card";
 
 export interface TermItem {
   id: string;
-  title: string;
-  summary: string;
+  title: string; // maps to term_en from database
+  summary: string; // maps to definition_en from database
   isFavorite?: boolean;
-  filipinoTerm?: string;
-  category?: string;
+  filipinoTerm?: string; // maps to term_fil from database
+  category?: string; // maps to domain from database
 }
 
 interface TermListItemProps {
@@ -59,11 +59,11 @@ export default function TermListItem({ item, onPress, containerStyle }: TermList
           />
         </View>
         <View style={tw`flex-1`}>
-          <View style={tw`flex-row items-center justify-between mb-1`}>
+          <View style={tw`flex-row items-center justify-between mb-2`}>
             <Text
               numberOfLines={1}
               ellipsizeMode="tail"
-              style={[tw`font-bold text-base`, { color: Colors.text.head, flexShrink: 1, marginRight: 8 }]}
+              style={[tw`font-bold text-lg`, { color: Colors.text.head, flexShrink: 1, marginRight: 8 }]}
             >
               {item.title}
             </Text>
@@ -79,9 +79,17 @@ export default function TermListItem({ item, onPress, containerStyle }: TermList
             ) : null}
           </View>
           {item.filipinoTerm ? (
-            <Text style={[tw`text-xs mb-2`, { color: Colors.text.sub }]}>{item.filipinoTerm}</Text>
+            <Text style={[tw`text-sm mb-3 font-medium`, { color: Colors.primary.blue }]}>
+              {item.filipinoTerm}
+            </Text>
           ) : null}
-          <Text style={[tw`text-sm leading-5`, { color: Colors.text.sub }]}>{item.summary}</Text>
+          <Text 
+            numberOfLines={2}
+            ellipsizeMode="tail"
+            style={[tw`text-sm leading-5`, { color: Colors.text.sub }]}
+          >
+            {item.summary}
+          </Text>
         </View>
         <ChevronRight size={18} color="#9ca3af" />
       </Card>
