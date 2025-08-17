@@ -1,4 +1,4 @@
-import { View, Text, Image, Animated } from "react-native";
+import { Text, Image, Animated } from "react-native";
 import { Redirect } from "expo-router";
 import { useEffect, useState, useRef } from "react";
 import tw from "tailwind-react-native-classnames";
@@ -20,7 +20,7 @@ export default function SplashScreen() {
     }, 4000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [fadeAnim]);
 
   if (shouldRedirect) {
     return <Redirect href="/onboarding" />;

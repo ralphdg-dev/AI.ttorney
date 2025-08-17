@@ -5,7 +5,7 @@ import {
   Home, 
   Scale, 
   MessageSquarePlus, 
-  MapPin, 
+  Gavel, 
   User 
 } from 'lucide-react-native';
 import Colors from '../constants/Colors';
@@ -37,14 +37,14 @@ const Navbar: React.FC<NavbarProps> = ({
     },
     {
       id: 'ask',
-      label: 'Ask Ai.ttorney',
+      label: 'Ask AI',
       icon: MessageSquarePlus,
       active: activeTab === 'ask'
     },
     {
       id: 'find',
-      label: 'Find Legal Help',
-      icon: MapPin,
+      label: 'Legal Help',
+      icon: Gavel,
       active: activeTab === 'find'
     },
     {
@@ -63,13 +63,13 @@ const Navbar: React.FC<NavbarProps> = ({
           return (
             <TouchableOpacity
               key={tab.id}
-              style={styles.tabItem}
+              style={[styles.tabItem, tab.active && styles.activeTabItem]}
               onPress={() => onTabPress?.(tab.id)}
               activeOpacity={0.7}
             >
               <IconComponent
-                size={24}
-                color={tab.active ? Colors.primary.blue : '#9CA3AF'}
+                size={22}
+                color={tab.active ? Colors.primary.blue : Colors.primary.blue}
                 strokeWidth={1.5}
               />
               <Text
@@ -111,13 +111,27 @@ const styles = StyleSheet.create({
     height: 60,
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 16,
+    marginHorizontal: 3,
+  },
+  activeTabItem: {
+    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+    shadowColor: Colors.primary.blue,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   tabLabel: {
     fontSize: 10,
@@ -127,9 +141,11 @@ const styles = StyleSheet.create({
   },
   activeLabel: {
     color: Colors.primary.blue,
+    ...GlobalStyles.textSemiBold,
   },
   inactiveLabel: {
-    color: '#9CA3AF',
+    color: Colors.primary.blue,
+    opacity: 0.6,
   },
 });
 
