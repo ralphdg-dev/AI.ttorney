@@ -17,7 +17,6 @@ import {
   Settings,
   HelpCircle,
   FileText,
-  Clock,
   LogOut,
   Bell,
   MessageSquare,
