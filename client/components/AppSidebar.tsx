@@ -105,10 +105,12 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const [shouldRender, setShouldRender] = useState(false);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (isVisible) {
+      setShouldRender(true);
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: 0,
@@ -121,21 +123,23 @@ const Sidebar: React.FC<SidebarProps> = ({
           useNativeDriver: true,
         }),
       ]).start();
-    } else {
+    } else if (shouldRender) {
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: -SIDEBAR_WIDTH,
-          duration: 250,
+          duration: 300,
           useNativeDriver: true,
         }),
         Animated.timing(overlayOpacity, {
           toValue: 0,
-          duration: 250,
+          duration: 300,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(() => {
+        setShouldRender(false);
+      });
     }
-  }, [isVisible, slideAnim, overlayOpacity]);
+  }, [isVisible, slideAnim, overlayOpacity, shouldRender]);
 
   const menuItems: MenuItem[] = [
     {
@@ -151,12 +155,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: Bookmark,
       route: 'favorites',
       badge: 3,
-    },
-    {
-      id: 'glossary',
-      label: 'Legal Glossary',
-      icon: BookOpen,
-      route: 'glossary',
     },
     {
       id: 'divider1',
@@ -267,7 +265,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  if (!isVisible) return null;
+  if (!shouldRender) return null;
 
   return (
     <View style={styles.container}>
