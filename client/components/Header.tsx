@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Menu, Search, Bell, ArrowLeft } from 'lucide-react-native';
 import { useSidebar } from './AppSidebar';
@@ -90,8 +90,11 @@ const Header: React.FC<HeaderProps> = ({
     if (variant === 'home') {
       return (
         <View style={styles.titleContainer}>
-          <Text style={styles.greeting}>Good day!</Text>
-          <Text style={styles.appName}>Ai.ttorney</Text>
+          <Image 
+            source={require('../assets/images/logo.png')} 
+            style={styles.logo}
+            resizeMode="contain"
+          />
         </View>
       );
     }
@@ -190,20 +193,16 @@ const styles = StyleSheet.create({
     width: 40,
   },
   titleContainer: {
-    flex: 1,
+    position: 'absolute',
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    marginHorizontal: 16,
+    justifyContent: 'center',
+    zIndex: -1,
   },
-  greeting: {
-    fontSize: 14,
-    color: Colors.text.sub,
-    ...GlobalStyles.text,
-  },
-  appName: {
-    fontSize: 18,
-    color: Colors.primary.blue,
-    marginTop: 2,
-    ...GlobalStyles.textBold,
+  logo: {
+    width: 160,
+    height: 40,
   },
   title: {
     fontSize: 18,

@@ -477,8 +477,8 @@ const styles = StyleSheet.create({
   },
   badge: {
     backgroundColor: Colors.primary.blue,
-    borderRadius: 12,
-    minWidth: 24,
+    borderRadius: 10,
+    minWidth: 20,
     height: 20,
     alignItems: 'center',
     justifyContent: 'center',
