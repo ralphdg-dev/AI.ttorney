@@ -78,13 +78,22 @@ const Post: React.FC<PostProps> = ({
     <TouchableOpacity style={styles.container} onPress={handlePostPress} activeOpacity={0.95}>
       {/* User Info Row */}
       <View style={styles.userRow}>
-        <Image 
-          source={{ uri: user.avatar || 'https://via.placeholder.com/40' }} 
-          style={styles.avatar} 
-        />
+        {user.username === 'anonymous' ? (
+          <View style={styles.anonymousAvatar}>
+            <Text style={styles.questionMark}>?</Text>
+          </View>
+        ) : (
+          <Image 
+            source={{ uri: user.avatar || 'https://via.placeholder.com/40' }} 
+            style={styles.avatar} 
+          />
+        )}
         <View style={styles.userInfo}>
           <View style={styles.nameRow}>
             <Text style={styles.userName}>{user.name}</Text>
+            <Text style={styles.username}>@{user.username}</Text>
+          </View>
+          <View style={styles.secondRow}>
             <View style={styles.categoryContainer}>
               <Text style={[styles.categoryText, {
                 backgroundColor: categoryColors.backgroundColor,
@@ -92,10 +101,7 @@ const Post: React.FC<PostProps> = ({
                 color: categoryColors.textColor,
               }]}>{displayText}</Text>
             </View>
-          </View>
-          <View style={styles.secondRow}>
-            <Text style={styles.username}>@{user.username}</Text>
-            <Text style={styles.timestamp}>• {timestamp}</Text>
+            <Text style={styles.timestamp}> - {timestamp}</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.moreButton} onPress={handleMorePress}>
@@ -145,18 +151,17 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 0,
+    marginBottom: 4,
   },
   userName: {
     fontSize: 15,
     fontWeight: '700',
     color: '#0F1419',
-    marginRight: 12,
+    marginRight: 8,
   },
   username: {
     fontSize: 15,
     color: '#536471',
-    marginRight: 4,
   },
   timestamp: {
     fontSize: 15,
@@ -204,7 +209,20 @@ const styles = StyleSheet.create({
   secondRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+  },
+  anonymousAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+    backgroundColor: '#E1E8ED',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  questionMark: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#536471',
   },
 });
 
