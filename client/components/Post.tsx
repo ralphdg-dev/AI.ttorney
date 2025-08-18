@@ -40,8 +40,39 @@ const Post: React.FC<PostProps> = ({
     onPostPress?.();
   };
 
-  // Clean category text by removing "Related Post"
-  const cleanCategory = category.replace(' Related Post', '');
+  // Clean category text by removing "Related Post" and simplifying names
+  const cleanCategory = category.replace(' Related Post', '').replace(' Law', '').toUpperCase();
+
+  // Get category colors based on category type
+  const getCategoryColors = (category: string) => {
+    switch ((category || '').toLowerCase()) {
+      case 'family':
+        return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', textColor: '#BE123C' };
+      case 'work':
+        return { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', textColor: '#1D4ED8' };
+      case 'civil':
+        return { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE', textColor: '#7C3AED' };
+      case 'criminal':
+        return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', textColor: '#DC2626' };
+      case 'consumer':
+        return { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', textColor: '#047857' };
+      default:
+        return { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', textColor: '#374151' };
+    }
+  };
+
+  const categoryColors = getCategoryColors(cleanCategory);
+  
+  // Determine display text - show "OTHERS" for non-matching categories
+  const getDisplayText = (category: string) => {
+    const lowerCategory = category.toLowerCase();
+    if (['family', 'work', 'civil', 'criminal', 'consumer'].includes(lowerCategory)) {
+      return category.toUpperCase();
+    }
+    return 'OTHERS';
+  };
+
+  const displayText = getDisplayText(cleanCategory);
 
   return (
     <TouchableOpacity style={styles.container} onPress={handlePostPress} activeOpacity={0.95}>
@@ -54,11 +85,17 @@ const Post: React.FC<PostProps> = ({
         <View style={styles.userInfo}>
           <View style={styles.nameRow}>
             <Text style={styles.userName}>{user.name}</Text>
+            <View style={styles.categoryContainer}>
+              <Text style={[styles.categoryText, {
+                backgroundColor: categoryColors.backgroundColor,
+                borderColor: categoryColors.borderColor,
+                color: categoryColors.textColor,
+              }]}>{displayText}</Text>
+            </View>
+          </View>
+          <View style={styles.secondRow}>
             <Text style={styles.username}>@{user.username}</Text>
             <Text style={styles.timestamp}>• {timestamp}</Text>
-          </View>
-          <View style={styles.categoryContainer}>
-            <Text style={styles.categoryText}>{cleanCategory}</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.moreButton} onPress={handleMorePress}>
@@ -85,9 +122,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    borderBottomWidth: 2,
-    borderBottomColor: '#E1E8ED',
-    marginBottom: 8,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E1E8ED',
   },
   userRow: {
     flexDirection: 'row',
@@ -106,14 +145,13 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    marginBottom: 4,
+    marginBottom: 0,
   },
   userName: {
     fontSize: 15,
     fontWeight: '700',
     color: '#0F1419',
-    marginRight: 4,
+    marginRight: 12,
   },
   username: {
     fontSize: 15,
@@ -130,12 +168,11 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1DA1F2',
-    backgroundColor: '#E8F5FD',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 12,
+    borderRadius: 6,
     alignSelf: 'flex-start',
+    borderWidth: 1,
   },
   moreButton: {
     padding: 8,
@@ -163,6 +200,11 @@ const styles = StyleSheet.create({
   actionCount: {
     fontSize: 13,
     color: '#536471',
+  },
+  secondRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
   },
 });
 
