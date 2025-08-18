@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { MessageCircle, MoreHorizontal, User } from 'lucide-react-native';
+import { MessageCircle, MoreHorizontal, User, Bookmark, Flag, ChevronRight } from 'lucide-react-native';
 import Colors from '../../constants/Colors';
 
 interface PostProps {
@@ -32,8 +32,8 @@ const Post: React.FC<PostProps> = ({
   onPostPress,
 }) => {
   const handleMorePress = () => {
-    // TODO: Handle three dots press
-    console.log('Three dots pressed');
+    // Toggle more menu
+    setMenuOpen((prev) => !prev);
   };
 
   const handlePostPress = () => {
@@ -54,6 +54,9 @@ const Post: React.FC<PostProps> = ({
         return { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE', textColor: '#7C3AED' };
       case 'criminal':
         return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', textColor: '#DC2626' };
+      case 'labor':
+        // Treat 'labor' as 'work' for styling
+        return { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', textColor: '#1D4ED8' };
       case 'consumer':
         return { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', textColor: '#047857' };
       default:
@@ -66,6 +69,7 @@ const Post: React.FC<PostProps> = ({
   // Determine display text - show "OTHERS" for non-matching categories
   const getDisplayText = (category: string) => {
     const lowerCategory = category.toLowerCase();
+    if (lowerCategory === 'labor') return 'WORK';
     if (['family', 'work', 'civil', 'criminal', 'consumer'].includes(lowerCategory)) {
       return category.toUpperCase();
     }
@@ -76,6 +80,10 @@ const Post: React.FC<PostProps> = ({
 
   // Determine if the user is anonymous
   const isAnonymous = (user.username || '').toLowerCase() === 'anonymous' || (user.name || '').toLowerCase().includes('anonymous');
+
+  // Local state for the three-dots dropdown menu
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
 
   return (
     <TouchableOpacity style={styles.container} onPress={handlePostPress} activeOpacity={0.95}>
@@ -117,15 +125,52 @@ const Post: React.FC<PostProps> = ({
           <MoreHorizontal size={16} color="#536471" />
         </TouchableOpacity>
       </View>
+      {menuOpen && (
+        <>
+          {/* Overlay to close menu when tapping outside */}
+          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setMenuOpen(false)} />
+          <View style={styles.menuContainer}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            activeOpacity={0.8}
+            onPress={() => {
+              setBookmarked((prev) => !prev);
+              onBookmarkPress?.();
+            }}
+          >
+            <Bookmark size={16} color={bookmarked ? '#F59E0B' : '#374151'} fill={bookmarked ? '#F59E0B' : 'none'} />
+            <Text style={styles.menuText}>
+              {bookmarked ? 'Unbookmark post' : 'Bookmark post'}
+            </Text>
+          </TouchableOpacity>
+          <View style={styles.menuDivider} />
+          <TouchableOpacity
+            style={styles.menuItem}
+            activeOpacity={0.8}
+            onPress={() => {
+              onReportPress?.();
+            }}
+          >
+            <Flag size={16} color="#B91C1C" />
+            <Text style={[styles.menuText, { color: '#B91C1C' }]}>Report post</Text>
+          </TouchableOpacity>
+          </View>
+        </>
+      )}
 
       {/* Post Content */}
       <Text style={styles.content}>{content}</Text>
 
       {/* Engagement Actions */}
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.actionButton} onPress={onCommentPress}>
-          <MessageCircle size={18} color="#536471" />
-          <Text style={styles.actionCount}>{comments}</Text>
+        <View style={styles.actionsLeft}>
+          <TouchableOpacity style={styles.actionButton} onPress={onCommentPress}>
+            <MessageCircle size={18} color="#536471" />
+            <Text style={styles.actionCount}>{comments}</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity onPress={handlePostPress} activeOpacity={0.7} hitSlop={{ top: 8, left: 8, bottom: 8, right: 8 }}>
+          <ChevronRight size={18} color="#536471" />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -201,8 +246,13 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  actionsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   actionButton: {
     flexDirection: 'row',
@@ -227,6 +277,55 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  menuContainer: {
+    position: 'absolute',
+    top: 36,
+    right: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingVertical: 6,
+    width: 180,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 6,
+    zIndex: 20,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
+    zIndex: 10,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  menuText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 2,
+  },
+  arrowButton: {
+    position: 'absolute',
+    bottom: 8,
+    right: 10,
+    padding: 6,
+    borderRadius: 16,
   },
 });
 

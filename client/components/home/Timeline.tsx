@@ -67,21 +67,9 @@ const Timeline: React.FC = () => {
         avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
       },
       timestamp: '5h',
-      category: 'Labor & Employment',
+      category: 'Labor Law',
       content: 'Nagresign po ako nang maayos at may clearance na, pero hanggang ngayon wala pa rin akong natatanggap na back pay o final pay. 2 months na po. Ano po dapat kong gawin para ma-claim ito?',
       comments: 2,
-    },
-    {
-      id: '5',
-      user: {
-        name: 'Maria Santos',
-        username: 'maria.santos',
-        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-      },
-      timestamp: '6h',
-      category: 'Property Law',
-      content: 'May squatter po sa lupa namin na ayaw umalis. 5 years na po sila doon. Pwede po ba namin silang paalisin? Ano po ang legal na proseso para ma-evict sila?',
-      comments: 8,
     },
     {
       id: '6',
