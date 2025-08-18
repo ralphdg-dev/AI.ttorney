@@ -21,6 +21,7 @@ import {
   Bell,
   MessageSquare,
   Star,
+  Calendar,
 } from 'lucide-react-native';
 import Colors from '../constants/Colors';
 import { GlobalStyles } from '../constants/GlobalStyles';
@@ -140,20 +141,37 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [isVisible, slideAnim, overlayOpacity, shouldRender]);
 
+  // TODO: Replace with actual database queries when backend is connected
+  const getBadgeCounts = () => ({
+    favoriteTerms: 0, // Count from user_glossary_favorites table
+    bookmarkedGuides: 0, // Count from user_forum_bookmarks table  
+    pendingConsultations: 0, // Count from consultation_requests where status = 'pending'
+    unreadNotifications: 0, // Count from notifications table (when implemented)
+  });
+
+  const badgeCounts = getBadgeCounts();
+
   const menuItems: MenuItem[] = [
     {
       id: 'bookmarks',
-      label: 'Bookmarked Terms',
+      label: 'Favorite Terms',
       icon: Star,
       route: 'bookmarks',
-      badge: 5,
+      badge: badgeCounts.favoriteTerms || undefined,
     },
     {
       id: 'favorites',
-      label: 'Favorite Guides',
+      label: 'Bookmarked Guides',
       icon: Bookmark,
       route: 'favorites',
-      badge: 3,
+      badge: badgeCounts.bookmarkedGuides || undefined,
+    },
+    {
+      id: 'consultations',
+      label: 'Consultations',
+      icon: Calendar,
+      route: 'consultations',
+      badge: badgeCounts.pendingConsultations || undefined,
     },
     {
       id: 'divider1',
@@ -166,7 +184,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: 'Notifications',
       icon: Bell,
       route: 'notifications',
-      badge: 2,
+      badge: badgeCounts.unreadNotifications || undefined,
     },
     {
       id: 'settings',
