@@ -63,19 +63,19 @@ const Navbar: React.FC<NavbarProps> = ({
           return (
             <TouchableOpacity
               key={tab.id}
-              style={[styles.tabItem, tab.active && styles.activeTabItem]}
+              style={styles.tabItem}
               onPress={() => onTabPress?.(tab.id)}
               activeOpacity={0.7}
             >
               <IconComponent
                 size={22}
-                color={tab.active ? Colors.primary.blue : Colors.primary.blue}
-                strokeWidth={1.5}
+                color={tab.active ? '#023D7B' : '#6B6B6B'} // Dark blue for active, darker gray for inactive
+                strokeWidth={2.2}
               />
               <Text
                 style={[
                   styles.tabLabel,
-                  tab.active ? styles.activeLabel : styles.inactiveLabel
+                  tab.active ? [styles.activeLabel, { color: '#023D7B' }] : [styles.inactiveLabel, { color: '#6B6B6B' }]
                 ]}
               >
                 {tab.label}
@@ -121,17 +121,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderRadius: 16,
     marginHorizontal: 3,
-  },
-  activeTabItem: {
-    backgroundColor: 'rgba(33, 150, 243, 0.1)',
-    shadowColor: Colors.primary.blue,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   tabLabel: {
     fontSize: 10,
