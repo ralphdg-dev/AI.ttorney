@@ -44,6 +44,7 @@ export default function RootLayout() {
           <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
           <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
           <Stack.Screen name="home/ViewPost" options={{ headerShown: false }} />
+          <Stack.Screen name="home/CreatePost" options={{ headerShown: false }} />
           <Stack.Screen
             name="directory"
             options={{

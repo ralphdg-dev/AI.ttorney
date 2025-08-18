@@ -102,7 +102,7 @@ const Timeline: React.FC = () => {
 
   const handleCreatePost = () => {
     console.log('Create post pressed');
-    // TODO: Navigate to create post screen
+    router.push('/home/CreatePost');
   };
 
   return (
