@@ -97,7 +97,7 @@ const Timeline: React.FC = () => {
 
   const handlePostPress = (postId: string) => {
     console.log(`Post pressed for post ${postId}`);
-    router.push(`/home/post?postId=${postId}`);
+    router.push(`/home/ViewPost?postId=${postId}`);
   };
 
   const handleCreatePost = () => {
