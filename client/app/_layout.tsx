@@ -50,6 +50,13 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="guides"
+            options={{
+              headerShown: false,
+              title: "Guides",
+            }}
+          />
+          <Stack.Screen
             name="glossary"
             options={{
               headerShown: false,
