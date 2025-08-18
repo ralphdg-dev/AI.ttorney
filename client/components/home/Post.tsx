@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { MessageCircle, MoreHorizontal } from 'lucide-react-native';
+import { MessageCircle, MoreHorizontal, User } from 'lucide-react-native';
 import Colors from '../../constants/Colors';
 
 interface PostProps {
@@ -74,14 +74,23 @@ const Post: React.FC<PostProps> = ({
 
   const displayText = getDisplayText(cleanCategory);
 
+  // Determine if the user is anonymous
+  const isAnonymous = (user.username || '').toLowerCase() === 'anonymous' || (user.name || '').toLowerCase().includes('anonymous');
+
   return (
     <TouchableOpacity style={styles.container} onPress={handlePostPress} activeOpacity={0.95}>
       {/* User Info Row */}
       <View style={styles.userRow}>
-        <Image 
-          source={{ uri: user.avatar || 'https://via.placeholder.com/40' }} 
-          style={styles.avatar} 
-        />
+        {isAnonymous ? (
+          <View style={[styles.avatar, styles.anonymousAvatar]}>
+            <User size={20} color="#6B7280" />
+          </View>
+        ) : (
+          <Image 
+            source={{ uri: user.avatar || 'https://via.placeholder.com/40' }} 
+            style={styles.avatar} 
+          />
+        )}
         <View style={styles.userInfo}>
           <View style={styles.nameRow}>
             <Text style={styles.userName}>{user.name}</Text>
@@ -94,8 +103,14 @@ const Post: React.FC<PostProps> = ({
             </View>
           </View>
           <View style={styles.secondRow}>
-            <Text style={styles.username}>@{user.username}</Text>
-            <Text style={styles.timestamp}>• {timestamp}</Text>
+            {isAnonymous ? (
+              <Text style={styles.timestamp}>{timestamp}</Text>
+            ) : (
+              <>
+                <Text style={styles.username}>@{user.username}</Text>
+                <Text style={styles.timestamp}>• {timestamp}</Text>
+              </>
+            )}
           </View>
         </View>
         <TouchableOpacity style={styles.moreButton} onPress={handleMorePress}>
@@ -205,6 +220,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,
+  },
+  anonymousAvatar: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
