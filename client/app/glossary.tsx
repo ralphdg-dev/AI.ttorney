@@ -9,8 +9,8 @@ import { Text as GSText } from "@/components/ui/text";
 import { Input, InputField, InputSlot } from "@/components/ui/input";
 import BottomNavigation from "@/app/directory/components/BottomNavigation";
 import ToggleGroup from "@/components/ui/ToggleGroup";
-import CategoryScroller from "./glossary/components/CategoryScroller";
-import TermListItem, { TermItem } from "./glossary/components/TermListItem";
+import CategoryScroller from "@/components/glossary/CategoryScroller";
+import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
 import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 

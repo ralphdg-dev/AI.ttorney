@@ -147,12 +147,12 @@ export default function TermDetail({ term }: TermDetailProps) {
                       <VStack>
                         {term.exampleUsage?.english ? (
                           <GSText size="sm" style={{ color: Colors.text.sub, marginBottom: 8 }}>
-                            “{term.exampleUsage.english}”
+                            &ldquo;{term.exampleUsage.english}&rdquo;
                           </GSText>
                         ) : null}
                         {term.exampleUsage?.filipino ? (
                           <GSText size="sm" style={{ color: Colors.text.sub }}>
-                            “{term.exampleUsage.filipino}”
+                            &ldquo;{term.exampleUsage.filipino}&rdquo;
                           </GSText>
                         ) : null}
                       </VStack>
@@ -167,5 +167,4 @@ export default function TermDetail({ term }: TermDetailProps) {
     </View>
   );
 }
-
 

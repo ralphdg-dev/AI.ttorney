@@ -97,4 +97,3 @@ export default function TermListItem({ item, onPress, containerStyle }: TermList
   );
 }
 
-
