@@ -35,18 +35,18 @@ export default function GuidesScreen() {
   const placeholderArticles: ArticleItem[] = useMemo(
     () => [
       {
-        id: "a1",
+        id: "1",
         title: "How Annulment Works in the Philippines",
         filipinoTitle: "Paano Gumagana ang Annulment sa Pilipinas",
         summary:
           "Understand the legal grounds, procedure, timeline, and costs involved in filing for annulment in the Philippines.",
         filipinoSummary:
           "Alamin ang mga batayan, proseso, tagal, at gastos sa paghahain ng annulment sa Pilipinas.",
-        image: require("@/assets/images/guides-placeholder/annulment.jpg"),
+        imageUrl: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&q=80&auto=format&fit=crop",
         category: "Family",
       },
       {
-        id: "a2",
+        id: "2",
         title: "Employee Rights During Probationary Period",
         filipinoTitle: "Mga Karapatan ng Empleyado sa Panahon ng Probation",
         summary:
@@ -124,7 +124,7 @@ export default function GuidesScreen() {
   };
 
   const handleArticlePress = (item: ArticleItem): void => {
-    // placeholder for article detail route
+    router.push(`/article/${item.id}` as any);
   };
 
   const handleToggleBookmark = (item: ArticleItem): void => {

@@ -42,6 +42,14 @@ export default function RootLayout() {
           <Stack.Screen name="role-selection" options={{ headerShown: false }} />
           <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
           <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
+          {/* Hide parent header for the article segment to avoid 'article' title bar */}
+          <Stack.Screen
+            name="article"
+            options={{
+              headerShown: false,
+              title: "Article",
+            }}
+          />
           <Stack.Screen
             name="directory"
             options={{
