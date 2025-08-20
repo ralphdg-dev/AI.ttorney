@@ -35,7 +35,8 @@ export default function RootLayout() {
   }
 
   return (
-    <GluestackUIProvider mode="light"><AuthProvider>
+    <GluestackUIProvider mode="light">
+      <AuthProvider>
         <Stack>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
@@ -43,19 +44,25 @@ export default function RootLayout() {
           <Stack.Screen name="role-selection" options={{ headerShown: false }} />
           <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
           <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
+            <Stack.Screen name="lawyer-starting-page" options={{ headerShown: false }} />
+            <Stack.Screen name="lawyer-reg" options={{ headerShown: false }} />
+            <Stack.Screen name="lawyer-face-verification" options={{ headerShown: false }} />
+            <Stack.Screen name="lawyer-preface-recog" options={{ headerShown: false }} />
+            <Stack.Screen name="lawyer-terms" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="directory"
+              options={{
+                headerShown: false,
+                title: "Find Legal Help",
+              }}
+            />
+          </Stack>
           {/* Hide parent header for the article segment to avoid 'article' title bar */}
           <Stack.Screen
             name="article"
             options={{
               headerShown: false,
               title: "Article",
-            }}
-          />
-          <Stack.Screen
-            name="directory"
-            options={{
-              headerShown: false,
-              title: "Find Legal Help",
             }}
           />
           <Stack.Screen
@@ -80,6 +87,7 @@ export default function RootLayout() {
             }}
           />
         </Stack>
-      </AuthProvider></GluestackUIProvider>
+      </AuthProvider>
+    </GluestackUIProvider>
   );
 }
