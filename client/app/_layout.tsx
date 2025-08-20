@@ -37,15 +37,13 @@ export default function RootLayout() {
   return (
     <GluestackUIProvider mode="light">
       <AuthProvider>
-        <SidebarProvider>
-          <Stack>
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="role-selection" options={{ headerShown: false }} />
-            <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
-            <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
-            <Stack.Screen name="home" options={{ headerShown: false, title: "" }} />
+        <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="role-selection" options={{ headerShown: false }} />
+          <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
+          <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
             <Stack.Screen name="lawyer-starting-page" options={{ headerShown: false }} />
             <Stack.Screen name="lawyer-reg" options={{ headerShown: false }} />
             <Stack.Screen name="lawyer-face-verification" options={{ headerShown: false }} />
@@ -59,8 +57,36 @@ export default function RootLayout() {
               }}
             />
           </Stack>
-          <SidebarWrapper />
-        </SidebarProvider>
+          {/* Hide parent header for the article segment to avoid 'article' title bar */}
+          <Stack.Screen
+            name="article"
+            options={{
+              headerShown: false,
+              title: "Article",
+            }}
+          />
+          <Stack.Screen
+            name="guides"
+            options={{
+              headerShown: false,
+              title: "Guides",
+            }}
+          />
+          <Stack.Screen
+            name="glossary"
+            options={{
+              headerShown: false,
+              title: "Glossary",
+            }}
+          />
+          <Stack.Screen
+            name="glossary/[id]"
+            options={{
+              headerShown: false,
+              title: "Term Details",
+            }}
+          />
+        </Stack>
       </AuthProvider>
     </GluestackUIProvider>
   );

@@ -1,5 +1,5 @@
 import React from "react";
-import DirectoryScreen from "./directory/screens/DirectoryScreen";
+import DirectoryScreen from "../components/directory/screens/DirectoryScreen";
 
 export default function Directory() {
   return <DirectoryScreen />;

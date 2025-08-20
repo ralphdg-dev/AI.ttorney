@@ -27,5 +27,7 @@ export default {
   text: {
     head: '#313131',
     sub: '#373737',
+    body: '#4B5563',
   },
+  success: '#10B981',
 };
