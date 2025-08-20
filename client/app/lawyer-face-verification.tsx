@@ -211,9 +211,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   avatarImg: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+    width: 340,
+    height: 340,
+    borderRadius: 340,
   },
   sectionTitle: {
     fontSize: 24,
