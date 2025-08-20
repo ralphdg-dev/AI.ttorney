@@ -11,7 +11,6 @@ import {
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { AuthProvider } from "../lib/auth-context";
-import { SidebarProvider, SidebarWrapper } from "../components/AppSidebar";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -56,37 +55,36 @@ export default function RootLayout() {
                 title: "Find Legal Help",
               }}
             />
+            {/* Hide parent header for the article segment to avoid 'article' title bar */}
+            <Stack.Screen
+              name="article"
+              options={{
+                headerShown: false,
+                title: "Article",
+              }}
+            />
+            <Stack.Screen
+              name="guides"
+              options={{
+                headerShown: false,
+                title: "Guides",
+              }}
+            />
+            <Stack.Screen
+              name="glossary"
+              options={{
+                headerShown: false,
+                title: "Glossary",
+              }}
+            />
+            <Stack.Screen
+              name="glossary/[id]"
+              options={{
+                headerShown: false,
+                title: "Term Details",
+              }}
+            />
           </Stack>
-          {/* Hide parent header for the article segment to avoid 'article' title bar */}
-          <Stack.Screen
-            name="article"
-            options={{
-              headerShown: false,
-              title: "Article",
-            }}
-          />
-          <Stack.Screen
-            name="guides"
-            options={{
-              headerShown: false,
-              title: "Guides",
-            }}
-          />
-          <Stack.Screen
-            name="glossary"
-            options={{
-              headerShown: false,
-              title: "Glossary",
-            }}
-          />
-          <Stack.Screen
-            name="glossary/[id]"
-            options={{
-              headerShown: false,
-              title: "Term Details",
-            }}
-          />
-        </Stack>
       </AuthProvider>
     </GluestackUIProvider>
   );
