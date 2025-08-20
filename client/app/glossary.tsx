@@ -16,7 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 export default function GlossaryScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<string>("guides");
+  const [activeTab, setActiveTab] = useState<string>("terms");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [bottomActiveTab, setBottomActiveTab] = useState<string>("learn");
@@ -140,15 +140,18 @@ export default function GlossaryScreen() {
     };
   };
 
+  const onToggleChange = (id: string) => {
+    setActiveTab(id);
+    if (id === 'guides') {
+      router.push('/guides');
+    }
+  };
+
   return (
     <View style={tw`flex-1 bg-gray-50`}>
-      <Header title="Legal Glossary" onMenuPress={handleMenuPress} showMenu={true} />
+      <Header title="Know Your Batas" onMenuPress={handleMenuPress} showMenu={true} />
 
-      <ToggleGroup
-        options={tabOptions}
-        activeOption={activeTab}
-        onOptionChange={setActiveTab}
-      />
+      <ToggleGroup options={tabOptions} activeOption={activeTab} onOptionChange={onToggleChange} />
 
       <Box className="px-6 pt-6 mb-4">
         <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
