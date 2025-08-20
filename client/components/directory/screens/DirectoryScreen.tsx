@@ -7,6 +7,7 @@ import SearchBar from "../components/SearchBar";
 import FilterButton from "../components/FilterButton";
 import LawyerCard from "../components/LawyerCard";
 import Navbar from "../../Navbar";
+import { SidebarProvider, SidebarWrapper } from "../../AppSidebar";
 
 interface Lawyer {
   id: number;
@@ -20,7 +21,6 @@ interface Lawyer {
 
 export default function DirectoryScreen() {
   const [activeTab, setActiveTab] = useState<string>("lawyers");
-  const [bottomActiveTab, setBottomActiveTab] = useState<string>("legal");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   const lawyers: Lawyer[] = [
@@ -62,9 +62,6 @@ export default function DirectoryScreen() {
     },
   ];
 
-  const handleMenuPress = (): void => {
-    Alert.alert("Menu", "Menu pressed");
-  };
 
   const handleFilterPress = (): void => {
     Alert.alert("Filter", "Filter options");
@@ -77,44 +74,42 @@ export default function DirectoryScreen() {
     );
   };
 
-  const handleBottomNavChange = (tab: string): void => {
-    setBottomActiveTab(tab);
-    Alert.alert("Navigation", `Navigating to ${tab}`);
-  };
 
   return (
-    <View style={tw`flex-1 bg-gray-50`}>
-      <Header
-        title="Find Legal Help"
-        onMenuPress={handleMenuPress}
-        showMenu={true}
-      />
-
-      <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
-
-      <View style={tw`relative`}>
-        <SearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search lawyers..."
+    <SidebarProvider>
+      <View style={tw`flex-1 bg-gray-50`}>
+        <Header
+          title="Find Legal Help"
+          showMenu={true}
         />
-        <FilterButton onPress={handleFilterPress} />
-      </View>
 
-      <ScrollView style={tw`flex-1`} showsVerticalScrollIndicator={false}>
-        {lawyers.map((lawyer) => (
-          <LawyerCard
-            key={lawyer.id}
-            lawyer={lawyer}
-            onBookConsultation={handleBookConsultation}
+        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+
+        <View style={tw`relative`}>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search lawyers..."
           />
-        ))}
+          <FilterButton onPress={handleFilterPress} />
+        </View>
 
-        {/* Add some bottom padding */}
-        <View style={tw`h-4`} />
-      </ScrollView>
+        <ScrollView style={tw`flex-1`} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+          {lawyers.map((lawyer) => (
+            <LawyerCard
+              key={lawyer.id}
+              lawyer={lawyer}
+              onBookConsultation={handleBookConsultation}
+            />
+          ))}
 
-      <Navbar />
-    </View>
+          {/* Add some bottom padding */}
+          <View style={tw`h-4`} />
+        </ScrollView>
+
+        <Navbar activeTab="find" />
+        <SidebarWrapper />
+      </View>
+    </SidebarProvider>
   );
 }

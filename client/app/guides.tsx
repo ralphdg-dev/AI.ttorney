@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { View, FlatList, useWindowDimensions } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
-import Header from "@/app/directory/components/Header";
+import Header from "@/components/Header";
 import ToggleGroup from "@/components/ui/ToggleGroup";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
@@ -10,8 +10,9 @@ import { Text as GSText } from "@/components/ui/text";
 import { Input, InputField, InputSlot } from "@/components/ui/input";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
-import CategoryScroller from "@/app/glossary/components/CategoryScroller";
-import BottomNavigation from "@/app/directory/components/BottomNavigation";
+import CategoryScroller from "@/components/glossary/CategoryScroller";
+import Navbar from "@/components/Navbar";
+import { SidebarProvider, SidebarWrapper } from "@/components/AppSidebar";
 import ArticleCard, { ArticleItem } from "@/components/guides/ArticleCard";
 
 export default function GuidesScreen() {
@@ -19,7 +20,6 @@ export default function GuidesScreen() {
   const [activeTab, setActiveTab] = useState<string>("guides");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [bottomActiveTab, setBottomActiveTab] = useState<string>("learn");
   const flatListRef = useRef<FlatList>(null);
   const { width } = useWindowDimensions();
 
@@ -109,12 +109,8 @@ export default function GuidesScreen() {
     return searched.map((a) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
   }, [filteredByCategory, searchQuery, bookmarks]);
 
-  const handleMenuPress = (): void => {};
   const handleFilterPress = (): void => {};
 
-  const handleBottomNavChange = (tab: string): void => {
-    setBottomActiveTab(tab);
-  };
 
   const handleCategoryChange = (categoryId: string): void => {
     setActiveCategory(categoryId);
@@ -151,56 +147,59 @@ export default function GuidesScreen() {
   );
 
   return (
-    <View style={tw`flex-1 bg-gray-50`}>
-      <Header title="Know Your Batas" onMenuPress={handleMenuPress} showMenu={true} />
+    <SidebarProvider>
+      <View style={tw`flex-1 bg-gray-50`}>
+        <Header title="Know Your Batas" showMenu={true} />
 
-      <ToggleGroup options={tabOptions} activeOption={activeTab} onOptionChange={onToggleChange} />
+        <ToggleGroup options={tabOptions} activeOption={activeTab} onOptionChange={onToggleChange} />
 
-      <Box className="px-6 pt-6 mb-4">
-        <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
-          <InputSlot className="pl-3">
-            <Ionicons name="search" size={20} color="#9CA3AF" />
-          </InputSlot>
-          <InputField
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search articles"
-            placeholderTextColor="#9CA3AF"
-            className="text-[#313131]"
-          />
-          <InputSlot className="pr-3" onPress={handleFilterPress}>
-            <Ionicons name="options" size={20} color={Colors.text.sub} />
-          </InputSlot>
-        </Input>
-      </Box>
+        <Box className="px-6 pt-6 mb-4">
+          <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
+            <InputSlot className="pl-3">
+              <Ionicons name="search" size={20} color="#9CA3AF" />
+            </InputSlot>
+            <InputField
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search articles"
+              placeholderTextColor="#9CA3AF"
+              className="text-[#313131]"
+            />
+            <InputSlot className="pr-3" onPress={handleFilterPress}>
+              <Ionicons name="options" size={20} color={Colors.text.sub} />
+            </InputSlot>
+          </Input>
+        </Box>
 
-      <FlatList
-        ref={flatListRef}
-        data={articlesToRender}
-        key={`${numColumns}-${activeCategory}`}
-        keyExtractor={(item) => item.id}
-        numColumns={numColumns}
-        ListHeaderComponent={renderListHeader}
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24, flexGrow: 1 }}
-        columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
-        renderItem={({ item }) => (
-          <ArticleCard
-            item={item}
-            onPress={handleArticlePress}
-            onToggleBookmark={handleToggleBookmark}
-            containerStyle={{ width: numColumns > 1 ? (width - horizontalPadding * 2 - 12) / numColumns : "100%", marginHorizontal: 0 }}
-          />
-        )}
-        showsVerticalScrollIndicator={false}
-        style={{ flex: 1 }}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={8}
-        initialNumToRender={6}
-        windowSize={8}
-      />
+        <FlatList
+          ref={flatListRef}
+          data={articlesToRender}
+          key={`${numColumns}-${activeCategory}`}
+          keyExtractor={(item) => item.id}
+          numColumns={numColumns}
+          ListHeaderComponent={renderListHeader}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 80, flexGrow: 1 }}
+          columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
+          renderItem={({ item }) => (
+            <ArticleCard
+              item={item}
+              onPress={handleArticlePress}
+              onToggleBookmark={handleToggleBookmark}
+              containerStyle={{ width: numColumns > 1 ? (width - horizontalPadding * 2 - 12) / numColumns : "100%", marginHorizontal: 0 }}
+            />
+          )}
+          showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={8}
+          initialNumToRender={6}
+          windowSize={8}
+        />
 
-      <BottomNavigation activeTab={bottomActiveTab} onTabChange={handleBottomNavChange} />
-    </View>
+        <Navbar activeTab="learn" />
+        <SidebarWrapper />
+      </View>
+    </SidebarProvider>
   );
 }
 

@@ -7,7 +7,7 @@ import { Text as GSText } from "@/components/ui/text";
 import { Button, ButtonText } from "@/components/ui/button";
 import { Badge, BadgeText } from "@/components/ui/badge";
 import BackButton from "@/components/ui/BackButton";
-import BottomNavigation from "@/app/directory/components/BottomNavigation";
+import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
 import { Star, BookOpen, Globe } from "lucide-react-native";
 // import { db } from "@/lib/supabase";
@@ -52,7 +52,6 @@ export default function TermDetailScreen() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
   const [scrollY] = useState(new Animated.Value(0));
-  const [activeTab, setActiveTab] = useState("learn");
 
   const loadTerm = useCallback(async () => {
     try {
@@ -85,26 +84,6 @@ export default function TermDetailScreen() {
     router.push('/glossary');
   };
 
-  const handleTabChange = (tabId: string) => {
-    setActiveTab(tabId);
-    switch (tabId) {
-      case 'home':
-        router.push('/');
-        break;
-      case 'learn':
-        router.push('/glossary');
-        break;
-      case 'ask':
-        // router.push('/chat');
-        break;
-      case 'legalhelp':
-        router.push('/directory');
-        break;
-      case 'profile':
-        // router.push('/profile');
-        break;
-    }
-  };
 
 
   const toggleFavorite = async () => {
@@ -191,14 +170,14 @@ export default function TermDetailScreen() {
       </View>
 
       <Animated.ScrollView 
-        style={tw`flex-1`}
-        contentContainerStyle={{ paddingBottom: 10 }}
+        style={[tw`flex-1`, { backgroundColor: '#F9FAFB' }]}
+        contentContainerStyle={tw`pb-20`}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false }
         )}
-        scrollEventThrottle={16}
       >
         {/* Single Content Card */}
         <View style={tw`bg-white mx-3 mt-2 rounded-lg`} className="shadow-sm">
@@ -293,7 +272,7 @@ export default function TermDetailScreen() {
       </Animated.ScrollView>
       
       {/* Bottom Navigation */}
-      <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
+      <Navbar activeTab="learn" />
     </View>
   );
 }
