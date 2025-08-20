@@ -35,28 +35,36 @@ export default function RootLayout() {
   }
 
   return (
-    <GluestackUIProvider mode="light">
-      <AuthProvider>
-        <SidebarProvider>
-          <Stack>
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="role-selection" options={{ headerShown: false }} />
-            <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
-            <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
-            <Stack.Screen name="home" options={{ headerShown: false, title: "" }} />
-            <Stack.Screen
-              name="directory"
-              options={{
-                headerShown: false,
-                title: "Find Legal Help",
-              }}
-            />
-          </Stack>
-          <SidebarWrapper />
-        </SidebarProvider>
-      </AuthProvider>
-    </GluestackUIProvider>
+    <GluestackUIProvider mode="light"><AuthProvider>
+        <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="role-selection" options={{ headerShown: false }} />
+          <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
+          <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="directory"
+            options={{
+              headerShown: false,
+              title: "Find Legal Help",
+            }}
+          />
+          <Stack.Screen
+            name="glossary"
+            options={{
+              headerShown: false,
+              title: "Glossary",
+            }}
+          />
+          <Stack.Screen
+            name="glossary/[id]"
+            options={{
+              headerShown: false,
+              title: "Term Details",
+            }}
+          />
+        </Stack>
+      </AuthProvider></GluestackUIProvider>
   );
 }
