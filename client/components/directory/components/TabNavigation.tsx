@@ -1,6 +1,7 @@
 import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
-import tw from "tailwind-react-native-classnames";
+import { HStack } from "@/components/ui/hstack";
+import { Pressable } from "@/components/ui/pressable";
+import { Text } from "@/components/ui/text";
 import Colors from "../../../constants/Colors";
 
 interface Tab {
@@ -20,30 +21,26 @@ export default function TabNavigation({ activeTab, onTabChange }: TabNavigationP
   ];
 
   return (
-    <View style={tw`flex-row mx-6 mb-4`}>
+    <HStack className="mx-6 mb-4" space="none">
       {tabs.map((tab) => (
-        <TouchableOpacity
+        <Pressable
           key={tab.id}
-          style={[
-            tw`flex-1 py-3 items-center border-b-2`,
-            {
-              borderBottomColor: activeTab === tab.id ? Colors.primary.blue : 'transparent'
-            }
-          ]}
+          className="flex-1 py-3 items-center border-b-2"
+          style={{
+            borderBottomColor: activeTab === tab.id ? Colors.primary.blue : "transparent"
+          }}
           onPress={() => onTabChange(tab.id)}
         >
           <Text
-            style={[
-              tw`font-semibold`,
-              {
-                color: activeTab === tab.id ? Colors.primary.blue : Colors.text.sub
-              }
-            ]}
+            className="font-semibold"
+            style={{
+              color: activeTab === tab.id ? Colors.primary.blue : Colors.text.sub
+            }}
           >
             {tab.label}
           </Text>
-        </TouchableOpacity>
+        </Pressable>
       ))}
-    </View>
+    </HStack>
   );
 }
