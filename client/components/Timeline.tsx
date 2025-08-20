@@ -122,6 +122,7 @@ const Timeline: React.FC = () => {
       {/* Timeline */}
       <ScrollView 
         style={styles.timeline}
+        contentContainerStyle={styles.timelineContent}
         showsVerticalScrollIndicator={false}
       >
         {samplePosts.map((post) => (
@@ -138,6 +139,7 @@ const Timeline: React.FC = () => {
             onPostPress={() => handlePostPress(post.id)}
           />
         ))}
+        <View style={styles.bottomSpacer} />
       </ScrollView>
 
       {/* Floating Create Post Button */}
@@ -156,17 +158,23 @@ const styles = StyleSheet.create({
   timeline: {
     flex: 1,
   },
+  timelineContent: {
+    paddingVertical: 10, // Add some vertical padding
+  },
+  bottomSpacer: {
+    height: 100, // Add a spacer at the bottom
+  },
   createPostButton: {
     position: 'absolute',
     bottom: 80,
     right: 20,
-    backgroundColor: '#1DA1F2',
+    backgroundColor: Colors.primary.blue,
     width: 56,
     height: 56,
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#1DA1F2',
+    shadowColor: Colors.primary.blue,
     shadowOffset: {
       width: 0,
       height: 4,

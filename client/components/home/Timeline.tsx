@@ -67,21 +67,9 @@ const Timeline: React.FC = () => {
         avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
       },
       timestamp: '5h',
-      category: 'Labor & Employment',
+      category: 'Labor Law',
       content: 'Nagresign po ako nang maayos at may clearance na, pero hanggang ngayon wala pa rin akong natatanggap na back pay o final pay. 2 months na po. Ano po dapat kong gawin para ma-claim ito?',
       comments: 2,
-    },
-    {
-      id: '5',
-      user: {
-        name: 'Maria Santos',
-        username: 'maria.santos',
-        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-      },
-      timestamp: '6h',
-      category: 'Property Law',
-      content: 'May squatter po sa lupa namin na ayaw umalis. 5 years na po sila doon. Pwede po ba namin silang paalisin? Ano po ang legal na proseso para ma-evict sila?',
-      comments: 8,
     },
     {
       id: '6',
@@ -109,12 +97,12 @@ const Timeline: React.FC = () => {
 
   const handlePostPress = (postId: string) => {
     console.log(`Post pressed for post ${postId}`);
-    router.push(`/home/post?postId=${postId}`);
+    router.push(`/home/ViewPost?postId=${postId}`);
   };
 
   const handleCreatePost = () => {
     console.log('Create post pressed');
-    // TODO: Navigate to create post screen
+    router.push('/home/CreatePost');
   };
 
   return (
@@ -122,6 +110,7 @@ const Timeline: React.FC = () => {
       {/* Timeline */}
       <ScrollView 
         style={styles.timeline}
+        contentContainerStyle={styles.timelineContent}
         showsVerticalScrollIndicator={false}
       >
         {samplePosts.map((post) => (
@@ -138,6 +127,7 @@ const Timeline: React.FC = () => {
             onPostPress={() => handlePostPress(post.id)}
           />
         ))}
+        <View style={styles.bottomSpacer} />
       </ScrollView>
 
       {/* Floating Create Post Button */}
@@ -156,17 +146,23 @@ const styles = StyleSheet.create({
   timeline: {
     flex: 1,
   },
+  timelineContent: {
+    paddingVertical: 10, // Add some padding at the top and bottom
+  },
+  bottomSpacer: {
+    height: 80, // Add a spacer at the bottom to prevent content from being hidden
+  },
   createPostButton: {
     position: 'absolute',
     bottom: 80,
     right: 20,
-    backgroundColor: '#1DA1F2',
+    backgroundColor: Colors.primary.blue,
     width: 56,
     height: 56,
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#1DA1F2',
+    shadowColor: Colors.primary.blue,
     shadowOffset: {
       width: 0,
       height: 4,
