@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter, usePathname } from 'expo-router';
 import { 
   Home, 
   Scale, 
@@ -17,41 +18,88 @@ interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ 
-  activeTab = 'learn', 
+  activeTab, 
   onTabPress 
 }) => {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Auto-detect active tab based on current route if not provided
+  const getActiveTab = () => {
+    if (activeTab) return activeTab;
+    
+    if (pathname.includes('/home') || pathname === '/') return 'home';
+    if (pathname.includes('/glossary') || pathname.includes('/guides')) return 'learn';
+    if (pathname.includes('/chatbot')) return 'ask';
+    if (pathname.includes('/directory')) return 'find';
+    if (pathname.includes('/profile')) return 'profile';
+    
+    return 'home'; // default
+  };
+
+  const currentActiveTab = getActiveTab();
+
+  const handleTabPress = (tabId: string) => {
+    // Call custom onTabPress if provided
+    if (onTabPress) {
+      onTabPress(tabId);
+      return;
+    }
+
+    // Default navigation behavior
+    switch (tabId) {
+      case 'home':
+        router.push('/home');
+        break;
+      case 'learn':
+        router.push('/glossary');
+        break;
+      case 'ask':
+        router.push('/chatbot');
+        break;
+      case 'find':
+        router.push('/directory');
+        break;
+      case 'profile':
+        // router.push('/profile'); // Uncomment when profile page is ready
+        console.log('Profile page not implemented yet');
+        break;
+      default:
+        console.log(`Unknown tab: ${tabId}`);
+    }
+  };
 
   const tabs = [
     {
       id: 'home',
       label: 'Home',
       icon: Home,
-      active: activeTab === 'home'
+      active: currentActiveTab === 'home'
     },
     {
       id: 'learn',
       label: 'Learn',
       icon: Scale,
-      active: activeTab === 'learn'
+      active: currentActiveTab === 'learn'
     },
     {
       id: 'ask',
       label: 'Ask AI',
       icon: MessageSquarePlus,
-      active: activeTab === 'ask'
+      active: currentActiveTab === 'ask'
     },
     {
       id: 'find',
       label: 'Legal Help',
       icon: Gavel,
-      active: activeTab === 'find'
+      active: currentActiveTab === 'find'
     },
     {
       id: 'profile',
       label: 'Profile',
       icon: User,
-      active: activeTab === 'profile'
+      active: currentActiveTab === 'profile'
     }
   ];
 
@@ -64,7 +112,7 @@ const Navbar: React.FC<NavbarProps> = ({
             <TouchableOpacity
               key={tab.id}
               style={styles.tabItem}
-              onPress={() => onTabPress?.(tab.id)}
+              onPress={() => handleTabPress(tab.id)}
               activeOpacity={0.7}
             >
               <IconComponent

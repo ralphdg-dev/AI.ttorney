@@ -2,24 +2,24 @@ import React, { useMemo, useState, useRef } from "react";
 import { View, FlatList, Alert, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import tw from "tailwind-react-native-classnames";
-import Header from "@/app/directory/components/Header";
+import Header from "@/components/Header";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
 import { Input, InputField, InputSlot } from "@/components/ui/input";
-import BottomNavigation from "@/app/directory/components/BottomNavigation";
+import Navbar from "@/components/Navbar";
 import ToggleGroup from "@/components/ui/ToggleGroup";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
 import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
+import { SidebarProvider, SidebarWrapper } from "@/components/AppSidebar";
 
 export default function GlossaryScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>("terms");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [bottomActiveTab, setBottomActiveTab] = useState<string>("learn");
   const { width } = useWindowDimensions();
   const flatListRef = useRef<FlatList>(null);
   const horizontalPadding = 24; // px-6 on each side
@@ -93,18 +93,11 @@ export default function GlossaryScreen() {
     );
   }, [filteredByCategory, searchQuery]);
 
-  const handleMenuPress = (): void => {
-    Alert.alert("Menu", "Menu pressed");
-  };
 
   const handleFilterPress = (): void => {
     Alert.alert("Filter", "Filter options");
   };
 
-  const handleBottomNavChange = (tab: string): void => {
-    setBottomActiveTab(tab);
-    // Wire this to navigate when routes are ready
-  };
 
   const handleTermPress = (item: TermItem): void => {
     router.push(`/glossary/${item.id}` as any);
@@ -148,62 +141,65 @@ export default function GlossaryScreen() {
   };
 
   return (
-    <View style={tw`flex-1 bg-gray-50`}>
-      <Header title="Know Your Batas" onMenuPress={handleMenuPress} showMenu={true} />
+    <SidebarProvider>
+      <View style={tw`flex-1 bg-gray-50`}>
+        <Header title="Know Your Batas" showMenu={true} />
 
-      <ToggleGroup options={tabOptions} activeOption={activeTab} onOptionChange={onToggleChange} />
+        <ToggleGroup options={tabOptions} activeOption={activeTab} onOptionChange={onToggleChange} />
 
-      <Box className="px-6 pt-6 mb-4">
-        <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
-          <InputSlot className="pl-3">
-            <Ionicons name="search" size={20} color="#9CA3AF" />
-          </InputSlot>
-          <InputField
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search"
-            placeholderTextColor="#9CA3AF"
-            className="text-[#313131]"
-          />
-          <InputSlot className="pr-3" onPress={handleFilterPress}>
-            <Ionicons name="options" size={20} color={Colors.text.sub} />
-          </InputSlot>
-        </Input>
-      </Box>
+        <Box className="px-6 pt-6 mb-4">
+          <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
+            <InputSlot className="pl-3">
+              <Ionicons name="search" size={20} color="#9CA3AF" />
+            </InputSlot>
+            <InputField
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search"
+              placeholderTextColor="#9CA3AF"
+              className="text-[#313131]"
+            />
+            <InputSlot className="pr-3" onPress={handleFilterPress}>
+              <Ionicons name="options" size={20} color={Colors.text.sub} />
+            </InputSlot>
+          </Input>
+        </Box>
 
-      <FlatList
-        ref={flatListRef}
-        data={termsToRender}
-        key={`${numColumns}-${activeCategory}`}
-        keyExtractor={(item) => item.id}
-        numColumns={numColumns}
-        ListHeaderComponent={renderListHeader}
-        contentContainerStyle={{ 
-          paddingHorizontal: 24, 
-          paddingBottom: 24,
-          flexGrow: 1
-        }}
-        columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
-        renderItem={({ item }) => (
-          <TermListItem
-            item={item}
-            onPress={handleTermPress}
-            containerStyle={{ 
-              width: numColumns > 1 ? (width - horizontalPadding * 2 - 12) / numColumns : "100%", 
-              marginHorizontal: 0 
-            }}
-          />
-        )}
-        showsVerticalScrollIndicator={false}
-        style={{ flex: 1 }}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={8}
-        initialNumToRender={6}
-        windowSize={8}
-        getItemLayout={numColumns === 1 ? getItemLayout : undefined}
-      />
+        <FlatList
+          ref={flatListRef}
+          data={termsToRender}
+          key={`${numColumns}-${activeCategory}`}
+          keyExtractor={(item) => item.id}
+          numColumns={numColumns}
+          ListHeaderComponent={renderListHeader}
+          contentContainerStyle={{ 
+            paddingHorizontal: 24, 
+            paddingBottom: 80,
+            flexGrow: 1
+          }}
+          columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
+          renderItem={({ item }) => (
+            <TermListItem
+              item={item}
+              onPress={handleTermPress}
+              containerStyle={{ 
+                width: numColumns > 1 ? (width - horizontalPadding * 2 - 12) / numColumns : "100%", 
+                marginHorizontal: 0 
+              }}
+            />
+          )}
+          showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={8}
+          initialNumToRender={6}
+          windowSize={8}
+          getItemLayout={numColumns === 1 ? getItemLayout : undefined}
+        />
 
-      <BottomNavigation activeTab={bottomActiveTab} onTabChange={handleBottomNavChange} />
-    </View>
+        <Navbar activeTab="learn" />
+        <SidebarWrapper />
+      </View>
+    </SidebarProvider>
   );
 }
