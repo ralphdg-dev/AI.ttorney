@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, ScrollView, Alert } from "react-native";
 import tw from "tailwind-react-native-classnames";
-import Header from "../components/Header";
+import Header from "../../../components/Header";
 import TabNavigation from "../components/TabNavigation";
 import SearchBar from "../components/SearchBar";
 import FilterButton from "../components/FilterButton";
