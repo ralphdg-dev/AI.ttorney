@@ -29,7 +29,7 @@ export default function LawyerStartingPage() {
         <BackButton onPress={handleBack} />
       </View>
       <View style={tw`flex-1 justify-between`}>
-        <View style={tw`px-10`}>
+        <View style={tw`px-6`}>
           {/* Heading */}
           <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#0f172a' }}>
             Let's get started
