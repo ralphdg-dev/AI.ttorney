@@ -12,7 +12,7 @@ import { useState } from "react";
 import Colors from "../constants/Colors";
 import BackButton from "../components/ui/BackButton";
 import PrimaryButton from "../components/ui/PrimaryButton";
-import ActionLink from "../components/ui/ActionLink";
+import BottomActions from "../components/ui/BottomActions";
 
 import lawyer_selected from "../assets/images/lawyer_selected.png";
 import lawyer_notselected from "../assets/images/lawyer_notselected.png";
@@ -321,17 +321,13 @@ export default function RoleSelection() {
       </View>
 
                            {/* Bottom Section */}
-        <View style={tw`px-6 pb-12 mt-8 relative`}>
-                     {/* Continue Button */}
-           <PrimaryButton
-             title="Continue"
-             onPress={handleContinue}
-             disabled={!selectedRole}
-           />
-
-          {/* Login Text */}
-          <ActionLink />
-        </View>
+        <BottomActions>
+          <PrimaryButton
+            title="Continue"
+            onPress={handleContinue}
+            disabled={!selectedRole}
+          />
+        </BottomActions>
     </View>
   );
 

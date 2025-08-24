@@ -1,186 +1,150 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  SafeAreaView,
-  StatusBar,
-  TouchableOpacity,
-  ScrollView,
-  Linking,
-} from 'react-native';
-
-import { lawyerStartingSteps } from '../data/lawyerStartingSteps';
-import { FontAwesome5 } from '@expo/vector-icons';
-import { Feather } from '@expo/vector-icons';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { View, Text, Image } from 'react-native';
+import tw from 'tailwind-react-native-classnames';
+import { router } from 'expo-router';
+import BackButton from '../components/ui/BackButton';
+import credentialsImg from '../assets/images/lawyer-registration/credentials.png';
+import selfieImg from '../assets/images/lawyer-registration/selfie.png';
+import termsImg from '../assets/images/lawyer-registration/terms.png';
+import PrimaryButton from "../components/ui/PrimaryButton";
+import BottomActions from "../components/ui/BottomActions";
 
 
 export default function LawyerStartingPage() {
-  const navigation = useNavigation();
-
+  const handleBack = () => {
+    // @ts-ignore: canGoBack may not exist on some expo-router versions
+    if (typeof (router as any).canGoBack === 'function' && (router as any).canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/role-selection');
+    }
+  };
   const handleContinue = () => {
-    navigation.navigate('lawyer-reg');
+    router.push('/lawyer-reg');
   };
-
-  const handleSignIn = () => {
-    navigation.navigate('login');
-  };
-
 
   return (
-    <SafeAreaView style={{
-      flex: 1,
-      backgroundColor: '#ffffff',
-    }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-
-      {/* Header with back arrow */}
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingTop: 20,
-        paddingHorizontal: 24,
-        paddingBottom: 32,
-      }}>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('role-selection')}
-        >
-          <MaterialIcons name="arrow-back" size={28} color="#d1d5db" />
-        </TouchableOpacity>
+    <View style={tw`flex-1 bg-white`}>
+      <View style={tw`flex-row justify-between items-center px-6 pt-12 pb-4`}>
+        <BackButton onPress={handleBack} />
       </View>
+      <View style={tw`flex-1 justify-between`}>
+        <View style={tw`px-10`}>
+          {/* Heading */}
+          <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#0f172a' }}>
+            Let's get started
+          </Text>
 
-      <View
-        style={{
-          flex: 1,
-          paddingHorizontal: 24,
-          paddingBottom: 40,
-      }}
-      >
-        showsVerticalScrollIndicator={false}
-        {/* Title */}
-        <Text style={{
-          fontSize: 32,
-          fontWeight: 'bold',
-          color: '#000000',
-          marginBottom: 8,
-        }}>Let's get started</Text>
+          {/* Subtitle */}
+          <Text style={{
+            fontSize: 14,
+            lineHeight: 22,
+            color: '#9ca3af',
+            marginTop: 8,
+            marginBottom: 20,
+          }}>
+            You are signing up as a <Text style={{ fontWeight: 'bold', color: '#9ca3af' }}>Lawyer</Text>. To protect users and maintain the integrity of our platform, all lawyers are required to complete identity and license verification.
+          </Text>
 
-        {/* Subtitle */}
-        <Text style={{
-          fontSize: 14,
-          lineHeight: 24,
-          color: '#9ca3af',
-          marginBottom: 15,
-        }}>
-          You are signing up as a <Text style={{ fontWeight: 'bold', color: '#9ca3af' }}>Lawyer</Text>. To protect users
-          and maintain the integrity of our platform, all
-          lawyers are required to complete identity and
-          license verification.
-        </Text>
-
-        {/* Steps from data */}
-        {lawyerStartingSteps.map((step, idx) => {
-          let IconComponent = null;
-          if (step.iconLib === 'FontAwesome5') IconComponent = FontAwesome5;
-          else if (step.iconLib === 'Feather') IconComponent = Feather;
-          else if (step.iconLib === 'MaterialCommunityIcons') IconComponent = MaterialCommunityIcons;
-
-          return (
-            <View key={idx} style={{ marginBottom: idx === lawyerStartingSteps.length - 1 ? 40 : 32 }}>
-              <Text style={{
-                fontSize: 18,
-                fontWeight: 'bold',
-                color: '#111827',
-                marginBottom: 8,
-                alignItems: 'center'
-              }}>{step.title}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 8 }}>
-                <View style={{
-                  width: 48,
-                  height: 48,
-                  backgroundColor: '#fff',
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: '#e5e7eb',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginRight: 16,
-                  shadowColor: '#000',
-                  shadowOpacity: 0.04,
-                  shadowRadius: 2,
-                  shadowOffset: { width: 0, height: 1 },
-                }}>
-                  {IconComponent && (
-                    <IconComponent name={step.icon} size={28} color="#1e3a8a" />
-                  )}
+          {/* Steps */}
+          <View style={{ marginTop: 40 }}>
+            {/* Step 1 */}
+            <View style={{ marginBottom: 24 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <View
+                  style={{
+                    width: 70,
+                    height: 70,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginTop: -10
+                  }}
+                >
+                  <Image
+                    source={credentialsImg}
+                    style={{ width: 40, height: 40, borderRadius: 8 }}
+                    resizeMode="cover"
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{
-                    fontSize: 12,
-                    color: '#6b7280',
-                    lineHeight: 22,
-                  }}>{step.description}</Text>
+                  <Text style={{ fontSize: 16, color: '#111827' }}>
+                    <Text style={{ fontWeight: 'bold' }}>Step 1: </Text>
+                    Enter Legal Credentials and Upload IBP ID Card
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#6b7280', lineHeight: 18, marginTop: 4 }}>
+                    Input your Roll of Attorneys number, Roll Sign Date, and your Integrated Bar of the Philippines (IBP) ID to confirm your status as a licensed lawyer.
+                  </Text>
                 </View>
               </View>
             </View>
-          );
-        })}
 
-        {/* Terms Text */}
-        <Text style={{
-          fontSize: 14,
-          lineHeight: 20,
-          color: '#9ca3af',
-        }}>
-          Clicking the continue button means that I have read and
-          agreed to the 
-            <Text style={{
-              color: '#000000',
-              textDecorationLine: 'underline',
-              fontWeight: '500',
-            }}> user identity authentication information statement</Text>
-          </Text>
+            {/* Step 2 */}
+            <View style={{ marginBottom: 24 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <View
+                  style={{
+                    width: 70,
+                    height: 70,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginTop: -18
+                  }}
+                >
+                  <Image
+                    source={selfieImg}
+                    style={{ width: 40, height: 40, borderRadius: 8 }}
+                    resizeMode="cover"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, color: '#111827' }}>
+                    <Text style={{ fontWeight: 'bold' }}>Step 2: </Text>
+                    Take a Live Selfie
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#6b7280', lineHeight: 18, marginTop: 4 }}>
+                    Take a quick selfie to help us verify that your face matches the photo on your IBP ID.
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Step 3 */}
+            <View style={{ marginBottom: 24 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <View
+                  style={{
+                    width: 70,
+                    height: 70,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginTop: -10
+                  }}
+                >
+                  <Image
+                    source={termsImg}
+                    style={{ width: 40, height: 40, borderRadius: 8 }}
+                    resizeMode="cover"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, color: '#111827' }}>
+                    <Text style={{ fontWeight: 'bold' }}>Step 3: </Text>
+                    Acknowledgment of Lawyer Terms and Conditions
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#6b7280', lineHeight: 18, marginTop: 4 }}>
+                    Carefully review and agree to the Terms and Conditions for legal practitioners.
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+          </View>
+
+        </View>
+        <BottomActions>
+          <PrimaryButton title="Continue" onPress={handleContinue} />
+        </BottomActions>
       </View>
-
-      {/* Continue Button */}
-      <View style={{
-        paddingHorizontal: 24,
-        paddingBottom: 20,
-      }}>
-        <TouchableOpacity
-          style={{
-            backgroundColor: '#023D7B',
-            borderRadius: 12,
-            paddingVertical: 20,
-            alignItems: 'center',
-            marginBottom: 10,
-          }}
-          onPress={handleContinue}
-        >
-          <Text style={{
-            color: '#ffffff',
-            fontSize: 18,
-            fontWeight: '600',
-          }}>Continue</Text>
-        </TouchableOpacity>
-
-        {/* Sign In Link */}
-        <TouchableOpacity onPress={handleSignIn} style={{ alignItems: 'center' }}>
-          <Text style={{
-            fontSize: 14,
-            color: '#6b7280',
-            marginBottom: -20,
-          }}>
-            Already have an account? <Text style={{
-              color: '#1d4ed8',
-              fontWeight: '500',
-            }}>Sign In</Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+    </View>
   );
-};
-
+}
