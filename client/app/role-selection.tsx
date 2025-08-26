@@ -92,7 +92,7 @@ export default function RoleSelection() {
       if (selectedRole === "lawyer") {
         	router.push("/lawyer-starting-page");
       } else if (selectedRole === "seeker") {
-        router.push("/nonlaw-reg");
+        router.push("/onboarding/user/registration");
       }
     }
     console.log("Continue pressed with role:", selectedRole);
@@ -265,7 +265,10 @@ export default function RoleSelection() {
 
         {/* Legal Seeker Card */}
         <TouchableOpacity
-          onPress={() => setSelectedRole("seeker")}
+          onPress={() => {
+            setSelectedRole("seeker");
+            router.push("/onboarding/user/registration");
+          }}
           style={[
             tw`rounded-lg border`,
             responsiveStyles.card,

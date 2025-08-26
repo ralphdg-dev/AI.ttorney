@@ -48,21 +48,37 @@ export default function LawyerFaceVerification() {
           This is to verify that your face matches with the photo on your IBP ID card.
         </Text>
 
-        <View style={{ gap: 12 }}>
-          <View style={{ flexDirection: 'row' }}>
-            <Text style={{ fontSize: 16, color: '#111827' }}>1. </Text>
+        {/* Guidance: icon + text rows */}
+        <View style={{ gap: 10, marginBottom: 4 }}>
+          {/* Row 1 */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Image
+              source={require('../assets/images/lawyer-registration/hold.png')}
+              style={{ width: 40, height: 40, borderRadius: 6, marginRight: 10 }}
+              resizeMode="cover"
+            />
             <Text style={{ flex: 1, fontSize: 16, color: '#111827' }}>
               Hold phone upright and make sure you are visible in the frame
             </Text>
           </View>
-          <View style={{ flexDirection: 'row' }}>
-            <Text style={{ fontSize: 16, color: '#111827' }}>2. </Text>
+          {/* Row 2 */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Image
+              source={require('../assets/images/lawyer-registration/lit.png')}
+              style={{ width: 40, height: 40, borderRadius: 6, marginRight: 10 }}
+              resizeMode="cover"
+            />
             <Text style={{ flex: 1, fontSize: 16, color: '#111827' }}>
               Make sure you are in a well-lit area
             </Text>
           </View>
-          <View style={{ flexDirection: 'row' }}>
-            <Text style={{ fontSize: 16, color: '#111827' }}>3. </Text>
+          {/* Row 3 */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Image
+              source={require('../assets/images/lawyer-registration/face.png')}
+              style={{ width: 40, height: 40, borderRadius: 6, marginRight: 10 }}
+              resizeMode="cover"
+            />
             <Text style={{ flex: 1, fontSize: 16, color: '#111827' }}>
               Ensure that face is not covered
             </Text>
@@ -107,7 +123,7 @@ export default function LawyerFaceVerification() {
         title="Next"
         disabled={!selfie}
         bottomOffset={16}
-        onPress={() => router.push('/documents-success')}
+        onPress={() => router.push('/lawyer-terms')}
       />
     </SafeAreaView>
   );
