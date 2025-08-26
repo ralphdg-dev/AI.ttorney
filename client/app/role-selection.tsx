@@ -265,10 +265,7 @@ export default function RoleSelection() {
 
         {/* Legal Seeker Card */}
         <TouchableOpacity
-          onPress={() => {
-            setSelectedRole("seeker");
-            router.push("/onboarding/user/registration");
-          }}
+          onPress={() => setSelectedRole("seeker")}
           style={[
             tw`rounded-lg border`,
             responsiveStyles.card,
