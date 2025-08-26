@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, SafeAreaView, StatusBar, Text, TextInput, TouchableOpacity, Image, Alert, Modal, ScrollView } from 'react-native';
+import { View, SafeAreaView, StatusBar, Text, TextInput, TouchableOpacity, Image, Alert, Modal, ScrollView, Platform } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import BackButton from '../components/ui/BackButton';
@@ -15,13 +16,14 @@ export default function LawyerReg() {
   const [calendarCursor, setCalendarCursor] = useState<Date>(new Date());
   const [showMonthSelect, setShowMonthSelect] = useState(false);
   const [showYearSelect, setShowYearSelect] = useState(false);
+  const [showUploadOptions, setShowUploadOptions] = useState(false);
   const [ibpCard, setIbpCard] = useState<any | null>(null);
   const isComplete = Boolean(rollNumber.trim() && rollSignDate && ibpCard);
   const today = new Date();
 
   const handleBrowseFiles = async () => {
     const result = await DocumentPicker.getDocumentAsync({
-      type: ['image/jpeg', 'image/png', 'image/jpg'],
+      type: Platform.OS === 'web' ? ['image/jpeg', 'image/png', 'image/jpg'] : ['image/*'],
       copyToCacheDirectory: true,
       multiple: false,
     });
@@ -33,7 +35,61 @@ export default function LawyerReg() {
         Alert.alert('File too large', 'Please select a file up to 5MB.');
         return;
       }
-      setIbpCard(asset);
+      // Normalize
+      setIbpCard({ uri: asset.uri, name: asset.name || 'upload.jpg', size: asset.size });
+    }
+  };
+
+  // Camera capture (Android/iOS)
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Camera permission is needed to take a photo.');
+        return;
+      }
+      const res = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.9,
+      });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        const a = res.assets[0];
+        const maxSize = 5 * 1024 * 1024;
+        if (a.fileSize && a.fileSize > maxSize) {
+          Alert.alert('File too large', 'Please select a file up to 5MB.');
+          return;
+        }
+        setIbpCard({ uri: a.uri, name: a.fileName || 'photo.jpg', size: a.fileSize });
+      }
+    } finally {
+      setShowUploadOptions(false);
+    }
+  };
+
+  // Gallery picker (Android/iOS)
+  const handleChooseGallery = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (perm.status !== 'granted') {
+        Alert.alert('Permission required', 'Media library permission is needed to choose a photo.');
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.9,
+        selectionLimit: 1,
+      });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        const a = res.assets[0];
+        const maxSize = 5 * 1024 * 1024;
+        if (a.fileSize && a.fileSize > maxSize) {
+          Alert.alert('File too large', 'Please select a file up to 5MB.');
+          return;
+        }
+        setIbpCard({ uri: a.uri, name: a.fileName || 'image.jpg', size: a.fileSize });
+      }
+    } finally {
+      setShowUploadOptions(false);
     }
   };
 
@@ -62,7 +118,11 @@ export default function LawyerReg() {
       </View>
 
       {/* Main Content */}
-      <View style={{ flex: 1, paddingHorizontal: 24 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 140 }}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Logo */}
         <View style={{ alignItems: 'center', marginTop: 8, marginBottom: 10 }}>
           <Image
@@ -95,8 +155,13 @@ export default function LawyerReg() {
           }}
           placeholder="Enter Roll Number"
           placeholderTextColor="#9ca3af"
+          keyboardType="numeric"
+          inputMode="numeric"
           value={rollNumber}
-          onChangeText={setRollNumber}
+          onChangeText={(t) => {
+            const digits = t.replace(/\D+/g, '');
+            setRollNumber(digits);
+          }}
         />
 
         {/* Roll Sign Date */}
@@ -350,43 +415,44 @@ export default function LawyerReg() {
           IBP Card <Text style={{ color: '#ef4444' }}>*</Text>
         </Text>
 
-        <TouchableOpacity
-          onPress={handleBrowseFiles}
-          activeOpacity={0.85}
-          style={{
-            width: '100%',
-            minHeight: 90,
-            borderWidth: 1.5,
-            borderColor: '#D1D5DB',
-            borderRadius: 10,
-            backgroundColor: '#F8FAFC',
-            justifyContent: 'center',
-            marginTop: 8,
-            borderStyle: 'dashed',
-            padding: 12,
-          }}
-        >
-          {/* Header Row */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-            <MaterialIcons name="cloud-upload" size={22} color="#6b7280" />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#6b7280', marginLeft: 8 }}>
-              Upload a file
-            </Text>
-          </View>
+        {!ibpCard && (
+          <TouchableOpacity
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                handleBrowseFiles();
+              } else {
+                setShowUploadOptions(true);
+              }
+            }}
+            activeOpacity={0.85}
+            style={{
+              width: '100%',
+              minHeight: 90,
+              borderWidth: 1.5,
+              borderColor: '#D1D5DB',
+              borderRadius: 10,
+              backgroundColor: '#F8FAFC',
+              justifyContent: 'center',
+              marginTop: 8,
+              borderStyle: 'dashed',
+              padding: 12,
+            }}
+          >
+            {/* Header Row */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+              <MaterialIcons name="cloud-upload" size={22} color="#6b7280" />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#6b7280', marginLeft: 8 }}>
+                Upload a file
+              </Text>
+            </View>
 
-          {/* Details */}
-          <Text style={{ fontSize: 13, color: '#6b7280', marginBottom: 2 }}>
-            Formats: JPG, JPEG, PNG
-          </Text>
-          <Text style={{ fontSize: 13, color: '#6b7280' }}>Max size: 5MB</Text>
-
-          {/* Selected file name */}
-          {ibpCard && (
-            <Text style={{ fontSize: 12, color: '#1f2937', marginTop: 10 }}>
-              Selected: <Text style={{ fontWeight: '600' }}>{ibpCard.name}</Text>
+            {/* Details */}
+            <Text style={{ fontSize: 13, color: '#6b7280', marginBottom: 2 }}>
+              Formats: JPG, JPEG, PNG
             </Text>
-          )}
-        </TouchableOpacity>
+            <Text style={{ fontSize: 13, color: '#6b7280' }}>Max size: 5MB</Text>
+          </TouchableOpacity>
+        )}
 
         {/* File info + actions */}
         {ibpCard && (
@@ -414,7 +480,7 @@ export default function LawyerReg() {
                 {ibpCard.name}
               </Text>
               {/* Replace */}
-              <TouchableOpacity onPress={handleBrowseFiles} style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'white', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', marginRight: 8 }}>
+              <TouchableOpacity onPress={() => { if (Platform.OS === 'web') { handleBrowseFiles(); } else { setShowUploadOptions(true); } }} style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'white', borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', marginRight: 8 }}>
                 <Text style={{ color: '#111827', fontWeight: '600' }}>Replace</Text>
               </TouchableOpacity>
               {/* Delete */}
@@ -432,16 +498,65 @@ export default function LawyerReg() {
             <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, overflow: 'hidden', backgroundColor: 'white' }}>
               <Image
                 source={{ uri: ibpCard.uri }}
-                style={{ width: '100%', height: 190, resizeMode: 'cover' as const }}
+                style={{ width: '100%', height: 220, backgroundColor: '#fff' }}
+                resizeMode="contain"
               />
             </View>
           </View>
         )}
-      </View>
+        
+        {/* Mobile upload options modal */}
+        <Modal
+          visible={showUploadOptions}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowUploadOptions(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}>
+            <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16 }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 8 }}>Upload Options</Text>
+              <TouchableOpacity onPress={handleTakePhoto} style={{ paddingVertical: 12 }}>
+                <Text style={{ fontSize: 15, color: '#111827', fontWeight: '600' }}>Take a Photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleChooseGallery} style={{ paddingVertical: 12 }}>
+                <Text style={{ fontSize: 15, color: '#111827', fontWeight: '600' }}>Choose from Gallery</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  // Close modal first, then open picker after a short delay to avoid presentation conflict on native
+                  setShowUploadOptions(false);
+                  if (Platform.OS === 'web') {
+                    handleBrowseFiles();
+                  } else {
+                    setTimeout(() => {
+                      handleBrowseFiles();
+                    }, 250);
+                  }
+                }}
+                style={{ paddingVertical: 12 }}
+              >
+                <Text style={{ fontSize: 15, color: '#111827', fontWeight: '600' }}>Browse Files</Text>
+              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
+                <TouchableOpacity onPress={() => setShowUploadOptions(false)} style={{ paddingVertical: 10, paddingHorizontal: 12 }}>
+                  <Text style={{ color: '#6b7280', fontWeight: '600' }}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
-      <StickyFooterButton title="Next" onPress={() => {}} disabled={!isComplete} bottomOffset={24} />
+      </ScrollView>
+
+      {/* Sticky footer next */}
+      <StickyFooterButton
+        title="Next"
+        disabled={!isComplete}
+        bottomOffset={16}
+        onPress={() => {
+          router.push('/lawyer-face-verification');
+        }}
+      />
     </SafeAreaView>
   );
 }
-
-

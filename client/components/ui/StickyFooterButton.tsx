@@ -13,7 +13,7 @@ export default function StickyFooterButton({
   title,
   onPress,
   disabled = false,
-  bottomOffset = 24,
+  bottomOffset = 0,
 }: StickyFooterButtonProps) {
   return (
     <View pointerEvents="box-none" style={[styles.container, { bottom: bottomOffset }] }>
@@ -40,5 +40,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginTop: 12,
     paddingBottom: Platform.OS === 'ios' ? 8 : 8,
+    // Compensate for PrimaryButton's mb-3 (approx 12px) so there's no gap/line below
+    marginBottom: -12,
   },
 });
