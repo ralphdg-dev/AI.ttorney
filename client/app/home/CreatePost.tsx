@@ -1,14 +1,19 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
+import { LEGAL_CATEGORIES } from '@/constants/categories';
+import CategoryScroller from '@/components/glossary/CategoryScroller';
+import Colors from '@/constants/Colors';
+import { Ionicons } from '@expo/vector-icons';
+import ToggleSwitch from '@/components/ui/ToggleSwitch';
 
-const CATEGORIES = ['Family', 'Work', 'Civil', 'Criminal', 'Consumer', 'Others'];
+// Shared categories reference
 
 const CreatePost: React.FC = () => {
   const router = useRouter();
   const [content, setContent] = useState('');
-  const [category, setCategory] = useState<string>('Others');
+  const [categoryId, setCategoryId] = useState<string>(LEGAL_CATEGORIES[0]?.id ?? 'family');
   const [isAnonymous, setIsAnonymous] = useState<boolean>(false);
   const MAX_LEN = 500;
 
@@ -20,7 +25,7 @@ const CreatePost: React.FC = () => {
   const onPressPost = () => {
     if (isPostDisabled) return;
     // TODO: Hook this up to backend; for now just log and navigate back to timeline
-    console.log('Posting content:', { content: content.trim(), category });
+    console.log('Posting content:', { content: content.trim(), categoryId });
     router.back();
   };
 
@@ -31,7 +36,6 @@ const CreatePost: React.FC = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={20} color="#536471" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Post</Text>
         <TouchableOpacity
           style={[styles.postButton, isPostDisabled && styles.postButtonDisabled]}
           onPress={onPressPost}
@@ -41,39 +45,23 @@ const CreatePost: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Category chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipsRow}
-        style={styles.chipsRowWrapper}
-      >
-        {CATEGORIES.map((cat) => {
-          const selected = cat.toLowerCase() === category.toLowerCase();
-          return (
-            <TouchableOpacity
-              key={cat}
-              style={[styles.chip, selected && styles.chipSelected]}
-              onPress={() => setCategory(cat)}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                {cat.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {/* Categories - reused design from Legal Guides/Terms */}
+      <View style={styles.categoriesWrapper}>
+        <View style={styles.chooseCategoryHeader}>
+          <Ionicons name="pricetags" size={16} color={Colors.text.sub} />
+          <Text style={styles.chooseCategoryText}>Choose Category</Text>
+        </View>
+        <CategoryScroller
+          activeCategory={categoryId}
+          onCategoryChange={setCategoryId}
+          includeAllOption={false}
+        />
+      </View>
 
       {/* Anonymous toggle */}
       <View style={styles.anonRow}>
         <Text style={styles.anonLabel}>Post anonymously</Text>
-        <Switch
-          value={isAnonymous}
-          onValueChange={setIsAnonymous}
-          trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
-          thumbColor={isAnonymous ? '#023D7B' : '#FFFFFF'}
-        />
+        <ToggleSwitch value={isAnonymous} onValueChange={setIsAnonymous} />
       </View>
 
       {/* Composer */}
@@ -137,6 +125,24 @@ const styles = StyleSheet.create({
   chipsRowWrapper: {
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+  },
+  categoriesWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  chooseCategoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 8,
+  },
+  chooseCategoryText: {
+    marginLeft: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors?.text?.sub ?? '#6B7280',
   },
   chipsRow: {
     paddingHorizontal: 12,

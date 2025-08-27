@@ -2,6 +2,7 @@
   import { View, Text, TouchableOpacity, ScrollView } from "react-native";
   import tw from "tailwind-react-native-classnames";
   import Colors from "@/constants/Colors";
+  import { LEGAL_CATEGORIES, LegalCategory } from "@/constants/categories";
   import {
     Library,
     Users,
@@ -9,29 +10,26 @@
     ScrollText,
     Gavel,
     ShoppingCart,
+    Tag,
   } from "lucide-react-native";
 
-  interface Category {
-    id: string;
-    label: string;
-  }
 
   interface CategoryScrollerProps {
     activeCategory: string;
     onCategoryChange: (categoryId: string) => void;
+    includeAllOption?: boolean; // default true for glossary, can be disabled elsewhere
   }
 
-  const categories: Category[] = [
-    { id: "all", label: "All" },
-    { id: "family", label: "Family" },
-    { id: "work", label: "Work" },
-    { id: "civil", label: "Civil" },
-    { id: "criminal", label: "Criminal" },
-    { id: "consumer", label: "Consumer" },
-  ];
+  // Helper to compute categories list optionally including 'all'
+  const composeCategories = (includeAll: boolean) =>
+    (includeAll
+      ? ([{ id: "all", label: "All" }, ...LEGAL_CATEGORIES] as (LegalCategory | { id: string; label: string })[])
+      : (LEGAL_CATEGORIES as (LegalCategory | { id: string; label: string })[])
+    );
 
-  export default function CategoryScroller({ activeCategory, onCategoryChange }: CategoryScrollerProps) {
+  export default function CategoryScroller({ activeCategory, onCategoryChange, includeAllOption = true }: CategoryScrollerProps) {
     const tileSize = 64; // fixed to keep layout consistent across categories
+    const categories = composeCategories(includeAllOption);
 
     const categoryIcons: Record<string, React.ComponentType<any>> = {
       all: Library,
@@ -40,6 +38,7 @@
       civil: ScrollText,
       criminal: Gavel,
       consumer: ShoppingCart,
+      others: Tag,
     };
 
     return (
