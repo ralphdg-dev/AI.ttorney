@@ -5,7 +5,7 @@ import { useState } from "react";
 import Colors from "../constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import logo from "../assets/images/logo.png";
-import { FontAwesome } from "@expo/vector-icons";
+ 
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -14,8 +14,8 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(false);
 
   const handleLogin = () => {
-    // TODO: Implement login logic
-    console.log("Login pressed");
+    // Redirect to home after login
+    router.replace("/home");
   };
 
   const handleGoogleLogin = () => {
@@ -153,7 +153,11 @@ export default function Login() {
             style={tw`py-3 rounded-lg items-center justify-center border border-gray-300 bg-white flex-row`}
             onPress={handleGoogleLogin}
           >
-            <FontAwesome name="google" size={22} style={tw`mr-2`} />
+            <Image
+              source={require("../assets/images/registration/google.png")}
+              style={[tw`mr-2`, { width: 22, height: 22 }]}
+              resizeMode="contain"
+            />
             <Text
               style={[tw`font-semibold text-lg`]}
             >
@@ -162,17 +166,15 @@ export default function Login() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              tw`py-3 rounded-lg items-center justify-center border border-gray-300 bg-white mt-3 flex-row`,
-            ]}
             onPress={() => {
               // TODO: Implement guest login logic
               console.log("Continue as Guest pressed");
             }}
+            style={tw`mt-3`}
+            activeOpacity={0.7}
           >
-            <Ionicons name="person-outline" size={22} color={Colors.text.head} style={tw`mr-2`} />
-            <Text style={[tw`font-semibold text-lg`, { color: Colors.text.head }]}>
-              Continue as Guest
+            <Text style={[tw`text-center`, { color: Colors.text.head }]}>
+              Continue as <Text style={{ color: Colors.primary.blue, fontWeight: '700' }}>Guest</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -182,7 +184,10 @@ export default function Login() {
       <View style={tw`px-6 pb-8 items-center`}>
         <Text style={[tw`text-center`, { color: Colors.text.sub }]}>
           Don&apos;t have an account?{" "}
-          <Text style={[tw`font-bold`, { color: Colors.primary.blue }]}>
+          <Text
+            style={[tw`font-bold`, { color: Colors.primary.blue }]}
+            onPress={() => router.push('/role-selection')}
+          >
             Sign Up
           </Text>
         </Text>

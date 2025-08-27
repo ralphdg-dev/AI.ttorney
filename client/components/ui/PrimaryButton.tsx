@@ -23,7 +23,7 @@ export default function PrimaryButton({
         tw`py-3 rounded-lg flex-row items-center justify-center mb-3`,
         { 
           backgroundColor: disabled ? "#D1D5DB" : Colors.primary.blue,
-          width: width - 48, // Full width minus padding (24px on each side)
+          width: width - 64, // Slightly narrower: full width minus 32px on each side
           height: 56, // Fixed height
           alignSelf: 'center', // Center the button
         },
