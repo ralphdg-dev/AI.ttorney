@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, Image } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { useState } from "react";
@@ -25,26 +25,35 @@ export default function Login() {
 
   return (
     <View style={tw`flex-1 bg-white`}>
-      {/* Top Navigation */}
-      <View style={tw`flex-row items-center px-6 pt-12 pb-4`}>
-        <TouchableOpacity onPress={() => router.back()} style={tw`p-2`}>
-          <Ionicons name="arrow-back" size={24} color="#A0A0A0" />
-        </TouchableOpacity>
-      </View>
+      <KeyboardAvoidingView
+        style={tw`flex-1`}
+        behavior={Platform.select({ ios: 'padding', android: undefined })}
+      >
+        <ScrollView
+          style={tw`flex-1`}
+          contentContainerStyle={tw`flex-grow`}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Top Navigation */}
+          <View style={tw`flex-row items-center px-6 pt-12 pb-4`}>
+            <TouchableOpacity onPress={() => router.back()} style={tw`p-2`}>
+              <Ionicons name="arrow-back" size={24} color="#A0A0A0" />
+            </TouchableOpacity>
+          </View>
 
-      {/* Main Content */}
-      <View style={tw`flex-1 justify-center items-center px-6`}>
-        {/* Logo Image */}
-        <View style={tw`mb-0 -mt-16 items-center`}>
-          <Image
-            source={logo}
-            style={tw`w-32 h-32 mb-1`}
-            resizeMode="contain"
-          />
-        </View>
+          {/* Main Content */}
+          <View style={tw`flex-1 justify-center items-center px-6`}>
+            {/* Logo Image */}
+            <View style={tw`mb-0 -mt-16 items-center`}>
+              <Image
+                source={logo}
+                style={tw`w-32 h-32 mb-1`}
+                resizeMode="contain"
+              />
+            </View>
 
-        {/* Login Form */}
-        <View style={tw`w-full max-w-sm`}>
+            {/* Login Form */}
+            <View style={tw`w-full max-w-sm`}>
           {/* Email Input */}
           <View style={tw`mb-4`}>
             <Text style={[tw`font-bold mb-2`, { color: Colors.text.head }]}>
@@ -192,6 +201,8 @@ export default function Login() {
           </Text>
         </Text>
       </View>
-    </View>
-  );
+    </ScrollView>
+  </KeyboardAvoidingView>
+</View>
+);
 }

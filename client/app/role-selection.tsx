@@ -5,6 +5,8 @@ import {
   ScrollView,
   Image,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
@@ -338,19 +340,20 @@ export default function RoleSelection() {
         <BackButton onPress={() => router.back()} />
       </View>
 
-      {isShortScreen ? (
-        // Use ScrollView for short screens
+      {/* Responsive, scrollable content */}
+      <KeyboardAvoidingView
+        style={tw`flex-1`}
+        behavior={Platform.select({ ios: 'padding', android: undefined })}
+      >
         <ScrollView
           style={tw`flex-1`}
           contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {renderContent()}
         </ScrollView>
-      ) : (
-        // Regular layout for taller screens
-        renderContent()
-      )}
+      </KeyboardAvoidingView>
     </View>
   );
 }

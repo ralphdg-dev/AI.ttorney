@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import BackButton from '../../../components/ui/BackButton';
 import PrimaryButton from '../../../components/ui/PrimaryButton';
@@ -39,17 +39,21 @@ export default function UserRegistration() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      {/* Header with BackButton */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 16 }}>
-        <BackButton onPress={() => router.back()} />
-      </View>
-
-      {/* Main Content */}
-      <ScrollView
+      <KeyboardAvoidingView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 32 }}
-        keyboardShouldPersistTaps="handled"
+        behavior={Platform.select({ ios: 'padding', android: undefined })}
       >
+        {/* Header with BackButton */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 16 }}>
+          <BackButton onPress={() => router.back()} />
+        </View>
+
+        {/* Main Content */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 32, flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* Logo */}
         <View style={{ alignItems: 'center', marginTop: 8, marginBottom: 10 }}>
           <Image
@@ -218,7 +222,8 @@ export default function UserRegistration() {
             <Text style={{ color: Colors.primary.blue, fontWeight: '700' }} onPress={() => router.push('/login')}>Sign In</Text>
           </Text>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Date Picker Modal */}
       <Modal
