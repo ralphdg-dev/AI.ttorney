@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { SafeAreaView, StatusBar, View, Text, TouchableOpacity, Image, Alert, Platform } from 'react-native';
+import { SafeAreaView, StatusBar, View, Text, TouchableOpacity, Image, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import BackButton from '../components/ui/BackButton';
-import StickyFooterButton from '../components/ui/StickyFooterButton';
+import BackButton from '../../../components/ui/BackButton';
+import StickyFooterButton from '../../../components/ui/StickyFooterButton';
 
 export default function LawyerFaceVerification() {
   const [selfie, setSelfie] = useState<any | null>(null);
@@ -53,7 +53,7 @@ export default function LawyerFaceVerification() {
           {/* Row 1 */}
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Image
-              source={require('../assets/images/lawyer-registration/hold.png')}
+              source={require('../../../assets/images/lawyer-registration/hold.png')}
               style={{ width: 40, height: 40, borderRadius: 6, marginRight: 10 }}
               resizeMode="cover"
             />
@@ -64,7 +64,7 @@ export default function LawyerFaceVerification() {
           {/* Row 2 */}
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Image
-              source={require('../assets/images/lawyer-registration/lit.png')}
+              source={require('../../../assets/images/lawyer-registration/lit.png')}
               style={{ width: 40, height: 40, borderRadius: 6, marginRight: 10 }}
               resizeMode="cover"
             />
@@ -75,7 +75,7 @@ export default function LawyerFaceVerification() {
           {/* Row 3 */}
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Image
-              source={require('../assets/images/lawyer-registration/face.png')}
+              source={require('../../../assets/images/lawyer-registration/face.png')}
               style={{ width: 40, height: 40, borderRadius: 6, marginRight: 10 }}
               resizeMode="cover"
             />
@@ -123,7 +123,7 @@ export default function LawyerFaceVerification() {
         title="Next"
         disabled={!selfie}
         bottomOffset={16}
-        onPress={() => router.push('/lawyer-terms')}
+        onPress={() => router.push('./lawyer-terms')}
       />
     </SafeAreaView>
   );

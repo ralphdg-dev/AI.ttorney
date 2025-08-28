@@ -2,12 +2,13 @@ import React from 'react';
 import { View, Text, Image } from 'react-native';
 import tw from 'tailwind-react-native-classnames';
 import { router } from 'expo-router';
-import BackButton from '../components/ui/BackButton';
-import credentialsImg from '../assets/images/lawyer-registration/credentials.png';
-import selfieImg from '../assets/images/lawyer-registration/selfie.png';
-import termsImg from '../assets/images/lawyer-registration/terms.png';
-import PrimaryButton from "../components/ui/PrimaryButton";
-import BottomActions from "../components/ui/BottomActions";
+import BackButton from '../../../components/ui/BackButton';
+import credentialsImg from '../../../assets/images/lawyer-registration/credentials.png';
+import selfieImg from '../../../assets/images/lawyer-registration/selfie.png';
+import termsImg from '../../../assets/images/lawyer-registration/terms.png';
+
+import PrimaryButton from "../../../components/ui/PrimaryButton";
+import BottomActions from "../../../components/ui/BottomActions";
 
 
 export default function LawyerStartingPage() {
@@ -20,7 +21,7 @@ export default function LawyerStartingPage() {
     }
   };
   const handleContinue = () => {
-    router.push('/lawyer-reg');
+    router.push('./upload-documents');
   };
 
   return (

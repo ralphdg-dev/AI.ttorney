@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
-import BackButton from '../../../components/ui/BackButton';
-import PrimaryButton from '../../../components/ui/PrimaryButton';
-import Colors from '../../../constants/Colors';
+import BackButton from '../../components/ui/BackButton';
+import PrimaryButton from '../../components/ui/PrimaryButton';
+import Colors from '../../constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function UserRegistration() {
@@ -57,7 +57,7 @@ export default function UserRegistration() {
         {/* Logo */}
         <View style={{ alignItems: 'center', marginTop: 8, marginBottom: 10 }}>
           <Image
-            source={require('../../../assets/images/logo.png')}
+            source={require('../../assets/images/logo.png')}
             style={{ width: 110, height: 110 }}
             resizeMode="contain"
           />
@@ -193,7 +193,15 @@ export default function UserRegistration() {
         </TouchableOpacity>
 
         {/* Primary Sign Up button */}
-        <PrimaryButton title="Sign Up" onPress={() => { /* TODO: submit action */ }} disabled={!isComplete} />
+        <PrimaryButton
+          title="Sign Up"
+          onPress={() => {
+            // Single registration flow: after basic input, go to OTP verification
+            // Pass email to OTP screen for masking/resend
+            router.push(`./verify-otp?email=${encodeURIComponent(email)}`);
+          }}
+          disabled={!isComplete}
+        />
 
         {/* OR separator */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 12 }}>
@@ -208,7 +216,7 @@ export default function UserRegistration() {
           onPress={() => { /* TODO: google sign up */ }}
         >
           <Image
-            source={require('../../../assets/images/registration/google.png')}
+            source={require('../../assets/images/registration/google.png')}
             style={{ width: 20, height: 20, marginRight: 8 }}
             resizeMode="contain"
           />

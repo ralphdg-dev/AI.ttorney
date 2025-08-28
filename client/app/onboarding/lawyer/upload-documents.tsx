@@ -4,8 +4,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import BackButton from '../components/ui/BackButton';
-import StickyFooterButton from '../components/ui/StickyFooterButton';
+import BackButton from '../../../components/ui/BackButton';
+import StickyFooterButton from '../../../components/ui/StickyFooterButton';
 
 export default function LawyerReg() {
   const [rollNumber, setRollNumber] = useState('');
@@ -126,7 +126,7 @@ export default function LawyerReg() {
         {/* Logo */}
         <View style={{ alignItems: 'center', marginTop: 8, marginBottom: 10 }}>
           <Image
-            source={require('../assets/images/logo.png')}
+            source={require('../../../assets/images/logo.png')}
             style={{ width: 110, height: 110 }}
             resizeMode="contain"
           />
@@ -554,7 +554,7 @@ export default function LawyerReg() {
         disabled={!isComplete}
         bottomOffset={16}
         onPress={() => {
-          router.push('/lawyer-face-verification');
+          router.push('./lawyer-face-verification');
         }}
       />
     </SafeAreaView>

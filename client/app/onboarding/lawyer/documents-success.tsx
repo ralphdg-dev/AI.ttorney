@@ -1,8 +1,8 @@
 import React from 'react';
 import { SafeAreaView, StatusBar, View, Image, Text } from 'react-native';
-import BackButton from '../components/ui/BackButton';
+import BackButton from '../../../components/ui/BackButton';
 import { router } from 'expo-router';
-import StickyFooterButton from '../components/ui/StickyFooterButton';
+import StickyFooterButton from '../../../components/ui/StickyFooterButton';
 
 export default function DocumentsSuccess() {
   return (
@@ -17,7 +17,7 @@ export default function DocumentsSuccess() {
       {/* Centered content (raised) */}
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, marginTop: -170 }}>
         <Image
-          source={require('../assets/images/registration/success.png')}
+          source={require('../../../assets/images/registration/success.png')}
           style={{ width: 180, height: 180, marginBottom: 20 }}
           resizeMode="contain"
         />

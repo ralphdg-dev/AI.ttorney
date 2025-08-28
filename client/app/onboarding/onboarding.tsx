@@ -2,12 +2,12 @@ import { View, Text, Animated } from 'react-native';
 import { router } from 'expo-router';
 import tw from 'tailwind-react-native-classnames';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import Colors from '../constants/Colors';
-import { OnboardingSlide, ProgressDots, OnboardingHeader } from '../components/onboarding';
-import { onboardingSlides } from '../data/onboardingData';
-import { useOnboardingAnimation } from '../hooks/useOnboardingAnimation';
-import PrimaryButton from '../components/ui/PrimaryButton';
-import ActionLink from '../components/ui/ActionLink';
+import Colors from '../../constants/Colors';
+import { OnboardingSlide, ProgressDots, OnboardingHeader } from '../../components/onboarding';
+import { onboardingSlides } from '../../data/onboardingData';
+import { useOnboardingAnimation } from '../../hooks/useOnboardingAnimation';
+import PrimaryButton from '../../components/ui/PrimaryButton';
+import ActionLink from '../../components/ui/ActionLink';
 
 export default function Onboarding() {
   const {
@@ -21,18 +21,18 @@ export default function Onboarding() {
   } = useOnboardingAnimation(onboardingSlides.length);
 
   const handleSkip = () => {
-    router.push('/role-selection');
+    router.push('/onboarding/registration');
   };
 
   const handleNext = () => {
     goToNextSlide(() => {
-      router.push('/role-selection');
+      router.push('/onboarding/registration');
     });
   };
 
   const handleGestureStateChange = (event: any) => {
     onHandlerStateChange(event, () => {
-      router.push('/role-selection');
+      router.push('/onboarding/registration');
     });
   };
 
@@ -54,11 +54,11 @@ export default function Onboarding() {
           {/* Main Content - All slides rendered but only current one visible */}
                 <Animated.View
                   style={[
-              tw`flex-1 relative`,
-              {
-                opacity: fadeAnim
-              }
-            ]}
+            tw`flex-1 relative`,
+            {
+              opacity: fadeAnim
+            }
+          ]}
           >
             {onboardingSlides.map((slideData, index) => (
               <View

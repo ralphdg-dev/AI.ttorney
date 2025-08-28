@@ -14,21 +14,20 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { useState, useEffect, useRef } from "react";
-import Colors from "../constants/Colors";
-import { Ionicons } from "@expo/vector-icons";
-import otpsent from "../assets/images/otpsent.png";
-import PrimaryButton from "../components/ui/PrimaryButton";
-import BackButton from "../components/ui/BackButton";
+import Colors from "../../constants/Colors";
+import otpsent from "../../assets/images/otpsent.png";
+import PrimaryButton from "../../components/ui/PrimaryButton";
+import BackButton from "../../components/ui/BackButton";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 export default function VerifyOTP() {
   // Get email from route params using useLocalSearchParams
   const params = useLocalSearchParams();
-  const email = params.email || "user@example.com";
+  const email = typeof params.email === 'string' ? params.email : "user@example.com";
 
   const [screenData, setScreenData] = useState(Dimensions.get("window"));
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
@@ -36,7 +35,7 @@ export default function VerifyOTP() {
 
 
   // Refs for OTP inputs
-  const inputRefs = useRef([]);
+  const inputRefs = useRef<Array<TextInput | null>>([]);
 
   useEffect(() => {
     const subscription = Dimensions.addEventListener("change", ({ window }) => {
@@ -47,7 +46,7 @@ export default function VerifyOTP() {
 
   // Timer for resend OTP
   useEffect(() => {
-    let interval;
+    let interval: ReturnType<typeof setInterval>;
     if (resendTimer > 0 && !canResend) {
       interval = setInterval(() => {
         setResendTimer((prev) => {
@@ -124,7 +123,7 @@ export default function VerifyOTP() {
 
   const dimensions = getResponsiveDimensions();
 
-  const handleOtpChange = (index, value) => {
+  const handleOtpChange = (index: number, value: string) => {
     // Only allow numbers
     if (!/^\d*$/.test(value)) return;
 
@@ -139,7 +138,7 @@ export default function VerifyOTP() {
     }
   };
 
-  const handleKeyPress = (index, key) => {
+  const handleKeyPress = (index: number, key: string) => {
     if (key === "Backspace" && !otp[index] && index > 0) {
       // Move to previous input on backspace if current is empty
       inputRefs.current[index - 1]?.focus();
@@ -170,8 +169,9 @@ export default function VerifyOTP() {
           {
             text: "OK",
             onPress: () => {
-              // Navigate to dashboard or next screen
-              router.replace("/dashboard");
+              // TODO: Navigate to OTP success page once implemented
+              // e.g., router.replace('/otp-success');
+              // For now, remain on this screen or navigate as needed.
             },
           },
         ]);
@@ -213,10 +213,11 @@ export default function VerifyOTP() {
   };
 
   const goBack = () => {
-    router.push("/nonlaw-reg");
+    // Back to unified registration screen
+    router.push("/onboarding/registration");
   };
 
-  const maskEmail = (email) => {
+  const maskEmail = (email: string) => {
     const [localPart, domain] = email.split("@");
     if (localPart.length <= 2) {
       return `${localPart[0]}***@${domain}`;
@@ -328,7 +329,7 @@ export default function VerifyOTP() {
               {otp.map((digit, index) => (
                 <TextInput
                   key={index}
-                  ref={(ref) => (inputRefs.current[index] = ref)}
+                  ref={(ref: TextInput | null) => { inputRefs.current[index] = ref; }}
                   style={{
                                          width: dimensions.otpBoxSize * 0.8,
                     height: dimensions.otpBoxSize,

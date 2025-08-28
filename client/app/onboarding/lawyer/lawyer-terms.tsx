@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, SafeAreaView, StatusBar, Text, ScrollView } from 'react-native';
-import BackButton from '../components/ui/BackButton';
-import StickyFooterButton from '../components/ui/StickyFooterButton';
+import BackButton from '../../../components/ui/BackButton';
+import StickyFooterButton from '../../../components/ui/StickyFooterButton';
 import { router } from 'expo-router';
 
 export default function LawyerTerms() {
@@ -72,7 +72,7 @@ export default function LawyerTerms() {
         title={enabled ? 'Submit Documents' : `Submit Documents (${secondsLeft})`}
         disabled={!enabled}
         bottomOffset={16}
-        onPress={() => router.push('/documents-success')}
+        onPress={() => router.push('./documents-success')}
       />
     </SafeAreaView>
   );
