@@ -1,8 +1,7 @@
-import { View, Text, Animated } from 'react-native';
+import { View, Animated } from 'react-native';
 import { router } from 'expo-router';
 import tw from 'tailwind-react-native-classnames';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import Colors from '../../constants/Colors';
 import { OnboardingSlide, ProgressDots, OnboardingHeader } from '../../components/onboarding';
 import { onboardingSlides } from '../../data/onboardingData';
 import { useOnboardingAnimation } from '../../hooks/useOnboardingAnimation';

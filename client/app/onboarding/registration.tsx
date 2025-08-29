@@ -78,7 +78,7 @@ export default function UserRegistration() {
             </Text>
             <TextInput
               style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, fontSize: 16, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
-              placeholder="Juan Mikko"
+              placeholder="First name"
               placeholderTextColor="#9ca3af"
               value={firstName}
               onChangeText={setFirstName}
@@ -90,7 +90,7 @@ export default function UserRegistration() {
             </Text>
             <TextInput
               style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, fontSize: 16, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
-              placeholder="de Guzman"
+              placeholder="Last name"
               placeholderTextColor="#9ca3af"
               value={lastName}
               onChangeText={setLastName}
@@ -103,8 +103,8 @@ export default function UserRegistration() {
           Username <Text style={{ color: '#ef4444' }}>*</Text>
         </Text>
         <TextInput
-          style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, fontSize: 16, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
-          placeholder="juanmikko"
+          style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, fontSize: 14, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
+          placeholder="Username"
           placeholderTextColor="#9ca3af"
           value={username}
           onChangeText={setUsername}
@@ -116,8 +116,8 @@ export default function UserRegistration() {
           Email Address <Text style={{ color: '#ef4444' }}>*</Text>
         </Text>
         <TextInput
-          style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, fontSize: 16, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
-          placeholder="juanmiksdeguzman@email.com"
+          style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, fontSize: 14, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
+          placeholder="Email address"
           placeholderTextColor="#9ca3af"
           value={email}
           onChangeText={setEmail}
@@ -143,8 +143,8 @@ export default function UserRegistration() {
           activeOpacity={0.8}
           style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, backgroundColor: '#fff', marginBottom: 12 }}
         >
-          <Text style={{ fontSize: 16, color: birthdate ? '#111827' : '#9ca3af' }}>
-            {birthdate ? formatDate(birthdate) : 'MM/DD/YYYY'}
+          <Text style={{ fontSize: 14, color: birthdate ? '#111827' : '#9ca3af' }}>
+            {birthdate ? formatDate(birthdate) : 'Select date'}
           </Text>
         </TouchableOpacity>
 
@@ -154,8 +154,8 @@ export default function UserRegistration() {
         </Text>
         <View style={{ position: 'relative' }}>
           <TextInput
-            style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, paddingRight: 44, fontSize: 16, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
-            placeholder="********"
+            style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, paddingRight: 44, fontSize: 14, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
+            placeholder="Password"
             placeholderTextColor="#9ca3af"
             value={password}
             onChangeText={setPassword}
@@ -173,8 +173,8 @@ export default function UserRegistration() {
         </Text>
         <View style={{ position: 'relative' }}>
           <TextInput
-            style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, paddingRight: 44, fontSize: 16, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
-            placeholder="********"
+            style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, paddingRight: 44, fontSize: 14, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
+            placeholder="Confirm password"
             placeholderTextColor="#9ca3af"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
@@ -191,7 +191,19 @@ export default function UserRegistration() {
           <View style={{ width: 18, height: 18, borderWidth: 1, borderColor: agree ? Colors.primary.blue : '#D1D5DB', borderRadius: 4, alignItems: 'center', justifyContent: 'center', marginRight: 8, backgroundColor: agree ? Colors.primary.blue : 'transparent' }}>
             {agree && <Ionicons name="checkmark" size={12} color="#fff" />}
           </View>
-          <Text style={{ color: '#374151' }}>By continuing, you agree to our terms of service.</Text>
+          <Text style={{ color: '#374151' }}>
+            By continuing, you agree to our{" "}
+            <Text 
+              style={{ color: Colors.primary.blue, fontWeight: '600', textDecorationLine: 'underline' }}
+              onPress={() => {
+                // TODO: Navigate to Terms of Service page/modal
+                console.log('Navigate to Terms of Service');
+              }}
+            >
+              Terms of Service
+            </Text>
+            .
+          </Text>
         </TouchableOpacity>
 
         {/* Primary Sign Up button */}

@@ -1,48 +1,30 @@
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  Dimensions,
-  Alert,
-  StatusBar,
-  ScrollView,
-  Image,
-} from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { Alert, Platform, TextInput } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import tw from "tailwind-react-native-classnames";
-import { useState, useEffect, useRef } from "react";
-import Colors from "../../constants/Colors";
-import otpsent from "../../assets/images/otpsent.png";
+import { Box } from "../../components/ui/box";
+import { VStack } from "../../components/ui/vstack";
+import { HStack } from "../../components/ui/hstack";
+import { Text } from "../../components/ui/text";
+import { KeyboardAvoidingView } from "../../components/ui/keyboard-avoiding-view";
+import { ScrollView } from "../../components/ui/scroll-view";
+import { StatusBar } from "../../components/ui/status-bar";
+import { Image } from "../../components/ui/image";
 import PrimaryButton from "../../components/ui/PrimaryButton";
 import BackButton from "../../components/ui/BackButton";
-
-const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+import Colors from "../../constants/Colors";
+import otpsent from "../../assets/images/otpsent.png";
 
 export default function VerifyOTP() {
-  // Get email from route params using useLocalSearchParams
   const params = useLocalSearchParams();
   const email = typeof params.email === 'string' ? params.email : "user@example.com";
 
-  const [screenData, setScreenData] = useState(Dimensions.get("window"));
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
   const [error, setError] = useState("");
 
-
-  // Refs for OTP inputs
-  const inputRefs = useRef<Array<TextInput | null>>([]);
-
-  useEffect(() => {
-    const subscription = Dimensions.addEventListener("change", ({ window }) => {
-      setScreenData(window);
-    });
-    return () => subscription?.remove();
-  }, []);
+  const inputRefs = useRef<(TextInput | null)[]>([]);
 
   // Timer for resend OTP
   useEffect(() => {
@@ -68,71 +50,14 @@ export default function VerifyOTP() {
     }
   }, []);
 
-  // Responsive calculations
-  const getResponsiveDimensions = () => {
-    const { width, height } = screenData;
-    const isTablet = width >= 768;
-    const isLargeTablet = width >= 1024;
-    const isSmallScreen = height < 700;
-    const isVerySmallScreen = height < 600;
-    const isLandscape = width > height;
-
-    return {
-      isTablet,
-      isLargeTablet,
-      isSmallScreen,
-      isVerySmallScreen,
-      isLandscape,
-      width,
-      height,
-      // Container padding
-      containerPadding: isLargeTablet ? 80 : isTablet ? 60 : 24,
-      maxWidth: isTablet ? 480 : width - 48,
-      // OTP box dimensions
-      otpBoxSize: isLargeTablet ? 72 : isTablet ? 64 : isSmallScreen ? 48 : 56,
-      otpBoxSpacing: isTablet ? 12 : isSmallScreen ? 6 : 8,
-      // Typography
-      headerSize: isLargeTablet ? 32 : isTablet ? 28 : isSmallScreen ? 20 : 24,
-      subHeaderSize: isTablet ? 18 : isSmallScreen ? 14 : 16,
-      bodySize: isTablet ? 16 : isSmallScreen ? 13 : 14,
-      smallSize: isTablet ? 14 : 12,
-      // Icon sizes
-      iconSize: isTablet ? 36 : 28,
-      backIconSize: isTablet ? 28 : 24,
-      // Spacing
-      iconContainerSize: isTablet ? 80 : isSmallScreen ? 56 : 64,
-      verticalSpacing: isVerySmallScreen
-        ? 16
-        : isSmallScreen
-        ? 24
-        : isTablet
-        ? 40
-        : 32,
-      smallVerticalSpacing: isVerySmallScreen
-        ? 8
-        : isSmallScreen
-        ? 12
-        : isTablet
-        ? 20
-        : 16,
-      // Button
-      buttonHeight: isTablet ? 56 : isSmallScreen ? 44 : 48,
-      buttonTextSize: isTablet ? 18 : 16,
-    };
-  };
-
-  const dimensions = getResponsiveDimensions();
-
   const handleOtpChange = (index: number, value: string) => {
-    // Only allow numbers
     if (!/^\d*$/.test(value)) return;
 
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
-    setError(""); // Clear error when user types
+    setError("");
 
-    // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
@@ -140,7 +65,6 @@ export default function VerifyOTP() {
 
   const handleKeyPress = (index: number, key: string) => {
     if (key === "Backspace" && !otp[index] && index > 0) {
-      // Move to previous input on backspace if current is empty
       inputRefs.current[index - 1]?.focus();
     }
   };
@@ -157,28 +81,22 @@ export default function VerifyOTP() {
     setError("");
 
     try {
-      // TODO: Implement OTP verification logic
       console.log("Verifying OTP:", otpString, "for email:", email);
-
-      // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      // Check if OTP is correct (for demo, accept 123456)
       if (otpString === "123456") {
         Alert.alert("Success", "Email verified successfully!", [
           {
             text: "OK",
             onPress: () => {
-              // TODO: Navigate to OTP success page once implemented
-              // e.g., router.replace('/otp-success');
-              // For now, remain on this screen or navigate as needed.
+              // TODO: Navigate to success page
             },
           },
         ]);
       } else {
         setError("Invalid verification code. Please try again.");
       }
-    } catch (error) {
+    } catch {
       setError("Verification failed. Please try again.");
     } finally {
       setIsLoading(false);
@@ -189,10 +107,7 @@ export default function VerifyOTP() {
     if (!canResend) return;
 
     try {
-      // TODO: Implement resend OTP logic
       console.log("Resending OTP to:", email);
-
-      // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       setCanResend(false);
@@ -200,21 +115,11 @@ export default function VerifyOTP() {
       setOtp(["", "", "", "", "", ""]);
       setError("");
 
-      Alert.alert(
-        "Code Sent",
-        "A new verification code has been sent to your email."
-      );
-
-      // Focus first input
+      Alert.alert("Code Sent", "A new verification code has been sent to your email.");
       inputRefs.current[0]?.focus();
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to resend code. Please try again.");
     }
-  };
-
-  const goBack = () => {
-    // Back to unified registration screen
-    router.push("/onboarding/registration");
   };
 
   const maskEmail = (email: string) => {
@@ -222,8 +127,7 @@ export default function VerifyOTP() {
     if (localPart.length <= 2) {
       return `${localPart[0]}***@${domain}`;
     }
-    const masked =
-      localPart[0] + "*".repeat(localPart.length - 2) + localPart.slice(-1);
+    const masked = localPart[0] + "*".repeat(localPart.length - 2) + localPart.slice(-1);
     return `${masked}@${domain}`;
   };
 
@@ -232,211 +136,103 @@ export default function VerifyOTP() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={{ flex: 1, backgroundColor: "white" }}
+      className="flex-1 bg-white"
     >
       <StatusBar barStyle="dark-content" backgroundColor="white" />
-
+      
       <ScrollView
+        className="flex-1"
         contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Top Navigation */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingTop: Platform.OS === "ios" ? 60 : 40,
-            paddingBottom: dimensions.smallVerticalSpacing,
-            paddingHorizontal: dimensions.containerPadding,
-          }}
-        >
-          <BackButton onPress={goBack} />
-        </View>
+        {/* Header */}
+        <Box className="flex-row items-center justify-between px-6 pt-12 pb-4 md:pt-16">
+          <BackButton onPress={() => router.push("/onboarding/registration")} />
+        </Box>
 
-        {/* Main Content Container */}
-        <View
-          style={{
-            flex: 1,
-            justifyContent:
-              dimensions.isLandscape && !dimensions.isTablet
-                ? "flex-start"
-                : "center",
-            paddingHorizontal: dimensions.containerPadding,
-            paddingTop: dimensions.isLandscape && !dimensions.isTablet ? 20 : 0,
-            maxWidth: dimensions.maxWidth,
-            alignSelf: "center",
-            width: "100%",
-          }}
-        >
-          {/* Header */}
-          <View
-            style={{
-              alignItems: "center",
-              marginBottom: dimensions.verticalSpacing,
-            }}
-          >
+        {/* Main Content */}
+        <VStack className="flex-1 justify-center px-6 max-w-md mx-auto w-full">
+          {/* Image and Title */}
+          <VStack className="items-center mb-8">
             <Image
               source={otpsent}
-              style={tw`w-36 h-36 mb-1 mr-6`}
+              className="w-36 h-36 mb-4"
               resizeMode="contain"
+              alt="OTP Sent"
             />
-            <Text
-              style={{
-                fontSize: dimensions.headerSize,
-                fontWeight: "bold",
-                marginBottom: dimensions.smallVerticalSpacing,
-                textAlign: "center",
-                color: Colors.text.head,
-              }}
-            >
+            <Text className="text-2xl font-bold text-center mb-4 text-gray-900">
               Verify Your Email
             </Text>
-
-                         <Text
-               style={{
-                 fontSize: dimensions.subHeaderSize,
-                 textAlign: "center",
-                 lineHeight: dimensions.subHeaderSize * 1.4,
-                 marginBottom: dimensions.smallVerticalSpacing / 2,
-                 color: Colors.text.sub,
-               }}
-             >
-               We've sent a code to{" "}
-               <Text style={{ fontWeight: "600", color: Colors.text.head }}>
-                 {maskEmail(email)}
-               </Text>
-               . Enter it below to continue.
-             </Text>
-          </View>
+            <Text className="text-base text-center text-gray-600 leading-6">
+              We&apos;ve sent a code to{" "}
+              <Text className="font-semibold text-gray-900">
+                {maskEmail(email)}
+              </Text>
+              . Enter it below to continue.
+            </Text>
+          </VStack>
 
           {/* OTP Input */}
-          <View
-            style={{
-              alignItems: "center",
-              marginBottom: dimensions.verticalSpacing,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "center",
-                alignItems: "center",
-                flexWrap: dimensions.isVerySmallScreen ? "wrap" : "nowrap",
-              }}
-            >
+          <VStack className="items-center mb-8">
+            <HStack className="justify-center items-center space-x-2 mb-4">
               {otp.map((digit, index) => (
                 <TextInput
                   key={index}
-                  ref={(ref: TextInput | null) => { inputRefs.current[index] = ref; }}
-                  style={{
-                                         width: dimensions.otpBoxSize * 0.8,
-                    height: dimensions.otpBoxSize,
-                    borderWidth: 2,
-                    borderRadius: 12,
-                    textAlign: "center",
-                    fontWeight: "bold",
-                    fontSize: dimensions.isTablet
-                      ? 24
-                      : dimensions.isSmallScreen
-                      ? 18
-                      : 20,
-                                         marginHorizontal: dimensions.otpBoxSpacing / 2,
-                    marginVertical: dimensions.isVerySmallScreen ? 4 : 0,
-                    borderColor: error
-                      ? "#EF4444"
+                  ref={(ref) => { inputRefs.current[index] = ref; }}
+                  className={`w-12 h-14 border-2 rounded-xl text-center font-bold text-xl ${
+                    error
+                      ? "border-red-500"
                       : digit
-                      ? Colors.primary.blue
-                      : "#E5E7EB",
-                    backgroundColor: digit ? "#F0F9FF" : "white",
-                    color: Colors.text.head,
-                  }}
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-300 bg-white"
+                  }`}
+                  style={{ color: Colors.text.head }}
                   value={digit}
                   onChangeText={(value) => handleOtpChange(index, value)}
-
-                  onKeyPress={({ nativeEvent }) =>
-                    handleKeyPress(index, nativeEvent.key)
-                  }
+                  onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
                   keyboardType="numeric"
                   maxLength={1}
                   selectTextOnFocus
                   accessibilityLabel={`Digit ${index + 1}`}
                 />
               ))}
-            </View>
+            </HStack>
 
             {error && (
-              <Text
-                style={{
-                  fontSize: dimensions.bodySize,
-                  marginTop: dimensions.smallVerticalSpacing,
-                  textAlign: "center",
-                  color: "#EF4444",
-                  paddingHorizontal: 20,
-                }}
-              >
+              <Text className="text-red-500 text-center text-sm px-4">
                 {error}
               </Text>
             )}
-          </View>
+          </VStack>
+        </VStack>
+      </ScrollView>
 
-                                                      
-          </View>
-        </ScrollView>
+      {/* Bottom Section - Match onboarding pattern */}
+      <Box className="px-6 pb-12 mt-8 relative">
+        <PrimaryButton
+          title={isLoading ? "Verifying..." : "Verify"}
+          onPress={handleVerifyOTP}
+          disabled={isLoading || !isOtpComplete}
+          loading={isLoading}
+        />
 
-                {/* Bottom Section - Fixed at bottom like onboarding */}
-         <View style={tw`px-6 pb-12 mt-8`}>
-           {/* Resend Code */}
-           <View
-             style={{
-               alignItems: "center",
-               marginBottom: 8,
-             }}
-           >
-             <View
-               style={{
-                 flexDirection: "row",
-                 alignItems: "center",
-                 flexWrap: "wrap",
-                 justifyContent: "center",
-               }}
-             >
-               <Text
-                 style={{
-                   fontSize: dimensions.bodySize,
-                   color: Colors.text.sub,
-                 }}
-               >
-                 Didn't receive code?{" "}
-               </Text>
-               <TouchableOpacity
-                 onPress={handleResendOTP}
-                 disabled={!canResend}
-                 accessibilityLabel="Resend verification code"
-                 style={{ paddingVertical: 4, paddingHorizontal: 2 }}
-               >
-                 <Text
-                   style={{
-                     fontSize: dimensions.bodySize,
-                     fontWeight: "600",
-                     color: canResend ? "#3B82F6" : "#9CA3AF",
-                     textDecorationLine: "none",
-                   }}
-                 >
-                   {canResend ? "Resend OTP" : `Resend OTP (${resendTimer}s)`}
-                 </Text>
-               </TouchableOpacity>
-             </View>
-           </View>
-
-           <PrimaryButton
-             title={isLoading ? "Verifying..." : "Verify"}
-             onPress={handleVerifyOTP}
-             disabled={isLoading || !isOtpComplete}
-             loading={isLoading}
-           />
-         </View>
-      </KeyboardAvoidingView>
-    );
-  }
+        {/* Resend Code - Below button like ActionLink */}
+        <Box className="absolute bottom-8 left-0 right-0 items-center px-4 sm:px-6 md:px-8">
+          <Text className="text-center text-sm sm:text-base" style={{ color: Colors.text.sub }}>
+            Didn&apos;t receive code?{" "}
+            <Text
+              className="font-bold text-sm sm:text-base"
+              style={{
+                color: canResend ? Colors.primary.blue : '#9ca3af'
+              }}
+              onPress={handleResendOTP}
+            >
+              {canResend ? "Resend OTP" : `Resend OTP (${resendTimer}s)`}
+            </Text>
+          </Text>
+        </Box>
+      </Box>
+    </KeyboardAvoidingView>
+  );
+}
