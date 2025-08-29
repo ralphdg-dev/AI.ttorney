@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Literal
-from datetime import datetime
+from datetime import datetime, date
 
 # User role enum based on database schema
 UserRole = Literal["guest", "registered_user", "verified_lawyer", "admin", "superadmin"]
@@ -9,8 +9,14 @@ class UserSignUp(BaseModel):
     email: EmailStr
     password: str
     username: str
-    full_name: Optional[str] = None
+    first_name: str
+    last_name: str
+    birthdate: date
     role: UserRole = "registered_user"
+    
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
 
 class UserSignIn(BaseModel):
     email: EmailStr

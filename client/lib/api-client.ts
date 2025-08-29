@@ -58,7 +58,9 @@ class ApiClient {
     email: string;
     password: string;
     username: string;
-    full_name?: string;
+    first_name: string;
+    last_name: string;
+    birthdate: string;
     role?: string;
   }): Promise<ApiResponse> {
     return this.request('/auth/signup', {

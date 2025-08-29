@@ -52,7 +52,9 @@ class SupabaseService:
                     return {"success": True, "data": data}
                 else:
                     error_data = response.json() if response.content else {}
-                    return {"success": False, "error": error_data.get("msg", "Sign up failed")}
+                    error_msg = error_data.get("msg") or error_data.get("message") or error_data.get("error_description") or f"Sign up failed: {response.status_code}"
+                    logger.error(f"Supabase signup error: {error_data}")
+                    return {"success": False, "error": error_msg}
                     
         except Exception as e:
             logger.error(f"Sign up error: {str(e)}")
@@ -78,7 +80,9 @@ class SupabaseService:
                     return {"success": True, "data": data}
                 else:
                     error_data = response.json() if response.content else {}
-                    return {"success": False, "error": error_data.get("error_description", "Sign in failed")}
+                    error_msg = error_data.get("error_description") or error_data.get("message") or f"Sign in failed: {response.status_code}"
+                    logger.error(f"Supabase signin error: {error_data}")
+                    return {"success": False, "error": error_msg}
                     
         except Exception as e:
             logger.error(f"Sign in error: {str(e)}")
@@ -147,9 +151,12 @@ class SupabaseService:
         """Insert user profile into users table"""
         try:
             async with httpx.AsyncClient() as client:
+                # Create a copy of user_data without None values
+                clean_user_data = {k: v for k, v in user_data.items() if v is not None}
+                
                 response = await client.post(
                     f"{self.rest_url}/users",
-                    json=user_data,
+                    json=clean_user_data,
                     headers=self._get_headers(use_service_key=True)
                 )
                 

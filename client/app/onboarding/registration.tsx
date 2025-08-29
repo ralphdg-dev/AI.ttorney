@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Image, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { router } from 'expo-router';
 import BackButton from '../../components/ui/BackButton';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import Colors from '../../constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
+import { apiClient } from '../../lib/api-client';
 
 export default function UserRegistration() {
   // Form state
@@ -18,6 +19,7 @@ export default function UserRegistration() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agree, setAgree] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Date picker modal state (pattern reused from lawyer-reg)
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -194,13 +196,35 @@ export default function UserRegistration() {
 
         {/* Primary Sign Up button */}
         <PrimaryButton
-          title="Sign Up"
-          onPress={() => {
-            // Single registration flow: after basic input, go to OTP verification
-            // Pass email to OTP screen for masking/resend
-            router.push(`./verify-otp?email=${encodeURIComponent(email)}`);
+          title={loading ? "Creating Account..." : "Sign Up"}
+          onPress={async () => {
+            if (!isComplete) return;
+            
+            setLoading(true);
+            try {
+              const result = await apiClient.signUp({
+                email,
+                password,
+                username,
+                first_name: firstName,
+                last_name: lastName,
+                birthdate: birthdate?.toISOString().split('T')[0] || '',
+                role: 'registered_user'
+              });
+              
+              if (result.error) {
+                Alert.alert('Registration Failed', result.error);
+              } else {
+                // Navigate directly to verify-otp with the email
+                router.push(`./verify-otp?email=${encodeURIComponent(email)}` as any);
+              }
+            } catch {
+              Alert.alert('Error', 'Failed to create account. Please try again.');
+            } finally {
+              setLoading(false);
+            }
           }}
-          disabled={!isComplete}
+          disabled={!isComplete || loading}
         />
 
         {/* OR separator */}

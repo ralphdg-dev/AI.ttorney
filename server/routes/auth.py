@@ -12,7 +12,7 @@ auth_service = AuthService()
 
 @router.post("/signup", response_model=Dict[str, Any])
 async def sign_up(user_data: UserSignUp):
-    """Register a new user"""
+    """Register a new user in both auth.users and public.users"""
     result = await auth_service.sign_up(user_data)
     
     if not result["success"]:
@@ -22,9 +22,10 @@ async def sign_up(user_data: UserSignUp):
         )
     
     return {
-        "message": "User created successfully",
+        "message": "User registered successfully",
         "user": result["user"],
-        "session": result["session"]
+        "session": result["session"],
+        "profile": result["profile"]
     }
 
 @router.post("/signin", response_model=Dict[str, Any])
