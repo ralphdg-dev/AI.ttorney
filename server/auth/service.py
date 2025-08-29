@@ -137,3 +137,15 @@ class AuthService:
         except Exception as e:
             logger.error(f"Password reset error: {str(e)}")
             return {"success": False, "error": str(e)}
+    
+    async def mark_user_verified(self, email: str) -> Dict[str, Any]:
+        """Mark user as verified after OTP verification"""
+        try:
+            response = await self.supabase.update_user_profile(
+                {"is_verified": True},
+                {"email": email}
+            )
+            return response
+        except Exception as e:
+            logger.error(f"Mark user verified error: {str(e)}")
+            return {"success": False, "error": str(e)}

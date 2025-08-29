@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, status
-from auth.models import UserSignUp, UserSignIn, UserResponse, PasswordReset, TokenResponse
+from auth.models import UserSignUp, UserSignIn, UserResponse, PasswordReset, TokenResponse, SendOTPRequest, VerifyOTPRequest, OTPResponse
 from auth.service import AuthService
+from services.otp_service import OTPService
 from middleware.auth import get_current_user, get_current_active_user
 from typing import Dict, Any
 import logging
@@ -9,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 auth_service = AuthService()
+otp_service = OTPService()
 
 @router.post("/signup", response_model=Dict[str, Any])
 async def sign_up(user_data: UserSignUp):
@@ -91,3 +93,74 @@ async def verify_token(current_user: Dict[str, Any] = Depends(get_current_user))
         "user": current_user["user"],
         "profile": current_user["profile"]
     }
+
+# OTP Endpoints
+@router.post("/send-otp", response_model=OTPResponse)
+async def send_otp(request: SendOTPRequest):
+    """Send OTP for email verification or password reset"""
+    try:
+        if request.otp_type == "email_verification":
+            result = await otp_service.send_verification_otp(request.email, "User")
+        elif request.otp_type == "password_reset":
+            result = await otp_service.send_password_reset_otp(request.email, "User")
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid OTP type"
+            )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["error"]
+            )
+        
+        return OTPResponse(
+            success=True,
+            message=result["message"],
+            expires_in_minutes=result.get("expires_in_minutes")
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Send OTP error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send OTP"
+        )
+
+@router.post("/verify-otp", response_model=OTPResponse)
+async def verify_otp(request: VerifyOTPRequest):
+    """Verify OTP code"""
+    try:
+        result = await otp_service.verify_otp(
+            request.email,
+            request.otp_code,
+            request.otp_type
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["error"]
+            )
+        
+        # If this is email verification, update user's verified status
+        if request.otp_type == "email_verification":
+            # Update user profile to mark as verified
+            await auth_service.mark_user_verified(request.email)
+        
+        return OTPResponse(
+            success=True,
+            message=result["message"]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Verify OTP error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to verify OTP"
+        )

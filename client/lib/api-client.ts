@@ -100,6 +100,28 @@ class ApiClient {
     return this.request('/auth/verify-token');
   }
 
+  // OTP endpoints
+  async sendOTP(data: {
+    email: string;
+    otp_type: 'email_verification' | 'password_reset';
+  }): Promise<ApiResponse> {
+    return this.request('/auth/send-otp', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async verifyOTP(data: {
+    email: string;
+    otp_code: string;
+    otp_type: 'email_verification' | 'password_reset';
+  }): Promise<ApiResponse> {
+    return this.request('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Health check
   async healthCheck(): Promise<ApiResponse> {
     return this.request('/health');

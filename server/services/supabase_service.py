@@ -38,13 +38,17 @@ class SupabaseService:
                 payload = {
                     "email": email,
                     "password": password,
-                    "data": user_metadata or {}
+                    "user_metadata": user_metadata or {},
+                    "email_confirm": True,    # Mark email as already confirmed
+                    "phone_confirm": False,   # Disable phone confirmation
+                    "confirm": True           # Skip confirmation process entirely
                 }
                 
+                # Use service role key to bypass email confirmation entirely
                 response = await client.post(
-                    f"{self.auth_url}/signup",
+                    f"{self.auth_url}/admin/users",
                     json=payload,
-                    headers=self._get_headers()
+                    headers=self._get_headers(use_service_key=True)
                 )
                 
                 if response.status_code == 200:
@@ -161,10 +165,15 @@ class SupabaseService:
                 )
                 
                 if response.status_code in [200, 201]:
-                    data = response.json()
-                    return {"success": True, "data": data}
+                    if response.content:
+                        data = response.json()
+                        return {"success": True, "data": data}
+                    else:
+                        # Success but no content (common with Supabase inserts)
+                        return {"success": True, "data": {"message": "User profile created successfully"}}
                 else:
                     error_data = response.json() if response.content else {}
+                    logger.error(f"Insert user profile failed: {response.status_code}, {error_data}")
                     return {"success": False, "error": error_data}
                     
         except Exception as e:
@@ -191,6 +200,32 @@ class SupabaseService:
                     
         except Exception as e:
             logger.error(f"Get user profile error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    async def update_user_profile(self, update_data: Dict[str, Any], where_clause: Dict[str, Any]) -> Dict[str, Any]:
+        """Update user profile in users table"""
+        try:
+            async with httpx.AsyncClient() as client:
+                # Build query parameters for WHERE clause
+                query_params = []
+                for key, value in where_clause.items():
+                    query_params.append(f"{key}=eq.{value}")
+                query_string = "&".join(query_params)
+                
+                response = await client.patch(
+                    f"{self.rest_url}/users?{query_string}",
+                    json=update_data,
+                    headers=self._get_headers(use_service_key=True)
+                )
+                
+                if response.status_code in [200, 204]:
+                    return {"success": True, "message": "User profile updated"}
+                else:
+                    error_data = response.json() if response.content else {}
+                    return {"success": False, "error": error_data}
+                    
+        except Exception as e:
+            logger.error(f"Update user profile error: {str(e)}")
             return {"success": False, "error": str(e)}
     
     async def test_connection(self) -> Dict[str, Any]:

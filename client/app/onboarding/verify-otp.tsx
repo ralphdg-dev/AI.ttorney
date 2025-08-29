@@ -12,6 +12,7 @@ import { Image } from "../../components/ui/image";
 import PrimaryButton from "../../components/ui/PrimaryButton";
 import BackButton from "../../components/ui/BackButton";
 import Colors from "../../constants/Colors";
+import { apiClient } from "../../lib/api-client";
 import otpsent from "../../assets/images/otpsent.png";
 
 export default function VerifyOTP() {
@@ -81,20 +82,24 @@ export default function VerifyOTP() {
     setError("");
 
     try {
-      console.log("Verifying OTP:", otpString, "for email:", email);
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const result = await apiClient.verifyOTP({
+        email,
+        otp_code: otpString,
+        otp_type: 'email_verification'
+      });
 
-      if (otpString === "123456") {
+      if (result.error) {
+        setError(result.error);
+      } else {
         Alert.alert("Success", "Email verified successfully!", [
           {
             text: "OK",
             onPress: () => {
-              // TODO: Navigate to success page
+              // Navigate to role selection page
+              router.replace('/role-selection');
             },
           },
         ]);
-      } else {
-        setError("Invalid verification code. Please try again.");
       }
     } catch {
       setError("Verification failed. Please try again.");
@@ -107,8 +112,15 @@ export default function VerifyOTP() {
     if (!canResend) return;
 
     try {
-      console.log("Resending OTP to:", email);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const result = await apiClient.sendOTP({
+        email,
+        otp_type: 'email_verification'
+      });
+
+      if (result.error) {
+        Alert.alert("Error", result.error);
+        return;
+      }
 
       setCanResend(false);
       setResendTimer(30);

@@ -214,7 +214,8 @@ export default function UserRegistration() {
             
             setLoading(true);
             try {
-              const result = await apiClient.signUp({
+              // Step 1: Create user account first
+              const signUpResult = await apiClient.signUp({
                 email,
                 password,
                 username,
@@ -224,12 +225,39 @@ export default function UserRegistration() {
                 role: 'registered_user'
               });
               
-              if (result.error) {
-                Alert.alert('Registration Failed', result.error);
-              } else {
-                // Navigate directly to verify-otp with the email
-                router.push(`./verify-otp?email=${encodeURIComponent(email)}` as any);
+              // Handle rate limiting or existing user
+              if (signUpResult.error && 
+                  !signUpResult.error.includes('rate_limit') && 
+                  !signUpResult.error.includes('already registered') &&
+                  !signUpResult.error.includes('security purposes') &&
+                  !signUpResult.error.includes('after') &&
+                  !signUpResult.error.includes('seconds')) {
+                Alert.alert('Registration Failed', signUpResult.error);
+                return;
               }
+              
+              // Show rate limit message but continue to OTP
+              if (signUpResult.error && (
+                  signUpResult.error.includes('rate_limit') || 
+                  signUpResult.error.includes('security purposes') ||
+                  signUpResult.error.includes('seconds'))) {
+                console.log('Rate limited, continuing to OTP step for existing user');
+              }
+              
+              // Step 2: Send OTP for email verification (even if signup was rate limited)
+              const otpResult = await apiClient.sendOTP({
+                email,
+                otp_type: 'email_verification'
+              });
+              
+              if (otpResult.error) {
+                Alert.alert('OTP Failed', otpResult.error);
+                return;
+              }
+              
+              // Step 3: Navigate to verify-otp with the email
+              router.push(`./verify-otp?email=${encodeURIComponent(email)}` as any);
+              
             } catch {
               Alert.alert('Error', 'Failed to create account. Please try again.');
             } finally {

@@ -43,3 +43,18 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     user: UserResponse
+
+# OTP-related models
+class SendOTPRequest(BaseModel):
+    email: EmailStr
+    otp_type: Literal["email_verification", "password_reset"]
+
+class VerifyOTPRequest(BaseModel):
+    email: EmailStr
+    otp_code: str
+    otp_type: Literal["email_verification", "password_reset"]
+
+class OTPResponse(BaseModel):
+    success: bool
+    message: str
+    expires_in_minutes: Optional[int] = None
