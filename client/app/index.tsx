@@ -23,7 +23,7 @@ export default function SplashScreen() {
   }, [fadeAnim]);
 
   if (shouldRedirect) {
-    return <Redirect href="/onboarding" />;
+    return <Redirect href="../onboarding/onboarding" />;
   }
 
   return (
