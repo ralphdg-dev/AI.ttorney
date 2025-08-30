@@ -1,5 +1,4 @@
 import React from 'react';
-import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 
@@ -17,7 +16,6 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header username="Superadmin" />
       <div className="flex">
         <Sidebar 
           activeItem={activeItem} 

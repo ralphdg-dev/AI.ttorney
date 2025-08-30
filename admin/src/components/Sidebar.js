@@ -1,52 +1,231 @@
 import React from 'react';
-import { 
-  Home, Users, UserCheck, Clock, BookOpen, FileText, 
-  MessageSquare, Activity, Settings, LogOut 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Home,
+  Users,
+  UserCheck,
+  FileText,
+  Ban,
+  Shield,
+  BookOpen,
+  ListChecks,
+  MessageSquare,
+  AlertTriangle,
+  Ticket,
+  History,
+  BarChart3,
+  Settings,
+  LogOut,
 } from 'lucide-react';
-import NavItem from './NavItem';
+
+// Menu configuration
+const sections = [
+  {
+    id: 'main',
+    title: 'MAIN',
+    groups: [
+      {
+        icon: Users,
+        label: 'Users',
+        items: [
+          { id: 'manage-legal-seekers', label: 'Manage Legal Seekers' },
+          { id: 'manage-lawyers', label: 'Manage Lawyers' },
+          { id: 'lawyer-applications', label: 'Lawyer Applications' },
+          { id: 'suspended-accounts', label: 'Suspended Accounts' },
+        ],
+      },
+      {
+        icon: Shield,
+        label: 'Admin',
+        items: [
+          { id: 'manage-admins', label: 'Manage Admins' },
+          { id: 'audit-logs', label: 'Audit Logs' },
+        ],
+      },
+      {
+        icon: BookOpen,
+        label: 'Legal Resources',
+        items: [
+          { id: 'manage-glossary-terms', label: 'Manage Glossary Terms' },
+          { id: 'manage-legal-articles', label: 'Manage Legal Articles' },
+        ],
+      },
+      {
+        icon: MessageSquare,
+        label: 'Forum',
+        items: [
+          { id: 'manage-topics-threads', label: 'Manage Topics & Threads' },
+          { id: 'reported-posts', label: 'Reported Posts' },
+          { id: 'ban-restrict-users', label: 'Ban/Restrict Users' },
+        ],
+      },
+      {
+        icon: Ticket,
+        label: 'Report Tickets',
+        items: [
+          { id: 'open-tickets', label: 'Open Tickets' },
+          { id: 'assigned-tickets', label: 'Assigned Tickets' },
+          { id: 'ticket-history', label: 'Ticket History' },
+        ],
+      },
+      {
+        icon: BarChart3,
+        label: 'Analytics',
+        items: [
+          { id: 'user-analytics', label: 'User Analytics' },
+          { id: 'content-analytics', label: 'Content Analytics' },
+          { id: 'forum-analytics', label: 'Forum Analytics' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'account',
+    groups: [
+      {
+        icon: Settings,
+        label: 'Settings',
+        items: [
+          { id: 'settings', label: 'Settings' },
+        ],
+      },
+    ],
+  },
+];
+
+const Avatar = () => (
+  <div className="flex items-center space-x-3">
+    <img
+      src="https://i.pravatar.cc/100?img=5"
+      alt="avatar"
+      className="h-10 w-10 rounded-full object-cover"
+    />
+    <div className="leading-tight">
+      <p className="text-[10px] text-gray-500">PRODUCT MANAGER</p>
+      <p className="text-[11px] font-semibold text-gray-900">Andrew Smith</p>
+    </div>
+  </div>
+);
 
 const Sidebar = ({ activeItem, onItemClick }) => {
-  const mainNavItems = [
-    { id: 'dashboard', icon: Home, label: 'Dashboard' },
-    { id: 'users', icon: Users, label: 'Users' },
-    { id: 'admin', icon: UserCheck, label: 'Admin' },
-    { id: 'report-tickets', icon: Clock, label: 'Report Tickets' },
-    { id: 'legal-glossary', icon: BookOpen, label: 'Legal Glossary' },
-    { id: 'legal-guide', icon: FileText, label: 'Legal Guide' },
-    { id: 'forum', icon: MessageSquare, label: 'Forum' },
-    { id: 'system-health', icon: Activity, label: 'System Health' }
-  ];
+  const [collapsed, setCollapsed] = React.useState(false);
+  const [openGroups, setOpenGroups] = React.useState({});
 
-  const bottomNavItems = [
-    { id: 'settings', icon: Settings, label: 'Settings' },
-    { id: 'logout', icon: LogOut, label: 'Logout' }
-  ];
+  const toggleGroup = (label) =>
+    setOpenGroups((s) => ({ ...s, [label]: !s[label] }));
+
+  const renderGroup = (group) => {
+    const Icon = group.icon || Home;
+    const isOpen = !!openGroups[group.label];
+
+    return (
+      <div key={group.label} className="mb-2">
+        <button
+          className={`w-full flex items-center ${
+            collapsed ? 'justify-center' : 'justify-between'
+          } px-3 py-1.5 rounded-lg text-gray-700 hover:bg-gray-50 text-[11px]`}
+          onClick={() => (collapsed ? null : toggleGroup(group.label))}
+          title={collapsed ? group.label : undefined}
+        >
+          <div className={`flex items-center ${collapsed ? '' : 'space-x-2'}`}>
+            <Icon size={16} className="text-gray-600" />
+            {!collapsed && <span className="text-[11px] font-medium">{group.label}</span>}
+          </div>
+          {!collapsed && (
+            <span className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}>
+              <ChevronRight size={16} className="text-gray-500" />
+            </span>
+          )}
+        </button>
+
+        {/* Items */}
+        {!collapsed && isOpen && (
+          <div className="relative mt-1 ml-9 after:content-[''] after:absolute after:left-0 after:top-0 after:bottom-0 after:border-l after:border-gray-200">
+            {group.items.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => onItemClick && onItemClick(item.id)}
+                className={`relative w-full text-left px-3 py-1 my-0.5 rounded-md ml-2 text-[10px] ${
+                  activeItem === item.id
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+            {/* Cover the lower half of the stem so it ends at the midpoint of the last item */}
+            <div className="pointer-events-none absolute left-0 bottom-0 w-[2px] h-3 bg-white" />
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 h-screen flex flex-col">
-      {/* Make only the main nav scrollable */}
-      <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-        {mainNavItems.map((item) => (
-          <NavItem
-            key={item.id}
-            icon={item.icon}
-            label={item.label}
-            isActive={activeItem === item.id}
-            onClick={() => onItemClick(item.id)}
-          />
+    <aside
+      className={`h-screen sticky top-0 bg-white shadow-sm border-r border-gray-200 flex flex-col relative ${
+        collapsed ? 'w-16' : 'w-56'
+      } transition-all duration-200`}
+    >
+      {/* Floating collapse/expand toggle */}
+      <button
+        className="absolute -right-3 top-10 z-20 h-9 w-9 flex items-center justify-center rounded-2xl bg-white border border-gray-200 shadow-md hover:shadow-lg text-gray-800"
+        onClick={() => setCollapsed((c) => !c)}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+      </button>
+      {/* Header */}
+      <div className="p-3 flex items-center justify-between">
+        {collapsed ? (
+          <div className="h-10 w-10 rounded-full overflow-hidden">
+            <img src="https://i.pravatar.cc/100?img=5" alt="avatar" />
+          </div>
+        ) : (
+          <Avatar />
+        )}
+        {/* toggle moved to floating button */}
+      </div>
+      {/* Header divider */}
+      <div className="mx-3 border-t border-gray-200" />
+
+      <div className="px-3 mt-2 overflow-y-auto">
+        {sections.map((section) => (
+          <div key={section.id} className="mb-4">
+            <p className={`px-2 text-[8px] tracking-widest text-gray-400 ${collapsed ? 'text-center' : ''}`}>
+              {section.title}
+            </p>
+            <div className={`mt-2 ${collapsed ? 'space-y-3' : ''}`}>
+              {section.groups.map((g) => renderGroup(g))}
+            </div>
+            {/* Divider between MAIN and ACCOUNT */}
+            {section.id === 'main' && (
+              <div className="my-3 border-t border-gray-200" />
+            )}
+          </div>
         ))}
-      </nav>
-      {/* Bottom nav stays fixed */}
-      <div className="border-t border-gray-200 px-4 py-4 space-y-1">
-        {bottomNavItems.map((item) => (
-          <NavItem
-            key={item.id}
-            icon={item.icon}
-            label={item.label}
-            isActive={activeItem === item.id}
-            onClick={() => onItemClick(item.id)}
-          />
-        ))}
+      </div>
+
+      {/* Footer actions when expanded/collapsed */}
+      <div className="mt-auto p-3">
+        <button
+          onClick={() => onItemClick && onItemClick('help')}
+          className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start space-x-3'} px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50`}
+          title={collapsed ? 'Help' : undefined}
+        >
+          <AlertTriangle size={18} />
+          {!collapsed && <span className="text-[10px]">Help</span>}
+        </button>
+        <button
+          onClick={() => onItemClick && onItemClick('logout')}
+          className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start space-x-3'} px-3 py-1.5 mt-2 rounded-lg text-red-600 hover:bg-red-50`}
+          title={collapsed ? 'Logout' : undefined}
+        >
+          <LogOut size={18} />
+          {!collapsed && <span className="text-[10px] font-medium">Logout Account</span>}
+        </button>
       </div>
     </aside>
   );
