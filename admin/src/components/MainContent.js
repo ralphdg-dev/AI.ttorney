@@ -5,6 +5,7 @@ import PlaceholderPage from '../pages/PlaceholderPage';
 import ManageLegalSeekers from '../pages/users/ManageLegalSeekers';
 import ManageLawyers from '../pages/users/ManageLawyers';
 import ManageLawyerApplications from '../pages/users/ManageLawyerApplications';
+import ManageAdmins from '../pages/users/ManageAdmins';
 import { getBreadcrumbForItem } from '../components/menuConfig';
 
 const MainContent = ({ activeItem }) => {
@@ -14,6 +15,7 @@ const MainContent = ({ activeItem }) => {
     if (activeItem === 'manage-legal-seekers') return <ManageLegalSeekers />;
     if (activeItem === 'manage-lawyers') return <ManageLawyers />;
     if (activeItem === 'lawyer-applications') return <ManageLawyerApplications />;
+    if (activeItem === 'manage-admins') return <ManageAdmins />;
 
     // Derive a sensible title from breadcrumbs (last segment)
     const crumbs = getBreadcrumbForItem(activeItem);
