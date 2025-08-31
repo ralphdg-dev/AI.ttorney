@@ -8,6 +8,7 @@ import ManageLawyerApplications from '../pages/users/ManageLawyerApplications';
 import ManageAdmins from '../pages/users/ManageAdmins';
 import ManageGlossaryTerms from '../pages/content/ManageGlossaryTerms';
 import ManageLegalArticles from '../pages/content/ManageLegalArticles';
+import Login from '../pages/auth/Login';
 import { getBreadcrumbForItem } from '../components/menuConfig';
 
 const MainContent = ({ activeItem }) => {
@@ -20,6 +21,7 @@ const MainContent = ({ activeItem }) => {
     if (activeItem === 'manage-admins') return <ManageAdmins />;
     if (activeItem === 'manage-glossary-terms') return <ManageGlossaryTerms />;
     if (activeItem === 'manage-legal-articles') return <ManageLegalArticles />;
+    if (activeItem === 'login') return <Login />;
 
     // Derive a sensible title from breadcrumbs (last segment)
     const crumbs = getBreadcrumbForItem(activeItem);
