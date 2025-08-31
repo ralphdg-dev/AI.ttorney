@@ -1,98 +1,8 @@
 import React from 'react';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Home,
-  Users,
-  UserCheck,
-  FileText,
-  Ban,
-  Shield,
-  BookOpen,
-  ListChecks,
-  MessageSquare,
-  AlertTriangle,
-  Ticket,
-  History,
-  BarChart3,
-  Settings,
-  LogOut,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home, AlertTriangle, LogOut, Settings } from 'lucide-react';
+import { sections } from './menuConfig';
 
-// Menu configuration
-const sections = [
-  {
-    id: 'main',
-    title: 'MAIN',
-    groups: [
-      {
-        icon: Users,
-        label: 'Users',
-        items: [
-          { id: 'manage-legal-seekers', label: 'Manage Legal Seekers' },
-          { id: 'manage-lawyers', label: 'Manage Lawyers' },
-          { id: 'lawyer-applications', label: 'Lawyer Applications' },
-          { id: 'suspended-accounts', label: 'Suspended Accounts' },
-        ],
-      },
-      {
-        icon: Shield,
-        label: 'Admin',
-        items: [
-          { id: 'manage-admins', label: 'Manage Admins' },
-          { id: 'audit-logs', label: 'Audit Logs' },
-        ],
-      },
-      {
-        icon: BookOpen,
-        label: 'Legal Resources',
-        items: [
-          { id: 'manage-glossary-terms', label: 'Manage Glossary Terms' },
-          { id: 'manage-legal-articles', label: 'Manage Legal Articles' },
-        ],
-      },
-      {
-        icon: MessageSquare,
-        label: 'Forum',
-        items: [
-          { id: 'manage-topics-threads', label: 'Manage Topics & Threads' },
-          { id: 'reported-posts', label: 'Reported Posts' },
-          { id: 'ban-restrict-users', label: 'Ban/Restrict Users' },
-        ],
-      },
-      {
-        icon: Ticket,
-        label: 'Report Tickets',
-        items: [
-          { id: 'open-tickets', label: 'Open Tickets' },
-          { id: 'assigned-tickets', label: 'Assigned Tickets' },
-          { id: 'ticket-history', label: 'Ticket History' },
-        ],
-      },
-      {
-        icon: BarChart3,
-        label: 'Analytics',
-        items: [
-          { id: 'user-analytics', label: 'User Analytics' },
-          { id: 'content-analytics', label: 'Content Analytics' },
-          { id: 'forum-analytics', label: 'Forum Analytics' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'account',
-    groups: [
-      {
-        icon: Settings,
-        label: 'Settings',
-        items: [
-          { id: 'settings', label: 'Settings' },
-        ],
-      },
-    ],
-  },
-];
+// sections now imported from menuConfig
 
 const Avatar = () => (
   <div className="flex items-center space-x-3">
@@ -148,7 +58,7 @@ const Sidebar = ({ activeItem, onItemClick }) => {
                 onClick={() => onItemClick && onItemClick(item.id)}
                 className={`relative w-full text-left px-3 py-1 my-0.5 rounded-md ml-2 text-[10px] ${
                   activeItem === item.id
-                    ? 'bg-blue-50 text-blue-700'
+                    ? 'bg-gray-50 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
@@ -197,9 +107,44 @@ const Sidebar = ({ activeItem, onItemClick }) => {
             <p className={`px-2 text-[8px] tracking-widest text-gray-400 ${collapsed ? 'text-center' : ''}`}>
               {section.title}
             </p>
-            <div className={`mt-2 ${collapsed ? 'space-y-3' : ''}`}>
-              {section.groups.map((g) => renderGroup(g))}
-            </div>
+            {/* Dashboard button under MAIN */}
+            {section.id === 'main' && (
+              <div className="mt-2">
+                <button
+                  onClick={() => onItemClick && onItemClick('dashboard')}
+                  className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start space-x-2'} px-3 py-1.5 rounded-lg text-[11px] ${
+                    activeItem === 'dashboard'
+                      ? 'bg-gray-50 text-gray-900'
+                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                  title={collapsed ? 'Dashboard' : undefined}
+                >
+                  <Home size={16} className="text-gray-600" />
+                  {!collapsed && <span className="text-[11px] font-medium">Dashboard</span>}
+                </button>
+              </div>
+            )}
+            {/* Section content */}
+            {section.id === 'account' ? (
+              <div className="mt-2">
+                <button
+                  onClick={() => onItemClick && onItemClick('settings')}
+                  className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start space-x-2'} px-3 py-1.5 rounded-lg text-[11px] ${
+                    activeItem === 'settings'
+                      ? 'bg-gray-50 text-gray-900'
+                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                  title={collapsed ? 'Settings' : undefined}
+                >
+                  <Settings size={16} className="text-gray-600" />
+                  {!collapsed && <span className="text-[11px] font-medium">Settings</span>}
+                </button>
+              </div>
+            ) : (
+              <div className={`mt-2 ${collapsed ? 'space-y-3' : ''}`}>
+                {section.groups.map((g) => renderGroup(g))}
+              </div>
+            )}
             {/* Divider between MAIN and ACCOUNT */}
             {section.id === 'main' && (
               <div className="my-3 border-t border-gray-200" />

@@ -1,7 +1,7 @@
 import React from 'react';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
-
+import Header from './components/Header';
 
 const App = () => {
   const [activeItem, setActiveItem] = React.useState('dashboard');
@@ -21,7 +21,10 @@ const App = () => {
           activeItem={activeItem} 
           onItemClick={handleNavItemClick} 
         />
-        <MainContent activeItem={activeItem} />
+        <div className="flex-1 flex flex-col">
+          <Header activeItem={activeItem} />
+          <MainContent activeItem={activeItem} />
+        </div>
       </div>
     </div>
   );

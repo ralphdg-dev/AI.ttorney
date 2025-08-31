@@ -1,22 +1,33 @@
 import React from 'react';
-import { User } from 'lucide-react';
-import logo from '../assets/images/logo.png';
+import { LayoutGrid } from 'lucide-react';
+import { getBreadcrumbForItem } from './menuConfig';
 
-const Header = ({ username }) => (
-  <header className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-    <div className="flex items-center space-x-3">
-      <div className="w-6 h-6 flex items-center justify-center overflow-hidden">
-        <img src={logo} alt="Logo" className="w-12 h-12 object-contain" />
+const Header = ({ activeItem }) => {
+  const crumbs = getBreadcrumbForItem(activeItem);
+
+  return (
+    <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+      <nav aria-label="Breadcrumb" className="flex items-center">
+        <LayoutGrid size={16} className="text-gray-500 mr-2" />
+        <ol className="flex items-center text-[11px]">
+          {crumbs.map((c, idx) => (
+            <li key={`${c}-${idx}`} className="flex items-center">
+              <span className={`whitespace-nowrap ${idx === crumbs.length - 1 ? 'font-semibold text-gray-900' : 'text-gray-500'}`}>{c}</span>
+              {idx < crumbs.length - 1 && (
+                <span className="mx-3 text-gray-300">/</span>
+              )}
+            </li>
+          ))}
+        </ol>
+      </nav>
+      <div className="flex items-center space-x-4 opacity-0 select-none">
+        {/* Right side actions placeholder (kept minimal to match screenshot) */}
+        <span className="w-2 h-2 bg-gray-200 rounded-full" />
+        <span className="w-2 h-2 bg-gray-200 rounded-full" />
+        <span className="w-2 h-2 bg-gray-200 rounded-full" />
       </div>
-      <h1 className="text-xl font-semibold text-gray-900">Ai.ttorney</h1>
-    </div>
-    <div className="flex items-center space-x-4">
-      <span className="text-lg font-medium text-gray-700">Hi, {username}!</span>
-      <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-        <User size={18} className="text-gray-600" />
-      </div>
-    </div>
-  </header>
-);
+    </header>
+  );
+};
 
 export default Header;
