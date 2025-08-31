@@ -12,7 +12,7 @@ const Header = ({ activeItem }) => {
         <ol className="flex items-center text-[11px]">
           {crumbs.map((c, idx) => (
             <li key={`${c}-${idx}`} className="flex items-center">
-              <span className={`whitespace-nowrap ${idx === crumbs.length - 1 ? 'font-semibold text-gray-900' : 'text-gray-500'}`}>{c}</span>
+              <span className={`whitespace-nowrap ${idx === crumbs.length - 1 ? 'text-gray-900' : 'text-gray-500'}`}>{c}</span>
               {idx < crumbs.length - 1 && (
                 <span className="mx-3 text-gray-300">/</span>
               )}
