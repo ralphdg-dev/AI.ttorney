@@ -1,13 +1,14 @@
 import React from 'react';
 import { Users, Eye, Archive, Check, X, Pencil } from 'lucide-react';
+import ViewLawyerApplicationModal from '../../components/lawyers/ViewLawyerApplicationModal';
 import DataTable from '../../components/ui/DataTable';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 
 const sampleApplications = [
-  { name: 'Atty. Paolo Reyes', email: 'paolo.reyes@example.com', rollNumber: 'RN-2024-01234', rollSignDate: '2024-02-10', status: 'Pending' },
-  { name: 'Atty. Nina Cruz', email: 'nina.cruz@example.com', rollNumber: 'RN-2023-09876', rollSignDate: '2023-09-18', status: 'Verified' },
-  { name: 'Atty. Marco Villanueva', email: 'marco.v@example.com', rollNumber: 'RN-2022-05555', rollSignDate: '2022-06-30', status: 'Rejected' },
+  { name: 'Atty. Paolo Reyes', email: 'paolo.reyes@example.com', rollNumber: 'RN-2024-01234', rollSignDate: '2024-02-10', registered: '2024-02-05', praStatus: 'Matched', status: 'Pending' },
+  { name: 'Atty. Nina Cruz', email: 'nina.cruz@example.com', rollNumber: 'RN-2023-09876', rollSignDate: '2023-09-18', registered: '2023-09-10', praStatus: 'Matched', status: 'Verified' },
+  { name: 'Atty. Marco Villanueva', email: 'marco.v@example.com', rollNumber: 'RN-2022-05555', rollSignDate: '2022-06-30', registered: '2022-06-20', praStatus: 'Not Found', status: 'Rejected' },
 ];
 
 const StatusBadge = ({ status }) => {
@@ -20,15 +21,41 @@ const StatusBadge = ({ status }) => {
   return <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>{status}</span>;
 };
 
+const RollMatchBadge = ({ status }) => {
+  const s = (status || '').toLowerCase();
+  const isMatched = s === 'matched';
+  const styles = isMatched
+    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+    : 'bg-red-50 text-red-700 border border-red-200';
+  const label = isMatched ? 'Matched' : 'Not Found';
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
+      {label}
+    </span>
+  );
+};
+
 const ManageLawyerApplications = () => {
   const [query, setQuery] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState('All');
   const [sortBy, setSortBy] = React.useState('Newest');
+  const [viewOpen, setViewOpen] = React.useState(false);
+  const [selected, setSelected] = React.useState(null);
+
+  const openView = (row) => {
+    setSelected(row);
+    setViewOpen(true);
+  };
 
   const columns = [
     { key: 'name', header: 'Full Name' },
     { key: 'email', header: 'Email' },
-    { key: 'rollNumber', header: 'Roll Number' },
+    { key: 'rollNumber', header: 'Roll Number', render: (row) => (
+      <div className="flex items-center gap-2">
+        <span>{row.rollNumber}</span>
+        <RollMatchBadge status={row.praStatus} />
+      </div>
+    ) },
     { key: 'rollSignDate', header: 'Roll Sign Date' },
     { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
     {
@@ -54,9 +81,13 @@ const ManageLawyerApplications = () => {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      render: () => (
+      render: (row) => (
         <div className="flex items-center justify-end space-x-2 text-gray-600">
-          <Tooltip content="View"><button className="p-1 rounded hover:bg-gray-100" aria-label="View"><Eye size={16} /></button></Tooltip>
+          <Tooltip content="View">
+            <button className="p-1 rounded hover:bg-gray-100" aria-label="View" onClick={() => openView(row)}>
+              <Eye size={16} />
+            </button>
+          </Tooltip>
           <Tooltip content="Edit"><button className="p-1 rounded hover:bg-gray-100" aria-label="Edit"><Pencil size={16} /></button></Tooltip>
           <Tooltip content="Archive"><button className="p-1 rounded hover:bg-gray-100" aria-label="Archive"><Archive size={16} /></button></Tooltip>
         </div>
@@ -113,6 +144,13 @@ const ManageLawyerApplications = () => {
 
       {/* Table */}
       <DataTable columns={columns} data={filteredData} rowKey={(r) => r.email} dense />
+
+      {/* View Modal */}
+      <ViewLawyerApplicationModal
+        open={viewOpen}
+        onClose={() => setViewOpen(false)}
+        application={selected}
+      />
     </div>
   );
 };
