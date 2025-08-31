@@ -532,7 +532,7 @@ export default function UserRegistration() {
             >
               Terms of Service
             </Text>
-            .
+            <Text>.</Text>
           </Text>
         </TouchableOpacity>
 
@@ -665,15 +665,23 @@ export default function UserRegistration() {
 
         {/* Google sign up */}
         <TouchableOpacity
-          className="py-3.5 rounded-lg items-center justify-center border border-gray-300 bg-white flex-row"
+          className="py-3 rounded-lg flex-row items-center justify-center mb-3 border border-gray-300 bg-white"
+          style={{
+            width: screenWidth - 64,
+            height: 56,
+            alignSelf: 'center',
+          }}
           onPress={() => { /* TODO: google sign up */ }}
+          activeOpacity={0.8}
         >
           <Image
             source={require('../../assets/images/registration/google.png')}
             style={{ width: 20, height: 20, marginRight: 8 }}
             resizeMode="contain"
           />
-          <Text className={`font-semibold text-gray-900 ${isDesktop ? 'text-lg' : isTablet ? 'text-base' : 'text-base'}`}>Sign Up with Google</Text>
+          <Text className="text-gray-900 font-semibold text-lg">
+            Sign Up with Google
+          </Text>
         </TouchableOpacity>
 
         {/* Bottom link */}
