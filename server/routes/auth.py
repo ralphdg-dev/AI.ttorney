@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends, status
-from auth.models import UserSignUp, UserSignIn, UserResponse, PasswordReset, TokenResponse, SendOTPRequest, VerifyOTPRequest, OTPResponse
+from fastapi import APIRouter, HTTPException, Depends
+from auth.models import UserSignUp, UserSignIn, OTPRequest, VerifyOTPRequest, OTPResponse, PasswordReset, SendOTPRequest
 from auth.service import AuthService
 from services.otp_service import OTPService
-from middleware.auth import get_current_user, get_current_active_user
+from middleware.auth import get_current_user
+from pydantic import BaseModel
 from typing import Dict, Any
 import logging
 
@@ -58,19 +59,35 @@ async def sign_out():
     
     if not result["success"]:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=400,
             detail=result["error"]
         )
     
     return {"message": "Sign out successful"}
 
-@router.get("/me", response_model=Dict[str, Any])
-async def get_me(current_user: Dict[str, Any] = Depends(get_current_active_user)):
-    """Get current user profile"""
-    return {
-        "user": current_user["user"],
-        "profile": current_user["profile"]
-    }
+@router.get("/me")
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+    """Get current user information"""
+    return {"success": True, "user": current_user}
+
+class ValidationRequest(BaseModel):
+    value: str
+
+@router.post("/check-email")
+async def check_email_exists(request: ValidationRequest):
+    """Check if email already exists"""
+    result = await auth_service.check_email_exists(request.value)
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return {"exists": result["exists"]}
+
+@router.post("/check-username") 
+async def check_username_exists(request: ValidationRequest):
+    """Check if username already exists"""
+    result = await auth_service.check_username_exists(request.value)
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return {"exists": result["exists"]}
 
 @router.post("/reset-password")
 async def reset_password(reset_data: PasswordReset):

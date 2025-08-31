@@ -8,6 +8,10 @@ interface ApiResponse<T = any> {
   data?: T;
   message?: string;
   error?: string;
+  locked_out?: boolean;
+  retry_after?: number;
+  attempts_remaining?: number;
+  success?: boolean;
 }
 
 class ApiClient {
@@ -46,10 +50,10 @@ class ApiClient {
         throw new Error(data.detail || data.message || 'Request failed');
       }
 
-      return { data };
+      return { data, success: true };
     } catch (error) {
       console.error('API request failed:', error);
-      return { error: error instanceof Error ? error.message : 'Unknown error' };
+      return { error: error instanceof Error ? error.message : 'Unknown error', success: false };
     }
   }
 
@@ -89,10 +93,24 @@ class ApiClient {
     return this.request('/auth/me');
   }
 
-  async resetPassword(email: string): Promise<ApiResponse> {
+  async resetPassword(data: { email: string }): Promise<ApiResponse> {
     return this.request('/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ email }),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async checkEmailExists(email: string): Promise<ApiResponse> {
+    return this.request('/auth/check-email', {
+      method: 'POST',
+      body: JSON.stringify({ value: email }),
+    });
+  }
+
+  async checkUsernameExists(username: string): Promise<ApiResponse> {
+    return this.request('/auth/check-username', {
+      method: 'POST',
+      body: JSON.stringify({ value: username }),
     });
   }
 

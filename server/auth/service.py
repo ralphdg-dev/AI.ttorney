@@ -149,3 +149,21 @@ class AuthService:
         except Exception as e:
             logger.error(f"Mark user verified error: {str(e)}")
             return {"success": False, "error": str(e)}
+    
+    async def check_email_exists(self, email: str) -> Dict[str, Any]:
+        """Check if email already exists in the system"""
+        try:
+            response = await self.supabase.check_user_exists("email", email)
+            return response
+        except Exception as e:
+            logger.error(f"Check email exists error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    async def check_username_exists(self, username: str) -> Dict[str, Any]:
+        """Check if username already exists in the system"""
+        try:
+            response = await self.supabase.check_user_exists("username", username)
+            return response
+        except Exception as e:
+            logger.error(f"Check username exists error: {str(e)}")
+            return {"success": False, "error": str(e)}

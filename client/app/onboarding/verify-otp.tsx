@@ -21,9 +21,12 @@ export default function VerifyOTP() {
 
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
-  const [resendTimer, setResendTimer] = useState(30);
+  const [resendTimer, setResendTimer] = useState(120); // 2 minutes
   const [canResend, setCanResend] = useState(false);
   const [error, setError] = useState("");
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
+  const [isLockedOut, setIsLockedOut] = useState(false);
+  const [lockoutTimer, setLockoutTimer] = useState(0);
 
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
@@ -43,6 +46,24 @@ export default function VerifyOTP() {
     }
     return () => clearInterval(interval);
   }, [resendTimer, canResend]);
+
+  // Timer for lockout countdown
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (lockoutTimer > 0) {
+      interval = setInterval(() => {
+        setLockoutTimer((prev) => {
+          if (prev <= 1) {
+            setIsLockedOut(false);
+            setError("");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [lockoutTimer]);
 
   // Focus first input on mount
   useEffect(() => {
@@ -90,16 +111,36 @@ export default function VerifyOTP() {
 
       if (result.error) {
         setError(result.error);
+        
+        // Handle lockout scenario
+        if (result.locked_out) {
+          setIsLockedOut(true);
+          setLockoutTimer(result.retry_after || 900); // 15 minutes default
+          setOtp(["", "", "", "", "", ""]); // Clear OTP inputs
+        }
+        
+        // Handle OTP expiration - enable resend immediately
+        if (result.error.includes("expired") || result.error.includes("not found")) {
+          setCanResend(true);
+          setResendTimer(0);
+          setOtp(["", "", "", "", "", ""]); // Clear OTP inputs
+        }
+        
+        // Handle attempts remaining
+        if (result.attempts_remaining !== undefined) {
+          setAttemptsRemaining(result.attempts_remaining);
+        }
       } else {
-        Alert.alert("Success", "Email verified successfully!", [
-          {
-            text: "OK",
-            onPress: () => {
-              // Navigate to role selection page
-              router.replace('/role-selection');
-            },
-          },
-        ]);
+        // Success case - OTP verified successfully
+        console.log('OTP verification successful, navigating to role selection');
+        // Clear states and navigate
+        setOtp(["", "", "", "", "", ""]);
+        setError("");
+        setAttemptsRemaining(null);
+        setIsLockedOut(false);
+        
+        console.log('Navigating to role selection...');
+        router.replace('/role-selection');
       }
     } catch {
       setError("Verification failed. Please try again.");
@@ -123,9 +164,12 @@ export default function VerifyOTP() {
       }
 
       setCanResend(false);
-      setResendTimer(30);
+      setResendTimer(120); // 2 minutes
       setOtp(["", "", "", "", "", ""]);
       setError("");
+      setAttemptsRemaining(null);
+      setIsLockedOut(false);
+      setLockoutTimer(0);
 
       Alert.alert("Code Sent", "A new verification code has been sent to your email.");
       inputRefs.current[0]?.focus();
@@ -134,14 +178,6 @@ export default function VerifyOTP() {
     }
   };
 
-  const maskEmail = (email: string) => {
-    const [localPart, domain] = email.split("@");
-    if (localPart.length <= 2) {
-      return `${localPart[0]}***@${domain}`;
-    }
-    const masked = localPart[0] + "*".repeat(localPart.length - 2) + localPart.slice(-1);
-    return `${masked}@${domain}`;
-  };
 
   const isOtpComplete = otp.every((digit) => digit !== "");
 
@@ -159,35 +195,39 @@ export default function VerifyOTP() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Header */}
-        <Box className="flex-row items-center justify-between px-6 pt-12 pb-4 md:pt-16">
+        <Box className="flex-row justify-between items-center px-6 pt-12 pb-4 md:pt-16">
           <BackButton onPress={() => router.push("/onboarding/registration")} />
         </Box>
 
         {/* Main Content */}
-        <VStack className="flex-1 justify-center px-6 max-w-md mx-auto w-full">
+        <VStack className="flex-1 justify-center px-6 mx-auto w-full max-w-md">
           {/* Image and Title */}
           <VStack className="items-center mb-8">
             <Image
               source={otpsent}
-              className="w-36 h-36 mb-4"
+              className="mb-4 w-36 h-36"
               resizeMode="contain"
               alt="OTP Sent"
             />
-            <Text className="text-2xl font-bold text-center mb-4 text-gray-900">
+            <Text className="mb-4 text-2xl font-bold text-center text-gray-900">
               Verify Your Email
             </Text>
-            <Text className="text-base text-center text-gray-600 leading-6">
-              We&apos;ve sent a code to{" "}
-              <Text className="font-semibold text-gray-900">
-                {maskEmail(email)}
+            <VStack className="items-center space-y-1">
+              <Text className="text-base text-center text-gray-600">
+                We&apos;ve sent a code to
               </Text>
-              . Enter it below to continue.
-            </Text>
+              <Text className="text-base font-semibold text-gray-900">
+                {email}
+              </Text>
+              <Text className="text-base text-center text-gray-600">
+                Enter it below to continue.
+              </Text>
+            </VStack>
           </VStack>
 
           {/* OTP Input */}
           <VStack className="items-center mb-8">
-            <HStack className="justify-center items-center space-x-2 mb-4">
+            <HStack className="justify-center items-center mb-4 space-x-2">
               {otp.map((digit, index) => (
                 <TextInput
                   key={index}
@@ -196,8 +236,8 @@ export default function VerifyOTP() {
                     error
                       ? "border-red-500"
                       : digit
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-300 bg-white"
+                      ? "bg-blue-50 border-blue-500"
+                      : "bg-white border-gray-300"
                   }`}
                   style={{ color: Colors.text.head }}
                   value={digit}
@@ -212,8 +252,22 @@ export default function VerifyOTP() {
             </HStack>
 
             {error && (
-              <Text className="text-red-500 text-center text-sm px-4">
+              <Text className="px-4 text-sm text-center text-red-500">
                 {error}
+              </Text>
+            )}
+
+            {/* Show attempts remaining */}
+            {attemptsRemaining !== null && attemptsRemaining > 0 && !isLockedOut && (
+              <Text className="px-4 mt-2 text-sm text-center text-orange-500">
+                {attemptsRemaining} attempt(s) remaining
+              </Text>
+            )}
+
+            {/* Show lockout timer */}
+            {isLockedOut && lockoutTimer > 0 && (
+              <Text className="px-4 mt-2 text-sm font-semibold text-center text-red-600">
+                Account temporarily locked. Try again in {Math.floor(lockoutTimer / 60)}:{(lockoutTimer % 60).toString().padStart(2, '0')}
               </Text>
             )}
           </VStack>
@@ -221,26 +275,31 @@ export default function VerifyOTP() {
       </ScrollView>
 
       {/* Bottom Section - Match onboarding pattern */}
-      <Box className="px-6 pb-12 mt-8 relative">
+      <Box className="relative px-6 pb-12 mt-8">
         <PrimaryButton
           title={isLoading ? "Verifying..." : "Verify"}
           onPress={handleVerifyOTP}
-          disabled={isLoading || !isOtpComplete}
+          disabled={isLoading || !isOtpComplete || isLockedOut}
           loading={isLoading}
         />
 
         {/* Resend Code - Below button like ActionLink */}
-        <Box className="absolute bottom-8 left-0 right-0 items-center px-4 sm:px-6 md:px-8">
-          <Text className="text-center text-sm sm:text-base" style={{ color: Colors.text.sub }}>
+        <Box className="absolute right-0 left-0 bottom-8 items-center px-4 sm:px-6 md:px-8">
+          <Text className="text-sm text-center sm:text-base" style={{ color: Colors.text.sub }}>
             Didn&apos;t receive code?{" "}
             <Text
-              className="font-bold text-sm sm:text-base"
+              className="text-sm font-bold sm:text-base"
               style={{
-                color: canResend ? Colors.primary.blue : '#9ca3af'
+                color: (canResend && !isLockedOut) ? Colors.primary.blue : '#9ca3af'
               }}
-              onPress={handleResendOTP}
+              onPress={!isLockedOut ? handleResendOTP : undefined}
             >
-              {canResend ? "Resend OTP" : `Resend OTP (${resendTimer}s)`}
+              {isLockedOut 
+                ? "Resend unavailable (locked out)" 
+                : canResend 
+                  ? "Resend OTP" 
+                  : `Resend OTP (${Math.floor(resendTimer / 60)}:${(resendTimer % 60).toString().padStart(2, '0')})`
+              }
             </Text>
           </Text>
         </Box>

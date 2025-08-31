@@ -45,6 +45,10 @@ class TokenResponse(BaseModel):
     user: UserResponse
 
 # OTP-related models
+class OTPRequest(BaseModel):
+    email: EmailStr
+    otp_type: Literal["email_verification", "password_reset"]
+
 class SendOTPRequest(BaseModel):
     email: EmailStr
     otp_type: Literal["email_verification", "password_reset"]

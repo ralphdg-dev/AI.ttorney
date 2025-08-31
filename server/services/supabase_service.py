@@ -228,6 +228,55 @@ class SupabaseService:
             logger.error(f"Update user profile error: {str(e)}")
             return {"success": False, "error": str(e)}
     
+    async def check_user_exists(self, field: str, value: str) -> Dict[str, Any]:
+        """Check if a user exists by field (email or username) in both auth.users and public.users"""
+        try:
+            async with httpx.AsyncClient() as client:
+                # For email, check both auth.users and public.users tables
+                if field == "email":
+                    # Check auth.users table first
+                    auth_response = await client.get(
+                        f"{self.auth_url}/admin/users",
+                        headers=self._get_headers(use_service_key=True),
+                        params={"email": value}
+                    )
+                    
+                    if auth_response.status_code == 200:
+                        auth_data = auth_response.json()
+                        # Check if any users found in auth table
+                        if auth_data and len(auth_data) > 0:
+                            return {
+                                "success": True,
+                                "exists": True,
+                                "data": auth_data
+                            }
+                
+                # Check public.users table (for both email and username)
+                response = await client.get(
+                    f"{self.rest_url}/users",
+                    headers=self._get_headers(use_service_key=True),
+                    params={
+                        "select": "id",
+                        field: f"eq.{value}"
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    exists = len(data) > 0
+                    return {
+                        "success": True,
+                        "exists": exists,
+                        "data": data
+                    }
+                else:
+                    logger.error(f"Check user exists error: {response.status_code} - {response.text}")
+                    return {"success": False, "error": f"Database query failed: {response.status_code}"}
+                    
+        except Exception as e:
+            logger.error(f"Check user exists error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
     async def test_connection(self) -> Dict[str, Any]:
         """Test Supabase connection"""
         try:

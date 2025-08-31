@@ -49,6 +49,14 @@ class OTPService:
         """Generate Redis key for OTP storage"""
         return f"otp:{otp_type}:{email}"
     
+    def get_attempts_key(self, email: str, otp_type: str) -> str:
+        """Generate Redis key for OTP attempt tracking"""
+        return f"otp_attempts:{otp_type}:{email}"
+    
+    def get_lockout_key(self, email: str, otp_type: str) -> str:
+        """Generate Redis key for OTP lockout tracking"""
+        return f"otp_lockout:{otp_type}:{email}"
+    
     async def send_verification_otp(self, email: str, user_name: str = "User") -> Dict[str, Any]:
         """Send OTP for email verification"""
         try:
@@ -56,7 +64,7 @@ class OTPService:
             
             # Generate OTP
             otp_code = self.generate_otp()
-            ttl_seconds = 600  # 10 minutes
+            ttl_seconds = 120  # 2 minutes
             
             # Hash the OTP
             otp_hash = self.hash_otp(otp_code)
@@ -70,6 +78,14 @@ class OTPService:
             }
             
             await self.redis_client.setex(redis_key, ttl_seconds, json.dumps(otp_data))
+            
+            # Reset attempt counter when new OTP is sent
+            attempts_key = self.get_attempts_key(email, "email_verification")
+            await self.redis_client.delete(attempts_key)
+            
+            # Clear any existing lockout
+            lockout_key = self.get_lockout_key(email, "email_verification")
+            await self.redis_client.delete(lockout_key)
             logger.info(f"OTP stored in Redis with key: {redis_key}, TTL: {ttl_seconds}s")
             
             # Send email via Resend
@@ -79,7 +95,7 @@ class OTPService:
                 return {
                     "success": True,
                     "message": "Verification OTP sent successfully",
-                    "expires_in_minutes": 10
+                    "expires_in_minutes": 2
                 }
             else:
                 return {"success": False, "error": email_response["error"]}
@@ -95,7 +111,7 @@ class OTPService:
             
             # Generate OTP
             otp_code = self.generate_otp()
-            ttl_seconds = 900  # 15 minutes
+            ttl_seconds = 120  # 2 minutes
             
             # Hash the OTP
             otp_hash = self.hash_otp(otp_code)
@@ -109,6 +125,14 @@ class OTPService:
             }
             
             await self.redis_client.setex(redis_key, ttl_seconds, json.dumps(otp_data))
+            
+            # Reset attempt counter when new OTP is sent
+            attempts_key = self.get_attempts_key(email, "password_reset")
+            await self.redis_client.delete(attempts_key)
+            
+            # Clear any existing lockout
+            lockout_key = self.get_lockout_key(email, "password_reset")
+            await self.redis_client.delete(lockout_key)
             logger.info(f"OTP stored in Redis with key: {redis_key}, TTL: {ttl_seconds}s")
             
             # Send email via Resend
@@ -118,7 +142,7 @@ class OTPService:
                 return {
                     "success": True,
                     "message": "Password reset OTP sent successfully",
-                    "expires_in_minutes": 15
+                    "expires_in_minutes": 2
                 }
             else:
                 return {"success": False, "error": email_response["error"]}
@@ -128,11 +152,25 @@ class OTPService:
             return {"success": False, "error": str(e)}
     
     async def verify_otp(self, email: str, otp_code: str, otp_type: str) -> Dict[str, Any]:
-        """Verify OTP code"""
+        """Verify OTP code with attempt tracking and lockout"""
         try:
             await self._ensure_redis_connection()
             
-            # Get Redis key
+            # Check if user is locked out
+            lockout_key = self.get_lockout_key(email, otp_type)
+            lockout_data = await self.redis_client.get(lockout_key)
+            
+            if lockout_data:
+                lockout_info = json.loads(lockout_data)
+                remaining_time = await self.redis_client.ttl(lockout_key)
+                return {
+                    "success": False, 
+                    "error": f"Too many failed attempts. Please try again in {remaining_time // 60} minutes and {remaining_time % 60} seconds.",
+                    "locked_out": True,
+                    "retry_after": remaining_time
+                }
+            
+            # Get Redis key for OTP
             redis_key = self.get_redis_key(email, otp_type)
             
             # Get stored OTP data from Redis
@@ -148,12 +186,50 @@ class OTPService:
             # Hash the provided OTP
             provided_hash = self.hash_otp(otp_code)
             
+            # Get current attempt count
+            attempts_key = self.get_attempts_key(email, otp_type)
+            current_attempts = await self.redis_client.get(attempts_key)
+            attempt_count = int(current_attempts) if current_attempts else 0
+            
             # Compare hashes
             if stored_hash != provided_hash:
-                return {"success": False, "error": "Invalid OTP code"}
+                # Increment attempt counter
+                attempt_count += 1
+                await self.redis_client.setex(attempts_key, 300, str(attempt_count))  # 5 minutes TTL for attempts
+                
+                # Check if max attempts reached
+                if attempt_count >= 5:
+                    # Set lockout for 15 minutes
+                    lockout_data = {
+                        "email": email,
+                        "attempts": attempt_count,
+                        "locked_at": asyncio.get_event_loop().time()
+                    }
+                    await self.redis_client.setex(lockout_key, 900, json.dumps(lockout_data))  # 15 minutes lockout
+                    
+                    # Delete the OTP and attempts to prevent further use
+                    await self.redis_client.delete(redis_key)
+                    await self.redis_client.delete(attempts_key)
+                    
+                    logger.warning(f"User {email} locked out after {attempt_count} failed OTP attempts")
+                    
+                    return {
+                        "success": False, 
+                        "error": "Too many failed attempts. Your account has been temporarily locked for 15 minutes.",
+                        "locked_out": True,
+                        "retry_after": 900
+                    }
+                
+                remaining_attempts = 5 - attempt_count
+                return {
+                    "success": False, 
+                    "error": f"Invalid OTP code. {remaining_attempts} attempt(s) remaining.",
+                    "attempts_remaining": remaining_attempts
+                }
             
-            # Delete OTP from Redis (single use)
+            # OTP is correct - delete OTP and attempts from Redis
             await self.redis_client.delete(redis_key)
+            await self.redis_client.delete(attempts_key)
             logger.info(f"OTP verified and deleted from Redis: {redis_key}")
             
             return {
@@ -226,7 +302,7 @@ class OTPService:
                     <h1 style="color: #2563eb; font-size: 32px; margin: 0; letter-spacing: 8px;">{otp_code}</h1>
                 </div>
                 
-                <p>This code will expire in <strong>10 minutes</strong>.</p>
+                <p>This code will expire in <strong>2 minutes</strong>.</p>
                 <p>If you didn't create an account with AI.ttorney, please ignore this email.</p>
                 
                 <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
@@ -258,7 +334,7 @@ class OTPService:
                     <h1 style="color: #dc2626; font-size: 32px; margin: 0; letter-spacing: 8px;">{otp_code}</h1>
                 </div>
                 
-                <p>This code will expire in <strong>15 minutes</strong>.</p>
+                <p>This code will expire in <strong>2 minutes</strong>.</p>
                 <p>If you didn't request a password reset, please ignore this email and your password will remain unchanged.</p>
                 
                 <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">

@@ -26,25 +26,25 @@ const SCOPE = 'TOAST';
 cssInterop(MotionView, { className: 'style' });
 
 const toastStyle = tva({
-  base: 'p-4 m-1 rounded-md gap-1 web:pointer-events-auto shadow-hard-5 border-outline-100',
+  base: 'px-4 py-3 mx-3 my-1 rounded-lg gap-1.5 web:pointer-events-auto',
   variants: {
     action: {
-      error: 'bg-error-800',
-      warning: 'bg-warning-700',
-      success: 'bg-success-700',
-      info: 'bg-info-700',
-      muted: 'bg-background-800',
+      error: 'bg-red-100',
+      warning: 'bg-amber-100',
+      success: 'bg-emerald-100',
+      info: 'bg-blue-100',
+      muted: 'bg-gray-100',
     },
 
     variant: {
       solid: '',
-      outline: 'border bg-background-0',
+      outline: 'bg-white border border-gray-200',
     },
   },
 });
 
 const toastTitleStyle = tva({
-  base: 'text-typography-0 font-medium font-body tracking-md text-left',
+  base: 'font-semibold tracking-md text-left',
   variants: {
     isTruncated: {
       true: '',
@@ -62,14 +62,14 @@ const toastTitleStyle = tva({
       '2xs': 'text-2xs',
       'xs': 'text-xs',
       'sm': 'text-sm',
-      'md': 'text-base',
-      'lg': 'text-lg',
-      'xl': 'text-xl',
-      '2xl': 'text-2xl',
-      '3xl': 'text-3xl',
-      '4xl': 'text-4xl',
-      '5xl': 'text-5xl',
-      '6xl': 'text-6xl',
+      'md': 'text-sm',
+      'lg': 'text-base',
+      'xl': 'text-lg',
+      '2xl': 'text-xl',
+      '3xl': 'text-2xl',
+      '4xl': 'text-3xl',
+      '5xl': 'text-4xl',
+      '6xl': 'text-5xl',
     },
   },
   parentVariants: {
@@ -78,44 +78,44 @@ const toastTitleStyle = tva({
       outline: '',
     },
     action: {
-      error: '',
-      warning: '',
-      success: '',
-      info: '',
-      muted: '',
+      error: 'text-red-700',
+      warning: 'text-amber-700',
+      success: 'text-emerald-700',
+      info: 'text-blue-700',
+      muted: 'text-gray-700',
     },
   },
   parentCompoundVariants: [
     {
       variant: 'outline',
       action: 'error',
-      class: 'text-error-800',
+      class: 'text-red-800',
     },
     {
       variant: 'outline',
       action: 'warning',
-      class: 'text-warning-800',
+      class: 'text-amber-800',
     },
     {
       variant: 'outline',
       action: 'success',
-      class: 'text-success-800',
+      class: 'text-emerald-800',
     },
     {
       variant: 'outline',
       action: 'info',
-      class: 'text-info-800',
+      class: 'text-blue-800',
     },
     {
       variant: 'outline',
       action: 'muted',
-      class: 'text-background-800',
+      class: 'text-gray-800',
     },
   ],
 });
 
 const toastDescriptionStyle = tva({
-  base: 'font-normal font-body tracking-md text-left',
+  base: 'font-normal tracking-md text-left',
   variants: {
     isTruncated: {
       true: '',
@@ -132,23 +132,57 @@ const toastDescriptionStyle = tva({
     size: {
       '2xs': 'text-2xs',
       'xs': 'text-xs',
-      'sm': 'text-sm',
-      'md': 'text-base',
-      'lg': 'text-lg',
-      'xl': 'text-xl',
-      '2xl': 'text-2xl',
-      '3xl': 'text-3xl',
-      '4xl': 'text-4xl',
-      '5xl': 'text-5xl',
-      '6xl': 'text-6xl',
+      'sm': 'text-xs',
+      'md': 'text-xs',
+      'lg': 'text-sm',
+      'xl': 'text-base',
+      '2xl': 'text-lg',
+      '3xl': 'text-xl',
+      '4xl': 'text-2xl',
+      '5xl': 'text-3xl',
+      '6xl': 'text-4xl',
     },
   },
   parentVariants: {
     variant: {
-      solid: 'text-typography-50',
-      outline: 'text-typography-900',
+      solid: '',
+      outline: '',
+    },
+    action: {
+      error: 'text-red-600',
+      warning: 'text-amber-600',
+      success: 'text-emerald-600',
+      info: 'text-blue-600',
+      muted: 'text-gray-600',
     },
   },
+  parentCompoundVariants: [
+    {
+      variant: 'outline',
+      action: 'error',
+      class: 'text-red-700',
+    },
+    {
+      variant: 'outline',
+      action: 'warning',
+      class: 'text-amber-700',
+    },
+    {
+      variant: 'outline',
+      action: 'success',
+      class: 'text-emerald-700',
+    },
+    {
+      variant: 'outline',
+      action: 'info',
+      class: 'text-blue-700',
+    },
+    {
+      variant: 'outline',
+      action: 'muted',
+      class: 'text-gray-700',
+    },
+  ],
 });
 
 const Root = withStyleContext(View, SCOPE);

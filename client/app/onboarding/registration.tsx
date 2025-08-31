@@ -1,13 +1,31 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Image, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Image, KeyboardAvoidingView, Platform, ActivityIndicator, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import BackButton from '../../components/ui/BackButton';
 import PrimaryButton from '../../components/ui/PrimaryButton';
-import Colors from '../../constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../lib/api-client';
+import { useToast, Toast, ToastTitle, ToastDescription } from '../../components/ui/toast';
 
 export default function UserRegistration() {
+  const toast = useToast();
+  
+  // Screen dimensions for responsive design
+  const { width: screenWidth } = Dimensions.get('window');
+  const isTablet = screenWidth >= 768;
+  const isDesktop = screenWidth >= 1024;
+  const isSmallScreen = screenWidth < 375;
+  
+  // Responsive values
+  const getResponsiveValue = (small: number, medium: number, large: number) => {
+    if (isDesktop) return large;
+    if (isTablet) return medium;
+    return small;
+  };
+  
+  const horizontalPadding = getResponsiveValue(24, 40, 60);
+  const logoSize = getResponsiveValue(110, 130, 150);
+  
   // Form state
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -20,6 +38,18 @@ export default function UserRegistration() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // Validation states
+  const [emailError, setEmailError] = useState('');
+  const [emailStatus, setEmailStatus] = useState<'none' | 'checking' | 'available' | 'taken' | 'invalid'>('none');
+  const [usernameError, setUsernameError] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState<'none' | 'checking' | 'available' | 'taken' | 'invalid'>('none');
+  const [passwordError, setPasswordError] = useState('');
+  const [validationLoading, setValidationLoading] = useState({ email: false, username: false });
+  
+  // Debounce timers for validation
+  const emailValidationTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const usernameValidationTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Date picker modal state (pattern reused from lawyer-reg)
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -36,60 +66,243 @@ export default function UserRegistration() {
     return `${mm}/${dd}/${yyyy}`;
   };
 
+  // Validation functions
+  const validateEmail = async (emailValue: string) => {
+    // Clear any existing timeout
+    if (emailValidationTimeout.current) {
+      clearTimeout(emailValidationTimeout.current);
+    }
+    
+    // Clear error state immediately when input changes
+    setEmailError('');
+    setEmailStatus('none');
+    
+    if (!emailValue) {
+      return;
+    }
+    
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailValue)) {
+      setEmailError('Please enter a valid email address');
+      setEmailStatus('invalid');
+      return;
+    }
+    
+    // Show checking state
+    setEmailStatus('checking');
+    
+    // Debounce the API call
+    emailValidationTimeout.current = setTimeout(async () => {
+      try {
+        setValidationLoading(prev => ({ ...prev, email: true }));
+        const result = await apiClient.checkEmailExists(emailValue);
+        
+        if (result.success) {
+          if (result.data?.exists) {
+            setEmailError('Email already exists');
+            setEmailStatus('taken');
+            toast.show({
+              placement: "top",
+              render: ({ id }) => (
+                <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+                  <ToastTitle size="md">Email Already Exists</ToastTitle>
+                  <ToastDescription size="sm">This email is already registered. Please use a different email or sign in instead.</ToastDescription>
+                </Toast>
+              ),
+            });
+          } else {
+            setEmailStatus('available');
+          }
+        } else {
+          // Handle API error - reset to none state
+          setEmailStatus('none');
+        }
+      } catch (error) {
+        console.error('Email validation error:', error);
+        setEmailStatus('none');
+      } finally {
+        setValidationLoading(prev => ({ ...prev, email: false }));
+      }
+    }, 500); // 500ms debounce
+  };
+
+  const validateUsername = async (usernameValue: string) => {
+    // Clear any existing timeout
+    if (usernameValidationTimeout.current) {
+      clearTimeout(usernameValidationTimeout.current);
+    }
+    
+    // Clear error state immediately when input changes
+    setUsernameError('');
+    setUsernameStatus('none');
+    
+    if (!usernameValue) {
+      return;
+    }
+    
+    // Username format validation
+    if (usernameValue.length < 3) {
+      setUsernameError('Username must be at least 3 characters');
+      setUsernameStatus('invalid');
+      return;
+    }
+    
+    if (!/^[a-zA-Z0-9_]+$/.test(usernameValue)) {
+      setUsernameError('Username can only contain letters, numbers, and underscores');
+      setUsernameStatus('invalid');
+      return;
+    }
+    
+    // Show checking state
+    setUsernameStatus('checking');
+    
+    // Debounce the API call
+    usernameValidationTimeout.current = setTimeout(async () => {
+      try {
+        setValidationLoading(prev => ({ ...prev, username: true }));
+        const result = await apiClient.checkUsernameExists(usernameValue);
+        
+        if (result.success) {
+          if (result.data?.exists) {
+            setUsernameError('This username is taken');
+            setUsernameStatus('taken');
+            toast.show({
+              placement: "top",
+              render: ({ id }) => (
+                <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+                  <ToastTitle size="md">Username Taken</ToastTitle>
+                  <ToastDescription size="sm">This username is already taken. Please choose a different username.</ToastDescription>
+                </Toast>
+              ),
+            });
+          } else {
+            setUsernameStatus('available');
+          }
+        } else {
+          // Handle API error - reset to none state
+          setUsernameStatus('none');
+        }
+      } catch (error) {
+        console.error('Username validation error:', error);
+        setUsernameStatus('none');
+      } finally {
+        setValidationLoading(prev => ({ ...prev, username: false }));
+      }
+    }, 500); // 500ms debounce
+  };
+
+  const validatePassword = (passwordValue: string) => {
+    // Clear error state immediately when input changes
+    setPasswordError('');
+    
+    if (!passwordValue) {
+      return;
+    }
+
+    const errors = [];
+    if (passwordValue.length < 8) errors.push('At least 8 characters');
+    if (!/[A-Z]/.test(passwordValue)) errors.push('One uppercase letter');
+    if (!/[a-z]/.test(passwordValue)) errors.push('One lowercase letter');
+    if (!/\d/.test(passwordValue)) errors.push('One number');
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(passwordValue)) errors.push('One special character');
+
+    if (errors.length > 0) {
+      setPasswordError(`Password must contain: ${errors.join(', ')}`);
+    }
+  };
+
+  const getPasswordStrength = (passwordValue: string) => {
+    if (!passwordValue) return { strength: 0, label: '', color: '#e5e7eb' };
+    
+    let score = 0;
+    if (passwordValue.length >= 8) score++;
+    if (/[A-Z]/.test(passwordValue)) score++;
+    if (/[a-z]/.test(passwordValue)) score++;
+    if (/\d/.test(passwordValue)) score++;
+    if (/[!@#$%^&*(),.?":{}|<>]/.test(passwordValue)) score++;
+
+    if (score <= 2) return { strength: score, label: 'Weak', color: '#ef4444' };
+    if (score <= 3) return { strength: score, label: 'Fair', color: '#f59e0b' };
+    if (score <= 4) return { strength: score, label: 'Good', color: '#10b981' };
+    return { strength: score, label: 'Strong', color: '#059669' };
+  };
+
+  const passwordStrength = getPasswordStrength(password);
   const passwordsMatch = password.length > 0 && password === confirmPassword;
-  const isComplete = Boolean(firstName && lastName && username && email && birthdate && passwordsMatch && agree);
+  const hasValidationErrors = !!emailError || !!usernameError || !!passwordError || (confirmPassword && !passwordsMatch);
+  const isComplete = Boolean(
+    firstName && 
+    lastName && 
+    username && 
+    email && 
+    birthdate && 
+    password && 
+    confirmPassword &&
+    passwordsMatch && 
+    agree && 
+    !hasValidationErrors &&
+    !validationLoading.email &&
+    !validationLoading.username
+  );
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+    <View className="flex-1 bg-white">
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        className="flex-1"
         behavior={Platform.select({ ios: 'padding', android: undefined })}
       >
         {/* Header with BackButton */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 16 }}>
+        <View className={`flex-row items-center pt-12 pb-4 ${isDesktop ? 'px-15' : isTablet ? 'px-10' : 'px-6'}`}>
           <BackButton onPress={() => router.back()} />
         </View>
 
         {/* Main Content */}
         <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 32, flexGrow: 1 }}
+          className="flex-1"
+          contentContainerStyle={{ 
+            paddingHorizontal: horizontalPadding, 
+            paddingBottom: 32, 
+            flexGrow: 1, 
+            alignItems: isDesktop || isTablet ? 'center' : 'stretch' 
+          }}
           keyboardShouldPersistTaps="handled"
         >
+        <View className={`w-full ${isDesktop ? 'max-w-lg' : isTablet ? 'max-w-md' : 'max-w-full'}`}>
         {/* Logo */}
-        <View style={{ alignItems: 'center', marginTop: 8, marginBottom: 10 }}>
+        <View className="items-center mt-2 mb-3">
           <Image
             source={require('../../assets/images/logo.png')}
-            style={{ width: 110, height: 110 }}
+            style={{ width: logoSize, height: logoSize }}
             resizeMode="contain"
           />
         </View>
 
         {/* Heading */}
-        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 16 }}>
+        <Text className={`font-bold text-gray-900 mb-4 ${isDesktop ? 'text-3xl' : isTablet ? 'text-2xl' : 'text-xl'}`}>
           Create an Account
         </Text>
 
         {/* First/Last Name */}
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
-              First Name <Text style={{ color: '#ef4444' }}>*</Text>
+        <View className={`${isSmallScreen ? 'flex-col' : 'flex-row'} ${isSmallScreen ? 'gap-0' : 'gap-2'}`}>
+          <View className="flex-1">
+            <Text className={`font-semibold text-gray-900 mb-1.5 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'}`}>
+              First Name <Text className="text-red-500">*</Text>
             </Text>
             <TextInput
-              style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, fontSize: 16, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
+              className={`w-full border border-gray-300 rounded-lg p-3 bg-white text-gray-900 mb-3 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'}`}
               placeholder="First name"
               placeholderTextColor="#9ca3af"
               value={firstName}
               onChangeText={setFirstName}
             />
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
-              Last Name <Text style={{ color: '#ef4444' }}>*</Text>
+          <View className="flex-1">
+            <Text className={`font-semibold text-gray-900 mb-1.5 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'}`}>
+              Last Name <Text className="text-red-500">*</Text>
             </Text>
             <TextInput
-              style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, fontSize: 16, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
+              className={`w-full border border-gray-300 rounded-lg p-3 bg-white text-gray-900 mb-3 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'}`}
               placeholder="Last name"
               placeholderTextColor="#9ca3af"
               value={lastName}
@@ -99,35 +312,95 @@ export default function UserRegistration() {
         </View>
 
         {/* Username */}
-        <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
-          Username <Text style={{ color: '#ef4444' }}>*</Text>
+        <Text className={`font-semibold text-gray-900 mb-1.5 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'}`}>
+          Username <Text className="text-red-500">*</Text>
         </Text>
-        <TextInput
-          style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, fontSize: 14, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
-          placeholder="Username"
-          placeholderTextColor="#9ca3af"
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-        />
+        <View className={`relative ${usernameError ? 'mb-1' : 'mb-3'}`}>
+          <TextInput
+            className={`w-full border rounded-lg p-3 pr-10 bg-white text-gray-900 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'} ${
+              usernameError ? 'border-red-500' : 
+              usernameStatus === 'available' ? 'border-green-500' : 
+              usernameStatus === 'checking' ? 'border-yellow-500' : 
+              'border-gray-300'
+            }`}
+            placeholder="Username"
+            placeholderTextColor="#9ca3af"
+            value={username}
+            onChangeText={(text) => {
+              setUsername(text);
+              validateUsername(text);
+            }}
+            autoCapitalize="none"
+          />
+          {usernameStatus === 'checking' && (
+            <View className="absolute top-3 right-3">
+              <ActivityIndicator size="small" color="#f59e0b" />
+            </View>
+          )}
+          {usernameStatus === 'available' && (
+            <View className="absolute top-3 right-3">
+              <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+            </View>
+          )}
+          {usernameStatus === 'taken' && (
+            <View className="absolute top-3 right-3">
+              <Ionicons name="close-circle" size={20} color="#ef4444" />
+            </View>
+          )}
+        </View>
+        {usernameError ? (
+          <Text className="mb-3 text-xs text-red-500">
+            {usernameError}
+          </Text>
+        ) : null}
 
         {/* Email */}
-        <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
-          Email Address <Text style={{ color: '#ef4444' }}>*</Text>
+        <Text className={`font-semibold text-gray-900 mb-1.5 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'}`}>
+          Email Address <Text className="text-red-500">*</Text>
         </Text>
-        <TextInput
-          style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, fontSize: 14, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
-          placeholder="Email address"
-          placeholderTextColor="#9ca3af"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
+        <View className={`relative ${emailError ? 'mb-1' : 'mb-3'}`}>
+          <TextInput
+            className={`w-full border rounded-lg p-3 pr-10 bg-white text-gray-900 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'} ${
+              emailError ? 'border-red-500' : 
+              emailStatus === 'available' ? 'border-green-500' : 
+              emailStatus === 'checking' ? 'border-yellow-500' : 
+              'border-gray-300'
+            }`}
+            placeholder="Email address"
+            placeholderTextColor="#9ca3af"
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              validateEmail(text);
+            }}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          {emailStatus === 'checking' && (
+            <View className="absolute top-3 right-3">
+              <ActivityIndicator size="small" color="#f59e0b" />
+            </View>
+          )}
+          {emailStatus === 'available' && (
+            <View className="absolute top-3 right-3">
+              <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+            </View>
+          )}
+          {emailStatus === 'taken' && (
+            <View className="absolute top-3 right-3">
+              <Ionicons name="close-circle" size={20} color="#ef4444" />
+            </View>
+          )}
+        </View>
+        {emailError ? (
+          <Text className="mb-3 text-xs text-red-500">
+            {emailError}
+          </Text>
+        ) : null}
 
         {/* Birthdate */}
-        <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
-          Birthdate <Text style={{ color: '#ef4444' }}>*</Text>
+        <Text className={`font-semibold text-gray-900 mb-1.5 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'}`}>
+          Birthdate <Text className="text-red-500">*</Text>
         </Text>
         <TouchableOpacity
           onPress={() => {
@@ -141,60 +414,117 @@ export default function UserRegistration() {
             setShowDatePicker(true);
           }}
           activeOpacity={0.8}
-          style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, backgroundColor: '#fff', marginBottom: 12 }}
+          className="p-3 mb-3 w-full bg-white rounded-lg border border-gray-300"
         >
-          <Text style={{ fontSize: 14, color: birthdate ? '#111827' : '#9ca3af' }}>
+          <Text className={`${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'} ${birthdate ? 'text-gray-900' : 'text-gray-400'}`}>
             {birthdate ? formatDate(birthdate) : 'Select date'}
           </Text>
         </TouchableOpacity>
 
         {/* Password */}
-        <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
-          Password <Text style={{ color: '#ef4444' }}>*</Text>
+        <Text className={`font-semibold text-gray-900 mb-1.5 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'}`}>
+          Password <Text className="text-red-500">*</Text>
         </Text>
-        <View style={{ position: 'relative' }}>
+        <View className="relative mb-3">
           <TextInput
-            style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, paddingRight: 44, fontSize: 14, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
+            className={`w-full border rounded-lg p-3 pr-11 bg-white text-gray-900 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'} ${
+              passwordError ? 'border-red-500' : 'border-gray-300'
+            }`}
             placeholder="Password"
             placeholderTextColor="#9ca3af"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => {
+              setPassword(text);
+              validatePassword(text);
+            }}
             secureTextEntry={!showPassword}
             autoCapitalize="none"
           />
-          <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={{ position: 'absolute', right: 10, top: 10, padding: 6 }}>
+          <TouchableOpacity onPress={() => setShowPassword(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5">
             <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={20} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
+        
+        {/* Password Strength Indicator */}
+        {password.length > 0 && (
+          <View className="mb-3">
+            <View className="flex-row items-center mb-1">
+              <View className="flex-1 mr-2 h-1 bg-gray-300 rounded-sm">
+                <View 
+                  style={{ 
+                    width: `${(passwordStrength.strength / 5) * 100}%`, 
+                    height: '100%', 
+                    backgroundColor: passwordStrength.color, 
+                    borderRadius: 2 
+                  }} 
+                />
+              </View>
+              <Text className="text-xs font-semibold" style={{ color: passwordStrength.color }}>
+                {passwordStrength.label}
+              </Text>
+            </View>
+          </View>
+        )}
+        
+        {passwordError && (
+          <Text className="mb-3 text-xs text-red-500">
+            {passwordError}
+          </Text>
+        )}
 
         {/* Confirm Password */}
-        <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
-          Confirm Password <Text style={{ color: '#ef4444' }}>*</Text>
+        <Text className={`font-semibold text-gray-900 mb-1.5 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'}`}>
+          Confirm Password <Text className="text-red-500">*</Text>
         </Text>
-        <View style={{ position: 'relative' }}>
+        <View className="relative">
           <TextInput
-            style={{ width: '100%', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12, paddingRight: 44, fontSize: 14, backgroundColor: '#fff', color: '#111827', marginBottom: 12 }}
+            className={`w-full border rounded-lg p-3 pr-11 bg-white text-gray-900 mb-1 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'} ${
+              (confirmPassword && !passwordsMatch) ? 'border-red-500' : 'border-gray-300'
+            }`}
             placeholder="Confirm password"
             placeholderTextColor="#9ca3af"
             value={confirmPassword}
-            onChangeText={setConfirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              // Trigger password validation when confirm password changes
+              if (password) {
+                validatePassword(password);
+              }
+            }}
             secureTextEntry={!showConfirmPassword}
             autoCapitalize="none"
           />
-          <TouchableOpacity onPress={() => setShowConfirmPassword(v => !v)} style={{ position: 'absolute', right: 10, top: 10, padding: 6 }}>
+          <TouchableOpacity onPress={() => setShowConfirmPassword(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5">
             <Ionicons name={showConfirmPassword ? 'eye' : 'eye-off'} size={20} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
+        
+        {/* Password Match Indicator */}
+        <View className="mb-3">
+          {confirmPassword && !passwordsMatch && (
+            <Text className="text-xs text-red-500">
+              Passwords do not match
+            </Text>
+          )}
+          {confirmPassword && passwordsMatch && (
+            <View className="flex-row items-center">
+              <Ionicons name="checkmark-circle" size={14} color="#10b981" style={{ marginRight: 4 }} />
+              <Text className="text-xs text-green-600">Passwords match</Text>
+            </View>
+          )}
+        </View>
 
         {/* Terms checkbox */}
-        <TouchableOpacity onPress={() => setAgree(v => !v)} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-          <View style={{ width: 18, height: 18, borderWidth: 1, borderColor: agree ? Colors.primary.blue : '#D1D5DB', borderRadius: 4, alignItems: 'center', justifyContent: 'center', marginRight: 8, backgroundColor: agree ? Colors.primary.blue : 'transparent' }}>
+        <TouchableOpacity onPress={() => setAgree(v => !v)} className="flex-row items-center mb-4">
+          <View className={`w-5 h-5 border-2 rounded items-center justify-center mr-2 ${
+            agree ? 'bg-blue-600 border-blue-600' : 'bg-transparent border-gray-400'
+          }`}>
             {agree && <Ionicons name="checkmark" size={12} color="#fff" />}
           </View>
-          <Text style={{ color: '#374151' }}>
+          <Text className="text-gray-700">
             By continuing, you agree to our{" "}
             <Text 
-              style={{ color: Colors.primary.blue, fontWeight: '600', textDecorationLine: 'underline' }}
+              className="font-semibold text-blue-600 underline"
               onPress={() => {
                 // TODO: Navigate to Terms of Service page/modal
                 console.log('Navigate to Terms of Service');
@@ -210,7 +540,31 @@ export default function UserRegistration() {
         <PrimaryButton
           title={loading ? "Creating Account..." : "Sign Up"}
           onPress={async () => {
-            if (!isComplete) return;
+            if (!isComplete) {
+              toast.show({
+                placement: "top",
+                render: ({ id }) => (
+                  <Toast nativeID={id} action="warning" variant="solid" className="mt-12">
+                    <ToastTitle size="md">Form Incomplete</ToastTitle>
+                    <ToastDescription size="sm">Please fill in all required fields and fix any validation errors.</ToastDescription>
+                  </Toast>
+                ),
+              });
+              return;
+            }
+            
+            if (validationLoading.email || validationLoading.username) {
+              toast.show({
+                placement: "top",
+                render: ({ id }) => (
+                  <Toast nativeID={id} action="info" variant="solid" className="mt-12">
+                    <ToastTitle size="md">Validating...</ToastTitle>
+                    <ToastDescription size="sm">Please wait while we validate your information.</ToastDescription>
+                  </Toast>
+                ),
+              });
+              return;
+            }
             
             setLoading(true);
             try {
@@ -232,7 +586,15 @@ export default function UserRegistration() {
                   !signUpResult.error.includes('security purposes') &&
                   !signUpResult.error.includes('after') &&
                   !signUpResult.error.includes('seconds')) {
-                Alert.alert('Registration Failed', signUpResult.error);
+                toast.show({
+                  placement: "top",
+                  render: ({ id }) => (
+                    <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+                      <ToastTitle size="md">Registration Failed</ToastTitle>
+                      <ToastDescription size="sm">{signUpResult.error}</ToastDescription>
+                    </Toast>
+                  ),
+                });
                 return;
               }
               
@@ -251,15 +613,42 @@ export default function UserRegistration() {
               });
               
               if (otpResult.error) {
-                Alert.alert('OTP Failed', otpResult.error);
+                toast.show({
+                  placement: "top",
+                  render: ({ id }) => (
+                    <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+                      <ToastTitle size="md">OTP Failed</ToastTitle>
+                      <ToastDescription size="sm">{otpResult.error}</ToastDescription>
+                    </Toast>
+                  ),
+                });
                 return;
               }
+              
+              // Show success toast
+              toast.show({
+                placement: "top",
+                render: ({ id }) => (
+                  <Toast nativeID={id} action="success" variant="solid" className="mt-12">
+                    <ToastTitle size="md">Registered Successfully!</ToastTitle>
+                    <ToastDescription size="sm">Please check your email for the verification code.</ToastDescription>
+                  </Toast>
+                ),
+              });
               
               // Step 3: Navigate to verify-otp with the email
               router.push(`./verify-otp?email=${encodeURIComponent(email)}` as any);
               
             } catch {
-              Alert.alert('Error', 'Failed to create account. Please try again.');
+              toast.show({
+                placement: "top",
+                render: ({ id }) => (
+                  <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+                    <ToastTitle size="md">Error</ToastTitle>
+                    <ToastDescription size="sm">Failed to create account. Please try again.</ToastDescription>
+                  </Toast>
+                ),
+              });
             } finally {
               setLoading(false);
             }
@@ -268,15 +657,15 @@ export default function UserRegistration() {
         />
 
         {/* OR separator */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 12 }}>
-          <View style={{ flex: 1, height: 1, backgroundColor: '#e5e7eb' }} />
-          <Text style={{ marginHorizontal: 12, color: '#6b7280' }}>OR</Text>
-          <View style={{ flex: 1, height: 1, backgroundColor: '#e5e7eb' }} />
+        <View className="flex-row items-center my-3">
+          <View className="flex-1 h-px bg-gray-300" />
+          <Text className="mx-3 text-gray-500">OR</Text>
+          <View className="flex-1 h-px bg-gray-300" />
         </View>
 
         {/* Google sign up */}
         <TouchableOpacity
-          style={{ paddingVertical: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff', flexDirection: 'row' }}
+          className="py-3.5 rounded-lg items-center justify-center border border-gray-300 bg-white flex-row"
           onPress={() => { /* TODO: google sign up */ }}
         >
           <Image
@@ -284,15 +673,16 @@ export default function UserRegistration() {
             style={{ width: 20, height: 20, marginRight: 8 }}
             resizeMode="contain"
           />
-          <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827' }}>Sign Up with Google</Text>
+          <Text className={`font-semibold text-gray-900 ${isDesktop ? 'text-lg' : isTablet ? 'text-base' : 'text-base'}`}>Sign Up with Google</Text>
         </TouchableOpacity>
 
         {/* Bottom link */}
-        <View style={{ alignItems: 'center', marginTop: 16 }}>
-          <Text style={{ color: '#6b7280' }}>
+        <View className="items-center mt-4">
+          <Text className="text-gray-500">
             Already have an account?{' '}
-            <Text style={{ color: Colors.primary.blue, fontWeight: '700' }} onPress={() => router.push('/login')}>Sign In</Text>
+            <Text className="font-bold text-blue-600" onPress={() => router.push('/login')}>Sign In</Text>
           </Text>
+        </View>
         </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -304,12 +694,12 @@ export default function UserRegistration() {
         animationType="fade"
         onRequestClose={() => setShowDatePicker(false)}
       >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16 }}>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 8 }}>Select Date</Text>
+        <View className="flex-1 justify-end bg-black/40">
+          <View className={`bg-white rounded-t-2xl max-h-4/5 ${isDesktop ? 'px-15' : isTablet ? 'px-10' : 'px-6'}`}>
+            <Text className="mb-2 text-base font-semibold text-gray-900">Select Date</Text>
 
             {/* Header with month navigation */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <View className="flex-row justify-between items-center mb-2">
               <TouchableOpacity
                 onPress={() => {
                   const y = calendarCursor.getFullYear();
@@ -319,18 +709,18 @@ export default function UserRegistration() {
                   setShowMonthSelect(false);
                   setShowYearSelect(false);
                 }}
-                style={{ padding: 6 }}
+                className="p-1.5"
               >
                 <Ionicons name="chevron-back" size={22} color="#111827" />
               </TouchableOpacity>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TouchableOpacity onPress={() => { setShowMonthSelect(v => !v); setShowYearSelect(false); }} style={{ paddingVertical: 6, paddingHorizontal: 8 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>
+              <View className="flex-row items-center">
+                <TouchableOpacity onPress={() => { setShowMonthSelect(v => !v); setShowYearSelect(false); }} className="py-1.5 px-2">
+                  <Text className="text-base font-bold text-gray-900">
                     {calendarCursor.toLocaleString(undefined, { month: 'long' })}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setShowYearSelect(v => !v); setShowMonthSelect(false); }} style={{ paddingVertical: 6, paddingHorizontal: 8 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>
+                <TouchableOpacity onPress={() => { setShowYearSelect(v => !v); setShowMonthSelect(false); }} className="py-1.5 px-2">
+                  <Text className="text-base font-bold text-gray-900">
                     {calendarCursor.getFullYear()}
                   </Text>
                 </TouchableOpacity>
@@ -344,7 +734,7 @@ export default function UserRegistration() {
                   setShowMonthSelect(false);
                   setShowYearSelect(false);
                 }}
-                style={{ padding: 6 }}
+                className="p-1.5"
               >
                 <Ionicons name="chevron-forward" size={22} color="#111827" />
               </TouchableOpacity>
@@ -352,13 +742,13 @@ export default function UserRegistration() {
 
             {/* Month selection grid */}
             {showMonthSelect && (
-              <View style={{ marginBottom: 8 }}>
+              <View className="mb-2">
                 {(() => {
                   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
                   const rows: React.ReactNode[] = [];
                   for (let r = 0; r < 3; r++) {
                     rows.push(
-                      <View key={r} style={{ flexDirection: 'row', marginBottom: 6 }}>
+                      <View key={r} className="flex-row mb-1.5">
                         {months.slice(r * 4, r * 4 + 4).map((label, idx) => {
                           const monthIndex = r * 4 + idx;
                           const isActive = monthIndex === calendarCursor.getMonth();
@@ -372,9 +762,13 @@ export default function UserRegistration() {
                                 setCalendarCursor(new Date(y, monthIndex, 1));
                                 setShowMonthSelect(false);
                               }}
-                              style={{ flex: 1, paddingVertical: 10, marginHorizontal: 4, borderRadius: 8, backgroundColor: isFutureMonth ? '#E5E7EB' : (isActive ? '#2563eb' : '#F3F4F6'), alignItems: 'center' }}
+                              className={`flex-1 py-2.5 mx-1 rounded-lg items-center ${
+                                isFutureMonth ? 'bg-gray-300' : isActive ? 'bg-blue-600' : 'bg-gray-100'
+                              }`}
                             >
-                              <Text style={{ color: isFutureMonth ? '#9ca3af' : (isActive ? '#fff' : '#111827'), fontWeight: '700' }}>{label}</Text>
+                              <Text className={`font-bold ${
+                                isFutureMonth ? 'text-gray-400' : isActive ? 'text-white' : 'text-gray-900'
+                              }`}>{label}</Text>
                             </TouchableOpacity>
                           );
                         })}
@@ -388,7 +782,7 @@ export default function UserRegistration() {
 
             {/* Year selection list */}
             {showYearSelect && (
-              <View style={{ marginBottom: 8, height: 200, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8 }}>
+              <View className="mb-2 h-48 rounded-lg border border-gray-300">
                 <ScrollView>
                   {(() => {
                     const currentYear = new Date().getFullYear();
@@ -405,9 +799,9 @@ export default function UserRegistration() {
                             setCalendarCursor(new Date(y, m, 1));
                             setShowYearSelect(false);
                           }}
-                          style={{ paddingVertical: 10, paddingHorizontal: 12, backgroundColor: isActive ? '#2563eb' : 'transparent' }}
+                          className={`py-2.5 px-3 ${isActive ? 'bg-blue-600' : 'bg-transparent'}`}
                         >
-                          <Text style={{ color: isActive ? '#fff' : '#111827', fontWeight: isActive ? '700' : '600' }}>{y}</Text>
+                          <Text className={`${isActive ? 'font-bold text-white' : 'font-semibold text-gray-900'}`}>{y}</Text>
                         </TouchableOpacity>
                       );
                     });
@@ -418,9 +812,9 @@ export default function UserRegistration() {
 
             {/* Weekday headers */}
             {!showMonthSelect && !showYearSelect && (
-              <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+              <View className="flex-row mb-1">
                 {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d) => (
-                  <Text key={d} style={{ flex: 1, textAlign: 'center', color: '#6b7280', fontWeight: '600' }}>{d}</Text>
+                  <Text key={d} className="flex-1 font-semibold text-center text-gray-500">{d}</Text>
                 ))}
               </View>
             )}
@@ -442,7 +836,7 @@ export default function UserRegistration() {
               today0.setHours(0,0,0,0);
               for (let r = 0; r < 6; r++) {
                 rows.push(
-                  <View key={r} style={{ flexDirection: 'row', marginBottom: 4 }}>
+                  <View key={r} className="flex-row mb-1">
                     {cells.slice(r * 7, r * 7 + 7).map((date, idx) => {
                       const isSelected = !!date && tempDate &&
                         date.getFullYear() === tempDate.getFullYear() &&
@@ -454,9 +848,9 @@ export default function UserRegistration() {
                           key={idx}
                           disabled={isDisabled}
                           onPress={() => date && !isDisabled && setTempDate(date)}
-                          style={{ flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8, backgroundColor: isSelected ? '#2563eb' : 'transparent' }}
+                          className={`flex-1 py-2.5 items-center rounded-lg ${isSelected ? 'bg-blue-600' : 'bg-transparent'}`}
                         >
-                          <Text style={{ color: isSelected ? '#fff' : (isDisabled ? '#9ca3af' : '#111827'), fontWeight: '600' }}>
+                          <Text className={`font-semibold ${isSelected ? 'text-white' : isDisabled ? 'text-gray-400' : 'text-gray-900'}`}>
                             {date ? date.getDate() : '0'}
                           </Text>
                         </TouchableOpacity>
@@ -468,9 +862,9 @@ export default function UserRegistration() {
               return <View>{rows}</View>;
             })()}
 
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
-              <TouchableOpacity onPress={() => setShowDatePicker(false)} style={{ paddingVertical: 10, paddingHorizontal: 12, marginRight: 8 }}>
-                <Text style={{ color: '#6b7280', fontWeight: '600' }}>Cancel</Text>
+            <View className="flex-row justify-end mt-2">
+              <TouchableOpacity onPress={() => setShowDatePicker(false)} className="py-2.5 px-3 mr-2">
+                <Text className="font-semibold text-gray-500">Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
@@ -482,9 +876,9 @@ export default function UserRegistration() {
                   setBirthdate(finalDate);
                   setShowDatePicker(false);
                 }}
-                style={{ paddingVertical: 10, paddingHorizontal: 12 }}
+                className="py-2.5 px-3"
               >
-                <Text style={{ color: '#2563eb', fontWeight: '700' }}>Done</Text>
+                <Text className="font-bold text-blue-600">Done</Text>
               </TouchableOpacity>
             </View>
           </View>
