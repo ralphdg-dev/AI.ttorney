@@ -2,12 +2,14 @@ import React from 'react';
 import Dashboard from '../pages/Dashboard';
 import Settings from '../pages/Settings';
 import PlaceholderPage from '../pages/PlaceholderPage';
+import ManageLegalSeekers from '../pages/users/ManageLegalSeekers';
 import { getBreadcrumbForItem } from '../components/menuConfig';
 
 const MainContent = ({ activeItem }) => {
   const getContentForItem = () => {
     if (activeItem === 'dashboard') return <Dashboard />;
     if (activeItem === 'settings') return <Settings />;
+    if (activeItem === 'manage-legal-seekers') return <ManageLegalSeekers />;
 
     // Derive a sensible title from breadcrumbs (last segment)
     const crumbs = getBreadcrumbForItem(activeItem);
