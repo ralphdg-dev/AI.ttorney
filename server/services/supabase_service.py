@@ -202,6 +202,28 @@ class SupabaseService:
             logger.error(f"Get user profile error: {str(e)}")
             return {"success": False, "error": str(e)}
     
+    async def get_user_profile_by_email(self, email: str) -> Dict[str, Any]:
+        """Get user profile from users table by email"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.rest_url}/users?email=eq.{email}&select=*",
+                    headers=self._get_headers()
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data:
+                        return {"success": True, "data": data[0]}
+                    else:
+                        return {"success": False, "error": "User not found"}
+                else:
+                    return {"success": False, "error": "Failed to get user profile"}
+                    
+        except Exception as e:
+            logger.error(f"Get user profile by email error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
     async def update_user_profile(self, update_data: Dict[str, Any], where_clause: Dict[str, Any]) -> Dict[str, Any]:
         """Update user profile in users table"""
         try:
@@ -229,29 +251,10 @@ class SupabaseService:
             return {"success": False, "error": str(e)}
     
     async def check_user_exists(self, field: str, value: str) -> Dict[str, Any]:
-        """Check if a user exists by field (email or username) in both auth.users and public.users"""
+        """Check if a user exists by field (email or username) in public.users table only"""
         try:
             async with httpx.AsyncClient() as client:
-                # For email, check both auth.users and public.users tables
-                if field == "email":
-                    # Check auth.users table first
-                    auth_response = await client.get(
-                        f"{self.auth_url}/admin/users",
-                        headers=self._get_headers(use_service_key=True),
-                        params={"email": value}
-                    )
-                    
-                    if auth_response.status_code == 200:
-                        auth_data = auth_response.json()
-                        # Check if any users found in auth table
-                        if auth_data and len(auth_data) > 0:
-                            return {
-                                "success": True,
-                                "exists": True,
-                                "data": auth_data
-                            }
-                
-                # Check public.users table (for both email and username)
+                # Only check public.users table for registration validation
                 response = await client.get(
                     f"{self.rest_url}/users",
                     headers=self._get_headers(use_service_key=True),

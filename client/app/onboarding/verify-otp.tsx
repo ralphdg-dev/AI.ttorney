@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Alert, Platform, TextInput } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Box } from "../../components/ui/box";
 import { VStack } from "../../components/ui/vstack";
 import { HStack } from "../../components/ui/hstack";
@@ -133,6 +134,10 @@ export default function VerifyOTP() {
       } else {
         // Success case - OTP verified successfully
         console.log('OTP verification successful, navigating to role selection');
+        
+        // Store user email for role selection
+        await AsyncStorage.setItem('user_email', email);
+        
         // Clear states and navigate
         setOtp(["", "", "", "", "", ""]);
         setError("");

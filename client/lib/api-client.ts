@@ -140,6 +140,16 @@ class ApiClient {
     });
   }
 
+  async selectRole(data: {
+    email: string;
+    selected_role: string;
+  }): Promise<ApiResponse> {
+    return this.request('/auth/select-role', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Health check
   async healthCheck(): Promise<ApiResponse> {
     return this.request('/health');

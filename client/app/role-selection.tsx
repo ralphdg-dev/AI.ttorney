@@ -7,14 +7,17 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { useState } from "react";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from "../constants/Colors";
 import BackButton from "../components/ui/BackButton";
 import PrimaryButton from "../components/ui/PrimaryButton";
 import BottomActions from "../components/ui/BottomActions";
+import { apiClient } from "../lib/api-client";
 
 import lawyer_selected from "../assets/images/lawyer_selected.png";
 import lawyer_notselected from "../assets/images/lawyer_notselected.png";
@@ -87,17 +90,59 @@ interface ResponsiveStyles {
 
 export default function RoleSelection() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleContinue = () => {
-    if (selectedRole) {
-      // Navigate based on selected role
-      if (selectedRole === "lawyer") {
-        	router.push("/lawyer-starting-page");
-      } else if (selectedRole === "seeker") {
-        router.push("/onboarding/user/registration");
+  const handleContinue = async () => {
+    if (!selectedRole) return;
+
+    setIsLoading(true);
+    
+    try {
+      // Get user email from storage
+      const userEmail = await AsyncStorage.getItem('user_email');
+      
+      console.log('Retrieved user email:', userEmail);
+      
+      if (!userEmail) {
+        Alert.alert('Error', 'User email not found. Please try logging in again.');
+        setIsLoading(false);
+        return;
       }
+
+      // Map frontend role to backend role
+      const backendRole = selectedRole === "seeker" ? "legal_seeker" : "lawyer";
+      
+      // Call role selection API
+      console.log('Calling selectRole API with:', { email: userEmail, selected_role: backendRole });
+      
+      const response = await apiClient.selectRole({
+        email: userEmail,
+        selected_role: backendRole
+      });
+
+      console.log('API Response:', response);
+
+      if (response.success && response.data) {
+        // Navigate based on API response
+        const redirectPath = response.data.redirect_path;
+        console.log('Redirect path:', redirectPath);
+        
+        if (redirectPath === "/home") {
+          router.replace("/home");
+        } else {
+          // For lawyers, navigate to a valid route or handle differently
+          router.replace("/home"); // Fallback to home for now
+        }
+      } else {
+        console.error('Role selection failed:', response.error);
+        Alert.alert('Error', response.error || 'Failed to update role');
+      }
+    } catch (error) {
+      console.error('Role selection error:', error);
+      Alert.alert('Error', 'Failed to update role. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-    console.log("Continue pressed with role:", selectedRole);
   };
 
   const handleContinueAsGuest = () => {
@@ -325,9 +370,9 @@ export default function RoleSelection() {
                            {/* Bottom Section */}
         <BottomActions>
           <PrimaryButton
-            title="Continue"
+            title={isLoading ? "Updating..." : "Continue"}
             onPress={handleContinue}
-            disabled={!selectedRole}
+            disabled={!selectedRole || isLoading}
           />
         </BottomActions>
     </View>

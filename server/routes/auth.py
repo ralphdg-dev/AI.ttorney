@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from auth.models import UserSignUp, UserSignIn, OTPRequest, VerifyOTPRequest, OTPResponse, PasswordReset, SendOTPRequest
 from auth.service import AuthService
 from services.otp_service import OTPService
@@ -33,20 +33,37 @@ async def sign_up(user_data: UserSignUp):
 
 @router.post("/signin", response_model=Dict[str, Any])
 async def sign_in(credentials: UserSignIn):
-    """Sign in user"""
+    """Sign in user with verification check and RBAC"""
     result = await auth_service.sign_in(credentials)
     
     if not result["success"]:
+        # Handle unverified account case
+        if result.get("error") == "account_not_verified":
+            # Automatically send OTP for unverified users
+            if result.get("requires_verification") and result.get("email"):
+                otp_result = await otp_service.send_verification_otp(result["email"], "User")
+                return {
+                    "success": False,
+                    "error": "account_not_verified",
+                    "message": result["message"],
+                    "requires_verification": True,
+                    "email": result["email"],
+                    "otp_sent": otp_result["success"],
+                    "otp_message": otp_result.get("message", "OTP sent to your email")
+                }
+            
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=result["error"]
         )
     
     return {
+        "success": True,
         "message": "Sign in successful",
         "user": result["user"],
         "session": result["session"],
-        "profile": result["profile"]
+        "profile": result["profile"],
+        "redirect_path": result.get("redirect_path", "/home")
     }
 
 @router.post("/signout")
@@ -180,4 +197,38 @@ async def verify_otp(request: VerifyOTPRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to verify OTP"
+        )
+
+class RoleSelectionRequest(BaseModel):
+    email: str
+    selected_role: str  # "legal_seeker" or "lawyer"
+
+@router.post("/select-role")
+async def select_role(request: RoleSelectionRequest):
+    """Update user role based on their selection after verification"""
+    try:
+        result = await auth_service.update_user_role(request.email, request.selected_role)
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["error"]
+            )
+        
+        # Determine redirect path based on role
+        redirect_path = "/home" if request.selected_role == "legal_seeker" else "/onboarding/lawyer"
+        
+        return {
+            "success": True,
+            "message": "Role updated successfully",
+            "redirect_path": redirect_path
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Role selection error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update role"
         )

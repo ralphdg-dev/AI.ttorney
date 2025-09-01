@@ -48,14 +48,16 @@ class AuthService:
                 "username": user_data.username,
                 "full_name": user_data.full_name,
                 "birthdate": user_data.birthdate.isoformat(),
-                "role": user_data.role,
+                "role": "guest",  # Always start as guest until verified
                 "is_verified": False
             }
             
             profile_response = await self.supabase.insert_user_profile(profile_data)
             
             if not profile_response["success"]:
-                logger.warning(f"Profile creation failed: {profile_response['error']}")
+                logger.error(f"Profile creation failed: {profile_response['error']}")
+                # TODO: Consider rolling back auth.users creation here
+                return {"success": False, "error": f"Failed to create user profile: {profile_response['error']}"}
             
             return {
                 "success": True,
@@ -69,7 +71,7 @@ class AuthService:
             return {"success": False, "error": str(e)}
     
     async def sign_in(self, credentials: UserSignIn) -> Dict[str, Any]:
-        """Sign in user"""
+        """Sign in user with verification check and RBAC"""
         try:
             auth_response = await self.supabase.sign_in(
                 email=credentials.email,
@@ -85,16 +87,49 @@ class AuthService:
             # Get user profile from users table
             profile_response = await self.supabase.get_user_profile(user["id"])
             
+            if not profile_response["success"] or not profile_response["data"]:
+                return {"success": False, "error": "User profile not found"}
+            
+            profile = profile_response["data"]
+            
+            # Check if user is verified - only block if role is guest AND unverified
+            user_role = profile.get("role", "guest")
+            is_verified = profile.get("is_verified", False)
+            
+            if user_role == "guest" and not is_verified:
+                return {
+                    "success": False,
+                    "error": "account_not_verified",
+                    "message": "Your account is not verified. Please check your email for the verification code.",
+                    "requires_verification": True,
+                    "email": credentials.email
+                }
+            
+            # Role-based response
+            redirect_path = self._get_redirect_path_for_role(user_role)
+            
             return {
                 "success": True,
                 "user": user,
                 "session": session,
-                "profile": profile_response["data"] if profile_response["success"] else None
+                "profile": profile,
+                "redirect_path": redirect_path
             }
             
         except Exception as e:
             logger.error(f"Sign in error: {str(e)}")
             return {"success": False, "error": str(e)}
+    
+    def _get_redirect_path_for_role(self, role: str) -> str:
+        """Get redirect path based on user role"""
+        role_redirects = {
+            "registered_user": "/home",
+            "verified_lawyer": "/home", 
+            "admin": "/admin",
+            "superadmin": "/admin",
+            "guest": "/home"
+        }
+        return role_redirects.get(role, "/home")
     
     async def sign_out(self, access_token: str) -> Dict[str, Any]:
         """Sign out user"""
@@ -139,15 +174,46 @@ class AuthService:
             return {"success": False, "error": str(e)}
     
     async def mark_user_verified(self, email: str) -> Dict[str, Any]:
-        """Mark user as verified after OTP verification"""
+        """Mark user as verified - role remains guest until role selection"""
         try:
             response = await self.supabase.update_user_profile(
-                {"is_verified": True},
+                {
+                    "is_verified": True
+                    # Keep role as guest until user selects role
+                },
                 {"email": email}
             )
             return response
         except Exception as e:
             logger.error(f"Mark user verified error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    async def update_user_role(self, email: str, role_selection: str) -> Dict[str, Any]:
+        """Update user role based on their selection after verification"""
+        try:
+            # First check if user is verified
+            profile_response = await self.supabase.get_user_profile_by_email(email)
+            if not profile_response["success"] or not profile_response["data"]:
+                return {"success": False, "error": "User profile not found"}
+            
+            profile = profile_response["data"]
+            if not profile.get("is_verified", False):
+                return {"success": False, "error": "User must be verified before selecting a role"}
+            
+            # Determine final role based on selection
+            final_role = "guest"  # Default fallback
+            if role_selection == "legal_seeker":
+                final_role = "registered_user"
+            elif role_selection == "lawyer":
+                final_role = "guest"  # Keep as guest until admin verification
+            
+            response = await self.supabase.update_user_profile(
+                {"role": final_role},
+                {"email": email}
+            )
+            return response
+        except Exception as e:
+            logger.error(f"Update user role error: {str(e)}")
             return {"success": False, "error": str(e)}
     
     async def check_email_exists(self, email: str) -> Dict[str, Any]:
