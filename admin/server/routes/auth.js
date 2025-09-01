@@ -29,6 +29,14 @@ router.post('/login', async (req, res) => {
     }
 
     // data: { user, session }
+    const user = data.user;
+    const appRole = user?.app_metadata?.role || user?.app_metadata?.roles?.[0];
+    const userRole = appRole || user?.user_metadata?.role;
+    const allowed = ['admin', 'superadmin'];
+    if (!allowed.includes((userRole || '').toString().toLowerCase())) {
+      // Deliberately neutral to avoid implying role info
+      return res.status(403).json({ error: 'Invalid login credentials' });
+    }
     return res.json({
       user: data.user,
       session: {
