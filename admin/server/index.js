@@ -45,7 +45,7 @@ const morgan = require('morgan');
 const { supabase, supabaseAdmin } = require('./routes/config/supabaseClient');
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
-const { requireAuth, requireRole } = require('./middleware/auth');
+const { requireAuth } = require('./middleware/auth');
 
 const PORT = process.env.PORT || 5001;
 const ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
@@ -78,7 +78,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Routes
-app.use('/api/admin', requireAuth, requireRole(['admin', 'superadmin']), adminRoutes);
+app.use('/api/admin', requireAuth, adminRoutes);
 app.use('/api/auth', authRoutes);
 
 // 404
