@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { View, FlatList, useWindowDimensions } from "react-native";
+import { View, FlatList, useWindowDimensions, TouchableOpacity } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
@@ -14,6 +14,7 @@ import CategoryScroller from "@/components/glossary/CategoryScroller";
 import Navbar from "@/components/Navbar";
 import { SidebarProvider, SidebarWrapper } from "@/components/AppSidebar";
 import ArticleCard, { ArticleItem } from "@/components/guides/ArticleCard";
+import { useLegalArticles } from "@/hooks/useLegalArticles";
 
 export default function GuidesScreen() {
   const router = useRouter();
@@ -27,86 +28,28 @@ export default function GuidesScreen() {
   const minCardWidth = 320;
   const numColumns = Math.max(1, Math.min(3, Math.floor((width - horizontalPadding * 2) / minCardWidth)));
 
+  // Use the custom hook to fetch legal articles from Supabase
+  const { articles: legalArticles, loading, error, refetch } = useLegalArticles();
+
   const tabOptions = [
     { id: "guides", label: "Legal Guides" },
     { id: "terms", label: "Legal Terms" },
   ];
 
-  const placeholderArticles: ArticleItem[] = useMemo(
-    () => [
-      {
-        id: "1",
-        title: "How Annulment Works in the Philippines",
-        filipinoTitle: "Paano Gumagana ang Annulment sa Pilipinas",
-        summary:
-          "Understand the legal grounds, procedure, timeline, and costs involved in filing for annulment in the Philippines.",
-        filipinoSummary:
-          "Alamin ang mga batayan, proseso, tagal, at gastos sa paghahain ng annulment sa Pilipinas.",
-        imageUrl: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&q=80&auto=format&fit=crop",
-        category: "Family",
-      },
-      {
-        id: "2",
-        title: "Employee Rights During Probationary Period",
-        filipinoTitle: "Mga Karapatan ng Empleyado sa Panahon ng Probation",
-        summary:
-          "A quick guide to rights, obligations, and due process for probationary employees and employers.",
-        filipinoSummary:
-          "Mabilisang gabay sa mga karapatan, obligasyon, at due process para sa probationary na empleyado at employer.",
-        imageUrl: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&q=80&auto=format&fit=crop",
-        category: "Work",
-      },
-      {
-        id: "a3",
-        title: "Small Claims: When and How to File",
-        filipinoTitle: "Small Claims: Kailan at Paano Maghain",
-        summary:
-          "Learn eligibility, filing steps, fees, and what to expect in small claims court.",
-        filipinoSummary:
-          "Alamin ang kwalipikasyon, mga hakbang sa paghahain, bayarin, at inaasahan sa small claims court.",
-        image: require("@/assets/images/guides-placeholder/small-claims.png"),
-        category: "Civil",
-      },
-      {
-        id: "a4",
-        title: "What To Do If You're Arrested",
-        filipinoTitle: "Ano ang Gagawin Kung Maaresto",
-        summary:
-          "Immediate steps to protect your rights, from invoking counsel to handling searches and seizures.",
-        filipinoSummary:
-          "Agarang mga hakbang para protektahan ang iyong karapatan, mula sa paghingi ng abogado hanggang sa pagharap sa paghahalughog at pagsamsam.",
-        image: require("@/assets/images/guides-placeholder/arrest.jpg"),
-        category: "Criminal",
-      },
-      {
-        id: "a5",
-        title: "Consumer Warranty Basics",
-        filipinoTitle: "Mga Batayan ng Consumer Warranty",
-        summary:
-          "Know the difference between express and implied warranties and how to file a claim.",
-        filipinoSummary:
-          "Alamin ang pagkakaiba ng express at implied warranty at kung paano maghain ng reklamo.",
-        imageUrl: "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=1200&q=80&auto=format&fit=crop",
-        category: "Consumer",
-      },
-    ],
-    []
-  );
-
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
 
   const filteredByCategory = useMemo(() => {
-    return placeholderArticles.filter((a) =>
+    return legalArticles.filter((a: ArticleItem) =>
       activeCategory === "all" ? true : a.category?.toLowerCase() === activeCategory
     );
-  }, [placeholderArticles, activeCategory]);
+  }, [legalArticles, activeCategory]);
 
   const articlesToRender: ArticleItem[] = useMemo(() => {
-    const searched = filteredByCategory.filter((a) =>
+    const searched = filteredByCategory.filter((a: ArticleItem) =>
       `${a.title}`.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
       `${a.summary}`.toLowerCase().includes(searchQuery.trim().toLowerCase())
     );
-    return searched.map((a) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
+    return searched.map((a: ArticleItem) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
   }, [filteredByCategory, searchQuery, bookmarks]);
 
   const handleFilterPress = (): void => {};
@@ -171,30 +114,51 @@ export default function GuidesScreen() {
           </Input>
         </Box>
 
-        <FlatList
-          ref={flatListRef}
-          data={articlesToRender}
-          key={`${numColumns}-${activeCategory}`}
-          keyExtractor={(item) => item.id}
-          numColumns={numColumns}
-          ListHeaderComponent={renderListHeader}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 80, flexGrow: 1 }}
-          columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
-          renderItem={({ item }) => (
-            <ArticleCard
-              item={item}
-              onPress={handleArticlePress}
-              onToggleBookmark={handleToggleBookmark}
-              containerStyle={{ width: numColumns > 1 ? (width - horizontalPadding * 2 - 12) / numColumns : "100%", marginHorizontal: 0 }}
-            />
-          )}
-          showsVerticalScrollIndicator={false}
-          style={{ flex: 1 }}
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={8}
-          initialNumToRender={6}
-          windowSize={8}
-        />
+        {loading ? (
+          <View style={tw`flex-1 justify-center items-center`}>
+            <GSText size="lg" className="text-gray-500">Loading articles...</GSText>
+          </View>
+        ) : error ? (
+          <View style={tw`flex-1 justify-center items-center px-6`}>
+            <GSText size="lg" className="text-red-500 text-center mb-4">{error}</GSText>
+            <TouchableOpacity 
+              style={tw`bg-blue-500 px-4 py-2 rounded-lg`}
+              onPress={refetch}
+            >
+              <GSText size="sm" className="text-white">Retry</GSText>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={articlesToRender}
+            key={`${numColumns}-${activeCategory}`}
+            keyExtractor={(item) => item.id}
+            numColumns={numColumns}
+            ListHeaderComponent={renderListHeader}
+            contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 80, flexGrow: 1 }}
+            columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
+            renderItem={({ item }) => (
+              <ArticleCard
+                item={item}
+                onPress={handleArticlePress}
+                onToggleBookmark={handleToggleBookmark}
+                containerStyle={{ width: numColumns > 1 ? (width - horizontalPadding * 2 - 12) / numColumns : "100%", marginHorizontal: 0 }}
+              />
+            )}
+            showsVerticalScrollIndicator={false}
+            style={{ flex: 1 }}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={8}
+            initialNumToRender={6}
+            windowSize={8}
+            ListEmptyComponent={
+              <View style={tw`flex-1 justify-center items-center py-8`}>
+                <GSText size="lg" className="text-gray-500 text-center">No articles found</GSText>
+              </View>
+            }
+          />
+        )}
 
         <Navbar activeTab="learn" />
         <SidebarWrapper />
