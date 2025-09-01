@@ -1,15 +1,39 @@
 import React from 'react';
 import { Lock, Eye, EyeOff } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 
 const Login = () => {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const navigate = useNavigate();
+  const { loginWithCredentials, isAuthenticated } = useAuth();
+  const toast = useToast();
 
-  const onSubmit = (e) => {
+  // If already logged in, redirect away from login
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  const onSubmit = async (e) => {
     e.preventDefault();
-    // TODO: wire to auth service
-    console.log('Login attempt', { email, password });
+    if (loading) return;
+    setLoading(true);
+    try {
+      console.log('Login attempt', { email, password });
+      const { user } = await loginWithCredentials(email, password);
+      toast.success('Login successful');
+      navigate('/', { replace: true });
+    } catch (err) {
+      toast.error(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -69,9 +93,10 @@ const Login = () => {
 
             <button
               type="submit"
-              className="w-full inline-flex items-center justify-center gap-2 bg-[#023D7B] text-white text-[12px] px-3 py-2 rounded-md hover:bg-[#013462]"
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2 bg-[#023D7B] disabled:opacity-60 disabled:cursor-not-allowed text-white text-[12px] px-3 py-2 rounded-md hover:bg-[#013462]"
             >
-              Sign in
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
         </div>
