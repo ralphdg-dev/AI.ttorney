@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { View, FlatList, useWindowDimensions, TouchableOpacity } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
@@ -29,7 +29,17 @@ export default function GuidesScreen() {
   const numColumns = Math.max(1, Math.min(3, Math.floor((width - horizontalPadding * 2) / minCardWidth)));
 
   // Use the custom hook to fetch legal articles from Supabase
-  const { articles: legalArticles, loading, error, refetch } = useLegalArticles();
+  const { articles: legalArticles, loading, error, refetch, getArticlesByCategory } = useLegalArticles();
+
+  // Locally controlled list for display, fed by server-side category filter
+  const [displayArticles, setDisplayArticles] = useState<ArticleItem[]>([]);
+
+  // Initialize from full list or reset when switching back to "all"
+  useEffect(() => {
+    if (activeCategory === "all") {
+      setDisplayArticles(legalArticles);
+    }
+  }, [legalArticles, activeCategory]);
 
   const tabOptions = [
     { id: "guides", label: "Legal Guides" },
@@ -39,10 +49,8 @@ export default function GuidesScreen() {
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
 
   const filteredByCategory = useMemo(() => {
-    return legalArticles.filter((a: ArticleItem) =>
-      activeCategory === "all" ? true : a.category?.toLowerCase() === activeCategory
-    );
-  }, [legalArticles, activeCategory]);
+    return displayArticles;
+  }, [displayArticles]);
 
   const articlesToRender: ArticleItem[] = useMemo(() => {
     const searched = filteredByCategory.filter((a: ArticleItem) =>
@@ -57,6 +65,14 @@ export default function GuidesScreen() {
 
   const handleCategoryChange = (categoryId: string): void => {
     setActiveCategory(categoryId);
+    if (categoryId && categoryId !== "all") {
+      (async () => {
+        const byCat = await getArticlesByCategory(categoryId);
+        setDisplayArticles(byCat);
+      })();
+    } else {
+      setDisplayArticles(legalArticles);
+    }
     setTimeout(() => {
       flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
     }, 50);

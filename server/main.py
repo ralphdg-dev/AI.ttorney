@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from routes.auth import router as auth_router
-from routes.legal import router as legal_router
+from routes.legalGuides import router as legal_router
 from services.supabase_service import SupabaseService
 import logging
 import os

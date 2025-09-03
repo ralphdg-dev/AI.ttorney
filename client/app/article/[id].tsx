@@ -5,8 +5,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/Colors';
 import { Badge, BadgeText } from '@/components/ui/badge';
-import { StructuredArticle } from '@/types/content.types';
 import LegalDisclaimer from '@/components/guides/LegalDisclaimer';
+import { db } from '@/lib/supabase';
 
 // Temporary static content overrides for Annulment (ID: 1)
 const ANNULMENT_CONTENT_EN = `Annulment in the Philippines is a legal process that declares a marriage void from the beginning, as if it never existed. Unlike divorce, which ends a valid marriage, annulment is based on specific grounds showing that the marriage was flawed from the start. Because the Philippines does not have divorce for most citizens, annulment is one of the primary legal remedies for couples who wish to formally dissolve their marital ties and regain the right to remarry.
@@ -42,39 +42,20 @@ It is also important to note that probationary employees cannot be dismissed wit
 If the six-month probationary period lapses without termination or prior notice, the employee automatically becomes regular. This means they will enjoy full security of tenure and all the rights accorded to regular employees, including protection against unjust dismissal.
 In essence, the probationary period is a time for both employee and employer to assess if the working relationship is a good fit. Still, compliance with labor laws is essential to safeguard employee rights and maintain fairness in the workplace.`;
 
-// Local metadata for articles (no service)
-const LOCAL_ARTICLES: StructuredArticle[] = [
-  {
-    id: 1,
-    title_en: 'How Annulment Works in the Philippines',
-    title_fil: 'Paano Gumagana ang Annulment sa Pilipinas',
-    summary_en: 'Understand the legal grounds, procedure, timeline, and costs involved in filing for annulment in the Philippines.',
-    summary_fil: 'Alamin ang mga batayan, proseso, tagal, at gastos sa paghahain ng annulment sa Pilipinas.',
-    category: 'Family',
-    imageUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&q=80&auto=format&fit=crop',
-    author: 'AI.ttorney Legal Team',
-    created_at: '2024-01-15T10:30:00Z',
-    updated_at: '2024-01-20T14:45:00Z',
-    is_verified: true,
-    verified_at: '2024-01-16T09:00:00Z',
-    sections: [],
-  },
-  {
-    id: 2,
-    title_en: 'Employee Rights During Probationary Period',
-    title_fil: 'Mga Karapatan ng Empleyado sa Panahon ng Probation',
-    summary_en: 'A comprehensive guide to rights, obligations, and due process for probationary employees and employers.',
-    summary_fil: 'Kumprehensibong gabay sa mga karapatan, obligasyon, at due process para sa probationary na empleyado at employer.',
-    category: 'Work',
-    imageUrl: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&q=80&auto=format&fit=crop',
-    author: 'AI.ttorney Legal Team',
-    created_at: '2024-01-10T08:15:00Z',
-    updated_at: '2024-01-18T11:30:00Z',
-    is_verified: true,
-    verified_at: '2024-01-11T10:00:00Z',
-    sections: [],
-  },
-];
+// Database article shape (subset)
+interface DbArticleRow {
+  id: number;
+  title_en: string;
+  title_fil: string | null;
+  content_en: string;
+  content_fil: string | null;
+  domain: string | null;
+  category?: string | null;
+  image_article?: string | null;
+  is_verified: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
 
 function getCategoryBadgeClasses(category?: string): { container: string; text: string } {
   switch ((category || '').toLowerCase()) {
@@ -93,32 +74,7 @@ function getCategoryBadgeClasses(category?: string): { container: string; text: 
   }
 }
 
-// Build a single plain-text body from structured sections, skipping headings and important notes
-function buildPlainBody(art: StructuredArticle, useFilipino: boolean): string {
-  if (!art?.sections) return '';
-  const parts: string[] = [];
-  const lang = useFilipino ? 'fil' : 'en';
-  for (const s of art.sections) {
-    // Skip important notes (covered by permanent LegalDisclaimer)
-    if (s.type === 'important_note') continue;
-    // Add section/introduction body content
-    const body = (lang === 'fil' ? s.content_fil : s.content_en) || '';
-    if (body.trim().length) parts.push(body.trim());
-    // Flatten list items as standalone paragraphs without bullets
-    const items = (lang === 'fil' ? (s as any).items_fil : (s as any).items_en) as string[] | undefined;
-    if (Array.isArray(items)) {
-      for (const item of items) {
-        const cleaned = (item || '')
-          // remove common leading list markers if any
-          .replace(/^[-*•\d+\.\)\s]+/u, '')
-          .trim();
-        if (cleaned) parts.push(cleaned);
-      }
-    }
-  }
-  // Separate paragraphs with a blank line
-  return parts.join('\n\n');
-}
+// No structured sections yet from DB; use raw content fields
 
 function formatDate(dateString: string | null): string {
   if (!dateString) return 'Unknown';
@@ -134,9 +90,10 @@ function formatDate(dateString: string | null): string {
 export default function ArticleViewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [article, setArticle] = useState<StructuredArticle | null>(null);
+  const [article, setArticle] = useState<DbArticleRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [showFilipino, setShowFilipino] = useState(false);
+  const noImageUri = 'https://placehold.co/1200x800/png?text=No+Image+Available';
 
   useEffect(() => {
     if (id) {
@@ -148,10 +105,20 @@ export default function ArticleViewScreen() {
     try {
       setLoading(true);
       const numericId = parseInt(id);
-      const local = LOCAL_ARTICLES.find(a => a.id === numericId) || null;
-      setArticle(local);
+      if (Number.isNaN(numericId)) {
+        setArticle(null);
+        return;
+      }
+      const { data, error } = await db.legal.articles.get(numericId);
+      if (error) {
+        console.error('Error fetching article:', error);
+        setArticle(null);
+        return;
+      }
+      setArticle(data as unknown as DbArticleRow);
     } catch (error) {
       console.error('Error fetching article:', error);
+      setArticle(null);
     } finally {
       setLoading(false);
     }
@@ -205,13 +172,11 @@ export default function ArticleViewScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Article Image */}
-        {article.imageUrl && (
-          <Image 
-            source={{ uri: article.imageUrl }} 
-            style={styles.articleImage}
-            resizeMode="cover"
-          />
-        )}
+        <Image 
+          source={{ uri: ((article as any).image_article || (article as any).article_image || noImageUri) as string }}
+          style={styles.articleImage}
+          resizeMode="cover"
+        />
 
 
         <View style={styles.articleContent}>
@@ -240,14 +205,14 @@ export default function ArticleViewScreen() {
             {/* Category Badge */}
 
 
-            {article.category && (
+            {((article as any).category || article.domain) && (
             <View style={styles.categoryContainer}>
               <Badge
                 variant="outline"
-                className={`rounded-md ${getCategoryBadgeClasses(article.category).container}`}
+                className={`rounded-md ${getCategoryBadgeClasses(((article as any).category || article.domain || '') as string).container}`}
               >
-                <BadgeText size="sm" className={getCategoryBadgeClasses(article.category).text}>
-                  {article.category}
+                <BadgeText size="sm" className={getCategoryBadgeClasses(((article as any).category || article.domain || '') as string).text}>
+                  {(article as any).category || article.domain}
                 </BadgeText>
               </Badge>
             </View>
@@ -255,7 +220,7 @@ export default function ArticleViewScreen() {
 
           {/* Summary */}
           <Text style={styles.summary}>
-            {showFilipino && article.summary_fil ? article.summary_fil : article.summary_en}
+            {showFilipino && article.content_fil ? article.content_fil : article.content_en}
           </Text>
           
 
@@ -279,7 +244,7 @@ export default function ArticleViewScreen() {
 
             
 
-            {article.is_verified && (
+            {article.is_verified === true && (
               <View style={styles.metadataRow}>
                 <Ionicons name="checkmark-circle" size={16} color="#10B981" />
                 <Text style={[styles.metadataText, { color: '#10B981' }]}>
@@ -292,11 +257,7 @@ export default function ArticleViewScreen() {
           {/* Article Content */}
           <View style={styles.contentSection}>
             <Text style={styles.contentText}>
-              {article?.id === 1
-                ? (showFilipino ? ANNULMENT_CONTENT_FIL : ANNULMENT_CONTENT_EN)
-                : article?.id === 2
-                  ? (showFilipino ? PROBATION_CONTENT_FIL : PROBATION_CONTENT_EN)
-                  : buildPlainBody(article, showFilipino)}
+              {showFilipino && article.content_fil ? article.content_fil : article.content_en}
             </Text>
           </View>
 

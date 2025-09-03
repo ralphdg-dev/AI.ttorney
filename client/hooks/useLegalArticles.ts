@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/supabase';
+import { db, supabase } from '@/lib/supabase';
 import { ArticleItem } from '@/components/guides/ArticleCard';
 
 export interface LegalArticle {
@@ -9,6 +9,8 @@ export interface LegalArticle {
   content_en: string;
   content_fil: string | null;
   domain: string | null;
+  category?: string | null;
+  image_article?: string | null;
   is_verified: boolean | null;
   created_at: string | null;
   updated_at: string | null;
@@ -17,6 +19,14 @@ export interface LegalArticle {
 // Configuration to choose between direct Supabase or server API
 const USE_SERVER_API = process.env.EXPO_PUBLIC_USE_SERVER_API === 'true';
 const SERVER_API_URL = process.env.EXPO_PUBLIC_SERVER_API_URL || 'http://localhost:8000';
+
+// Normalize DB category values to app category ids
+const normalizeCategory = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  const v = value.toLowerCase();
+  if (v === 'labor') return 'work';
+  return v;
+};
 
 export const useLegalArticles = () => {
   const [articles, setArticles] = useState<ArticleItem[]>([]);
@@ -59,32 +69,39 @@ export const useLegalArticles = () => {
         // Use server API
         data = await fetchArticlesFromServer();
       } else {
-        // Use direct Supabase
-        const { data: supabaseData, error: fetchError } = await db.legal.articles.getAll();
+        // Use direct Supabase - only fetch verified articles
+        const { data: supabaseData, error: fetchError } = await supabase
+          .from('legal_articles')
+          .select('*')
+          .eq('is_verified', true);
         
         if (fetchError) {
           throw fetchError;
         }
         
-        data = supabaseData || [];
+        data = supabaseData as unknown as LegalArticle[] || [];
       }
 
       // Transform the database data to match ArticleItem interface
-      const transformedArticles: ArticleItem[] = data.map((article: LegalArticle) => ({
-        id: article.id.toString(),
-        title: article.title_en,
-        filipinoTitle: article.title_fil || undefined,
-        summary: article.content_en.length > 150 
-          ? article.content_en.substring(0, 150) + '...' 
-          : article.content_en,
-        filipinoSummary: article.content_fil 
-          ? (article.content_fil.length > 150 
-              ? article.content_fil.substring(0, 150) + '...' 
-              : article.content_fil)
-          : undefined,
-        category: article.domain || undefined,
-        imageUrl: `https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&q=80&auto=format&fit=crop`, // Default image
-      }));
+      const transformedArticles: ArticleItem[] = data.map((article: LegalArticle) => {
+        const rawCategory = (article as any).category ?? article.domain;
+        const normalized = normalizeCategory(rawCategory || undefined);
+        return ({
+          id: article.id.toString(),
+          title: article.title_en,
+          filipinoTitle: article.title_fil || undefined,
+          summary: article.content_en.length > 150 
+            ? article.content_en.substring(0, 150) + '...' 
+            : article.content_en,
+          filipinoSummary: article.content_fil 
+            ? (article.content_fil.length > 150 
+                ? article.content_fil.substring(0, 150) + '...' 
+                : article.content_fil)
+            : undefined,
+          category: normalized,
+          imageUrl: (article as any).image_article || undefined,
+        });
+      });
 
       setArticles(transformedArticles);
     } catch (err) {
@@ -118,20 +135,27 @@ export const useLegalArticles = () => {
         
         data = result.data;
       } else {
-        // Use direct Supabase
-        const { data: supabaseData, error: fetchError } = await db.legal.articles.get(parseInt(id));
+        // Use direct Supabase - only fetch verified articles
+        const { data: supabaseData, error: fetchError } = await supabase
+          .from('legal_articles')
+          .select('*')
+          .eq('id', parseInt(id))
+          .eq('is_verified', true)
+          .single();
         
         if (fetchError || !supabaseData) {
           return null;
         }
         
-        data = supabaseData;
+        data = supabaseData as unknown as LegalArticle;
       }
 
       if (!data) {
         return null;
       }
 
+      const rawCategory = (data as any).category ?? data.domain;
+      const normalized = normalizeCategory(rawCategory || undefined);
       return {
         id: data.id.toString(),
         title: data.title_en,
@@ -144,8 +168,8 @@ export const useLegalArticles = () => {
               ? data.content_fil.substring(0, 150) + '...' 
               : data.content_fil)
           : undefined,
-        category: data.domain || undefined,
-        imageUrl: `https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&q=80&auto=format&fit=crop`,
+        category: normalized,
+        imageUrl: (data as any).image_article || undefined,
       };
     } catch (err) {
       console.error('Error fetching article by ID:', err);
@@ -158,8 +182,9 @@ export const useLegalArticles = () => {
       let data: LegalArticle[] = [];
       
       if (USE_SERVER_API) {
-        // Use server API
-        const response = await fetch(`${SERVER_API_URL}/api/legal/articles?domain=${encodeURIComponent(category)}`);
+        // Use server API (send category; server supports it)
+        const dbCategory = category === 'work' ? 'labor' : category;
+        const response = await fetch(`${SERVER_API_URL}/api/legal/articles?category=${encodeURIComponent(dbCategory)}`);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -173,31 +198,39 @@ export const useLegalArticles = () => {
         
         data = result.data || [];
       } else {
-        // Use direct Supabase
-        const { data: supabaseData, error: fetchError } = await db.legal.articles.getByDomain(category);
-        
+        // Use direct Supabase filtering by category column - only verified articles
+        const dbCategory = category === 'work' ? 'labor' : category;
+        const { data: supabaseData, error: fetchError } = await supabase
+          .from('legal_articles')
+          .select('*')
+          .eq('category', dbCategory)
+          .eq('is_verified', true);
+
         if (fetchError || !supabaseData) {
           return [];
         }
-        
-        data = supabaseData;
+        data = supabaseData as unknown as LegalArticle[];
       }
 
-      return data.map((article: LegalArticle) => ({
-        id: article.id.toString(),
-        title: article.title_en,
-        filipinoTitle: article.title_fil || undefined,
-        summary: article.content_en.length > 150 
-          ? article.content_en.substring(0, 150) + '...' 
-          : article.content_en,
-        filipinoSummary: article.content_fil 
-          ? (article.content_fil.length > 150 
-              ? article.content_fil.substring(0, 150) + '...' 
-              : article.content_fil)
-          : undefined,
-        category: article.domain || undefined,
-        imageUrl: `https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&q=80&auto=format&fit=crop`,
-      }));
+      return data.map((article: LegalArticle) => {
+        const rawCategory = (article as any).category ?? article.domain;
+        const normalized = normalizeCategory(rawCategory || undefined);
+        return ({
+          id: article.id.toString(),
+          title: article.title_en,
+          filipinoTitle: article.title_fil || undefined,
+          summary: article.content_en.length > 150 
+            ? article.content_en.substring(0, 150) + '...' 
+            : article.content_en,
+          filipinoSummary: article.content_fil 
+            ? (article.content_fil.length > 150 
+                ? article.content_fil.substring(0, 150) + '...' 
+                : article.content_fil)
+            : undefined,
+          category: normalized,
+          imageUrl: (article as any).image_article || undefined,
+        });
+      });
     } catch (err) {
       console.error('Error fetching articles by category:', err);
       return [];

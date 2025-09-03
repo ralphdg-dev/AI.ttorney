@@ -8,7 +8,8 @@ router = APIRouter(prefix="/api/legal", tags=["legal"])
 
 @router.get("/articles")
 async def get_legal_articles(
-    domain: Optional[str] = Query(None, description="Filter by domain/category"),
+    domain: Optional[str] = Query(None, description="Filter by domain (legacy)"),
+    category: Optional[str] = Query(None, description="Filter by category (preferred)"),
     limit: int = Query(50, ge=1, le=100, description="Number of articles to return"),
     offset: int = Query(0, ge=0, description="Number of articles to skip")
 ):
@@ -18,11 +19,15 @@ async def get_legal_articles(
     try:
         supabase_service = SupabaseService()
         
-        # Build the query
-        query = supabase_service.supabase.table("legal_articles").select("*")
+        # Build the query - only verified articles
+        query = supabase_service.supabase.table("legal_articles").select("*").eq("is_verified", True)
         
-        # Apply domain filter if provided
-        if domain:
+        # Apply category (preferred) or domain filter if provided
+        # Map UI 'work' back to DB 'labor' for category
+        if category:
+            db_category = 'labor' if category.lower() == 'work' else category
+            query = query.eq("category", db_category)
+        elif domain:
             query = query.eq("domain", domain)
         
         # Apply pagination
@@ -57,7 +62,7 @@ async def get_legal_article(article_id: int):
     try:
         supabase_service = SupabaseService()
         
-        response = await supabase_service.supabase.table("legal_articles").select("*").eq("id", article_id).single().execute()
+        response = await supabase_service.supabase.table("legal_articles").select("*").eq("id", article_id).eq("is_verified", True).single().execute()
         
         if response.error:
             if response.error.code == "PGRST116":
