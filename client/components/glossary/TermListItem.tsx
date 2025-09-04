@@ -12,6 +12,7 @@ export interface TermItem {
   summary: string; // maps to definition_en from database
   isFavorite?: boolean;
   filipinoTerm?: string; // maps to term_fil from database
+  filipinoDefinition?: string; // maps to definition_fil from database
   category?: string; // maps to domain from database
 }
 
@@ -54,7 +55,6 @@ export default function TermListItem({ item, onPress, containerStyle }: TermList
             size={18}
             color={isFavorite ? "#f59e0b" : "#9ca3af"}
             strokeWidth={2}
-            // Fill when favorited; outline when not
             fill={isFavorite ? "#f59e0b" : "none"}
           />
         </View>
@@ -90,10 +90,18 @@ export default function TermListItem({ item, onPress, containerStyle }: TermList
           >
             {item.summary}
           </Text>
+          {item.filipinoDefinition ? (
+            <Text 
+              numberOfLines={2}
+              ellipsizeMode="tail"
+              style={[tw`text-sm leading-5 mt-1 italic`, { color: '#6B7280' }]}
+            >
+              {item.filipinoDefinition}
+            </Text>
+          ) : null}
         </View>
         <ChevronRight size={18} color="#9ca3af" />
       </Card>
     </TouchableOpacity>
   );
 }
-

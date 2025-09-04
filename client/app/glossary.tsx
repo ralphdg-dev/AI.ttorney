@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useRef } from "react";
-import { View, FlatList, Alert, useWindowDimensions } from "react-native";
+import React, { useMemo, useState, useRef, useEffect } from "react";
+import { View, FlatList, Alert, useWindowDimensions, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import Header from "@/components/Header";
@@ -15,75 +15,89 @@ import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import { SidebarProvider, SidebarWrapper } from "@/components/AppSidebar";
 
+// Supabase Configuration
+import { createClient } from "@supabase/supabase-js";
+
+// Use environment variables for secure access
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
+
+// Initialize Supabase client
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
 export default function GlossaryScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>("terms");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [terms, setTerms] = useState<TermItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const flatListRef = useRef<FlatList>(null);
-  const horizontalPadding = 24; // px-6 on each side
-  const minCardWidth = 360; // aim for 1–2 columns depending on width
+  const horizontalPadding = 24;
+  const minCardWidth = 360;
   const numColumns = Math.max(1, Math.min(3, Math.floor((width - horizontalPadding * 2) / minCardWidth)));
 
-  // Tab options for the toggle
   const tabOptions = [
     { id: "guides", label: "Legal Guides" },
     { id: "terms", label: "Legal Terms" },
   ];
 
-  // Sample data matching Supabase schema - replace with API data later
-  const placeholderTerms: TermItem[] = useMemo(
-    () => [
-      {
-        id: "1",
-        title: "Annulment",
-        filipinoTerm: "Pagpapawalang-bisa",
-        summary: "A court declaration that a marriage is invalid from the start, as if it never existed. Unlike divorce, which ends a valid marriage, annulment treats the marriage as if it was never legally valid.",
-        isFavorite: true,
-        category: "Family",
-      },
-      {
-        id: "2",
-        title: "Employment Contract",
-        filipinoTerm: "Kontrata sa Trabaho",
-        summary: "A legally binding agreement between employer and employee that sets out the terms and conditions of employment, including duties, compensation, benefits, and termination procedures.",
-        isFavorite: false,
-        category: "Work",
-      },
-      {
-        id: "3",
-        title: "Damages",
-        filipinoTerm: "Danyos",
-        summary: "Monetary compensation awarded for loss or injury caused by another's unlawful act or negligence in civil cases.",
-        isFavorite: false,
-        category: "Civil",
-      },
-      {
-        id: "4",
-        title: "Probable Cause",
-        filipinoTerm: "Makatwirang Hinala",
-        summary: "Sufficient reason based on facts and circumstances to believe that a crime has been committed and that a particular person committed it, required for arrest warrants and search warrants.",
-        isFavorite: true,
-        category: "Criminal",
-      },
-      {
-        id: "5",
-        title: "Warranty",
-        filipinoTerm: "Garantiya",
-        summary: "A written or implied promise by a seller or manufacturer regarding the quality, performance, condition, or reliability of goods or services sold to consumers.",
-        isFavorite: false,
-        category: "Consumer",
+  // Fetch legal terms directly from Supabase
+const fetchLegalTerms = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const { data, error: supabaseError } = await supabase
+        .from("glossary_terms")
+        .select("id, term_en, term_fil, definition_en, definition_fil, example_en, example_fil, category, created_at")
+        .order("term_en", { ascending: true }); // Order by English term alphabetically
+
+      if (supabaseError) {
+        throw new Error(supabaseError.message);
       }
-    ],
-    []
-  );
+      
+      if (data) {
+        const placeholderText = "wala pa HHAHHA";
+        // Map the Supabase data fields to the local TermItem interface
+        const formattedTerms: TermItem[] = data.map((item: any) => ({
+          id: item.id,
+          title: item.term_en || placeholderText,
+          filipinoTerm: item.term_fil || placeholderText,
+          definition: item.definition_en || placeholderText,
+          filipinoDefinition: item.definition_fil || placeholderText,
+          example: item.example_en || placeholderText,
+          filipinoExample: item.example_fil || placeholderText,
+          category: item.category || placeholderText,
+        }));
+        setTerms(formattedTerms);
+      }
+    } catch (err) {
+      console.error("Error fetching legal terms from Supabase:", err);
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+      setError(errorMessage);
+      
+      Alert.alert(
+        "Connection Error",
+        `Could not fetch terms from Supabase. Error: ${errorMessage}`,
+        [{ text: "OK" }]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLegalTerms();
+  }, []);
 
   const filteredByCategory = useMemo(() => {
-    return placeholderTerms.filter((t) =>
-      activeCategory === "all" ? true : t.category?.toLowerCase() === activeCategory
+    return terms.filter((t) =>
+      activeCategory === "all" ? true : t.category?.toLowerCase() === activeCategory.toLowerCase()
     );
-  }, [placeholderTerms, activeCategory]);
+  }, [terms, activeCategory]);
 
   const termsToRender: TermItem[] = useMemo(() => {
     return filteredByCategory.filter((t) =>
@@ -93,11 +107,9 @@ export default function GlossaryScreen() {
     );
   }, [filteredByCategory, searchQuery]);
 
-
   const handleFilterPress = (): void => {
     Alert.alert("Filter", "Filter options");
   };
-
 
   const handleTermPress = (item: TermItem): void => {
     router.push(`/glossary/${item.id}` as any);
@@ -105,10 +117,13 @@ export default function GlossaryScreen() {
 
   const handleCategoryChange = (categoryId: string): void => {
     setActiveCategory(categoryId);
-    // Scroll to top when category changes
     setTimeout(() => {
       flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
     }, 50);
+  };
+
+  const handleRefresh = async (): Promise<void> => {
+    await fetchLegalTerms();
   };
 
   const renderListHeader = () => (
@@ -123,9 +138,65 @@ export default function GlossaryScreen() {
     </View>
   );
 
+  const renderEmptyState = () => {
+    if (loading) {
+      return (
+        <View style={tw`flex-1 justify-center items-center py-10`}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <GSText className="mt-4 text-center" style={{ color: Colors.text.sub }}>
+            Loading legal terms...
+          </GSText>
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={tw`flex-1 justify-center items-center py-10 px-6`}>
+          <Ionicons name="cloud-offline" size={48} color={Colors.text.sub} />
+          <GSText className="mt-4 text-center font-bold" style={{ color: Colors.text.main }}>
+            Connection Error
+          </GSText>
+          <GSText className="mt-2 text-center" style={{ color: Colors.text.sub }}>
+            Unable to load legal terms. Please check your connection and try again.
+          </GSText>
+          <Box className="mt-4 px-4 py-2 bg-blue-500 rounded-lg" onTouchEnd={handleRefresh}>
+            <GSText className="text-white font-semibold">Retry</GSText>
+          </Box>
+        </View>
+      );
+    }
+
+    if (termsToRender.length === 0 && searchQuery.trim()) {
+      return (
+        <View style={tw`flex-1 justify-center items-center py-10`}>
+          <Ionicons name="search" size={48} color={Colors.text.sub} />
+          <GSText className="mt-4 text-center font-bold" style={{ color: Colors.text.main }}>
+            No results found
+          </GSText>
+          <GSText className="mt-2 text-center" style={{ color: Colors.text.sub }}>
+            Try adjusting your search terms or category filter.
+          </GSText>
+        </View>
+      );
+    }
+
+    return (
+      <View style={tw`flex-1 justify-center items-center py-10`}>
+        <Ionicons name="book" size={48} color={Colors.text.sub} />
+        <GSText className="mt-4 text-center font-bold" style={{ color: Colors.text.main }}>
+          No terms available
+        </GSText>
+        <GSText className="mt-2 text-center" style={{ color: Colors.text.sub }}>
+          Legal terms will appear here once loaded.
+        </GSText>
+      </View>
+    );
+  };
+
   const getItemLayout = (data: any, index: number) => {
-    const ITEM_HEIGHT = 140; // Approximate height of each TermListItem including margin
-    const HEADER_HEIGHT = 120; // Approximate height of the header
+    const ITEM_HEIGHT = 140;
+    const HEADER_HEIGHT = 120;
     return {
       length: ITEM_HEIGHT,
       offset: HEADER_HEIGHT + ITEM_HEIGHT * Math.floor(index / numColumns),
@@ -155,9 +226,10 @@ export default function GlossaryScreen() {
             <InputField
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder="Search"
+              placeholder="Search legal terms..."
               placeholderTextColor="#9CA3AF"
               className="text-[#313131]"
+              editable={!loading}
             />
             <InputSlot className="pr-3" onPress={handleFilterPress}>
               <Ionicons name="options" size={20} color={Colors.text.sub} />
@@ -171,7 +243,8 @@ export default function GlossaryScreen() {
           key={`${numColumns}-${activeCategory}`}
           keyExtractor={(item) => item.id}
           numColumns={numColumns}
-          ListHeaderComponent={renderListHeader}
+          ListHeaderComponent={!loading && !error ? renderListHeader : undefined}
+          ListEmptyComponent={renderEmptyState}
           contentContainerStyle={{ 
             paddingHorizontal: 24, 
             paddingBottom: 80,
@@ -195,6 +268,8 @@ export default function GlossaryScreen() {
           initialNumToRender={6}
           windowSize={8}
           getItemLayout={numColumns === 1 ? getItemLayout : undefined}
+          refreshing={loading}
+          onRefresh={handleRefresh}
         />
 
         <Navbar activeTab="learn" />
