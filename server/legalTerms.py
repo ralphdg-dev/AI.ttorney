@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 
 def scrape_and_push_terms():
     """
-    Scrapes legal terms and pushes them to the Supabase database,
-    populating only the 'term_en' column.
+    Scrapes legal terms, checks for existing entries in the database,
+    and pushes only new terms to the Supabase 'glossary_terms' table.
     """
     # Load environment variables
     dotenv_path = os.path.join(os.path.dirname(__file__), '.env.development')
@@ -18,7 +18,7 @@ def scrape_and_push_terms():
     SUPABASE_KEY = os.environ.get("EXPO_PUBLIC_SUPABASE_ANON_KEY")
 
     if not SUPABASE_URL or not SUPABASE_KEY:
-        print("Error: Supabase credentials not found.")
+        print("Error: Supabase credentials not found. Check your .env.development file.")
         return
 
     # Initialize Supabase client
@@ -53,27 +53,49 @@ def scrape_and_push_terms():
     for term_element in term_elements:
         term_title = term_element.get_text(strip=True)
         if term_title:
-
             scraped_data.append({"term_en": term_title})
 
     if not scraped_data:
-        print("⚠️ Warning: No data to push to the database.")
+        print("⚠️ Warning: No new data to process.")
         return
     
-    print(f"🔍 Found {len(scraped_data)} terms to push.")
+    print(f"🔍 Found {len(scraped_data)} terms on the website.")
     
+    # --- New Logic to Prevent Duplicates ---
     try:
-        response = supabase.table('glossary_terms').insert(scraped_data).execute()
+        # Fetch existing terms from the database
+        print("⏳ Checking for existing terms in the database...")
+        existing_terms_response = supabase.table('glossary_terms').select('term_en').execute()
+        
+        if existing_terms_response and hasattr(existing_terms_response, 'data') and existing_terms_response.data:
+            existing_terms = {item['term_en'] for item in existing_terms_response.data}
+            print(f"✅ Found {len(existing_terms)} existing terms.")
+        else:
+            existing_terms = set()
+            print("✅ No existing terms found in the database.")
+            
+        # Filter out terms that already exist
+        new_terms_to_insert = [
+            term for term in scraped_data if term['term_en'] not in existing_terms
+        ]
+
+        if not new_terms_to_insert:
+            print("🎉 All scraped terms already exist in the database. No new terms to push.")
+            return
+
+        # Push only the new, non-duplicate terms
+        print(f"🔍 Pushing {len(new_terms_to_insert)} new terms to the database...")
+        insert_response = supabase.table('glossary_terms').insert(new_terms_to_insert).execute()
         
         # Check for data in the response object
-        if response and hasattr(response, 'data') and response.data:
-            print(f"🎉 Successfully pushed {len(response.data)} terms to Supabase.")
+        if insert_response and hasattr(insert_response, 'data') and insert_response.data:
+            print(f"🎉 Successfully pushed {len(insert_response.data)} terms to Supabase.")
             print("📝 Example of a pushed term:")
-            print(response.data[0])
+            print(insert_response.data[0])
         else:
             print("❌ Failed to push terms. No data returned from Supabase.")
-            if hasattr(response, 'error') and response.error:
-                print(f"Error details: {response.error}")
+            if hasattr(insert_response, 'error') and insert_response.error:
+                print(f"Error details: {insert_response.error}")
 
     except Exception as e:
         print(f"❌ An unexpected error occurred while pushing to Supabase: {e}")
