@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Alert, StatusBar, Animated, Pressable } from "react-native";
+import {
+  View,
+  Alert,
+  StatusBar,
+  Animated,
+  Pressable,
+  ActivityIndicator,
+} from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { HStack } from "@/components/ui/hstack";
@@ -10,40 +17,25 @@ import BackButton from "@/components/ui/BackButton";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
 import { Star, BookOpen, Globe } from "lucide-react-native";
-// import { db } from "@/lib/supabase";
-import { Database } from "@/types/database.types";
+import { createClient } from "@supabase/supabase-js";
 
-type GlossaryTerm = Database["public"]["Tables"]["glossary_terms"]["Row"];
+// Supabase Configuration - same as in your glossary screen
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Sample data matching the schema - replace with actual API call
-const sampleTerms: GlossaryTerm[] = [
-  {
-    id: 1,
-    term_en: "Annulment",
-    term_fil: "Pagpapawalang-bisa",
-    definition_en: "A court declaration that a marriage is invalid from the start, as if it never existed. Unlike divorce, which ends a valid marriage, annulment treats the marriage as if it was never legally valid.",
-    definition_fil: "Isang pagpapahayag ng korte na ang kasal ay walang bisa mula pa sa simula, na parang hindi ito nangyari. Hindi tulad ng diborsyo na nagtatapos sa isang wastong kasal, ang annulment ay tumuturing sa kasal na parang hindi ito kailanman naging legal na wasto.",
-    example_en: "Maria filed for annulment because her husband concealed his existing marriage, making their union void from the beginning.",
-    example_fil: "Nag-file si Maria ng annulment dahil itinago ng kanyang asawa ang kanyang kasalukuyang kasal, na ginawang walang bisa ang kanilang unyon mula pa sa simula.",
-    domain: "Family",
-    view_count: 1250,
-    created_at: "2024-01-15T08:00:00Z",
-    updated_at: "2024-01-15T08:00:00Z"
-  },
-  {
-    id: 2,
-    term_en: "Employment Contract",
-    term_fil: "Kontrata sa Trabaho",
-    definition_en: "A legally binding agreement between employer and employee that sets out the terms and conditions of employment, including duties, compensation, benefits, and termination procedures.",
-    definition_fil: "Isang legal na kasunduan sa pagitan ng employer at empleyado na nagtatatag ng mga tuntunin at kondisyon ng trabaho, kasama ang mga tungkulin, sahod, benepisyo, at pamamaraan ng pagtatapos.",
-    example_en: "Before starting work, John signed an employment contract that specified his salary, working hours, and probationary period.",
-    example_fil: "Bago magsimula sa trabaho, pumirma si John ng kontrata sa trabaho na nagtukoy sa kanyang sahod, oras ng trabaho, at probationary period.",
-    domain: "Work",
-    view_count: 890,
-    created_at: "2024-01-16T09:30:00Z",
-    updated_at: "2024-01-16T09:30:00Z"
-  }
-];
+// Interface for the glossary term from Supabase
+interface GlossaryTerm {
+  id: number;
+  term_en: string;
+  term_fil: string | null;
+  definition_en: string;
+  definition_fil: string | null;
+  example_en: string | null;
+  example_fil: string | null;
+  category: string | null;
+  created_at: string;
+}
 
 export default function TermDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -53,24 +45,48 @@ export default function TermDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [scrollY] = useState(new Animated.Value(0));
 
+  const getDynamicLineHeight = (text: string, baseSize: number) => {
+    const charCount = text.length;
+    const lineHeightIncrease = Math.floor(charCount / 50);
+    const minLineHeight = baseSize * 1.2; // 120% of font size
+    const maxLineHeight = baseSize * 1.8; // 180% of font size
+    const newHeight = baseSize + lineHeightIncrease;
+
+    return Math.min(Math.max(newHeight, minLineHeight), maxLineHeight);
+  };
+
   const loadTerm = useCallback(async () => {
     try {
       setLoading(true);
-      // For now, use sample data. Replace with actual API call:
-      // const { data, error } = await db.legal.glossary.get(parseInt(id));
-      const foundTerm = sampleTerms.find(t => t.id === parseInt(id));
-      
-      if (foundTerm) {
-        setTerm(foundTerm);
-        // Increment view count (would be done server-side in real implementation)
-        // await db.legal.glossary.update(foundTerm.id, { view_count: (foundTerm.view_count || 0) + 1 });
+
+      // Fetch the specific term from Supabase using the ID
+      const { data, error } = await supabase
+        .from("glossary_terms")
+        .select("*")
+        .eq("id", id)
+        .single(); // Get single record
+
+      if (error) {
+        console.error("Supabase error:", error);
+        throw new Error(error.message);
+      }
+
+      if (data) {
+        setTerm(data);
       } else {
         Alert.alert("Error", "Term not found");
         router.back();
       }
     } catch (error) {
       console.error("Error loading term:", error);
-      Alert.alert("Error", "Failed to load term details");
+      Alert.alert(
+        "Error",
+        "Failed to load term details. Please check your connection and try again.",
+        [
+          { text: "Retry", onPress: loadTerm },
+          { text: "Go Back", onPress: () => router.back() },
+        ]
+      );
     } finally {
       setLoading(false);
     }
@@ -81,52 +97,72 @@ export default function TermDetailScreen() {
   }, [loadTerm]);
 
   const handleBack = () => {
-    router.push('/glossary');
+    router.push("/glossary");
   };
-
-
 
   const toggleFavorite = async () => {
     try {
       setIsFavorite(!isFavorite);
-      // In real implementation, would call API to toggle favorite
-      // if (isFavorite) {
-      //   await db.userPreferences.favorites.delete(favoriteId);
-      // } else {
-      //   await db.userPreferences.favorites.create({ user_id: userId, glossary_id: term.id });
-      // }
+      // Note: You'll need to implement user authentication and favorites table in Supabase
+      // For now, this just toggles the UI state
     } catch (error) {
       console.error("Error toggling favorite:", error);
       setIsFavorite(!isFavorite); // Revert on error
     }
   };
 
-  const getCategoryBadgeClasses = (domain?: string | null) => {
-    switch ((domain || '').toLowerCase()) {
-      case 'family':
-        return { container: 'bg-rose-50 border-rose-200', text: 'text-rose-700' };
-      case 'work':
-        return { container: 'bg-blue-50 border-blue-200', text: 'text-blue-700' };
-      case 'civil':
-        return { container: 'bg-violet-50 border-violet-200', text: 'text-violet-700' };
-      case 'criminal':
-        return { container: 'bg-red-50 border-red-200', text: 'text-red-700' };
-      case 'consumer':
-        return { container: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700' };
+  const getCategoryBadgeClasses = (category?: string | null) => {
+    switch ((category || "").toLowerCase()) {
+      case "family":
+        return {
+          container: "bg-rose-50 border-rose-200",
+          text: "text-rose-700",
+        };
+      case "work":
+        return {
+          container: "bg-blue-50 border-blue-200",
+          text: "text-blue-700",
+        };
+      case "civil":
+        return {
+          container: "bg-violet-50 border-violet-200",
+          text: "text-violet-700",
+        };
+      case "criminal":
+        return { container: "bg-red-50 border-red-200", text: "text-red-700" };
+      case "consumer":
+        return {
+          container: "bg-emerald-50 border-emerald-200",
+          text: "text-emerald-700",
+        };
       default:
-        return { container: 'bg-gray-50 border-gray-200', text: 'text-gray-700' };
+        return {
+          container: "bg-gray-50 border-gray-200",
+          text: "text-gray-700",
+        };
     }
   };
 
   if (loading) {
     return (
       <View style={tw`flex-1 bg-gray-50`}>
-        <View style={[tw`flex-row items-center justify-between px-5`, { paddingTop: 44, paddingBottom: 16 }]}>
-        <BackButton onPress={handleBack} color={Colors.primary.blue} />
-        <GSText>Loading...</GSText>
-      </View>
+        <View
+          style={[
+            tw`flex-row items-center justify-between px-5 bg-white`,
+            { paddingTop: 50, paddingBottom: 16 },
+          ]}
+        >
+          <BackButton onPress={handleBack} color={Colors.primary.blue} />
+          <GSText size="lg" bold style={{ color: Colors.primary.blue }}>
+            Loading...
+          </GSText>
+          <View style={{ width: 38 }} />
+        </View>
         <View style={tw`flex-1 items-center justify-center`}>
-          <GSText>Loading term details...</GSText>
+          <ActivityIndicator size="large" color={Colors.primary.blue} />
+          <GSText className="mt-4" style={{ color: Colors.text.sub }}>
+            Loading term details...
+          </GSText>
         </View>
       </View>
     );
@@ -135,30 +171,64 @@ export default function TermDetailScreen() {
   if (!term) {
     return (
       <View style={tw`flex-1 bg-gray-50`}>
-        <View style={[tw`flex-row items-center justify-between px-5`, { paddingTop: 44, paddingBottom: 16 }]}>
-        <BackButton onPress={handleBack} color={Colors.primary.blue} />
-        <GSText>Term Not Found</GSText>
-      </View>
+        <View
+          style={[
+            tw`flex-row items-center justify-between px-5 bg-white`,
+            { paddingTop: 50, paddingBottom: 16 },
+          ]}
+        >
+          <BackButton onPress={handleBack} color={Colors.primary.blue} />
+          <GSText size="lg" bold style={{ color: Colors.primary.blue }}>
+            Term Not Found
+          </GSText>
+          <View style={{ width: 38 }} />
+        </View>
         <View style={tw`flex-1 items-center justify-center px-6`}>
-          <GSText className="text-center mb-4">The requested term could not be found.</GSText>
+          <GSText
+            className="text-center mb-4"
+            style={{ color: Colors.text.sub }}
+          >
+            The requested term could not be found.
+          </GSText>
           <Button onPress={handleBack}>
-            <ButtonText>Go Back</ButtonText>
+            <ButtonText>Go Back to Glossary</ButtonText>
           </Button>
         </View>
       </View>
     );
   }
 
-
   return (
     <View style={tw`flex-1 bg-gray-100`}>
       <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
-      
-      {/* Simple Header */}
-      <View style={[tw`flex-row items-center justify-between px-4 bg-white`, { paddingTop: 50, paddingBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 }]}>
+
+      {/* Header with term name */}
+      <View
+        style={[
+          tw`flex-row items-center justify-between px-4 bg-white`,
+          {
+            paddingTop: 50,
+            paddingBottom: 16,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.1,
+            shadowRadius: 2,
+            elevation: 2,
+          },
+        ]}
+      >
         <BackButton onPress={handleBack} color={Colors.primary.blue} />
-        <GSText size="lg" bold style={{ color: Colors.primary.blue }}>
-          {term?.term_en || 'Legal Term'}
+        <GSText
+          size="lg"
+          bold
+          style={{
+            color: Colors.primary.blue,
+            flex: 1,
+            textAlign: "center",
+            marginHorizontal: 8,
+          }}
+        >
+          {term?.term_en || "Legal Term"}
         </GSText>
         <Pressable onPress={toggleFavorite} style={tw`p-2`}>
           <Star
@@ -169,8 +239,8 @@ export default function TermDetailScreen() {
         </Pressable>
       </View>
 
-      <Animated.ScrollView 
-        style={[tw`flex-1`, { backgroundColor: '#F9FAFB' }]}
+      <Animated.ScrollView
+        style={[tw`flex-1`, { backgroundColor: "#F9FAFB" }]}
         contentContainerStyle={tw`pb-20`}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
@@ -179,53 +249,87 @@ export default function TermDetailScreen() {
           { useNativeDriver: false }
         )}
       >
-        {/* Single Content Card */}
-        <View style={tw`bg-white mx-3 mt-2 rounded-lg`} className="shadow-sm">
-          {/* Term Header */}
+        {/* Main Content Card */}
+        <View style={tw`bg-white mx-3 mt-2 rounded-lg shadow-sm`}>
+          {/* Term Header Section */}
           <View style={tw`px-4 pt-4 pb-3 border-b border-gray-100`}>
-            <GSText size="lg" bold className="mb-1" style={{ color: Colors.text.head }}>
+            <GSText
+              size="xl"
+              bold
+              className="mb-1"
+              style={{ color: Colors.text.head }}
+            >
               {term.term_en}
             </GSText>
             {term.term_fil && (
-              <GSText size="sm" className="mb-2" style={{ color: Colors.primary.blue, fontWeight: '500' }}>
+              <GSText
+                size="md"
+                className="mb-2"
+                style={{ color: Colors.primary.blue, fontWeight: "500" }}
+              >
                 {term.term_fil}
               </GSText>
             )}
-            {term.domain && (
+            {term.category && (
               <Badge
                 variant="outline"
-                className={`self-start rounded-md ${getCategoryBadgeClasses(term.domain).container}`}
+                className={`self-start rounded-md ${
+                  getCategoryBadgeClasses(term.category).container
+                }`}
               >
-                <BadgeText size="sm" className={getCategoryBadgeClasses(term.domain).text}>
-                  {term.domain}
+                <BadgeText
+                  size="sm"
+                  className={getCategoryBadgeClasses(term.category).text}
+                >
+                  {term.category}
                 </BadgeText>
               </Badge>
             )}
           </View>
 
           {/* English Definition */}
-          <View style={tw`px-4 py-3 border-b border-gray-100`}>
+          <View style={tw`px-4 py-4 border-b border-gray-100`}>
             <HStack className="items-center mb-2">
               <Globe size={16} color={Colors.primary.blue} />
-              <GSText size="sm" bold className="ml-2" style={{ color: Colors.text.head }}>
+              <GSText
+                size="md"
+                bold
+                className="ml-2"
+                style={{ color: Colors.text.head }}
+              >
                 Definition
               </GSText>
             </HStack>
-            <GSText size="sm" style={{ color: Colors.text.head }}>
+            <GSText
+              size="sm"
+              style={{
+                color: Colors.text.main,
+              }}
+            >
               {term.definition_en}
             </GSText>
           </View>
 
           {/* Filipino Definition */}
           {term.definition_fil && (
-            <View style={tw`px-4 py-3 border-b border-gray-100`}>
+            <View style={tw`px-4 py-4 border-b border-gray-100`}>
               <HStack className="items-center mb-2">
                 <Globe size={16} color={Colors.primary.blue} />
-                <GSText size="sm" bold className="ml-2" style={{ color: Colors.text.head }}>
+                <GSText
+                  size="md"
+                  bold
+                  className="ml-2"
+                  style={{ color: Colors.text.head }}
+                >
                   Kahulugan sa Filipino
                 </GSText>
               </HStack>
-              <GSText size="sm" style={{ color: Colors.text.head }}>
+              <GSText
+                size="sm"
+                style={{
+                  color: Colors.text.main,
+                }}
+              >
                 {term.definition_fil}
               </GSText>
             </View>
@@ -233,35 +337,78 @@ export default function TermDetailScreen() {
 
           {/* Examples Section */}
           {(term.example_en || term.example_fil) && (
-            <View style={tw`px-4 py-3`}>
-              <HStack className="items-center mb-2">
+            <View style={tw`px-4 py-4`}>
+              <HStack className="items-center mb-3">
                 <BookOpen size={16} color={Colors.primary.blue} />
-                <GSText size="sm" bold className="ml-2" style={{ color: Colors.text.head }}>
+                <GSText
+                  size="md"
+                  bold
+                  className="ml-2"
+                  style={{ color: Colors.text.head }}
+                >
                   Examples
                 </GSText>
               </HStack>
-              
+
               {term.example_en && (
                 <View style={tw`mb-3`}>
-                  <GSText size="xs" bold className="mb-1" style={{ color: Colors.text.sub }}>
-                    English:
+                  <GSText
+                    size="sm"
+                    bold
+                    className="mb-1"
+                    style={{ color: Colors.text.sub }}
+                  >
+                    English Example:
                   </GSText>
-                  <View style={[tw`p-2 rounded-md`, { backgroundColor: '#F8FAFC', borderLeftWidth: 2, borderLeftColor: Colors.primary.blue }]}>
-                    <GSText size="xs" className="italic" style={{ color: Colors.text.head }}>
-                      &ldquo;{term.example_en}&rdquo;
+                  <View
+                    style={[
+                      tw`p-3 rounded-lg`,
+                      {
+                        backgroundColor: "#F8FAFC",
+                        borderLeftWidth: 3,
+                        borderLeftColor: Colors.primary.blue,
+                      },
+                    ]}
+                  >
+                    <GSText
+                      size="sm"
+                      className="italic"
+                      style={{
+                        color: Colors.text.main,
+                      }}
+                    >
+                      "{term.example_en}"
                     </GSText>
                   </View>
                 </View>
               )}
-              
+
               {term.example_fil && (
                 <View>
-                  <GSText size="xs" bold className="mb-1" style={{ color: Colors.text.sub }}>
-                    Filipino:
+                  <GSText
+                    size="sm"
+                    bold
+                    className="mb-1"
+                    style={{ color: Colors.text.sub }}
+                  >
+                    Halimbawa sa Filipino:
                   </GSText>
-                  <View style={[tw`p-2 rounded-md`, { backgroundColor: '#F0F9FF', borderLeftWidth: 2, borderLeftColor: Colors.primary.blue }]}>
-                    <GSText size="xs" className="italic" style={{ color: Colors.text.head }}>
-                      &ldquo;{term.example_fil}&rdquo;
+                  <View
+                    style={[
+                      tw`p-3 rounded-lg`,
+                      {
+                        backgroundColor: "#F0F9FF",
+                        borderLeftWidth: 3,
+                        borderLeftColor: Colors.primary.blue,
+                      },
+                    ]}
+                  >
+                    <GSText
+                      size="sm"
+                      className="italic"
+                      style={{ color: Colors.text.main }}
+                    >
+                      "{term.example_fil}"
                     </GSText>
                   </View>
                 </View>
@@ -270,7 +417,7 @@ export default function TermDetailScreen() {
           )}
         </View>
       </Animated.ScrollView>
-      
+
       {/* Bottom Navigation */}
       <Navbar activeTab="learn" />
     </View>

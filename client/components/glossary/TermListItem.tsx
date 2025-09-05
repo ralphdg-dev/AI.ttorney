@@ -9,11 +9,13 @@ import { Card } from "@/components/ui/card";
 export interface TermItem {
   id: string;
   title: string; // maps to term_en from database
-  summary: string; // maps to definition_en from database
+  definition: string; // maps to definition_en from database (changed from 'summary')
   isFavorite?: boolean;
   filipinoTerm?: string; // maps to term_fil from database
   filipinoDefinition?: string; // maps to definition_fil from database
-  category?: string; // maps to domain from database
+  example?: string; // maps to example_en from database
+  filipinoExample?: string; // maps to example_fil from database
+  category?: string; // maps to category from database
 }
 
 interface TermListItemProps {
@@ -43,6 +45,7 @@ export default function TermListItem({ item, onPress, containerStyle }: TermList
         return { container: 'bg-gray-50 border-gray-200', text: 'text-gray-700' };
     }
   };
+  
   return (
     <TouchableOpacity
       accessibilityRole="button"
@@ -88,7 +91,7 @@ export default function TermListItem({ item, onPress, containerStyle }: TermList
             ellipsizeMode="tail"
             style={[tw`text-sm leading-5`, { color: Colors.text.sub }]}
           >
-            {item.summary}
+            {item.definition}
           </Text>
           {item.filipinoDefinition ? (
             <Text 
