@@ -20,6 +20,20 @@ export interface LegalArticle {
 const USE_SERVER_API = process.env.EXPO_PUBLIC_USE_SERVER_API === 'true';
 const SERVER_API_URL = process.env.EXPO_PUBLIC_SERVER_API_URL || 'http://localhost:8000';
 
+// Helper function to get full Supabase Storage URL
+const getStorageUrl = (path: string | null | undefined): string | undefined => {
+  if (!path) return undefined;
+  
+  // If it's already a full URL, return as is
+  if (path.startsWith('http')) return path;
+  
+  // If it's a storage path, construct the full URL
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return undefined;
+  
+  return `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/legal-articles/${path}`;
+};
+
 // Normalize DB category values to app category ids
 const normalizeCategory = (value: string | null | undefined): string | undefined => {
   if (!value) return undefined;
@@ -99,7 +113,7 @@ export const useLegalArticles = () => {
                 : article.content_fil)
             : undefined,
           category: normalized,
-          imageUrl: (article as any).image_article || undefined,
+          imageUrl: getStorageUrl((article as any).image_article),
         });
       });
 
@@ -169,7 +183,7 @@ export const useLegalArticles = () => {
               : data.content_fil)
           : undefined,
         category: normalized,
-        imageUrl: (data as any).image_article || undefined,
+        imageUrl: getStorageUrl((data as any).image_article),
       };
     } catch (err) {
       console.error('Error fetching article by ID:', err);
@@ -216,19 +230,21 @@ export const useLegalArticles = () => {
         const rawCategory = (article as any).category ?? article.domain;
         const normalized = normalizeCategory(rawCategory || undefined);
         return ({
-          id: article.id.toString(),
+          id: article.id?.toString(),
           title: article.title_en,
           filipinoTitle: article.title_fil || undefined,
-          summary: article.content_en.length > 150 
-            ? article.content_en.substring(0, 150) + '...' 
-            : article.content_en,
-          filipinoSummary: article.content_fil 
+          summary: article.content_en
+            ? (article.content_en.length > 150 
+                ? article.content_en.substring(0, 150) + "..."
+                : article.content_en)
+            : "",
+          filipinoSummary: article.content_fil
             ? (article.content_fil.length > 150 
-                ? article.content_fil.substring(0, 150) + '...' 
+                ? article.content_fil.substring(0, 150) + "..."
                 : article.content_fil)
             : undefined,
           category: normalized,
-          imageUrl: (article as any).image_article || undefined,
+          imageUrl: getStorageUrl(article.image_article || null),
         });
       });
     } catch (err) {
@@ -244,5 +260,6 @@ export const useLegalArticles = () => {
     refetch: fetchArticles,
     getArticleById,
     getArticlesByCategory,
+    getStorageUrl,
   };
 };
