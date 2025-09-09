@@ -8,7 +8,7 @@ import { Text as GSText } from "@/components/ui/text";
 import { Button, ButtonText } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
-import { Bell, MessageSquare, Calendar, CheckCircle } from "lucide-react-native";
+import { Bell, MessageSquare, Calendar, CheckCircle, ChevronRight } from "lucide-react-native";
 
 type NotificationItem = {
   id: string;
@@ -72,7 +72,7 @@ export default function NotificationsScreen() {
     const subColor = Colors.text.sub;
 
     return (
-      <View style={[tw`bg-white rounded-xl mb-3`, { padding: 14, borderWidth: 1, borderColor }]}> 
+      <View style={[tw`bg-white rounded-xl mb-3`, { padding: 14, borderWidth: 1, borderColor, position: 'relative' }]}> 
         <HStack className="items-start">
           <View style={[tw`mr-3`, { marginTop: 2 }]}>
             {renderIcon(item.type, item.unread ? Colors.primary.blue : subColor)}
@@ -91,6 +91,10 @@ export default function NotificationsScreen() {
             <CheckCircle size={16} color={subColor} strokeWidth={1.7} />
           )}
         </HStack>
+        {/* Chevron indicator (design only) */}
+        <View style={{ position: 'absolute', right: 12, bottom: 10 }}>
+          <ChevronRight size={18} color={Colors.text.sub} strokeWidth={1.7} />
+        </View>
       </View>
     );
   };
