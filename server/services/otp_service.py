@@ -8,11 +8,117 @@ import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import redis.asyncio as redis
 import json
 import asyncio
+import time
+import threading
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
+
+@dataclass
+class OTPData:
+    """Data structure for storing OTP information"""
+    hash: str
+    email: str
+    otp_type: str
+    expires_at: float
+    attempts: int = 0
+    locked_until: Optional[float] = None
+
+class InMemoryOTPStore:
+    """Thread-safe in-memory OTP storage with automatic cleanup"""
+    
+    def __init__(self):
+        self._store: Dict[str, OTPData] = {}
+        self._lock = threading.RLock()
+        self._cleanup_thread = None
+        self._stop_cleanup = threading.Event()
+        self._start_cleanup_thread()
+    
+    def _start_cleanup_thread(self):
+        """Start the background cleanup thread"""
+        if self._cleanup_thread is None or not self._cleanup_thread.is_alive():
+            self._cleanup_thread = threading.Thread(target=self._cleanup_expired, daemon=True)
+            self._cleanup_thread.start()
+            logger.info("OTP cleanup thread started")
+    
+    def _cleanup_expired(self):
+        """Background thread to clean up expired OTPs"""
+        while not self._stop_cleanup.wait(30):  # Check every 30 seconds
+            current_time = time.time()
+            with self._lock:
+                expired_keys = []
+                for key, otp_data in self._store.items():
+                    if current_time > otp_data.expires_at:
+                        expired_keys.append(key)
+                    elif otp_data.locked_until and current_time > otp_data.locked_until:
+                        # Clear lockout but keep OTP if not expired
+                        otp_data.locked_until = None
+                        otp_data.attempts = 0
+                
+                for key in expired_keys:
+                    del self._store[key]
+                
+                if expired_keys:
+                    logger.info(f"Cleaned up {len(expired_keys)} expired OTPs")
+    
+    def store_otp(self, key: str, otp_data: OTPData):
+        """Store OTP data with thread safety"""
+        with self._lock:
+            self._store[key] = otp_data
+    
+    def get_otp(self, key: str) -> Optional[OTPData]:
+        """Get OTP data if exists and not expired"""
+        with self._lock:
+            otp_data = self._store.get(key)
+            if otp_data and time.time() <= otp_data.expires_at:
+                return otp_data
+            elif otp_data:
+                # Expired, remove it
+                del self._store[key]
+            return None
+    
+    def delete_otp(self, key: str):
+        """Delete OTP data"""
+        with self._lock:
+            self._store.pop(key, None)
+    
+    def update_attempts(self, key: str, attempts: int, locked_until: Optional[float] = None):
+        """Update attempt count and lockout status"""
+        with self._lock:
+            if key in self._store:
+                self._store[key].attempts = attempts
+                if locked_until:
+                    self._store[key].locked_until = locked_until
+    
+    def is_locked(self, key: str) -> tuple[bool, Optional[float]]:
+        """Check if OTP is locked and return remaining lockout time"""
+        with self._lock:
+            otp_data = self._store.get(key)
+            if otp_data and otp_data.locked_until:
+                current_time = time.time()
+                if current_time < otp_data.locked_until:
+                    return True, otp_data.locked_until - current_time
+                else:
+                    # Lockout expired, clear it
+                    otp_data.locked_until = None
+                    otp_data.attempts = 0
+            return False, None
+    
+    def clear_lockout(self, key: str):
+        """Clear lockout and reset attempts"""
+        with self._lock:
+            if key in self._store:
+                self._store[key].locked_until = None
+                self._store[key].attempts = 0
+    
+    def shutdown(self):
+        """Shutdown the cleanup thread"""
+        self._stop_cleanup.set()
+        if self._cleanup_thread and self._cleanup_thread.is_alive():
+            self._cleanup_thread.join(timeout=5)
 
 class OTPService:
     def __init__(self):
@@ -24,18 +130,8 @@ class OTPService:
         self.from_email = os.getenv("FROM_EMAIL", "noreply@ai.ttorney.com")
         self.from_name = os.getenv("FROM_NAME", "AI.ttorney")
         
-        # Initialize Redis connection
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-        self.redis_client = redis.from_url(redis_url, decode_responses=True)
-        
-    async def _ensure_redis_connection(self):
-        """Ensure Redis connection is established"""
-        try:
-            await self.redis_client.ping()
-            logger.info("✅ Redis connection established")
-        except Exception as e:
-            logger.error(f"Redis connection failed: {str(e)}")
-            raise
+        # Initialize in-memory OTP store
+        self.otp_store = InMemoryOTPStore()
         
     def generate_otp(self, length: int = 6) -> str:
         """Generate a random OTP code"""
@@ -45,23 +141,13 @@ class OTPService:
         """Hash OTP code using SHA-256"""
         return hashlib.sha256(otp_code.encode()).hexdigest()
     
-    def get_redis_key(self, email: str, otp_type: str) -> str:
-        """Generate Redis key for OTP storage"""
+    def get_otp_key(self, email: str, otp_type: str) -> str:
+        """Generate key for OTP storage"""
         return f"otp:{otp_type}:{email}"
-    
-    def get_attempts_key(self, email: str, otp_type: str) -> str:
-        """Generate Redis key for OTP attempt tracking"""
-        return f"otp_attempts:{otp_type}:{email}"
-    
-    def get_lockout_key(self, email: str, otp_type: str) -> str:
-        """Generate Redis key for OTP lockout tracking"""
-        return f"otp_lockout:{otp_type}:{email}"
     
     async def send_verification_otp(self, email: str, user_name: str = "User") -> Dict[str, Any]:
         """Send OTP for email verification"""
         try:
-            await self._ensure_redis_connection()
-            
             # Generate OTP
             otp_code = self.generate_otp()
             ttl_seconds = 120  # 2 minutes
@@ -69,26 +155,22 @@ class OTPService:
             # Hash the OTP
             otp_hash = self.hash_otp(otp_code)
             
-            # Store hash in Redis with TTL
-            redis_key = self.get_redis_key(email, "email_verification")
-            otp_data = {
-                "hash": otp_hash,
-                "email": email,
-                "type": "email_verification"
-            }
+            # Create OTP data
+            otp_key = self.get_otp_key(email, "email_verification")
+            otp_data = OTPData(
+                hash=otp_hash,
+                email=email,
+                otp_type="email_verification",
+                expires_at=time.time() + ttl_seconds,
+                attempts=0,
+                locked_until=None
+            )
             
-            await self.redis_client.setex(redis_key, ttl_seconds, json.dumps(otp_data))
+            # Store in memory
+            self.otp_store.store_otp(otp_key, otp_data)
+            logger.info(f"OTP stored in memory with key: {otp_key}, expires in: {ttl_seconds}s")
             
-            # Reset attempt counter when new OTP is sent
-            attempts_key = self.get_attempts_key(email, "email_verification")
-            await self.redis_client.delete(attempts_key)
-            
-            # Clear any existing lockout
-            lockout_key = self.get_lockout_key(email, "email_verification")
-            await self.redis_client.delete(lockout_key)
-            logger.info(f"OTP stored in Redis with key: {redis_key}, TTL: {ttl_seconds}s")
-            
-            # Send email via Resend
+            # Send email
             email_response = await self.send_otp_email(email, otp_code, user_name, "verification")
             
             if email_response["success"]:
@@ -107,8 +189,6 @@ class OTPService:
     async def send_password_reset_otp(self, email: str, user_name: str = "User") -> Dict[str, Any]:
         """Send OTP for password reset"""
         try:
-            await self._ensure_redis_connection()
-            
             # Generate OTP
             otp_code = self.generate_otp()
             ttl_seconds = 120  # 2 minutes
@@ -116,26 +196,22 @@ class OTPService:
             # Hash the OTP
             otp_hash = self.hash_otp(otp_code)
             
-            # Store hash in Redis with TTL
-            redis_key = self.get_redis_key(email, "password_reset")
-            otp_data = {
-                "hash": otp_hash,
-                "email": email,
-                "type": "password_reset"
-            }
+            # Create OTP data
+            otp_key = self.get_otp_key(email, "password_reset")
+            otp_data = OTPData(
+                hash=otp_hash,
+                email=email,
+                otp_type="password_reset",
+                expires_at=time.time() + ttl_seconds,
+                attempts=0,
+                locked_until=None
+            )
             
-            await self.redis_client.setex(redis_key, ttl_seconds, json.dumps(otp_data))
+            # Store in memory
+            self.otp_store.store_otp(otp_key, otp_data)
+            logger.info(f"OTP stored in memory with key: {otp_key}, expires in: {ttl_seconds}s")
             
-            # Reset attempt counter when new OTP is sent
-            attempts_key = self.get_attempts_key(email, "password_reset")
-            await self.redis_client.delete(attempts_key)
-            
-            # Clear any existing lockout
-            lockout_key = self.get_lockout_key(email, "password_reset")
-            await self.redis_client.delete(lockout_key)
-            logger.info(f"OTP stored in Redis with key: {redis_key}, TTL: {ttl_seconds}s")
-            
-            # Send email via Resend
+            # Send email
             email_response = await self.send_otp_email(email, otp_code, user_name, "password_reset")
             
             if email_response["success"]:
@@ -154,62 +230,40 @@ class OTPService:
     async def verify_otp(self, email: str, otp_code: str, otp_type: str) -> Dict[str, Any]:
         """Verify OTP code with attempt tracking and lockout"""
         try:
-            await self._ensure_redis_connection()
+            # Get OTP key
+            otp_key = self.get_otp_key(email, otp_type)
             
             # Check if user is locked out
-            lockout_key = self.get_lockout_key(email, otp_type)
-            lockout_data = await self.redis_client.get(lockout_key)
-            
-            if lockout_data:
-                lockout_info = json.loads(lockout_data)
-                remaining_time = await self.redis_client.ttl(lockout_key)
+            is_locked, remaining_lockout = self.otp_store.is_locked(otp_key)
+            if is_locked:
+                minutes = int(remaining_lockout // 60)
+                seconds = int(remaining_lockout % 60)
                 return {
                     "success": False, 
-                    "error": f"Too many failed attempts. Please try again in {remaining_time // 60} minutes and {remaining_time % 60} seconds.",
+                    "error": f"Too many failed attempts. Please try again in {minutes} minutes and {seconds} seconds.",
                     "locked_out": True,
-                    "retry_after": remaining_time
+                    "retry_after": int(remaining_lockout)
                 }
             
-            # Get Redis key for OTP
-            redis_key = self.get_redis_key(email, otp_type)
+            # Get stored OTP data
+            otp_data = self.otp_store.get_otp(otp_key)
             
-            # Get stored OTP data from Redis
-            stored_data = await self.redis_client.get(redis_key)
-            
-            if not stored_data:
+            if not otp_data:
                 return {"success": False, "error": "OTP not found or expired"}
-            
-            # Parse stored data
-            otp_data = json.loads(stored_data)
-            stored_hash = otp_data["hash"]
             
             # Hash the provided OTP
             provided_hash = self.hash_otp(otp_code)
             
-            # Get current attempt count
-            attempts_key = self.get_attempts_key(email, otp_type)
-            current_attempts = await self.redis_client.get(attempts_key)
-            attempt_count = int(current_attempts) if current_attempts else 0
-            
             # Compare hashes
-            if stored_hash != provided_hash:
+            if otp_data.hash != provided_hash:
                 # Increment attempt counter
-                attempt_count += 1
-                await self.redis_client.setex(attempts_key, 300, str(attempt_count))  # 5 minutes TTL for attempts
+                attempt_count = otp_data.attempts + 1
                 
                 # Check if max attempts reached
                 if attempt_count >= 5:
                     # Set lockout for 15 minutes
-                    lockout_data = {
-                        "email": email,
-                        "attempts": attempt_count,
-                        "locked_at": asyncio.get_event_loop().time()
-                    }
-                    await self.redis_client.setex(lockout_key, 900, json.dumps(lockout_data))  # 15 minutes lockout
-                    
-                    # Delete the OTP and attempts to prevent further use
-                    await self.redis_client.delete(redis_key)
-                    await self.redis_client.delete(attempts_key)
+                    lockout_until = time.time() + 900  # 15 minutes
+                    self.otp_store.update_attempts(otp_key, attempt_count, lockout_until)
                     
                     logger.warning(f"User {email} locked out after {attempt_count} failed OTP attempts")
                     
@@ -220,6 +274,9 @@ class OTPService:
                         "retry_after": 900
                     }
                 
+                # Update attempt count
+                self.otp_store.update_attempts(otp_key, attempt_count)
+                
                 remaining_attempts = 5 - attempt_count
                 return {
                     "success": False, 
@@ -227,10 +284,9 @@ class OTPService:
                     "attempts_remaining": remaining_attempts
                 }
             
-            # OTP is correct - delete OTP and attempts from Redis
-            await self.redis_client.delete(redis_key)
-            await self.redis_client.delete(attempts_key)
-            logger.info(f"OTP verified and deleted from Redis: {redis_key}")
+            # OTP is correct - delete from memory
+            self.otp_store.delete_otp(otp_key)
+            logger.info(f"OTP verified and deleted from memory: {otp_key}")
             
             return {
                 "success": True,
@@ -347,3 +403,8 @@ class OTPService:
         </html>
         """
     
+    def shutdown(self):
+        """Shutdown the OTP service and cleanup resources"""
+        if hasattr(self, 'otp_store'):
+            self.otp_store.shutdown()
+            logger.info("OTP service shutdown completed")

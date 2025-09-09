@@ -105,8 +105,12 @@ class AuthService:
                     "email": credentials.email
                 }
             
-            # Role-based response
-            redirect_path = self._get_redirect_path_for_role(user_role)
+            # Special case: verified user with guest role should go to role selection
+            if user_role == "guest" and is_verified:
+                redirect_path = "/role-selection"
+            else:
+                # Role-based response for other cases
+                redirect_path = self._get_redirect_path_for_role(user_role)
             
             return {
                 "success": True,

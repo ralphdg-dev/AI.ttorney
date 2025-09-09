@@ -98,21 +98,42 @@ export default function Login() {
         await AsyncStorage.setItem('userSession', JSON.stringify(data.session));
         await AsyncStorage.setItem('userProfile', JSON.stringify(data.profile));
         
-        // Show success toast
-        toast.show({
-          placement: "top",
-          render: ({ id }) => (
-            <Toast nativeID={id} action="success" variant="solid" className="mt-12">
-              <ToastTitle size="md">Login Successful</ToastTitle>
-              <ToastDescription size="sm">Welcome back! Redirecting...</ToastDescription>
-            </Toast>
-          ),
-        });
-        
-        // Small delay to show toast before navigation
-        setTimeout(() => {
-          router.replace(redirectPath);
-        }, 500);
+        // Special handling for role selection redirect
+        if (redirectPath === '/role-selection') {
+          // Store user email for role selection process
+          await AsyncStorage.setItem('user_email', email.toLowerCase().trim());
+          
+          toast.show({
+            placement: "top",
+            render: ({ id }) => (
+              <Toast nativeID={id} action="info" variant="solid" className="mt-12">
+                <ToastTitle size="md">Account Verified</ToastTitle>
+                <ToastDescription size="sm">Please select your role to continue...</ToastDescription>
+              </Toast>
+            ),
+          });
+          
+          // Small delay to show toast before navigation
+          setTimeout(() => {
+            router.replace('/role-selection');
+          }, 1000);
+        } else {
+          // Show success toast for normal login
+          toast.show({
+            placement: "top",
+            render: ({ id }) => (
+              <Toast nativeID={id} action="success" variant="solid" className="mt-12">
+                <ToastTitle size="md">Login Successful</ToastTitle>
+                <ToastDescription size="sm">Welcome back! Redirecting...</ToastDescription>
+              </Toast>
+            ),
+          });
+          
+          // Small delay to show toast before navigation
+          setTimeout(() => {
+            router.replace(redirectPath);
+          }, 500);
+        }
       } else {
         // Handle unverified account - directly route to OTP verification
         if (data.error === 'account_not_verified') {
