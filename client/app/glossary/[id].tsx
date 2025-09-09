@@ -12,6 +12,7 @@ import Colors from "@/constants/Colors";
 import { Star, BookOpen, Globe } from "lucide-react-native";
 // import { db } from "@/lib/supabase";
 import { Database } from "@/types/database.types";
+import { useFavorites } from "@/contexts/FavoritesContext";
 
 type GlossaryTerm = Database["public"]["Tables"]["glossary_terms"]["Row"];
 
@@ -48,10 +49,12 @@ const sampleTerms: GlossaryTerm[] = [
 export default function TermDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { isFavorite, toggleFavorite } = useFavorites();
   const [term, setTerm] = useState<GlossaryTerm | null>(null);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
   const [scrollY] = useState(new Animated.Value(0));
+  
+  const isTermFavorite = isFavorite(id);
 
   const loadTerm = useCallback(async () => {
     try {
@@ -86,18 +89,9 @@ export default function TermDetailScreen() {
 
 
 
-  const toggleFavorite = async () => {
-    try {
-      setIsFavorite(!isFavorite);
-      // In real implementation, would call API to toggle favorite
-      // if (isFavorite) {
-      //   await db.userPreferences.favorites.delete(favoriteId);
-      // } else {
-      //   await db.userPreferences.favorites.create({ user_id: userId, glossary_id: term.id });
-      // }
-    } catch (error) {
-      console.error("Error toggling favorite:", error);
-      setIsFavorite(!isFavorite); // Revert on error
+  const handleToggleFavorite = async () => {
+    if (term) {
+      await toggleFavorite(id, term.term_en);
     }
   };
 
@@ -160,11 +154,11 @@ export default function TermDetailScreen() {
         <GSText size="lg" bold style={{ color: Colors.primary.blue }}>
           {term?.term_en || 'Legal Term'}
         </GSText>
-        <Pressable onPress={toggleFavorite} style={tw`p-2`}>
+        <Pressable onPress={handleToggleFavorite} style={tw`p-2`}>
           <Star
             size={22}
-            color={isFavorite ? "#F59E0B" : "#9CA3AF"}
-            fill={isFavorite ? "#F59E0B" : "none"}
+            color={isTermFavorite ? "#F59E0B" : "#9CA3AF"}
+            fill={isTermFavorite ? "#F59E0B" : "none"}
           />
         </Pressable>
       </View>

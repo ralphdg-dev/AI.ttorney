@@ -10,6 +10,8 @@ import {
   StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { useFavorites } from '@/contexts/FavoritesContext';
 import {
   X,
   User,
@@ -141,9 +143,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [isVisible, slideAnim, overlayOpacity, shouldRender]);
 
-  // TODO: Replace with actual database queries when backend is connected
+  // Get actual favorite count from context
+  const { getFavoriteCount } = useFavorites();
+  
   const getBadgeCounts = () => ({
-    favoriteTerms: 0, // Count from user_glossary_favorites table
+    favoriteTerms: getFavoriteCount(), // Count from favorites context
     bookmarkedGuides: 0, // Count from user_forum_bookmarks table  
     pendingConsultations: 0, // Count from consultation_requests where status = 'pending'
     unreadNotifications: 0, // Count from notifications table (when implemented)
@@ -366,10 +370,25 @@ export const SidebarWrapper: React.FC<{
   };
 }> = ({ userInfo }) => {
   const { isVisible, closeSidebar } = useSidebar();
+  const router = useRouter();
 
   const handleNavigate = (route: string) => {
     console.log(`Navigate to ${route}`);
-    // Add navigation logic here when routes are implemented
+    
+    switch (route) {
+      case 'bookmarks':
+        router.push('/favorites');
+        break;
+      case 'favorites':
+        // This could be for bookmarked guides in the future
+        console.log('Bookmarked guides not implemented yet');
+        break;
+      case 'profile':
+        console.log('Profile page not implemented yet');
+        break;
+      default:
+        console.log(`Route ${route} not implemented yet`);
+    }
   };
 
   return (
