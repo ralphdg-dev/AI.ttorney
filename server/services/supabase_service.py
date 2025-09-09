@@ -254,20 +254,21 @@ class SupabaseService:
         """Check if a user exists by field (email or username) in both auth.users and public.users tables"""
         try:
             async with httpx.AsyncClient() as client:
+                # Initialize data variables
+                public_data = []
+                auth_data = {"users": []}
+                
                 # Check public.users table
                 public_response = await client.get(
-                    f"{self.rest_url}/users",
-                    headers=self._get_headers(use_service_key=True),
-                    params={
-                        "select": "id",
-                        field: f"eq.{value}"
-                    }
+                    f"{self.rest_url}/users?select=id&{field}=eq.{value}",
+                    headers=self._get_headers(use_service_key=True)
                 )
                 
                 public_exists = False
                 if public_response.status_code == 200:
                     public_data = public_response.json()
                     public_exists = len(public_data) > 0
+                    logger.info(f"Public users check: found {len(public_data)} records for {field}={value}")
                 else:
                     logger.error(f"Check public.users error: {public_response.status_code} - {public_response.text}")
                     return {"success": False, "error": f"Database query failed: {public_response.status_code}"}
@@ -275,18 +276,21 @@ class SupabaseService:
                 # Check auth.users table (only for email field)
                 auth_exists = False
                 if field == "email":
+                    # Use the get user by email endpoint instead of listing all users
                     auth_response = await client.get(
                         f"{self.auth_url}/admin/users",
-                        headers=self._get_headers(use_service_key=True),
-                        params={
-                            "email": value
-                        }
+                        headers=self._get_headers(use_service_key=True)
                     )
                     
                     if auth_response.status_code == 200:
                         auth_data = auth_response.json()
-                        # Check if any users returned
-                        auth_exists = len(auth_data.get("users", [])) > 0
+                        # Filter users by email manually since Supabase admin API doesn't support email filtering
+                        all_users = auth_data.get("users", [])
+                        matching_users = [user for user in all_users if user.get("email") == value]
+                        auth_exists = len(matching_users) > 0
+                        logger.info(f"Auth users check: found {len(matching_users)} records for email={value}")
+                        # Update auth_data to only include matching users
+                        auth_data = {"users": matching_users}
                     else:
                         logger.error(f"Check auth.users error: {auth_response.status_code} - {auth_response.text}")
                         return {"success": False, "error": f"Auth query failed: {auth_response.status_code}"}
@@ -294,14 +298,16 @@ class SupabaseService:
                 # User exists if found in either table
                 exists = public_exists or auth_exists
                 
+                logger.info(f"Final result: exists={exists}, public_exists={public_exists}, auth_exists={auth_exists}")
+                
                 return {
                     "success": True,
                     "exists": exists,
                     "found_in_public": public_exists,
                     "found_in_auth": auth_exists,
                     "data": {
-                        "public": public_data if public_exists else [],
-                        "auth": auth_data.get("users", []) if auth_exists else []
+                        "public": public_data,
+                        "auth": auth_data.get("users", [])
                     }
                 }
                     
