@@ -29,17 +29,19 @@ export default function GuidesScreen() {
   const numColumns = Math.max(1, Math.min(3, Math.floor((width - horizontalPadding * 2) / minCardWidth)));
 
   // Use the custom hook to fetch legal articles from Supabase
-  const { articles: legalArticles, loading, error, refetch, getArticlesByCategory } = useLegalArticles();
+  const { articles: legalArticles, loading, error, refetch, getArticlesByCategory, searchArticles } = useLegalArticles();
 
-  // Locally controlled list for display, fed by server-side category filter
+  // Locally controlled list for display, fed by server-side category filter or search
   const [displayArticles, setDisplayArticles] = useState<ArticleItem[]>([]);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const previousSearchRef = useRef<string>("");
 
   // Initialize from full list or reset when switching back to "all"
   useEffect(() => {
-    if (activeCategory === "all") {
+    if (activeCategory === "all" && !searchQuery.trim()) {
       setDisplayArticles(legalArticles);
     }
-  }, [legalArticles, activeCategory]);
+  }, [legalArticles, activeCategory, searchQuery]);
 
   const tabOptions = [
     { id: "guides", label: "Legal Guides" },
@@ -48,17 +50,57 @@ export default function GuidesScreen() {
 
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
 
-  const filteredByCategory = useMemo(() => {
-    return displayArticles;
-  }, [displayArticles]);
+  // Handle search with debouncing
+  useEffect(() => {
+    const searchTimeout = setTimeout(async () => {
+      const trimmedQuery = searchQuery.trim();
+      const searchKey = `${trimmedQuery}-${activeCategory}`;
+      
+      // Prevent duplicate requests
+      if (previousSearchRef.current === searchKey) {
+        return;
+      }
+      
+      previousSearchRef.current = searchKey;
+      
+      if (trimmedQuery) {
+        // Only search if query is at least 2 characters to avoid excessive requests
+        if (trimmedQuery.length >= 2) {
+          setIsSearching(true);
+          try {
+            const searchResults = await searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
+            setDisplayArticles(searchResults);
+          } catch (err) {
+            console.error('Search error:', err);
+            setDisplayArticles([]);
+          } finally {
+            setIsSearching(false);
+          }
+        }
+      } else {
+        // Clear search - show category or all articles
+        setIsSearching(false);
+        if (activeCategory === "all") {
+          setDisplayArticles(legalArticles);
+        } else {
+          // Re-fetch category when search is cleared
+          try {
+            const byCat = await getArticlesByCategory(activeCategory);
+            setDisplayArticles(byCat);
+          } catch (err) {
+            console.error('Category fetch error:', err);
+            setDisplayArticles(legalArticles);
+          }
+        }
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(searchTimeout);
+  }, [searchQuery, activeCategory, legalArticles, searchArticles, getArticlesByCategory]);
 
   const articlesToRender: ArticleItem[] = useMemo(() => {
-    const searched = filteredByCategory.filter((a: ArticleItem) =>
-      `${a.title}`.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
-      `${a.summary}`.toLowerCase().includes(searchQuery.trim().toLowerCase())
-    );
-    return searched.map((a: ArticleItem) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
-  }, [filteredByCategory, searchQuery, bookmarks]);
+    return displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
+  }, [displayArticles, bookmarks]);
 
   const handleFilterPress = (): void => {};
 
@@ -130,9 +172,11 @@ export default function GuidesScreen() {
           </Input>
         </Box>
 
-        {loading ? (
+        {loading || isSearching ? (
           <View style={tw`flex-1 justify-center items-center`}>
-            <GSText size="lg" className="text-gray-500">Loading articles...</GSText>
+            <GSText size="lg" className="text-gray-500">
+              {isSearching ? "Searching articles..." : "Loading articles..."}
+            </GSText>
           </View>
         ) : error ? (
           <View style={tw`flex-1 justify-center items-center px-6`}>

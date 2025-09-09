@@ -13,6 +13,8 @@ interface DbArticleRow {
   id: number;
   title_en: string;
   title_fil: string | null;
+  description_en: string;
+  description_fil: string | null;
   content_en: string;
   content_fil: string | null;
   domain: string | null;
@@ -191,7 +193,7 @@ export default function ArticleViewScreen() {
 
           {/* Summary */}
           <Text style={styles.summary}>
-            {showFilipino && article.content_fil ? article.content_fil : article.content_en}
+            {showFilipino && article.description_fil ? article.description_fil : article.description_en}
           </Text>
           
 

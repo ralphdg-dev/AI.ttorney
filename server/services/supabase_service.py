@@ -4,6 +4,7 @@ import json
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 import logging
+from supabase import create_client, Client
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -21,6 +22,9 @@ class SupabaseService:
         
         self.auth_url = f"{self.url}/auth/v1"
         self.rest_url = f"{self.url}/rest/v1"
+        
+        # Create Supabase client for direct database operations
+        self.supabase: Client = create_client(self.url, self.anon_key)
     
     def _get_headers(self, use_service_key: bool = False) -> Dict[str, str]:
         """Get request headers"""
