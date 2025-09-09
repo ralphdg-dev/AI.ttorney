@@ -251,11 +251,11 @@ class SupabaseService:
             return {"success": False, "error": str(e)}
     
     async def check_user_exists(self, field: str, value: str) -> Dict[str, Any]:
-        """Check if a user exists by field (email or username) in public.users table only"""
+        """Check if a user exists by field (email or username) in both auth.users and public.users tables"""
         try:
             async with httpx.AsyncClient() as client:
-                # Only check public.users table for registration validation
-                response = await client.get(
+                # Check public.users table
+                public_response = await client.get(
                     f"{self.rest_url}/users",
                     headers=self._get_headers(use_service_key=True),
                     params={
@@ -264,17 +264,46 @@ class SupabaseService:
                     }
                 )
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    exists = len(data) > 0
-                    return {
-                        "success": True,
-                        "exists": exists,
-                        "data": data
-                    }
+                public_exists = False
+                if public_response.status_code == 200:
+                    public_data = public_response.json()
+                    public_exists = len(public_data) > 0
                 else:
-                    logger.error(f"Check user exists error: {response.status_code} - {response.text}")
-                    return {"success": False, "error": f"Database query failed: {response.status_code}"}
+                    logger.error(f"Check public.users error: {public_response.status_code} - {public_response.text}")
+                    return {"success": False, "error": f"Database query failed: {public_response.status_code}"}
+                
+                # Check auth.users table (only for email field)
+                auth_exists = False
+                if field == "email":
+                    auth_response = await client.get(
+                        f"{self.auth_url}/admin/users",
+                        headers=self._get_headers(use_service_key=True),
+                        params={
+                            "email": value
+                        }
+                    )
+                    
+                    if auth_response.status_code == 200:
+                        auth_data = auth_response.json()
+                        # Check if any users returned
+                        auth_exists = len(auth_data.get("users", [])) > 0
+                    else:
+                        logger.error(f"Check auth.users error: {auth_response.status_code} - {auth_response.text}")
+                        return {"success": False, "error": f"Auth query failed: {auth_response.status_code}"}
+                
+                # User exists if found in either table
+                exists = public_exists or auth_exists
+                
+                return {
+                    "success": True,
+                    "exists": exists,
+                    "found_in_public": public_exists,
+                    "found_in_auth": auth_exists,
+                    "data": {
+                        "public": public_data if public_exists else [],
+                        "auth": auth_data.get("users", []) if auth_exists else []
+                    }
+                }
                     
         except Exception as e:
             logger.error(f"Check user exists error: {str(e)}")
