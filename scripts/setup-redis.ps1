@@ -55,24 +55,73 @@ function Test-Command {
 function Install-RedisNative {
     Write-Info "Installing Redis natively on Windows..."
     
+    # Check if Redis is already installed
+    if (Test-Command "redis-server") {
+        Write-Info "Redis already installed, using existing installation"
+        return $true
+    }
+    
+    # Try Chocolatey
     if (Test-Command "choco") {
         Write-Info "Installing Redis via Chocolatey..."
-        choco install redis-64 -y
-        Write-Success "Redis installed via Chocolatey"
+        try {
+            $chocoResult = choco install redis-64 -y
+            if ($LASTEXITCODE -eq 0) {
+                Write-Success "Redis installed via Chocolatey"
+                return $true
+            }
+            else {
+                Write-Error "Failed to install Redis via Chocolatey (Exit code: $LASTEXITCODE)"
+            }
+        }
+        catch {
+            Write-Error "Error installing Redis via Chocolatey: $($_.Exception.Message)"
+        }
     }
-    elseif (Test-Command "scoop") {
+    
+    # Try Scoop
+    if (Test-Command "scoop") {
         Write-Info "Installing Redis via Scoop..."
-        scoop install redis
-        Write-Success "Redis installed via Scoop"
+        try {
+            $scoopResult = scoop install redis
+            if ($LASTEXITCODE -eq 0) {
+                Write-Success "Redis installed via Scoop"
+                return $true
+            }
+            else {
+                Write-Error "Failed to install Redis via Scoop (Exit code: $LASTEXITCODE)"
+            }
+        }
+        catch {
+            Write-Error "Error installing Redis via Scoop: $($_.Exception.Message)"
+        }
     }
-    else {
-        Write-Warning "No package manager found (Chocolatey or Scoop)"
-        Write-Info "Please install Redis manually or use Docker setup"
-        Write-Info "Chocolatey: https://chocolatey.org/install"
-        Write-Info "Scoop: https://scoop.sh/"
-        return $false
+    
+    # Try winget (Windows Package Manager)
+    if (Test-Command "winget") {
+        Write-Info "Installing Redis via winget..."
+        try {
+            $wingetResult = winget install --id=Redis.Redis -e --silent
+            if ($LASTEXITCODE -eq 0) {
+                Write-Success "Redis installed via winget"
+                return $true
+            }
+            else {
+                Write-Error "Failed to install Redis via winget (Exit code: $LASTEXITCODE)"
+            }
+        }
+        catch {
+            Write-Error "Error installing Redis via winget: $($_.Exception.Message)"
+        }
     }
-    return $true
+    
+    Write-Warning "No package manager found or installation failed"
+    Write-Info "Available package managers:"
+    Write-Info "  - Chocolatey: https://chocolatey.org/install"
+    Write-Info "  - Scoop: https://scoop.sh/"
+    Write-Info "  - winget: Built into Windows 10/11"
+    Write-Info "Or use Docker setup for easier installation"
+    return $false
 }
 
 function Setup-DockerRedis {
@@ -233,21 +282,48 @@ function Start-RedisService {
     Write-Info "Starting Redis service..."
     
     if (Test-Command "redis-server") {
-        Start-Process -FilePath "redis-server" -ArgumentList $RedisConfigFile -NoNewWindow
-        Write-Success "Redis server started"
-    }
-    else {
-        Write-Warning "redis-server command not found. Using Docker instead."
-        if (Test-Path $DockerComposeFile) {
-            docker-compose -f $DockerComposeFile up -d
-            Write-Success "Redis started with Docker"
+        try {
+            # Check if Redis is already running
+            $redisProcess = Get-Process -Name "redis-server" -ErrorAction SilentlyContinue
+            if ($redisProcess) {
+                Write-Info "Redis server is already running (PID: $($redisProcess.Id))"
+                return $true
+            }
+            
+            # Start Redis server
+            $redisArgs = @()
+            if (Test-Path $RedisConfigFile) {
+                $redisArgs += $RedisConfigFile
+            }
+            
+            Start-Process -FilePath "redis-server" -ArgumentList $redisArgs -WindowStyle Hidden
+            Start-Sleep -Seconds 2
+            Write-Success "Redis server started"
+            return $true
         }
-        else {
-            Write-Error "No Redis installation or Docker Compose file found"
+        catch {
+            Write-Error "Failed to start Redis server: $($_.Exception.Message)"
             return $false
         }
     }
-    return $true
+    else {
+        Write-Warning "redis-server command not found. Checking for Docker..."
+        if (Test-Command "docker" -and (Test-Path $DockerComposeFile)) {
+            try {
+                docker-compose -f $DockerComposeFile up -d
+                Write-Success "Redis started with Docker"
+                return $true
+            }
+            catch {
+                Write-Error "Failed to start Redis with Docker: $($_.Exception.Message)"
+                return $false
+            }
+        }
+        else {
+            Write-Error "No Redis installation or Docker setup found"
+            return $false
+        }
+    }
 }
 
 function Show-Usage {
@@ -317,6 +393,13 @@ function Main {
             if (Install-RedisNative) {
                 if (Start-RedisService) {
                     Test-RedisConnection
+                }
+            }
+            else {
+                Write-Warning "Native installation failed. Falling back to Docker setup..."
+                if (Setup-DockerRedis) {
+                    Write-Info "To start Redis with Docker, run:"
+                    Write-Host "  docker-compose -f $DockerComposeFile up -d"
                 }
             }
         }

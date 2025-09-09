@@ -65,12 +65,35 @@ install_redis_macos() {
     print_info "Installing Redis on macOS..."
     
     if check_command "brew"; then
-        brew install redis
-        print_success "Redis installed via Homebrew"
+        print_info "Installing Redis via Homebrew..."
+        if brew install redis; then
+            print_success "Redis installed via Homebrew"
+            return 0
+        else
+            print_error "Failed to install Redis via Homebrew"
+            return 1
+        fi
+    elif check_command "port"; then
+        print_info "Installing Redis via MacPorts..."
+        if sudo port install redis; then
+            print_success "Redis installed via MacPorts"
+            return 0
+        else
+            print_error "Failed to install Redis via MacPorts"
+            return 1
+        fi
     else
-        print_error "Homebrew not found. Please install Homebrew first:"
-        echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-        exit 1
+        print_warning "No package manager found (Homebrew or MacPorts)"
+        print_info "Attempting to install Homebrew..."
+        if /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; then
+            print_success "Homebrew installed successfully"
+            if brew install redis; then
+                print_success "Redis installed via Homebrew"
+                return 0
+            fi
+        fi
+        print_error "Failed to install Redis. Please install Homebrew manually or use Docker setup"
+        return 1
     fi
 }
 
@@ -78,18 +101,54 @@ install_redis_linux() {
     print_info "Installing Redis on Linux..."
     
     if check_command "apt-get"; then
-        sudo apt-get update
-        sudo apt-get install -y redis-server
-        print_success "Redis installed via apt-get"
+        print_info "Installing Redis via apt-get..."
+        if sudo apt-get update && sudo apt-get install -y redis-server; then
+            print_success "Redis installed via apt-get"
+            return 0
+        else
+            print_error "Failed to install Redis via apt-get"
+            return 1
+        fi
     elif check_command "yum"; then
-        sudo yum install -y redis
-        print_success "Redis installed via yum"
+        print_info "Installing Redis via yum..."
+        if sudo yum install -y redis; then
+            print_success "Redis installed via yum"
+            return 0
+        else
+            print_error "Failed to install Redis via yum"
+            return 1
+        fi
     elif check_command "dnf"; then
-        sudo dnf install -y redis
-        print_success "Redis installed via dnf"
+        print_info "Installing Redis via dnf..."
+        if sudo dnf install -y redis; then
+            print_success "Redis installed via dnf"
+            return 0
+        else
+            print_error "Failed to install Redis via dnf"
+            return 1
+        fi
+    elif check_command "pacman"; then
+        print_info "Installing Redis via pacman..."
+        if sudo pacman -S --noconfirm redis; then
+            print_success "Redis installed via pacman"
+            return 0
+        else
+            print_error "Failed to install Redis via pacman"
+            return 1
+        fi
+    elif check_command "zypper"; then
+        print_info "Installing Redis via zypper..."
+        if sudo zypper install -y redis; then
+            print_success "Redis installed via zypper"
+            return 0
+        else
+            print_error "Failed to install Redis via zypper"
+            return 1
+        fi
     else
-        print_error "No supported package manager found (apt-get, yum, dnf)"
-        exit 1
+        print_error "No supported package manager found (apt-get, yum, dnf, pacman, zypper)"
+        print_info "Please install Redis manually or use Docker setup"
+        return 1
     fi
 }
 
@@ -336,24 +395,43 @@ main() {
             
             case $os_type in
                 "macos")
-                    install_redis_macos
-                    start_redis_service
+                    if install_redis_macos; then
+                        start_redis_service
+                        test_redis_connection
+                    else
+                        print_warning "Native installation failed. Falling back to Docker setup..."
+                        create_redis_config
+                        setup_docker_redis
+                        print_info "To start Redis with Docker, run:"
+                        echo "  docker-compose -f $DOCKER_COMPOSE_FILE up -d"
+                        return
+                    fi
                     ;;
                 "linux")
-                    install_redis_linux
-                    start_redis_service
+                    if install_redis_linux; then
+                        start_redis_service
+                        test_redis_connection
+                    else
+                        print_warning "Native installation failed. Falling back to Docker setup..."
+                        create_redis_config
+                        setup_docker_redis
+                        print_info "To start Redis with Docker, run:"
+                        echo "  docker-compose -f $DOCKER_COMPOSE_FILE up -d"
+                        return
+                    fi
                     ;;
                 "windows")
-                    install_redis_windows
+                    print_warning "Windows detected. Use PowerShell or batch script for Windows setup."
+                    print_info "Run: scripts\\setup-redis.ps1 or scripts\\setup-redis.bat"
                     exit 1
                     ;;
                 *)
                     print_error "Unsupported operating system: $os_type"
-                    exit 1
+                    print_info "Falling back to Docker setup..."
+                    create_redis_config
+                    setup_docker_redis
                     ;;
             esac
-            
-            test_redis_connection
             ;;
         "config")
             create_redis_config

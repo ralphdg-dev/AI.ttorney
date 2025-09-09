@@ -7,24 +7,142 @@ setlocal enabledelayedexpansion
 REM Configuration
 set REDIS_PORT=6379
 set DOCKER_COMPOSE_FILE=docker-compose.redis.yml
+set REDIS_CONFIG_FILE=redis.conf
 
 echo ====================================
 echo    AI.ttorney Redis Setup (Windows)
 echo ====================================
 echo.
 
+REM Parse command line arguments
+set SETUP_TYPE=
+if "%1"=="--docker" set SETUP_TYPE=docker
+if "%1"=="--native" set SETUP_TYPE=native
+if "%1"=="--config" set SETUP_TYPE=config
+if "%1"=="--test" set SETUP_TYPE=test
+if "%1"=="--help" goto :show_usage
+
+REM If no argument provided, show menu
+if "%SETUP_TYPE%"=="" (
+    echo Choose Redis setup method:
+    echo 1) Docker recommended for cross-platform
+    echo 2) Native installation try Chocolatey/Scoop
+    echo 3) Configuration files only
+    echo 4) Test existing installation
+    set /p choice="Enter choice (1-4): "
+    
+    if "!choice!"=="1" set SETUP_TYPE=docker
+    if "!choice!"=="2" set SETUP_TYPE=native
+    if "!choice!"=="3" set SETUP_TYPE=config
+    if "!choice!"=="4" set SETUP_TYPE=test
+    
+    if "!SETUP_TYPE!"=="" (
+        echo [ERROR] Invalid choice
+        pause
+        exit /b 1
+    )
+)
+
+REM Execute based on setup type
+if "%SETUP_TYPE%"=="docker" goto :setup_docker
+if "%SETUP_TYPE%"=="native" goto :setup_native
+if "%SETUP_TYPE%"=="config" goto :setup_config
+if "%SETUP_TYPE%"=="test" goto :test_redis
+
+:setup_docker
+echo [INFO] Setting up Redis with Docker...
+
 REM Check if Docker is available
 docker --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Docker not found. Please install Docker Desktop first.
     echo Download from: https://www.docker.com/products/docker-desktop
-    pause
-    exit /b 1
+    echo.
+    echo Falling back to native installation...
+    goto :setup_native
 )
 
-echo [INFO] Docker found. Setting up Redis with Docker...
+call :create_redis_config
+call :create_docker_compose
 
-REM Create Docker Compose file
+echo [INFO] Starting Redis with Docker...
+docker-compose -f %DOCKER_COMPOSE_FILE% up -d
+
+REM Wait for Redis to start
+echo [INFO] Waiting for Redis to start...
+timeout /t 5 /nobreak >nul
+
+call :test_redis_connection
+goto :success
+
+:setup_native
+echo [INFO] Setting up Redis natively on Windows...
+
+REM Check for Chocolatey
+choco --version >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [INFO] Installing Redis via Chocolatey...
+    choco install redis-64 -y
+    if %errorlevel% equ 0 (
+        echo [SUCCESS] Redis installed via Chocolatey
+        call :create_redis_config
+        call :start_redis_native
+        call :test_redis_connection
+        goto :success
+    ) else (
+        echo [ERROR] Failed to install Redis via Chocolatey
+    )
+)
+
+REM Check for Scoop
+scoop --version >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [INFO] Installing Redis via Scoop...
+    scoop install redis
+    if %errorlevel% equ 0 (
+        echo [SUCCESS] Redis installed via Scoop
+        call :create_redis_config
+        call :start_redis_native
+        call :test_redis_connection
+        goto :success
+    ) else (
+        echo [ERROR] Failed to install Redis via Scoop
+    )
+)
+
+REM Check for existing Redis installation
+redis-server --version >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [INFO] Redis already installed, using existing installation
+    call :create_redis_config
+    call :start_redis_native
+    call :test_redis_connection
+    goto :success
+)
+
+echo [WARNING] No package manager found and Redis not installed
+echo [INFO] Please install one of the following:
+echo   - Chocolatey: https://chocolatey.org/install
+echo   - Scoop: https://scoop.sh/
+echo   - Docker Desktop: https://www.docker.com/products/docker-desktop
+echo.
+echo [INFO] Falling back to Docker setup...
+goto :setup_docker
+
+:setup_config
+echo [INFO] Creating configuration files only...
+call :create_redis_config
+call :create_docker_compose
+echo [SUCCESS] Configuration files created successfully
+goto :success
+
+:test_redis
+echo [INFO] Testing existing Redis installation...
+call :test_redis_connection
+goto :success
+
+:create_docker_compose
+echo [INFO] Creating Docker Compose file...
 (
 echo version: '3.8'
 echo.
@@ -49,28 +167,26 @@ echo volumes:
 echo   redis_data:
 echo     driver: local
 ) > %DOCKER_COMPOSE_FILE%
-
 echo [SUCCESS] Docker Compose file created: %DOCKER_COMPOSE_FILE%
+goto :eof
 
-REM Create Redis configuration
-call :create_redis_config
+:start_redis_native
+echo [INFO] Starting Redis server...
+start /B redis-server %REDIS_CONFIG_FILE%
+timeout /t 3 /nobreak >nul
+goto :eof
 
-echo [INFO] Starting Redis with Docker...
-docker-compose -f %DOCKER_COMPOSE_FILE% up -d
-
-REM Wait for Redis to start
-echo [INFO] Waiting for Redis to start...
-timeout /t 5 /nobreak >nul
-
-REM Test Redis connection
+:test_redis_connection
 echo [INFO] Testing Redis connection...
+
+REM Try Docker Redis first
 docker exec ai-ttorney-redis redis-cli ping >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [SUCCESS] Redis is running and responding to ping
+    echo [SUCCESS] Redis Docker is running and responding to ping
     
     REM Test basic operations
     docker exec ai-ttorney-redis redis-cli set test_key "AI.ttorney Redis Setup" >nul
-    for /f "delims=" %%i in ('docker exec ai-ttorney-redis redis-cli get test_key') do set test_value=%%i
+    for /f "delims=" %%i in ('docker exec ai-ttorney-redis redis-cli get test_key 2^>nul') do set test_value=%%i
     
     if "!test_value!"=="AI.ttorney Redis Setup" (
         echo [SUCCESS] Redis read/write operations working correctly
@@ -78,12 +194,31 @@ if %errorlevel% equ 0 (
     ) else (
         echo [WARNING] Redis ping successful but read/write test failed
     )
-) else (
-    echo [ERROR] Redis is not responding. Please check the installation.
-    pause
-    exit /b 1
+    goto :eof
 )
 
+REM Try native Redis
+redis-cli ping >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [SUCCESS] Redis native is running and responding to ping
+    
+    REM Test basic operations
+    redis-cli set test_key "AI.ttorney Redis Setup" >nul
+    for /f "delims=" %%i in ('redis-cli get test_key 2^>nul') do set test_value=%%i
+    
+    if "!test_value!"=="AI.ttorney Redis Setup" (
+        echo [SUCCESS] Redis read/write operations working correctly
+        redis-cli del test_key >nul
+    ) else (
+        echo [WARNING] Redis ping successful but read/write test failed
+    )
+    goto :eof
+)
+
+echo [ERROR] Redis is not responding. Please check the installation.
+goto :eof
+
+:success
 echo.
 echo [SUCCESS] Redis setup completed successfully!
 echo.
@@ -95,9 +230,28 @@ echo.
 echo For your .env file, add:
 echo   REDIS_URL=redis://localhost:6379
 echo.
-echo To stop Redis:
-echo   docker-compose -f %DOCKER_COMPOSE_FILE% down
+if "%SETUP_TYPE%"=="docker" (
+    echo To stop Redis:
+    echo   docker-compose -f %DOCKER_COMPOSE_FILE% down
+)
 echo.
+pause
+goto :eof
+
+:show_usage
+echo Usage: %0 [OPTIONS]
+echo.
+echo Options:
+echo   --docker     Use Docker setup recommended for cross-platform
+echo   --native     Install Redis natively on the system
+echo   --config     Only create configuration files
+echo   --test       Test existing Redis installation
+echo   --help       Show this help message
+echo.
+echo Examples:
+echo   %0 --docker    # Setup Redis with Docker
+echo   %0 --native    # Install Redis natively
+echo   %0 --test      # Test Redis connection
 pause
 goto :eof
 

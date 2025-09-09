@@ -4,39 +4,51 @@ This directory contains scripts and configurations to set up Redis for the AI.tt
 
 ## 🚀 Quick Start
 
-### Option 1: Docker (Recommended)
+### Option 1: Docker (Recommended - Works on all platforms)
 ```bash
-# Make script executable (macOS/Linux)
+# macOS/Linux
 chmod +x scripts/setup-redis.sh
-
-# Run Docker setup
 ./scripts/setup-redis.sh --docker
 
-# Start Redis
+# Windows (PowerShell - Run as Administrator)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\scripts\setup-redis.ps1 -Docker
+
+# Windows (Command Prompt)
+scripts\setup-redis.bat --docker
+
+# Start Redis (all platforms)
 docker-compose -f docker-compose.redis.yml up -d
 ```
 
 ### Option 2: Native Installation
 ```bash
-# macOS/Linux
+# macOS/Linux (auto-detects package manager)
 ./scripts/setup-redis.sh --native
 
-# Windows (PowerShell)
+# Windows (PowerShell - tries Chocolatey, Scoop, winget)
 .\scripts\setup-redis.ps1 -Native
 
-# Windows (Command Prompt)
-scripts\setup-redis.bat
+# Windows (Command Prompt - tries Chocolatey, Scoop)
+scripts\setup-redis.bat --native
+```
+
+### Option 3: Test Existing Setup
+```bash
+# Test if Redis is working
+./scripts/test-redis-setup.sh  # macOS/Linux
 ```
 
 ## 📁 Files Overview
 
 | File | Description |
 |------|-------------|
-| `setup-redis.sh` | Main setup script for macOS/Linux |
-| `setup-redis.bat` | Windows batch script |
-| `setup-redis.ps1` | Windows PowerShell script |
-| `docker-compose.redis.yml` | Docker Compose configuration |
-| `redis.conf` | Optimized Redis configuration |
+| `setup-redis.sh` | Main setup script for macOS/Linux with fallback support |
+| `setup-redis.bat` | Windows batch script with multiple package manager support |
+| `setup-redis.ps1` | Windows PowerShell script with enhanced error handling |
+| `test-redis-setup.sh` | Test script to verify Redis setup and OTP operations |
+| `docker-compose.redis.yml` | Docker Compose configuration with Redis Commander |
+| `redis.conf` | Optimized Redis configuration for AI.ttorney OTP services |
 
 ## 🐳 Docker Setup (Recommended)
 
