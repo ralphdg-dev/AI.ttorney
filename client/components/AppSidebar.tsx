@@ -160,14 +160,14 @@ const Sidebar: React.FC<SidebarProps> = ({
       id: 'bookmarks',
       label: 'Favorite Terms',
       icon: Star,
-      route: 'bookmarks',
+      route: 'favorite-terms',
       badge: badgeCounts.favoriteTerms || undefined,
     },
     {
       id: 'favorites',
       label: 'Bookmarked Guides',
       icon: Bookmark,
-      route: 'favorites',
+      route: 'bookmarked-guides',
       badge: badgeCounts.bookmarkedGuides || undefined,
     },
     {
@@ -376,11 +376,10 @@ export const SidebarWrapper: React.FC<{
     console.log(`Navigate to ${route}`);
     
     switch (route) {
-      case 'bookmarks':
-        router.push('/favorites');
+      case 'favorite-terms':
+        router.push('/favorite-terms');
         break;
-      case 'favorites':
-        // Navigate to Bookmarked Guides page
+      case 'bookmarked-guides':
         router.push('/bookmarked-guides');
         break;
       case 'profile':

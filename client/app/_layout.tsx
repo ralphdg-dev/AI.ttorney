@@ -89,7 +89,7 @@ export default function RootLayout() {
                 }}
               />
               <Stack.Screen
-                name="favorites"
+                name="favorite-terms"
                 options={{
                   headerShown: false,
                   title: "Favorite Terms",

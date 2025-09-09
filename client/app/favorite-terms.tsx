@@ -6,7 +6,9 @@ import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
 import { Text as GSText } from "@/components/ui/text";
 import { Button, ButtonText } from "@/components/ui/button";
-import { Input, InputField } from "@/components/ui/input";
+import { Input, InputField, InputSlot } from "@/components/ui/input";
+import { Box } from "@/components/ui/box";
+import { Ionicons } from "@expo/vector-icons";
 import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
@@ -163,9 +165,7 @@ export default function FavoritesScreen() {
       <View style={tw`flex-1 bg-gray-50`}>
         <Header
           title="Favorite Terms"
-          showBackButton
-          showMenu={false}
-          onBackPress={handleBack}
+          showMenu={true}
         />
         <View style={tw`flex-1 items-center justify-center`}>
           <GSText>Loading your favorite terms...</GSText>
@@ -181,23 +181,25 @@ export default function FavoritesScreen() {
       {/* Header */}
       <Header
         title="Favorite Terms"
-        showBackButton
-        showMenu={false}
-        onBackPress={handleBack}
+        showMenu={true}
       />
 
-      {/* Search Bar */}
+      {/* Search Bar (match Bookmarked Guides styling) */}
       {favoriteTerms.length > 0 && (
-        <View style={tw`px-4 py-3 bg-gray-50`}>
-          <Input variant="outline" size="md">
+        <Box className="px-6 pt-6 mb-4">
+          <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
+            <InputSlot className="pl-3">
+              <Ionicons name="search" size={20} color="#9CA3AF" />
+            </InputSlot>
             <InputField
-              placeholder="Search your favorite terms..."
               value={searchQuery}
               onChangeText={setSearchQuery}
-              style={{ fontSize: 14 }}
+              placeholder="Search your favorite terms"
+              placeholderTextColor="#9CA3AF"
+              className="text-[#313131]"
             />
           </Input>
-        </View>
+        </Box>
       )}
 
       {favoriteTerms.length === 0 ? (
@@ -239,8 +241,14 @@ export default function FavoritesScreen() {
             { useNativeDriver: false }
           )}
         >
-          {/* Category Filter */}
-          <View style={tw`px-3 pt-3`}>
+          {/* Category Filter (match Bookmarked Guides header) */}
+          <View style={tw`px-4`}>
+            <HStack className="items-center mb-4">
+              <Ionicons name="bookmarks" size={16} color={Colors.text.sub} />
+              <GSText size="sm" bold className="ml-2" style={{ color: Colors.text.sub }}>
+                Filter by Category
+              </GSText>
+            </HStack>
             <CategoryScroller
               activeCategory={activeCategory}
               onCategoryChange={setActiveCategory}
