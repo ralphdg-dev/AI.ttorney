@@ -145,15 +145,7 @@ export default function RoleSelection() {
     }
   };
 
-  const handleContinueAsGuest = () => {
-    // router.push("/home");
-    console.log("Continue as guest pressed");
-  };
 
-  const handleSkip = () => {
-    // Skip to guest mode or next screen
-    handleContinueAsGuest();
-  };
 
   // Responsive styles
   const responsiveStyles: ResponsiveStyles = {
