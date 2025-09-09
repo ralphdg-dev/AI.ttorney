@@ -380,8 +380,8 @@ export const SidebarWrapper: React.FC<{
         router.push('/favorites');
         break;
       case 'favorites':
-        // This could be for bookmarked guides in the future
-        console.log('Bookmarked guides not implemented yet');
+        // Navigate to Bookmarked Guides page
+        router.push('/bookmarked-guides');
         break;
       case 'profile':
         console.log('Profile page not implemented yet');

@@ -289,7 +289,7 @@ export default function FavoritesScreen() {
               ))
             )}
             {filteredTerms.length > 0 && (
-              <View style={[tw`mt-3 mb-6`, { paddingHorizontal: 8 }]}>
+              <View style={[tw`mt-1 mb-6`, { paddingHorizontal: 8 }]}> 
                 <Button onPress={() => router.push('/glossary')} style={{ backgroundColor: Colors.primary.blue }}>
                   <ButtonText>Browse Legal Terms</ButtonText>
                 </Button>
