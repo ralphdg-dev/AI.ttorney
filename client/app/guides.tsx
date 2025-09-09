@@ -21,8 +21,11 @@ export default function GuidesScreen() {
   const [activeTab, setActiveTab] = useState<string>("guides");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const flatListRef = useRef<FlatList>(null);
   const { width } = useWindowDimensions();
+  
+  const ARTICLES_PER_PAGE = 10;
 
   const horizontalPadding = 24;
   const minCardWidth = 320;
@@ -102,6 +105,18 @@ export default function GuidesScreen() {
     return displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
   }, [displayArticles, bookmarks]);
 
+  // Pagination calculations
+  const totalArticles = articlesToRender.length;
+  const totalPages = Math.ceil(totalArticles / ARTICLES_PER_PAGE);
+  const startIndex = (currentPage - 1) * ARTICLES_PER_PAGE;
+  const endIndex = startIndex + ARTICLES_PER_PAGE;
+  const paginatedArticles = articlesToRender.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search or category changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeCategory]);
+
   const handleFilterPress = (): void => {};
 
 
@@ -147,6 +162,115 @@ export default function GuidesScreen() {
     </View>
   );
 
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    const getPageNumbers = () => {
+      const pages = [];
+      const maxVisiblePages = 5;
+      
+      if (totalPages <= maxVisiblePages) {
+        for (let i = 1; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        if (currentPage <= 3) {
+          pages.push(1, 2, 3, 4, '...', totalPages);
+        } else if (currentPage >= totalPages - 2) {
+          pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+        } else {
+          pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+        }
+      }
+      return pages;
+    };
+
+    return (
+      <View style={tw`py-6 bg-gray-50`}>
+        <View style={tw`flex-row justify-center items-center`}>
+          {/* Previous Button */}
+          <TouchableOpacity
+            style={[
+              tw`w-12 h-12 rounded-full flex justify-center items-center mr-3`,
+              {
+                backgroundColor: currentPage > 1 ? '#ffffff' : '#d1d5db',
+                borderWidth: 1,
+                borderColor: '#d1d5db'
+              }
+            ]}
+            onPress={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
+            disabled={currentPage <= 1}
+          >
+            <Ionicons 
+              name="chevron-back" 
+              size={18} 
+              color={currentPage > 1 ? '#374151' : '#9ca3af'} 
+            />
+          </TouchableOpacity>
+
+          {/* Page Numbers */}
+          {getPageNumbers().map((page, index) => (
+            <View key={index}>
+              {page === '...' ? (
+                <GSText size="md" className="mx-3" style={{ color: '#6b7280' }}>...</GSText>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    tw`w-12 h-12 rounded-xl flex justify-center items-center mx-1`,
+                    {
+                      backgroundColor: currentPage === page ? '#d1d5db' : '#ffffff',
+                      borderWidth: 1,
+                      borderColor: '#d1d5db'
+                    }
+                  ]}
+                  onPress={() => setCurrentPage(page as number)}
+                >
+                  <GSText 
+                    size="md" 
+                    bold={false}
+                    style={{ 
+                      color: currentPage === page ? '#ffffff' : '#374151',
+                      fontWeight: currentPage === page ? '600' : '400'
+                    }}
+                  >
+                    {page}
+                  </GSText>
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+
+          {/* Next Button */}
+          <TouchableOpacity
+            style={[
+              tw`w-12 h-12 rounded-full flex justify-center items-center ml-3`,
+              {
+                backgroundColor: currentPage < totalPages ? '#ffffff' : '#d1d5db',
+                borderWidth: 1,
+                borderColor: '#d1d5db'
+              }
+            ]}
+            onPress={() => currentPage < totalPages && setCurrentPage(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+          >
+            <Ionicons 
+              name="chevron-forward" 
+              size={18} 
+              color={currentPage < totalPages ? '#374151' : '#9ca3af'} 
+            />
+          </TouchableOpacity>
+        </View>
+        
+        {/* Results count under pagination */}
+        <View style={tw`mt-4`}>
+          <GSText size="sm" className="text-center" style={{ color: '#9ca3af' }}>
+            Showing {paginatedArticles.length} of {totalArticles} results
+          </GSText>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SidebarProvider>
       <View style={tw`flex-1 bg-gray-50`}>
@@ -189,35 +313,47 @@ export default function GuidesScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <FlatList
-            ref={flatListRef}
-            data={articlesToRender}
-            key={`${numColumns}-${activeCategory}`}
-            keyExtractor={(item) => item.id}
-            numColumns={numColumns}
-            ListHeaderComponent={renderListHeader}
-            contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 80, flexGrow: 1 }}
-            columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
-            renderItem={({ item }) => (
-              <ArticleCard
-                item={item}
-                onPress={handleArticlePress}
-                onToggleBookmark={handleToggleBookmark}
-                containerStyle={{ width: numColumns > 1 ? (width - horizontalPadding * 2 - 12) / numColumns : "100%", marginHorizontal: 0 }}
-              />
-            )}
-            showsVerticalScrollIndicator={false}
-            style={{ flex: 1 }}
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={8}
-            initialNumToRender={6}
-            windowSize={8}
-            ListEmptyComponent={
-              <View style={tw`flex-1 justify-center items-center py-8`}>
-                <GSText size="lg" className="text-gray-500 text-center">No articles found</GSText>
+          <View style={{ flex: 1 }}>
+            <FlatList
+              ref={flatListRef}
+              data={paginatedArticles}
+              key={`${numColumns}-${activeCategory}-${currentPage}`}
+              keyExtractor={(item) => item.id}
+              numColumns={numColumns}
+              ListHeaderComponent={renderListHeader}
+              ListFooterComponent={renderPagination}
+              contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 20, flexGrow: 1 }}
+              columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
+              renderItem={({ item }) => (
+                <ArticleCard
+                  item={item}
+                  onPress={handleArticlePress}
+                  onToggleBookmark={handleToggleBookmark}
+                  containerStyle={{ width: numColumns > 1 ? (width - horizontalPadding * 2 - 12) / numColumns : "100%", marginHorizontal: 0 }}
+                />
+              )}
+              showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={8}
+              initialNumToRender={6}
+              windowSize={8}
+              ListEmptyComponent={
+                <View style={tw`flex-1 justify-center items-center py-8`}>
+                  <GSText size="lg" className="text-gray-500 text-center">No articles found</GSText>
+                </View>
+              }
+            />
+            
+            {/* Results count - always show when there are articles */}
+            {articlesToRender.length > 0 && totalPages <= 1 && (
+              <View style={tw`px-6 py-4 bg-gray-50`}>
+                <GSText size="sm" className="text-center" style={{ color: '#9ca3af' }}>
+                  Showing {articlesToRender.length} of {totalArticles} results
+                </GSText>
               </View>
-            }
-          />
+            )}
+          </View>
         )}
 
         <Navbar activeTab="learn" />
