@@ -102,6 +102,13 @@ export default function RootLayout() {
                   title: "Bookmarked Guides",
                 }}
               />
+              <Stack.Screen
+                name="notifications"
+                options={{
+                  headerShown: false,
+                  title: "Notifications",
+                }}
+              />
               <Stack.Screen name="documents-success" options={{ headerShown: false }} />
             </Stack>
             {/* Mount the sidebar at the root so it can overlay any screen */}

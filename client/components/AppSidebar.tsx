@@ -382,6 +382,9 @@ export const SidebarWrapper: React.FC<{
       case 'bookmarked-guides':
         router.push('/bookmarked-guides');
         break;
+      case 'notifications':
+        router.push('/notifications');
+        break;
       case 'profile':
         console.log('Profile page not implemented yet');
         break;
