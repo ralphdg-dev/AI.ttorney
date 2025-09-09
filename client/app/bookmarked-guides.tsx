@@ -13,7 +13,7 @@ import CategoryScroller from "@/components/glossary/CategoryScroller";
 import Navbar from "@/components/Navbar";
 import ArticleCard, { ArticleItem } from "@/components/guides/ArticleCard";
 import { Button, ButtonText } from "@/components/ui/button";
-import { Filter } from "lucide-react-native";
+import { Filter, SortAsc } from "lucide-react-native";
 
 export default function BookmarkedGuidesScreen() {
   const router = useRouter();
@@ -134,6 +134,25 @@ export default function BookmarkedGuidesScreen() {
         </GSText>
       </HStack>
       <CategoryScroller activeCategory={activeCategory} onCategoryChange={handleCategoryChange} includeAllOption />
+
+      {/* Results Info (match Favorite Terms) */}
+      <View style={tw`px-5 mb-3`}>
+        <HStack className="items-center justify-between">
+          <GSText size="sm" style={{ color: Colors.text.sub }}>
+            {bookmarkedArticles.length} {bookmarkedArticles.length === 1 ? 'result' : 'results'}
+            {activeCategory !== "all" && ` in ${activeCategory}`}
+            {searchQuery && ` for "${searchQuery}"`}
+          </GSText>
+          {bookmarkedArticles.length > 1 && (
+            <HStack className="items-center">
+              <SortAsc size={14} color={Colors.text.sub} />
+              <GSText size="xs" className="ml-1" style={{ color: Colors.text.sub }}>
+                A-Z
+              </GSText>
+            </HStack>
+          )}
+        </HStack>
+      </View>
     </View>
   );
 
