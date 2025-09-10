@@ -45,16 +45,6 @@ export default function TermDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [scrollY] = useState(new Animated.Value(0));
 
-  const getDynamicLineHeight = (text: string, baseSize: number) => {
-    const charCount = text.length;
-    const lineHeightIncrease = Math.floor(charCount / 50);
-    const minLineHeight = baseSize * 1.2; // 120% of font size
-    const maxLineHeight = baseSize * 1.8; // 180% of font size
-    const newHeight = baseSize + lineHeightIncrease;
-
-    return Math.min(Math.max(newHeight, minLineHeight), maxLineHeight);
-  };
-
   const loadTerm = useCallback(async () => {
     try {
       setLoading(true);
@@ -303,7 +293,7 @@ export default function TermDetailScreen() {
             <GSText
               size="sm"
               style={{
-                color: Colors.text.main,
+                color: Colors.text.head,
               }}
             >
               {term.definition_en}
@@ -327,7 +317,7 @@ export default function TermDetailScreen() {
               <GSText
                 size="sm"
                 style={{
-                  color: Colors.text.main,
+                  color: Colors.text.head,
                 }}
               >
                 {term.definition_fil}
@@ -374,10 +364,10 @@ export default function TermDetailScreen() {
                       size="sm"
                       className="italic"
                       style={{
-                        color: Colors.text.main,
+                        color: Colors.text.head,
                       }}
                     >
-                      "{term.example_en}"
+                      &quot;{term.example_en}&quot;
                     </GSText>
                   </View>
                 </View>
@@ -406,9 +396,9 @@ export default function TermDetailScreen() {
                     <GSText
                       size="sm"
                       className="italic"
-                      style={{ color: Colors.text.main }}
+                      style={{ color: Colors.text.head }}
                     >
-                      "{term.example_fil}"
+                      &quot;{term.example_fil}&quot;
                     </GSText>
                   </View>
                 </View>
