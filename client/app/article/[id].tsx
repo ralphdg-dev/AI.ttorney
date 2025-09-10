@@ -56,37 +56,46 @@ function formatDate(dateString: string | null): string {
 }
 
 export default function ArticleViewScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, hasNetworkError, errorMessage } = useLocalSearchParams<{ 
+    id: string; 
+    hasNetworkError?: string;
+    errorMessage?: string;
+  }>();
+  
   const router = useRouter();
   const [article, setArticle] = useState<DbArticleRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [showFilipino, setShowFilipino] = useState(false);
+  const [error, setError] = useState<string | null>(
+    hasNetworkError === 'true' ? (errorMessage || 'Unable to load article.') : null
+  );
+  
   const noImageUri = 'https://placehold.co/1200x800/png?text=No+Image+Available';
-
-  useEffect(() => {
-    if (id) {
-      fetchArticle();
-    }
-  }, [id]);
 
   const fetchArticle = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
       const numericId = parseInt(id);
       if (Number.isNaN(numericId)) {
-        setArticle(null);
-        return;
+        throw new Error('Invalid article ID');
       }
-      const { data, error } = await db.legal.articles.get(numericId);
-      if (error) {
-        console.error('Error fetching article:', error);
-        setArticle(null);
-        return;
+      
+      const { data, error: fetchError } = await db.legal.articles.get(numericId);
+      
+      if (fetchError) {
+        throw new Error('Failed to load article. Please check your connection and try again.');
       }
+      
+      if (!data) {
+        throw new Error('Article not found');
+      }
+      
       setArticle(data as unknown as DbArticleRow);
-    } catch (error) {
-      console.error('Error fetching article:', error);
-      setArticle(null);
+    } catch (err) {
+      console.error('Error fetching article:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setLoading(false);
     }
@@ -100,6 +109,14 @@ export default function ArticleViewScreen() {
     setShowFilipino(!showFilipino);
   };
 
+  // Fetch article on mount or when ID changes
+  useEffect(() => {
+    if (id) {
+      fetchArticle();
+    }
+  }, [id]);
+
+  // Loading state
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -110,134 +127,83 @@ export default function ArticleViewScreen() {
     );
   }
 
-  if (!article) {
+  // Error state
+  if (error) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Article not found</Text>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>Go Back</Text>
+          <Ionicons name="alert-circle-outline" size={48} color="#EF4444" style={styles.errorIcon} />
+          <Text style={styles.errorTitle}>Error Loading Article</Text>
+          <Text style={styles.errorMessage}>{error}</Text>
+          <TouchableOpacity onPress={fetchArticle} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleBack} style={[styles.retryButton, { backgroundColor: '#6B7280', marginTop: 8 }]}>
+            <Text style={styles.retryButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
+  // Article not found state - this should never be reached as we handle this in the error state
+  // but keeping it as a fallback
+  if (!article) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color="#EF4444" style={styles.errorIcon} />
+          <Text style={styles.errorTitle}>Article Not Found</Text>
+          <Text style={styles.errorMessage}>The requested article could not be loaded.</Text>
+          <TouchableOpacity onPress={handleBack} style={[styles.retryButton, { backgroundColor: '#6B7280' }]}>
+            <Text style={styles.retryButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // If we have an article, render it
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={Colors.primary.blue} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Article</Text>
-        <TouchableOpacity onPress={toggleLanguage} style={styles.languageBtn}>
-          <Text style={styles.languageBtnText}>
-            {showFilipino ? 'EN' : 'FIL'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Article Image */}
-        <Image 
-          source={{ 
-            uri: ((article as any).image_article 
-              ? `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/legal-articles/${(article as any).image_article}`
-              : noImageUri
-            ) as string 
-          }}
-          style={styles.articleImage}
-          resizeMode="cover"
-        />
-
-
-        <View style={styles.articleContent}>
-
-             {/* Language Toggle Info */}
-             <View style={styles.languageToggleInfo}>
-            <Ionicons name="language-outline" size={16} color={Colors.text.sub} />
-            <Text style={styles.languageToggleText}>
-              Tap the language button above to switch between English and Filipino
+      <ScrollView>
+        {/* Article Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity onPress={toggleLanguage} style={styles.languageBtn}>
+            <Text style={styles.languageBtnText}>
+              {showFilipino ? 'EN' : 'FIL'}
             </Text>
-          </View>
-        
+          </TouchableOpacity>
+        </View>
 
-          {/* Title */}
+        {/* Article Content */}
+        <View style={styles.content}>
           <Text style={styles.title}>
             {showFilipino && article.title_fil ? article.title_fil : article.title_en}
           </Text>
 
-          {/* Alternate Title */}
-          {(showFilipino ? article.title_en : article.title_fil) && (
-            <Text style={styles.alternateTitle}>
-              {showFilipino ? article.title_en : article.title_fil}
-            </Text>
+          {/* Article Image */}
+          {article.image_article && (
+            <Image
+              source={{ uri: article.image_article || noImageUri }}
+              style={styles.articleImage}
+              resizeMode="cover"
+            />
           )}
 
-            {/* Category Badge */}
-
-
-            {((article as any).category || article.domain) && (
-            <View style={styles.categoryContainer}>
-              <Badge
-                variant="outline"
-                className={`rounded-md ${getCategoryBadgeClasses(((article as any).category || article.domain || '') as string).container}`}
-              >
-                <BadgeText size="sm" className={getCategoryBadgeClasses(((article as any).category || article.domain || '') as string).text}>
-                  {(article as any).category || article.domain}
-                </BadgeText>
-              </Badge>
-            </View>
-          )}
-
-          {/* Summary */}
-          <Text style={styles.summary}>
-            {showFilipino && article.description_fil ? article.description_fil : article.description_en}
-          </Text>
-          
-
-          {/* Metadata */}
-          <View style={styles.metadataContainer}>
-            <View style={styles.metadataRow}>
-              <Ionicons name="calendar-outline" size={16} color={Colors.text.sub} />
-              <Text style={styles.metadataText}>
-                Posted on {formatDate(article.created_at)}
-              </Text>
-            </View>
-            
-            {article.updated_at && article.updated_at !== article.created_at && (
-              <View style={styles.metadataRow}>
-                <Ionicons name="refresh-outline" size={16} color={Colors.text.sub} />
-                <Text style={styles.metadataText}>
-                  Updated on {formatDate(article.updated_at)}
-                </Text>
-              </View>
-            )}
-
-            
-
-            {article.is_verified === true && (
-              <View style={styles.metadataRow}>
-                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                <Text style={[styles.metadataText, { color: '#10B981' }]}>
-                  Verified Content
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Article Content */}
-          <View style={styles.contentSection}>
-            <Text style={styles.contentText}>
+          {/* Article Body */}
+          <View style={styles.articleBody}>
+            <Text style={styles.articleText}>
               {showFilipino && article.content_fil ? article.content_fil : article.content_en}
             </Text>
           </View>
 
-          {/* Legal Disclaimer - Always appears */}
+          {/* Legal Disclaimer */}
           <LegalDisclaimer showFilipino={showFilipino} />
-
-       
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -247,48 +213,64 @@ export default function ArticleViewScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: 'white',
+    padding: 16,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#e5e7eb',
   },
-  backBtn: {
+  backButton: {
     padding: 8,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.primary.blue,
-  },
   languageBtn: {
-    backgroundColor: Colors.primary.blue,
+    padding: 8,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 20,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
   },
   languageBtnText: {
-    color: 'white',
-    fontSize: 12,
+    color: '#1f2937',
     fontWeight: '600',
   },
   content: {
-    flex: 1,
+    padding: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
+    lineHeight: 32,
+  },
+  articleImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  articleBody: {
+    marginTop: 16,
+  },
+  articleText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#374151',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   loadingText: {
     fontSize: 16,
-    color: Colors.text.sub,
+    color: '#6b7280',
+    marginTop: 16,
   },
   errorContainer: {
     flex: 1,
@@ -296,60 +278,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  errorText: {
-    fontSize: 18,
-    color: Colors.text.head,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  backButton: {
-    backgroundColor: Colors.primary.blue,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  backButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  articleImage: {
-    width: '100%',
-    height: 240,
-  },
-  articleContent: {
-    padding: 20,
-  },
-  categoryContainer: {
+  errorIcon: {
     marginBottom: 16,
-    alignSelf: 'flex-start',
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: Colors.text.head,
-    lineHeight: 36,
-    marginBottom: 8,
-  },
-  alternateTitle: {
+  errorTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: Colors.primary.blue,
-    lineHeight: 28,
-    marginBottom: 12,
-    fontStyle: 'italic',
+    color: '#111827',
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  summary: {
+  errorMessage: {
     fontSize: 16,
-    lineHeight: 24,
-    color: Colors.text.sub,
-    marginTop: -15,
-    marginBottom: 5,
-    fontStyle: 'italic',
-    backgroundColor: '#F8FAFC',
-    paddingVertical: 16,
-    paddingHorizontal: 0,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#1E40AF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
+    alignSelf: 'center',
+    marginTop: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 16,
   },
   metadataContainer: {
     backgroundColor: 'white',
@@ -366,7 +322,7 @@ const styles = StyleSheet.create({
   },
   metadataText: {
     fontSize: 14,
-    color: Colors.text.sub,
+    color: '#6B7280',
     marginLeft: 8,
     flex: 1,
   },
@@ -381,7 +337,7 @@ const styles = StyleSheet.create({
   contentText: {
     fontSize: 16,
     lineHeight: 26,
-    color: Colors.text.head,
+    color: '#111827',
     textAlign: 'justify',
   },
   languageToggleInfo: {
@@ -395,9 +351,9 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   languageToggleText: {
-    fontSize: 12,
-    color: Colors.text.sub,
+    fontSize: 14,
+    color: '#6B7280',
     marginLeft: 8,
     flex: 1,
   },
-});
+} as const);
