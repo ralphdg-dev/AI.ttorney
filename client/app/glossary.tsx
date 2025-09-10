@@ -212,7 +212,7 @@ export default function GlossaryScreen() {
             <Ionicons
               name="chevron-back"
               size={20}
-              color={currentPage === 1 ? "#9CA3AF" : Colors.primary}
+              color={currentPage === 1 ? "#9CA3AF" : Colors.primary.blue}
             />
           </TouchableOpacity>
 
@@ -256,7 +256,7 @@ export default function GlossaryScreen() {
             <Ionicons
               name="chevron-forward"
               size={20}
-              color={currentPage === totalPages ? "#9CA3AF" : Colors.primary}
+              color={currentPage === totalPages ? "#9CA3AF" : Colors.primary.blue}
             />
           </TouchableOpacity>
         </View>
@@ -294,7 +294,7 @@ export default function GlossaryScreen() {
     if (loading) {
       return (
         <View style={tw`flex-1 justify-center items-center py-10`}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <ActivityIndicator size="large" color={Colors.primary.blue} />
           <GSText
             className="mt-4 text-center"
             style={{ color: Colors.text.sub }}
@@ -311,7 +311,7 @@ export default function GlossaryScreen() {
           <Ionicons name="cloud-offline" size={48} color={Colors.text.sub} />
           <GSText
             className="mt-4 text-center font-bold"
-            style={{ color: Colors.text.main }}
+            style={{ color: Colors.text.head }} // Changed from main to head
           >
             Connection Error
           </GSText>
@@ -338,7 +338,7 @@ export default function GlossaryScreen() {
           <Ionicons name="search" size={48} color={Colors.text.sub} />
           <GSText
             className="mt-4 text-center font-bold"
-            style={{ color: Colors.text.main }}
+            style={{ color: Colors.text.head }} // Changed from main to head
           >
             No results found
           </GSText>
@@ -357,7 +357,7 @@ export default function GlossaryScreen() {
         <Ionicons name="book" size={48} color={Colors.text.sub} />
         <GSText
           className="mt-4 text-center font-bold"
-          style={{ color: Colors.text.main }}
+          style={{ color: Colors.text.head }} // Changed from main to head
         >
           No terms available
         </GSText>
