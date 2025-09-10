@@ -22,15 +22,8 @@ import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import { SidebarProvider, SidebarWrapper } from "@/components/AppSidebar";
 
-// Supabase Configuration
-import { createClient } from "@supabase/supabase-js";
-
-// Use environment variables for secure access
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
-
-// Initialize Supabase client
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// API Configuration
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
 // Pagination constants
 const ITEMS_PER_PAGE = 10;
@@ -44,6 +37,8 @@ export default function GlossaryScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const { width } = useWindowDimensions();
   const flatListRef = useRef<FlatList>(null);
   const horizontalPadding = 24;
@@ -58,47 +53,59 @@ export default function GlossaryScreen() {
     { id: "terms", label: "Legal Terms" },
   ];
 
-  // Fetch legal terms directly from Supabase
-  const fetchLegalTerms = async () => {
+  // Fetch legal terms from your API
+  const fetchLegalTerms = async (page = 1, category = activeCategory, search = searchQuery) => {
     try {
       setLoading(true);
       setError(null);
 
-      const { data, error: supabaseError } = await supabase
-        .from("glossary_terms")
-        .select(
-          "id, term_en, term_fil, definition_en, definition_fil, example_en, example_fil, category, created_at"
-        )
-        .order("term_en", { ascending: true });
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: ITEMS_PER_PAGE.toString(),
+      });
 
-      if (supabaseError) {
-        throw new Error(supabaseError.message);
+      if (category && category !== "all") {
+        params.append("category", category);
       }
 
-      if (data) {
-        const placeholderText = "wala pa HHAHHA";
-        const formattedTerms: TermItem[] = data.map((item: any) => ({
-          id: item.id,
-          title: item.term_en || placeholderText,
-          filipinoTerm: item.term_fil || placeholderText,
-          definition: item.definition_en || placeholderText,
-          filipinoDefinition: item.definition_fil || placeholderText,
-          example: item.example_en || placeholderText,
-          filipinoExample: item.example_fil || placeholderText,
-          category: item.category || placeholderText,
-        }));
-        setTerms(formattedTerms);
-        setCurrentPage(1); // Reset to first page when data changes
+      if (search && search.trim()) {
+        params.append("search", search.trim());
       }
+
+      const response = await fetch(`${API_BASE_URL}/glossary/terms?${params}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      const placeholderText = "wala pa HHAHHA";
+      const formattedTerms: TermItem[] = data.terms.map((item: any) => ({
+        id: item.id,
+        title: item.term_en || placeholderText,
+        filipinoTerm: item.term_fil || placeholderText,
+        definition: item.definition_en || placeholderText,
+        filipinoDefinition: item.definition_fil || placeholderText,
+        example: item.example_en || placeholderText,
+        filipinoExample: item.example_fil || placeholderText,
+        category: item.category || placeholderText,
+      }));
+      
+      setTerms(formattedTerms);
+      setTotalPages(data.pagination.pages);
+      setTotalCount(data.pagination.total);
+      setCurrentPage(page);
     } catch (err) {
-      console.error("Error fetching legal terms from Supabase:", err);
+      console.error("Error fetching legal terms from API:", err);
       const errorMessage =
         err instanceof Error ? err.message : "An unknown error occurred.";
       setError(errorMessage);
 
       Alert.alert(
         "Connection Error",
-        `Could not fetch terms from Supabase. Error: ${errorMessage}`,
+        `Could not fetch terms from server. Error: ${errorMessage}`,
         [{ text: "OK" }]
       );
     } finally {
@@ -107,31 +114,13 @@ export default function GlossaryScreen() {
   };
 
   useEffect(() => {
-    fetchLegalTerms();
+    fetchLegalTerms(1);
   }, []);
 
-  const filteredByCategory = useMemo(() => {
-    return terms.filter((t) =>
-      activeCategory === "all"
-        ? true
-        : t.category?.toLowerCase() === activeCategory.toLowerCase()
-    );
-  }, [terms, activeCategory]);
-
-  const termsToRender: TermItem[] = useMemo(() => {
-    return filteredByCategory.filter((t) =>
-      `${t.title} ${t.filipinoTerm ?? ""}`
-        .toLowerCase()
-        .includes(searchQuery.trim().toLowerCase())
-    );
-  }, [filteredByCategory, searchQuery]);
-
-  // Pagination logic
-  const totalPages = Math.ceil(termsToRender.length / ITEMS_PER_PAGE);
-  const paginatedTerms = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return termsToRender.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [termsToRender, currentPage]);
+  // Update terms when category or search changes
+  useEffect(() => {
+    fetchLegalTerms(1, activeCategory, searchQuery);
+  }, [activeCategory, searchQuery]);
 
   const handleFilterPress = (): void => {
     Alert.alert("Filter", "Filter options");
@@ -143,23 +132,22 @@ export default function GlossaryScreen() {
 
   const handleCategoryChange = (categoryId: string): void => {
     setActiveCategory(categoryId);
-    setCurrentPage(1); // Reset to first page when category changes
     setTimeout(() => {
       flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
     }, 50);
   };
 
   const handleRefresh = async (): Promise<void> => {
-    await fetchLegalTerms();
+    await fetchLegalTerms(currentPage);
   };
 
   const handlePageChange = (page: number): void => {
-    setCurrentPage(page);
+    fetchLegalTerms(page);
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
   const renderPaginationControls = () => {
-    if (termsToRender.length <= ITEMS_PER_PAGE || totalPages <= 1) return null;
+    if (totalPages <= 1) return null;
 
     // Mobile-friendly pagination with limited page buttons
     const getVisiblePages = () => {
@@ -197,7 +185,6 @@ export default function GlossaryScreen() {
 
     return (
       <View style={tw`flex-col items-center`}>
-
         {/* Pagination controls */}
         <View style={tw`flex-row justify-center items-center`}>
           <TouchableOpacity
@@ -262,7 +249,7 @@ export default function GlossaryScreen() {
         </View>
 
         <GSText size="xs" className="mt-3 text-gray-500">
-          Showing {paginatedTerms.length} of {termsToRender.length} results
+          Showing {terms.length} of {totalCount} results
         </GSText>
       </View>
     );
@@ -311,7 +298,7 @@ export default function GlossaryScreen() {
           <Ionicons name="cloud-offline" size={48} color={Colors.text.sub} />
           <GSText
             className="mt-4 text-center font-bold"
-            style={{ color: Colors.text.head }} // Changed from main to head
+            style={{ color: Colors.text.head }}
           >
             Connection Error
           </GSText>
@@ -332,13 +319,13 @@ export default function GlossaryScreen() {
       );
     }
 
-    if (termsToRender.length === 0 && searchQuery.trim()) {
+    if (terms.length === 0 && searchQuery.trim()) {
       return (
         <View style={tw`flex-1 justify-center items-center py-10`}>
           <Ionicons name="search" size={48} color={Colors.text.sub} />
           <GSText
             className="mt-4 text-center font-bold"
-            style={{ color: Colors.text.head }} // Changed from main to head
+            style={{ color: Colors.text.head }}
           >
             No results found
           </GSText>
@@ -357,7 +344,7 @@ export default function GlossaryScreen() {
         <Ionicons name="book" size={48} color={Colors.text.sub} />
         <GSText
           className="mt-4 text-center font-bold"
-          style={{ color: Colors.text.head }} // Changed from main to head
+          style={{ color: Colors.text.head }}
         >
           No terms available
         </GSText>
@@ -409,7 +396,6 @@ export default function GlossaryScreen() {
               value={searchQuery}
               onChangeText={(text) => {
                 setSearchQuery(text);
-                setCurrentPage(1); // Reset to first page when search changes
               }}
               placeholder="Search legal terms..."
               placeholderTextColor="#9CA3AF"
@@ -424,7 +410,7 @@ export default function GlossaryScreen() {
 
         <FlatList
           ref={flatListRef}
-          data={paginatedTerms}
+          data={terms}
           key={`${numColumns}-${activeCategory}-${currentPage}`}
           keyExtractor={(item) => item.id}
           numColumns={numColumns}
@@ -432,7 +418,7 @@ export default function GlossaryScreen() {
             !loading && !error ? renderListHeader : undefined
           }
           ListFooterComponent={
-            !loading && !error && termsToRender.length > 0
+            !loading && !error && terms.length > 0
               ? renderListFooter
               : undefined
           }
