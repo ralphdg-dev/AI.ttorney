@@ -7,10 +7,12 @@ import Colors from "../constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import logo from "../assets/images/logo.png";
 import { useToast, Toast, ToastTitle, ToastDescription } from "../components/ui/toast";
+import { useAuth } from "../contexts/AuthContext";
  
 
 export default function Login() {
   const toast = useToast();
+  const { setUser } = useAuth();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -91,12 +93,20 @@ export default function Login() {
       const data = await response.json();
 
       if (response.ok && data.success) {
+        // Debug logging
+        console.log('Login response data:', data);
+        console.log('User profile:', data.profile);
+        console.log('Redirect path:', data.redirect_path);
+        
         // Successful login - redirect based on role
         const redirectPath = data.redirect_path || '/home';
         
         // Store user session data
         await AsyncStorage.setItem('userSession', JSON.stringify(data.session));
         await AsyncStorage.setItem('userProfile', JSON.stringify(data.profile));
+        
+        // Set user in AuthContext for immediate access
+        setUser(data.profile);
         
         // Special handling for role selection redirect
         if (redirectPath === '/role-selection') {

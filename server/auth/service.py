@@ -92,10 +92,14 @@ class AuthService:
             
             profile = profile_response["data"]
             
-            # Check if user is verified - only block if role is guest AND unverified
+            # Check user verification and role status
             user_role = profile.get("role", "guest")
             is_verified = profile.get("is_verified", False)
             
+            # Debug logging
+            logger.info(f"Login attempt - Role: {user_role}, Verified: {is_verified}, Email: {credentials.email}")
+            
+            # Case 1: Unverified guest with account - send OTP and route to verification
             if user_role == "guest" and not is_verified:
                 return {
                     "success": False,
@@ -105,12 +109,20 @@ class AuthService:
                     "email": credentials.email
                 }
             
-            # Special case: verified user with guest role should go to role selection
+            # Case 2: Verified guest - route to role selection
             if user_role == "guest" and is_verified:
                 redirect_path = "/role-selection"
+            # Case 3: Verified registered_user - route to user pages
+            elif user_role == "registered_user":
+                redirect_path = "/home"
+            # Case 4: Verified lawyer - route to lawyer dashboard (remove is_verified check for now)
+            elif user_role == "verified_lawyer":
+                redirect_path = "/lawyer"
             else:
-                # Role-based response for other cases
+                # Fallback for other roles (admin, superadmin, etc.)
                 redirect_path = self._get_redirect_path_for_role(user_role)
+            
+            logger.info(f"Redirect path determined: {redirect_path}")
             
             return {
                 "success": True,
@@ -128,10 +140,10 @@ class AuthService:
         """Get redirect path based on user role"""
         role_redirects = {
             "registered_user": "/home",
-            "verified_lawyer": "/home", 
+            "verified_lawyer": "/lawyer", 
             "admin": "/admin",
             "superadmin": "/admin",
-            "guest": "/home"
+            "guest": "/role-selection"  # Verified guests go to role selection
         }
         return role_redirects.get(role, "/home")
     

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Menu, Search, Bell, ArrowLeft } from 'lucide-react-native';
+import { Menu, Search, Bell, ArrowLeft, Settings } from 'lucide-react-native';
 import { useSidebar } from './AppSidebar';
 import Colors from '../constants/Colors';
 import { GlobalStyles } from '../constants/GlobalStyles';
@@ -12,11 +12,13 @@ interface HeaderProps {
   showMenu?: boolean;
   showSearch?: boolean;
   showNotifications?: boolean;
+  showSettings?: boolean;
   onBackPress?: () => void;
   onMenuPress?: () => void;
   onSearchPress?: () => void;
   onNotificationPress?: () => void;
-  variant?: 'default' | 'home' | 'minimal';
+  onSettingsPress?: () => void;
+  variant?: 'default' | 'home' | 'minimal' | 'lawyer-home' | 'lawyer-cases' | 'lawyer-consult' | 'lawyer-clients' | 'lawyer-profile';
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -25,10 +27,12 @@ const Header: React.FC<HeaderProps> = ({
   showMenu = true,
   showSearch = false,
   showNotifications = false,
+  showSettings = false,
   onBackPress,
   onMenuPress,
   onSearchPress,
   onNotificationPress,
+  onSettingsPress,
   variant = 'default',
 }) => {
   const { openSidebar } = useSidebar();
@@ -111,7 +115,7 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   const renderRightSection = () => {
-    if (showSearch || showNotifications) {
+    if (showSearch || showNotifications || showSettings) {
       return (
         <View style={styles.rightActions}>
           {showSearch && (
@@ -135,6 +139,16 @@ const Header: React.FC<HeaderProps> = ({
               <View style={styles.notificationBadge}>
                 <Text style={styles.badgeText}>3</Text>
               </View>
+            </TouchableOpacity>
+          )}
+
+          {showSettings && (
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={onSettingsPress}
+              activeOpacity={0.7}
+            >
+              <Settings size={22} color={Colors.text.sub} strokeWidth={1.5} />
             </TouchableOpacity>
           )}
         </View>

@@ -11,6 +11,8 @@ import {
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { AuthProvider } from "../lib/auth-context";
+import { AuthProvider as CustomAuthProvider } from "../contexts/AuthContext";
+import { SidebarProvider } from "../components/AppSidebar";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -36,18 +38,27 @@ export default function RootLayout() {
   return (
     <GluestackUIProvider mode="light">
       <AuthProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="role-selection" options={{ headerShown: false }} />
-          <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
-          <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
+        <CustomAuthProvider>
+          <SidebarProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="role-selection" options={{ headerShown: false }} />
+            <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
+            <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
             <Stack.Screen name="lawyer-starting-page" options={{ headerShown: false }} />
-            <Stack.Screen name="lawyer-reg" options={{ headerShown: false }} />
-            <Stack.Screen name="lawyer-face-verification" options={{ headerShown: false }} />
-            <Stack.Screen name="lawyer-preface-recog" options={{ headerShown: false }} />
-            <Stack.Screen name="lawyer-terms" options={{ headerShown: false }} />
+            <Stack.Screen name="lawyer/index" options={{ headerShown: false }} />
+            <Stack.Screen name="lawyer/forum" options={{ headerShown: false }} />
+            <Stack.Screen name="lawyer/consult" options={{ headerShown: false }} />
+            <Stack.Screen name="lawyer/profile" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="lawyer"
+              options={{
+                headerShown: false,
+                title: "Lawyer Dashboard",
+              }}
+            />
             <Stack.Screen
               name="directory"
               options={{
@@ -85,7 +96,9 @@ export default function RootLayout() {
               }}
             />
             <Stack.Screen name="documents-success" options={{ headerShown: false }} />
-          </Stack>
+            </Stack>
+          </SidebarProvider>
+        </CustomAuthProvider>
       </AuthProvider>
     </GluestackUIProvider>
   );
