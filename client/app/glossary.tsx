@@ -21,6 +21,7 @@ import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
 import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import { SidebarProvider, SidebarWrapper } from "@/components/AppSidebar";
+import { CacheService, generateGlossaryCacheKey } from "./glossary/cacheService";
 
 // API Configuration
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
@@ -39,6 +40,7 @@ export default function GlossaryScreen() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
+  const [isOffline, setIsOffline] = useState<boolean>(false);
   const { width } = useWindowDimensions();
   const flatListRef = useRef<FlatList>(null);
   const horizontalPadding = 24;
@@ -48,18 +50,53 @@ export default function GlossaryScreen() {
     Math.min(3, Math.floor((width - horizontalPadding * 2) / minCardWidth))
   );
 
+  // Check network status on mount
+  useEffect(() => {
+    const checkNetwork = async () => {
+      const connected = await CacheService.isConnected();
+      setIsOffline(!connected);
+    };
+    
+    checkNetwork();
+    
+    // Clear expired cache on mount
+    CacheService.clearExpired();
+  }, []);
+
   const tabOptions = [
     { id: "guides", label: "Legal Guides" },
     { id: "terms", label: "Legal Terms" },
   ];
 
-  // Fetch legal terms from your API
+  // Fetch legal terms from API or cache
   const fetchLegalTerms = async (page = 1, category = activeCategory, search = searchQuery) => {
     try {
       setLoading(true);
       setError(null);
 
-      // Build query parameters
+      const cacheKey = generateGlossaryCacheKey(page, category, search);
+      const isConnected = await CacheService.isConnected();
+      setIsOffline(!isConnected);
+
+      // Try to get from cache first
+      const cachedData = await CacheService.get<any>(cacheKey);
+      
+      if (cachedData && !isConnected) {
+        // Use cached data when offline
+        console.log('Using cached data for offline mode');
+        setTerms(cachedData.terms);
+        setTotalPages(cachedData.pagination.pages);
+        setTotalCount(cachedData.pagination.total);
+        setCurrentPage(page);
+        setLoading(false);
+        return;
+      }
+
+      if (!isConnected) {
+        throw new Error("No internet connection and no cached data available");
+      }
+
+      // Build query parameters for API call
       const params = new URLSearchParams({
         page: page.toString(),
         limit: ITEMS_PER_PAGE.toString(),
@@ -97,17 +134,24 @@ export default function GlossaryScreen() {
       setTotalPages(data.pagination.pages);
       setTotalCount(data.pagination.total);
       setCurrentPage(page);
+
+      // Cache the response
+      await CacheService.set(cacheKey, data);
+      
     } catch (err) {
-      console.error("Error fetching legal terms from API:", err);
+      console.error("Error fetching legal terms:", err);
       const errorMessage =
-        err instanceof Error ? err.message : "An unknown error occurred.";
+        err instanceof Error ? err.message : "An unknown error occurred";
+      
       setError(errorMessage);
 
-      Alert.alert(
-        "Connection Error",
-        `Could not fetch terms from server. Error: ${errorMessage}`,
-        [{ text: "OK" }]
-      );
+      if (!isOffline) {
+        Alert.alert(
+          "Connection Error",
+          `Could not fetch terms from server. Error: ${errorMessage}`,
+          [{ text: "OK" }]
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -286,7 +330,7 @@ export default function GlossaryScreen() {
             className="mt-4 text-center"
             style={{ color: Colors.text.sub }}
           >
-            Loading legal terms...
+            {isOffline ? "Loading cached data..." : "Loading legal terms..."}
           </GSText>
         </View>
       );
@@ -295,26 +339,34 @@ export default function GlossaryScreen() {
     if (error) {
       return (
         <View style={tw`flex-1 justify-center items-center py-10 px-6`}>
-          <Ionicons name="cloud-offline" size={48} color={Colors.text.sub} />
+          <Ionicons 
+            name={isOffline ? "cloud-offline" : "warning"} 
+            size={48} 
+            color={Colors.text.sub} 
+          />
           <GSText
             className="mt-4 text-center font-bold"
             style={{ color: Colors.text.head }}
           >
-            Connection Error
+            {isOffline ? "Offline Mode" : "Connection Error"}
           </GSText>
           <GSText
             className="mt-2 text-center"
             style={{ color: Colors.text.sub }}
           >
-            Unable to load legal terms. Please check your connection and try
-            again.
+            {isOffline 
+              ? "Using cached data. Some features may be limited."
+              : "Unable to load legal terms. Please check your connection and try again."
+            }
           </GSText>
-          <TouchableOpacity
-            onPress={handleRefresh}
-            style={tw`mt-4 px-4 py-2 bg-blue-500 rounded-lg`}
-          >
-            <GSText className="text-white font-semibold">Retry</GSText>
-          </TouchableOpacity>
+          {!isOffline && (
+            <TouchableOpacity
+              onPress={handleRefresh}
+              style={tw`mt-4 px-4 py-2 bg-blue-500 rounded-lg`}
+            >
+              <GSText className="text-white font-semibold">Retry</GSText>
+            </TouchableOpacity>
+          )}
         </View>
       );
     }
@@ -333,7 +385,10 @@ export default function GlossaryScreen() {
             className="mt-2 text-center"
             style={{ color: Colors.text.sub }}
           >
-            Try adjusting your search terms or category filter.
+            {isOffline 
+              ? "No cached results for this search. Connect to internet to search."
+              : "Try adjusting your search terms or category filter."
+            }
           </GSText>
         </View>
       );
@@ -349,7 +404,10 @@ export default function GlossaryScreen() {
           No terms available
         </GSText>
         <GSText className="mt-2 text-center" style={{ color: Colors.text.sub }}>
-          Legal terms will appear here once loaded.
+          {isOffline 
+            ? "No cached data available. Connect to internet to load terms."
+            : "Legal terms will appear here once loaded."
+          }
         </GSText>
       </View>
     );
