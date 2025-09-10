@@ -17,14 +17,11 @@ import BackButton from "@/components/ui/BackButton";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
 import { Star, BookOpen, Globe } from "lucide-react-native";
-import { createClient } from "@supabase/supabase-js";
 
-// Supabase Configuration - same as in your glossary screen
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// API Configuration - same as in your glossary screen
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
-// Interface for the glossary term from Supabase
+// Interface for the glossary term from your API
 interface GlossaryTerm {
   id: number;
   term_en: string;
@@ -49,18 +46,15 @@ export default function TermDetailScreen() {
     try {
       setLoading(true);
 
-      // Fetch the specific term from Supabase using the ID
-      const { data, error } = await supabase
-        .from("glossary_terms")
-        .select("*")
-        .eq("id", id)
-        .single(); // Get single record
+      // Fetch the specific term from your API using the ID
+      const response = await fetch(`${API_BASE_URL}/glossary/terms/${id}`);
 
-      if (error) {
-        console.error("Supabase error:", error);
-        throw new Error(error.message);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
+      const data = await response.json();
+      
       if (data) {
         setTerm(data);
       } else {
@@ -69,9 +63,12 @@ export default function TermDetailScreen() {
       }
     } catch (error) {
       console.error("Error loading term:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "An unknown error occurred";
+      
       Alert.alert(
-        "Error",
-        "Failed to load term details. Please check your connection and try again.",
+        "Connection Error",
+        `Could not fetch term from server. Error: ${errorMessage}`,
         [
           { text: "Retry", onPress: loadTerm },
           { text: "Go Back", onPress: () => router.back() },
@@ -93,7 +90,7 @@ export default function TermDetailScreen() {
   const toggleFavorite = async () => {
     try {
       setIsFavorite(!isFavorite);
-      // Note: You'll need to implement user authentication and favorites table in Supabase
+      // Note: You'll need to implement user authentication and favorites table
       // For now, this just toggles the UI state
     } catch (error) {
       console.error("Error toggling favorite:", error);
