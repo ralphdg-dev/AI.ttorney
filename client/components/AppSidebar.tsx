@@ -385,6 +385,9 @@ export const SidebarWrapper: React.FC<{
       case 'notifications':
         router.push('/notifications');
         break;
+      case 'settings':
+        router.push('/settings');
+        break;
       case 'profile':
         console.log('Profile page not implemented yet');
         break;
