@@ -156,17 +156,21 @@ export default function VerifyOTP() {
           return;
         }
         
-        // Clear temporary password and states
+        // Clear temporary password and store user email
         await AsyncStorage.removeItem('temp_password');
         await AsyncStorage.setItem('user_email', email);
         
+        // Clear form states
         setOtp(["", "", "", "", "", ""]);
         setError("");
         setAttemptsRemaining(null);
         setIsLockedOut(false);
         
+        // Wait a moment for auth state to update, then navigate
         console.log('Session created, navigating to role selection...');
-        router.push('/role-selection');
+        setTimeout(() => {
+          router.replace('/role-selection');
+        }, 100);
       }
     } catch {
       setError("Verification failed. Please try again.");

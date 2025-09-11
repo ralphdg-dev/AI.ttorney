@@ -217,11 +217,8 @@ class AuthService:
                 return {"success": False, "error": "User must be verified before selecting a role"}
             
             # Determine final role based on selection
-            final_role = "guest"  # Default fallback
-            if role_selection == "legal_seeker":
-                final_role = "registered_user"
-            elif role_selection == "lawyer":
-                final_role = "guest"  # Keep as guest until admin verification
+            final_role = "registered_user"  # Both seeker and lawyer become registered_user
+            # Note: Lawyers will be upgraded to verified_lawyer after admin verification
             
             response = await self.supabase.update_user_profile(
                 {"role": final_role},

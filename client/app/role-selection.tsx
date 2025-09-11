@@ -18,6 +18,7 @@ import BackButton from "../components/ui/BackButton";
 import PrimaryButton from "../components/ui/PrimaryButton";
 import BottomActions from "../components/ui/BottomActions";
 import { apiClient } from "../lib/api-client";
+import { useAuth } from "../contexts/AuthContext";
 
 import lawyer_selected from "../assets/images/lawyer_selected.png";
 import lawyer_notselected from "../assets/images/lawyer_notselected.png";
@@ -91,6 +92,7 @@ interface ResponsiveStyles {
 export default function RoleSelection() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { refreshUserData } = useAuth();
 
   const handleContinue = async () => {
     if (!selectedRole) return;
@@ -109,32 +111,35 @@ export default function RoleSelection() {
         return;
       }
 
-      // Map frontend role to backend role
-      const backendRole = selectedRole === "seeker" ? "legal_seeker" : "lawyer";
+      // Map frontend selection to backend role type for API
+      const apiRoleSelection = selectedRole === "seeker" ? "legal_seeker" : "lawyer";
       
       // Call role selection API
-      console.log('Calling selectRole API with:', { email: userEmail, selected_role: backendRole });
+      console.log('Calling selectRole API with:', { email: userEmail, selected_role: apiRoleSelection });
       
       const response = await apiClient.selectRole({
         email: userEmail,
-        selected_role: backendRole
+        selected_role: apiRoleSelection
       });
 
       console.log('API Response:', response);
 
       if (response.success && response.data) {
+        // Refresh user data in AuthContext to update role
+        await refreshUserData();
+        
         // Navigate based on selected role
         console.log('Selected role:', selectedRole);
         
         if (selectedRole === "seeker") {
-          // Legal seeker goes to home page
-          router.push("/home");
+          // Legal seeker goes to home page - use replace to prevent back navigation
+          router.replace("/home");
         } else if (selectedRole === "lawyer") {
-          // Lawyer goes to verification instructions
-          router.push("/onboarding/lawyer/verification-instructions");
+          // Lawyer goes to verification instructions - use replace to prevent back navigation
+          router.replace("/onboarding/lawyer/verification-instructions");
         } else {
           // Fallback
-          router.push("/home");
+          router.replace("/home");
         }
       } else {
         console.error('Role selection failed:', response.error);

@@ -32,6 +32,7 @@ export interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   setUser: (user: User | null) => void;
+  refreshUserData: () => Promise<void>;
   hasRole: (role: UserRole) => boolean;
   isLawyer: () => boolean;
   isAdmin: () => boolean;
@@ -181,6 +182,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }));
   };
 
+  const refreshUserData = async () => {
+    try {
+      if (authState.session?.user?.id) {
+        // Fetch updated user profile from database
+        const { data: profile, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authState.session.user.id)
+          .single();
+
+        if (!error && profile) {
+          setAuthState(prev => ({
+            ...prev,
+            user: profile,
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+    }
+  };
+
   const hasRole = (role: UserRole): boolean => {
     return authState.user?.role === role;
   };
@@ -202,6 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn,
     signOut,
     setUser: setUserData,
+    refreshUserData,
     hasRole,
     isLawyer,
     isAdmin,

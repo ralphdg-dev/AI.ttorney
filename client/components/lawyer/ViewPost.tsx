@@ -3,6 +3,7 @@ import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, SafeAreaVie
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, MoreHorizontal, User, Send, Shield, MessageCircle } from 'lucide-react-native';
 import tw from 'tailwind-react-native-classnames';
+import { Box } from '../../components/ui/box';
 import PostActionsMenu from '../../components/home/PostActionsMenu';
 import Comments from '../../components/home/Comments';
 
@@ -184,6 +185,12 @@ const LawyerViewPost: React.FC = () => {
 
   const isAnonymous = post.is_anonymous || (displayUser.username || '').toLowerCase() === 'anonymous' || (displayUser.name || '').toLowerCase().includes('anonymous');
 
+  const handleTextChange = (text: string) => {
+    if (text.length <= 500) {
+      setReplyText(text);
+    }
+  };
+
   const handleSendReply = () => {
     const text = (replyText || '').trim();
     if (!text) return;
@@ -329,13 +336,6 @@ const LawyerViewPost: React.FC = () => {
             </View>
           </View>
         </View>
-
-        {/* Enhanced Comments Section */}
-        <View style={tw`bg-gray-50 px-5 py-3`}>
-          <Text style={tw`text-sm font-semibold text-gray-700`}>
-            {replies.length} Professional {replies.length === 1 ? 'Response' : 'Responses'}
-          </Text>
-        </View>
         
         <Comments replies={replies.map(reply => ({
           id: reply.id,
@@ -359,45 +359,48 @@ const LawyerViewPost: React.FC = () => {
               Responding as Verified Lawyer
             </Text>
           </View>
-          <View style={tw`bg-emerald-100 px-2 py-1 rounded-full`}>
-            <Text style={tw`text-xs font-bold text-emerald-800`}>
-              PROFESSIONAL
-            </Text>
-          </View>
         </View>
         
         {/* Input Area */}
-        <View style={tw`flex-row items-end p-4`}>
-          <View style={tw`flex-1 mr-3`}>
+        <Box className="p-4">
+          <View style={tw`flex-row items-center bg-gray-50 border border-gray-300 rounded-lg px-3 py-2`}>
             <TextInput
-              style={tw`max-h-24 min-h-12 border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 text-gray-900`}
-              placeholder="Provide professional legal guidance..."
+              style={[
+                tw`flex-1 text-base text-gray-900`,
+                { 
+                  minHeight: 32,
+                  maxHeight: 76,
+                  paddingRight: 8,
+                  textAlignVertical: 'top'
+                }
+              ]}
+              placeholder="Share helpful tips and general guidance..."
               placeholderTextColor="#9CA3AF"
               value={replyText}
-              onChangeText={setReplyText}
+              onChangeText={handleTextChange}
               multiline
-              textAlignVertical="top"
             />
-            {replyText.length > 0 && (
-              <Text style={tw`text-xs text-gray-500 mt-1 ml-2`}>
-                {replyText.length}/500 characters
-              </Text>
-            )}
+            <TouchableOpacity
+              onPress={handleSendReply}
+              disabled={!replyText?.trim() || isReplying}
+              style={[
+                tw`ml-2 rounded-full`,
+                {
+                  width: 32,
+                  height: 32,
+                  backgroundColor: replyText?.trim() && !isReplying ? '#1D4ED8' : '#D1D5DB',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }
+              ]}
+            >
+              <Send 
+                size={14} 
+                color="white" 
+              />
+            </TouchableOpacity>
           </View>
-          
-          <TouchableOpacity
-            style={tw`${replyText.trim() ? 'bg-blue-600' : 'bg-gray-300'} rounded-xl px-4 py-3 ${isReplying ? 'opacity-50' : ''} min-h-12 items-center justify-center`}
-            onPress={handleSendReply}
-            disabled={!replyText.trim() || isReplying}
-            activeOpacity={0.8}
-          >
-            {isReplying ? (
-              <View style={tw`w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin`} />
-            ) : (
-              <Send size={16} color="#FFFFFF" />
-            )}
-          </TouchableOpacity>
-        </View>
+        </Box>
       </View>
 
       <PostActionsMenu

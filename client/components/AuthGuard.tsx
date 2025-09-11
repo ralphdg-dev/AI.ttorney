@@ -31,7 +31,10 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     // Handle authenticated users
     if (isAuthenticated && user) {
       // Check if authenticated user is trying to access auth/onboarding routes
-      if (routeConfig.redirectTo === 'role-based' && (routeConfig.isPublic || routeConfig.allowedRoles?.includes('guest'))) {
+      // Exception: Allow lawyer onboarding routes for authenticated users during verification process
+      const isLawyerOnboardingRoute = currentPath.startsWith('/onboarding/lawyer/');
+      
+      if (routeConfig.redirectTo === 'role-based' && (routeConfig.isPublic || routeConfig.allowedRoles?.includes('guest')) && !isLawyerOnboardingRoute) {
         const redirectPath = getRoleBasedRedirect(user.role, user.is_verified);
         console.log(`Authenticated user accessing auth/onboarding route ${currentPath}, redirecting to ${redirectPath}`);
         logRouteAccess(currentPath, user, 'denied', 'Already authenticated');

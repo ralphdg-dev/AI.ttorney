@@ -155,16 +155,16 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     errorBoundary: true
   },
 
-  // Lawyer onboarding routes (only for guests during onboarding)
+  // Lawyer onboarding routes (for authenticated users during verification process)
   '/onboarding/lawyer': {
     path: '/onboarding/lawyer',
-    allowedRoles: ['guest'],
+    allowedRoles: ['guest', 'registered_user'],
     redirectTo: 'role-based',
     errorBoundary: true
   },
   '/documents-success': { 
     path: '/documents-success', 
-    allowedRoles: ['guest'],
+    allowedRoles: ['guest', 'registered_user'],
     redirectTo: 'role-based',
     errorBoundary: true
   },
@@ -188,7 +188,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   },
   '/onboarding/otp-success': {
     path: '/onboarding/otp-success',
-    allowedRoles: ['guest'],
+    allowedRoles: ['guest', 'registered_user'],
     redirectTo: 'role-based',
     errorBoundary: true
   },
@@ -202,43 +202,43 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   // Lawyer onboarding flow
   '/onboarding/lawyer/documents-success': {
     path: '/onboarding/lawyer/documents-success',
-    allowedRoles: ['guest'],
+    allowedRoles: ['guest', 'registered_user'],
     redirectTo: 'role-based',
     errorBoundary: true
   },
   '/onboarding/lawyer/lawyer-face-verification': {
     path: '/onboarding/lawyer/lawyer-face-verification',
-    allowedRoles: ['guest'],
+    allowedRoles: ['guest', 'registered_user'],
     redirectTo: 'role-based',
     errorBoundary: true
   },
   '/onboarding/lawyer/lawyer-terms': {
     path: '/onboarding/lawyer/lawyer-terms',
-    allowedRoles: ['guest'],
+    allowedRoles: ['guest', 'registered_user'],
     redirectTo: 'role-based',
     errorBoundary: true
   },
   '/onboarding/lawyer/rejected': {
     path: '/onboarding/lawyer/rejected',
-    allowedRoles: ['guest'],
+    allowedRoles: ['guest', 'registered_user'],
     redirectTo: 'role-based',
     errorBoundary: true
   },
   '/onboarding/lawyer/resubmission': {
     path: '/onboarding/lawyer/resubmission',
-    allowedRoles: ['guest'],
+    allowedRoles: ['guest', 'registered_user'],
     redirectTo: 'role-based',
     errorBoundary: true
   },
   '/onboarding/lawyer/upload-documents': {
     path: '/onboarding/lawyer/upload-documents',
-    allowedRoles: ['guest'],
+    allowedRoles: ['guest', 'registered_user'],
     redirectTo: 'role-based',
     errorBoundary: true
   },
   '/onboarding/lawyer/verification-instructions': {
     path: '/onboarding/lawyer/verification-instructions',
-    allowedRoles: ['guest'],
+    allowedRoles: ['guest', 'registered_user'],
     redirectTo: 'role-based',
     errorBoundary: true
   }
