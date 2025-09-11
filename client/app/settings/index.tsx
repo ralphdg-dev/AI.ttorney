@@ -14,7 +14,6 @@ import Colors from "@/constants/Colors";
 import { 
   User, 
   Lock, 
-  CreditCard, 
   Bell, 
   Info, 
   Shield, 
@@ -54,8 +53,7 @@ export default function SettingsScreen() {
       icon: <Lock size={20} color={Colors.text.body} />,
       type: "navigation",
       onPress: () => {
-        // Navigate to change password
-        console.log("Navigate to change password");
+        router.push("/settings/change-password");
       },
     },
     {
