@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { Plus, Home, Search, Bell, Mail } from 'lucide-react-native';
+import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Post from './Post';
 import Colors from '../../constants/Colors';
@@ -18,7 +18,11 @@ interface PostData {
   comments: number;
 }
 
-const Timeline: React.FC = () => {
+interface TimelineProps {
+  context?: 'user' | 'lawyer';
+}
+
+const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
 
   // Sample data for demonstration - Twitter/X style
@@ -97,12 +101,14 @@ const Timeline: React.FC = () => {
 
   const handlePostPress = (postId: string) => {
     console.log(`Post pressed for post ${postId}`);
-    router.push(`/home/ViewPost?postId=${postId}`);
+    const route = context === 'lawyer' ? `/lawyer/ViewPost?postId=${postId}` : `/home/ViewPost?postId=${postId}`;
+    router.push(route as any);
   };
 
   const handleCreatePost = () => {
     console.log('Create post pressed');
-    router.push('/home/CreatePost');
+    const route = context === 'lawyer' ? '/lawyer/CreatePost' : '/home/CreatePost';
+    router.push(route as any);
   };
 
   return (

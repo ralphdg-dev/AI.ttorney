@@ -592,7 +592,6 @@ export type Database = {
           full_name: string | null
           id: string
           is_verified: boolean | null
-          password_hash: string
           role: Database["public"]["Enums"]["user_role"] | null
           updated_at: string | null
           username: string
@@ -604,7 +603,6 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_verified?: boolean | null
-          password_hash: string
           role?: Database["public"]["Enums"]["user_role"] | null
           updated_at?: string | null
           username: string
@@ -616,7 +614,6 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_verified?: boolean | null
-          password_hash?: string
           role?: Database["public"]["Enums"]["user_role"] | null
           updated_at?: string | null
           username?: string

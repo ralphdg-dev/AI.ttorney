@@ -14,6 +14,7 @@ import PrimaryButton from "../../components/ui/PrimaryButton";
 import BackButton from "../../components/ui/BackButton";
 import Colors from "../../constants/Colors";
 import { apiClient } from "../../lib/api-client";
+import { supabase } from "../../config/supabase";
 import otpsent from "../../assets/images/otpsent.png";
 
 export default function VerifyOTP() {
@@ -133,19 +134,39 @@ export default function VerifyOTP() {
         }
       } else {
         // Success case - OTP verified successfully
-        console.log('OTP verification successful, navigating to role selection');
+        console.log('OTP verification successful, creating authenticated session');
         
-        // Store user email for role selection
+        // Get the temporary password from AsyncStorage (stored during registration)
+        const tempPassword = await AsyncStorage.getItem('temp_password');
+        
+        if (!tempPassword) {
+          setError("Registration session expired. Please register again.");
+          return;
+        }
+        
+        // Sign in the user with Supabase to create an authenticated session
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password: tempPassword,
+        });
+        
+        if (signInError) {
+          console.error('Error creating session after OTP verification:', signInError);
+          setError("Failed to create session. Please try logging in manually.");
+          return;
+        }
+        
+        // Clear temporary password and states
+        await AsyncStorage.removeItem('temp_password');
         await AsyncStorage.setItem('user_email', email);
         
-        // Clear states and navigate
         setOtp(["", "", "", "", "", ""]);
         setError("");
         setAttemptsRemaining(null);
         setIsLockedOut(false);
         
-        console.log('Navigating to role selection...');
-        router.replace('/role-selection');
+        console.log('Session created, navigating to role selection...');
+        router.push('/role-selection');
       }
     } catch {
       setError("Verification failed. Please try again.");

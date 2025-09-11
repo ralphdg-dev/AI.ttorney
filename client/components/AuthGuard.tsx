@@ -2,7 +2,12 @@ import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
-import { getRouteConfig, hasRoutePermission, getRoleBasedRedirect } from '../config/routes';
+import { 
+  getRouteConfig, 
+  hasRoutePermission,
+  logRouteAccess,
+  getRoleBasedRedirect 
+} from '../config/routes';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -19,39 +24,50 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     const currentPath = `/${segments.join('/')}`;
     const routeConfig = getRouteConfig(currentPath);
     
-    console.log(`AuthGuard: currentPath=${currentPath}, isAuthenticated=${isAuthenticated}, user=${user?.role}, session=${!!session}, routeConfig=`, routeConfig);
+    console.log(`AuthGuard: currentPath=${currentPath}, isAuthenticated=${isAuthenticated}, user=${user?.role}, session=${!!session}`);
 
     if (!routeConfig) return;
 
     // Handle authenticated users
     if (isAuthenticated && user) {
-      // Check if this is an auth route that should redirect authenticated users
-      if (routeConfig.redirectTo === 'role-based' && routeConfig.isPublic) {
+      // Check if authenticated user is trying to access auth/onboarding routes
+      if (routeConfig.redirectTo === 'role-based' && (routeConfig.isPublic || routeConfig.allowedRoles?.includes('guest'))) {
         const redirectPath = getRoleBasedRedirect(user.role, user.is_verified);
-        console.log(`Authenticated user on auth route ${currentPath}, redirecting to ${redirectPath}`);
+        console.log(`Authenticated user accessing auth/onboarding route ${currentPath}, redirecting to ${redirectPath}`);
+        logRouteAccess(currentPath, user, 'denied', 'Already authenticated');
         router.replace(redirectPath as any);
         return;
       }
 
-      // Check if user has permission for this route
+      // Check route permissions using restored route config
       if (!hasRoutePermission(routeConfig, user.role)) {
-        // For authenticated users with insufficient permissions, redirect to their role-appropriate dashboard
-        const redirectPath = routeConfig.redirectTo === 'role-based' 
-          ? getRoleBasedRedirect(user.role, user.is_verified)
-          : routeConfig.redirectTo || getRoleBasedRedirect(user.role, user.is_verified);
+        const redirectPath = routeConfig.fallbackRoute || getRoleBasedRedirect(user.role, user.is_verified);
         console.log(`User lacks permission for ${currentPath}, redirecting to ${redirectPath}`);
-        router.replace(redirectPath as any);
+        logRouteAccess(currentPath, user, 'denied', 'Insufficient permissions');
+        
+        // Use replace for role-based redirects to prevent back navigation
+        if (routeConfig.redirectTo === 'role-based') {
+          router.replace(redirectPath as any);
+        } else {
+          router.replace(redirectPath as any);
+        }
         return;
       }
+
+      // Log successful access
+      logRouteAccess(currentPath, user, 'granted');
     } else {
-      // Handle unauthenticated users
+      // Handle unauthenticated users - check if route is public
       if (!routeConfig.isPublic) {
-        // For unauthenticated users, always redirect to login regardless of redirectTo configuration
         const redirectPath = '/login';
         console.log(`Unauthenticated user accessing protected route ${currentPath}, redirecting to ${redirectPath}`);
-        router.replace(redirectPath as any);
+        logRouteAccess(currentPath, null, 'denied', 'Authentication required');
+        router.push(redirectPath as any);
         return;
       }
+
+      // Log public access
+      logRouteAccess(currentPath, null, 'granted', 'Public route');
     }
   }, [isAuthenticated, user, session, isLoading, segments, router]);
 

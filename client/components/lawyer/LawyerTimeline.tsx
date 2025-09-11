@@ -1,148 +1,139 @@
 import React from 'react';
 import { View, ScrollView, TouchableOpacity } from 'react-native';
-import tw from 'tailwind-react-native-classnames';
 import { Plus } from 'lucide-react-native';
-import LawyerPost from './LawyerPost';
+import { useRouter } from 'expo-router';
+import Post from '../home/Post';
+import Colors from '../../constants/Colors';
+import { Database } from '../../types/database.types';
 
-interface PostData {
-  id: string;
-  title: string;
-  body: string;
-  domain: 'family' | 'criminal' | 'civil' | 'labor' | 'consumer' | 'others' | null;
-  created_at: string | null;
-  updated_at: string | null;
-  user_id: string | null;
-  is_anonymous: boolean | null;
-  is_flagged: boolean | null;
-  user?: {
-    name: string;
-    username: string;
-    avatar: string;
-    isLawyer: boolean;
-    lawyerBadge?: string;
-  };
-  comments?: number;
-}
+type ForumPost = Database['public']['Tables']['forum_posts']['Row'];
+type User = Database['public']['Tables']['users']['Row'];
 
-interface LawyerTimelineProps {
-  filter?: 'all' | 'questions' | 'discussions' | 'cases';
-}
+type ForumPostWithUser = ForumPost & {
+  user: User;
+  reply_count: number;
+};
 
-const LawyerTimeline: React.FC<LawyerTimelineProps> = ({ filter = 'all' }) => {
+const LawyerTimeline: React.FC = () => {
+  const router = useRouter();
 
-  // Sample data matching forum_posts schema
-  const samplePosts: PostData[] = [
+  // Sample data for demonstration using forum_posts schema
+  const samplePosts: ForumPostWithUser[] = [
     {
-      id: '1',
-      title: 'Important Family Code Amendment Updates',
-      body: 'Important update on the new Family Code amendments. All practitioners should be aware of the changes in custody arrangements effective this month.',
-      domain: 'family',
-      created_at: '2024-01-15T10:30:00Z',
+      id: 'post_001',
+      title: 'Need urgent legal advice regarding protest-related charges',
+      body: 'Hello po, baka may makasagot agad. Na-involve po ako sa protest actions at ngayon may kaso na akong rebellion at tinatangka pa akong kasuhan ng arson dahil daw sa mga nangyari during the rally. Hindi ko alam kung ano ang dapat kong gawin. May lawyer po ba na pwedeng mag-advise?',
+      domain: 'criminal',
+      created_at: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
       updated_at: null,
-      user_id: 'lawyer_001',
+      user_id: 'user_001',
       is_anonymous: false,
       is_flagged: false,
       user: {
-        name: 'Atty. Maria Santos',
-        username: '@maria_santos',
-        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-        isLawyer: true,
-        lawyerBadge: 'Family Law Specialist'
+        id: 'user_001',
+        email: 'ralph@example.com',
+        username: 'twizt3rfries',
+        full_name: 'Ralph de Guzman',
+        role: 'registered_user',
+        is_verified: true,
+        birthdate: null,
+        created_at: null,
+        updated_at: null,
       },
-      comments: 24
+      reply_count: 3,
     },
     {
-      id: '2',
-      title: 'Traffic Violation - Need Legal Advice',
-      body: 'I need advice regarding a traffic violation case. The officer claims I was speeding but I have dashcam footage showing otherwise. What are my options?',
-      domain: 'criminal',
-      created_at: '2024-01-15T06:30:00Z',
+      id: 'post_002',
+      title: 'NCAP violation - not the actual driver',
+      body: 'Hello po! Nahuli daw ako ng NCAP pero hindi ako ang driver ng sasakyan. May way po ba para ma-contest ito? Wala rin akong sasakyan sa pangalan ko.',
+      domain: 'civil',
+      created_at: new Date(Date.now() - 10800000).toISOString(), // 3 hours ago
       updated_at: null,
       user_id: 'user_002',
-      is_anonymous: false,
+      is_anonymous: true,
       is_flagged: false,
       user: {
-        name: 'John Doe',
-        username: '@johndoe',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-        isLawyer: false
+        id: 'user_002',
+        email: 'anon@example.com',
+        username: 'anonymous',
+        full_name: 'Anonymous User',
+        role: 'registered_user',
+        is_verified: true,
+        birthdate: null,
+        created_at: null,
+        updated_at: null,
       },
-      comments: 12
+      reply_count: 12,
     },
     {
-      id: '3',
-      title: 'SEC Compliance Best Practices for Startups',
-      body: 'Discussion: Best practices for handling SEC compliance in startup companies. Share your experiences and insights.',
-      domain: 'civil',
-      created_at: '2024-01-15T04:30:00Z',
+      id: 'post_003',
+      title: 'Child support without marriage',
+      body: 'Pwede po ba akong humingi ng child support kahit hindi kami kasal ng nanay ng anak ko? May anak kami pero hindi kami nagpakasal. Ano po ang dapat kong gawin para sa anak namin?',
+      domain: 'family',
+      created_at: new Date(Date.now() - 18000000).toISOString(), // 5 hours ago
       updated_at: null,
-      user_id: 'lawyer_003',
+      user_id: 'user_003',
       is_anonymous: false,
       is_flagged: false,
       user: {
-        name: 'Atty. Robert Chen',
-        username: '@robert_chen',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-        isLawyer: true,
-        lawyerBadge: 'Corporate Law Expert'
+        id: 'user_003',
+        email: 'lebron@example.com',
+        username: 'lebbyjames',
+        full_name: 'LeBron James',
+        role: 'registered_user',
+        is_verified: true,
+        birthdate: null,
+        created_at: null,
+        updated_at: null,
       },
-      comments: 18
+      reply_count: 2,
     },
     {
-      id: '4',
-      title: 'Overtime Compensation Issue',
-      body: 'My employer is asking me to work overtime without proper compensation. Is this legal? What steps should I take?',
+      id: 'post_004',
+      title: 'Final pay not released after 2 months',
+      body: 'Nagresign po ako nang maayos at may clearance na, pero hanggang ngayon wala pa rin akong natatanggap na back pay o final pay. 2 months na po. Ano po dapat kong gawin para ma-claim ito?',
       domain: 'labor',
-      created_at: '2024-01-15T02:30:00Z',
+      created_at: new Date(Date.now() - 18000000).toISOString(), // 5 hours ago
       updated_at: null,
       user_id: 'user_004',
       is_anonymous: false,
       is_flagged: false,
       user: {
-        name: 'Sarah Kim',
-        username: '@sarahkim',
-        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-        isLawyer: false
+        id: 'user_004',
+        email: 'willie@example.com',
+        username: 'pengej4cket',
+        full_name: 'Willie Revillame',
+        role: 'registered_user',
+        is_verified: true,
+        birthdate: null,
+        created_at: null,
+        updated_at: null,
       },
-      comments: 31
+      reply_count: 2,
     },
     {
-      id: '5',
-      title: 'Criminal Defense Case Study',
-      body: 'Case study: Successfully defended a client against false accusations. Key strategies that made the difference in court.',
-      domain: 'criminal',
-      created_at: '2024-01-14T10:30:00Z',
+      id: 'post_005',
+      title: 'Small claims court for 50k debt',
+      body: 'May utang sa akin na 50k pero ayaw magbayad. Pwede po ba sa small claims court? Ano po ang requirements at proseso? Salamat po sa makakasagot.',
+      domain: 'civil',
+      created_at: new Date(Date.now() - 28800000).toISOString(), // 8 hours ago
       updated_at: null,
-      user_id: 'lawyer_005',
+      user_id: 'user_005',
       is_anonymous: false,
       is_flagged: false,
       user: {
-        name: 'Atty. Lisa Rodriguez',
-        username: '@lisa_rodriguez',
-        avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face',
-        isLawyer: true,
-        lawyerBadge: 'Criminal Defense Attorney'
+        id: 'user_005',
+        email: 'juan@example.com',
+        username: 'juan.dc',
+        full_name: 'Juan Dela Cruz',
+        role: 'registered_user',
+        is_verified: true,
+        birthdate: null,
+        created_at: null,
+        updated_at: null,
       },
-      comments: 45
+      reply_count: 5,
     },
-    {
-      id: '6',
-      title: 'Defective Product Refund Rights',
-      body: 'Bought a defective product online. The seller refuses to refund or replace. What are my rights as a consumer?',
-      domain: 'consumer',
-      created_at: '2024-01-14T10:30:00Z',
-      updated_at: null,
-      user_id: 'user_006',
-      is_anonymous: false,
-      is_flagged: false,
-      user: {
-        name: 'Mike Johnson',
-        username: '@mikejohnson',
-        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
-        isLawyer: false
-      },
-      comments: 8
-    }
   ];
 
   const handleCommentPress = (postId: string) => {
@@ -157,60 +148,98 @@ const LawyerTimeline: React.FC<LawyerTimelineProps> = ({ filter = 'all' }) => {
 
   const handlePostPress = (postId: string) => {
     console.log(`Post pressed for post ${postId}`);
-    // TODO: Show ViewPost component as modal or navigate to dedicated page
+    router.push(`/lawyer/ViewPost?postId=${postId}` as any);
   };
 
   const handleCreatePost = () => {
-    console.log('Create lawyer post pressed');
-    // TODO: Show CreatePost component as modal or navigate to dedicated page
+    console.log('Create post pressed');
+    router.push('/lawyer/CreatePost' as any);
   };
 
-  // Filter posts based on the filter prop
-  const filteredPosts = samplePosts.filter(post => {
-    if (filter === 'all') return true;
-    if (filter === 'questions') return !post.user?.isLawyer;
-    if (filter === 'discussions') return post.user?.isLawyer;
-    if (filter === 'cases') return post.domain?.includes('criminal') || post.domain?.includes('civil');
-    return true;
-  });
-
   return (
-    <View style={tw`flex-1 bg-white`}>
+    <View className="flex-1 bg-white">
       {/* Timeline */}
       <ScrollView 
-        style={tw`flex-1`}
-        contentContainerStyle={tw`py-2`}
+        className="flex-1"
+        contentContainerStyle={{ paddingVertical: 10 }}
         showsVerticalScrollIndicator={false}
       >
-        {filteredPosts.map((post) => (
-          <LawyerPost
-            key={post.id}
-            id={post.id}
-            title={post.title}
-            body={post.body}
-            domain={post.domain}
-            created_at={post.created_at}
-            updated_at={post.updated_at}
-            user_id={post.user_id}
-            is_anonymous={post.is_anonymous}
-            is_flagged={post.is_flagged}
-            user={post.user}
-            comments={post.comments}
-            onCommentPress={() => handleCommentPress(post.id)}
-            onReportPress={() => handleReportPress(post.id)}
-            onPostPress={() => handlePostPress(post.id)}
-          />
-        ))}
-        <View style={tw`h-20`} />
+        {samplePosts.map((post) => {
+          // Convert database timestamp to relative time
+          const getRelativeTime = (timestamp: string) => {
+            const now = new Date();
+            const postTime = new Date(timestamp);
+            const diffMs = now.getTime() - postTime.getTime();
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            
+            if (diffHours < 1) return 'now';
+            if (diffHours < 24) return `${diffHours}h`;
+            const diffDays = Math.floor(diffHours / 24);
+            return `${diffDays}d`;
+          };
+
+          // Convert domain to display category
+          const getDomainDisplayName = (domain: string | null) => {
+            if (!domain) return 'General';
+            switch (domain) {
+              case 'criminal': return 'Criminal Law';
+              case 'civil': return 'Civil Law';
+              case 'family': return 'Family Law';
+              case 'labor': return 'Labor Law';
+              case 'consumer': return 'Consumer Law';
+              default: return 'General';
+            }
+          };
+
+          return (
+            <Post
+              key={post.id}
+              id={post.id}
+              user={{
+                name: post.user.full_name || post.user.username,
+                username: post.user.username,
+                avatar: `https://images.unsplash.com/photo-${Math.random() > 0.5 ? '1472099645785-5658abf4ff4e' : '1507003211169-0a1dd7228f2d'}?w=150&h=150&fit=crop&crop=face`,
+              }}
+              timestamp={getRelativeTime(post.created_at || '')}
+              category={getDomainDisplayName(post.domain)}
+              content={post.body}
+              comments={post.reply_count}
+              onCommentPress={() => handleCommentPress(post.id)}
+              onReportPress={() => handleReportPress(post.id)}
+              onPostPress={() => handlePostPress(post.id)}
+            />
+          );
+        })}
+        <View className="h-20" />
       </ScrollView>
 
       {/* Floating Create Post Button */}
-      <TouchableOpacity style={tw`absolute bottom-20 right-5 bg-blue-600 w-14 h-14 rounded-full justify-center items-center shadow-lg`} onPress={handleCreatePost} activeOpacity={0.8}>
+      <TouchableOpacity 
+        style={[
+          {
+            position: 'absolute',
+            bottom: 80,
+            right: 20,
+            backgroundColor: Colors.primary.blue,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            justifyContent: 'center',
+            alignItems: 'center',
+            shadowColor: Colors.primary.blue,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 8,
+          }
+        ]} 
+        onPress={handleCreatePost} 
+        activeOpacity={0.8}
+      >
         <Plus size={24} color="#FFFFFF" />
       </TouchableOpacity>
     </View>
   );
 };
-
 
 export default LawyerTimeline;

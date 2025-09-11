@@ -6,6 +6,9 @@ export interface RouteConfig {
   allowedRoles?: UserRole[];
   redirectTo?: string;
   isPublic?: boolean;
+  serverValidation?: boolean; // New: Enable server-side validation
+  fallbackRoute?: string; // New: Fallback route for errors
+  errorBoundary?: boolean; // New: Enable error boundary
 }
 
 // Centralized route configuration
@@ -19,16 +22,25 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   '/login': { 
     path: '/login', 
     isPublic: true,
-    redirectTo: 'role-based' // Special flag for role-based redirect
+    redirectTo: 'role-based',
+    errorBoundary: true
   },
-  '/onboarding': { 
-    path: '/onboarding', 
+  '/onboarding/registration': {
+    path: '/onboarding/registration',
     isPublic: true,
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    errorBoundary: true
   },
   '/role-selection': { 
     path: '/role-selection', 
     allowedRoles: ['guest'],
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
+  '/onboarding': { 
+    path: '/onboarding', 
+    isPublic: true,
     redirectTo: 'role-based'
   },
   '/nonlaw-reg': { 
@@ -51,157 +63,186 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   '/lawyer': { 
     path: '/lawyer', 
     requiredRole: 'verified_lawyer',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true,
+    fallbackRoute: '/role-selection'
   },
   '/lawyer/chatbot': {
     path: '/lawyer/chatbot',
     requiredRole: 'verified_lawyer',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
   },
   '/lawyer/consult': {
     path: '/lawyer/consult',
     requiredRole: 'verified_lawyer',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
   },
   '/lawyer/forum': {
     path: '/lawyer/forum',
     requiredRole: 'verified_lawyer',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
   },
   '/lawyer/profile': {
     path: '/lawyer/profile',
     requiredRole: 'verified_lawyer',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
   },
 
   // User routes (require registered_user role)
   '/home': { 
     path: '/home', 
     requiredRole: 'registered_user',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true,
+    fallbackRoute: '/role-selection'
   },
   '*': {
     path: '*',
     requiredRole: 'registered_user',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    fallbackRoute: '/home'
   },
   '/directory': { 
     path: '/directory', 
     requiredRole: 'registered_user',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
   },
   '/guides': { 
     path: '/guides', 
     requiredRole: 'registered_user',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
   },
   '/glossary': { 
     path: '/glossary', 
     requiredRole: 'registered_user',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
   },
   '/article': { 
     path: '/article', 
     requiredRole: 'registered_user',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
   },
   '/chatbot': { 
     path: '/chatbot', 
     requiredRole: 'registered_user',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
   },
   '/booklawyer': { 
     path: '/booklawyer', 
     requiredRole: 'registered_user',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
   },
 
-  // Lawyer onboarding routes (public during onboarding process)
+  // Lawyer onboarding routes (only for guests during onboarding)
   '/onboarding/lawyer': {
     path: '/onboarding/lawyer',
-    isPublic: true,
-    redirectTo: 'role-based'
+    allowedRoles: ['guest'],
+    redirectTo: 'role-based',
+    errorBoundary: true
   },
   '/documents-success': { 
     path: '/documents-success', 
-    requiredRole: 'registered_user',
-    redirectTo: 'role-based'
+    allowedRoles: ['guest'],
+    redirectTo: 'role-based',
+    errorBoundary: true
   },
 
   // Admin routes
   '/admin': { 
     path: '/admin', 
     requiredRole: 'admin',
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true,
+    fallbackRoute: '/role-selection'
   },
 
   // Additional onboarding routes
   '/onboarding/onboarding': {
     path: '/onboarding/onboarding',
     isPublic: true,
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    errorBoundary: true
   },
   '/onboarding/otp-success': {
     path: '/onboarding/otp-success',
-    isPublic: true,
-    redirectTo: 'role-based'
+    allowedRoles: ['guest'],
+    redirectTo: 'role-based',
+    errorBoundary: true
   },
   '/onboarding/verify-otp': {
     path: '/onboarding/verify-otp',
     isPublic: true,
-    redirectTo: 'role-based'
+    redirectTo: 'role-based',
+    errorBoundary: true
   },
 
-  // Lawyer onboarding flow (public during registration)
+  // Lawyer onboarding flow
   '/onboarding/lawyer/documents-success': {
     path: '/onboarding/lawyer/documents-success',
-    isPublic: true,
-    redirectTo: 'role-based'
+    allowedRoles: ['guest'],
+    redirectTo: 'role-based',
+    errorBoundary: true
   },
   '/onboarding/lawyer/lawyer-face-verification': {
     path: '/onboarding/lawyer/lawyer-face-verification',
-    isPublic: true,
-    redirectTo: 'role-based'
+    allowedRoles: ['guest'],
+    redirectTo: 'role-based',
+    errorBoundary: true
   },
   '/onboarding/lawyer/lawyer-terms': {
     path: '/onboarding/lawyer/lawyer-terms',
-    isPublic: true,
-    redirectTo: 'role-based'
+    allowedRoles: ['guest'],
+    redirectTo: 'role-based',
+    errorBoundary: true
   },
   '/onboarding/lawyer/rejected': {
     path: '/onboarding/lawyer/rejected',
-    isPublic: true,
-    redirectTo: 'role-based'
+    allowedRoles: ['guest'],
+    redirectTo: 'role-based',
+    errorBoundary: true
   },
   '/onboarding/lawyer/resubmission': {
     path: '/onboarding/lawyer/resubmission',
-    isPublic: true,
-    redirectTo: 'role-based'
+    allowedRoles: ['guest'],
+    redirectTo: 'role-based',
+    errorBoundary: true
   },
   '/onboarding/lawyer/upload-documents': {
     path: '/onboarding/lawyer/upload-documents',
-    isPublic: true,
-    redirectTo: 'role-based'
+    allowedRoles: ['guest'],
+    redirectTo: 'role-based',
+    errorBoundary: true
   },
   '/onboarding/lawyer/verification-instructions': {
     path: '/onboarding/lawyer/verification-instructions',
-    isPublic: true,
-    redirectTo: 'role-based'
-  },
-
-  // Nested routes that inherit parent permissions
-  '/home/CreatePost': {
-    path: '/home/CreatePost',
-    requiredRole: 'registered_user',
-    redirectTo: 'role-based'
-  },
-  '/home/ViewPost': {
-    path: '/home/ViewPost',
-    requiredRole: 'registered_user',
-    redirectTo: 'role-based'
-  },
+    allowedRoles: ['guest'],
+    redirectTo: 'role-based',
+    errorBoundary: true
+  }
 };
-
 
 // Get role-based redirect path
 export const getRoleBasedRedirect = (role: UserRole, isVerified?: boolean): string => {
@@ -214,7 +255,6 @@ export const getRoleBasedRedirect = (role: UserRole, isVerified?: boolean): stri
     case 'registered_user':
       return '/home';
     case 'guest':
-      // Only verified guests should go to role-selection, unverified guests go to login
       return isVerified ? '/role-selection' : '/login';
     default:
       return '/home';
@@ -243,6 +283,102 @@ export const hasRoutePermission = (
   return userRole !== 'guest';
 };
 
+// Server-side route validation
+export const validateRouteOnServer = async (
+  path: string,
+  userToken: string
+): Promise<{ valid: boolean; redirectTo?: string; error?: string }> => {
+  try {
+    const response = await fetch('/api/validate-route', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userToken}`
+      },
+      body: JSON.stringify({ path })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server validation failed: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Server route validation error:', error);
+    return {
+      valid: false,
+      error: 'Server validation unavailable',
+      redirectTo: '/login'
+    };
+  }
+};
+
+// Enhanced route access validation with server-side check
+export const validateRouteAccess = async (
+  route: RouteConfig,
+  user: any,
+  userToken?: string
+): Promise<{ allowed: boolean; redirectTo?: string; reason?: string }> => {
+  // Client-side permission check first
+  if (!hasRoutePermission(route, user?.role)) {
+    return {
+      allowed: false,
+      redirectTo: route.fallbackRoute || getRoleBasedRedirect(user?.role, user?.is_verified),
+      reason: 'Insufficient permissions'
+    };
+  }
+
+  // Server-side validation for sensitive routes
+  if (route.serverValidation && userToken) {
+    try {
+      const serverResult = await validateRouteOnServer(route.path, userToken);
+      if (!serverResult.valid) {
+        return {
+          allowed: false,
+          redirectTo: serverResult.redirectTo || route.fallbackRoute || '/login',
+          reason: serverResult.error || 'Server validation failed'
+        };
+      }
+    } catch (error) {
+      console.error('Server validation error:', error);
+      // Continue with client-side validation if server fails
+    }
+  }
+
+  return { allowed: true };
+};
+
+// Audit logging for route access
+export const logRouteAccess = (
+  path: string,
+  user: any,
+  result: 'granted' | 'denied',
+  reason?: string
+): void => {
+  const logData = {
+    timestamp: new Date().toISOString(),
+    path,
+    user: user?.email || 'anonymous',
+    userId: user?.id || null,
+    role: user?.role || 'guest',
+    result,
+    reason,
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown'
+  };
+
+  // Log to console for development
+  console.log(`[ROUTE_ACCESS] ${result.toUpperCase()}: ${logData.user} -> ${path}${reason ? ` (${reason})` : ''}`);
+
+  // Send to server for audit trail (in production)
+  if (process.env.NODE_ENV === 'production') {
+    fetch('/api/audit/route-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(logData)
+    }).catch(error => console.error('Failed to log route access:', error));
+  }
+};
+
 // Get route config for a given path
 export const getRouteConfig = (path: string): RouteConfig | null => {
   // Direct match
@@ -261,6 +397,8 @@ export const getRouteConfig = (path: string): RouteConfig | null => {
   return {
     path,
     requiredRole: 'registered_user',
-    redirectTo: '/login'
+    redirectTo: '/login',
+    fallbackRoute: '/home',
+    errorBoundary: true
   };
 };

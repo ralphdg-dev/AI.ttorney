@@ -2,10 +2,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from routes.auth import router as auth_router
+from routes.route_validation import router as route_validation_router
 from services.supabase_service import SupabaseService
 import logging
 import os
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
 # Load environment variables
 load_dotenv()
@@ -17,13 +19,37 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Lifespan event handler
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("AI.ttorney API starting up...")
+    
+    # Test Supabase connection on startup
+    try:
+        supabase_service = SupabaseService()
+        connection_test = await supabase_service.test_connection()
+        
+        if connection_test["success"]:
+            logger.info("✅ Supabase connection established")
+        else:
+            logger.warning(f"⚠️ Supabase connection issue: {connection_test['error']}")
+    except Exception as e:
+        logger.error(f"❌ Failed to test Supabase connection: {str(e)}")
+    
+    yield
+    
+    # Shutdown
+    logger.info("AI.ttorney API shutting down...")
+
 # Create FastAPI app
 app = FastAPI(
     title="AI.ttorney API",
     description="Production backend API for AI.ttorney legal assistance app",
     version="1.0.0",
     docs_url="/docs" if os.getenv("NODE_ENV") != "production" else None,
-    redoc_url="/redoc" if os.getenv("NODE_ENV") != "production" else None
+    redoc_url="/redoc" if os.getenv("NODE_ENV") != "production" else None,
+    lifespan=lifespan
 )
 
 # Configure CORS
@@ -51,6 +77,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include routers
 app.include_router(auth_router)
+app.include_router(route_validation_router, prefix="/api")
 
 @app.get("/")
 async def root():
@@ -110,27 +137,6 @@ async def test_supabase_connection():
             detail="Database connection test failed"
         )
 
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    logger.info("AI.ttorney API starting up...")
-    
-    # Test Supabase connection on startup
-    try:
-        supabase_service = SupabaseService()
-        connection_test = await supabase_service.test_connection()
-        
-        if connection_test["success"]:
-            logger.info("✅ Supabase connection established")
-        else:
-            logger.warning(f"⚠️ Supabase connection issue: {connection_test['error']}")
-    except Exception as e:
-        logger.error(f"❌ Failed to test Supabase connection: {str(e)}")
-
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("AI.ttorney API shutting down...")
 
 if __name__ == "__main__":
     import uvicorn

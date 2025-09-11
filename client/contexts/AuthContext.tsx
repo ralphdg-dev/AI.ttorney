@@ -126,7 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (shouldNavigate && profile) {
         const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified);
         console.log('AuthContext: Navigating to', redirectPath, 'for role', profile.role);
-        router.replace(redirectPath as any);
+        router.push(redirectPath as any);
       }
     } catch (error) {
       console.error('Error handling auth state change:', error);
@@ -168,7 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('Sign out error:', error);
       }
       // Auth state change will be handled by the listener
-      router.replace('/login' as any);
+      router.push('/login' as any);
     } catch (error) {
       console.error('Sign out error:', error);
     }

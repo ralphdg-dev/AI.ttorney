@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, MoreHorizontal, User, Send, Shield } from 'lucide-react-native';
+import { ArrowLeft, MoreHorizontal, User, Send, Shield, MessageCircle } from 'lucide-react-native';
+import tw from 'tailwind-react-native-classnames';
 import PostActionsMenu from '../../components/home/PostActionsMenu';
 import Comments from '../../components/home/Comments';
 
@@ -53,6 +54,7 @@ interface PostData {
 const LawyerViewPost: React.FC = () => {
   const router = useRouter();
   const { postId } = useLocalSearchParams();
+  const [isReplying, setIsReplying] = useState(false);
 
   // Helper function to format timestamp
   const formatTimestamp = (timestamp: string | null): string => {
@@ -125,6 +127,7 @@ const LawyerViewPost: React.FC = () => {
   const [bookmarked, setBookmarked] = useState<boolean>(false);
   const [replies, setReplies] = useState<Reply[]>(post.replies);
   const [replyText, setReplyText] = useState<string>('');
+  const [showFullContent, setShowFullContent] = useState<boolean>(false);
 
   const handleBackPress = () => {
     router.back();
@@ -185,86 +188,155 @@ const LawyerViewPost: React.FC = () => {
     const text = (replyText || '').trim();
     if (!text) return;
     
-    // As a lawyer, replies are marked with lawyer badge using new schema
-    const newReply: Reply = {
-      id: String(Date.now()),
-      body: text,
-      created_at: new Date().toISOString(),
-      updated_at: null,
-      user_id: 'lawyer_current',
-      is_anonymous: false,
-      is_flagged: false,
-      user: {
-        name: 'Atty. Maria Santos', // Current logged-in lawyer
-        username: 'attymaria',
-        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-        isLawyer: true,
-        lawyerBadge: 'Verified Lawyer',
-      },
-    };
-    setReplies((prev) => [newReply, ...prev]);
-    setReplyText('');
+    setIsReplying(true);
+    
+    // Simulate API call delay
+    setTimeout(() => {
+      const newReply: Reply = {
+        id: String(Date.now()),
+        body: text,
+        created_at: new Date().toISOString(),
+        updated_at: null,
+        user_id: 'lawyer_current',
+        is_anonymous: false,
+        is_flagged: false,
+        user: {
+          name: 'Atty. Maria Santos',
+          username: 'attymaria',
+          avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+          isLawyer: true,
+          lawyerBadge: 'Verified Lawyer',
+        },
+      };
+      setReplies((prev) => [newReply, ...prev]);
+      setReplyText('');
+      setIsReplying(false);
+    }, 800);
   };
 
+  const contentPreview = displayContent.length > 280 ? displayContent.substring(0, 280) + '...' : displayContent;
+  const shouldShowReadMore = displayContent.length > 280;
+
   return (
-    <View style={[styles.container, { position: 'relative' }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <ArrowLeft size={20} color="#536471" />
+    <SafeAreaView style={tw`flex-1 bg-white`}>
+      {/* Enhanced Header */}
+      <View style={tw`flex-row items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shadow-sm`}>
+        <TouchableOpacity 
+          style={tw`p-2 rounded-full`} 
+          onPress={handleBackPress}
+          activeOpacity={0.7}
+        >
+          <ArrowLeft size={20} color="#374151" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Post</Text>
-        <TouchableOpacity style={styles.moreButton} onPress={handleMorePress}>
-          <MoreHorizontal size={20} color="#536471" />
+        <View style={tw`flex-1 items-center`}>
+          <Text style={tw`text-lg font-bold text-gray-900`}>
+            Legal Discussion
+          </Text>
+          <Text style={tw`text-xs text-gray-500 mt-0.5`}>
+            {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+          </Text>
+        </View>
+        <TouchableOpacity 
+          style={tw`p-2 rounded-full`} 
+          onPress={handleMorePress}
+          activeOpacity={0.7}
+        >
+          <MoreHorizontal size={20} color="#374151" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 64 }} showsVerticalScrollIndicator={false}>
-        {/* Main Post */}
-        <View style={styles.postContainer}>
-          <View style={styles.userRow}>
+      <ScrollView 
+        style={tw`flex-1`}
+        contentContainerStyle={{ paddingBottom: 140 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Enhanced Main Post */}
+        <View style={tw`bg-white px-5 py-6 border-b border-gray-100`}>
+          {/* User Info Row */}
+          <View style={tw`flex-row items-start mb-4`}>
             {isAnonymous ? (
-              <View style={[styles.avatar, styles.anonymousAvatar]}>
-                <User size={20} color="#6B7280" />
+              <View style={tw`w-14 h-14 rounded-full bg-gray-100 border border-gray-200 items-center justify-center mr-4`}>
+                <User size={24} color="#6B7280" />
               </View>
             ) : (
               <Image 
                 source={{ uri: displayUser.avatar }} 
-                style={styles.avatar} 
+                style={tw`w-14 h-14 rounded-full mr-4`}
               />
             )}
-            <View style={styles.userInfo}>
-              <View style={styles.nameRow}>
-                <View style={styles.nameContainer}>
-                  <Text style={styles.userName}>{displayUser.name}</Text>
+            <View style={tw`flex-1`}>
+              <View style={tw`flex-row items-center justify-between mb-1`}>
+                <View style={tw`flex-row items-center flex-1 mr-3`}>
+                  <Text style={tw`text-base font-bold text-gray-900 mr-2 flex-shrink`}>
+                    {displayUser.name}
+                  </Text>
                   {displayUser.isLawyer && (
-                    <View style={styles.lawyerBadge}>
-                      <Shield size={14} color="#059669" fill="#059669" />
-                      <Text style={styles.lawyerBadgeText}>Lawyer</Text>
+                    <View style={tw`flex-row items-center bg-emerald-50 px-2 py-1 rounded border border-emerald-200`}>
+                      <Shield size={10} color="#059669" fill="#059669" />
+                      <Text style={tw`text-xs font-semibold text-emerald-700 ml-1`}>
+                        Verified
+                      </Text>
                     </View>
                   )}
                 </View>
-                <View style={styles.categoryContainer}>
-                  <Text style={[styles.categoryText, {
-                    backgroundColor: categoryColors.backgroundColor,
-                    borderColor: categoryColors.borderColor,
-                    color: categoryColors.textColor,
-                  }]}>
+                <View style={[tw`px-3 py-1 rounded-full border`, {
+                  backgroundColor: categoryColors.backgroundColor,
+                  borderColor: categoryColors.borderColor,
+                }]}>
+                  <Text style={[tw`text-xs font-bold`, { color: categoryColors.textColor }]}>
                     {displayText}
                   </Text>
                 </View>
               </View>
-              <View style={styles.secondRow}>
-                {!isAnonymous && <Text style={styles.username}>@{displayUser.username}</Text>}
-                <Text style={styles.timestamp}>{!isAnonymous ? '• ' : ''}{displayTimestamp}</Text>
+              <View style={tw`flex-row items-center`}>
+                {!isAnonymous && (
+                  <Text style={tw`text-sm text-gray-500 mr-1`}>
+                    @{displayUser.username}
+                  </Text>
+                )}
+                <Text style={tw`text-sm text-gray-500`}>
+                  {!isAnonymous ? '• ' : ''}{displayTimestamp}
+                </Text>
               </View>
             </View>
           </View>
 
-          <Text style={styles.postContent}>{displayContent}</Text>
+          {/* Post Content */}
+          <View style={tw`mb-4`}>
+            <Text style={tw`text-base leading-6 text-gray-900 mb-2`}>
+              {showFullContent ? displayContent : contentPreview}
+            </Text>
+            {shouldShowReadMore && (
+              <TouchableOpacity 
+                onPress={() => setShowFullContent(!showFullContent)}
+                style={tw`mt-2`}
+                activeOpacity={0.7}
+              >
+                <Text style={tw`text-blue-600 font-medium text-sm`}>
+                  {showFullContent ? 'Show less' : 'Read more'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Simplified Engagement Bar */}
+          <View style={tw`flex-row items-center pt-4 border-t border-gray-100`}>
+            <View style={tw`flex-row items-center`}>
+              <MessageCircle size={18} color="#6B7280" />
+              <Text style={tw`ml-2 text-sm text-gray-600 font-medium`}>
+                {replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}
+              </Text>
+            </View>
+          </View>
         </View>
 
-        {/* Comments Component */}
+        {/* Enhanced Comments Section */}
+        <View style={tw`bg-gray-50 px-5 py-3`}>
+          <Text style={tw`text-sm font-semibold text-gray-700`}>
+            {replies.length} Professional {replies.length === 1 ? 'Response' : 'Responses'}
+          </Text>
+        </View>
+        
         <Comments replies={replies.map(reply => ({
           id: reply.id,
           user: {
@@ -277,26 +349,53 @@ const LawyerViewPost: React.FC = () => {
         }))} />
       </ScrollView>
 
-      {/* Reply composer with lawyer notice */}
-      <View style={styles.composerContainer}>
-        <View style={styles.lawyerNotice}>
-          <Shield size={12} color="#059669" />
-          <Text style={styles.lawyerNoticeText}>Replying as verified lawyer</Text>
+      {/* Enhanced Reply Composer */}
+      <View style={tw`absolute left-0 right-0 bottom-0 bg-white border-t border-gray-200 shadow-lg`}>
+        {/* Lawyer Status Bar */}
+        <View style={tw`flex-row items-center justify-between bg-emerald-50 px-4 py-2 border-b border-emerald-100`}>
+          <View style={tw`flex-row items-center`}>
+            <Shield size={12} color="#059669" fill="#059669" />
+            <Text style={tw`ml-2 text-xs font-medium text-emerald-700`}>
+              Responding as Verified Lawyer
+            </Text>
+          </View>
+          <View style={tw`bg-emerald-100 px-2 py-1 rounded-full`}>
+            <Text style={tw`text-xs font-bold text-emerald-800`}>
+              PROFESSIONAL
+            </Text>
+          </View>
         </View>
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.composerInput}
-            placeholder="Share your legal advice..."
-            placeholderTextColor="#9CA3AF"
-            value={replyText}
-            onChangeText={setReplyText}
-            multiline
-          />
+        
+        {/* Input Area */}
+        <View style={tw`flex-row items-end p-4`}>
+          <View style={tw`flex-1 mr-3`}>
+            <TextInput
+              style={tw`max-h-24 min-h-12 border border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 text-gray-900`}
+              placeholder="Provide professional legal guidance..."
+              placeholderTextColor="#9CA3AF"
+              value={replyText}
+              onChangeText={setReplyText}
+              multiline
+              textAlignVertical="top"
+            />
+            {replyText.length > 0 && (
+              <Text style={tw`text-xs text-gray-500 mt-1 ml-2`}>
+                {replyText.length}/500 characters
+              </Text>
+            )}
+          </View>
+          
           <TouchableOpacity
-            style={styles.composerSend}
+            style={tw`${replyText.trim() ? 'bg-blue-600' : 'bg-gray-300'} rounded-xl px-4 py-3 ${isReplying ? 'opacity-50' : ''} min-h-12 items-center justify-center`}
             onPress={handleSendReply}
+            disabled={!replyText.trim() || isReplying}
+            activeOpacity={0.8}
           >
-            <Send size={18} color="#FFFFFF" />
+            {isReplying ? (
+              <View style={tw`w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin`} />
+            ) : (
+              <Send size={16} color="#FFFFFF" />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -307,195 +406,11 @@ const LawyerViewPost: React.FC = () => {
         bookmarked={bookmarked}
         onToggleBookmark={() => setBookmarked((prev: boolean) => !prev)}
         onReport={() => console.log('Report post')}
-        position={{ top: 48, right: 12 }}
-        minWidth={200}
+        position={{ top: 60, right: 16 }}
+        minWidth={220}
       />
-    </View>
+    </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EFF3F4',
-  },
-  backButton: {
-    padding: 8,
-    borderRadius: 20,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F1419',
-  },
-  moreButton: {
-    padding: 8,
-    borderRadius: 20,
-  },
-  content: {
-    flex: 1,
-  },
-  postContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E1E8ED',
-  },
-  userRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 0,
-  },
-  nameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  userName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F1419',
-    marginRight: 8,
-  },
-  lawyerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    marginRight: 8,
-  },
-  lawyerBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#059669',
-    marginLeft: 2,
-  },
-  username: {
-    fontSize: 15,
-    color: '#536471',
-    marginRight: 4,
-  },
-  timestamp: {
-    fontSize: 15,
-    color: '#536471',
-  },
-  categoryContainer: {
-    marginBottom: 0,
-  },
-  categoryText: {
-    fontSize: 13,
-    fontWeight: '600',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-  },
-  secondRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  anonymousAvatar: {
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  postContent: {
-    fontSize: 15,
-    lineHeight: 20,
-    color: '#0F1419',
-    marginBottom: 12,
-  },
-  composerContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E1E8ED',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 6,
-    zIndex: 5,
-  },
-  lawyerNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#A7F3D0',
-  },
-  lawyerNoticeText: {
-    marginLeft: 4,
-    fontSize: 11,
-    color: '#059669',
-    fontWeight: '500',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  composerInput: {
-    flex: 1,
-    maxHeight: 80,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    fontSize: 14,
-    backgroundColor: '#F9FAFB',
-    color: '#111827',
-    textAlignVertical: 'top',
-  },
-  composerSend: {
-    height: 36,
-    paddingHorizontal: 12,
-    paddingVertical: 0,
-    backgroundColor: '#023D7B',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
 
 export default LawyerViewPost;

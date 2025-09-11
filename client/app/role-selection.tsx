@@ -123,15 +123,18 @@ export default function RoleSelection() {
       console.log('API Response:', response);
 
       if (response.success && response.data) {
-        // Navigate based on API response
-        const redirectPath = response.data.redirect_path;
-        console.log('Redirect path:', redirectPath);
+        // Navigate based on selected role
+        console.log('Selected role:', selectedRole);
         
-        if (redirectPath === "/home") {
-          router.replace("/home");
+        if (selectedRole === "seeker") {
+          // Legal seeker goes to home page
+          router.push("/home");
+        } else if (selectedRole === "lawyer") {
+          // Lawyer goes to verification instructions
+          router.push("/onboarding/lawyer/verification-instructions");
         } else {
-          // For lawyers, navigate to a valid route or handle differently
-          router.replace("/home"); // Fallback to home for now
+          // Fallback
+          router.push("/home");
         }
       } else {
         console.error('Role selection failed:', response.error);
