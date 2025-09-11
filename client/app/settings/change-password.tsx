@@ -116,7 +116,7 @@ export default function ChangePasswordScreen() {
         {/* Password Field */}
         <VStack style={{ marginBottom: 24 }}>
           <GSText size="sm" style={{ color: Colors.text.head, marginBottom: 8 }}>
-            Password
+            New Password
           </GSText>
           <View style={{ position: 'relative' }}>
             <Input variant="outline" size="lg" style={{ borderColor: '#E5E7EB', borderRadius: 8 }}>
@@ -148,7 +148,7 @@ export default function ChangePasswordScreen() {
         {/* Confirm Password Field */}
         <VStack style={{ marginBottom: 32 }}>
           <GSText size="sm" style={{ color: Colors.text.head, marginBottom: 8 }}>
-            Confirm Password
+            Confirm New Password
           </GSText>
           <View style={{ position: 'relative' }}>
             <Input variant="outline" size="lg" style={{ borderColor: '#E5E7EB', borderRadius: 8 }}>

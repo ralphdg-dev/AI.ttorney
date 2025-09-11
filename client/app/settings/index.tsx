@@ -68,23 +68,12 @@ export default function SettingsScreen() {
 
   const moreSettings: SettingItem[] = [
     {
-      id: "about-us",
-      title: "About us",
-      icon: <Info size={20} color={Colors.text.body} />,
-      type: "navigation",
-      onPress: () => {
-        // Navigate to about us
-        console.log("Navigate to about us");
-      },
-    },
-    {
       id: "privacy-policy",
       title: "Privacy policy",
       icon: <Shield size={20} color={Colors.text.body} />,
       type: "navigation",
       onPress: () => {
-        // Navigate to privacy policy
-        console.log("Navigate to privacy policy");
+        router.push("/settings/privacy-policy");
       },
     },
     {
@@ -93,8 +82,7 @@ export default function SettingsScreen() {
       icon: <FileText size={20} color={Colors.text.body} />,
       type: "navigation",
       onPress: () => {
-        // Navigate to terms of use
-        console.log("Navigate to terms of use");
+        router.push("/settings/terms");
       },
     },
   ];
