@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, ScrollView } from "react-native";
+import { View, ScrollView, TouchableOpacity } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
@@ -100,47 +100,47 @@ export default function SettingsScreen() {
   ];
 
   const renderSettingItemInGroup = (item: SettingItem) => {
-    return (
-      <HStack className="items-center justify-between px-5 py-4">
-        <HStack className="items-center flex-1">
-          <View style={[tw`mr-4 p-2 rounded-lg`, { backgroundColor: '#F8FAFC' }]}>
-            {item.icon}
-          </View>
-          <GSText size="md" style={{ color: Colors.text.head, flex: 1 }}>
-            {item.title}
-          </GSText>
-        </HStack>
-
-        {item.type === "navigation" && (
-          <Button
-            variant="link"
-            size="sm"
-            onPress={item.onPress}
-            style={{ padding: 8, marginRight: -8 }}
-          >
-            <ChevronRight size={18} color={Colors.text.sub} />
-          </Button>
-        )}
-
-        {item.type === "add" && (
-          <Button
-            variant="link"
-            size="sm"
-            onPress={item.onPress}
-            style={{ padding: 8, marginRight: -8 }}
-          >
-            <Plus size={18} color={Colors.primary.blue} strokeWidth={2} />
-          </Button>
-        )}
-
-        {item.type === "toggle" && (
+    if (item.type === "toggle") {
+      return (
+        <HStack className="items-center justify-between px-5 py-4">
+          <HStack className="items-center flex-1">
+            <View style={[tw`mr-4 p-2 rounded-lg`, { backgroundColor: '#F8FAFC' }]}>
+              {item.icon}
+            </View>
+            <GSText size="md" style={{ color: Colors.text.head, flex: 1 }}>
+              {item.title}
+            </GSText>
+          </HStack>
           <CustomToggle
             value={item.value || false}
             onValueChange={item.onToggle || (() => {})}
             size="md"
           />
-        )}
-      </HStack>
+        </HStack>
+      );
+    }
+
+    return (
+      <TouchableOpacity onPress={item.onPress} activeOpacity={0.6}>
+        <HStack className="items-center justify-between px-5 py-4">
+          <HStack className="items-center flex-1">
+            <View style={[tw`mr-4 p-2 rounded-lg`, { backgroundColor: '#F8FAFC' }]}>
+              {item.icon}
+            </View>
+            <GSText size="md" style={{ color: Colors.text.head, flex: 1 }}>
+              {item.title}
+            </GSText>
+          </HStack>
+
+          {item.type === "navigation" && (
+            <ChevronRight size={18} color={Colors.text.sub} />
+          )}
+
+          {item.type === "add" && (
+            <Plus size={18} color={Colors.primary.blue} strokeWidth={2} />
+          )}
+        </HStack>
+      </TouchableOpacity>
     );
   };
 
@@ -208,7 +208,7 @@ export default function SettingsScreen() {
               <View key={item.id}>
                 {renderSettingItemInGroup(item)}
                 {index < accountSettings.length - 1 && (
-                  <View style={{ height: 1, backgroundColor: '#F1F5F9', marginLeft: 60 }} />
+                  <View style={{ height: 1, backgroundColor: '#F1F5F9' }} />
                 )}
               </View>
             ))}
@@ -231,7 +231,7 @@ export default function SettingsScreen() {
               <View key={item.id}>
                 {renderSettingItemInGroup(item)}
                 {index < moreSettings.length - 1 && (
-                  <View style={{ height: 1, backgroundColor: '#F1F5F9', marginLeft: 60 }} />
+                  <View style={{ height: 1, backgroundColor: '#F1F5F9' }} />
                 )}
               </View>
             ))}
