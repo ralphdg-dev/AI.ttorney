@@ -1,7 +1,10 @@
 import React from 'react';
-import { StatusBar, Image, View, Text, SafeAreaView } from 'react-native';
+import { StatusBar, SafeAreaView } from 'react-native';
 import BackButton from './BackButton';
 import StickyFooterButton from './StickyFooterButton';
+import { Box } from './box';
+import { Text } from './text';
+import { Image } from './image';
 
 export type StatusScreenProps = {
   image: any; // require('path/to/image.png')
@@ -17,16 +20,16 @@ export default function StatusScreen({ image, title, description, buttonLabel, o
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
       {/* Header with BackButton */}
-      <View className="flex-row items-center px-6 pt-12 pb-4">
+      <Box className="flex-row items-center px-6 pt-12 pb-4">
         <BackButton onPress={onPress} />
-      </View>
+      </Box>
 
       {/* Centered content */}
-      <View className="flex-1 items-center justify-center px-6 -mt-44">
-        <Image source={image} style={{ width: 180, height: 180, marginBottom: 20 }} resizeMode="contain" />
+      <Box className="flex-1 items-center justify-center px-6 -mt-44">
+        <Image source={image} className="w-[180px] h-[180px] mb-5" resizeMode="contain" />
         <Text className="text-[22px] font-bold text-gray-900 text-center mb-2">{title}</Text>
         <Text className="text-[15px] text-gray-500 text-center">{description}</Text>
-      </View>
+      </Box>
 
       {/* Sticky footer button */}
       <StickyFooterButton
