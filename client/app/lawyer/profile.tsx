@@ -5,7 +5,6 @@ import { Settings, Edit, Star, Users, Briefcase, LogOut, Shield, Mail, Phone, Ma
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 import Header from '../../components/Header';
 import Colors from '../../constants/Colors';
-import { LawyerRoute } from '../../components/auth/ProtectedRoute';
 import { useAuth } from '../../contexts/AuthContext';
 
 const LawyerProfilePage: React.FC = () => {
@@ -52,7 +51,6 @@ const LawyerProfilePage: React.FC = () => {
   };
 
   return (
-    <LawyerRoute>
       <SafeAreaView style={styles.container}>
       <Header 
         variant="lawyer-profile"
@@ -176,10 +174,8 @@ const LawyerProfilePage: React.FC = () => {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
-
       <LawyerNavbar activeTab="profile" />
       </SafeAreaView>
-    </LawyerRoute>
   );
 };
 

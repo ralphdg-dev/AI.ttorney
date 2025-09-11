@@ -1,5 +1,4 @@
 import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { useState } from "react";
@@ -12,7 +11,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function Login() {
   const toast = useToast();
-  const { setUser } = useAuth();
+  const { signIn } = useAuth();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -79,106 +78,32 @@ export default function Login() {
     setIsLoading(true);
     
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/auth/signin`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email.toLowerCase().trim(),
-          password: password,
-        }),
-      });
+      // Use AuthContext signIn method with Supabase Auth
+      const result = await signIn(email.toLowerCase().trim(), password);
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        // Debug logging
-        console.log('Login response data:', data);
-        console.log('User profile:', data.profile);
-        console.log('Redirect path:', data.redirect_path);
-        
-        // Successful login - redirect based on role
-        const redirectPath = data.redirect_path || '/home';
-        
-        // Store user session data
-        await AsyncStorage.setItem('userSession', JSON.stringify(data.session));
-        await AsyncStorage.setItem('userProfile', JSON.stringify(data.profile));
-        
-        // Set user in AuthContext for immediate access
-        setUser(data.profile);
-        
-        // Special handling for role selection redirect
-        if (redirectPath === '/role-selection') {
-          // Store user email for role selection process
-          await AsyncStorage.setItem('user_email', email.toLowerCase().trim());
-          
-          toast.show({
-            placement: "top",
-            render: ({ id }) => (
-              <Toast nativeID={id} action="info" variant="solid" className="mt-12">
-                <ToastTitle size="md">Account Verified</ToastTitle>
-                <ToastDescription size="sm">Please select your role to continue...</ToastDescription>
-              </Toast>
-            ),
-          });
-          
-          // Small delay to show toast before navigation
-          setTimeout(() => {
-            router.replace('/role-selection');
-          }, 1000);
-        } else {
-          // Show success toast for normal login
-          toast.show({
-            placement: "top",
-            render: ({ id }) => (
-              <Toast nativeID={id} action="success" variant="solid" className="mt-12">
-                <ToastTitle size="md">Login Successful</ToastTitle>
-                <ToastDescription size="sm">Welcome back! Redirecting...</ToastDescription>
-              </Toast>
-            ),
-          });
-          
-          // Small delay to show toast before navigation
-          setTimeout(() => {
-            router.replace(redirectPath);
-          }, 500);
-        }
+      if (result.success) {
+        // Show success toast
+        toast.show({
+          placement: "top",
+          render: ({ id }) => (
+            <Toast nativeID={id} action="success" variant="solid" className="mt-12">
+              <ToastTitle size="md">Login Successful</ToastTitle>
+              <ToastDescription size="sm">Welcome back! Redirecting...</ToastDescription>
+            </Toast>
+          ),
+        });
+        // Navigation is handled by AuthContext
       } else {
-        // Handle unverified account - directly route to OTP verification
-        if (data.error === 'account_not_verified') {
-          toast.show({
-            placement: "top",
-            render: ({ id }) => (
-              <Toast nativeID={id} action="warning" variant="solid" className="mt-12">
-                <ToastTitle size="md">Account Not Verified</ToastTitle>
-                <ToastDescription size="sm">Please verify your email. Redirecting to verification...</ToastDescription>
-              </Toast>
-            ),
-          });
-          
-          // Small delay to show toast before navigation
-          setTimeout(() => {
-            router.push({
-              pathname: '/onboarding/verify-otp',
-              params: {
-                email: data.email || email,
-                otpType: 'email_verification',
-                fromLogin: 'true'
-              }
-            });
-          }, 1000);
-        } else {
-          toast.show({
-            placement: "top",
-            render: ({ id }) => (
-              <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-                <ToastTitle size="md">Login Failed</ToastTitle>
-                <ToastDescription size="sm">{data.detail || data.message || "Invalid credentials"}</ToastDescription>
-              </Toast>
-            ),
-          });
-        }
+        // Handle login errors
+        toast.show({
+          placement: "top",
+          render: ({ id }) => (
+            <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+              <ToastTitle size="md">Login Failed</ToastTitle>
+              <ToastDescription size="sm">{result.error || "Invalid credentials"}</ToastDescription>
+            </Toast>
+          ),
+        });
       }
     } catch (error) {
       console.error('Login error:', error);

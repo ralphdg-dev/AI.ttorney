@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { supabase } from '../config/supabase';
+import { router } from 'expo-router';
+import { getRoleBasedRedirect } from '../config/routes';
 
 // Role hierarchy based on backend schema
 export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
@@ -16,62 +18,118 @@ export interface User {
   updated_at?: string;
 }
 
+export interface AuthState {
+  session: Session | null;
+  user: User | null;
+  supabaseUser: SupabaseUser | null;
+}
+
 export interface AuthContextType {
   user: User | null;
+  session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   setUser: (user: User | null) => void;
   hasRole: (role: UserRole) => boolean;
-  hasMinimumRole: (minimumRole: UserRole) => boolean;
   isLawyer: () => boolean;
   isAdmin: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const ROLE_HIERARCHY: Record<UserRole, number> = {
-  guest: 0,
-  registered_user: 1,
-  verified_lawyer: 2,
-  admin: 3,
-  superadmin: 4,
-};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [authState, setAuthState] = useState<AuthState>({
+    session: null,
+    user: null,
+    supabaseUser: null,
+  });
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
 
   useEffect(() => {
-    // Initialize auth state - check for stored session
-    initializeAuth();
+    // Initialize auth state and listen for auth changes
+    const initialize = async () => {
+      try {
+        // Get initial session
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          setIsLoading(false);
+          return;
+        }
+
+        if (session?.user) {
+          await handleAuthStateChange(session);
+        }
+
+        // Listen for auth state changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            console.log('Auth state changed:', event, session?.user?.email);
+            
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              if (session) {
+                await handleAuthStateChange(session);
+              }
+            } else if (event === 'SIGNED_OUT') {
+              setAuthState({
+                session: null,
+                user: null,
+                supabaseUser: null,
+              });
+            }
+            
+            setIsLoading(false);
+          }
+        );
+
+        setIsLoading(false);
+
+        // Cleanup subscription on unmount
+        return () => {
+          subscription.unsubscribe();
+        };
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        setIsLoading(false);
+      }
+    };
+
+    initialize();
   }, []);
 
-  const initializeAuth = async () => {
-    try {
-      // Check for stored session and profile data
-      const [sessionData, profileData] = await Promise.all([
-        AsyncStorage.getItem('userSession'),
-        AsyncStorage.getItem('userProfile')
-      ]);
 
-      if (sessionData && profileData) {
-        const session = JSON.parse(sessionData);
-        const profile = JSON.parse(profileData);
-        
-        // Verify session is still valid (check expiration if needed)
-        if (session && profile) {
-          setUser(profile);
-        }
+  const handleAuthStateChange = async (session: Session, shouldNavigate = false) => {
+    try {
+      // Fetch user profile from your custom users table
+      const { data: profile, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return;
+      }
+
+      setAuthState({
+        session,
+        user: profile,
+        supabaseUser: session.user,
+      });
+
+      // Handle navigation after login if requested
+      if (shouldNavigate && profile) {
+        const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified);
+        console.log('AuthContext: Navigating to', redirectPath, 'for role', profile.role);
+        router.replace(redirectPath as any);
       }
     } catch (error) {
-      console.error('Auth initialization error:', error);
-      // Clear potentially corrupted data
-      await AsyncStorage.multiRemove(['userSession', 'userProfile']);
-    } finally {
-      setIsLoading(false);
+      console.error('Error handling auth state change:', error);
     }
   };
 
@@ -79,28 +137,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/auth/signin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+      // Use Supabase Auth for sign in
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      const data = await response.json();
-
-      if (data.success) {
-        setUser(data.profile);
-        
-        // Role-based navigation
-        const redirectPath = getRedirectPathForRole(data.profile.role);
-        router.replace(redirectPath as any);
-        
-        return { success: true };
-      } else {
-        return { success: false, error: data.error };
+      if (error) {
+        return { success: false, error: error.message };
       }
-    } catch {
-      return { success: false, error: 'Network error' };
+
+      if (data.session) {
+        // Handle auth state change with navigation
+        await handleAuthStateChange(data.session, true);
+        return { success: true };
+      }
+
+      return { success: false, error: 'No session created' };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Network error' };
     } finally {
       setIsLoading(false);
     }
@@ -108,9 +163,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      // Clear stored session data
-      await AsyncStorage.multiRemove(['userSession', 'userProfile', 'user_email']);
-      setUser(null);
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Sign out error:', error);
+      }
+      // Auth state change will be handled by the listener
       router.replace('/login' as any);
     } catch (error) {
       console.error('Sign out error:', error);
@@ -118,51 +175,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const setUserData = (userData: User | null) => {
-    setUser(userData);
+    setAuthState(prev => ({
+      ...prev,
+      user: userData,
+    }));
   };
 
   const hasRole = (role: UserRole): boolean => {
-    return user?.role === role;
-  };
-
-  const hasMinimumRole = (minimumRole: UserRole): boolean => {
-    if (!user) return false;
-    return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY[minimumRole];
+    return authState.user?.role === role;
   };
 
   const isLawyer = (): boolean => {
-    return hasMinimumRole('verified_lawyer');
+    return hasRole('verified_lawyer');
   };
 
   const isAdmin = (): boolean => {
-    return hasMinimumRole('admin');
+    return hasRole('admin') || hasRole('superadmin');
   };
 
-  const getRedirectPathForRole = (role: UserRole): string => {
-    switch (role) {
-      case 'verified_lawyer':
-        return '/lawyer';
-      case 'admin':
-      case 'superadmin':
-        return '/admin';
-      case 'registered_user':
-        return '/home';
-      case 'guest':
-        return '/role-selection';
-      default:
-        return '/home';
-    }
-  };
 
   const value: AuthContextType = {
-    user,
+    user: authState.user,
+    session: authState.session,
     isLoading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!authState.session && !!authState.user,
     signIn,
     signOut,
     setUser: setUserData,
     hasRole,
-    hasMinimumRole,
     isLawyer,
     isAdmin,
   };

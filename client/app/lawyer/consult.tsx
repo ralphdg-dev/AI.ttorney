@@ -5,7 +5,6 @@ import { MessageCircle, Video, Phone, Clock, Star } from 'lucide-react-native';
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 import Header from '../../components/Header';
 import Colors from '../../constants/Colors';
-import { LawyerRoute } from '../../components/auth/ProtectedRoute';
 
 interface ConsultationRequest {
   id: string;
@@ -123,7 +122,6 @@ const LawyerConsultPage: React.FC = () => {
   };
 
   return (
-    <LawyerRoute>
       <SafeAreaView style={styles.container}>
       <Header 
         variant="lawyer-consult"
@@ -257,7 +255,6 @@ const LawyerConsultPage: React.FC = () => {
 
       <LawyerNavbar activeTab="consult" />
       </SafeAreaView>
-    </LawyerRoute>
   );
 };
 

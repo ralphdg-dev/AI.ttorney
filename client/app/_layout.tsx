@@ -13,6 +13,7 @@ import { useEffect } from "react";
 import { AuthProvider } from "../lib/auth-context";
 import { AuthProvider as CustomAuthProvider } from "../contexts/AuthContext";
 import { SidebarProvider } from "../components/AppSidebar";
+import { AuthGuard } from "../components/AuthGuard";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -39,8 +40,9 @@ export default function RootLayout() {
     <GluestackUIProvider mode="light">
       <AuthProvider>
         <CustomAuthProvider>
-          <SidebarProvider>
-            <Stack screenOptions={{ headerShown: false }}>
+          <AuthGuard>
+            <SidebarProvider>
+              <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="onboarding" options={{ headerShown: false }} />
             <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -97,9 +99,10 @@ export default function RootLayout() {
             />
             <Stack.Screen name="documents-success" options={{ headerShown: false }} />
             </Stack>
-          </SidebarProvider>
-        </CustomAuthProvider>
-      </AuthProvider>
+              </SidebarProvider>
+            </AuthGuard>
+          </CustomAuthProvider>
+        </AuthProvider>
     </GluestackUIProvider>
   );
 }

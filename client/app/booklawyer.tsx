@@ -1,6 +1,6 @@
 import React from "react";
 import BookLawyer from "../components/booklawyer/LawyerBookingView";
 
-export default function Directory() {
+export default function BookLawyerPage() {
   return <BookLawyer />;
 }

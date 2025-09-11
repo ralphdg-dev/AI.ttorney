@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import tw from 'tailwind-react-native-classnames';
-import { LawyerRoute } from '../../components/auth/ProtectedRoute';
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 import LawyerTimeline from '../../components/lawyer/LawyerTimeline';
 import RoleBasedHeader from '../../components/navigation/RoleBasedHeader';
@@ -25,7 +24,6 @@ const LawyerForumPage: React.FC = () => {
   ];
 
   return (
-    <LawyerRoute>
       <SafeAreaView style={tw`flex-1 bg-gray-50`}>
         <RoleBasedHeader variant="lawyer" />
         
@@ -88,7 +86,6 @@ const LawyerForumPage: React.FC = () => {
         
         <LawyerNavbar activeTab="forum" />
       </SafeAreaView>
-    </LawyerRoute>
   );
 };
 

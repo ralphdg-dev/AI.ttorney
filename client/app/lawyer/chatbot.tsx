@@ -4,7 +4,6 @@ import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../../constants/Colors";
 import Header from "../../components/Header";
-import { LawyerRoute } from "../../components/auth/ProtectedRoute";
 import LawyerNavbar from "../../components/lawyer/LawyerNavbar";
 
 // Replace with your lawyer-specific logo if needed
@@ -110,7 +109,6 @@ export default function LawyerChatbotScreen() {
 
   if (showIntro) {
     return (
-      <LawyerRoute>
         <View style={tw`flex-1 bg-white`}>
           <Header
             title="AI Legal Assistant"
@@ -152,12 +150,10 @@ export default function LawyerChatbotScreen() {
           </View>
           <LawyerNavbar activeTab="chatbot" />
         </View>
-      </LawyerRoute>
     );
   }
 
   return (
-    <LawyerRoute>
       <View style={tw`flex-1 bg-white`}>
         <Header
           title="Legal Assistant"
@@ -221,6 +217,5 @@ export default function LawyerChatbotScreen() {
         </KeyboardAvoidingView>
         <LawyerNavbar activeTab="chatbot" />
       </View>
-    </LawyerRoute>
   );
 }
