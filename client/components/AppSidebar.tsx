@@ -385,6 +385,9 @@ export const SidebarWrapper: React.FC<{
       case 'notifications':
         router.push('/notifications');
         break;
+      case 'help':
+        router.push('/help');
+        break;
       case 'settings':
         router.push('/settings');
         break;

@@ -3,6 +3,7 @@ import { View, ScrollView } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
+import { Box } from "@/components/ui/box";
 import { VStack } from "@/components/ui/vstack";
 import { Text as GSText } from "@/components/ui/text";
 import Navbar from "@/components/Navbar";
@@ -12,7 +13,7 @@ export default function PrivacyPolicyScreen() {
   const router = useRouter();
 
   return (
-    <View style={tw`flex-1 bg-white`}>
+    <Box className="flex-1 bg-white">
       <Header showBackButton={true} showMenu={false} onBackPress={() => router.back()} />
 
       <ScrollView
@@ -116,6 +117,6 @@ export default function PrivacyPolicyScreen() {
       </ScrollView>
       
       <Navbar />
-    </View>
+    </Box>
   );
 }
