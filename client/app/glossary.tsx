@@ -21,12 +21,13 @@ import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
 import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import { SidebarProvider, SidebarWrapper } from "@/components/AppSidebar";
-import { CacheService, generateGlossaryCacheKey } from "./glossary/cacheService";
+import {
+  CacheService,
+  generateGlossaryCacheKey,
+} from "./glossary/cacheService";
 
-// API Configuration
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
-// Pagination constants
 const ITEMS_PER_PAGE = 10;
 
 export default function GlossaryScreen() {
@@ -50,16 +51,14 @@ export default function GlossaryScreen() {
     Math.min(3, Math.floor((width - horizontalPadding * 2) / minCardWidth))
   );
 
-  // Check network status on mount
   useEffect(() => {
     const checkNetwork = async () => {
       const connected = await CacheService.isConnected();
       setIsOffline(!connected);
     };
-    
+
     checkNetwork();
-    
-    // Clear expired cache on mount
+
     CacheService.clearExpired();
   }, []);
 
@@ -68,8 +67,25 @@ export default function GlossaryScreen() {
     { id: "terms", label: "Legal Terms" },
   ];
 
-  // Fetch legal terms from API or cache
-  const fetchLegalTerms = async (page = 1, category = activeCategory, search = searchQuery) => {
+  const formatTerms = (apiTerms: any[]): TermItem[] => {
+    const placeholderText = "Information not available";
+    return apiTerms.map((item: any) => ({
+      id: item.id.toString(),
+      title: item.term_en || placeholderText,
+      filipinoTerm: item.term_fil || placeholderText,
+      definition: item.definition_en || placeholderText,
+      filipinoDefinition: item.definition_fil || placeholderText,
+      example: item.example_en || placeholderText,
+      filipinoExample: item.example_fil || placeholderText,
+      category: item.category || "others",
+    }));
+  };
+
+  const fetchLegalTerms = async (
+    page = 1,
+    category = activeCategory,
+    search = searchQuery
+  ) => {
     try {
       setLoading(true);
       setError(null);
@@ -78,25 +94,27 @@ export default function GlossaryScreen() {
       const isConnected = await CacheService.isConnected();
       setIsOffline(!isConnected);
 
-      // Try to get from cache first
       const cachedData = await CacheService.get<any>(cacheKey);
-      
-      if (cachedData && !isConnected) {
-        // Use cached data when offline
-        console.log('Using cached data for offline mode');
-        setTerms(cachedData.terms);
-        setTotalPages(cachedData.pagination.pages);
-        setTotalCount(cachedData.pagination.total);
+
+      if (cachedData) {
+        console.log("Using cached data for:", cacheKey);
+        const formattedTerms = formatTerms(
+          cachedData.terms || cachedData.data?.terms || []
+        );
+        setTerms(formattedTerms);
+        setTotalPages(cachedData.pagination?.pages || 1);
+        setTotalCount(cachedData.pagination?.total || formattedTerms.length);
         setCurrentPage(page);
-        setLoading(false);
-        return;
+        if (!isConnected) {
+          setLoading(false);
+          return;
+        }
       }
 
-      if (!isConnected) {
+      if (!isConnected && !cachedData) {
         throw new Error("No internet connection and no cached data available");
       }
 
-      // Build query parameters for API call
       const params = new URLSearchParams({
         page: page.toString(),
         limit: ITEMS_PER_PAGE.toString(),
@@ -117,35 +135,25 @@ export default function GlossaryScreen() {
       }
 
       const data = await response.json();
-      
-      const placeholderText = "wala pa HHAHHA";
-      const formattedTerms: TermItem[] = data.terms.map((item: any) => ({
-        id: item.id,
-        title: item.term_en || placeholderText,
-        filipinoTerm: item.term_fil || placeholderText,
-        definition: item.definition_en || placeholderText,
-        filipinoDefinition: item.definition_fil || placeholderText,
-        example: item.example_en || placeholderText,
-        filipinoExample: item.example_fil || placeholderText,
-        category: item.category || placeholderText,
-      }));
-      
+
+      const formattedTerms = formatTerms(data.terms);
       setTerms(formattedTerms);
       setTotalPages(data.pagination.pages);
       setTotalCount(data.pagination.total);
       setCurrentPage(page);
 
-      // Cache the response
-      await CacheService.set(cacheKey, data);
-      
+      await CacheService.set(cacheKey, {
+        terms: data.terms,
+        pagination: data.pagination,
+      });
     } catch (err) {
       console.error("Error fetching legal terms:", err);
       const errorMessage =
         err instanceof Error ? err.message : "An unknown error occurred";
-      
+
       setError(errorMessage);
 
-      if (!isOffline) {
+      if (!isOffline && !terms.length) {
         Alert.alert(
           "Connection Error",
           `Could not fetch terms from server. Error: ${errorMessage}`,
@@ -161,9 +169,12 @@ export default function GlossaryScreen() {
     fetchLegalTerms(1);
   }, []);
 
-  // Update terms when category or search changes
   useEffect(() => {
-    fetchLegalTerms(1, activeCategory, searchQuery);
+    const timeoutId = setTimeout(() => {
+      fetchLegalTerms(1, activeCategory, searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
   }, [activeCategory, searchQuery]);
 
   const handleFilterPress = (): void => {
@@ -193,7 +204,6 @@ export default function GlossaryScreen() {
   const renderPaginationControls = () => {
     if (totalPages <= 1) return null;
 
-    // Mobile-friendly pagination with limited page buttons
     const getVisiblePages = () => {
       if (totalPages <= 5) {
         return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -287,7 +297,9 @@ export default function GlossaryScreen() {
             <Ionicons
               name="chevron-forward"
               size={20}
-              color={currentPage === totalPages ? "#9CA3AF" : Colors.primary.blue}
+              color={
+                currentPage === totalPages ? "#9CA3AF" : Colors.primary.blue
+              }
             />
           </TouchableOpacity>
         </View>
@@ -339,10 +351,10 @@ export default function GlossaryScreen() {
     if (error) {
       return (
         <View style={tw`flex-1 justify-center items-center py-10 px-6`}>
-          <Ionicons 
-            name={isOffline ? "cloud-offline" : "warning"} 
-            size={48} 
-            color={Colors.text.sub} 
+          <Ionicons
+            name={isOffline ? "cloud-offline" : "warning"}
+            size={48}
+            color={Colors.text.sub}
           />
           <GSText
             className="mt-4 text-center font-bold"
@@ -354,14 +366,13 @@ export default function GlossaryScreen() {
             className="mt-2 text-center"
             style={{ color: Colors.text.sub }}
           >
-            {isOffline 
+            {isOffline
               ? "Using cached data. Some features may be limited."
-              : "Unable to load legal terms. Please check your connection and try again."
-            }
+              : "Unable to load legal terms. Please check your connection and try again."}
           </GSText>
           {!isOffline && (
             <TouchableOpacity
-              onPress={handleRefresh}
+              onPress={() => fetchLegalTerms(currentPage)}
               style={tw`mt-4 px-4 py-2 bg-blue-500 rounded-lg`}
             >
               <GSText className="text-white font-semibold">Retry</GSText>
@@ -385,10 +396,9 @@ export default function GlossaryScreen() {
             className="mt-2 text-center"
             style={{ color: Colors.text.sub }}
           >
-            {isOffline 
+            {isOffline
               ? "No cached results for this search. Connect to internet to search."
-              : "Try adjusting your search terms or category filter."
-            }
+              : "Try adjusting your search terms or category filter."}
           </GSText>
         </View>
       );
@@ -404,10 +414,9 @@ export default function GlossaryScreen() {
           No terms available
         </GSText>
         <GSText className="mt-2 text-center" style={{ color: Colors.text.sub }}>
-          {isOffline 
+          {isOffline
             ? "No cached data available. Connect to internet to load terms."
-            : "Legal terms will appear here once loaded."
-          }
+            : "Legal terms will appear here once loaded."}
         </GSText>
       </View>
     );

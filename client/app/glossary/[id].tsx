@@ -18,10 +18,8 @@ import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
 import { Star, BookOpen, Globe } from "lucide-react-native";
 
-// API Configuration - same as in your glossary screen
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
-// Interface for the glossary term from your API
 interface GlossaryTerm {
   id: number;
   term_en: string;
@@ -46,7 +44,6 @@ export default function TermDetailScreen() {
     try {
       setLoading(true);
 
-      // Fetch the specific term from your API using the ID
       const response = await fetch(`${API_BASE_URL}/glossary/terms/${id}`);
 
       if (!response.ok) {
@@ -90,11 +87,10 @@ export default function TermDetailScreen() {
   const toggleFavorite = async () => {
     try {
       setIsFavorite(!isFavorite);
-      // Note: You'll need to implement user authentication and favorites table
-      // For now, this just toggles the UI state
+      // Note: NEED PA IKONEK SA USER
     } catch (error) {
       console.error("Error toggling favorite:", error);
-      setIsFavorite(!isFavorite); // Revert on error
+      setIsFavorite(!isFavorite);
     }
   };
 
@@ -405,7 +401,6 @@ export default function TermDetailScreen() {
         </View>
       </Animated.ScrollView>
 
-      {/* Bottom Navigation */}
       <Navbar activeTab="learn" />
     </View>
   );

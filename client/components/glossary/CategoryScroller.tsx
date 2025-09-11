@@ -17,10 +17,9 @@
   interface CategoryScrollerProps {
     activeCategory: string;
     onCategoryChange: (categoryId: string) => void;
-    includeAllOption?: boolean; // default true for glossary, can be disabled elsewhere
+    includeAllOption?: boolean;
   }
 
-  // Helper to compute categories list optionally including 'all'
   const composeCategories = (includeAll: boolean) =>
     (includeAll
       ? ([{ id: "all", label: "All" }, ...LEGAL_CATEGORIES] as (LegalCategory | { id: string; label: string })[])

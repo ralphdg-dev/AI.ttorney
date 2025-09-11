@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 
 const CACHE_PREFIX = 'glossary_cache_';
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_DURATION = 24 * 60 * 60 * 1000;
 
 export interface CacheData {
   data: any;
@@ -18,7 +18,6 @@ export class CacheService {
 
       const cacheData: CacheData = JSON.parse(cached);
       
-      // Check if cache is expired
       if (Date.now() > cacheData.expiresAt) {
         await this.remove(key);
         return null;
@@ -75,17 +74,42 @@ export class CacheService {
     }
   }
 
+  static async clearAll(): Promise<void> {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const cacheKeys = keys.filter(key => key.startsWith(CACHE_PREFIX));
+      await AsyncStorage.multiRemove(cacheKeys);
+    } catch (error) {
+      console.error('Clear all cache error:', error);
+    }
+  }
+
   static async isConnected(): Promise<boolean> {
     const state = await NetInfo.fetch();
     return state.isConnected ?? false;
   }
+
+  static async getAllKeys(): Promise<string[]> {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      return keys.filter(key => key.startsWith(CACHE_PREFIX));
+    } catch (error) {
+      console.error('Get all keys error:', error);
+      return [];
+    }
+  }
 }
 
-// Generate cache key for glossary terms
 export const generateGlossaryCacheKey = (
   page: number,
   category: string,
   search: string
 ): string => {
-  return `terms_page_${page}_category_${category}_search_${search}`;
+  const normalizedCategory = category.toLowerCase().replace(/\s+/g, '_');
+  const normalizedSearch = search.toLowerCase().trim().replace(/\s+/g, '_');
+  return `terms_page_${page}_category_${normalizedCategory}_search_${normalizedSearch}`;
+};
+
+export const generateTermCacheKey = (termId: string): string => {
+  return `term_${termId}`;
 };
