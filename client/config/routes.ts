@@ -33,7 +33,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   },
   '/role-selection': { 
     path: '/role-selection', 
-    allowedRoles: ['guest'],
+    allowedRoles: ['guest', 'registered_user'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true

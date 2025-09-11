@@ -94,6 +94,31 @@ export default function RoleSelection() {
   const [isLoading, setIsLoading] = useState(false);
   const { refreshUserData } = useAuth();
 
+  const handleBack = async () => {
+    try {
+      // Get user email from storage
+      const userEmail = await AsyncStorage.getItem('user_email');
+      
+      if (userEmail) {
+        // Revert user role to guest when going back
+        await apiClient.selectRole({
+          email: userEmail,
+          selected_role: "guest"
+        });
+        
+        // Refresh user data to update role in context
+        await refreshUserData();
+      }
+      
+      // Navigate back
+      router.back();
+    } catch (error) {
+      console.error('Error reverting role:', error);
+      // Still navigate back even if API call fails
+      router.back();
+    }
+  };
+
   const handleContinue = async () => {
     if (!selectedRole) return;
 
@@ -111,8 +136,8 @@ export default function RoleSelection() {
         return;
       }
 
-      // Map frontend selection to backend role type for API
-      const apiRoleSelection = selectedRole === "seeker" ? "legal_seeker" : "lawyer";
+      // Both seeker and lawyer selections result in registered_user role
+      const apiRoleSelection = "registered_user";
       
       // Call role selection API
       console.log('Calling selectRole API with:', { email: userEmail, selected_role: apiRoleSelection });
@@ -382,7 +407,7 @@ export default function RoleSelection() {
     <View style={tw`flex-1 bg-white`}>
       {/* Static Header - Same as Onboarding */}
       <View style={tw`flex-row justify-between items-center px-6 pt-12 pb-4`}>
-        <BackButton onPress={() => router.back()} />
+        <BackButton onPress={handleBack} />
       </View>
 
       {/* Responsive, scrollable content */}
