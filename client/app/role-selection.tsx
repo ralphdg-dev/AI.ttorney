@@ -92,12 +92,12 @@ interface ResponsiveStyles {
 export default function RoleSelection() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { refreshUserData } = useAuth();
+  const { refreshUserData, user } = useAuth();
 
   const handleBack = async () => {
     try {
-      // Get user email from storage
-      const userEmail = await AsyncStorage.getItem('user_email');
+      // Get user email from AuthContext instead of AsyncStorage
+      const userEmail = user?.email;
       
       if (userEmail) {
         // Revert user role to guest when going back
@@ -113,7 +113,6 @@ export default function RoleSelection() {
       // Navigate back
       router.back();
     } catch (error) {
-      console.error('Error reverting role:', error);
       // Still navigate back even if API call fails
       router.back();
     }
@@ -125,10 +124,9 @@ export default function RoleSelection() {
     setIsLoading(true);
     
     try {
-      // Get user email from storage
-      const userEmail = await AsyncStorage.getItem('user_email');
+      // Get user email from AuthContext instead of AsyncStorage
+      const userEmail = user?.email;
       
-      console.log('Retrieved user email:', userEmail);
       
       if (!userEmail) {
         Alert.alert('Error', 'User email not found. Please try logging in again.');
@@ -140,21 +138,18 @@ export default function RoleSelection() {
       const apiRoleSelection = "registered_user";
       
       // Call role selection API
-      console.log('Calling selectRole API with:', { email: userEmail, selected_role: apiRoleSelection });
       
       const response = await apiClient.selectRole({
         email: userEmail,
         selected_role: apiRoleSelection
       });
 
-      console.log('API Response:', response);
 
       if (response.success && response.data) {
         // Refresh user data in AuthContext to update role
         await refreshUserData();
         
         // Navigate based on selected role
-        console.log('Selected role:', selectedRole);
         
         if (selectedRole === "seeker") {
           // Legal seeker goes to home page - use replace to prevent back navigation
@@ -167,11 +162,9 @@ export default function RoleSelection() {
           router.replace("/home");
         }
       } else {
-        console.error('Role selection failed:', response.error);
         Alert.alert('Error', response.error || 'Failed to update role');
       }
     } catch (error) {
-      console.error('Role selection error:', error);
       Alert.alert('Error', 'Failed to update role. Please try again.');
     } finally {
       setIsLoading(false);

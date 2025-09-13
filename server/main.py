@@ -79,6 +79,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(auth_router)
 app.include_router(route_validation_router, prefix="/api")
 
+# Import and include lawyer application router
+from routes.lawyer_applications import router as lawyer_applications_router
+app.include_router(lawyer_applications_router, prefix="/api")
+
 @app.get("/")
 async def root():
     """Health check endpoint"""

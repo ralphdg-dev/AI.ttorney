@@ -34,7 +34,7 @@ export default function DocumentsSuccess() {
         title="Explore Ai.ttorney"
         disabled={false}
         bottomOffset={16}
-        onPress={() => router.back()}
+        onPress={() => router.push('/')}
       />
     </SafeAreaView>
   );

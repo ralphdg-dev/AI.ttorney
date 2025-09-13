@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { SafeAreaView, StatusBar, View, Text, TouchableOpacity, Image, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import BackButton from '../../../components/ui/BackButton';
 import StickyFooterButton from '../../../components/ui/StickyFooterButton';
+import { lawyerApplicationService } from '../../../services/lawyerApplicationService';
 
 export default function LawyerFaceVerification() {
   const [selfie, setSelfie] = useState<any | null>(null);
+  const [selfiePath, setSelfiePath] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleTakeSelfie = async () => {
     // On web, ImagePicker.launchCameraAsync may show a file dialog; still attempt for consistency
@@ -26,7 +30,41 @@ export default function LawyerFaceVerification() {
         Alert.alert('File too large', 'Please take a photo up to 5MB.');
         return;
       }
+      
+      // Set preview immediately for better UX
       setSelfie({ uri: a.uri, name: a.fileName || 'selfie.jpg', size: a.fileSize });
+      
+      // Upload selfie to backend
+      setIsUploading(true);
+      try {
+        let uploadResult;
+        
+        // Check if we're on web and have a File object
+        if (typeof window !== 'undefined' && a.file) {
+          // On web, use the File object directly
+          uploadResult = await lawyerApplicationService.uploadSelfie(a.file);
+        } else {
+          // On native, use the URI-based approach
+          uploadResult = await lawyerApplicationService.uploadSelfie({
+            uri: a.uri,
+            name: a.fileName || 'selfie.jpg',
+            type: 'image/jpeg',
+          });
+        }
+        
+        
+        if (uploadResult.success && uploadResult.file_path) {
+          setSelfiePath(uploadResult.file_path);
+        } else {
+          // Keep the preview but show warning - don't remove the image
+          Alert.alert('Upload Warning', 'Selfie captured but upload failed. You can continue and try again later.');
+        }
+      } catch (error) {
+        // Keep the preview but show warning - don't remove the image
+        Alert.alert('Upload Warning', 'Selfie captured but upload failed. You can continue and try again later.');
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -88,17 +126,20 @@ export default function LawyerFaceVerification() {
         {/* Take live selfie button */}
         <TouchableOpacity
           onPress={handleTakeSelfie}
+          disabled={isUploading}
           activeOpacity={0.85}
           style={{
             marginTop: 20,
             width: '100%',
             paddingVertical: 14,
-            backgroundColor: '#023D7B',
+            backgroundColor: isUploading ? '#9CA3AF' : '#023D7B',
             borderRadius: 10,
             alignItems: 'center',
           }}
         >
-          <Text style={{ color: 'white', fontWeight: '700', fontSize: 16 }}>Take live selfie</Text>
+          <Text style={{ color: 'white', fontWeight: '700', fontSize: 16 }}>
+            {isUploading ? 'Uploading...' : 'Take live selfie'}
+          </Text>
         </TouchableOpacity>
 
         {/* Preview */}
@@ -120,10 +161,14 @@ export default function LawyerFaceVerification() {
 
       {/* Sticky footer */}
       <StickyFooterButton
-        title="Next"
-        disabled={!selfie}
+        title={isUploading ? "Uploading..." : "Next"}
+        disabled={!selfie || isUploading}
         bottomOffset={16}
-        onPress={() => router.push('./lawyer-terms')}
+        onPress={async () => {
+          // Store selfie path for later submission
+          await AsyncStorage.setItem('lawyer_selfie_path', selfiePath);
+          router.push('./lawyer-terms');
+        }}
       />
     </SafeAreaView>
   );
