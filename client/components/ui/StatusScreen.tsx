@@ -13,10 +13,11 @@ export type StatusScreenProps = {
   buttonLabel: string;
   onPress: () => void; // keep router wiring out for now
   onBack?: () => void; // optional back button handler
+  showBackButton?: boolean; // whether to show back button (default: true)
   imageAlt?: string; // accessibility alt text for image
 };
 
-export default function StatusScreen({ image, title, description, buttonLabel, onPress, onBack, imageAlt }: StatusScreenProps) {
+export default function StatusScreen({ image, title, description, buttonLabel, onPress, onBack, showBackButton = true, imageAlt }: StatusScreenProps) {
   const handleBack = () => {
     if (onBack) {
       onBack();
@@ -36,9 +37,11 @@ export default function StatusScreen({ image, title, description, buttonLabel, o
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
       {/* Header with BackButton */}
-      <Box className="flex-row items-center px-6 pt-12 pb-4">
-        <BackButton onPress={handleBack} />
-      </Box>
+      {showBackButton && (
+        <Box className="flex-row items-center px-6 pt-12 pb-4" style={{ zIndex: 1000 }}>
+          <BackButton onPress={handleBack} />
+        </Box>
+      )}
 
       {/* Centered content */}
       <Box className="flex-1 items-center justify-center px-6 -mt-44">

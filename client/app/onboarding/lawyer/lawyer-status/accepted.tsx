@@ -56,6 +56,7 @@ export default function AcceptedStatus() {
       description="Congratulations! Your lawyer application has been approved. You now have access to the lawyer dashboard and all lawyer features."
       buttonLabel={isProcessing ? "Processing..." : "Go to Lawyer Dashboard"}
       onPress={handleGoToDashboard}
+      showBackButton={false}
       imageAlt="Lawyer application accepted"
     />
   );

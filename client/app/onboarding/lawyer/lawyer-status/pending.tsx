@@ -28,6 +28,7 @@ export default function PendingStatus() {
       description="Your application is currently being reviewed by our team. We'll notify you once the review is complete."
       buttonLabel="Go to Home"
       onPress={() => router.push('/home')}
+      showBackButton={false}
       imageAlt="Lawyer application pending review"
     />
   );
