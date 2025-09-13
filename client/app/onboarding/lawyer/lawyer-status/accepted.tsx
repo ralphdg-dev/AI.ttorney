@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { lawyerApplicationService, LawyerApplicationStatus } from '../../../../services/lawyerApplicationService';
 import StatusScreen from '../../../../components/ui/StatusScreen';
 import { useAuth } from '../../../../contexts/AuthContext';
+import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
 
 export default function AcceptedStatus() {
   const [applicationData, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
@@ -50,14 +51,16 @@ export default function AcceptedStatus() {
   };
 
   return (
-    <StatusScreen
-      image={require('../../../../assets/images/lawyer-registration/accepted.png')}
-      title="Application Accepted!"
-      description="Congratulations! Your lawyer application has been approved. You now have access to the lawyer dashboard and all lawyer features."
-      buttonLabel={isProcessing ? "Processing..." : "Go to Lawyer Dashboard"}
-      onPress={handleGoToDashboard}
-      showBackButton={false}
-      imageAlt="Lawyer application accepted"
-    />
+    <LawyerStatusGuard requiredStatus="accepted">
+      <StatusScreen
+        image={require('../../../../assets/images/lawyer-registration/accepted.png')}
+        title="Application Accepted!"
+        description="Congratulations! Your lawyer application has been approved. You now have access to the lawyer dashboard and all lawyer features."
+        buttonLabel={isProcessing ? "Processing..." : "Go to Lawyer Dashboard"}
+        onPress={handleGoToDashboard}
+        showBackButton={false}
+        imageAlt="Lawyer application accepted"
+      />
+    </LawyerStatusGuard>
   );
 }

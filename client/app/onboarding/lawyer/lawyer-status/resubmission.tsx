@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { lawyerApplicationService, LawyerApplicationStatus } from '../../../../services/lawyerApplicationService';
 import StatusScreen from '../../../../components/ui/StatusScreen';
+import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
 
 export default function Resubmission() {
   const [applicationData, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
@@ -32,14 +33,16 @@ export default function Resubmission() {
   };
 
   return (
-    <StatusScreen
-      image={require('../../../../assets/images/lawyer-registration/resubmission.png')}
-      title="Resubmission Required"
-      description={description}
-      buttonLabel="Resubmit Documents"
-      onPress={handleResubmit}
-      onBack={handleBackToHome}
-      imageAlt="Document resubmission required"
-    />
+    <LawyerStatusGuard requiredStatus="resubmission">
+      <StatusScreen
+        image={require('../../../../assets/images/lawyer-registration/resubmission.png')}
+        title="Resubmission Required"
+        description={description}
+        buttonLabel="Resubmit Documents"
+        onPress={handleResubmit}
+        onBack={handleBackToHome}
+        imageAlt="Document resubmission required"
+      />
+    </LawyerStatusGuard>
   );
 }

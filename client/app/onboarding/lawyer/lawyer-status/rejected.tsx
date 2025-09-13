@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { lawyerApplicationService, LawyerApplicationStatus } from '../../../../services/lawyerApplicationService';
 import StatusScreen from '../../../../components/ui/StatusScreen';
+import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
 
 export default function RejectedStatus() {
   const [applicationData, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
@@ -33,13 +34,15 @@ export default function RejectedStatus() {
   }
 
   return (
-    <StatusScreen
-      image={require('../../../../assets/images/lawyer-registration/rejected.png')}
-      title="Application Rejected"
-      description={description}
-      buttonLabel={canReapply ? "Reapply" : "Go to Home"}
-      onPress={() => canReapply ? router.push('/onboarding/lawyer/upload-documents') : router.push('/home')}
-      imageAlt="Lawyer application rejected"
-    />
+    <LawyerStatusGuard requiredStatus="rejected">
+      <StatusScreen
+        image={require('../../../../assets/images/lawyer-registration/rejected.png')}
+        title="Application Rejected"
+        description={description}
+        buttonLabel={canReapply ? "Reapply" : "Go to Home"}
+        onPress={() => canReapply ? router.push('/onboarding/lawyer/upload-documents') : router.push('/home')}
+        imageAlt="Lawyer application rejected"
+      />
+    </LawyerStatusGuard>
   );
 }

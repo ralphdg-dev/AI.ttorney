@@ -28,20 +28,11 @@ export default function LoadingStatus() {
       }
 
       // Fetch the actual application status
-      console.log('Fetching application status for user:', user.email);
       const statusData = await lawyerApplicationService.getApplicationStatus();
       let applicationStatus = null;
       
-      console.log('Raw API response:', JSON.stringify(statusData, null, 2));
-      
       if (statusData && statusData.has_application && statusData.application) {
         applicationStatus = statusData.application.status;
-        console.log('Found application status:', applicationStatus);
-      } else {
-        console.log('No application found or no status data');
-        console.log('statusData exists:', !!statusData);
-        console.log('has_application:', statusData?.has_application);
-        console.log('application exists:', !!statusData?.application);
       }
 
       // Get the correct redirect path with the actual status
@@ -52,21 +43,15 @@ export default function LoadingStatus() {
         applicationStatus || undefined
       );
 
-      console.log('Redirect path determined:', redirectPath);
-
       if (redirectPath && redirectPath !== 'loading') {
-        console.log('Redirecting to:', redirectPath);
         router.replace(redirectPath as any);
       } else {
         // Only fallback to pending if we truly have no status
-        console.log('No valid redirect path, checking if user should have status...');
         if (user.pending_lawyer) {
-          console.log('User has pending_lawyer flag but no status found, defaulting to pending');
           router.replace('/onboarding/lawyer/lawyer-status/pending');
         } else {
           // User doesn't have pending_lawyer, redirect to normal dashboard
           const normalRedirect = getRoleBasedRedirect(user.role, user.is_verified, false);
-          console.log('User has no pending_lawyer flag, redirecting to:', normalRedirect);
           router.replace(normalRedirect as any);
         }
       }
