@@ -2,8 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Shield, Users, Briefcase, ScrollText, Gavel, ShoppingCart, Library } from 'lucide-react-native';
+import { Shield, Library, Users, Gavel, ScrollText, Briefcase, ShoppingCart } from 'lucide-react-native';
 import tw from 'tailwind-react-native-classnames';
+import Colors from '../../constants/Colors';
+import Header from '../../components/Header';
+import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 
 type LegalCategory = 'family' | 'criminal' | 'civil' | 'labor' | 'consumer' | 'others';
 
@@ -112,27 +115,19 @@ const LawyerCreatePost: React.FC = () => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
           <View style={tw`flex-1`}>
-        {/* Header */}
-        <View style={tw`flex-row items-center justify-between px-4 py-4 bg-white shadow-sm`}>
-          <TouchableOpacity 
-            onPress={() => router.back()}
-            style={tw`p-2`}
-            activeOpacity={0.7}
-          >
-            <ArrowLeft size={24} color="#374151" />
-          </TouchableOpacity>
-          
-          <View style={tw`flex-row items-center`}>
-            <Text style={tw`ml-2 text-lg font-bold text-gray-900`}>
-              New Post
-            </Text>
-          </View>
-          
+        <Header 
+          title="New Post"
+          showBackButton={true}
+          onBackPress={() => router.back()}
+        />
+
+        {/* Post Button */}
+        <View style={tw`px-4 py-2 bg-white border-b border-gray-100`}>
           <TouchableOpacity
             onPress={handleSubmit}
             disabled={!canSubmit}
             style={[
-              tw`px-6 py-2 rounded-full`,
+              tw`px-6 py-2 rounded-full self-end`,
               {
                 backgroundColor: canSubmit ? '#059669' : '#D1D5DB'
               }
@@ -153,12 +148,12 @@ const LawyerCreatePost: React.FC = () => {
           bounces={false}
         >
           {/* Guidelines */}
-          <View style={tw`bg-blue-50 rounded-2xl p-4 mb-4 border border-blue-200`}>
+          <View style={[tw`rounded-2xl p-4 mb-4 border`, { backgroundColor: '#E8F4FD', borderColor: '#C1E4F7' }]}>
             <View style={tw`flex-row items-center mb-2`}>
-              <Shield size={16} color="#2563EB" />
-              <Text style={tw`ml-2 text-blue-800 font-semibold text-sm`}>Guidelines</Text>
+              <Shield size={16} color={Colors.primary.blue} />
+              <Text style={[tw`ml-2 font-semibold text-sm`, { color: Colors.primary.blue }]}>Guidelines</Text>
             </View>
-            <Text style={tw`text-blue-700 text-sm leading-5`}>
+            <Text style={[tw`text-sm leading-5`, { color: Colors.primary.blue }]}>
               Follow ethics rules • Share general info only • Avoid specific case advice • No legal promotion
             </Text>
           </View>
@@ -229,6 +224,8 @@ const LawyerCreatePost: React.FC = () => {
         </ScrollView>
           </View>
       </KeyboardAvoidingView>
+      
+      <LawyerNavbar activeTab="forum" />
     </SafeAreaView>
   );
 };

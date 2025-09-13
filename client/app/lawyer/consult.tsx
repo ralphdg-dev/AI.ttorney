@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MessageCircle, Video, Phone, Clock, Star } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { MessageCircle, Video, Clock, Calendar, TrendingUp, MapPin } from 'lucide-react-native';
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 import Header from '../../components/Header';
+import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 
 interface ConsultationRequest {
@@ -11,88 +13,89 @@ interface ConsultationRequest {
   client: {
     name: string;
     avatar: string;
-    rating?: number;
   };
-  category: string;
-  type: 'chat' | 'video' | 'phone';
-  status: 'pending' | 'scheduled' | 'completed';
-  requestTime: string;
-  scheduledTime?: string;
-  urgency: 'low' | 'medium' | 'high';
-  description: string;
-  estimatedDuration: string;
+  message: string;
+  mode: 'onsite' | 'online';
+  status: 'pending' | 'accepted' | 'rejected' | 'completed';
+  requested_at: string | null;
+  consultation_date: string | null;
+  consultation_time: string | null;
+  user_id: string | null;
+  lawyer_id: string | null;
+  responded_at?: string | null;
 }
 
 const LawyerConsultPage: React.FC = () => {
-  const [filter, setFilter] = useState<'all' | 'pending' | 'scheduled' | 'completed'>('all');
+  const router = useRouter();
+  const [filter, setFilter] = useState<'all' | 'pending' | 'accepted' | 'completed'>('all');
 
   const sampleRequests: ConsultationRequest[] = [
     {
-      id: 'consult_001',
+      id: '550e8400-e29b-41d4-a716-446655440001',
       client: {
         name: 'Sarah Johnson',
         avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-        rating: 4.8,
       },
-      category: 'Family Law',
-      type: 'video',
+      message: 'I need urgent consultation regarding child custody modification due to changed circumstances. My ex-spouse has relocated and I need to understand my legal options.',
+      mode: 'online',
       status: 'pending',
-      urgency: 'high',
-      requestTime: '2 hours ago',
-      description: 'Need urgent consultation regarding child custody modification due to changed circumstances.',
-      estimatedDuration: '45 minutes',
+      requested_at: '2 hours ago',
+      consultation_date: '2024-09-15',
+      consultation_time: '14:30',
+      user_id: '123e4567-e89b-12d3-a456-426614174001',
+      lawyer_id: null,
     },
     {
-      id: 'consult_002',
+      id: '550e8400-e29b-41d4-a716-446655440002',
       client: {
         name: 'Michael Chen',
         avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
       },
-      category: 'Business Law',
-      type: 'chat',
-      status: 'scheduled',
-      urgency: 'medium',
-      requestTime: '4 hours ago',
-      scheduledTime: 'Today 3:00 PM',
-      description: 'Contract review for new partnership agreement and liability concerns.',
-      estimatedDuration: '30 minutes',
+      message: 'I need help with contract review for a new partnership agreement. There are some liability concerns I want to discuss.',
+      mode: 'onsite',
+      status: 'accepted',
+      requested_at: '4 hours ago',
+      consultation_date: '2024-09-14',
+      consultation_time: '15:00',
+      user_id: '123e4567-e89b-12d3-a456-426614174002',
+      lawyer_id: '123e4567-e89b-12d3-a456-426614174100',
     },
     {
-      id: 'consult_003',
+      id: '550e8400-e29b-41d4-a716-446655440003',
       client: {
         name: 'Lisa Rodriguez',
         avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-        rating: 4.9,
       },
-      category: 'Criminal Law',
-      type: 'phone',
+      message: 'Emergency consultation regarding arrest warrant and bail procedures. I need immediate legal guidance.',
+      mode: 'online',
       status: 'completed',
-      urgency: 'high',
-      requestTime: '1 day ago',
-      description: 'Emergency consultation completed regarding arrest warrant and bail procedures.',
-      estimatedDuration: '60 minutes',
+      requested_at: '1 day ago',
+      consultation_date: '2024-09-13',
+      consultation_time: '10:00',
+      user_id: '123e4567-e89b-12d3-a456-426614174003',
+      lawyer_id: '123e4567-e89b-12d3-a456-426614174100',
     },
   ];
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'video':
+  const getModeIcon = (mode: string) => {
+    switch (mode) {
+      case 'online':
         return Video;
-      case 'phone':
-        return Phone;
+      case 'onsite':
+        return MapPin;
       default:
         return MessageCircle;
     }
   };
 
-  const getUrgencyColor = (urgency: string) => {
-    switch (urgency) {
-      case 'high':
-        return { bg: '#FEF2F2', border: '#FECACA', text: '#DC2626' };
-      case 'medium':
-        return { bg: '#FFFBEB', border: '#FDE68A', text: '#D97706' };
-      default:
+  const getModeColor = (mode: string) => {
+    switch (mode) {
+      case 'online':
+        return { bg: '#E8F4FD', border: '#C1E4F7', text: Colors.primary.blue };
+      case 'onsite':
         return { bg: '#F0FDF4', border: '#BBF7D0', text: '#16A34A' };
+      default:
+        return { bg: '#F3F4F6', border: '#D1D5DB', text: '#374151' };
     }
   };
 
@@ -100,8 +103,10 @@ const LawyerConsultPage: React.FC = () => {
     switch (status) {
       case 'pending':
         return { bg: '#FEF3C7', text: '#92400E' };
-      case 'scheduled':
-        return { bg: '#DBEAFE', text: '#1E40AF' };
+      case 'accepted':
+        return { bg: '#E8F4FD', text: Colors.primary.blue };
+      case 'rejected':
+        return { bg: '#FEE2E2', text: '#991B1B' };
       case 'completed':
         return { bg: '#D1FAE5', text: '#065F46' };
       default:
@@ -113,7 +118,7 @@ const LawyerConsultPage: React.FC = () => {
 
   const handleRequestPress = (requestId: string) => {
     console.log(`Consultation request ${requestId} pressed`);
-    // TODO: Navigate to consultation details
+    router.push(`/lawyer/consultation/${requestId}`);
   };
 
   const handleAcceptRequest = (requestId: string) => {
@@ -122,7 +127,7 @@ const LawyerConsultPage: React.FC = () => {
   };
 
   return (
-      <SafeAreaView style={styles.container}>
+    <SafeAreaView style={tw`flex-1 bg-gray-50`}>
       <Header 
         variant="lawyer-consult"
         title="Consultations"
@@ -130,336 +135,259 @@ const LawyerConsultPage: React.FC = () => {
         onSearchPress={() => console.log('Search consultations')}
       />
       
-      <View style={styles.content}>
-        {/* Stats Cards */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>12</Text>
-            <Text style={styles.statLabel}>Pending</Text>
+      <ScrollView 
+        style={tw`flex-1`}
+        contentContainerStyle={tw`pb-24`}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Enhanced Stats Grid */}
+        <View style={tw`px-4 pt-6 pb-2`}>
+          <Text style={tw`text-xl font-bold text-gray-900 mb-4`}>Overview</Text>
+          <View style={tw`flex-row flex-wrap -mr-3`}>
+            <View style={tw`bg-white rounded-xl p-4 flex-1 min-w-36 shadow-sm border border-gray-100 mr-3 mb-3`}>
+              <View style={tw`flex-row items-center justify-between mb-2`}>
+                <View style={tw`bg-orange-100 p-2 rounded-lg`}>
+                  <Clock size={20} color="#EA580C" />
+                </View>
+                <Text style={tw`text-2xl font-bold text-gray-900`}>12</Text>
+              </View>
+              <Text style={tw`text-sm font-medium text-gray-600`}>Pending Requests</Text>
+              <Text style={tw`text-xs text-orange-600 mt-1`}>+3 from yesterday</Text>
+            </View>
+            
+            <View style={tw`bg-white rounded-xl p-4 flex-1 min-w-36 shadow-sm border border-gray-100 mr-3 mb-3`}>
+              <View style={tw`flex-row items-center justify-between mb-2`}>
+                <View style={[tw`p-2 rounded-lg`, { backgroundColor: '#E8F4FD' }]}>
+                  <Calendar size={20} color={Colors.primary.blue} />
+                </View>
+                <Text style={tw`text-2xl font-bold text-gray-900`}>8</Text>
+              </View>
+              <Text style={tw`text-sm font-medium text-gray-600`}>Today&apos;s Sessions</Text>
+              <Text style={[tw`text-xs mt-1`, { color: Colors.primary.blue }]}>Next at 2:00 PM</Text>
+            </View>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>8</Text>
-            <Text style={styles.statLabel}>Today</Text>
+          
+          <View style={tw`flex-row flex-wrap -mr-3 mt-3`}>
+            <View style={tw`bg-white rounded-xl p-4 flex-1 min-w-36 shadow-sm border border-gray-100 mr-3`}>
+              <View style={tw`flex-row items-center justify-between mb-2`}>
+                <View style={tw`bg-green-100 p-2 rounded-lg`}>
+                  <TrendingUp size={20} color="#16A34A" />
+                </View>
+                <Text style={tw`text-2xl font-bold text-gray-900`}>24</Text>
+              </View>
+              <Text style={tw`text-sm font-medium text-gray-600`}>Completed</Text>
+              <Text style={tw`text-xs text-green-600 mt-1`}>This month</Text>
+            </View>
+            
+            <View style={tw`bg-white rounded-xl p-4 flex-1 min-w-36 shadow-sm border border-gray-100 mr-3`}>
+              <View style={tw`flex-row items-center justify-between mb-2`}>
+                <View style={tw`bg-purple-100 p-2 rounded-lg`}>
+                  <MessageCircle size={20} color="#7C3AED" />
+                </View>
+                <Text style={tw`text-2xl font-bold text-gray-900`}>156</Text>
+              </View>
+              <Text style={tw`text-sm font-medium text-gray-600`}>Total Requests</Text>
+              <Text style={tw`text-xs text-purple-600 mt-1`}>All time</Text>
+            </View>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>₱45,000</Text>
-            <Text style={styles.statLabel}>This Month</Text>
-          </View>
-        </ScrollView>
+        </View>
 
-        {/* Filter Tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterContainer}>
-          {['all', 'pending', 'scheduled', 'completed'].map((filterOption) => (
-            <TouchableOpacity
-              key={filterOption}
-              style={[
-                styles.filterTab,
-                filter === filterOption && styles.activeFilterTab
-              ]}
-              onPress={() => setFilter(filterOption as any)}
-            >
-              <Text style={[
-                styles.filterText,
-                filter === filterOption && styles.activeFilterText
-              ]}>
-                {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {/* Enhanced Filter Tabs */}
+        <View style={tw`px-4 py-4`}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`px-1`}>
+            <View style={tw`flex-row -mr-3`}>
+              {['all', 'pending', 'accepted', 'completed'].map((filterOption) => (
+                <TouchableOpacity
+                  key={filterOption}
+                  style={[
+                    tw`px-5 py-3 rounded-full border shadow-sm mr-3`,
+                    filter === filterOption 
+                      ? [tw`border-0`, { backgroundColor: Colors.primary.blue }] 
+                      : tw`bg-white border-gray-200`
+                  ]}
+                  onPress={() => setFilter(filterOption as any)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    tw`text-sm font-semibold capitalize`,
+                    filter === filterOption 
+                      ? tw`text-white` 
+                      : tw`text-gray-700`
+                  ]}>
+                    {filterOption === 'all' ? 'All Requests' : filterOption}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
 
-        {/* Consultation Requests */}
-        <ScrollView style={styles.requestsList} showsVerticalScrollIndicator={false}>
+        {/* Enhanced Consultation Cards */}
+        <View style={tw`px-4`}>
+          <View style={tw`flex-row items-center justify-between mb-4`}>
+            <Text style={tw`text-lg font-bold text-gray-900`}>
+              {filter === 'all' ? 'All Requests' : `${filter.charAt(0).toUpperCase() + filter.slice(1)} Requests`}
+            </Text>
+            <Text style={tw`text-sm text-gray-500`}>
+              {filteredRequests.length} {filteredRequests.length === 1 ? 'request' : 'requests'}
+            </Text>
+          </View>
+          
           {filteredRequests.map((request) => {
-            const TypeIcon = getTypeIcon(request.type);
-            const urgencyStyle = getUrgencyColor(request.urgency);
+            const ModeIcon = getModeIcon(request.mode);
+            const modeStyle = getModeColor(request.mode);
             const statusStyle = getStatusColor(request.status);
             
             return (
               <TouchableOpacity
                 key={request.id}
-                style={styles.requestCard}
+                style={tw`bg-white rounded-2xl p-5 mb-4 shadow-sm border border-gray-100`}
                 onPress={() => handleRequestPress(request.id)}
-                activeOpacity={0.7}
+                activeOpacity={0.92}
               >
-                <View style={styles.requestHeader}>
-                  <View style={styles.clientInfo}>
-                    <Image source={{ uri: request.client.avatar }} style={styles.clientAvatar} />
-                    <View style={styles.clientDetails}>
-                      <View style={styles.clientNameRow}>
-                        <Text style={styles.clientName}>{request.client.name}</Text>
-                        {request.client.rating && (
-                          <View style={styles.ratingContainer}>
-                            <Star size={12} color="#F59E0B" fill="#F59E0B" />
-                            <Text style={styles.rating}>{request.client.rating}</Text>
-                          </View>
-                        )}
+                {/* Enhanced Header */}
+                <View style={tw`flex-row items-start justify-between mb-4`}>
+                  <View style={tw`flex-row items-center flex-1 mr-3`}>
+                    <View style={tw`relative`}>
+                      <Image 
+                        source={{ uri: request.client.avatar }} 
+                        style={tw`w-12 h-12 rounded-full`}
+                      />
+                      {request.status === 'pending' && (
+                        <View style={tw`absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white`} />
+                      )}
+                    </View>
+                    
+                    <View style={tw`ml-3 flex-1`}>
+                      <View style={tw`flex-row items-center mb-1`}>
+                        <Text style={tw`text-base font-semibold text-gray-900 mr-2`}>
+                          {request.client.name}
+                        </Text>
                       </View>
-                      <Text style={styles.category}>{request.category}</Text>
+                      <Text style={tw`text-sm text-gray-600 font-medium`}>Consultation Request</Text>
                     </View>
                   </View>
                   
-                  <View style={styles.requestMeta}>
-                    <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-                      <Text style={[styles.statusText, { color: statusStyle.text }]}>
-                        {request.status.toUpperCase()}
+                  <View style={tw`items-end`}>
+                    <View style={[
+                      tw`px-3 py-1 rounded-full`,
+                      { backgroundColor: statusStyle.bg }
+                    ]}>
+                      <Text style={[
+                        tw`text-xs font-semibold uppercase`,
+                        { color: statusStyle.text }
+                      ]}>
+                        {request.status}
                       </Text>
                     </View>
                   </View>
                 </View>
 
-                <Text style={styles.preview} numberOfLines={2}>{request.description}</Text>
+                {/* Message */}
+                <Text style={tw`text-sm text-gray-700 leading-5 mb-4`} numberOfLines={2}>
+                  {request.message}
+                </Text>
 
-                <View style={styles.requestFooter}>
-                  <View style={styles.requestInfo}>
-                    <View style={styles.typeContainer}>
-                      <TypeIcon size={14} color="#6B7280" />
-                      <Text style={styles.typeText}>{request.type.toUpperCase()}</Text>
-                    </View>
-                    <View style={[styles.urgencyBadge, {
-                      backgroundColor: urgencyStyle.bg,
-                      borderColor: urgencyStyle.border,
-                    }]}>
-                      <Text style={[styles.urgencyText, { color: urgencyStyle.text }]}>
-                        {request.urgency.toUpperCase()}
+                {/* Enhanced Footer */}
+                <View style={tw`flex-row items-center justify-between mb-3`}>
+                  <View style={tw`flex-row items-center flex-wrap`}>
+                    {/* Consultation Mode */}
+                    <View style={[
+                      tw`flex-row items-center px-3 py-1 rounded-full border`,
+                      {
+                        backgroundColor: modeStyle.bg,
+                        borderColor: modeStyle.border,
+                      }
+                    ]}>
+                      <ModeIcon size={12} color={modeStyle.text} />
+                      <Text style={[
+                        tw`text-xs font-medium ml-1 capitalize`,
+                        { color: modeStyle.text }
+                      ]}>
+                        {request.mode}
                       </Text>
                     </View>
                   </View>
                   
-                  <View style={styles.timeAndFee}>
-                    <View style={styles.timeInfo}>
+                  {/* Time and Duration */}
+                  <View style={tw`items-end flex-shrink-0`}>
+                    <View style={tw`flex-row items-center mb-1`}>
                       <Clock size={12} color="#6B7280" />
-                      <Text style={styles.timeText}>
-                        {request.scheduledTime || request.requestTime}
+                      <Text style={tw`text-gray-500 text-xs ml-1`}>
+                        {request.requested_at}
                       </Text>
                     </View>
-                    <Text style={styles.fee}>{request.estimatedDuration}</Text>
+                    <Text style={[tw`text-xs font-semibold`, { color: Colors.primary.blue }]}>
+                      Requested
+                    </Text>
                   </View>
                 </View>
 
+                {/* Preferred Date and Time */}
+                {(request.consultation_date || request.consultation_time) && (
+                  <View style={tw`bg-gray-50 rounded-lg p-3 mb-3`}>
+                    <Text style={tw`text-xs font-semibold text-gray-600 mb-2`}>Client&apos;s Preferred Schedule:</Text>
+                    <View style={tw`flex-row items-center justify-between`}>
+                      {request.consultation_date && (
+                        <View style={tw`flex-row items-center`}>
+                          <Calendar size={14} color="#6B7280" />
+                          <Text style={tw`text-sm text-gray-700 ml-2 font-medium`}>
+                            {new Date(request.consultation_date).toLocaleDateString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </Text>
+                        </View>
+                      )}
+                      {request.consultation_time && (
+                        <View style={tw`flex-row items-center`}>
+                          <Clock size={14} color="#6B7280" />
+                          <Text style={tw`text-sm text-gray-700 ml-2 font-medium`}>
+                            {new Date(`2000-01-01T${request.consultation_time}`).toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                )}
+
+                {/* Action Buttons */}
                 {request.status === 'pending' && (
                   <TouchableOpacity
-                    style={styles.acceptButton}
+                    style={[tw`py-3 rounded-xl mt-2 shadow-sm`, { backgroundColor: Colors.primary.blue }]}
                     onPress={() => handleAcceptRequest(request.id)}
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                   >
-                    <Text style={styles.acceptButtonText}>Accept Consultation</Text>
+                    <Text style={tw`text-white text-center font-semibold text-sm`}>
+                      Accept Consultation
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                
+                {request.status === 'accepted' && (
+                  <TouchableOpacity 
+                    style={tw`bg-green-600 py-3 rounded-xl mt-2 shadow-sm`}
+                    onPress={() => console.log('Mark session completed', request.id)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={tw`text-white text-center font-semibold text-sm`}>Mark Session Completed</Text>
                   </TouchableOpacity>
                 )}
               </TouchableOpacity>
             );
           })}
-          <View style={styles.bottomSpacer} />
-        </ScrollView>
-      </View>
+        </View>
+      </ScrollView>
 
       <LawyerNavbar activeTab="consult" />
-      </SafeAreaView>
+    </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  content: {
-    flex: 1,
-    paddingTop: 16,
-  },
-  statsContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  statCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    marginRight: 12,
-    minWidth: 100,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.primary.blue,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  filterContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  filterTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  activeFilterTab: {
-    backgroundColor: Colors.primary.blue,
-    borderColor: Colors.primary.blue,
-  },
-  filterText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  activeFilterText: {
-    color: '#FFFFFF',
-  },
-  requestsList: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  requestCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  requestHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  clientInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  clientAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  clientDetails: {
-    flex: 1,
-  },
-  clientNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  clientName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginRight: 8,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rating: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#F59E0B',
-    marginLeft: 2,
-  },
-  category: {
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  requestMeta: {
-    alignItems: 'flex-end',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  preview: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#4B5563',
-    marginBottom: 12,
-  },
-  requestFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  requestInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  typeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  typeText: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#6B7280',
-    marginLeft: 4,
-  },
-  urgencyBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-  },
-  urgencyText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  timeAndFee: {
-    alignItems: 'flex-end',
-  },
-  timeInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  timeText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginLeft: 4,
-  },
-  fee: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primary.blue,
-  },
-  acceptButton: {
-    backgroundColor: Colors.primary.blue,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  acceptButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  bottomSpacer: {
-    height: 80,
-  },
-});
 
 export default LawyerConsultPage;

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, MoreHorizontal, User, Send, Shield, MessageCircle } from 'lucide-react-native';
+import { User, Send, Shield, MessageCircle } from 'lucide-react-native';
 import tw from 'tailwind-react-native-classnames';
-import { Box } from '../../components/ui/box';
-import PostActionsMenu from '../../components/home/PostActionsMenu';
-import Comments from '../../components/home/Comments';
+import Colors from '../../constants/Colors';
+import Header from '../Header';
 
 interface Reply {
   id: string;
@@ -56,6 +55,8 @@ const LawyerViewPost: React.FC = () => {
   const router = useRouter();
   const { postId } = useLocalSearchParams();
   const [isReplying, setIsReplying] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [showFullContent, setShowFullContent] = useState(false);
 
   // Helper function to format timestamp
   const formatTimestamp = (timestamp: string | null): string => {
@@ -100,157 +101,75 @@ const LawyerViewPost: React.FC = () => {
         is_flagged: false,
         user: {
           name: 'Atty. Maria Santos',
-          username: 'attymaria',
+          username: 'atty_maria',
           avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
           isLawyer: true,
-          lawyerBadge: 'Verified Lawyer',
-        },
+          lawyerBadge: 'Criminal Law Specialist'
+        }
       },
       {
         id: '2',
-        body: 'Thank you Atty. Santos! This is very helpful information.',
-        created_at: '2024-01-15T10:15:00Z',
+        body: 'Agree with Atty. Santos. Also, for arson charges - they need to prove you actually set fire to property with intent. Being present during a rally where fires occurred is not enough. Keep all evidence of your actual activities during the protest.',
+        created_at: '2024-01-15T11:30:00Z',
         updated_at: null,
-        user_id: 'user_002',
+        user_id: 'lawyer_002',
         is_anonymous: false,
         is_flagged: false,
         user: {
-          name: 'Juan Dela Cruz',
-          username: 'juan.dc',
-          avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
-          isLawyer: false,
-        },
-      },
-    ],
+          name: 'Atty. John Cruz',
+          username: 'atty_john',
+          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+          isLawyer: true,
+          lawyerBadge: 'Public Interest Lawyer'
+        }
+      }
+    ]
   };
 
-  const [menuOpen, setMenuOpen] = useState<boolean>(false);
-  const [bookmarked, setBookmarked] = useState<boolean>(false);
-  const [replies, setReplies] = useState<Reply[]>(post.replies);
-  const [replyText, setReplyText] = useState<string>('');
-  const [showFullContent, setShowFullContent] = useState<boolean>(false);
+  // Derived data
+  const isAnonymous = post.is_anonymous || false;
+  const displayUser = isAnonymous ? { name: 'Anonymous User', avatar: '', isLawyer: false } : (post.user || { name: 'Unknown User', avatar: '', isLawyer: false });
+  const displayTimestamp = formatTimestamp(post.created_at);
+  const displayContent = post.body || '';
+  const replies = post.replies || [];
 
-  const handleBackPress = () => {
-    router.back();
+  // Category colors mapping
+  const categoryColors = {
+    family: { bg: '#FEF2F2', text: '#BE123C', border: '#FECACA' },
+    criminal: { bg: '#FFF7ED', text: '#EA580C', border: '#FED7AA' },
+    civil: { bg: '#F5F3FF', text: '#7C3AED', border: '#DDD6FE' },
+    labor: { bg: '#EFF6FF', text: '#1D4ED8', border: '#BFDBFE' },
+    consumer: { bg: '#ECFDF5', text: '#047857', border: '#A7F3D0' },
+    others: { bg: '#F9FAFB', text: '#374151', border: '#E5E7EB' }
   };
-
-  const handleMorePress = () => {
-    setMenuOpen((prev: boolean) => !prev);
-  };
-
-  // Use new schema or fallback to legacy props
-  const displayUser = post.user || {
-    name: post.is_anonymous ? 'Anonymous User' : 'Unknown User',
-    username: post.is_anonymous ? 'anonymous' : 'unknown',
-    avatar: '',
-    isLawyer: false
-  };
-  const displayTimestamp = post.timestamp || formatTimestamp(post.created_at);
-  const displayCategory = post.category || post.domain || 'others';
-  const displayContent = post.content || post.body;
-
-  // Clean category text similar to card and compute colors/label
-  const cleanCategory = displayCategory.replace(' Related Post', '').replace(' Law', '').toUpperCase();
-
-  const getCategoryColors = (category: string) => {
-    switch ((category || '').toLowerCase()) {
-      case 'family':
-        return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', textColor: '#BE123C' };
-      case 'work':
-        return { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', textColor: '#1D4ED8' };
-      case 'civil':
-        return { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE', textColor: '#7C3AED' };
-      case 'criminal':
-        return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', textColor: '#DC2626' };
-      case 'labor':
-        return { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', textColor: '#1D4ED8' };
-      case 'consumer':
-        return { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', textColor: '#047857' };
-      default:
-        return { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', textColor: '#374151' };
-    }
-  };
-
-  const getDisplayText = (category: string) => {
-    const lowerCategory = category.toLowerCase();
-    if (lowerCategory === 'labor') return 'WORK';
-    if (['family', 'work', 'civil', 'criminal', 'consumer'].includes(lowerCategory)) {
-      return category.toUpperCase();
-    }
-    return 'OTHERS';
-  };
-
-  const categoryColors = getCategoryColors(cleanCategory);
-  const displayText = getDisplayText(cleanCategory);
-
-  const isAnonymous = post.is_anonymous || (displayUser.username || '').toLowerCase() === 'anonymous' || (displayUser.name || '').toLowerCase().includes('anonymous');
 
   const handleTextChange = (text: string) => {
-    if (text.length <= 500) {
-      setReplyText(text);
-    }
+    setReplyText(text);
   };
 
   const handleSendReply = () => {
-    const text = (replyText || '').trim();
-    if (!text) return;
-    
-    setIsReplying(true);
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      const newReply: Reply = {
-        id: String(Date.now()),
-        body: text,
-        created_at: new Date().toISOString(),
-        updated_at: null,
-        user_id: 'lawyer_current',
-        is_anonymous: false,
-        is_flagged: false,
-        user: {
-          name: 'Atty. Maria Santos',
-          username: 'attymaria',
-          avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-          isLawyer: true,
-          lawyerBadge: 'Verified Lawyer',
-        },
-      };
-      setReplies((prev) => [newReply, ...prev]);
-      setReplyText('');
-      setIsReplying(false);
-    }, 800);
+    if (replyText.trim()) {
+      console.log('Sending reply:', replyText);
+      setIsReplying(true);
+      
+      setTimeout(() => {
+        setReplyText('');
+        setIsReplying(false);
+      }, 800);
+    }
   };
+
 
   const contentPreview = displayContent.length > 280 ? displayContent.substring(0, 280) + '...' : displayContent;
   const shouldShowReadMore = displayContent.length > 280;
 
   return (
     <SafeAreaView style={tw`flex-1 bg-white`}>
-      {/* Enhanced Header */}
-      <View style={tw`flex-row items-center justify-between px-4 py-3 bg-white border-b border-gray-100 shadow-sm`}>
-        <TouchableOpacity 
-          style={tw`p-2 rounded-full`} 
-          onPress={handleBackPress}
-          activeOpacity={0.7}
-        >
-          <ArrowLeft size={20} color="#374151" />
-        </TouchableOpacity>
-        <View style={tw`flex-1 items-center`}>
-          <Text style={tw`text-lg font-bold text-gray-900`}>
-            Legal Discussion
-          </Text>
-          <Text style={tw`text-xs text-gray-500 mt-0.5`}>
-            {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
-          </Text>
-        </View>
-        <TouchableOpacity 
-          style={tw`p-2 rounded-full`} 
-          onPress={handleMorePress}
-          activeOpacity={0.7}
-        >
-          <MoreHorizontal size={20} color="#374151" />
-        </TouchableOpacity>
-      </View>
+      <Header 
+        title="Post"
+        showBackButton={true}
+        onBackPress={() => router.back()}
+      />
 
       <ScrollView 
         style={tw`flex-1`}
@@ -286,136 +205,110 @@ const LawyerViewPost: React.FC = () => {
                     </View>
                   )}
                 </View>
-                <View style={[tw`px-3 py-1 rounded-full border`, {
-                  backgroundColor: categoryColors.backgroundColor,
-                  borderColor: categoryColors.borderColor,
-                }]}>
-                  <Text style={[tw`text-xs font-bold`, { color: categoryColors.textColor }]}>
-                    {displayText}
-                  </Text>
-                </View>
-              </View>
-              <View style={tw`flex-row items-center`}>
-                {!isAnonymous && (
-                  <Text style={tw`text-sm text-gray-500 mr-1`}>
-                    @{displayUser.username}
-                  </Text>
+                
+                {post.domain && (
+                  <View style={[
+                    tw`px-3 py-1 rounded-full border`,
+                    { backgroundColor: categoryColors[post.domain]?.bg || categoryColors.others.bg,
+                      borderColor: categoryColors[post.domain]?.border || categoryColors.others.border }
+                  ]}>
+                    <Text style={[tw`text-xs font-semibold`, { color: categoryColors[post.domain]?.text || categoryColors.others.text }]}>
+                      {post.domain?.charAt(0).toUpperCase() + post.domain?.slice(1)}
+                    </Text>
+                  </View>
                 )}
-                <Text style={tw`text-sm text-gray-500`}>
-                  {!isAnonymous ? '• ' : ''}{displayTimestamp}
-                </Text>
               </View>
-            </View>
-          </View>
-
-          {/* Post Content */}
-          <View style={tw`mb-4`}>
-            <Text style={tw`text-base leading-6 text-gray-900 mb-2`}>
-              {showFullContent ? displayContent : contentPreview}
-            </Text>
-            {shouldShowReadMore && (
-              <TouchableOpacity 
-                onPress={() => setShowFullContent(!showFullContent)}
-                style={tw`mt-2`}
-                activeOpacity={0.7}
-              >
-                <Text style={tw`text-blue-600 font-medium text-sm`}>
-                  {showFullContent ? 'Show less' : 'Read more'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Simplified Engagement Bar */}
-          <View style={tw`flex-row items-center pt-4 border-t border-gray-100`}>
-            <View style={tw`flex-row items-center`}>
-              <MessageCircle size={18} color="#6B7280" />
-              <Text style={tw`ml-2 text-sm text-gray-600 font-medium`}>
-                {replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}
+              
+              <Text style={tw`text-sm text-gray-500`}>
+                {!isAnonymous ? `@${displayUser.name?.toLowerCase().replace(/\s+/g, '')}` : 'Anonymous'} • {displayTimestamp}
               </Text>
             </View>
           </View>
-        </View>
-        
-        <Comments replies={replies.map(reply => ({
-          id: reply.id,
-          user: {
-            name: reply.user?.name || (reply.is_anonymous ? 'Anonymous' : 'Unknown'),
-            username: reply.user?.username || 'unknown',
-            avatar: reply.user?.avatar || ''
-          },
-          timestamp: reply.timestamp || formatTimestamp(reply.created_at),
-          content: reply.content || reply.body
-        }))} />
-      </ScrollView>
 
-      {/* Enhanced Reply Composer */}
-      <View style={tw`absolute left-0 right-0 bottom-0 bg-white border-t border-gray-200 shadow-lg`}>
-        {/* Lawyer Status Bar */}
-        <View style={tw`flex-row items-center justify-between bg-emerald-50 px-4 py-2 border-b border-emerald-100`}>
-          <View style={tw`flex-row items-center`}>
-            <Shield size={12} color="#059669" fill="#059669" />
-            <Text style={tw`ml-2 text-xs font-medium text-emerald-700`}>
-              Responding as Verified Lawyer
+
+          {/* Post Content */}
+          <Text style={tw`text-gray-800 text-base leading-6 mb-4`}>
+            {showFullContent ? displayContent : contentPreview}
+          </Text>
+          
+          {shouldShowReadMore && (
+            <TouchableOpacity onPress={() => setShowFullContent(!showFullContent)}>
+              <Text style={[tw`font-medium mb-4`, { color: Colors.primary.blue }]}>
+                {showFullContent ? 'Show less' : 'Read more'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Comments Section */}
+        <View style={tw`bg-white px-5 py-4`}>
+          <View style={tw`flex-row items-center mb-4`}>
+            <MessageCircle size={20} color="#6B7280" />
+            <Text style={tw`text-gray-700 font-semibold ml-2`}>
+              {replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}
             </Text>
           </View>
+
+          {/* Replies List */}
+          {replies.map((reply) => (
+            <View key={reply.id} style={tw`mb-4 pb-4 border-b border-gray-100`}>
+              <View style={tw`flex-row items-start`}>
+                <Image 
+                  source={{ uri: reply.user?.avatar || '' }} 
+                  style={tw`w-10 h-10 rounded-full mr-3`}
+                />
+                <View style={tw`flex-1`}>
+                  <View style={tw`flex-row items-center mb-1`}>
+                    <Text style={tw`font-semibold text-gray-900 mr-2`}>
+                      {reply.user?.name || 'Anonymous'}
+                    </Text>
+                    {reply.user?.isLawyer && (
+                      <View style={tw`flex-row items-center bg-emerald-50 px-2 py-1 rounded border border-emerald-200`}>
+                        <Shield size={8} color="#059669" fill="#059669" />
+                        <Text style={tw`text-xs font-semibold text-emerald-700 ml-1`}>
+                          Verified
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={tw`text-sm text-gray-500 ml-2`}>
+                      {formatTimestamp(reply.created_at)}
+                    </Text>
+                  </View>
+                  <Text style={tw`text-gray-800 leading-5`}>
+                    {reply.body}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ))}
         </View>
-        
-        {/* Input Area */}
-        <Box className="p-4">
-          <View style={tw`flex-row items-center bg-gray-50 border border-gray-300 rounded-3xl px-4 py-2`}>
-            <TextInput
-              style={[
-                tw`flex-1 text-gray-900`,
-                { 
-                  fontSize: 14,
-                  lineHeight: 18,
-                  minHeight: 20,
-                  maxHeight: 100,
-                  paddingVertical: 8,
-                  paddingRight: 8,
-                  textAlignVertical: 'top'
-                }
-              ]}
-              placeholder="Share helpful tips and general guidance..."
-              placeholderTextColor="#9CA3AF"
-              value={replyText}
-              onChangeText={handleTextChange}
-              multiline
-              scrollEnabled={true}
-            />
-            <TouchableOpacity
-              onPress={handleSendReply}
-              disabled={!replyText?.trim() || isReplying}
-              style={[
-                tw`ml-2 rounded-full`,
-                {
-                  width: 32,
-                  height: 32,
-                  backgroundColor: replyText?.trim() && !isReplying ? '#1D4ED8' : '#D1D5DB',
-                  justifyContent: 'center',
-                  alignItems: 'center'
-                }
-              ]}
-            >
-              <Send 
-                size={14} 
-                color="white" 
-              />
-            </TouchableOpacity>
-          </View>
-        </Box>
+      </ScrollView>
+
+      {/* Reply Input */}
+      <View style={tw`absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3`}>
+        <View style={tw`flex-row items-center`}>
+          <TextInput
+            style={tw`flex-1 border border-gray-300 rounded-full px-4 py-2 mr-3 text-base`}
+            placeholder="Write a reply..."
+            value={replyText}
+            onChangeText={handleTextChange}
+            multiline={false}
+          />
+          <TouchableOpacity
+            onPress={handleSendReply}
+            disabled={!replyText.trim() || isReplying}
+            style={[
+              tw`w-10 h-10 rounded-full items-center justify-center`,
+              {
+                backgroundColor: replyText.trim() && !isReplying ? Colors.primary.blue : '#D1D5DB'
+              }
+            ]}
+          >
+            <Send size={18} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <PostActionsMenu
-        open={menuOpen}
-        onRequestClose={() => setMenuOpen(false)}
-        bookmarked={bookmarked}
-        onToggleBookmark={() => setBookmarked((prev: boolean) => !prev)}
-        onReport={() => console.log('Report post')}
-        position={{ top: 60, right: 16 }}
-        minWidth={220}
-      />
     </SafeAreaView>
   );
 };

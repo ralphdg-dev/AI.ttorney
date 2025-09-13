@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image } from "react-native";
-import tw from "tailwind-react-native-classnames";
+import tw from 'tailwind-react-native-classnames';
+import Colors from '../../constants/Colors';
 import { Ionicons } from "@expo/vector-icons";
-import Colors from "../../constants/Colors";
 import Header from "../../components/Header";
 import LawyerNavbar from "../../components/lawyer/LawyerNavbar";
 
@@ -209,7 +209,7 @@ export default function LawyerChatbotScreen() {
 
             <TouchableOpacity
               onPress={sendMessage}
-              style={tw`p-2 bg-blue-900 rounded-full`}
+              style={[tw`p-2 rounded-full`, { backgroundColor: Colors.primary.blue }]}
             >
               <Ionicons name="send" size={20} color="#fff" />
             </TouchableOpacity>
