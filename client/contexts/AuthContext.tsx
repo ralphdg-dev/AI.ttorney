@@ -38,6 +38,8 @@ export interface AuthContextType {
   isLawyer: () => boolean;
   isAdmin: () => boolean;
   checkLawyerApplicationStatus: () => Promise<any>;
+  hasRedirectedToStatus: boolean;
+  setHasRedirectedToStatus: (value: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -50,6 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabaseUser: null,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [hasRedirectedToStatus, setHasRedirectedToStatus] = useState(false);
 
   useEffect(() => {
     // Initialize auth state and listen for auth changes
@@ -73,9 +76,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           async (event, session) => {
             console.log('Auth state changed:', event, session?.user?.email);
             
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            if (event === 'SIGNED_IN') {
               if (session) {
-                await handleAuthStateChange(session);
+                // Only navigate on explicit sign in, not token refresh
+                await handleAuthStateChange(session, true);
+              }
+            } else if (event === 'TOKEN_REFRESHED') {
+              if (session) {
+                // Don't navigate on token refresh, just update auth state
+                await handleAuthStateChange(session, false);
               }
             } else if (event === 'SIGNED_OUT') {
               setAuthState({
@@ -126,8 +135,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         supabaseUser: session.user,
       });
 
-      // Handle navigation after login if requested
+      // Only handle navigation on explicit login attempts
       if (shouldNavigate && profile) {
+        // Always set the redirect flag to prevent future redirects
+        setHasRedirectedToStatus(true);
+        
         let applicationStatus = null;
         
         // Check lawyer application status if user has pending_lawyer flag
@@ -136,15 +148,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (statusData && statusData.has_application && statusData.application) {
             applicationStatus = statusData.application.status;
           }
-        }
-        
-        const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, profile.pending_lawyer, applicationStatus || undefined);
-        
-        // Handle different redirect scenarios
-        if (redirectPath === 'loading') {
-          // Show loading screen while fetching status
-          router.push('/loading-status' as any);
-        } else if (redirectPath) {
+          
+          const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, profile.pending_lawyer, applicationStatus || undefined);
+          
+          // Handle different redirect scenarios
+          if (redirectPath === 'loading') {
+            // Show loading screen while fetching status
+            router.push('/loading-status' as any);
+          } else if (redirectPath && redirectPath.includes('/lawyer-status/')) {
+            router.push(redirectPath as any);
+          } else if (redirectPath) {
+            router.push(redirectPath as any);
+          }
+        } else {
+          // User doesn't have pending lawyer status, redirect normally
+          const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
           router.push(redirectPath as any);
         }
       }
@@ -156,6 +174,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true);
+      // Reset redirect flag on new login
+      setHasRedirectedToStatus(false);
       
       // Use Supabase Auth for sign in
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -183,6 +203,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
+      // Reset redirect flag on sign out
+      setHasRedirectedToStatus(false);
+      
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Sign out error:', error);
@@ -273,6 +296,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLawyer,
     isAdmin,
     checkLawyerApplicationStatus,
+    hasRedirectedToStatus,
+    setHasRedirectedToStatus,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

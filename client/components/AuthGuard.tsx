@@ -14,7 +14,7 @@ interface AuthGuardProps {
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
-  const { user, session, isLoading, isAuthenticated } = useAuth();
+  const { user, session, isLoading, isAuthenticated, hasRedirectedToStatus } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
@@ -30,43 +30,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
 
     // Handle authenticated users
     if (isAuthenticated && user) {
-      // PRIORITY: Check for pending lawyer applications first - but only redirect on initial login
-      // Allow users to navigate away from status screens to use the app
-      const isStatusScreen = currentPath.startsWith('/onboarding/lawyer/lawyer-status/');
-      const isHomePage = currentPath === '/home';
-      
-      if (user.pending_lawyer && !isStatusScreen && !isHomePage && currentPath !== '/role-selection') {
-        console.log('User has pending_lawyer flag, fetching actual application status...');
-        
-        // Fetch actual application status from API
-        fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/lawyer-applications/me`, {
-          headers: {
-            'Authorization': `Bearer ${session?.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-        .then(response => response.json())
-        .then(data => {
-          if (data && data.has_application && data.application) {
-            const actualStatus = data.application.status;
-            const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer, actualStatus);
-            console.log(`Redirecting to ${actualStatus} status screen: ${redirectPath}`);
-            router.replace(redirectPath as any);
-          } else {
-            // No application found, default to pending
-            const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer, 'pending');
-            router.replace(redirectPath as any);
-          }
-        })
-        .catch(error => {
-          console.error('Error fetching application status:', error);
-          // Fallback to pending on error
-          const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer, 'pending');
-          router.replace(redirectPath as any);
-        });
-        
-        return;
-      }
+      // Skip pending lawyer redirect logic - this is now handled in AuthContext during login only
+      // AuthGuard should not redirect users with pending_lawyer status during navigation
 
       // Check if authenticated user is trying to access auth/onboarding routes
       // Exceptions: 
@@ -76,7 +41,12 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       const isRoleSelectionRoute = currentPath === '/role-selection';
       
       if (routeConfig.redirectTo === 'role-based' && (routeConfig.isPublic || routeConfig.allowedRoles?.includes('guest')) && !isLawyerOnboardingRoute && !isRoleSelectionRoute) {
-        const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
+        // Don't redirect users with pending_lawyer status - let them access any route
+        if (user.pending_lawyer) {
+          return; // Allow access to current route
+        }
+        
+        const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, false);
         console.log(`Authenticated user accessing auth/onboarding route ${currentPath}, redirecting to ${redirectPath}`);
         logRouteAccess(currentPath, user, 'denied', 'Already authenticated');
         router.replace(redirectPath as any);
@@ -85,7 +55,12 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
 
       // Check route permissions using restored route config
       if (!hasRoutePermission(routeConfig, user.role)) {
-        const redirectPath = routeConfig.fallbackRoute || getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
+        // Don't redirect users with pending_lawyer status - let them access any route
+        if (user.pending_lawyer) {
+          return; // Allow access to current route
+        }
+        
+        const redirectPath = routeConfig.fallbackRoute || getRoleBasedRedirect(user.role, user.is_verified, false);
         console.log(`User lacks permission for ${currentPath}, redirecting to ${redirectPath}`);
         logRouteAccess(currentPath, user, 'denied', 'Insufficient permissions');
         
