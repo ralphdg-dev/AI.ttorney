@@ -363,13 +363,16 @@ const LawyerViewPost: React.FC = () => {
         
         {/* Input Area */}
         <Box className="p-4">
-          <View style={tw`flex-row items-center bg-gray-50 border border-gray-300 rounded-lg px-3 py-2`}>
+          <View style={tw`flex-row items-center bg-gray-50 border border-gray-300 rounded-3xl px-4 py-2`}>
             <TextInput
               style={[
-                tw`flex-1 text-base text-gray-900`,
+                tw`flex-1 text-gray-900`,
                 { 
-                  minHeight: 32,
-                  maxHeight: 76,
+                  fontSize: 14,
+                  lineHeight: 18,
+                  minHeight: 20,
+                  maxHeight: 100,
+                  paddingVertical: 8,
                   paddingRight: 8,
                   textAlignVertical: 'top'
                 }
@@ -379,6 +382,7 @@ const LawyerViewPost: React.FC = () => {
               value={replyText}
               onChangeText={handleTextChange}
               multiline
+              scrollEnabled={true}
             />
             <TouchableOpacity
               onPress={handleSendReply}
@@ -390,7 +394,7 @@ const LawyerViewPost: React.FC = () => {
                   height: 32,
                   backgroundColor: replyText?.trim() && !isReplying ? '#1D4ED8' : '#D1D5DB',
                   justifyContent: 'center',
-                  alignItems: 'center',
+                  alignItems: 'center'
                 }
               ]}
             >
