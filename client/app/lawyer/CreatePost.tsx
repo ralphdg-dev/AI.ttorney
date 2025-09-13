@@ -164,53 +164,51 @@ const LawyerCreatePost: React.FC = () => {
           </View>
 
           {/* Category Selection */}
-          <View style={tw`bg-white rounded-2xl p-4 mb-4 shadow-sm`}>
-            <Text style={tw`text-gray-900 font-semibold text-base mb-3`}>Category</Text>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={tw`px-1`}
-            >
-              {LEGAL_CATEGORIES.map((category) => {
-                const Icon = category.icon;
-                return (
-                  <TouchableOpacity
-                    key={category.id}
-                    onPress={() => setSelectedCategory(category.id)}
+          <Text style={tw`text-gray-900 font-semibold text-base mb-3 px-1`}>Category</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={tw`px-1 mb-4`}
+          >
+            {LEGAL_CATEGORIES.map((category) => {
+              const Icon = category.icon;
+              return (
+                <TouchableOpacity
+                  key={category.id}
+                  onPress={() => setSelectedCategory(category.id)}
+                  style={[
+                    tw`items-center justify-center w-20 h-20 rounded-2xl border-2 mr-4`,
+                    {
+                      backgroundColor: selectedCategory === category.id ? category.bgColor : '#FFFFFF',
+                      borderColor: selectedCategory === category.id ? category.color : '#E5E7EB',
+                    }
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  <Icon 
+                    size={28} 
+                    color={selectedCategory === category.id ? category.color : '#9CA3AF'} 
+                    strokeWidth={2} 
+                  />
+                  <Text 
                     style={[
-                      tw`items-center justify-center w-20 h-20 rounded-2xl border-2 mr-4`,
-                      {
-                        backgroundColor: selectedCategory === category.id ? category.bgColor : '#FFFFFF',
-                        borderColor: selectedCategory === category.id ? category.color : '#E5E7EB',
-                      }
+                      tw`font-medium text-xs text-center mt-1`,
+                      { color: selectedCategory === category.id ? category.color : '#6B7280' }
                     ]}
-                    activeOpacity={0.7}
                   >
-                    <Icon 
-                      size={28} 
-                      color={selectedCategory === category.id ? category.color : '#9CA3AF'} 
-                      strokeWidth={2} 
-                    />
-                    <Text 
-                      style={[
-                        tw`font-medium text-xs text-center mt-1`,
-                        { color: selectedCategory === category.id ? category.color : '#6B7280' }
-                      ]}
-                    >
-                      {category.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
+                    {category.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
 
-          {/* Content Input */}
+          {/* Content Input Card */}
           <View style={tw`bg-white rounded-2xl p-4 mb-4 shadow-sm`}>
             <Text style={tw`text-gray-900 font-semibold text-base mb-3`}>Share Your Legal Insight</Text>
             <TextInput
               style={[
-                tw`text-gray-900 text-base leading-6`,
+                tw`text-gray-900 text-base leading-6 border border-gray-200 rounded-lg p-3`,
                 { minHeight: 120, textAlignVertical: 'top' }
               ]}
               placeholder="Help others understand the law better."
