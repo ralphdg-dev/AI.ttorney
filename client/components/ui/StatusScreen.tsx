@@ -12,21 +12,42 @@ export type StatusScreenProps = {
   description: string;
   buttonLabel: string;
   onPress: () => void; // keep router wiring out for now
+  onBack?: () => void; // optional back button handler
+  imageAlt?: string; // accessibility alt text for image
 };
 
-export default function StatusScreen({ image, title, description, buttonLabel, onPress }: StatusScreenProps) {
+export default function StatusScreen({ image, title, description, buttonLabel, onPress, onBack, imageAlt }: StatusScreenProps) {
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      // Default back behavior - use router
+      const { router } = require('expo-router');
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.push('/home');
+      }
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
       {/* Header with BackButton */}
       <Box className="flex-row items-center px-6 pt-12 pb-4">
-        <BackButton onPress={onPress} />
+        <BackButton onPress={handleBack} />
       </Box>
 
       {/* Centered content */}
       <Box className="flex-1 items-center justify-center px-6 -mt-44">
-        <Image source={image} className="w-[180px] h-[180px] mb-5" resizeMode="contain" />
+        <Image 
+          source={image} 
+          className="w-[180px] h-[180px] mb-5" 
+          resizeMode="contain"
+          alt={imageAlt || title}
+        />
         <Text className="text-[22px] font-bold text-gray-900 text-center mb-2">{title}</Text>
         <Text className="text-[15px] text-gray-500 text-center">{description}</Text>
       </Box>

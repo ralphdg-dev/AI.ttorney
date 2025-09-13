@@ -44,6 +44,11 @@ interface SubmitApplicationResponse {
 }
 
 class LawyerApplicationService {
+  private statusCache: { data: LawyerApplicationStatus | null; timestamp: number } | null = null;
+  private readonly CACHE_DURATION = 300000; // 5 minutes
+  private readonly REQUEST_TIMEOUT = 5000; // 5 seconds
+  private pendingRequests = new Map<string, Promise<any>>();
+
   private async getAuthToken(): Promise<string | null> {
     try {
       const token = await AsyncStorage.getItem('access_token');
@@ -57,6 +62,10 @@ class LawyerApplicationService {
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const token = await this.getAuthToken();
     
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT);
+    
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
@@ -69,10 +78,19 @@ class LawyerApplicationService {
       headers['Content-Type'] = 'application/json';
     }
 
-    return fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
   }
 
   async uploadIbpIdCard(file: { uri: string; name: string; type?: string } | File): Promise<FileUploadResponse> {
@@ -307,6 +325,55 @@ class LawyerApplicationService {
   }
 
   async getApplicationStatus(): Promise<LawyerApplicationStatus | null> {
+    const cacheKey = 'lawyer-application-status';
+    
+    // Check memory cache first
+    if (this.statusCache && (Date.now() - this.statusCache.timestamp) < this.CACHE_DURATION) {
+      return this.statusCache.data;
+    }
+
+    // Check persistent cache
+    try {
+      const cachedData = await AsyncStorage.getItem(cacheKey);
+      if (cachedData) {
+        const parsed = JSON.parse(cachedData);
+        if ((Date.now() - parsed.timestamp) < this.CACHE_DURATION) {
+          this.statusCache = parsed;
+          return parsed.data;
+        }
+      }
+    } catch (error) {
+      console.error('Cache read error:', error);
+    }
+
+    // Deduplicate requests
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const requestPromise = this.fetchApplicationStatus();
+    this.pendingRequests.set(cacheKey, requestPromise);
+
+    try {
+      const data = await requestPromise;
+      
+      // Cache in memory and storage
+      const cacheData = { data, timestamp: Date.now() };
+      this.statusCache = cacheData;
+      
+      try {
+        await AsyncStorage.setItem(cacheKey, JSON.stringify(cacheData));
+      } catch (error) {
+        console.error('Cache write error:', error);
+      }
+
+      return data;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  private async fetchApplicationStatus(): Promise<LawyerApplicationStatus | null> {
     try {
       const response = await this.makeRequest('/api/lawyer-applications/me');
       
@@ -317,7 +384,23 @@ class LawyerApplicationService {
 
       return await response.json();
     } catch (error) {
+      console.error('API request failed:', error);
       return null;
+    }
+  }
+
+  // Clear cache when status might change (after submission, etc.)
+  clearStatusCache(): void {
+    this.statusCache = null;
+    AsyncStorage.removeItem('lawyer-application-status').catch(console.error);
+  }
+
+  // Prefetch status in background
+  async prefetchApplicationStatus(): Promise<void> {
+    try {
+      await this.getApplicationStatus();
+    } catch (error) {
+      // Silent fail for background prefetch
     }
   }
 }

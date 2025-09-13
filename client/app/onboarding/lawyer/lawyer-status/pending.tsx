@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { lawyerApplicationService, LawyerApplicationStatus } from '../../../../services/lawyerApplicationService';
 import StatusScreen from '../../../../components/ui/StatusScreen';
 
-export default function AcceptedStatus() {
+export default function PendingStatus() {
   const [applicationData, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
 
   useEffect(() => {
@@ -23,12 +23,12 @@ export default function AcceptedStatus() {
 
   return (
     <StatusScreen
-      image={require('../../../../assets/images/lawyer-registration/accepted.png')}
-      title="🎉 Application Accepted!"
-      description="Congratulations! Your lawyer application has been approved. You now have access to the lawyer dashboard and all lawyer features."
-      buttonLabel="Go to Lawyer Dashboard"
-      onPress={() => router.push('/lawyer')}
-      imageAlt="Lawyer application accepted"
+      image={require('../../../../assets/images/lawyer-registration/pending.png')}
+      title="Application Under Review"
+      description="Your application is currently being reviewed by our team. We'll notify you once the review is complete."
+      buttonLabel="Go to Home"
+      onPress={() => router.push('/home')}
+      imageAlt="Lawyer application pending review"
     />
   );
 }

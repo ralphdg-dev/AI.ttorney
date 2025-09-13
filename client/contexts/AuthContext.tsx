@@ -14,6 +14,7 @@ export interface User {
   full_name: string;
   role: UserRole;
   is_verified: boolean;
+  pending_lawyer?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -36,6 +37,7 @@ export interface AuthContextType {
   hasRole: (role: UserRole) => boolean;
   isLawyer: () => boolean;
   isAdmin: () => boolean;
+  checkLawyerApplicationStatus: () => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -112,6 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', session.user.id)
         .single();
 
+
       if (error) {
         console.error('Error fetching user profile:', error);
         return;
@@ -125,8 +128,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Handle navigation after login if requested
       if (shouldNavigate && profile) {
-        const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified);
-        console.log('AuthContext: Navigating to', redirectPath, 'for role', profile.role);
+        let applicationStatus = null;
+        
+        // Check lawyer application status if user has pending_lawyer flag
+        if (profile.pending_lawyer) {
+          const statusData = await checkLawyerApplicationStatus();
+          if (statusData && statusData.has_application && statusData.application) {
+            applicationStatus = statusData.application.status;
+          }
+        }
+        
+        const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, profile.pending_lawyer, applicationStatus || undefined);
         router.push(redirectPath as any);
       }
     } catch (error) {
@@ -216,6 +228,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return hasRole('admin') || hasRole('superadmin');
   };
 
+  const checkLawyerApplicationStatus = async (): Promise<any> => {
+    try {
+      if (!authState.session?.access_token) {
+        return null;
+      }
+
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/lawyer-applications/me`, {
+        headers: {
+          'Authorization': `Bearer ${authState.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data;
+      }
+      
+      return null;
+    } catch (error) {
+      return null;
+    }
+  };
+
 
   const value: AuthContextType = {
     user: authState.user,
@@ -229,6 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hasRole,
     isLawyer,
     isAdmin,
+    checkLawyerApplicationStatus,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

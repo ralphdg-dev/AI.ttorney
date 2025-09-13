@@ -38,30 +38,15 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     serverValidation: true,
     errorBoundary: true
   },
-  '/onboarding': { 
-    path: '/onboarding', 
-    isPublic: true,
-    redirectTo: 'role-based'
-  },
-  '/nonlaw-reg': { 
-    path: '/nonlaw-reg', 
-    isPublic: true,
-    redirectTo: 'role-based'
-  },
-  '/verifyotp-reg': { 
-    path: '/verifyotp-reg', 
-    isPublic: true,
-    redirectTo: 'role-based'
-  },
-  '/lawyer-starting-page': { 
-    path: '/lawyer-starting-page', 
+  '/onboarding/onboarding': { 
+    path: '/onboarding/onboarding', 
     isPublic: true,
     redirectTo: 'role-based'
   },
 
   // Lawyer routes (all require verified_lawyer role)
   '/lawyer': { 
-    path: '/lawyer', 
+    path: '/lawyer/index', 
     requiredRole: 'verified_lawyer',
     redirectTo: 'role-based',
     serverValidation: true,
@@ -180,12 +165,6 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   },
 
   // Additional onboarding routes
-  '/onboarding/onboarding': {
-    path: '/onboarding/onboarding',
-    isPublic: true,
-    redirectTo: 'role-based',
-    errorBoundary: true
-  },
   '/onboarding/otp-success': {
     path: '/onboarding/otp-success',
     allowedRoles: ['guest', 'registered_user'],
@@ -241,11 +220,52 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     allowedRoles: ['guest', 'registered_user'],
     redirectTo: 'role-based',
     errorBoundary: true
+  },
+  
+  // Lawyer status screens
+  '/onboarding/lawyer/lawyer-status/resubmission': {
+    path: '/onboarding/lawyer/lawyer-status/resubmission',
+    allowedRoles: ['registered_user'],
+    redirectTo: 'role-based',
+    errorBoundary: true
+  },
+  '/onboarding/lawyer/lawyer-status/rejected': {
+    path: '/onboarding/lawyer/lawyer-status/rejected',
+    allowedRoles: ['registered_user'],
+    redirectTo: 'role-based',
+    errorBoundary: true
+  },
+  '/onboarding/lawyer/lawyer-status/accepted': {
+    path: '/onboarding/lawyer/lawyer-status/accepted',
+    allowedRoles: ['registered_user'],
+    redirectTo: 'role-based',
+    errorBoundary: true
   }
 };
 
-// Get role-based redirect path
-export const getRoleBasedRedirect = (role: UserRole, isVerified?: boolean): string => {
+// Get role-based redirect path with pending lawyer application check
+export const getRoleBasedRedirect = (role: UserRole, isVerified?: boolean, pendingLawyer?: boolean, applicationStatus?: string): string => {
+  // If user has pending lawyer application, redirect to appropriate status screen
+  if (pendingLawyer) {
+    if (applicationStatus) {
+      switch (applicationStatus) {
+        case 'pending':
+          return '/onboarding/lawyer/lawyer-status/pending';
+        case 'resubmission':
+          return '/onboarding/lawyer/lawyer-status/resubmission';
+        case 'rejected':
+          return '/onboarding/lawyer/lawyer-status/rejected';
+        case 'accepted':
+          return '/onboarding/lawyer/lawyer-status/accepted';
+        default:
+          return '/onboarding/lawyer/lawyer-status/pending';
+      }
+    } else {
+      // If pending_lawyer is true but no application status, default to pending
+      return '/onboarding/lawyer/lawyer-status/pending';
+    }
+  }
+
   switch (role) {
     case 'verified_lawyer':
       return '/lawyer';
