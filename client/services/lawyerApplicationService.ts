@@ -45,9 +45,10 @@ interface SubmitApplicationResponse {
 
 class LawyerApplicationService {
   private statusCache: { data: LawyerApplicationStatus | null; timestamp: number } | null = null;
-  private readonly CACHE_DURATION = 300000; // 5 minutes
-  private readonly REQUEST_TIMEOUT = 5000; // 5 seconds
+  private readonly CACHE_DURATION = 10000; // 10 seconds
+  private readonly REQUEST_TIMEOUT = 3000; // 3 seconds
   private pendingRequests = new Map<string, Promise<any>>();
+
 
   private async getAuthToken(): Promise<string | null> {
     try {
