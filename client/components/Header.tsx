@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Menu, Search, Bell, ArrowLeft, Settings } from 'lucide-react-native';
 import { useSidebar } from './AppSidebar';
+import { useRouter } from 'expo-router';
 import Colors from '../constants/Colors';
 import { GlobalStyles } from '../constants/GlobalStyles';
 
@@ -36,6 +37,7 @@ const Header: React.FC<HeaderProps> = ({
   variant = 'default',
 }) => {
   const { openSidebar } = useSidebar();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const handleMenuPress = () => {
@@ -67,7 +69,7 @@ const Header: React.FC<HeaderProps> = ({
       return (
         <TouchableOpacity
           style={styles.iconButton}
-          onPress={onBackPress}
+          onPress={onBackPress || (() => router.back())}
           activeOpacity={0.7}
         >
           <ArrowLeft size={24} color={Colors.primary.blue} strokeWidth={1.5} />
