@@ -139,7 +139,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, profile.pending_lawyer, applicationStatus || undefined);
-        router.push(redirectPath as any);
+        
+        // Handle different redirect scenarios
+        if (redirectPath === 'loading') {
+          // Show loading screen while fetching status
+          router.push('/loading-status' as any);
+        } else if (redirectPath) {
+          router.push(redirectPath as any);
+        }
       }
     } catch (error) {
       console.error('Error handling auth state change:', error);
