@@ -237,7 +237,13 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   },
   '/onboarding/lawyer/lawyer-status/accepted': {
     path: '/onboarding/lawyer/lawyer-status/accepted',
-    allowedRoles: ['registered_user'],
+    allowedRoles: ['registered_user', 'verified_lawyer'],
+    redirectTo: 'role-based',
+    errorBoundary: true
+  },
+  '/onboarding/lawyer/lawyer-status/pending': {
+    path: '/onboarding/lawyer/lawyer-status/pending',
+    allowedRoles: ['registered_user', 'verified_lawyer'],
     redirectTo: 'role-based',
     errorBoundary: true
   }

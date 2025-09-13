@@ -403,6 +403,35 @@ class LawyerApplicationService {
       // Silent fail for background prefetch
     }
   }
+
+  // Clear pending_lawyer flag when user completes accepted flow
+  async clearPendingLawyerStatus(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.makeRequest('/api/lawyer-applications/clear-pending', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to clear pending lawyer status');
+      }
+
+      const data = await response.json();
+      
+      // Clear cache since user status has changed
+      this.clearStatusCache();
+      
+      return {
+        success: true,
+        message: data.message || 'Pending lawyer status cleared successfully'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to clear pending lawyer status'
+      };
+    }
+  }
 }
 
 export const lawyerApplicationService = new LawyerApplicationService();

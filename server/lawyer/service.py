@@ -373,3 +373,32 @@ class LawyerApplicationService:
         except Exception as e:
             logger.error(f"Delete application error: {str(e)}")
             return {"success": False, "error": str(e)}
+
+    async def clear_pending_lawyer_status(self, user_id: str) -> Dict[str, Any]:
+        """Clear pending_lawyer flag when user completes accepted flow"""
+        try:
+            # Update user: pending_lawyer = false
+            update_data = {
+                "pending_lawyer": False,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            result = await self.supabase.update_user_profile(
+                update_data,
+                {"id": user_id}
+            )
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "message": "Pending lawyer status cleared successfully"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Failed to clear pending lawyer status"
+                }
+                
+        except Exception as e:
+            logger.error(f"Clear pending lawyer status error: {str(e)}")
+            return {"success": False, "error": str(e)}

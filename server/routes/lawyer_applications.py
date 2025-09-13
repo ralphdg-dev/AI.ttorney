@@ -235,8 +235,7 @@ async def review_lawyer_application(
         
         return {
             "success": True,
-            "message": result["message"],
-            "data": {}
+            "message": result["message"]
         }
         
     except HTTPException:
@@ -245,5 +244,35 @@ async def review_lawyer_application(
         logger.error(f"Review application error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to review application"
+            detail="Internal server error"
+        )
+
+@router.post("/clear-pending", response_model=Dict[str, Any])
+async def clear_pending_lawyer_status(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Clear pending_lawyer flag when user completes accepted flow"""
+    try:
+        user_id = current_user["user"]["id"]
+        
+        result = await lawyer_service.clear_pending_lawyer_status(user_id)
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["error"]
+            )
+        
+        return {
+            "success": True,
+            "message": result["message"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Clear pending lawyer status error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
         )
