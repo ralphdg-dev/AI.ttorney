@@ -40,6 +40,7 @@ export interface AuthContextType {
   checkLawyerApplicationStatus: () => Promise<any>;
   hasRedirectedToStatus: boolean;
   setHasRedirectedToStatus: (value: boolean) => void;
+  initialAuthCheck: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabaseUser: null,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [initialAuthCheck, setInitialAuthCheck] = useState(false);
   const [hasRedirectedToStatus, setHasRedirectedToStatus] = useState(false);
 
   useEffect(() => {
@@ -70,6 +72,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           await handleAuthStateChange(session);
         }
+        
+        setInitialAuthCheck(true);
 
         // Listen for auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -137,13 +141,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Only handle navigation on explicit login attempts
       if (shouldNavigate && profile) {
-        // Always set the redirect flag to prevent future redirects
-        setHasRedirectedToStatus(true);
-        
         let applicationStatus = null;
         
         // Check lawyer application status if user has pending_lawyer flag
         if (profile.pending_lawyer) {
+          // Set redirect flag only for pending lawyer users to prevent future status redirects
+          setHasRedirectedToStatus(true);
+          
           const statusData = await checkLawyerApplicationStatus();
           if (statusData && statusData.has_application && statusData.application) {
             applicationStatus = statusData.application.status;
@@ -298,6 +302,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkLawyerApplicationStatus,
     hasRedirectedToStatus,
     setHasRedirectedToStatus,
+    initialAuthCheck,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

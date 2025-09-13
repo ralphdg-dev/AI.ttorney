@@ -24,52 +24,38 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     const currentPath = `/${segments.join('/')}`;
     const routeConfig = getRouteConfig(currentPath);
     
-    console.log(`AuthGuard: currentPath=${currentPath}, isAuthenticated=${isAuthenticated}, user=${user?.role}, session=${!!session}`);
+    console.log(`AuthGuard: currentPath=${currentPath}, isAuthenticated=${isAuthenticated}, user=${user?.role}, pending_lawyer=${user?.pending_lawyer}, hasRedirectedToStatus=${hasRedirectedToStatus}, session=${!!session}`);
 
     if (!routeConfig) return;
 
     // Handle authenticated users
     if (isAuthenticated && user) {
-      // Skip pending lawyer redirect logic - this is now handled in AuthContext during login only
-      // AuthGuard should not redirect users with pending_lawyer status during navigation
-
-      // Check if authenticated user is trying to access auth/onboarding routes
-      // Exceptions: 
-      // 1. Allow lawyer onboarding routes for authenticated users during verification process
-      // 2. Allow role-selection for users who haven't completed role selection yet
-      const isLawyerOnboardingRoute = currentPath.startsWith('/onboarding/lawyer/');
-      const isRoleSelectionRoute = currentPath === '/role-selection';
+      // Check if authenticated user is trying to access login/registration pages
+      const isLoginPage = currentPath === '/login';
+      const isRegistrationPage = currentPath === '/onboarding/registration';
       
-      if (routeConfig.redirectTo === 'role-based' && (routeConfig.isPublic || routeConfig.allowedRoles?.includes('guest')) && !isLawyerOnboardingRoute && !isRoleSelectionRoute) {
-        // Don't redirect users with pending_lawyer status - let them access any route
-        if (user.pending_lawyer) {
-          return; // Allow access to current route
-        }
-        
-        const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, false);
-        console.log(`Authenticated user accessing auth/onboarding route ${currentPath}, redirecting to ${redirectPath}`);
+      if (isLoginPage || isRegistrationPage) {
+        // Redirect authenticated users away from login/registration
+        const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
+        console.log(`Authenticated user accessing ${currentPath}, redirecting to ${redirectPath}`);
         logRouteAccess(currentPath, user, 'denied', 'Already authenticated');
         router.replace(redirectPath as any);
         return;
       }
 
-      // Check route permissions using restored route config
+      // Check route permissions
       if (!hasRoutePermission(routeConfig, user.role)) {
-        // Don't redirect users with pending_lawyer status - let them access any route
+        // Allow users with pending_lawyer to access most routes
         if (user.pending_lawyer) {
-          return; // Allow access to current route
+          console.log(`Pending lawyer user accessing ${currentPath}, allowing access`);
+          logRouteAccess(currentPath, user, 'granted', 'Pending lawyer access');
+          return;
         }
         
         const redirectPath = routeConfig.fallbackRoute || getRoleBasedRedirect(user.role, user.is_verified, false);
         console.log(`User lacks permission for ${currentPath}, redirecting to ${redirectPath}`);
         logRouteAccess(currentPath, user, 'denied', 'Insufficient permissions');
-        
-        // Use replace for role-based redirects to prevent back navigation
-        if (routeConfig.redirectTo === 'role-based') {
-          router.replace(redirectPath as any);
-        } else {
-          router.replace(redirectPath as any);
-        }
+        router.replace(redirectPath as any);
         return;
       }
 
