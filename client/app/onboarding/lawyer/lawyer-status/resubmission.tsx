@@ -23,13 +23,22 @@ export default function Resubmission() {
 
   const description = "We found issues with your document submission. Please review the requirements and resubmit your documents to continue your lawyer application.";
 
+  const handleBackToHome = () => {
+    router.push('/home');
+  };
+
+  const handleResubmit = () => {
+    router.push('/onboarding/lawyer/verification-instructions');
+  };
+
   return (
     <StatusScreen
       image={require('../../../../assets/images/lawyer-registration/resubmission.png')}
       title="Resubmission Required"
       description={description}
       buttonLabel="Resubmit Documents"
-      onPress={() => router.push('/onboarding/lawyer/resubmission')}
+      onPress={handleResubmit}
+      onBack={handleBackToHome}
       imageAlt="Document resubmission required"
     />
   );
