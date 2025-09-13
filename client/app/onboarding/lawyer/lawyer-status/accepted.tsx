@@ -29,27 +29,21 @@ export default function AcceptedStatus() {
     
     setIsProcessing(true);
     
+    // Navigate immediately for better UX
+    router.push('/lawyer');
+    
     try {
-      // Clear the pending_lawyer flag since user is now fully onboarded
+      // Clear the pending_lawyer flag in background
       const result = await lawyerApplicationService.clearPendingLawyerStatus();
       
       if (result.success) {
         // Refresh user data in AuthContext to update pending_lawyer flag
         await refreshUserData();
-        
-        // Small delay to ensure state is updated
-        setTimeout(() => {
-          router.push('/lawyer');
-        }, 100);
       } else {
         console.error('Failed to clear pending lawyer status:', result.message);
-        // Still navigate to dashboard even if API call fails
-        router.push('/lawyer');
       }
     } catch (error) {
       console.error('Error clearing pending lawyer status:', error);
-      // Still navigate to dashboard even if there's an error
-      router.push('/lawyer');
     } finally {
       setIsProcessing(false);
     }
