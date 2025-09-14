@@ -61,16 +61,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initialize = async () => {
       try {
         // Get initial session
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
         
-        if (error) {
-          console.error('Error getting session:', error);
+        if (initialSession) {
+          console.log('Initial session found:', initialSession.user?.email);
+          await handleAuthStateChange(initialSession, false);
+        } else {
+          console.log('No initial session found');
+          setAuthState({
+            session: null,
+            user: null,
+            supabaseUser: null,
+          });
           setIsLoading(false);
-          return;
-        }
-
-        if (session?.user) {
-          await handleAuthStateChange(session);
         }
         
         setInitialAuthCheck(true);
@@ -159,16 +162,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Handle different redirect scenarios
           if (redirectPath === 'loading') {
             // Show loading screen while fetching status
-            router.push('/loading-status' as any);
+            router.replace('/loading' as any);
           } else if (redirectPath && redirectPath.includes('/lawyer-status/')) {
-            router.push(redirectPath as any);
+            router.replace(redirectPath as any);
           } else if (redirectPath) {
-            router.push(redirectPath as any);
+            router.replace(redirectPath as any);
           }
         } else {
           // User doesn't have pending lawyer status, redirect normally
           const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
-          router.push(redirectPath as any);
+          router.replace(redirectPath as any);
         }
       }
     } catch (error) {
@@ -207,81 +210,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    console.log('SignOut: Starting sign out process');
+    
+    // Stop any ongoing polling immediately
     try {
-      console.log('Starting sign out process...');
-      
-      // Reset redirect flag on sign out
-      setHasRedirectedToStatus(false);
-      
-      // Clear all application state immediately
-      setAuthState({
-        session: null,
-        user: null,
-        supabaseUser: null,
-      });
-      
-      // Clear Supabase session with scope 'global' to remove from all storage
-      await supabase.auth.signOut({ scope: 'global' });
-      
-      // Clear all browser storage manually - be more aggressive
-      if (typeof window !== 'undefined') {
-        // Clear ALL localStorage
-        localStorage.clear();
-        
-        // Clear ALL sessionStorage
-        sessionStorage.clear();
-        
-        // Clear cookies if possible
-        document.cookie.split(";").forEach(function(c) { 
-          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-        });
-      }
-      
-      // Clear AsyncStorage data
-      try {
-        const AsyncStorage = await import('@react-native-async-storage/async-storage');
-        await AsyncStorage.default.clear(); // Clear everything
-      } catch (storageError) {
-        console.warn('AsyncStorage clear error:', storageError);
-      }
-      
-      // Clear lawyer application service cache
-      try {
-        const { lawyerApplicationService } = await import('../services/lawyerApplicationService');
-        lawyerApplicationService.clearCache();
-        lawyerApplicationService.stopStatusPolling();
-      } catch (serviceError) {
-        console.warn('Service cleanup error:', serviceError);
-      }
-      
-      console.log('Sign out complete, forcing page reload...');
-      
-      // Force a hard page reload to completely reset the app state
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-      } else {
-        router.replace('/login' as any);
-      }
-      
+      const { lawyerApplicationService } = await import('../services/lawyerApplicationService');
+      lawyerApplicationService.stopStatusPolling();
     } catch (error) {
-      console.error('Sign out error:', error);
-      // Force clear state even if there's an error
-      setAuthState({
-        session: null,
-        user: null,
-        supabaseUser: null,
-      });
-      setHasRedirectedToStatus(false);
-      
-      // Force clear storage even on error
-      if (typeof window !== 'undefined') {
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.href = '/login';
-      } else {
-        router.replace('/login' as any);
-      }
+      console.warn('Error stopping polling:', error);
     }
+    
+    // Reset redirect flag on sign out
+    setHasRedirectedToStatus(false);
+    
+    // Clear all application state immediately
+    setAuthState({
+      session: null,
+      user: null,
+      supabaseUser: null,
+    });
+    
+    // Clear Supabase session synchronously first
+    try {
+      await supabase.auth.signOut({ scope: 'global' });
+      console.log('SignOut: Supabase session cleared');
+    } catch (error) {
+      console.warn('SignOut: Supabase signout error:', error);
+    }
+    
+    // Clear browser storage immediately
+    if (typeof window !== 'undefined') {
+      localStorage.clear();
+      sessionStorage.clear();
+      console.log('SignOut: Browser storage cleared');
+    }
+    
+    // Navigate to login
+    console.log('SignOut: Redirecting to login');
+    router.replace('/login' as any);
+    
+    // Do remaining cleanup in background
+    setTimeout(async () => {
+      try {
+        // Clear AsyncStorage
+        try {
+          const AsyncStorage = await import('@react-native-async-storage/async-storage');
+          await AsyncStorage.default.clear();
+        } catch (error) {
+          console.warn('AsyncStorage clear error:', error);
+        }
+        
+        // Clear service cache
+        try {
+          const { lawyerApplicationService } = await import('../services/lawyerApplicationService');
+          lawyerApplicationService.clearCache();
+        } catch (error) {
+          console.warn('Service cleanup error:', error);
+        }
+      } catch (error) {
+        console.warn('Background cleanup error:', error);
+      }
+    }, 100);
   };
 
   const setUserData = (userData: User | null) => {

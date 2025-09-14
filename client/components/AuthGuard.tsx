@@ -85,9 +85,14 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     );
   }
 
-  // Only block rendering for a brief moment to prevent flash, then let redirect handle it
+  // Don't block rendering on login page - let it show immediately
   const currentPath = `/${segments.join('/')}`;
   const routeConfig = getRouteConfig(currentPath);
+  
+  // Never block login page rendering
+  if (currentPath === '/login') {
+    return <>{children}</>;
+  }
   
   // Only show loading for protected routes when we're clearly unauthenticated
   if (routeConfig && !routeConfig.isPublic && !isAuthenticated && !user && !session) {

@@ -62,6 +62,7 @@ export default function LawyerStatusGuard({ children, requiredStatus }: LawyerSt
     try {
       // If user is not authenticated or doesn't have pending_lawyer flag
       if (!user) {
+        console.log('LawyerStatusGuard: No user, redirecting to login');
         router.replace('/login');
         return;
       }

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { lawyerApplicationService, LawyerApplicationStatus } from '../services/lawyerApplicationService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface UseStatusPollingOptions {
   enabled?: boolean;
@@ -9,51 +10,81 @@ interface UseStatusPollingOptions {
 
 export function useStatusPolling({ enabled = true, onStatusChange }: UseStatusPollingOptions = {}) {
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  const { user, session } = useAuth();
+  const currentPath = usePathname();
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !user || !session) {
       return;
     }
 
     // Start polling
     lawyerApplicationService.startStatusPolling();
 
-    // Subscribe to status changes
-    const unsubscribe = lawyerApplicationService.onStatusChange((newStatus) => {
-      // Call custom callback if provided
-      if (onStatusChange) {
-        onStatusChange(newStatus);
-      }
+    // Simple polling without subscriptions since subscribeToStatusChanges doesn't exist
+    let pollingInterval: any;
+    
+    const pollStatus = async () => {
+      try {
+        if (!user || !session) {
+          console.log('useStatusPolling: User not authenticated, stopping polling');
+          if (pollingInterval) clearInterval(pollingInterval);
+          return;
+        }
 
-      // Auto-redirect to correct status page based on new status
-      if (newStatus?.application) {
-        const currentPath = window.location.pathname;
-        const newStatus_ = newStatus.application.status;
+        const newStatus = await lawyerApplicationService.getApplicationStatus();
         
-        // Determine the correct path for the new status
-        let correctPath = '';
-        switch (newStatus_) {
-          case 'pending':
-            correctPath = '/onboarding/lawyer/lawyer-status/pending';
-            break;
-          case 'resubmission':
-            correctPath = '/onboarding/lawyer/lawyer-status/resubmission';
-            break;
-          case 'rejected':
-            correctPath = '/onboarding/lawyer/lawyer-status/rejected';
-            break;
-          case 'accepted':
-            correctPath = '/onboarding/lawyer/lawyer-status/accepted';
-            break;
+        // Call custom callback if provided
+        if (onStatusChange) {
+          onStatusChange(newStatus);
         }
 
-        // Only redirect if we're on a different status page
-        if (correctPath && currentPath !== correctPath && currentPath.includes('/lawyer-status/')) {
-          console.log(`Status changed to ${newStatus_}, redirecting from ${currentPath} to ${correctPath}`);
-          router.replace(correctPath);
+        // Auto-redirect to correct status page based on new status
+        if (newStatus?.application) {
+          const newStatus_ = newStatus.application.status;
+          
+          // Determine the correct path for the new status
+          let correctPath = '';
+          switch (newStatus_) {
+            case 'pending':
+              correctPath = '/onboarding/lawyer/lawyer-status/pending';
+              break;
+            case 'resubmission':
+              correctPath = '/onboarding/lawyer/lawyer-status/resubmission';
+              break;
+            case 'rejected':
+              correctPath = '/onboarding/lawyer/lawyer-status/rejected';
+              break;
+            case 'accepted':
+              correctPath = '/onboarding/lawyer/lawyer-status/accepted';
+              break;
+          }
+
+          // Only redirect if we're on a different status page
+          if (correctPath && currentPath !== correctPath && currentPath.includes('/lawyer-status/')) {
+            console.log(`Status changed to ${newStatus_}, redirecting from ${currentPath} to ${correctPath}`);
+            // Add delay to ensure router is ready
+            setTimeout(() => {
+              router.replace(correctPath as any);
+            }, 100);
+          }
         }
+      } catch (error) {
+        console.warn('Status polling error:', error);
       }
-    });
+    };
+
+    // Start polling every 5 seconds
+    pollingInterval = setInterval(pollStatus, 5000);
+    
+    // Initial poll
+    pollStatus();
+
+    const unsubscribe = () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
 
     unsubscribeRef.current = unsubscribe;
 
@@ -65,7 +96,7 @@ export function useStatusPolling({ enabled = true, onStatusChange }: UseStatusPo
       }
       lawyerApplicationService.stopStatusPolling();
     };
-  }, [enabled, onStatusChange]);
+  }, [enabled, onStatusChange, user, session, currentPath]);
 
   return {
     stopPolling: () => {
