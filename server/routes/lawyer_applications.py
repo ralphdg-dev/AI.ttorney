@@ -4,6 +4,7 @@ from lawyer.models import (
     LawyerApplicationReview, 
     LawyerApplicationResponse,
     LawyerApplicationStatusResponse,
+    LawyerApplicationHistoryResponse,
     FileUploadResponse
 )
 from lawyer.service import LawyerApplicationService
@@ -275,4 +276,87 @@ async def clear_pending_lawyer_status(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
+        )
+
+@router.post("/resubmit", response_model=Dict[str, Any])
+async def resubmit_lawyer_application(
+    full_name: str = Form(...),
+    roll_signing_date: str = Form(...),
+    ibp_id: str = Form(...),
+    roll_number: str = Form(...),
+    selfie: str = Form(...),
+    current_user: Dict[str, Any] = Depends(require_role("registered_user"))
+):
+    """Resubmit a lawyer application (creates new version)"""
+    try:
+        user_id = current_user["user"]["id"]
+        
+        # Convert string date to date object
+        from datetime import datetime
+        try:
+            date_obj = datetime.fromisoformat(roll_signing_date.replace('Z', '+00:00')).date()
+        except ValueError:
+            # Try parsing as YYYY-MM-DD format
+            date_obj = datetime.strptime(roll_signing_date, '%Y-%m-%d').date()
+        
+        # Create application data
+        application_data = LawyerApplicationSubmit(
+            full_name=full_name,
+            roll_signing_date=date_obj,
+            ibp_id=ibp_id,
+            roll_number=roll_number,
+            selfie=selfie
+        )
+        
+        # Resubmit application
+        result = await lawyer_service.resubmit_application(user_id, application_data)
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["error"]
+            )
+        
+        return {
+            "success": True,
+            "message": result["message"],
+            "application_id": result["application_id"],
+            "version": result["version"],
+            "data": {"redirect_path": "/onboarding/lawyer/lawyer-status"}
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Resubmit application error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to resubmit application"
+        )
+
+@router.get("/history", response_model=LawyerApplicationHistoryResponse)
+async def get_my_application_history(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get current user's complete application history"""
+    try:
+        user_id = current_user["user"]["id"]
+        
+        result = await lawyer_service.get_user_application_history(user_id)
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["error"]
+            )
+        
+        return LawyerApplicationHistoryResponse(**result["data"])
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get application history error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get application history"
         )

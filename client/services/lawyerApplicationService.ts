@@ -27,6 +27,10 @@ interface LawyerApplicationStatus {
     matched_at?: string;
     submitted_at: string;
     updated_at: string;
+    // New versioning fields
+    version?: number;
+    parent_application_id?: string;
+    is_latest?: boolean;
   };
   can_apply: boolean;
   reject_count: number;
@@ -34,20 +38,50 @@ interface LawyerApplicationStatus {
   last_rejected_at?: string;
 }
 
+interface LawyerApplicationHistory {
+  applications: Array<{
+    id: string;
+    user_id: string;
+    full_name?: string;
+    roll_signing_date?: string;
+    ibp_id?: string;
+    roll_number?: string;
+    selfie?: string;
+    status: 'pending' | 'accepted' | 'rejected' | 'resubmission';
+    reviewed_by?: string;
+    reviewed_at?: string;
+    admin_notes?: string;
+    matched_roll_id?: number;
+    matched_at?: string;
+    submitted_at: string;
+    updated_at: string;
+    version?: number;
+    parent_application_id?: string;
+    is_latest?: boolean;
+  }>;
+  total_applications: number;
+}
+
 interface SubmitApplicationResponse {
   success: boolean;
   message: string;
   application_id?: string;
+  version?: number;
   data?: {
     redirect_path: string;
   };
 }
 
 class LawyerApplicationService {
-  private statusCache: { data: LawyerApplicationStatus | null; timestamp: number } | null = null;
+  private cachedApplicationStatus: LawyerApplicationStatus | null = null;
+  private cacheTimestamp: number | null = null;
   private readonly CACHE_DURATION = 10000; // 10 seconds
-  private readonly REQUEST_TIMEOUT = 3000; // 3 seconds
+  private readonly REQUEST_TIMEOUT = 10000; // 10 seconds
+  private readonly POLLING_INTERVAL = 30000; // 30 seconds
   private pendingRequests = new Map<string, Promise<any>>();
+  private pollingInterval: any = null;
+  private statusChangeCallbacks = new Set<(status: LawyerApplicationStatus | null) => void>();
+  private statusCache: { data: LawyerApplicationStatus | null; timestamp: number } | null = null;
 
 
   private async getAuthToken(): Promise<string | null> {
@@ -90,6 +124,9 @@ class LawyerApplicationService {
       return response;
     } catch (error) {
       clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timed out. Please check your connection and try again.');
+      }
       throw error;
     }
   }
@@ -396,6 +433,13 @@ class LawyerApplicationService {
     AsyncStorage.removeItem('lawyer-application-status').catch(console.error);
   }
 
+  /**
+   * Public method to clear all cache
+   */
+  clearCache(): void {
+    this.clearStatusCache();
+  }
+
   // Prefetch status in background
   async prefetchApplicationStatus(): Promise<void> {
     try {
@@ -433,7 +477,149 @@ class LawyerApplicationService {
       };
     }
   }
+
+  // Resubmit application (creates new version)
+  async resubmitApplication(applicationData: {
+    full_name: string;
+    roll_signing_date: string;
+    ibp_id: string;
+    roll_number: string;
+    selfie: string;
+  }): Promise<SubmitApplicationResponse> {
+    try {
+      // Convert date string to YYYY-MM-DD format for backend
+      const dateObj = new Date(applicationData.roll_signing_date);
+      const formattedDate = dateObj.toISOString().split('T')[0];
+      
+      const formData = new FormData();
+      formData.append('full_name', applicationData.full_name);
+      formData.append('roll_signing_date', formattedDate);
+      formData.append('ibp_id', applicationData.ibp_id || '');
+      formData.append('roll_number', applicationData.roll_number);
+      formData.append('selfie', applicationData.selfie || '');
+
+      const response = await this.makeRequest('/api/lawyer-applications/resubmit', {
+        method: 'POST',
+        body: formData,
+      });
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        throw new Error(`Server error ${response.status}: ${response.statusText}`);
+      }
+      
+      if (!response.ok) {
+        let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+      
+        if (data?.detail) {
+          if (Array.isArray(data.detail)) {
+            // Handle FastAPI validation errors (array of error objects)
+            errorMsg = data.detail.map((err: any) => err.msg || err.message || JSON.stringify(err)).join(', ');
+          } else {
+            errorMsg = data.detail;
+          }
+        } else if (data?.message) {
+          errorMsg = data.message;
+        }
+      
+        throw new Error(errorMsg);
+      }
+
+      // Clear cache since application status has changed
+      this.clearStatusCache();
+
+      return data;
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Resubmission failed',
+      };
+    }
+  }
+
+  // Get application history
+  async getApplicationHistory(): Promise<LawyerApplicationHistory | null> {
+    try {
+      const response = await this.makeRequest('/api/lawyer-applications/history');
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to get application history');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Get application history failed:', error);
+      return null;
+    }
+  }
+
+  // Real-time status monitoring
+  startStatusPolling(): void {
+    if (this.pollingInterval) {
+      return; // Already polling
+    }
+
+    this.pollingInterval = setInterval(async () => {
+      try {
+        const currentStatus = await this.fetchApplicationStatus();
+        const cachedStatus = this.statusCache?.data;
+        
+        // Check if status has changed
+        if (this.hasStatusChanged(cachedStatus || null, currentStatus)) {
+          // Update cache
+          this.statusCache = { data: currentStatus, timestamp: Date.now() };
+          
+          // Notify all callbacks
+          this.statusChangeCallbacks.forEach(callback => {
+            try {
+              callback(currentStatus);
+            } catch (error) {
+              console.error('Error in status change callback:', error);
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error during status polling:', error);
+      }
+    }, this.POLLING_INTERVAL);
+  }
+
+  stopStatusPolling(): void {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
+  }
+
+  onStatusChange(callback: (status: LawyerApplicationStatus | null) => void): () => void {
+    this.statusChangeCallbacks.add(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      this.statusChangeCallbacks.delete(callback);
+    };
+  }
+
+  private hasStatusChanged(oldStatus: LawyerApplicationStatus | null, newStatus: LawyerApplicationStatus | null): boolean {
+    if (!oldStatus && !newStatus) return false;
+    if (!oldStatus || !newStatus) return true;
+    
+    const oldApp = oldStatus.application;
+    const newApp = newStatus.application;
+    
+    if (!oldApp && !newApp) return false;
+    if (!oldApp || !newApp) return true;
+    
+    return (
+      oldApp.status !== newApp.status ||
+      oldApp.version !== newApp.version ||
+      oldApp.updated_at !== newApp.updated_at
+    );
+  }
 }
 
 export const lawyerApplicationService = new LawyerApplicationService();
-export type { FileUploadResponse, LawyerApplicationStatus, SubmitApplicationResponse };
+export type { FileUploadResponse, LawyerApplicationStatus, LawyerApplicationHistory, SubmitApplicationResponse };
