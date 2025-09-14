@@ -96,6 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 user: null,
                 supabaseUser: null,
               });
+              setHasRedirectedToStatus(false);
             }
             
             setIsLoading(false);
@@ -207,17 +208,79 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
+      console.log('Starting sign out process...');
+      
       // Reset redirect flag on sign out
       setHasRedirectedToStatus(false);
       
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Sign out error:', error);
+      // Clear all application state immediately
+      setAuthState({
+        session: null,
+        user: null,
+        supabaseUser: null,
+      });
+      
+      // Clear Supabase session with scope 'global' to remove from all storage
+      await supabase.auth.signOut({ scope: 'global' });
+      
+      // Clear all browser storage manually - be more aggressive
+      if (typeof window !== 'undefined') {
+        // Clear ALL localStorage
+        localStorage.clear();
+        
+        // Clear ALL sessionStorage
+        sessionStorage.clear();
+        
+        // Clear cookies if possible
+        document.cookie.split(";").forEach(function(c) { 
+          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+        });
       }
-      // Auth state change will be handled by the listener
-      router.push('/login' as any);
+      
+      // Clear AsyncStorage data
+      try {
+        const AsyncStorage = await import('@react-native-async-storage/async-storage');
+        await AsyncStorage.default.clear(); // Clear everything
+      } catch (storageError) {
+        console.warn('AsyncStorage clear error:', storageError);
+      }
+      
+      // Clear lawyer application service cache
+      try {
+        const { lawyerApplicationService } = await import('../services/lawyerApplicationService');
+        lawyerApplicationService.clearCache();
+        lawyerApplicationService.stopStatusPolling();
+      } catch (serviceError) {
+        console.warn('Service cleanup error:', serviceError);
+      }
+      
+      console.log('Sign out complete, forcing page reload...');
+      
+      // Force a hard page reload to completely reset the app state
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      } else {
+        router.replace('/login' as any);
+      }
+      
     } catch (error) {
       console.error('Sign out error:', error);
+      // Force clear state even if there's an error
+      setAuthState({
+        session: null,
+        user: null,
+        supabaseUser: null,
+      });
+      setHasRedirectedToStatus(false);
+      
+      // Force clear storage even on error
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.href = '/login';
+      } else {
+        router.replace('/login' as any);
+      }
     }
   };
 

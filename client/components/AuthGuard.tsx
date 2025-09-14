@@ -28,8 +28,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
 
     if (!routeConfig) return;
 
-    // Handle authenticated users
-    if (isAuthenticated && user) {
+    // Handle authenticated users - check both session and user exist
+    if (isAuthenticated && user && session) {
       // Check if authenticated user is trying to access login/registration pages
       const isLoginPage = currentPath === '/login';
       const isRegistrationPage = currentPath === '/onboarding/registration';
@@ -67,7 +67,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
         const redirectPath = '/login';
         console.log(`Unauthenticated user accessing protected route ${currentPath}, redirecting to ${redirectPath}`);
         logRouteAccess(currentPath, null, 'denied', 'Authentication required');
-        router.push(redirectPath as any);
+        router.replace(redirectPath as any); // Use replace instead of push for faster redirect
         return;
       }
 
@@ -76,13 +76,23 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     }
   }, [isAuthenticated, user, session, isLoading, segments, router]);
 
-  // Show loading screen while checking authentication
+  // Show loading screen while checking authentication OR if we need to redirect
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#023D7B" />
       </View>
     );
+  }
+
+  // Only block rendering for a brief moment to prevent flash, then let redirect handle it
+  const currentPath = `/${segments.join('/')}`;
+  const routeConfig = getRouteConfig(currentPath);
+  
+  // Only show loading for protected routes when we're clearly unauthenticated
+  if (routeConfig && !routeConfig.isPublic && !isAuthenticated && !user && !session) {
+    // Use a minimal delay to prevent flash but allow quick redirect
+    return null; // Return null instead of loading spinner for faster redirect
   }
 
   return <>{children}</>;
