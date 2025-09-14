@@ -372,10 +372,18 @@ export const SidebarWrapper: React.FC<{
   };
 }> = ({ userInfo }) => {
   const { isVisible, closeSidebar } = useSidebar();
+  const { user } = useAuth();
 
   const handleNavigate = (route: string) => {
     console.log(`Navigate to ${route}`);
     // Add navigation logic here when routes are implemented
+  };
+
+  // Use actual user data from auth context
+  const actualUserInfo = {
+    name: user?.full_name || 'User',
+    email: user?.email || 'user@example.com',
+    avatar: userInfo?.avatar
   };
 
   return (
@@ -383,7 +391,7 @@ export const SidebarWrapper: React.FC<{
       isVisible={isVisible}
       onClose={closeSidebar}
       onNavigate={handleNavigate}
-      userInfo={userInfo}
+      userInfo={actualUserInfo}
     />
   );
 };
@@ -451,12 +459,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    fontSize: 14,
+    fontSize: 12,
     color: Colors.text.head,
     ...GlobalStyles.textSemiBold,
   },
   userEmail: {
-    fontSize: 12,
+    fontSize: 10,
     color: Colors.text.sub,
     marginTop: 2,
     ...GlobalStyles.text,
