@@ -5,16 +5,14 @@ import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 import { 
   Calendar, 
-  CheckCircle, 
   ArrowUpRight,
   TrendingUp,
-  Clock,
-  Activity,
   Video,
   MapPin
 } from "lucide-react-native";
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 import Header from '../../components/Header';
+import ConsultationCalendar from '../../components/lawyer/ConsultationCalendar';
 
 const LawyerDashboard: React.FC = () => {
   const router = useRouter();
@@ -42,14 +40,6 @@ const LawyerDashboard: React.FC = () => {
 
   const { date } = getCurrentDateTime();
 
-  // Sample consultation data matching database schema
-  const consultationStats = {
-    pending: 8,
-    accepted: 12,
-    completed: 45,
-    rejected: 3,
-    total: 68
-  };
 
   // Recent consultation data matching consultation_requests database schema
   const recentConsultations = [
@@ -62,7 +52,7 @@ const LawyerDashboard: React.FC = () => {
       status: 'pending' as const,
       requested_at: '2024-01-15T10:30:00Z',
       responded_at: null,
-      consultation_date: '2024-01-18',
+      consultation_date: '2025-09-15',
       consultation_time: '14:00:00',
       mode: 'online' as const
     },
@@ -75,7 +65,7 @@ const LawyerDashboard: React.FC = () => {
       status: 'accepted' as const,
       requested_at: '2024-01-14T14:20:00Z',
       responded_at: '2024-01-14T15:30:00Z',
-      consultation_date: '2024-01-17',
+      consultation_date: '2025-09-16',
       consultation_time: '10:30:00',
       mode: 'onsite' as const
     },
@@ -88,7 +78,7 @@ const LawyerDashboard: React.FC = () => {
       status: 'completed' as const,
       requested_at: '2024-01-13T09:15:00Z',
       responded_at: '2024-01-13T10:00:00Z',
-      consultation_date: '2024-01-15',
+      consultation_date: '2025-09-14',
       consultation_time: '16:00:00',
       mode: 'online' as const
     }
@@ -138,7 +128,7 @@ const LawyerDashboard: React.FC = () => {
         </View>
         
         {/* Quick Stats */}
-        <View style={tw`px-6 mb-6`}>
+        <View style={tw`px-4 mb-6`}>
           <View style={tw`flex-row -mx-2`}>
             {quickStats.map((stat, index) => {
               const IconComponent = stat.icon;
@@ -165,62 +155,32 @@ const LawyerDashboard: React.FC = () => {
           </View>
         </View>
 
-        {/* Consultation Status */}
-        <View style={tw`mx-6 mb-6 p-6 bg-white rounded-2xl border border-gray-200`}>
-          <View style={tw`flex-row justify-between items-center mb-6`}>
-            <View>
-              <Text style={tw`text-lg font-bold text-gray-900`}>Consultation Overview</Text>
-              <Text style={tw`text-sm text-gray-500 mt-1`}>Current consultation status</Text>
-            </View>
-            <TouchableOpacity style={[tw`px-4 py-2 rounded-lg`, { backgroundColor: '#E8F4FD' }]} activeOpacity={0.7}>
-              <Text style={[tw`text-sm font-semibold`, { color: Colors.primary.blue }]}>View All</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={tw`bg-gray-50 p-6 rounded-2xl border border-gray-200`}>
-            <View style={tw`flex-row justify-between mb-4`}>
-              <View style={tw`flex-1 items-center`}>
-                <View style={[tw`w-16 h-16 rounded-2xl justify-center items-center mb-3`, { backgroundColor: '#E8F4FD' }]}>
-                  <Clock size={24} color={Colors.primary.blue} strokeWidth={2} />
-                </View>
-                <Text style={tw`text-2xl font-bold text-gray-900 mb-1`}>{consultationStats.pending}</Text>
-                <Text style={tw`text-sm text-gray-600 font-medium`}>Pending</Text>
-              </View>
-              <View style={tw`flex-1 items-center`}>
-                <View style={tw`w-16 h-16 bg-yellow-100 rounded-2xl justify-center items-center mb-3`}>
-                  <Activity size={24} color="#D97706" strokeWidth={2} />
-                </View>
-                <Text style={tw`text-2xl font-bold text-gray-900 mb-1`}>{consultationStats.accepted}</Text>
-                <Text style={tw`text-sm text-gray-600 font-medium`}>Accepted</Text>
-              </View>
-              <View style={tw`flex-1 items-center`}>
-                <View style={tw`w-16 h-16 bg-green-100 rounded-2xl justify-center items-center mb-3`}>
-                  <CheckCircle size={24} color="#059669" strokeWidth={2} />
-                </View>
-                <Text style={tw`text-2xl font-bold text-gray-900 mb-1`}>{consultationStats.completed}</Text>
-                <Text style={tw`text-sm text-gray-600 font-medium`}>Completed</Text>
-              </View>
-            </View>
-            
-            {/* Progress Bar */}
-            <View style={tw`mt-4`}>
-              <View style={tw`flex-row justify-between mb-2`}>
-                <Text style={tw`text-xs text-gray-500 font-medium`}>Total: {consultationStats.total} consultations</Text>
-                <Text style={tw`text-xs text-gray-500 font-medium`}>{Math.round((consultationStats.completed / consultationStats.total) * 100)}% completed</Text>
-              </View>
-              <View style={tw`h-2 bg-gray-200 rounded-full overflow-hidden`}>
-                <View style={tw`flex-row h-full`}>
-                  <View style={[{ backgroundColor: Colors.primary.blue, width: `${(consultationStats.pending / consultationStats.total) * 100}%` }]} />
-                  <View style={[tw`bg-yellow-400`, { width: `${(consultationStats.accepted / consultationStats.total) * 100}%` }]} />
-                  <View style={[tw`bg-green-500`, { width: `${(consultationStats.completed / consultationStats.total) * 100}%` }]} />
-                </View>
-              </View>
-            </View>
-          </View>
+        {/* Consultation Calendar */}
+        <View style={tw`mx-4 mb-6`}>
+          <ConsultationCalendar 
+            consultations={recentConsultations.map(consultation => ({
+              id: consultation.id,
+              consultation_date: consultation.consultation_date,
+              status: consultation.status,
+              mode: consultation.mode,
+              client_name: consultation.client_name,
+              consultation_time: consultation.consultation_time,
+              message: consultation.message
+            }))}
+            onDatePress={(date) => {
+              console.log('Date pressed:', date);
+              // Navigate to consultations for specific date
+              router.push(`/lawyer/consult?date=${date}`);
+            }}
+            onConsultationPress={(consultationId) => {
+              console.log('Consultation pressed:', consultationId);
+              router.push(`/lawyer/consultation/${consultationId}`);
+            }}
+          />
         </View>
 
         {/* Recent Consultations */}
-        <View style={tw`mx-6 mb-6 p-6 bg-white rounded-2xl border border-gray-200`}>
+        <View style={tw`mx-4 mb-6 p-6 bg-white rounded-2xl border border-gray-200`}>
           <View style={tw`flex-row justify-between items-center mb-6`}>
             <View>
               <Text style={tw`text-lg font-bold text-gray-900`}>Recent Activity</Text>

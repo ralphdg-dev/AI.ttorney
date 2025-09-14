@@ -121,9 +121,20 @@ const LawyerConsultPage: React.FC = () => {
     router.push(`/lawyer/consultation/${requestId}`);
   };
 
-  const handleAcceptRequest = (requestId: string) => {
+  const handleAcceptRequest = (requestId: string, event?: any) => {
+    if (event) {
+      event.stopPropagation();
+    }
     console.log(`Accept consultation ${requestId}`);
     // TODO: Accept consultation request
+  };
+
+  const handleCompleteRequest = (requestId: string, event?: any) => {
+    if (event) {
+      event.stopPropagation();
+    }
+    console.log('Mark session completed', requestId);
+    // TODO: Mark consultation as completed
   };
 
   return (
@@ -144,18 +155,18 @@ const LawyerConsultPage: React.FC = () => {
         <View style={tw`px-4 pt-6 pb-2`}>
           <Text style={tw`text-xl font-bold text-gray-900 mb-4`}>Overview</Text>
           <View style={tw`flex-row flex-wrap -mr-3`}>
-            <View style={tw`bg-white rounded-xl p-4 flex-1 min-w-36 shadow-sm border border-gray-100 mr-3 mb-3`}>
+            <View style={[tw`bg-white rounded-xl p-4 flex-1 border border-gray-100 mr-3 mb-3`, { minWidth: 144, boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }]}>
               <View style={tw`flex-row items-center justify-between mb-2`}>
-                <View style={tw`bg-orange-100 p-2 rounded-lg`}>
+                <View style={[tw`p-2 rounded-lg`, { backgroundColor: '#FED7AA' }]}>
                   <Clock size={20} color="#EA580C" />
                 </View>
                 <Text style={tw`text-2xl font-bold text-gray-900`}>12</Text>
               </View>
               <Text style={tw`text-sm font-medium text-gray-600`}>Pending Requests</Text>
-              <Text style={tw`text-xs text-orange-600 mt-1`}>+3 from yesterday</Text>
+              <Text style={[tw`text-xs mt-1`, { color: '#EA580C' }]}>+3 from yesterday</Text>
             </View>
             
-            <View style={tw`bg-white rounded-xl p-4 flex-1 min-w-36 shadow-sm border border-gray-100 mr-3 mb-3`}>
+            <View style={[tw`bg-white rounded-xl p-4 flex-1 border border-gray-100 mr-3 mb-3`, { minWidth: 144, boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }]}>
               <View style={tw`flex-row items-center justify-between mb-2`}>
                 <View style={[tw`p-2 rounded-lg`, { backgroundColor: '#E8F4FD' }]}>
                   <Calendar size={20} color={Colors.primary.blue} />
@@ -168,9 +179,9 @@ const LawyerConsultPage: React.FC = () => {
           </View>
           
           <View style={tw`flex-row flex-wrap -mr-3 mt-3`}>
-            <View style={tw`bg-white rounded-xl p-4 flex-1 min-w-36 shadow-sm border border-gray-100 mr-3`}>
+            <View style={[tw`bg-white rounded-xl p-4 flex-1 border border-gray-100 mr-3`, { minWidth: 144, boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }]}>
               <View style={tw`flex-row items-center justify-between mb-2`}>
-                <View style={tw`bg-green-100 p-2 rounded-lg`}>
+                <View style={[tw`p-2 rounded-lg`, { backgroundColor: '#DCFCE7' }]}>
                   <TrendingUp size={20} color="#16A34A" />
                 </View>
                 <Text style={tw`text-2xl font-bold text-gray-900`}>24</Text>
@@ -179,9 +190,9 @@ const LawyerConsultPage: React.FC = () => {
               <Text style={tw`text-xs text-green-600 mt-1`}>This month</Text>
             </View>
             
-            <View style={tw`bg-white rounded-xl p-4 flex-1 min-w-36 shadow-sm border border-gray-100 mr-3`}>
+            <View style={[tw`bg-white rounded-xl p-4 flex-1 border border-gray-100 mr-3`, { minWidth: 144, boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }]}>
               <View style={tw`flex-row items-center justify-between mb-2`}>
-                <View style={tw`bg-purple-100 p-2 rounded-lg`}>
+                <View style={[tw`p-2 rounded-lg`, { backgroundColor: '#F3E8FF' }]}>
                   <MessageCircle size={20} color="#7C3AED" />
                 </View>
                 <Text style={tw`text-2xl font-bold text-gray-900`}>156</Text>
@@ -200,12 +211,13 @@ const LawyerConsultPage: React.FC = () => {
                 <TouchableOpacity
                   key={filterOption}
                   style={[
-                    tw`px-5 py-3 rounded-full border shadow-sm mr-3`,
+                    tw`px-5 py-3 rounded-full border mr-3`,
+                    { boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' },
                     filter === filterOption 
                       ? [tw`border-0`, { backgroundColor: Colors.primary.blue }] 
                       : tw`bg-white border-gray-200`
                   ]}
-                  onPress={() => setFilter(filterOption as any)}
+                  onPress={() => setFilter(filterOption as 'all' | 'pending' | 'accepted' | 'completed')}
                   activeOpacity={0.7}
                 >
                   <Text style={[
@@ -239,11 +251,9 @@ const LawyerConsultPage: React.FC = () => {
             const statusStyle = getStatusColor(request.status);
             
             return (
-              <TouchableOpacity
+              <View
                 key={request.id}
-                style={tw`bg-white rounded-2xl p-5 mb-4 shadow-sm border border-gray-100`}
-                onPress={() => handleRequestPress(request.id)}
-                activeOpacity={0.92}
+                style={[tw`bg-white rounded-2xl p-5 mb-4 border border-gray-100`, { boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }]}
               >
                 {/* Enhanced Header */}
                 <View style={tw`flex-row items-start justify-between mb-4`}>
@@ -254,7 +264,7 @@ const LawyerConsultPage: React.FC = () => {
                         style={tw`w-12 h-12 rounded-full`}
                       />
                       {request.status === 'pending' && (
-                        <View style={tw`absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white`} />
+                        <View style={[tw`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white`, { backgroundColor: '#F97316' }]} />
                       )}
                     </View>
                     
@@ -264,7 +274,7 @@ const LawyerConsultPage: React.FC = () => {
                           {request.client.name}
                         </Text>
                       </View>
-                      <Text style={tw`text-sm text-gray-600 font-medium`}>Consultation Request</Text>
+                      <Text style={tw`text-sm text-gray-600 font-medium`} accessibilityLabel={`Consultation request from ${request.client.name}`}>Consultation Request</Text>
                     </View>
                   </View>
                   
@@ -284,7 +294,7 @@ const LawyerConsultPage: React.FC = () => {
                 </View>
 
                 {/* Message */}
-                <Text style={tw`text-sm text-gray-700 leading-5 mb-4`} numberOfLines={2}>
+                <Text style={tw`text-sm text-gray-700 leading-5 mb-4`} numberOfLines={2} accessibilityLabel={`Message: ${request.message}`}>
                   {request.message}
                 </Text>
 
@@ -359,8 +369,10 @@ const LawyerConsultPage: React.FC = () => {
                 {/* Action Buttons */}
                 {request.status === 'pending' && (
                   <TouchableOpacity
-                    style={[tw`py-3 rounded-xl mt-2 shadow-sm`, { backgroundColor: Colors.primary.blue }]}
-                    onPress={() => handleAcceptRequest(request.id)}
+                    style={[tw`py-3 rounded-xl mt-2`, { backgroundColor: Colors.primary.blue, boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }]}
+                    onPress={(event) => handleAcceptRequest(request.id, event)}
+                    accessibilityLabel={`Accept consultation request from ${request.client.name}`}
+                    accessibilityRole="button"
                     activeOpacity={0.85}
                   >
                     <Text style={tw`text-white text-center font-semibold text-sm`}>
@@ -371,14 +383,29 @@ const LawyerConsultPage: React.FC = () => {
                 
                 {request.status === 'accepted' && (
                   <TouchableOpacity 
-                    style={tw`bg-green-600 py-3 rounded-xl mt-2 shadow-sm`}
-                    onPress={() => console.log('Mark session completed', request.id)}
+                    style={[tw`bg-green-600 py-3 rounded-xl mt-2`, { boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }]}
+                    onPress={(event) => handleCompleteRequest(request.id, event)}
+                    accessibilityLabel={`Mark consultation with ${request.client.name} as completed`}
+                    accessibilityRole="button"
                     activeOpacity={0.85}
                   >
                     <Text style={tw`text-white text-center font-semibold text-sm`}>Mark Session Completed</Text>
                   </TouchableOpacity>
                 )}
-              </TouchableOpacity>
+                
+                {/* View Details Button */}
+                <TouchableOpacity
+                  style={tw`bg-gray-100 py-3 rounded-xl mt-3 border border-gray-200`}
+                  onPress={() => handleRequestPress(request.id)}
+                  accessibilityLabel={`View consultation details for ${request.client.name}`}
+                  accessibilityRole="button"
+                  activeOpacity={0.7}
+                >
+                  <Text style={tw`text-gray-700 text-center font-semibold text-sm`}>
+                    View Details
+                  </Text>
+                </TouchableOpacity>
+              </View>
             );
           })}
         </View>

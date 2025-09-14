@@ -1,15 +1,24 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Image, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Settings, Edit, Star, Users, Briefcase, LogOut, Shield, Mail, Phone, MapPin, Calendar, Award } from 'lucide-react-native';
+import { Settings, Edit, LogOut, Shield, Mail, Phone, MapPin, Clock, X } from 'lucide-react-native';
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 import Header from '../../components/Header';
 import Colors from '../../constants/Colors';
 import { useAuth } from '../../contexts/AuthContext';
+import tw from 'tailwind-react-native-classnames';
+
+interface TimeSlot {
+  id: string;
+  day: string;
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
+}
 
 const LawyerProfilePage: React.FC = () => {
   const { signOut } = useAuth();
-  const [profileData] = React.useState({
+  const [profileData] = useState({
     name: 'Atty. Maria Santos',
     email: 'maria.santos@lawfirm.com',
     phone: '+63 912 345 6789',
@@ -17,20 +26,23 @@ const LawyerProfilePage: React.FC = () => {
     avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
     specialization: 'Family & Criminal Law',
     experience: '8 years',
-    rating: 4.8,
-    totalReviews: 127,
     verificationStatus: 'Verified Lawyer',
     licenseNumber: 'PH-LAW-2016-001234',
     barAdmission: '2016',
+    bio: 'Experienced lawyer specializing in family and criminal law with a passion for justice and client advocacy.',
   });
 
-  const [stats] = React.useState({
-    totalCases: 45,
-    activeCases: 12,
-    totalClients: 38,
-    consultations: 156,
-    successRate: 92,
-  });
+  const [availabilitySlots, setAvailabilitySlots] = useState<TimeSlot[]>([
+    { id: '1', day: 'Monday', startTime: '09:00', endTime: '17:00', isActive: true },
+    { id: '2', day: 'Tuesday', startTime: '09:00', endTime: '17:00', isActive: true },
+    { id: '3', day: 'Wednesday', startTime: '09:00', endTime: '17:00', isActive: true },
+    { id: '4', day: 'Thursday', startTime: '09:00', endTime: '17:00', isActive: true },
+    { id: '5', day: 'Friday', startTime: '09:00', endTime: '17:00', isActive: true },
+    { id: '6', day: 'Saturday', startTime: '10:00', endTime: '14:00', isActive: false },
+    { id: '7', day: 'Sunday', startTime: '10:00', endTime: '14:00', isActive: false },
+  ]);
+
+  const [isEditingAvailability, setIsEditingAvailability] = useState(false);
 
   const handleEditProfile = () => {
     console.log('Edit profile');
@@ -43,15 +55,72 @@ const LawyerProfilePage: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Logout error:', error);
+    Alert.alert(
+      'Confirm Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await signOut();
+            } catch (error) {
+              console.error('Logout error:', error);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const toggleSlotStatus = (slotId: string) => {
+    setAvailabilitySlots(prev => 
+      prev.map(slot => 
+        slot.id === slotId ? { ...slot, isActive: !slot.isActive } : slot
+      )
+    );
+  };
+
+  const updateSlotTime = (slotId: string, field: 'startTime' | 'endTime', value: string) => {
+    // Validate time format (HH:MM)
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timeRegex.test(value)) return;
+
+    setAvailabilitySlots(prev => 
+      prev.map(slot => 
+        slot.id === slotId ? { ...slot, [field]: value } : slot
+      )
+    );
+  };
+
+  const validateTimeSlot = (startTime: string, endTime: string): boolean => {
+    const start = new Date(`2000-01-01T${startTime}:00`);
+    const end = new Date(`2000-01-01T${endTime}:00`);
+    return start < end;
+  };
+
+
+  const saveAvailability = () => {
+    // Validate all active slots have valid times
+    const invalidSlots = availabilitySlots.filter(slot => 
+      slot.isActive && !validateTimeSlot(slot.startTime, slot.endTime)
+    );
+
+    if (invalidSlots.length > 0) {
+      Alert.alert('Invalid Time Slots', 'Please fix the time slots with invalid times before saving.');
+      return;
     }
+
+    // TODO: Save availability to backend
+    console.log('Saving availability:', availabilitySlots);
+    setIsEditingAvailability(false);
+    Alert.alert('Success', 'Availability updated successfully!');
   };
 
   return (
-      <SafeAreaView style={styles.container}>
+    <SafeAreaView style={tw`flex-1 bg-gray-50`}>
       <Header 
         variant="lawyer-profile"
         title="Profile"
@@ -59,296 +128,243 @@ const LawyerProfilePage: React.FC = () => {
         onSettingsPress={handleSettings}
       />
       
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={tw`flex-1`} showsVerticalScrollIndicator={false} contentContainerStyle={tw`pb-24`}>
         {/* Profile Header */}
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarContainer}>
-            <Image source={{ uri: profileData.avatar }} style={styles.avatar} />
-            <View style={styles.verificationBadge}>
-              <Shield size={16} color="#059669" fill="#059669" />
-            </View>
-          </View>
-          
-          <View style={styles.profileInfo}>
-            <Text style={styles.name}>{profileData.name}</Text>
-            <Text style={styles.specialization}>{profileData.specialization}</Text>
-            <View style={styles.verificationContainer}>
-              <Text style={styles.verificationText}>{profileData.verificationStatus}</Text>
+        <View style={tw`bg-white p-4 border-b border-gray-200`}>
+          <View style={tw`flex-row items-center`}>
+            <View style={tw`relative mr-4`}>
+              <Image 
+                source={{ uri: profileData.avatar }} 
+                style={tw`w-20 h-20 rounded-full`}
+              />
+              <View style={[tw`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center`, { backgroundColor: '#ECFDF5' }]}>
+                <Shield size={14} color="#059669" fill="#059669" />
+              </View>
             </View>
             
-            <View style={styles.ratingContainer}>
-              <Star size={16} color="#F59E0B" fill="#F59E0B" />
-              <Text style={styles.rating}>{profileData.rating}</Text>
-              <Text style={styles.reviewCount}>({profileData.totalReviews} reviews)</Text>
+            <View style={tw`flex-1`}>
+              <Text style={tw`text-xl font-bold text-gray-900 mb-1`}>{profileData.name}</Text>
+              <Text style={tw`text-sm text-gray-600 mb-2`}>{profileData.specialization}</Text>
+              <View style={[tw`px-2 py-1 rounded-md self-start`, { backgroundColor: '#ECFDF5' }]}>
+                <Text style={tw`text-xs font-semibold text-green-700`}>{profileData.verificationStatus}</Text>
+              </View>
             </View>
+            
+            <TouchableOpacity 
+              style={[tw`p-2 rounded-full`, { backgroundColor: '#F3F4F6' }]}
+              onPress={handleEditProfile}
+            >
+              <Edit size={18} color={Colors.primary.blue} />
+            </TouchableOpacity>
           </View>
           
-          <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
-            <Edit size={18} color={Colors.primary.blue} />
-          </TouchableOpacity>
+          {/* Bio Section */}
+          <View style={tw`mt-4 pt-4 border-t border-gray-100`}>
+            <Text style={tw`text-sm text-gray-700 leading-5`}>{profileData.bio}</Text>
+          </View>
         </View>
 
         {/* Contact Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact Information</Text>
-          <View style={styles.contactItem}>
-            <Mail size={18} color="#6B7280" />
-            <Text style={styles.contactText}>{profileData.email}</Text>
-          </View>
-          <View style={styles.contactItem}>
-            <Phone size={18} color="#6B7280" />
-            <Text style={styles.contactText}>{profileData.phone}</Text>
-          </View>
-          <View style={styles.contactItem}>
-            <MapPin size={18} color="#6B7280" />
-            <Text style={styles.contactText}>{profileData.location}</Text>
+        <View style={tw`bg-white mt-3 p-4`}>
+          <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>Contact Information</Text>
+          <View style={tw`flex flex-col`}>
+            <View style={tw`flex-row items-center`}>
+              <View style={[tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`, { backgroundColor: '#F3F4F6' }]}>
+                <Mail size={18} color="#6B7280" />
+              </View>
+              <Text style={tw`text-sm text-gray-700 flex-1`}>{profileData.email}</Text>
+            </View>
+            <View style={tw`flex-row items-center`}>
+              <View style={[tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`, { backgroundColor: '#F3F4F6' }]}>
+                <Phone size={18} color="#6B7280" />
+              </View>
+              <Text style={tw`text-sm text-gray-700 flex-1`}>{profileData.phone}</Text>
+            </View>
+            <View style={tw`flex-row items-center`}>
+              <View style={[tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`, { backgroundColor: '#F3F4F6' }]}>
+                <MapPin size={18} color="#6B7280" />
+              </View>
+              <Text style={tw`text-sm text-gray-700 flex-1`}>{profileData.location}</Text>
+            </View>
           </View>
         </View>
 
         {/* Professional Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Professional Information</Text>
-          <View style={styles.professionalGrid}>
-            <View style={styles.professionalItem}>
-              <Text style={styles.professionalLabel}>Experience</Text>
-              <Text style={styles.professionalValue}>{profileData.experience}</Text>
+        <View style={tw`bg-white mt-3 p-4`}>
+          <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>Professional Information</Text>
+          <View style={tw`flex-row flex-wrap -mx-2`}>
+            <View style={tw`w-1/2 px-2 mb-4`}>
+              <Text style={tw`text-xs text-gray-500 mb-1`}>Experience</Text>
+              <Text style={tw`text-sm font-semibold text-gray-900`}>{profileData.experience}</Text>
             </View>
-            <View style={styles.professionalItem}>
-              <Text style={styles.professionalLabel}>Bar Admission</Text>
-              <Text style={styles.professionalValue}>{profileData.barAdmission}</Text>
+            <View style={tw`w-1/2 px-2 mb-4`}>
+              <Text style={tw`text-xs text-gray-500 mb-1`}>Bar Admission</Text>
+              <Text style={tw`text-sm font-semibold text-gray-900`}>{profileData.barAdmission}</Text>
             </View>
-            <View style={styles.professionalItem}>
-              <Text style={styles.professionalLabel}>License Number</Text>
-              <Text style={styles.professionalValue}>{profileData.licenseNumber}</Text>
-            </View>
-            <View style={styles.professionalItem}>
-              <Text style={styles.professionalLabel}>Success Rate</Text>
-              <Text style={styles.professionalValue}>{stats.successRate}%</Text>
+            <View style={tw`w-full px-2`}>
+              <Text style={tw`text-xs text-gray-500 mb-1`}>License Number</Text>
+              <Text style={tw`text-sm font-semibold text-gray-900`}>{profileData.licenseNumber}</Text>
             </View>
           </View>
         </View>
 
-        {/* Statistics */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Statistics</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <Briefcase size={24} color={Colors.primary.blue} />
-              <Text style={styles.statNumber}>{stats.totalCases}</Text>
-              <Text style={styles.statLabel}>Total Cases</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Calendar size={24} color={Colors.primary.blue} />
-              <Text style={styles.statNumber}>{stats.activeCases}</Text>
-              <Text style={styles.statLabel}>Active Cases</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Users size={24} color={Colors.primary.blue} />
-              <Text style={styles.statNumber}>{stats.totalClients}</Text>
-              <Text style={styles.statLabel}>Total Clients</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Award size={24} color={Colors.primary.blue} />
-              <Text style={styles.statNumber}>{stats.consultations}</Text>
-              <Text style={styles.statLabel}>Consultations</Text>
-            </View>
+        {/* Availability Management */}
+        <View style={tw`bg-white mt-3 p-4`}>
+          <View style={tw`flex-row items-center justify-between mb-4`}>
+            <Text style={tw`text-lg font-bold text-gray-900`}>Consultation Availability</Text>
+            <TouchableOpacity
+              style={[tw`px-3 py-2 rounded-lg flex-row items-center`, { backgroundColor: isEditingAvailability ? '#FEE2E2' : '#E8F4FD' }]}
+              onPress={() => setIsEditingAvailability(!isEditingAvailability)}
+            >
+              {isEditingAvailability ? (
+                <X size={16} color="#DC2626" />
+              ) : (
+                <Edit size={16} color={Colors.primary.blue} />
+              )}
+              <Text style={[tw`text-sm font-medium ml-2`, { color: isEditingAvailability ? '#DC2626' : Colors.primary.blue }]}>
+                {isEditingAvailability ? 'Cancel' : 'Edit'}
+              </Text>
+            </TouchableOpacity>
           </View>
+          
+          <Text style={tw`text-sm text-gray-600 mb-4`}>
+            Set your available hours for client consultations. This will be shown to clients when booking.
+          </Text>
+          
+          <View style={tw`flex flex-col`}>
+            {availabilitySlots.map((slot) => (
+              <View key={slot.id} style={tw`py-3 px-4 bg-gray-50 rounded-lg`}>
+                <View style={tw`flex-row items-center justify-between mb-3`}>
+                  <Text style={tw`text-sm font-medium text-gray-900`}>{slot.day}</Text>
+                  
+                  {isEditingAvailability && (
+                    <TouchableOpacity
+                      style={[tw`w-12 h-6 rounded-full border-2 flex-row`, 
+                        slot.isActive ? { backgroundColor: Colors.primary.blue, borderColor: Colors.primary.blue } : { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB' }
+                      ]}
+                      onPress={() => toggleSlotStatus(slot.id)}
+                    >
+                      <View style={[tw`w-4 h-4 rounded-full bg-white my-auto`, 
+                        slot.isActive ? tw`ml-6` : tw`ml-1`
+                      ]} />
+                    </TouchableOpacity>
+                  )}
+                  
+                  {!isEditingAvailability && (
+                    <View style={[tw`w-2 h-2 rounded-full`, 
+                      { backgroundColor: slot.isActive ? '#10B981' : '#D1D5DB' }
+                    ]} />
+                  )}
+                </View>
+
+                {slot.isActive ? (
+                  isEditingAvailability ? (
+                    <View style={tw`flex-row items-center space-x-3`}>
+                      <View style={tw`flex-1`}>
+                        <Text style={tw`text-xs text-gray-500 mb-1`}>Start Time</Text>
+                        <View style={tw`flex-row items-center bg-white rounded-lg border border-gray-200 px-3 py-2`}>
+                          <Clock size={16} color="#6B7280" />
+                          <TextInput
+                            style={tw`flex-1 ml-2 text-sm text-gray-900`}
+                            value={slot.startTime}
+                            onChangeText={(value) => updateSlotTime(slot.id, 'startTime', value)}
+                            placeholder="09:00"
+                            keyboardType="numeric"
+                            maxLength={5}
+                          />
+                        </View>
+                      </View>
+                      
+                      <View style={tw`flex-1`}>
+                        <Text style={tw`text-xs text-gray-500 mb-1`}>End Time</Text>
+                        <View style={tw`flex-row items-center bg-white rounded-lg border border-gray-200 px-3 py-2`}>
+                          <Clock size={16} color="#6B7280" />
+                          <TextInput
+                            style={tw`flex-1 ml-2 text-sm text-gray-900`}
+                            value={slot.endTime}
+                            onChangeText={(value) => updateSlotTime(slot.id, 'endTime', value)}
+                            placeholder="17:00"
+                            keyboardType="numeric"
+                            maxLength={5}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={tw`flex-row items-center`}>
+                      <Clock size={14} color="#6B7280" />
+                      <Text style={tw`text-xs text-gray-600 ml-1`}>
+                        {slot.startTime} - {slot.endTime}
+                      </Text>
+                    </View>
+                  )
+                ) : (
+                  <Text style={tw`text-xs text-gray-500`}>Unavailable</Text>
+                )}
+
+                {isEditingAvailability && slot.isActive && !validateTimeSlot(slot.startTime, slot.endTime) && (
+                  <View style={tw`mt-2 p-2 bg-red-50 rounded-md`}>
+                    <Text style={tw`text-xs text-red-600`}>
+                      End time must be after start time
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+          
+          {isEditingAvailability && (
+            <View style={tw`mt-6 pt-4 border-t border-gray-200`}>
+              <TouchableOpacity
+                style={[tw`py-3 rounded-xl flex items-center justify-center`, { backgroundColor: Colors.primary.blue }]}
+                onPress={saveAvailability}
+                activeOpacity={0.8}
+              >
+                <Text style={tw`text-white font-semibold text-base`}>Save Availability</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <TouchableOpacity style={styles.actionItem} onPress={handleEditProfile}>
-            <Edit size={20} color="#374151" />
-            <Text style={styles.actionText}>Edit Profile</Text>
+        <View style={tw`bg-white mt-3 p-4`}>
+          <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>Quick Actions</Text>
+          
+          <TouchableOpacity 
+            style={tw`flex-row items-center py-4 border-b border-gray-100`}
+            onPress={handleEditProfile}
+          >
+            <View style={[tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`, { backgroundColor: '#F3F4F6' }]}>
+              <Edit size={18} color="#374151" />
+            </View>
+            <Text style={tw`text-base text-gray-900 flex-1`}>Edit Profile</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionItem} onPress={handleSettings}>
-            <Settings size={20} color="#374151" />
-            <Text style={styles.actionText}>Settings</Text>
+          
+          <TouchableOpacity 
+            style={tw`flex-row items-center py-4 border-b border-gray-100`}
+            onPress={handleSettings}
+          >
+            <View style={[tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`, { backgroundColor: '#F3F4F6' }]}>
+              <Settings size={18} color="#374151" />
+            </View>
+            <Text style={tw`text-base text-gray-900 flex-1`}>Settings</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionItem, styles.logoutItem]} onPress={handleLogout}>
-            <LogOut size={20} color="#DC2626" />
-            <Text style={[styles.actionText, styles.logoutText]}>Logout</Text>
+          
+          <TouchableOpacity 
+            style={tw`flex-row items-center py-4`}
+            onPress={handleLogout}
+          >
+            <View style={[tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`, { backgroundColor: '#FEE2E2' }]}>
+              <LogOut size={18} color="#DC2626" />
+            </View>
+            <Text style={tw`text-base text-red-600 flex-1`}>Logout</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={styles.bottomSpacer} />
       </ScrollView>
       <LawyerNavbar activeTab="profile" />
-      </SafeAreaView>
+    </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  content: {
-    flex: 1,
-  },
-  profileHeader: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 16,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-  },
-  verificationBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#ECFDF5',
-    borderRadius: 12,
-    padding: 4,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  name: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  specialization: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  verificationContainer: {
-    marginBottom: 8,
-  },
-  verificationText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rating: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#F59E0B',
-    marginLeft: 4,
-    marginRight: 4,
-  },
-  reviewCount: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  editButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-  },
-  section: {
-    backgroundColor: '#FFFFFF',
-    marginTop: 12,
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  contactText: {
-    fontSize: 14,
-    color: '#374151',
-    marginLeft: 12,
-  },
-  professionalGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  professionalItem: {
-    width: '48%',
-    marginBottom: 16,
-  },
-  professionalLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  professionalValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  statCard: {
-    width: '48%',
-    backgroundColor: '#F9FAFB',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  actionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  actionText: {
-    fontSize: 16,
-    color: '#374151',
-    marginLeft: 12,
-  },
-  logoutItem: {
-    borderBottomWidth: 0,
-  },
-  logoutText: {
-    color: '#DC2626',
-  },
-  bottomSpacer: {
-    height: 80,
-  },
-});
 
 export default LawyerProfilePage;
