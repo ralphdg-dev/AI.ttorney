@@ -1,5 +1,5 @@
-import React from "react";
-import { View, useWindowDimensions } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, useWindowDimensions, Alert, ActivityIndicator, TouchableOpacity } from "react-native";
 import Colors from "@/constants/Colors";
 import { Card } from "@/components/ui/card";
 import { Heading } from "@/components/ui/heading";
@@ -9,6 +9,9 @@ import { VStack } from "@/components/ui/vstack";
 import { Divider } from "@/components/ui/divider";
 import { Accordion, AccordionContent, AccordionHeader, AccordionIcon, AccordionItem, AccordionTitleText, AccordionTrigger, AccordionContentText } from "@/components/ui/accordion";
 import { Star, Languages, BookText, Quote } from "lucide-react-native";
+import { CacheService, generateTermCacheKey } from "../../app/glossary/cacheService";
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface TermDetailData {
   id: string;
@@ -25,12 +28,139 @@ export interface TermDetailData {
 }
 
 interface TermDetailProps {
-  term: TermDetailData;
+  termId: string;
 }
 
-export default function TermDetail({ term }: TermDetailProps) {
+export default function TermDetail({ termId }: TermDetailProps) {
   const { width } = useWindowDimensions();
   const isWide = width >= 800;
+  const [term, setTerm] = useState<TermDetailData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState<boolean>(false);
+
+  const formatTerm = (apiTerm: any): TermDetailData => {
+    const placeholderText = "Information not available";
+    return {
+      id: apiTerm.id.toString(),
+      englishTerm: apiTerm.term_en || placeholderText,
+      filipinoTerm: apiTerm.term_fil || placeholderText,
+      englishDefinition: apiTerm.definition_en || placeholderText,
+      filipinoDefinition: apiTerm.definition_fil || placeholderText,
+      exampleUsage: {
+        english: apiTerm.example_en || undefined,
+        filipino: apiTerm.example_fil || undefined,
+      },
+      category: apiTerm.category || undefined,
+      isFavorite: false,
+    };
+  };
+
+  const fetchTermDetail = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const cacheKey = generateTermCacheKey(termId);
+      const isConnected = await CacheService.isConnected();
+      setIsOffline(!isConnected);
+
+      const cachedData = await CacheService.get<any>(cacheKey);
+
+      if (cachedData) {
+        console.log("Using cached term data for:", cacheKey);
+        const formattedTerm = formatTerm(cachedData);
+        setTerm(formattedTerm);
+
+        if (!isConnected) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (!isConnected && !cachedData) {
+        throw new Error("No internet connection and no cached data available");
+      }
+
+      const response = await fetch(`${API_BASE_URL}/glossary/terms/${termId}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const formattedTerm = formatTerm(data);
+      setTerm(formattedTerm);
+
+      await CacheService.set(cacheKey, data);
+    } catch (err) {
+      console.error("Error fetching term detail:", err);
+      const errorMessage =
+        err instanceof Error ? err.message : "An unknown error occurred";
+
+      setError(errorMessage);
+
+      if (!isOffline && !term) {
+        Alert.alert(
+          "Connection Error",
+          `Could not fetch term details. Error: ${errorMessage}`,
+          [{ text: "OK" }]
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTermDetail();
+  }, [termId]);
+
+  const handleRefresh = async (): Promise<void> => {
+    await fetchTermDetail();
+  };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F9FAFB" }}>
+        <ActivityIndicator size="large" color={Colors.primary.blue} />
+        <GSText className="mt-4" style={{ color: Colors.text.sub }}>
+          {isOffline ? "Loading cached data..." : "Loading term details..."}
+        </GSText>
+      </View>
+    );
+  }
+
+  if (error && !term) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F9FAFB", padding: 24 }}>
+        <GSText size="lg" bold style={{ color: Colors.text.head, marginBottom: 8 }}>
+          {isOffline ? "Offline Mode" : "Connection Error"}
+        </GSText>
+        <GSText style={{ color: Colors.text.sub, textAlign: "center", marginBottom: 16 }}>
+          {isOffline
+            ? "Unable to load term details. Please check your connection."
+            : "Unable to load term details. Please check your connection and try again."}
+        </GSText>
+        {!isOffline && (
+          <TouchableOpacity
+            onPress={handleRefresh}
+            style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: Colors.primary.blue, borderRadius: 8 }}
+          >
+            <GSText style={{ color: "white" }}>Retry</GSText>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }
+
+  if (!term) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F9FAFB" }}>
+        <GSText style={{ color: Colors.text.sub }}>Term not found</GSText>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F9FAFB" }}>
@@ -167,4 +297,3 @@ export default function TermDetail({ term }: TermDetailProps) {
     </View>
   );
 }
-

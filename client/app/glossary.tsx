@@ -21,16 +21,14 @@ import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
 import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import { SidebarProvider, SidebarWrapper } from "@/components/AppSidebar";
+import {
+  CacheService,
+  generateGlossaryCacheKey,
+} from "./glossary/cacheService";
 
-// Supabase Configuration
-import { createClient } from "@supabase/supabase-js";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
-// Use environment variables for secure access
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
-
-// Initialize Supabase client
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const ITEMS_PER_PAGE = 10;
 
 // Pagination constants
 const ITEMS_PER_PAGE = 10;
@@ -44,6 +42,9 @@ export default function GlossaryScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [isOffline, setIsOffline] = useState<boolean>(false);
   const { width } = useWindowDimensions();
   const flatListRef = useRef<FlatList>(null);
   const horizontalPadding = 24;
@@ -53,78 +54,131 @@ export default function GlossaryScreen() {
     Math.min(3, Math.floor((width - horizontalPadding * 2) / minCardWidth))
   );
 
+  useEffect(() => {
+    const checkNetwork = async () => {
+      const connected = await CacheService.isConnected();
+      setIsOffline(!connected);
+    };
+
+    checkNetwork();
+
+    CacheService.clearExpired();
+  }, []);
+
   const tabOptions = [
     { id: "guides", label: "Legal Guides" },
     { id: "terms", label: "Legal Terms" },
   ];
 
-  // Fetch legal terms directly from Supabase
-  const fetchLegalTerms = async () => {
+  const formatTerms = (apiTerms: any[]): TermItem[] => {
+    const placeholderText = "Information not available";
+    return apiTerms.map((item: any) => ({
+      id: item.id.toString(),
+      title: item.term_en || placeholderText,
+      filipinoTerm: item.term_fil || placeholderText,
+      definition: item.definition_en || placeholderText,
+      filipinoDefinition: item.definition_fil || placeholderText,
+      example: item.example_en || placeholderText,
+      filipinoExample: item.example_fil || placeholderText,
+      category: item.category || "others",
+    }));
+  };
+
+  const fetchLegalTerms = async (
+    page = 1,
+    category = activeCategory,
+    search = searchQuery
+  ) => {
     try {
       setLoading(true);
       setError(null);
 
-      const { data, error: supabaseError } = await supabase
-        .from("glossary_terms")
-        .select(
-          "id, term_en, term_fil, definition_en, definition_fil, example_en, example_fil, category, created_at"
-        )
-        .order("term_en", { ascending: true });
+      const cacheKey = generateGlossaryCacheKey(page, category, search);
+      const isConnected = await CacheService.isConnected();
+      setIsOffline(!isConnected);
 
-      if (supabaseError) {
-        throw new Error(supabaseError.message);
-      }
+      const cachedData = await CacheService.get<any>(cacheKey);
 
-      if (data) {
-        const placeholderText = "wala pa HHAHHA";
-        const formattedTerms: TermItem[] = data.map((item: any) => ({
-          id: item.id,
-          title: item.term_en || placeholderText,
-          filipinoTerm: item.term_fil || placeholderText,
-          definition: item.definition_en || placeholderText,
-          filipinoDefinition: item.definition_fil || placeholderText,
-          example: item.example_en || placeholderText,
-          filipinoExample: item.example_fil || placeholderText,
-          category: item.category || placeholderText,
-        }));
+      if (cachedData) {
+        console.log("Using cached data for:", cacheKey);
+        const formattedTerms = formatTerms(
+          cachedData.terms || cachedData.data?.terms || []
+        );
         setTerms(formattedTerms);
-        setCurrentPage(1); // Reset to first page when data changes
+        setTotalPages(cachedData.pagination?.pages || 1);
+        setTotalCount(cachedData.pagination?.total || formattedTerms.length);
+        setCurrentPage(page);
+        if (!isConnected) {
+          setLoading(false);
+          return;
+        }
       }
+
+      if (!isConnected && !cachedData) {
+        throw new Error("No internet connection and no cached data available");
+      }
+
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: ITEMS_PER_PAGE.toString(),
+      });
+
+      if (category && category !== "all") {
+        params.append("category", category);
+      }
+
+      if (search && search.trim()) {
+        params.append("search", search.trim());
+      }
+
+      const response = await fetch(`${API_BASE_URL}/glossary/terms?${params}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      const formattedTerms = formatTerms(data.terms);
+      setTerms(formattedTerms);
+      setTotalPages(data.pagination.pages);
+      setTotalCount(data.pagination.total);
+      setCurrentPage(page);
+
+      await CacheService.set(cacheKey, {
+        terms: data.terms,
+        pagination: data.pagination,
+      });
     } catch (err) {
-      console.error("Error fetching legal terms from Supabase:", err);
+      console.error("Error fetching legal terms:", err);
       const errorMessage =
-        err instanceof Error ? err.message : "An unknown error occurred.";
+        err instanceof Error ? err.message : "An unknown error occurred";
+
       setError(errorMessage);
 
-      Alert.alert(
-        "Connection Error",
-        `Could not fetch terms from Supabase. Error: ${errorMessage}`,
-        [{ text: "OK" }]
-      );
+      if (!isOffline && !terms.length) {
+        Alert.alert(
+          "Connection Error",
+          `Could not fetch terms from server. Error: ${errorMessage}`,
+          [{ text: "OK" }]
+        );
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLegalTerms();
+    fetchLegalTerms(1);
   }, []);
 
-  const filteredByCategory = useMemo(() => {
-    return terms.filter((t) =>
-      activeCategory === "all"
-        ? true
-        : t.category?.toLowerCase() === activeCategory.toLowerCase()
-    );
-  }, [terms, activeCategory]);
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchLegalTerms(1, activeCategory, searchQuery);
+    }, 500);
 
-  const termsToRender: TermItem[] = useMemo(() => {
-    return filteredByCategory.filter((t) =>
-      `${t.title} ${t.filipinoTerm ?? ""}`
-        .toLowerCase()
-        .includes(searchQuery.trim().toLowerCase())
-    );
-  }, [filteredByCategory, searchQuery]);
+    return () => clearTimeout(timeoutId);
+  }, [activeCategory, searchQuery]);
 
   // Pagination logic
   const totalPages = Math.ceil(termsToRender.length / ITEMS_PER_PAGE);
@@ -150,7 +204,122 @@ export default function GlossaryScreen() {
   };
 
   const handleRefresh = async (): Promise<void> => {
-    await fetchLegalTerms();
+    await fetchLegalTerms(currentPage);
+  };
+
+  const handlePageChange = (page: number): void => {
+    fetchLegalTerms(page);
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
+
+  const renderPaginationControls = () => {
+    if (totalPages <= 1) return null;
+
+    const getVisiblePages = () => {
+      if (totalPages <= 5) {
+        return Array.from({ length: totalPages }, (_, i) => i + 1);
+      }
+
+      if (currentPage <= 3) {
+        return [1, 2, 3, 4, "...", totalPages];
+      }
+
+      if (currentPage >= totalPages - 2) {
+        return [
+          1,
+          "...",
+          totalPages - 3,
+          totalPages - 2,
+          totalPages - 1,
+          totalPages,
+        ];
+      }
+
+      return [
+        1,
+        "...",
+        currentPage - 1,
+        currentPage,
+        currentPage + 1,
+        "...",
+        totalPages,
+      ];
+    };
+
+    const visiblePages = getVisiblePages();
+
+    return (
+      <View style={tw`flex-col items-center`}>
+        {/* Pagination controls */}
+        <View style={tw`flex-row justify-center items-center`}>
+          <TouchableOpacity
+            onPress={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            style={tw`p-3 mx-1 rounded-full ${
+              currentPage === 1
+                ? "bg-gray-200 opacity-50"
+                : "bg-white border border-gray-300"
+            }`}
+          >
+            <Ionicons
+              name="chevron-back"
+              size={20}
+              color={currentPage === 1 ? "#9CA3AF" : Colors.primary.blue}
+            />
+          </TouchableOpacity>
+
+          {visiblePages.map((page, index) =>
+            page === "..." ? (
+              <View key={`ellipsis-${index}`} style={tw`px-2 py-3`}>
+                <GSText className="text-gray-500">...</GSText>
+              </View>
+            ) : (
+              <TouchableOpacity
+                key={page}
+                onPress={() => handlePageChange(page as number)}
+                style={tw`w-10 h-10 mx-1 rounded-lg justify-center items-center ${
+                  currentPage === page
+                    ? "bg-gray-300"
+                    : "bg border border-gray-300"
+                }`}
+              >
+                <GSText
+                  className={
+                    currentPage === page
+                      ? "text-white font-bold"
+                      : "text-gray-700"
+                  }
+                >
+                  {page}
+                </GSText>
+              </TouchableOpacity>
+            )
+          )}
+
+          <TouchableOpacity
+            onPress={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            style={tw`p-3 mx-1 rounded-full ${
+              currentPage === totalPages
+                ? "bg-gray-200 opacity-50"
+                : "bg-white border border-gray-300"
+            }`}
+          >
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={
+                currentPage === totalPages ? "#9CA3AF" : Colors.primary.blue
+              }
+            />
+          </TouchableOpacity>
+        </View>
+
+        <GSText size="xs" className="mt-3 text-gray-500">
+          Showing {terms.length} of {totalCount} results
+        </GSText>
+      </View>
+    );
   };
 
   const handlePageChange = (page: number): void => {
@@ -294,12 +463,12 @@ export default function GlossaryScreen() {
     if (loading) {
       return (
         <View style={tw`flex-1 justify-center items-center py-10`}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <ActivityIndicator size="large" color={Colors.primary.blue} />
           <GSText
             className="mt-4 text-center"
             style={{ color: Colors.text.sub }}
           >
-            Loading legal terms...
+            {isOffline ? "Loading cached data..." : "Loading legal terms..."}
           </GSText>
         </View>
       );
@@ -308,37 +477,44 @@ export default function GlossaryScreen() {
     if (error) {
       return (
         <View style={tw`flex-1 justify-center items-center py-10 px-6`}>
-          <Ionicons name="cloud-offline" size={48} color={Colors.text.sub} />
+          <Ionicons
+            name={isOffline ? "cloud-offline" : "warning"}
+            size={48}
+            color={Colors.text.sub}
+          />
           <GSText
             className="mt-4 text-center font-bold"
-            style={{ color: Colors.text.main }}
+            style={{ color: Colors.text.head }}
           >
-            Connection Error
+            {isOffline ? "Offline Mode" : "Connection Error"}
           </GSText>
           <GSText
             className="mt-2 text-center"
             style={{ color: Colors.text.sub }}
           >
-            Unable to load legal terms. Please check your connection and try
-            again.
+            {isOffline
+              ? "Using cached data. Some features may be limited."
+              : "Unable to load legal terms. Please check your connection and try again."}
           </GSText>
-          <TouchableOpacity
-            onPress={handleRefresh}
-            style={tw`mt-4 px-4 py-2 bg-blue-500 rounded-lg`}
-          >
-            <GSText className="text-white font-semibold">Retry</GSText>
-          </TouchableOpacity>
+          {!isOffline && (
+            <TouchableOpacity
+              onPress={() => fetchLegalTerms(currentPage)}
+              style={tw`mt-4 px-4 py-2 bg-blue-500 rounded-lg`}
+            >
+              <GSText className="text-white font-semibold">Retry</GSText>
+            </TouchableOpacity>
+          )}
         </View>
       );
     }
 
-    if (termsToRender.length === 0 && searchQuery.trim()) {
+    if (terms.length === 0 && searchQuery.trim()) {
       return (
         <View style={tw`flex-1 justify-center items-center py-10`}>
           <Ionicons name="search" size={48} color={Colors.text.sub} />
           <GSText
             className="mt-4 text-center font-bold"
-            style={{ color: Colors.text.main }}
+            style={{ color: Colors.text.head }}
           >
             No results found
           </GSText>
@@ -346,7 +522,9 @@ export default function GlossaryScreen() {
             className="mt-2 text-center"
             style={{ color: Colors.text.sub }}
           >
-            Try adjusting your search terms or category filter.
+            {isOffline
+              ? "No cached results for this search. Connect to internet to search."
+              : "Try adjusting your search terms or category filter."}
           </GSText>
         </View>
       );
@@ -357,12 +535,14 @@ export default function GlossaryScreen() {
         <Ionicons name="book" size={48} color={Colors.text.sub} />
         <GSText
           className="mt-4 text-center font-bold"
-          style={{ color: Colors.text.main }}
+          style={{ color: Colors.text.head }}
         >
           No terms available
         </GSText>
         <GSText className="mt-2 text-center" style={{ color: Colors.text.sub }}>
-          Legal terms will appear here once loaded.
+          {isOffline
+            ? "No cached data available. Connect to internet to load terms."
+            : "Legal terms will appear here once loaded."}
         </GSText>
       </View>
     );
@@ -409,7 +589,6 @@ export default function GlossaryScreen() {
               value={searchQuery}
               onChangeText={(text) => {
                 setSearchQuery(text);
-                setCurrentPage(1); // Reset to first page when search changes
               }}
               placeholder="Search legal terms..."
               placeholderTextColor="#9CA3AF"
@@ -424,7 +603,7 @@ export default function GlossaryScreen() {
 
         <FlatList
           ref={flatListRef}
-          data={paginatedTerms}
+          data={terms}
           key={`${numColumns}-${activeCategory}-${currentPage}`}
           keyExtractor={(item) => item.id}
           numColumns={numColumns}
@@ -432,7 +611,7 @@ export default function GlossaryScreen() {
             !loading && !error ? renderListHeader : undefined
           }
           ListFooterComponent={
-            !loading && !error && termsToRender.length > 0
+            !loading && !error && terms.length > 0
               ? renderListFooter
               : undefined
           }

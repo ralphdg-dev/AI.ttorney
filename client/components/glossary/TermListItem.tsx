@@ -8,14 +8,14 @@ import { Card } from "@/components/ui/card";
 
 export interface TermItem {
   id: string;
-  title: string; // maps to term_en from database
-  definition: string; // maps to definition_en from database (changed from 'summary')
+  title: string;
+  definition: string;
   isFavorite?: boolean;
-  filipinoTerm?: string; // maps to term_fil from database
-  filipinoDefinition?: string; // maps to definition_fil from database
-  example?: string; // maps to example_en from database
-  filipinoExample?: string; // maps to example_fil from database
-  category?: string; // maps to category from database
+  filipinoTerm?: string; 
+  filipinoDefinition?: string; 
+  example?: string;
+  filipinoExample?: string;
+  category?: string;
 }
 
 interface TermListItemProps {
