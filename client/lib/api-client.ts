@@ -159,7 +159,7 @@ class ApiClient {
 
   async getLegalArticleCategories(): Promise<ApiResponse> {
     return this.request('/api/legal/categories');
-  // OTP endpoints
+  }  // OTP endpoints
   async sendOTP(data: {
     email: string;
     otp_type: 'email_verification' | 'password_reset';

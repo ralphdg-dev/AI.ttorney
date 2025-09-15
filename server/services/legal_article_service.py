@@ -2,6 +2,7 @@ from typing import List, Optional
 from services.supabase_service import SupabaseService
 from models.legal_article import LegalArticle, SearchParams
 import logging
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -11,67 +12,79 @@ class LegalArticleService:
     
     async def get_articles(self, params: SearchParams) -> tuple[List[LegalArticle], int]:
         """
-        Get legal articles with filtering and pagination
+        Get legal articles with filtering and pagination using HTTP requests
         Returns tuple of (articles, total_count)
         """
         try:
-            # Build base query
-            query = self.supabase_service.supabase.table("legal_articles").select(
-                "id, title_en, title_fil, description_en, description_fil, content_en, content_fil, "
-                "category, image_article, is_verified, created_at, updated_at"
-            ).eq("is_verified", True)
+            # Build query parameters
+            query_params = ["is_verified=eq.true"]
             
             # Apply category filter
             if params.category:
                 db_category = "labor" if params.category.lower() == "work" else params.category
-                query = query.eq("category", db_category)
+                query_params.append(f"category=eq.{db_category}")
             
             # Apply search filter
             if params.search:
-                search_term = f"%{params.search}%"
-                query = query.or_(
-                    f"title_en.ilike.{search_term},"
-                    f"title_fil.ilike.{search_term},"
-                    f"description_en.ilike.{search_term},"
-                    f"description_fil.ilike.{search_term},"
-                    f"content_en.ilike.{search_term},"
-                    f"content_fil.ilike.{search_term}"
+                search_term = params.search.replace(" ", "%20")
+                search_filter = (
+                    f"or=(title_en.ilike.*{search_term}*,"
+                    f"title_fil.ilike.*{search_term}*,"
+                    f"description_en.ilike.*{search_term}*,"
+                    f"description_fil.ilike.*{search_term}*,"
+                    f"content_en.ilike.*{search_term}*,"
+                    f"content_fil.ilike.*{search_term}*)"
                 )
+                query_params.append(search_filter)
             
-            # Get total count for pagination
-            count_query = self.supabase_service.supabase.table("legal_articles").select(
-                "id", count="exact"
-            ).eq("is_verified", True)
+            # Build the query string
+            query_string = "&".join(query_params)
             
-            if params.category:
-                db_category = "labor" if params.category.lower() == "work" else params.category
-                count_query = count_query.eq("category", db_category)
-            
-            if params.search:
-                search_term = f"%{params.search}%"
-                count_query = count_query.or_(
-                    f"title_en.ilike.{search_term},"
-                    f"title_fil.ilike.{search_term},"
-                    f"description_en.ilike.{search_term},"
-                    f"description_fil.ilike.{search_term},"
-                    f"content_en.ilike.{search_term},"
-                    f"content_fil.ilike.{search_term}"
+            async with httpx.AsyncClient() as client:
+                # Get total count
+                count_url = f"{self.supabase_service.rest_url}/legal_articles?select=id&{query_string}"
+                count_response = await client.get(
+                    count_url,
+                    headers={
+                        **self.supabase_service._get_headers(),
+                        "Prefer": "count=exact"
+                    }
                 )
-            
-            # Execute count query
-            count_response = count_query.execute()
-            total_count = count_response.count or 0
-            
-            # Apply pagination and execute main query
-            query = query.range(params.offset, params.offset + params.limit - 1)
-            response = query.execute()
-            
-            if not response.data:
-                return [], 0
-            
-            # Convert to Pydantic models
-            articles = [LegalArticle(**article) for article in response.data]
-            return articles, total_count
+                
+                total_count = 0
+                if count_response.status_code == 200:
+                    content_range = count_response.headers.get("content-range", "")
+                    if content_range and "/" in content_range:
+                        total_count = int(content_range.split("/")[-1])
+                
+                # Get articles with pagination
+                select_fields = (
+                    "id,title_en,title_fil,description_en,description_fil,"
+                    "content_en,content_fil,category,image_article,is_verified,created_at,updated_at"
+                )
+                
+                range_header = f"{params.offset}-{params.offset + params.limit - 1}"
+                articles_url = f"{self.supabase_service.rest_url}/legal_articles?select={select_fields}&{query_string}"
+                
+                articles_response = await client.get(
+                    articles_url,
+                    headers={
+                        **self.supabase_service._get_headers(),
+                        "Range": range_header
+                    }
+                )
+                
+                if articles_response.status_code != 200:
+                    logger.error(f"Failed to fetch articles: {articles_response.status_code} - {articles_response.text}")
+                    return [], 0
+                
+                articles_data = articles_response.json()
+                if not articles_data:
+                    return [], total_count
+                
+                # Convert to Pydantic models
+                articles = [LegalArticle(**article) for article in articles_data]
+                return articles, total_count
             
         except Exception as e:
             logger.error(f"Error fetching articles: {str(e)}")
@@ -93,23 +106,31 @@ class LegalArticleService:
     
     async def get_article_by_id(self, article_id: int) -> Optional[LegalArticle]:
         """
-        Get a specific article by ID
+        Get a specific article by ID using HTTP requests
         """
         try:
-            response = self.supabase_service.supabase.table("legal_articles") \
-                .select(
-                    "id, title_en, title_fil, description_en, description_fil, content_en, content_fil, "
-                    "category, image_article, is_verified, created_at, updated_at"
-                ) \
-                .eq("id", article_id) \
-                .eq("is_verified", True) \
-                .single() \
-                .execute()
+            select_fields = (
+                "id,title_en,title_fil,description_en,description_fil,"
+                "content_en,content_fil,category,image_article,is_verified,created_at,updated_at"
+            )
             
-            if not response.data:
-                return None
-            
-            return LegalArticle(**response.data)
+            async with httpx.AsyncClient() as client:
+                url = f"{self.supabase_service.rest_url}/legal_articles?select={select_fields}&id=eq.{article_id}&is_verified=eq.true"
+                
+                response = await client.get(
+                    url,
+                    headers=self.supabase_service._get_headers()
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"Failed to fetch article {article_id}: {response.status_code} - {response.text}")
+                    return None
+                
+                articles_data = response.json()
+                if not articles_data:
+                    return None
+                
+                return LegalArticle(**articles_data[0])
             
         except Exception as e:
             logger.error(f"Error fetching article {article_id}: {str(e)}")
@@ -117,26 +138,34 @@ class LegalArticleService:
     
     async def get_categories(self) -> List[str]:
         """
-        Get all available article categories
+        Get all available article categories using HTTP requests
         """
         try:
-            response = self.supabase_service.supabase.table("legal_articles") \
-                .select("category") \
-                .eq("is_verified", True) \
-                .execute()
-            
-            if not response.data:
-                return []
-            
-            # Extract unique categories
-            categories = list(set([
-                article.get("category") 
-                for article in response.data 
-                if article.get("category")
-            ]))
-            categories.sort()
-            
-            return categories
+            async with httpx.AsyncClient() as client:
+                url = f"{self.supabase_service.rest_url}/legal_articles?select=category&is_verified=eq.true"
+                
+                response = await client.get(
+                    url,
+                    headers=self.supabase_service._get_headers()
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"Failed to fetch categories: {response.status_code} - {response.text}")
+                    return []
+                
+                articles_data = response.json()
+                if not articles_data:
+                    return []
+                
+                # Extract unique categories
+                categories = list(set([
+                    article.get("category") 
+                    for article in articles_data 
+                    if article.get("category")
+                ]))
+                categories.sort()
+                
+                return categories
             
         except Exception as e:
             logger.error(f"Error fetching categories: {str(e)}")

@@ -30,9 +30,6 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
 const ITEMS_PER_PAGE = 10;
 
-// Pagination constants
-const ITEMS_PER_PAGE = 10;
-
 export default function GlossaryScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>("terms");
@@ -42,8 +39,8 @@ export default function GlossaryScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [totalCount, setTotalCount] = useState<number>(0);
+  const [, setTotalPages] = useState<number>(1);
+  const [, setTotalCount] = useState<number>(0);
   const [isOffline, setIsOffline] = useState<boolean>(false);
   const { width } = useWindowDimensions();
   const flatListRef = useRef<FlatList>(null);
@@ -180,8 +177,21 @@ export default function GlossaryScreen() {
     return () => clearTimeout(timeoutId);
   }, [activeCategory, searchQuery]);
 
+  // Filter terms based on search and category
+  const termsToRender = useMemo(() => {
+    return terms.filter(term => {
+      const matchesSearch = !searchQuery.trim() || 
+        term.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        term.definition.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesCategory = activeCategory === 'all' || term.category === activeCategory;
+      
+      return matchesSearch && matchesCategory;
+    });
+  }, [terms, searchQuery, activeCategory]);
+
   // Pagination logic
-  const totalPages = Math.ceil(termsToRender.length / ITEMS_PER_PAGE);
+  const totalPagesLocal = Math.ceil(termsToRender.length / ITEMS_PER_PAGE);
   const paginatedTerms = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     return termsToRender.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -207,31 +217,33 @@ export default function GlossaryScreen() {
     await fetchLegalTerms(currentPage);
   };
 
+
   const handlePageChange = (page: number): void => {
-    fetchLegalTerms(page);
+    setCurrentPage(page);
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
   const renderPaginationControls = () => {
-    if (totalPages <= 1) return null;
+    if (termsToRender.length <= ITEMS_PER_PAGE || totalPagesLocal <= 1) return null;
 
+    // Mobile-friendly pagination with limited page buttons
     const getVisiblePages = () => {
-      if (totalPages <= 5) {
-        return Array.from({ length: totalPages }, (_, i) => i + 1);
+      if (totalPagesLocal <= 5) {
+        return Array.from({ length: totalPagesLocal }, (_, i) => i + 1);
       }
 
       if (currentPage <= 3) {
-        return [1, 2, 3, 4, "...", totalPages];
+        return [1, 2, 3, 4, "...", totalPagesLocal];
       }
 
-      if (currentPage >= totalPages - 2) {
+      if (currentPage >= totalPagesLocal - 2) {
         return [
           1,
           "...",
-          totalPages - 3,
-          totalPages - 2,
-          totalPages - 1,
-          totalPages,
+          totalPagesLocal - 3,
+          totalPagesLocal - 2,
+          totalPagesLocal - 1,
+          totalPagesLocal,
         ];
       }
 
@@ -242,7 +254,7 @@ export default function GlossaryScreen() {
         currentPage,
         currentPage + 1,
         "...",
-        totalPages,
+        totalPagesLocal,
       ];
     };
 
@@ -298,9 +310,9 @@ export default function GlossaryScreen() {
 
           <TouchableOpacity
             onPress={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalPagesLocal}
             style={tw`p-3 mx-1 rounded-full ${
-              currentPage === totalPages
+              currentPage === totalPagesLocal
                 ? "bg-gray-200 opacity-50"
                 : "bg-white border border-gray-300"
             }`}
@@ -308,124 +320,7 @@ export default function GlossaryScreen() {
             <Ionicons
               name="chevron-forward"
               size={20}
-              color={
-                currentPage === totalPages ? "#9CA3AF" : Colors.primary.blue
-              }
-            />
-          </TouchableOpacity>
-        </View>
-
-        <GSText size="xs" className="mt-3 text-gray-500">
-          Showing {terms.length} of {totalCount} results
-        </GSText>
-      </View>
-    );
-  };
-
-  const handlePageChange = (page: number): void => {
-    setCurrentPage(page);
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-  };
-
-  const renderPaginationControls = () => {
-    if (termsToRender.length <= ITEMS_PER_PAGE || totalPages <= 1) return null;
-
-    // Mobile-friendly pagination with limited page buttons
-    const getVisiblePages = () => {
-      if (totalPages <= 5) {
-        return Array.from({ length: totalPages }, (_, i) => i + 1);
-      }
-
-      if (currentPage <= 3) {
-        return [1, 2, 3, 4, "...", totalPages];
-      }
-
-      if (currentPage >= totalPages - 2) {
-        return [
-          1,
-          "...",
-          totalPages - 3,
-          totalPages - 2,
-          totalPages - 1,
-          totalPages,
-        ];
-      }
-
-      return [
-        1,
-        "...",
-        currentPage - 1,
-        currentPage,
-        currentPage + 1,
-        "...",
-        totalPages,
-      ];
-    };
-
-    const visiblePages = getVisiblePages();
-
-    return (
-      <View style={tw`flex-col items-center`}>
-
-        {/* Pagination controls */}
-        <View style={tw`flex-row justify-center items-center`}>
-          <TouchableOpacity
-            onPress={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            style={tw`p-3 mx-1 rounded-full ${
-              currentPage === 1
-                ? "bg-gray-200 opacity-50"
-                : "bg-white border border-gray-300"
-            }`}
-          >
-            <Ionicons
-              name="chevron-back"
-              size={20}
-              color={currentPage === 1 ? "#9CA3AF" : Colors.primary}
-            />
-          </TouchableOpacity>
-
-          {visiblePages.map((page, index) =>
-            page === "..." ? (
-              <View key={`ellipsis-${index}`} style={tw`px-2 py-3`}>
-                <GSText className="text-gray-500">...</GSText>
-              </View>
-            ) : (
-              <TouchableOpacity
-                key={page}
-                onPress={() => handlePageChange(page as number)}
-                style={tw`w-10 h-10 mx-1 rounded-lg justify-center items-center ${
-                  currentPage === page
-                    ? "bg-gray-300"
-                    : "bg border border-gray-300"
-                }`}
-              >
-                <GSText
-                  className={
-                    currentPage === page
-                      ? "text-white font-bold"
-                      : "text-gray-700"
-                  }
-                >
-                  {page}
-                </GSText>
-              </TouchableOpacity>
-            )
-          )}
-
-          <TouchableOpacity
-            onPress={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            style={tw`p-3 mx-1 rounded-full ${
-              currentPage === totalPages
-                ? "bg-gray-200 opacity-50"
-                : "bg-white border border-gray-300"
-            }`}
-          >
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={currentPage === totalPages ? "#9CA3AF" : Colors.primary}
+              color={currentPage === totalPagesLocal ? "#9CA3AF" : Colors.primary.blue}
             />
           </TouchableOpacity>
         </View>
@@ -603,7 +498,7 @@ export default function GlossaryScreen() {
 
         <FlatList
           ref={flatListRef}
-          data={terms}
+          data={paginatedTerms}
           key={`${numColumns}-${activeCategory}-${currentPage}`}
           keyExtractor={(item) => item.id}
           numColumns={numColumns}

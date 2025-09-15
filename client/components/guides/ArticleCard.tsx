@@ -52,11 +52,7 @@ export default function ArticleCard({ item, onPress, containerStyle, onToggleBoo
   const [imageSource, setImageSource] = useState<ImageSourcePropType>(initialSource);
 
   return (
-    <TouchableOpacity
-      accessibilityRole="button"
-      style={[tw`mb-4`, containerStyle]}
-      onPress={() => onPress && onPress(item)}
-    >
+    <View style={[tw`mb-4`, containerStyle]}>
       <View
         style={[
           tw`bg-white border border-gray-200`,
@@ -67,17 +63,32 @@ export default function ArticleCard({ item, onPress, containerStyle, onToggleBoo
           },
         ]}
       >
-        <Image
-          source={imageSource}
-          style={{ width: '100%', height: 160 }}
-          resizeMode="cover"
-          onError={() => setImageSource({ uri: noImageUri })}
-          accessibilityLabel={`Cover image for ${item.title}`}
-        />
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={() => onPress && onPress(item)}
+          style={{ flex: 1 }}
+        >
+          <Image
+            source={imageSource}
+            style={{ width: '100%', height: 160 }}
+            resizeMode="cover"
+            onError={() => setImageSource({ uri: noImageUri })}
+            accessibilityLabel={`Cover image for ${item.title}`}
+          />
+        </TouchableOpacity>
+        
         <TouchableOpacity
           accessibilityRole="button"
           onPress={() => onToggleBookmark && onToggleBookmark(item)}
-          style={{ position: 'absolute', top: 10, right: 10, padding: 6, borderRadius: 9999, backgroundColor: 'rgba(255,255,255,0.9)' }}
+          style={{ 
+            position: 'absolute', 
+            top: 10, 
+            right: 10, 
+            padding: 6, 
+            borderRadius: 9999, 
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            zIndex: 10
+          }}
         >
           <Bookmark
             size={18}
@@ -86,52 +97,59 @@ export default function ArticleCard({ item, onPress, containerStyle, onToggleBoo
             fill={item.isBookmarked ? "#f59e0b" : "none"}
           />
         </TouchableOpacity>
-        <View style={tw`px-4 py-4`}>
-          <View style={tw`flex-row items-start justify-between mb-2`}>
-            <Text
-              numberOfLines={2}
-              ellipsizeMode="tail"
-              style={[tw`font-bold text-base`, { color: Colors.text.head, flex: 1, marginRight: 8 }]}
-            >
-              {item.title}
-            </Text>
-            {item.category ? (
-              <Badge
-                variant="outline"
-                className={`rounded-md ${getCategoryBadgeClasses(item.category).container}`}
+        
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={() => onPress && onPress(item)}
+          style={{ flex: 1 }}
+        >
+          <View style={tw`px-4 py-4`}>
+            <View style={tw`flex-row items-start justify-between mb-2`}>
+              <Text
+                numberOfLines={2}
+                ellipsizeMode="tail"
+                style={[tw`font-bold text-base`, { color: Colors.text.head, flex: 1, marginRight: 8 }]}
               >
-                <BadgeText size="sm" className={getCategoryBadgeClasses(item.category).text}>
-                  {item.category}
-                </BadgeText>
-              </Badge>
+                {item.title}
+              </Text>
+              {item.category ? (
+                <Badge
+                  variant="outline"
+                  className={`rounded-md ${getCategoryBadgeClasses(item.category).container}`}
+                >
+                  <BadgeText size="sm" className={getCategoryBadgeClasses(item.category).text}>
+                    {item.category}
+                  </BadgeText>
+                </Badge>
+              ) : null}
+            </View>
+            {item.filipinoTitle ? (
+              <Text style={[tw`text-sm mb-2 font-medium`, { color: Colors.primary.blue }]}> 
+                {item.filipinoTitle}
+              </Text>
             ) : null}
-          </View>
-          {item.filipinoTitle ? (
-            <Text style={[tw`text-sm mb-2 font-medium`, { color: Colors.primary.blue }]}> 
-              {item.filipinoTitle}
-            </Text>
-          ) : null}
-          <Text
-            numberOfLines={3}
-            ellipsizeMode="tail"
-            style={[tw`text-sm leading-5`, { color: Colors.text.sub }]}
-          >
-            {item.summary}
-          </Text>
-          {item.filipinoSummary ? (
             <Text
               numberOfLines={3}
               ellipsizeMode="tail"
-              style={[tw`text-sm leading-5 mt-2`, { color: Colors.text.sub }]}
+              style={[tw`text-sm leading-5`, { color: Colors.text.sub }]}
             >
-              {item.filipinoSummary}
+              {item.summary}
             </Text>
-          ) : null}
-        </View>
-        <View style={{ position: 'absolute', right: 10, bottom: 10 }}>
-          <ChevronRight size={18} color="#9ca3af" />
-        </View>
+            {item.filipinoSummary ? (
+              <Text
+                numberOfLines={3}
+                ellipsizeMode="tail"
+                style={[tw`text-sm leading-5 mt-2`, { color: Colors.text.sub }]}
+              >
+                {item.filipinoSummary}
+              </Text>
+            ) : null}
+          </View>
+          <View style={{ position: 'absolute', right: 10, bottom: 10 }}>
+            <ChevronRight size={18} color="#9ca3af" />
+          </View>
+        </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }

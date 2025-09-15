@@ -12,6 +12,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { AuthProvider } from "../lib/auth-context";
 import { AuthProvider as CustomAuthProvider } from "../contexts/AuthContext";
+import { FavoritesProvider } from "../contexts/FavoritesContext";
 import { SidebarProvider } from "../components/AppSidebar";
 import { AuthGuard } from "../components/AuthGuard";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
@@ -41,9 +42,10 @@ export default function RootLayout() {
     <GluestackUIProvider mode="light">
       <AuthProvider>
         <CustomAuthProvider>
-          <AuthGuard>
-            <RouteErrorBoundary>
-              <SidebarProvider>
+          <FavoritesProvider>
+            <AuthGuard>
+              <RouteErrorBoundary>
+                <SidebarProvider>
                     <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="index" options={{ headerShown: false }} />
                 <Stack.Screen name="onboarding" options={{ headerShown: false }} />
@@ -101,11 +103,12 @@ export default function RootLayout() {
                 />
                 <Stack.Screen name="documents-success" options={{ headerShown: false }} />
                 </Stack>
-              </SidebarProvider>
-            </RouteErrorBoundary>
-          </AuthGuard>
-          </CustomAuthProvider>
-        </AuthProvider>
+                </SidebarProvider>
+              </RouteErrorBoundary>
+            </AuthGuard>
+          </FavoritesProvider>
+        </CustomAuthProvider>
+      </AuthProvider>
     </GluestackUIProvider>
   );
 }
