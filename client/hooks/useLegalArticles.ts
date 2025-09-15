@@ -109,21 +109,36 @@ export const useLegalArticles = () => {
       
       let data: LegalArticle[] = [];
       
+      console.log('Fetching articles...');
+      console.log('USE_SERVER_API:', USE_SERVER_API);
+      
       if (USE_SERVER_API) {
+        console.log('Using server API to fetch articles');
         // Use server API
         data = await fetchArticlesFromServer();
       } else {
+        console.log('Using direct Supabase to fetch articles');
+        // Log Supabase client to check if it's properly initialized
+        console.log('Supabase client:', {
+          supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
+          supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+        });
+        
         // Use direct Supabase - only fetch verified articles with new description fields
         const { data: supabaseData, error: fetchError } = await supabase
           .from('legal_articles')
           .select('id, title_en, title_fil, description_en, description_fil, content_en, content_fil, category, image_article, is_verified, created_at, updated_at')
           .eq('is_verified', true);
         
+        console.log('Supabase response:', { data: supabaseData, error: fetchError });
+        
         if (fetchError) {
+          console.error('Supabase fetch error:', fetchError);
           throw fetchError;
         }
         
         data = supabaseData as unknown as LegalArticle[] || [];
+        console.log('Fetched articles:', data.length);
       }
 
       // Transform the database data to match ArticleItem interface
