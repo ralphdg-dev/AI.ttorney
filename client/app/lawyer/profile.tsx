@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Alert, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Alert, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Settings, Edit, LogOut, Shield, Mail, Phone, MapPin, Clock, X } from 'lucide-react-native';
+import { Settings, Edit, LogOut, Shield, Mail, Phone, MapPin, Clock, X, Camera } from 'lucide-react-native';
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 import Header from '../../components/Header';
 import Colors from '../../constants/Colors';
@@ -27,8 +27,8 @@ const LawyerProfilePage: React.FC = () => {
     specialization: 'Family & Criminal Law',
     experience: '8 years',
     verificationStatus: 'Verified Lawyer',
-    licenseNumber: 'PH-LAW-2016-001234',
-    barAdmission: '2016',
+    rollNumber: 'SC-2016-001234',
+    rollSigningDate: '2016-03-15',
     bio: 'Experienced lawyer specializing in family and criminal law with a passion for justice and client advocacy.',
   });
 
@@ -43,10 +43,78 @@ const LawyerProfilePage: React.FC = () => {
   ]);
 
   const [isEditingAvailability, setIsEditingAvailability] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: profileData.name,
+    email: profileData.email,
+    phone: profileData.phone,
+    location: profileData.location,
+    specialization: profileData.specialization,
+    bio: profileData.bio,
+  });
 
   const handleEditProfile = () => {
-    console.log('Edit profile');
-    // TODO: Navigate to edit profile screen
+    setEditFormData({
+      name: profileData.name,
+      email: profileData.email,
+      phone: profileData.phone,
+      location: profileData.location,
+      specialization: profileData.specialization,
+      bio: profileData.bio,
+    });
+    setIsEditingProfile(true);
+  };
+
+  const handleSaveProfile = async () => {
+    // Validate form data
+    if (!editFormData.name.trim() || !editFormData.email.trim()) {
+      Alert.alert('Validation Error', 'Name and email are required fields.');
+      return;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editFormData.email)) {
+      Alert.alert('Validation Error', 'Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      // TODO: Implement backend API call
+      // const response = await updateLawyerProfile(editFormData);
+      
+      // For now, update local state (frontend-only)
+      console.log('Saving profile data:', editFormData);
+      
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      Alert.alert('Success', 'Profile updated successfully!');
+      setIsEditingProfile(false);
+      
+      // TODO: Update profileData state with response from backend
+      // setProfileData(prev => ({ ...prev, ...editFormData }));
+      
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Alert.alert('Error', 'Failed to update profile. Please try again.');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingProfile(false);
+    setEditFormData({
+      name: profileData.name,
+      email: profileData.email,
+      phone: profileData.phone,
+      location: profileData.location,
+      specialization: profileData.specialization,
+      bio: profileData.bio,
+    });
+  };
+
+  const updateFormField = (field: string, value: string) => {
+    setEditFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSettings = () => {
@@ -168,13 +236,13 @@ const LawyerProfilePage: React.FC = () => {
         <View style={tw`bg-white mt-3 p-4`}>
           <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>Contact Information</Text>
           <View style={tw`flex flex-col`}>
-            <View style={tw`flex-row items-center`}>
+            <View style={tw`flex-row items-center mb-4`}>
               <View style={[tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`, { backgroundColor: '#F3F4F6' }]}>
                 <Mail size={18} color="#6B7280" />
               </View>
               <Text style={tw`text-sm text-gray-700 flex-1`}>{profileData.email}</Text>
             </View>
-            <View style={tw`flex-row items-center`}>
+            <View style={tw`flex-row items-center mb-4`}>
               <View style={[tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`, { backgroundColor: '#F3F4F6' }]}>
                 <Phone size={18} color="#6B7280" />
               </View>
@@ -198,12 +266,12 @@ const LawyerProfilePage: React.FC = () => {
               <Text style={tw`text-sm font-semibold text-gray-900`}>{profileData.experience}</Text>
             </View>
             <View style={tw`w-1/2 px-2 mb-4`}>
-              <Text style={tw`text-xs text-gray-500 mb-1`}>Bar Admission</Text>
-              <Text style={tw`text-sm font-semibold text-gray-900`}>{profileData.barAdmission}</Text>
+              <Text style={tw`text-xs text-gray-500 mb-1`}>Roll Signing Date</Text>
+              <Text style={tw`text-sm font-semibold text-gray-900`}>{new Date(profileData.rollSigningDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
             </View>
             <View style={tw`w-full px-2`}>
-              <Text style={tw`text-xs text-gray-500 mb-1`}>License Number</Text>
-              <Text style={tw`text-sm font-semibold text-gray-900`}>{profileData.licenseNumber}</Text>
+              <Text style={tw`text-xs text-gray-500 mb-1`}>Supreme Court Roll Number</Text>
+              <Text style={tw`text-sm font-semibold text-gray-900`}>{profileData.rollNumber}</Text>
             </View>
           </View>
         </View>
@@ -351,6 +419,129 @@ const LawyerProfilePage: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={isEditingProfile}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={tw`flex-1 bg-gray-50`}>
+          <View style={tw`bg-white px-4 py-3 border-b border-gray-200`}>
+            <View style={tw`flex-row items-center justify-between`}>
+              <TouchableOpacity onPress={handleCancelEdit}>
+                <Text style={tw`text-base text-gray-600`}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={tw`text-lg font-bold text-gray-900`}>Edit Profile</Text>
+              <TouchableOpacity 
+                onPress={handleSaveProfile}
+                style={[tw`px-4 py-2 rounded-lg`, { backgroundColor: Colors.primary.blue }]}
+              >
+                <Text style={tw`text-white font-medium text-sm`}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <ScrollView style={tw`flex-1 p-4`} showsVerticalScrollIndicator={false}>
+            {/* Avatar Section */}
+            <View style={tw`bg-white rounded-lg p-4 mb-4 items-center`}>
+              <View style={tw`relative mb-4`}>
+                <Image 
+                  source={{ uri: profileData.avatar }} 
+                  style={tw`w-24 h-24 rounded-full`}
+                />
+                <TouchableOpacity 
+                  style={[tw`absolute -bottom-2 -right-2 w-8 h-8 rounded-full border-2 border-white flex items-center justify-center`, { backgroundColor: Colors.primary.blue }]}
+                >
+                  <Camera size={16} color="white" />
+                </TouchableOpacity>
+              </View>
+              <Text style={tw`text-sm text-gray-600 text-center`}>Tap camera icon to change photo</Text>
+            </View>
+
+            {/* Basic Information */}
+            <View style={tw`bg-white rounded-lg p-4 mb-4`}>
+              <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>Basic Information</Text>
+              
+              <View style={tw`mb-4`}>
+                <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>Full Name *</Text>
+                <TextInput
+                  style={tw`border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-900`}
+                  value={editFormData.name}
+                  onChangeText={(value) => updateFormField('name', value)}
+                  placeholder="Enter your full name"
+                />
+              </View>
+
+              <View style={tw`mb-4`}>
+                <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>Email Address *</Text>
+                <TextInput
+                  style={tw`border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-900`}
+                  value={editFormData.email}
+                  onChangeText={(value) => updateFormField('email', value)}
+                  placeholder="Enter your email address"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={tw`mb-4`}>
+                <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>Phone Number</Text>
+                <TextInput
+                  style={tw`border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-900`}
+                  value={editFormData.phone}
+                  onChangeText={(value) => updateFormField('phone', value)}
+                  placeholder="Enter your phone number"
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <View style={tw`mb-4`}>
+                <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>Location</Text>
+                <TextInput
+                  style={tw`border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-900`}
+                  value={editFormData.location}
+                  onChangeText={(value) => updateFormField('location', value)}
+                  placeholder="Enter your location"
+                />
+              </View>
+
+              <View style={tw`mb-4`}>
+                <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>Specialization</Text>
+                <TextInput
+                  style={tw`border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-900`}
+                  value={editFormData.specialization}
+                  onChangeText={(value) => updateFormField('specialization', value)}
+                  placeholder="Enter your specialization"
+                />
+              </View>
+
+              <View>
+                <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>Bio</Text>
+                <TextInput
+                  style={tw`border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-900`}
+                  value={editFormData.bio}
+                  onChangeText={(value) => updateFormField('bio', value)}
+                  placeholder="Tell clients about yourself and your experience"
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
+
+            {/* Professional Information Note */}
+            <View style={tw`bg-blue-50 rounded-lg p-4 mb-4`}>
+              <Text style={tw`text-sm text-blue-800 font-medium mb-1`}>Professional Information</Text>
+              <Text style={tw`text-sm text-blue-700`}>
+                Experience, Roll Signing Date, and Supreme Court Roll Number cannot be edited here. 
+                Contact support if you need to update these verified credentials.
+              </Text>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
       <LawyerNavbar activeTab="profile" />
     </SafeAreaView>
   );
