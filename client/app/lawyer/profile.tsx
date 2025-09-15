@@ -124,8 +124,7 @@ const LawyerProfilePage: React.FC = () => {
       <Header 
         variant="lawyer-profile"
         title="Profile"
-        showSettings={true}
-        onSettingsPress={handleSettings}
+        showSettings={false}
       />
       
       <ScrollView style={tw`flex-1`} showsVerticalScrollIndicator={false} contentContainerStyle={tw`pb-24`}>
@@ -151,10 +150,11 @@ const LawyerProfilePage: React.FC = () => {
             </View>
             
             <TouchableOpacity 
-              style={[tw`p-2 rounded-full`, { backgroundColor: '#F3F4F6' }]}
+              style={[tw`px-4 py-2 rounded-lg flex-row items-center`, { backgroundColor: Colors.primary.blue }]}
               onPress={handleEditProfile}
             >
-              <Edit size={18} color={Colors.primary.blue} />
+              <Edit size={16} color="white" />
+              <Text style={tw`text-white font-medium text-sm ml-2`}>Edit</Text>
             </TouchableOpacity>
           </View>
           
@@ -326,19 +326,9 @@ const LawyerProfilePage: React.FC = () => {
           )}
         </View>
 
-        {/* Quick Actions */}
+        {/* Account Actions */}
         <View style={tw`bg-white mt-3 p-4`}>
-          <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>Quick Actions</Text>
-          
-          <TouchableOpacity 
-            style={tw`flex-row items-center py-4 border-b border-gray-100`}
-            onPress={handleEditProfile}
-          >
-            <View style={[tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`, { backgroundColor: '#F3F4F6' }]}>
-              <Edit size={18} color="#374151" />
-            </View>
-            <Text style={tw`text-base text-gray-900 flex-1`}>Edit Profile</Text>
-          </TouchableOpacity>
+          <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>Account</Text>
           
           <TouchableOpacity 
             style={tw`flex-row items-center py-4 border-b border-gray-100`}
@@ -347,7 +337,7 @@ const LawyerProfilePage: React.FC = () => {
             <View style={[tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`, { backgroundColor: '#F3F4F6' }]}>
               <Settings size={18} color="#374151" />
             </View>
-            <Text style={tw`text-base text-gray-900 flex-1`}>Settings</Text>
+            <Text style={tw`text-base text-gray-900 flex-1`}>Settings & Preferences</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -357,7 +347,7 @@ const LawyerProfilePage: React.FC = () => {
             <View style={[tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`, { backgroundColor: '#FEE2E2' }]}>
               <LogOut size={18} color="#DC2626" />
             </View>
-            <Text style={tw`text-base text-red-600 flex-1`}>Logout</Text>
+            <Text style={tw`text-base text-red-600 flex-1`}>Sign Out</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
