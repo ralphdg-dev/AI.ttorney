@@ -14,7 +14,7 @@ module.exports = function(api) {
                     "tailwind.config": "./tailwind.config.js"
                 }
             }],
-            ["transform-inline-environment-variables", {
+            ["babel-plugin-transform-inline-environment-variables", {
                 include: [
                     "EXPO_PUBLIC_SUPABASE_URL",
                     "EXPO_PUBLIC_SUPABASE_ANON_KEY",

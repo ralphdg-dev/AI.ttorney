@@ -167,7 +167,7 @@ const ConsultationDetailPage: React.FC = () => {
               Consultation Details
             </Text>
 
-            <View style={tw`space-y-4`}>
+            <View style={tw`gap-4`}>
               <View style={tw`flex-row justify-between items-center mb-3`}>
                 <View style={tw`flex-row items-center`}>
                   <Settings size={16} color="#6B7280" />

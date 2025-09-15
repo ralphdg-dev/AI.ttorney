@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { MessageCircle, Video, Clock, Calendar, TrendingUp, MapPin } from 'lucide-react-native';
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 import Header from '../../components/Header';
+import ConfirmationModal from '../../components/lawyer/ConfirmationModal';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 
@@ -28,6 +29,12 @@ interface ConsultationRequest {
 const LawyerConsultPage: React.FC = () => {
   const router = useRouter();
   const [filter, setFilter] = useState<'all' | 'pending' | 'accepted' | 'completed'>('all');
+  const [confirmationModal, setConfirmationModal] = useState<{
+    isOpen: boolean;
+    actionType: 'accept' | 'complete' | null;
+    requestId: string | null;
+    clientName: string | null;
+  }>({ isOpen: false, actionType: null, requestId: null, clientName: null });
 
   const sampleRequests: ConsultationRequest[] = [
     {
@@ -121,20 +128,43 @@ const LawyerConsultPage: React.FC = () => {
     router.push(`/lawyer/consultation/${requestId}`);
   };
 
-  const handleAcceptRequest = (requestId: string, event?: any) => {
+  const handleAcceptRequest = (requestId: string, clientName: string, event?: any) => {
     if (event) {
       event.stopPropagation();
     }
-    console.log(`Accept consultation ${requestId}`);
-    // TODO: Accept consultation request
+    setConfirmationModal({
+      isOpen: true,
+      actionType: 'accept',
+      requestId,
+      clientName
+    });
   };
 
-  const handleCompleteRequest = (requestId: string, event?: any) => {
+  const handleCompleteRequest = (requestId: string, clientName: string, event?: any) => {
     if (event) {
       event.stopPropagation();
     }
-    console.log('Mark session completed', requestId);
-    // TODO: Mark consultation as completed
+    setConfirmationModal({
+      isOpen: true,
+      actionType: 'complete',
+      requestId,
+      clientName
+    });
+  };
+
+  const handleConfirmAction = () => {
+    if (confirmationModal.actionType === 'accept') {
+      console.log(`Accept consultation ${confirmationModal.requestId}`);
+      // TODO: Accept consultation request
+    } else if (confirmationModal.actionType === 'complete') {
+      console.log('Mark session completed', confirmationModal.requestId);
+      // TODO: Mark consultation as completed
+    }
+    setConfirmationModal({ isOpen: false, actionType: null, requestId: null, clientName: null });
+  };
+
+  const handleCloseModal = () => {
+    setConfirmationModal({ isOpen: false, actionType: null, requestId: null, clientName: null });
   };
 
   return (
@@ -370,7 +400,7 @@ const LawyerConsultPage: React.FC = () => {
                 {request.status === 'pending' && (
                   <TouchableOpacity
                     style={[tw`py-3 rounded-xl mt-2`, { backgroundColor: Colors.primary.blue, boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }]}
-                    onPress={(event) => handleAcceptRequest(request.id, event)}
+                    onPress={(event) => handleAcceptRequest(request.id, request.client.name, event)}
                     accessibilityLabel={`Accept consultation request from ${request.client.name}`}
                     accessibilityRole="button"
                     activeOpacity={0.85}
@@ -384,7 +414,7 @@ const LawyerConsultPage: React.FC = () => {
                 {request.status === 'accepted' && (
                   <TouchableOpacity 
                     style={[tw`bg-green-600 py-3 rounded-xl mt-2`, { boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }]}
-                    onPress={(event) => handleCompleteRequest(request.id, event)}
+                    onPress={(event) => handleCompleteRequest(request.id, request.client.name, event)}
                     accessibilityLabel={`Mark consultation with ${request.client.name} as completed`}
                     accessibilityRole="button"
                     activeOpacity={0.85}
@@ -412,6 +442,14 @@ const LawyerConsultPage: React.FC = () => {
       </ScrollView>
 
       <LawyerNavbar activeTab="consult" />
+      
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        onClose={handleCloseModal}
+        onConfirm={handleConfirmAction}
+        actionType={confirmationModal.actionType}
+        clientName={confirmationModal.clientName || undefined}
+      />
     </SafeAreaView>
   );
 };
