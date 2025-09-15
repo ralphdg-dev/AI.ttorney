@@ -98,6 +98,49 @@ class ApiClient {
     return this.request('/auth/verify-token');
   }
 
+  // Legal Articles endpoints
+  async getLegalArticles(params?: {
+    category?: string;
+    domain?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.category) searchParams.append('category', params.category);
+    if (params?.domain) searchParams.append('domain', params.domain);
+    if (params?.search) searchParams.append('search', params.search);
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.offset) searchParams.append('offset', params.offset.toString());
+    
+    const queryString = searchParams.toString();
+    return this.request(`/api/legal/articles${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async searchLegalArticles(params: {
+    q: string;
+    category?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse> {
+    const searchParams = new URLSearchParams();
+    searchParams.append('q', params.q);
+    if (params.category) searchParams.append('category', params.category);
+    if (params.limit) searchParams.append('limit', params.limit.toString());
+    if (params.offset) searchParams.append('offset', params.offset.toString());
+    
+    const queryString = searchParams.toString();
+    return this.request(`/api/legal/search?${queryString}`);
+  }
+
+  async getLegalArticle(id: string): Promise<ApiResponse> {
+    return this.request(`/api/legal/articles/${id}`);
+  }
+
+  async getLegalArticleCategories(): Promise<ApiResponse> {
+    return this.request('/api/legal/categories');
+  }
+
   // Health check
   async healthCheck(): Promise<ApiResponse> {
     return this.request('/health');
