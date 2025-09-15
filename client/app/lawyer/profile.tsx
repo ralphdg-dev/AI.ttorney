@@ -123,24 +123,15 @@ const LawyerProfilePage: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Confirm Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut();
-            } catch (error) {
-              console.error('Logout error:', error);
-            }
-          }
-        }
-      ]
-    );
+    const confirmed = window.confirm('Are you sure you want to logout?');
+    
+    if (confirmed) {
+      try {
+        await signOut();
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+    }
   };
 
   const toggleSlotStatus = (slotId: string) => {

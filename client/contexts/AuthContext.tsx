@@ -41,6 +41,7 @@ export interface AuthContextType {
   hasRedirectedToStatus: boolean;
   setHasRedirectedToStatus: (value: boolean) => void;
   initialAuthCheck: boolean;
+  isSigningOut: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,74 +56,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [initialAuthCheck, setInitialAuthCheck] = useState(false);
   const [hasRedirectedToStatus, setHasRedirectedToStatus] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
-  useEffect(() => {
-    // Initialize auth state and listen for auth changes
-    const initialize = async () => {
-      try {
-        // Get initial session
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
-        if (initialSession) {
-          console.log('Initial session found:', initialSession.user?.email);
-          await handleAuthStateChange(initialSession, false);
-        } else {
-          console.log('No initial session found');
-          setAuthState({
-            session: null,
-            user: null,
-            supabaseUser: null,
-          });
-          setIsLoading(false);
-        }
-        
-        setInitialAuthCheck(true);
-
-        // Listen for auth state changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          async (event, session) => {
-            console.log('Auth state changed:', event, session?.user?.email);
-            
-            if (event === 'SIGNED_IN') {
-              if (session) {
-                // Only navigate on explicit sign in, not token refresh
-                await handleAuthStateChange(session, true);
-              }
-            } else if (event === 'TOKEN_REFRESHED') {
-              if (session) {
-                // Don't navigate on token refresh, just update auth state
-                await handleAuthStateChange(session, false);
-              }
-            } else if (event === 'SIGNED_OUT') {
-              setAuthState({
-                session: null,
-                user: null,
-                supabaseUser: null,
-              });
-              setHasRedirectedToStatus(false);
-            }
-            
-            setIsLoading(false);
-          }
-        );
-
-        setIsLoading(false);
-
-        // Cleanup subscription on unmount
-        return () => {
-          subscription.unsubscribe();
-        };
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-        setIsLoading(false);
+  const checkLawyerApplicationStatus = React.useCallback(async (): Promise<any> => {
+    try {
+      if (!authState.session?.access_token) {
+        return null;
       }
-    };
 
-    initialize();
-  }, []);
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/lawyer-applications/me`, {
+        headers: {
+          'Authorization': `Bearer ${authState.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
+      if (response.ok) {
+        const data = await response.json();
+        return data;
+      }
+      
+      return null;
+    } catch {
+      return null;
+    }
+  }, [authState.session?.access_token]);
 
-  const handleAuthStateChange = async (session: Session, shouldNavigate = false) => {
+  const handleAuthStateChange = React.useCallback(async (session: Session, shouldNavigate = false) => {
     try {
       // Fetch user profile from your custom users table
       const { data: profile, error } = await supabase
@@ -177,7 +137,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error handling auth state change:', error);
     }
-  };
+  }, [checkLawyerApplicationStatus]);
+
+  useEffect(() => {
+    // Initialize auth state and listen for auth changes
+    const initialize = async () => {
+      try {
+        // Get initial session
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (initialSession) {
+          console.log('Initial session found:', initialSession.user?.email);
+          await handleAuthStateChange(initialSession, false);
+        } else {
+          console.log('No initial session found');
+          setAuthState({
+            session: null,
+            user: null,
+            supabaseUser: null,
+          });
+          setIsLoading(false);
+        }
+        
+        setInitialAuthCheck(true);
+
+        // Listen for auth state changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            if (event === 'SIGNED_IN') {
+              if (session) {
+                // Only navigate on explicit sign in, not token refresh
+                await handleAuthStateChange(session, true);
+              }
+            } else if (event === 'TOKEN_REFRESHED') {
+              if (session) {
+                // Don't navigate on token refresh, just update auth state
+                await handleAuthStateChange(session, false);
+              }
+            } else if (event === 'SIGNED_OUT') {
+              setAuthState({
+                session: null,
+                user: null,
+                supabaseUser: null,
+              });
+              setHasRedirectedToStatus(false);
+              
+              // Navigate to login when signed out
+              router.replace('/login');
+            }
+            
+            setIsLoading(false);
+          }
+        );
+
+        setIsLoading(false);
+
+        // Cleanup subscription on unmount
+        return () => {
+          subscription.unsubscribe();
+        };
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        setIsLoading(false);
+      }
+    };
+
+    initialize();
+  }, [handleAuthStateChange]);
+
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -210,67 +237,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    console.log('SignOut: Starting sign out process');
+    setIsSigningOut(true);
     
-    // Stop any ongoing polling immediately
     try {
-      const { lawyerApplicationService } = await import('../services/lawyerApplicationService');
-      lawyerApplicationService.stopStatusPolling();
-    } catch (error) {
-      console.warn('Error stopping polling:', error);
-    }
-    
-    // Reset redirect flag on sign out
-    setHasRedirectedToStatus(false);
-    
-    // Clear all application state immediately
-    setAuthState({
-      session: null,
-      user: null,
-      supabaseUser: null,
-    });
-    
-    // Clear Supabase session synchronously first
-    try {
+      // Clear Supabase session first - this triggers SIGNED_OUT event
       await supabase.auth.signOut({ scope: 'global' });
-      console.log('SignOut: Supabase session cleared');
-    } catch (error) {
-      console.warn('SignOut: Supabase signout error:', error);
-    }
-    
-    // Clear browser storage immediately
-    if (typeof window !== 'undefined') {
-      localStorage.clear();
-      sessionStorage.clear();
-      console.log('SignOut: Browser storage cleared');
-    }
-    
-    // Navigate to login
-    console.log('SignOut: Redirecting to login');
-    router.replace('/login' as any);
-    
-    // Do remaining cleanup in background
-    setTimeout(async () => {
+      
+      // Clear AsyncStorage
       try {
-        // Clear AsyncStorage
-        try {
-          const AsyncStorage = await import('@react-native-async-storage/async-storage');
-          await AsyncStorage.default.clear();
-        } catch (error) {
-          console.warn('AsyncStorage clear error:', error);
-        }
-        
-        // Clear service cache
-        try {
-          const { lawyerApplicationService } = await import('../services/lawyerApplicationService');
-          lawyerApplicationService.clearCache();
-        } catch (error) {
-          console.warn('Service cleanup error:', error);
-        }
+        const AsyncStorage = await import('@react-native-async-storage/async-storage');
+        await AsyncStorage.default.clear();
       } catch (error) {
-        console.warn('Background cleanup error:', error);
+        console.warn('AsyncStorage clear error:', error);
       }
-    }, 100);
+      
+      // Stop any ongoing services
+      try {
+        const { lawyerApplicationService } = await import('../services/lawyerApplicationService');
+        lawyerApplicationService.stopStatusPolling();
+        lawyerApplicationService.clearCache();
+      } catch (error) {
+        console.warn('Error stopping polling:', error);
+      }
+      
+      // Reset redirect flag
+      setHasRedirectedToStatus(false);
+      
+    } catch (error) {
+      console.error('SignOut: Error during sign out process:', error);
+      
+      // Force clear state on error
+      setAuthState({
+        session: null,
+        user: null,
+        supabaseUser: null,
+      });
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   const setUserData = (userData: User | null) => {
@@ -314,29 +318,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return hasRole('admin') || hasRole('superadmin');
   };
 
-  const checkLawyerApplicationStatus = async (): Promise<any> => {
-    try {
-      if (!authState.session?.access_token) {
-        return null;
-      }
-
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/lawyer-applications/me`, {
-        headers: {
-          'Authorization': `Bearer ${authState.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data;
-      }
-      
-      return null;
-    } catch (error) {
-      return null;
-    }
-  };
 
 
   const value: AuthContextType = {
@@ -355,6 +336,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hasRedirectedToStatus,
     setHasRedirectedToStatus,
     initialAuthCheck,
+    isSigningOut,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
