@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image } from "react-native";
 import tw from "tailwind-react-native-classnames";
-import { Ionicons, FontAwesome } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import Colors from "../constants/Colors";
-import Header from "../components/Header"; // ✅ Import Header
+import Header from "../components/Header";
 import { SidebarProvider, SidebarWrapper } from "../components/AppSidebar";
 import Navbar from "../components/Navbar";
 // Replace with your bird logo after upload
@@ -194,3 +194,4 @@ export default function ChatbotScreen() {
     </SidebarProvider>
   );
 }
+

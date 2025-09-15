@@ -8,6 +8,10 @@ interface ApiResponse<T = any> {
   data?: T;
   message?: string;
   error?: string;
+  locked_out?: boolean;
+  retry_after?: number;
+  attempts_remaining?: number;
+  success?: boolean;
 }
 
 class ApiClient {
@@ -46,10 +50,10 @@ class ApiClient {
         throw new Error(data.detail || data.message || 'Request failed');
       }
 
-      return { data };
+      return { data, success: true };
     } catch (error) {
       console.error('API request failed:', error);
-      return { error: error instanceof Error ? error.message : 'Unknown error' };
+      return { error: error instanceof Error ? error.message : 'Unknown error', success: false };
     }
   }
 
@@ -58,7 +62,9 @@ class ApiClient {
     email: string;
     password: string;
     username: string;
-    full_name?: string;
+    first_name: string;
+    last_name: string;
+    birthdate: string;
     role?: string;
   }): Promise<ApiResponse> {
     return this.request('/auth/signup', {
@@ -87,10 +93,24 @@ class ApiClient {
     return this.request('/auth/me');
   }
 
-  async resetPassword(email: string): Promise<ApiResponse> {
+  async resetPassword(data: { email: string }): Promise<ApiResponse> {
     return this.request('/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ email }),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async checkEmailExists(email: string): Promise<ApiResponse> {
+    return this.request('/auth/check-email', {
+      method: 'POST',
+      body: JSON.stringify({ value: email }),
+    });
+  }
+
+  async checkUsernameExists(username: string): Promise<ApiResponse> {
+    return this.request('/auth/check-username', {
+      method: 'POST',
+      body: JSON.stringify({ value: username }),
     });
   }
 
@@ -139,6 +159,36 @@ class ApiClient {
 
   async getLegalArticleCategories(): Promise<ApiResponse> {
     return this.request('/api/legal/categories');
+  // OTP endpoints
+  async sendOTP(data: {
+    email: string;
+    otp_type: 'email_verification' | 'password_reset';
+  }): Promise<ApiResponse> {
+    return this.request('/auth/send-otp', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async verifyOTP(data: {
+    email: string;
+    otp_code: string;
+    otp_type: 'email_verification' | 'password_reset';
+  }): Promise<ApiResponse> {
+    return this.request('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async selectRole(data: {
+    email: string;
+    selected_role: string;
+  }): Promise<ApiResponse> {
+    return this.request('/auth/select-role', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   // Health check

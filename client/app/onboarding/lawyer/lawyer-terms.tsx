@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, SafeAreaView, StatusBar, Text, ScrollView } from 'react-native';
+import { View, SafeAreaView, StatusBar, Text, ScrollView, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import BackButton from '../../../components/ui/BackButton';
 import StickyFooterButton from '../../../components/ui/StickyFooterButton';
 import { router } from 'expo-router';
+import { lawyerApplicationService } from '../../../services/lawyerApplicationService';
 
 export default function LawyerTerms() {
   const [enabled, setEnabled] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(5);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     let remaining = 5;
@@ -21,6 +24,66 @@ export default function LawyerTerms() {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleSubmitApplication = async () => {
+    setIsSubmitting(true);
+    
+    try {
+      // Get stored application data from AsyncStorage
+      const rollNumber = await AsyncStorage.getItem('lawyer_roll_number');
+      const rollSignDate = await AsyncStorage.getItem('lawyer_roll_sign_date');
+      const fullName = await AsyncStorage.getItem('lawyer_full_name');
+      const ibpCardPath = await AsyncStorage.getItem('lawyer_ibp_card_path');
+      const selfiePath = await AsyncStorage.getItem('lawyer_selfie_path');
+
+      console.log('Retrieved data from AsyncStorage:', {
+        rollNumber,
+        rollSignDate,
+        fullName,
+        ibpCardPath,
+        selfiePath
+      });
+
+      if (!rollNumber || !rollSignDate || !fullName) {
+        Alert.alert('Missing Information', 'Some required information is missing. Please go back and complete all steps.');
+        return;
+      }
+
+      const applicationData = {
+        full_name: fullName,
+        roll_signing_date: rollSignDate,
+        ibp_id: ibpCardPath || '',
+        roll_number: rollNumber,
+        selfie: selfiePath || '',
+      };
+
+      console.log('Submitting application data:', applicationData);
+
+      const result = await lawyerApplicationService.submitApplication(applicationData);
+
+      console.log('Submission result:', result);
+
+      if (result.success) {
+        // Clear stored data
+        await AsyncStorage.multiRemove([
+          'lawyer_roll_number',
+          'lawyer_roll_sign_date', 
+          'lawyer_full_name',
+          'lawyer_ibp_card_path',
+          'lawyer_selfie_path'
+        ]);
+        
+        router.push('./documents-success');
+      } else {
+        Alert.alert('Submission Failed', result.message || 'Failed to submit application');
+      }
+    } catch (error) {
+      console.error('Submit application error:', error);
+      Alert.alert('Error', `An error occurred while submitting your application: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
@@ -69,10 +132,10 @@ export default function LawyerTerms() {
 
       {/* Sticky footer button */}
       <StickyFooterButton
-        title={enabled ? 'Submit Documents' : `Submit Documents (${secondsLeft})`}
-        disabled={!enabled}
+        title={isSubmitting ? 'Submitting...' : (enabled ? 'Submit Documents' : `Submit Documents (${secondsLeft})`)}
+        disabled={!enabled || isSubmitting}
         bottomOffset={16}
-        onPress={() => router.push('./documents-success')}
+        onPress={handleSubmitApplication}
       />
     </SafeAreaView>
   );

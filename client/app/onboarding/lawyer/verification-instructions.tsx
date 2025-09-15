@@ -17,7 +17,7 @@ export default function LawyerStartingPage() {
     if (typeof (router as any).canGoBack === 'function' && (router as any).canGoBack()) {
       router.back();
     } else {
-      router.replace('/role-selection');
+      router.push('/role-selection');
     }
   };
   const handleContinue = () => {

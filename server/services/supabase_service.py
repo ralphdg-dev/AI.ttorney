@@ -42,13 +42,17 @@ class SupabaseService:
                 payload = {
                     "email": email,
                     "password": password,
-                    "data": user_metadata or {}
+                    "user_metadata": user_metadata or {},
+                    "email_confirm": True,    # Mark email as already confirmed
+                    "phone_confirm": False,   # Disable phone confirmation
+                    "confirm": True           # Skip confirmation process entirely
                 }
                 
+                # Use service role key to bypass email confirmation entirely
                 response = await client.post(
-                    f"{self.auth_url}/signup",
+                    f"{self.auth_url}/admin/users",
                     json=payload,
-                    headers=self._get_headers()
+                    headers=self._get_headers(use_service_key=True)
                 )
                 
                 if response.status_code == 200:
@@ -56,7 +60,9 @@ class SupabaseService:
                     return {"success": True, "data": data}
                 else:
                     error_data = response.json() if response.content else {}
-                    return {"success": False, "error": error_data.get("msg", "Sign up failed")}
+                    error_msg = error_data.get("msg") or error_data.get("message") or error_data.get("error_description") or f"Sign up failed: {response.status_code}"
+                    logger.error(f"Supabase signup error: {error_data}")
+                    return {"success": False, "error": error_msg}
                     
         except Exception as e:
             logger.error(f"Sign up error: {str(e)}")
@@ -82,7 +88,9 @@ class SupabaseService:
                     return {"success": True, "data": data}
                 else:
                     error_data = response.json() if response.content else {}
-                    return {"success": False, "error": error_data.get("error_description", "Sign in failed")}
+                    error_msg = error_data.get("error_description") or error_data.get("message") or f"Sign in failed: {response.status_code}"
+                    logger.error(f"Supabase signin error: {error_data}")
+                    return {"success": False, "error": error_msg}
                     
         except Exception as e:
             logger.error(f"Sign in error: {str(e)}")
@@ -151,17 +159,25 @@ class SupabaseService:
         """Insert user profile into users table"""
         try:
             async with httpx.AsyncClient() as client:
+                # Create a copy of user_data without None values
+                clean_user_data = {k: v for k, v in user_data.items() if v is not None}
+                
                 response = await client.post(
                     f"{self.rest_url}/users",
-                    json=user_data,
+                    json=clean_user_data,
                     headers=self._get_headers(use_service_key=True)
                 )
                 
                 if response.status_code in [200, 201]:
-                    data = response.json()
-                    return {"success": True, "data": data}
+                    if response.content:
+                        data = response.json()
+                        return {"success": True, "data": data}
+                    else:
+                        # Success but no content (common with Supabase inserts)
+                        return {"success": True, "data": {"message": "User profile created successfully"}}
                 else:
                     error_data = response.json() if response.content else {}
+                    logger.error(f"Insert user profile failed: {response.status_code}, {error_data}")
                     return {"success": False, "error": error_data}
                     
         except Exception as e:
@@ -188,6 +204,119 @@ class SupabaseService:
                     
         except Exception as e:
             logger.error(f"Get user profile error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    async def get_user_profile_by_email(self, email: str) -> Dict[str, Any]:
+        """Get user profile from users table by email"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.rest_url}/users?email=eq.{email}&select=*",
+                    headers=self._get_headers()
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data:
+                        return {"success": True, "data": data[0]}
+                    else:
+                        return {"success": False, "error": "User not found"}
+                else:
+                    return {"success": False, "error": "Failed to get user profile"}
+                    
+        except Exception as e:
+            logger.error(f"Get user profile by email error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    async def update_user_profile(self, update_data: Dict[str, Any], where_clause: Dict[str, Any]) -> Dict[str, Any]:
+        """Update user profile in users table"""
+        try:
+            async with httpx.AsyncClient() as client:
+                # Build query parameters for WHERE clause
+                query_params = []
+                for key, value in where_clause.items():
+                    query_params.append(f"{key}=eq.{value}")
+                query_string = "&".join(query_params)
+                
+                response = await client.patch(
+                    f"{self.rest_url}/users?{query_string}",
+                    json=update_data,
+                    headers=self._get_headers(use_service_key=True)
+                )
+                
+                if response.status_code in [200, 204]:
+                    return {"success": True, "message": "User profile updated"}
+                else:
+                    error_data = response.json() if response.content else {}
+                    return {"success": False, "error": error_data}
+                    
+        except Exception as e:
+            logger.error(f"Update user profile error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    async def check_user_exists(self, field: str, value: str) -> Dict[str, Any]:
+        """Check if a user exists by field (email or username) in both auth.users and public.users tables"""
+        try:
+            async with httpx.AsyncClient() as client:
+                # Initialize data variables
+                public_data = []
+                auth_data = {"users": []}
+                
+                # Check public.users table
+                public_response = await client.get(
+                    f"{self.rest_url}/users?select=id&{field}=eq.{value}",
+                    headers=self._get_headers(use_service_key=True)
+                )
+                
+                public_exists = False
+                if public_response.status_code == 200:
+                    public_data = public_response.json()
+                    public_exists = len(public_data) > 0
+                    logger.info(f"Public users check: found {len(public_data)} records for {field}={value}")
+                else:
+                    logger.error(f"Check public.users error: {public_response.status_code} - {public_response.text}")
+                    return {"success": False, "error": f"Database query failed: {public_response.status_code}"}
+                
+                # Check auth.users table (only for email field)
+                auth_exists = False
+                if field == "email":
+                    # Use the get user by email endpoint instead of listing all users
+                    auth_response = await client.get(
+                        f"{self.auth_url}/admin/users",
+                        headers=self._get_headers(use_service_key=True)
+                    )
+                    
+                    if auth_response.status_code == 200:
+                        auth_data = auth_response.json()
+                        # Filter users by email manually since Supabase admin API doesn't support email filtering
+                        all_users = auth_data.get("users", [])
+                        matching_users = [user for user in all_users if user.get("email") == value]
+                        auth_exists = len(matching_users) > 0
+                        logger.info(f"Auth users check: found {len(matching_users)} records for email={value}")
+                        # Update auth_data to only include matching users
+                        auth_data = {"users": matching_users}
+                    else:
+                        logger.error(f"Check auth.users error: {auth_response.status_code} - {auth_response.text}")
+                        return {"success": False, "error": f"Auth query failed: {auth_response.status_code}"}
+                
+                # User exists if found in either table
+                exists = public_exists or auth_exists
+                
+                logger.info(f"Final result: exists={exists}, public_exists={public_exists}, auth_exists={auth_exists}")
+                
+                return {
+                    "success": True,
+                    "exists": exists,
+                    "found_in_public": public_exists,
+                    "found_in_auth": auth_exists,
+                    "data": {
+                        "public": public_data,
+                        "auth": auth_data.get("users", [])
+                    }
+                }
+                    
+        except Exception as e:
+            logger.error(f"Check user exists error: {str(e)}")
             return {"success": False, "error": str(e)}
     
     async def test_connection(self) -> Dict[str, Any]:

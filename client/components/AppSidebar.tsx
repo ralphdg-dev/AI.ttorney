@@ -27,6 +27,7 @@ import {
 } from 'lucide-react-native';
 import Colors from '../constants/Colors';
 import { GlobalStyles } from '../constants/GlobalStyles';
+import { useAuth } from '../contexts/AuthContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 const SIDEBAR_WIDTH = screenWidth * 0.8;
@@ -109,6 +110,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const [shouldRender, setShouldRender] = useState(false);
   const insets = useSafeAreaInsets();
+  const { signOut } = useAuth();
 
   useEffect(() => {
     if (isVisible) {
@@ -230,8 +232,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       id: 'logout',
       label: 'Sign Out',
       icon: LogOut,
-      action: () => {
-        console.log('Logout pressed');
+      action: async () => {
+        try {
+          await signOut();
+        } catch (error) {
+          console.error('Logout error:', error);
+        }
       },
     },
   ];

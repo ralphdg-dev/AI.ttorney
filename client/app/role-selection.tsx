@@ -7,14 +7,18 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { useState } from "react";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from "../constants/Colors";
 import BackButton from "../components/ui/BackButton";
 import PrimaryButton from "../components/ui/PrimaryButton";
 import BottomActions from "../components/ui/BottomActions";
+import { apiClient } from "../lib/api-client";
+import { useAuth } from "../contexts/AuthContext";
 
 import lawyer_selected from "../assets/images/lawyer_selected.png";
 import lawyer_notselected from "../assets/images/lawyer_notselected.png";
@@ -87,28 +91,87 @@ interface ResponsiveStyles {
 
 export default function RoleSelection() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { refreshUserData, user } = useAuth();
 
-  const handleContinue = () => {
-    if (selectedRole) {
-      // Navigate based on selected role
-      if (selectedRole === "lawyer") {
-        	router.push("/lawyer-starting-page");
-      } else if (selectedRole === "seeker") {
-        router.push("/onboarding/user/registration");
+  const handleBack = async () => {
+    try {
+      // Get user email from AuthContext instead of AsyncStorage
+      const userEmail = user?.email;
+      
+      if (userEmail) {
+        // Revert user role to guest when going back
+        await apiClient.selectRole({
+          email: userEmail,
+          selected_role: "guest"
+        });
+        
+        // Refresh user data to update role in context
+        await refreshUserData();
       }
+      
+      // Navigate back
+      router.back();
+    } catch (error) {
+      // Still navigate back even if API call fails
+      router.back();
     }
-    console.log("Continue pressed with role:", selectedRole);
   };
 
-  const handleContinueAsGuest = () => {
-    // router.push("/home");
-    console.log("Continue as guest pressed");
+  const handleContinue = async () => {
+    if (!selectedRole) return;
+
+    setIsLoading(true);
+    
+    try {
+      // Get user email from AuthContext instead of AsyncStorage
+      const userEmail = user?.email;
+      
+      
+      if (!userEmail) {
+        Alert.alert('Error', 'User email not found. Please try logging in again.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Both seeker and lawyer selections result in registered_user role
+      const apiRoleSelection = "registered_user";
+      
+      // Call role selection API
+      
+      const response = await apiClient.selectRole({
+        email: userEmail,
+        selected_role: apiRoleSelection
+      });
+
+
+      if (response.success && response.data) {
+        // Refresh user data in AuthContext to update role
+        await refreshUserData();
+        
+        // Navigate based on selected role
+        
+        if (selectedRole === "seeker") {
+          // Legal seeker goes to home page - use replace to prevent back navigation
+          router.replace("/home");
+        } else if (selectedRole === "lawyer") {
+          // Lawyer goes to verification instructions - use replace to prevent back navigation
+          router.replace("/onboarding/lawyer/verification-instructions");
+        } else {
+          // Fallback
+          router.replace("/home");
+        }
+      } else {
+        Alert.alert('Error', response.error || 'Failed to update role');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update role. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSkip = () => {
-    // Skip to guest mode or next screen
-    handleContinueAsGuest();
-  };
+
 
   // Responsive styles
   const responsiveStyles: ResponsiveStyles = {
@@ -325,9 +388,9 @@ export default function RoleSelection() {
                            {/* Bottom Section */}
         <BottomActions>
           <PrimaryButton
-            title="Continue"
+            title={isLoading ? "Updating..." : "Continue"}
             onPress={handleContinue}
-            disabled={!selectedRole}
+            disabled={!selectedRole || isLoading}
           />
         </BottomActions>
     </View>
@@ -337,7 +400,7 @@ export default function RoleSelection() {
     <View style={tw`flex-1 bg-white`}>
       {/* Static Header - Same as Onboarding */}
       <View style={tw`flex-row justify-between items-center px-6 pt-12 pb-4`}>
-        <BackButton onPress={() => router.back()} />
+        <BackButton onPress={handleBack} />
       </View>
 
       {/* Responsive, scrollable content */}

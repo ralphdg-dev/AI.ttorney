@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, SafeAreaView, StatusBar, Text, TextInput, TouchableOpacity, Image, Alert, Modal, ScrollView, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import BackButton from '../../../components/ui/BackButton';
 import StickyFooterButton from '../../../components/ui/StickyFooterButton';
+import { lawyerApplicationService } from '../../../services/lawyerApplicationService';
+import { useAuth } from '../../../contexts/AuthContext';
 
 export default function LawyerReg() {
+  const { user } = useAuth();
   const [rollNumber, setRollNumber] = useState('');
   const [rollSignDate, setRollSignDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -18,25 +22,102 @@ export default function LawyerReg() {
   const [showYearSelect, setShowYearSelect] = useState(false);
   const [showUploadOptions, setShowUploadOptions] = useState(false);
   const [ibpCard, setIbpCard] = useState<any | null>(null);
+  const [ibpCardPath, setIbpCardPath] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
   const isComplete = Boolean(rollNumber.trim() && rollSignDate && ibpCard);
   const today = new Date();
 
   const handleBrowseFiles = async () => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: Platform.OS === 'web' ? ['image/jpeg', 'image/png', 'image/jpg'] : ['image/*'],
-      copyToCacheDirectory: true,
-      multiple: false,
-    });
-    if (result.assets && result.assets.length > 0) {
-      const asset = result.assets[0];
-      // Validate size <= 5MB if available
-      const maxSize = 5 * 1024 * 1024;
-      if (asset.size && asset.size > maxSize) {
-        Alert.alert('File too large', 'Please select a file up to 5MB.');
-        return;
+    if (Platform.OS === 'web') {
+      // Use native file input for web to get actual File objects
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/jpeg,image/png,image/jpg';
+      input.onchange = async (e: any) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Validate size <= 10MB
+        const fileSizeInMB = file.size / (1024 * 1024);
+        if (fileSizeInMB > 10) {
+          Alert.alert('File too large', 'Please select a file smaller than 10MB.');
+          return;
+        }
+        
+        // Set preview immediately for better UX
+        const previewUrl = URL.createObjectURL(file);
+        setIbpCard({ uri: previewUrl, name: file.name, size: file.size });
+        
+        // Upload to backend
+        setIsUploading(true);
+        try {
+          const uploadResult = await lawyerApplicationService.uploadIbpIdCard(file);
+          
+          console.log('Upload result:', uploadResult);
+          
+          if (uploadResult.success && uploadResult.file_path) {
+            setIbpCardPath(uploadResult.file_path);
+            setShowUploadOptions(false);
+          } else {
+            // Keep the preview but show warning - don't remove the image
+            console.warn('Upload failed but keeping preview:', uploadResult.message);
+            Alert.alert('Upload Warning', 'File selected but upload failed. You can continue and try again later.');
+          }
+        } catch (error) {
+          // Keep the preview but show warning - don't remove the image
+          console.error('Upload error:', error);
+          Alert.alert('Upload Warning', 'File selected but upload failed. You can continue and try again later.');
+        } finally {
+          setIsUploading(false);
+        }
+      };
+      input.click();
+    } else {
+      // Use DocumentPicker for native platforms
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        // Validate size <= 10MB if available
+        const fileSizeInMB = asset.size ? asset.size / (1024 * 1024) : 0;
+        if (fileSizeInMB > 10) {
+          Alert.alert('File too large', 'Please select a file smaller than 10MB.');
+          return;
+        }
+        
+        // Set preview immediately for better UX
+        setIbpCard(asset);
+        
+        // Upload to backend
+        setIsUploading(true);
+        try {
+          const uploadResult = await lawyerApplicationService.uploadIbpIdCard({
+            uri: asset.uri,
+            name: asset.name,
+            type: asset.mimeType,
+          });
+          
+          console.log('Upload result:', uploadResult);
+          
+          if (uploadResult.success && uploadResult.file_path) {
+            setIbpCardPath(uploadResult.file_path);
+            setShowUploadOptions(false);
+          } else {
+            // Keep the preview but show warning - don't remove the image
+            console.warn('Upload failed but keeping preview:', uploadResult.message);
+            Alert.alert('Upload Warning', 'File selected but upload failed. You can continue and try again later.');
+          }
+        } catch (error) {
+          // Keep the preview but show warning - don't remove the image
+          console.error('Upload error:', error);
+          Alert.alert('Upload Warning', 'File selected but upload failed. You can continue and try again later.');
+        } finally {
+          setIsUploading(false);
+        }
       }
-      // Normalize
-      setIbpCard({ uri: asset.uri, name: asset.name || 'upload.jpg', size: asset.size });
     }
   };
 
@@ -59,7 +140,36 @@ export default function LawyerReg() {
           Alert.alert('File too large', 'Please select a file up to 5MB.');
           return;
         }
+        
+        // Set preview immediately for better UX
         setIbpCard({ uri: a.uri, name: a.fileName || 'photo.jpg', size: a.fileSize });
+        
+        // Upload to backend
+        setIsUploading(true);
+        try {
+          const uploadResult = await lawyerApplicationService.uploadIbpIdCard({
+            uri: a.uri,
+            name: a.fileName || 'photo.jpg',
+            type: 'image/jpeg',
+          });
+          
+          console.log('Upload result:', uploadResult);
+          
+          if (uploadResult.success && uploadResult.file_path) {
+            setIbpCardPath(uploadResult.file_path);
+            setShowUploadOptions(false);
+          } else {
+            // Keep the preview but show warning - don't remove the image
+            console.warn('Upload failed but keeping preview:', uploadResult.message);
+            Alert.alert('Upload Warning', 'File selected but upload failed. You can continue and try again later.');
+          }
+        } catch (error) {
+          // Keep the preview but show warning - don't remove the image
+          console.error('Upload error:', error);
+          Alert.alert('Upload Warning', 'File selected but upload failed. You can continue and try again later.');
+        } finally {
+          setIsUploading(false);
+        }
       }
     } finally {
       setShowUploadOptions(false);
@@ -86,7 +196,36 @@ export default function LawyerReg() {
           Alert.alert('File too large', 'Please select a file up to 5MB.');
           return;
         }
+        
+        // Set preview immediately for better UX
         setIbpCard({ uri: a.uri, name: a.fileName || 'image.jpg', size: a.fileSize });
+        
+        // Upload to backend
+        setIsUploading(true);
+        try {
+          const uploadResult = await lawyerApplicationService.uploadIbpIdCard({
+            uri: a.uri,
+            name: a.fileName || 'image.jpg',
+            type: 'image/jpeg',
+          });
+          
+          console.log('Upload result:', uploadResult);
+          
+          if (uploadResult.success && uploadResult.file_path) {
+            setIbpCardPath(uploadResult.file_path);
+            setShowUploadOptions(false);
+          } else {
+            // Keep the preview but show warning - don't remove the image
+            console.warn('Upload failed but keeping preview:', uploadResult.message);
+            Alert.alert('Upload Warning', 'File selected but upload failed. You can continue and try again later.');
+          }
+        } catch (error) {
+          // Keep the preview but show warning - don't remove the image
+          console.error('Upload error:', error);
+          Alert.alert('Upload Warning', 'File selected but upload failed. You can continue and try again later.');
+        } finally {
+          setIsUploading(false);
+        }
       }
     } finally {
       setShowUploadOptions(false);
@@ -484,7 +623,10 @@ export default function LawyerReg() {
                 <Text style={{ color: '#111827', fontWeight: '600' }}>Replace</Text>
               </TouchableOpacity>
               {/* Delete */}
-              <TouchableOpacity onPress={() => setIbpCard(null)} style={{ padding: 6, borderWidth: 1, borderColor: '#FCA5A5', backgroundColor: '#FEF2F2', borderRadius: 8 }}>
+              <TouchableOpacity onPress={() => {
+                setIbpCard(null);
+                setIbpCardPath('');
+              }} style={{ padding: 6, borderWidth: 1, borderColor: '#FCA5A5', backgroundColor: '#FEF2F2', borderRadius: 8 }}>
                 <MaterialIcons name="delete" size={18} color="#DC2626" />
               </TouchableOpacity>
             </View>
@@ -550,10 +692,16 @@ export default function LawyerReg() {
 
       {/* Sticky footer next */}
       <StickyFooterButton
-        title="Next"
-        disabled={!isComplete}
+        title={isUploading ? "Uploading..." : "Next"}
+        disabled={!isComplete || isUploading}
         bottomOffset={16}
-        onPress={() => {
+        onPress={async () => {
+          // Store form data in AsyncStorage for later submission
+          await AsyncStorage.setItem('lawyer_roll_number', rollNumber);
+          await AsyncStorage.setItem('lawyer_roll_sign_date', rollSignDate ? rollSignDate.toISOString() : '');
+          await AsyncStorage.setItem('lawyer_full_name', user?.full_name || '');
+          await AsyncStorage.setItem('lawyer_ibp_card_path', ibpCardPath);
+          
           router.push('./lawyer-face-verification');
         }}
       />

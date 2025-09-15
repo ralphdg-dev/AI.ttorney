@@ -140,30 +140,39 @@ export type Database = {
       }
       consultation_requests: {
         Row: {
+          consultation_date: string | null
+          consultation_time: string | null
           id: string
           lawyer_id: string | null
           message: string
+          mode: Database["public"]["Enums"]["consultation_mode"] | null
           requested_at: string | null
           responded_at: string | null
-          status: string | null
+          status: Database["public"]["Enums"]["consultation_status"] | null
           user_id: string | null
         }
         Insert: {
+          consultation_date?: string | null
+          consultation_time?: string | null
           id?: string
           lawyer_id?: string | null
           message: string
+          mode?: Database["public"]["Enums"]["consultation_mode"] | null
           requested_at?: string | null
           responded_at?: string | null
-          status?: string | null
+          status?: Database["public"]["Enums"]["consultation_status"] | null
           user_id?: string | null
         }
         Update: {
+          consultation_date?: string | null
+          consultation_time?: string | null
           id?: string
           lawyer_id?: string | null
           message?: string
+          mode?: Database["public"]["Enums"]["consultation_mode"] | null
           requested_at?: string | null
           responded_at?: string | null
-          status?: string | null
+          status?: Database["public"]["Enums"]["consultation_status"] | null
           user_id?: string | null
         }
         Relationships: [
@@ -187,7 +196,7 @@ export type Database = {
         Row: {
           body: string
           created_at: string | null
-          domain: string | null
+          domain: Database["public"]["Enums"]["legal_category"] | null
           id: string
           is_anonymous: boolean | null
           is_flagged: boolean | null
@@ -198,7 +207,7 @@ export type Database = {
         Insert: {
           body: string
           created_at?: string | null
-          domain?: string | null
+          domain?: Database["public"]["Enums"]["legal_category"] | null
           id?: string
           is_anonymous?: boolean | null
           is_flagged?: boolean | null
@@ -209,7 +218,7 @@ export type Database = {
         Update: {
           body?: string
           created_at?: string | null
-          domain?: string | null
+          domain?: Database["public"]["Enums"]["legal_category"] | null
           id?: string
           is_anonymous?: boolean | null
           is_flagged?: boolean | null
@@ -309,7 +318,7 @@ export type Database = {
           created_at: string | null
           definition_en: string
           definition_fil: string | null
-          domain: string | null
+          domain: Database["public"]["Enums"]["legal_category"] | null
           example_en: string | null
           example_fil: string | null
           id: number
@@ -322,7 +331,7 @@ export type Database = {
           created_at?: string | null
           definition_en: string
           definition_fil?: string | null
-          domain?: string | null
+          domain?: Database["public"]["Enums"]["legal_category"] | null
           example_en?: string | null
           example_fil?: string | null
           id?: number
@@ -335,7 +344,7 @@ export type Database = {
           created_at?: string | null
           definition_en?: string
           definition_fil?: string | null
-          domain?: string | null
+          domain?: Database["public"]["Enums"]["legal_category"] | null
           example_en?: string | null
           example_fil?: string | null
           id?: number
@@ -428,7 +437,7 @@ export type Database = {
           content_fil: string | null
           created_at: string | null
           created_by: string | null
-          domain: string | null
+          domain: Database["public"]["Enums"]["legal_category"] | null
           id: number
           is_verified: boolean | null
           title_en: string
@@ -442,7 +451,7 @@ export type Database = {
           content_fil?: string | null
           created_at?: string | null
           created_by?: string | null
-          domain?: string | null
+          domain?: Database["public"]["Enums"]["legal_category"] | null
           id?: number
           is_verified?: boolean | null
           title_en: string
@@ -456,7 +465,7 @@ export type Database = {
           content_fil?: string | null
           created_at?: string | null
           created_by?: string | null
-          domain?: string | null
+          domain?: Database["public"]["Enums"]["legal_category"] | null
           id?: number
           is_verified?: boolean | null
           title_en?: string
@@ -577,34 +586,34 @@ export type Database = {
       }
       users: {
         Row: {
+          birthdate: string | null
           created_at: string | null
           email: string
           full_name: string | null
           id: string
           is_verified: boolean | null
-          password_hash: string
           role: Database["public"]["Enums"]["user_role"] | null
           updated_at: string | null
           username: string
         }
         Insert: {
+          birthdate?: string | null
           created_at?: string | null
           email: string
           full_name?: string | null
           id?: string
           is_verified?: boolean | null
-          password_hash: string
           role?: Database["public"]["Enums"]["user_role"] | null
           updated_at?: string | null
           username: string
         }
         Update: {
+          birthdate?: string | null
           created_at?: string | null
           email?: string
           full_name?: string | null
           id?: string
           is_verified?: boolean | null
-          password_hash?: string
           role?: Database["public"]["Enums"]["user_role"] | null
           updated_at?: string | null
           username?: string
@@ -619,6 +628,21 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      consultation_mode:
+        | "onsite"
+        | "online"
+      consultation_status:
+        | "pending"
+        | "accepted"
+        | "rejected"
+        | "completed"
+      legal_category:
+        | "family"
+        | "criminal"
+        | "civil"
+        | "labor"
+        | "consumer"
+        | "others"
       user_role:
         | "guest"
         | "registered_user"
@@ -752,6 +776,24 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      consultation_mode: [
+        "onsite",
+        "online",
+      ],
+      consultation_status: [
+        "pending",
+        "accepted",
+        "rejected",
+        "completed",
+      ],
+      legal_category: [
+        "family",
+        "criminal",
+        "civil",
+        "labor",
+        "consumer",
+        "others",
+      ],
       user_role: [
         "guest",
         "registered_user",

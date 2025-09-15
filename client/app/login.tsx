@@ -5,17 +5,120 @@ import { useState } from "react";
 import Colors from "../constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import logo from "../assets/images/logo.png";
+import { useToast, Toast, ToastTitle, ToastDescription } from "../components/ui/toast";
+import { useAuth } from "../contexts/AuthContext";
  
 
 export default function Login() {
+  const toast = useToast();
+  const { signIn } = useAuth();
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Validation states
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
-  const handleLogin = () => {
-    // Redirect to home after login
-    router.replace("/home");
+  // Validation functions
+  const validateEmail = (emailValue: string) => {
+    setEmailError("");
+    
+    if (!emailValue) {
+      setEmailError("Email is required");
+      return false;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailValue)) {
+      setEmailError("Please enter a valid email address");
+      return false;
+    }
+    
+    return true;
+  };
+  
+  const validatePassword = (passwordValue: string) => {
+    setPasswordError("");
+    
+    if (!passwordValue) {
+      setPasswordError("Password is required");
+      return false;
+    }
+    
+    if (passwordValue.length < 6) {
+      setPasswordError("Password must be at least 6 characters");
+      return false;
+    }
+    
+    return true;
+  };
+  
+  const handleLogin = async () => {
+    // Validate inputs
+    const isEmailValid = validateEmail(email);
+    const isPasswordValid = validatePassword(password);
+    
+    if (!isEmailValid || !isPasswordValid) {
+      toast.show({
+        placement: "top",
+        render: ({ id }) => (
+          <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+            <ToastTitle size="md">Validation Error</ToastTitle>
+            <ToastDescription size="sm">Please fix the errors in the form</ToastDescription>
+          </Toast>
+        ),
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      // Use AuthContext signIn method with Supabase Auth
+      const result = await signIn(email.toLowerCase().trim(), password);
+
+      if (result.success) {
+        // Show success toast
+        toast.show({
+          placement: "top",
+          render: ({ id }) => (
+            <Toast nativeID={id} action="success" variant="solid" className="mt-12">
+              <ToastTitle size="md">Login Successful</ToastTitle>
+              <ToastDescription size="sm">Welcome back! Redirecting...</ToastDescription>
+            </Toast>
+          ),
+        });
+        // Navigation is handled by AuthContext
+      } else {
+        // Handle login errors
+        toast.show({
+          placement: "top",
+          render: ({ id }) => (
+            <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+              <ToastTitle size="md">Login Failed</ToastTitle>
+              <ToastDescription size="sm">{result.error || "Invalid credentials"}</ToastDescription>
+            </Toast>
+          ),
+        });
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.show({
+        placement: "top",
+        render: ({ id }) => (
+          <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+            <ToastTitle size="md">Network Error</ToastTitle>
+            <ToastDescription size="sm">Please check your connection and try again</ToastDescription>
+          </Toast>
+        ),
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleLogin = () => {
@@ -61,16 +164,28 @@ export default function Login() {
             </Text>
             <TextInput
               style={[
-                tw`border border-gray-300 rounded-lg px-4 py-3 bg-white`,
-                { color: Colors.text.head },
+                tw`border rounded-lg px-4 py-3 bg-white`,
+                {
+                  color: Colors.text.head,
+                  borderColor: emailError ? '#ef4444' : '#d1d5db',
+                  borderWidth: emailError ? 2 : 1,
+                },
               ]}
               placeholder="Your email"
               placeholderTextColor="#9CA3AF"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (emailError) setEmailError(""); // Clear error on input
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
             />
+            {emailError ? (
+              <Text style={[tw`text-sm mt-1`, { color: '#ef4444' }]}>
+                {emailError}
+              </Text>
+            ) : null}
           </View>
 
           {/* Password Input */}
@@ -81,13 +196,20 @@ export default function Login() {
             <View style={tw`relative`}>
               <TextInput
                 style={[
-                  tw`border border-gray-300 rounded-lg px-4 py-3 bg-white pr-12`,
-                  { color: Colors.text.head },
+                  tw`border rounded-lg px-4 py-3 bg-white pr-12`,
+                  {
+                    color: Colors.text.head,
+                    borderColor: passwordError ? '#ef4444' : '#d1d5db',
+                    borderWidth: passwordError ? 2 : 1,
+                  },
                 ]}
                 placeholder="Your password"
                 placeholderTextColor="#9CA3AF"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (passwordError) setPasswordError(""); // Clear error on input
+                }}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
               />
@@ -102,6 +224,11 @@ export default function Login() {
                 />
               </TouchableOpacity>
             </View>
+            {passwordError ? (
+              <Text style={[tw`text-sm mt-1`, { color: '#ef4444' }]}>
+                {passwordError}
+              </Text>
+            ) : null}
           </View>
 
           {/* Remember Me & Forgot Password */}
@@ -141,11 +268,17 @@ export default function Login() {
           <TouchableOpacity
             style={[
               tw`py-3 rounded-lg items-center justify-center mb-3`,
-              { backgroundColor: Colors.primary.blue },
+              { 
+                backgroundColor: isLoading ? '#9CA3AF' : Colors.primary.blue,
+                opacity: isLoading ? 0.7 : 1
+              },
             ]}
             onPress={handleLogin}
+            disabled={isLoading}
           >
-            <Text style={tw`text-white font-semibold text-lg`}>Login</Text>
+            <Text style={tw`text-white font-semibold text-lg`}>
+              {isLoading ? 'Signing In...' : 'Login'}
+            </Text>
           </TouchableOpacity>
 
           {/* OR Separator */}
@@ -195,7 +328,7 @@ export default function Login() {
           Don&apos;t have an account?{" "}
           <Text
             style={[tw`font-bold`, { color: Colors.primary.blue }]}
-            onPress={() => router.push('/role-selection')}
+            onPress={() => router.push('/onboarding/registration')}
           >
             Sign Up
           </Text>
