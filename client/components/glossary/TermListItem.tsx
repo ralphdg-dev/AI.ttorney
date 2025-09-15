@@ -5,6 +5,7 @@ import Colors from "@/constants/Colors";
 import { ChevronRight, Star } from "lucide-react-native";
 import { Badge, BadgeText } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { useFavorites } from "@/contexts/FavoritesContext";
 
 export interface TermItem {
   id: string;
@@ -25,7 +26,13 @@ interface TermListItemProps {
 }
 
 export default function TermListItem({ item, onPress, containerStyle }: TermListItemProps) {
-  const isFavorite = !!item.isFavorite;
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const isTermFavorite = isFavorite(item.id);
+
+  const handleFavoritePress = async (e: any) => {
+    e.stopPropagation(); // Prevent triggering the main onPress
+    await toggleFavorite(item.id, item.title);
+  };
 
   const getCategoryBadgeClasses = (
     category?: string
@@ -53,14 +60,15 @@ export default function TermListItem({ item, onPress, containerStyle }: TermList
       onPress={() => onPress && onPress(item)}
     >
       <Card className="flex-row items-start px-5 py-5 bg-white rounded-2xl border border-gray-200">
-        <View style={tw`mt-1 mr-4`}>
+        <TouchableOpacity style={tw`mt-1 mr-4`} onPress={handleFavoritePress}>
           <Star
             size={18}
-            color={isFavorite ? "#f59e0b" : "#9ca3af"}
+            color={isTermFavorite ? "#f59e0b" : "#9ca3af"}
             strokeWidth={2}
-            fill={isFavorite ? "#f59e0b" : "none"}
+            // Fill when favorited; outline when not
+            fill={isTermFavorite ? "#f59e0b" : "none"}
           />
-        </View>
+        </TouchableOpacity>
         <View style={tw`flex-1`}>
           <View style={tw`flex-row items-center justify-between mb-2`}>
             <Text

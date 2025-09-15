@@ -17,6 +17,9 @@ import BackButton from "@/components/ui/BackButton";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
 import { Star, BookOpen, Globe } from "lucide-react-native";
+// import { db } from "@/lib/supabase";
+import { Database } from "@/types/database.types";
+import { useFavorites } from "@/contexts/FavoritesContext";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -35,10 +38,12 @@ interface GlossaryTerm {
 export default function TermDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { isFavorite, toggleFavorite } = useFavorites();
   const [term, setTerm] = useState<GlossaryTerm | null>(null);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
   const [scrollY] = useState(new Animated.Value(0));
+  
+  const isTermFavorite = isFavorite(id);
 
   const getDynamicLineHeight = (text: string, baseSize: number) => {
     const charCount = text.length;
@@ -94,13 +99,11 @@ export default function TermDetailScreen() {
     router.push("/glossary");
   };
 
-  const toggleFavorite = async () => {
-    try {
-      setIsFavorite(!isFavorite);
-      // Note: NEED PA IKONEK SA USER
-    } catch (error) {
-      console.error("Error toggling favorite:", error);
-      setIsFavorite(!isFavorite);
+
+
+  const handleToggleFavorite = async () => {
+    if (term) {
+      await toggleFavorite(id, term.term_en);
     }
   };
 
@@ -223,11 +226,11 @@ export default function TermDetailScreen() {
         >
           {term?.term_en || "Legal Term"}
         </GSText>
-        <Pressable onPress={toggleFavorite} style={tw`p-2`}>
+        <Pressable onPress={handleToggleFavorite} style={tw`p-2`}>
           <Star
             size={22}
-            color={isFavorite ? "#F59E0B" : "#9CA3AF"}
-            fill={isFavorite ? "#F59E0B" : "none"}
+            color={isTermFavorite ? "#F59E0B" : "#9CA3AF"}
+            fill={isTermFavorite ? "#F59E0B" : "none"}
           />
         </Pressable>
       </View>
