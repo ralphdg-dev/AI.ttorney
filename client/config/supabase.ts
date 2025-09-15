@@ -13,13 +13,22 @@ const createSupabaseClient = (): SupabaseClient => {
     return supabaseInstance;
   }
 
-  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: false,
-      storage: Platform.OS === 'web' ? undefined : AsyncStorage,
-    },
+// For immediate use, create with basic config and update later
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true, // Re-enable session persistence for proper login
+    detectSessionInUrl: false,
+    storage: Platform.OS === 'web' ? undefined : undefined, // Let it use default storage but we'll clear it manually
+  },
+});
+
+// Initialize proper storage when available
+if (Platform.OS !== 'web') {
+  import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
+    supabase.auth.setSession = supabase.auth.setSession.bind(supabase.auth);
+    // Update the storage after import
+    (supabase.auth as any).storage = AsyncStorage;
   });
 
   return supabaseInstance;

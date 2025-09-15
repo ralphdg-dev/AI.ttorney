@@ -59,7 +59,23 @@ export default function LawyerTerms() {
 
       console.log('Submitting application data:', applicationData);
 
-      const result = await lawyerApplicationService.submitApplication(applicationData);
+      // Check if user has existing application to determine if this is a resubmission
+      const currentStatus = await lawyerApplicationService.getApplicationStatus();
+      const isResubmission = currentStatus?.has_application && 
+                            (currentStatus.application?.status === 'rejected' || 
+                             currentStatus.application?.status === 'resubmission');
+
+      console.log('Current application status:', currentStatus);
+      console.log('Is resubmission:', isResubmission);
+
+      let result;
+      if (isResubmission) {
+        console.log('Calling resubmitApplication...');
+        result = await lawyerApplicationService.resubmitApplication(applicationData);
+      } else {
+        console.log('Calling submitApplication...');
+        result = await lawyerApplicationService.submitApplication(applicationData);
+      }
 
       console.log('Submission result:', result);
 

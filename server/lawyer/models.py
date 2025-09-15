@@ -1,5 +1,5 @@
 from pydantic import BaseModel, validator
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from datetime import datetime, date
 from uuid import UUID
 
@@ -64,6 +64,10 @@ class LawyerApplicationResponse(BaseModel):
     matched_at: Optional[datetime] = None
     submitted_at: datetime
     updated_at: datetime
+    # New versioning fields
+    version: Optional[int] = 1
+    parent_application_id: Optional[UUID] = None
+    is_latest: Optional[bool] = True
 
 class LawyerApplicationStatusResponse(BaseModel):
     has_application: bool
@@ -72,6 +76,10 @@ class LawyerApplicationStatusResponse(BaseModel):
     reject_count: int
     is_blocked: bool
     last_rejected_at: Optional[datetime] = None
+
+class LawyerApplicationHistoryResponse(BaseModel):
+    applications: List[LawyerApplicationResponse]
+    total_applications: int
 
 class FileUploadResponse(BaseModel):
     success: bool

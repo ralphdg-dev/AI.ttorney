@@ -3,7 +3,8 @@ from lawyer.models import (
     LawyerApplicationSubmit, 
     LawyerApplicationReview, 
     LawyerApplicationResponse,
-    LawyerApplicationStatusResponse
+    LawyerApplicationStatusResponse,
+    LawyerApplicationHistoryResponse
 )
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
@@ -41,6 +42,9 @@ class LawyerApplicationService:
                 "roll_number": application_data.roll_number,
                 "selfie": application_data.selfie,
                 "status": "pending",
+                "version": 1,
+                "parent_application_id": None,
+                "is_latest": True,
                 "submitted_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
@@ -68,6 +72,81 @@ class LawyerApplicationService:
             
         except Exception as e:
             logger.error(f"Submit application error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    async def resubmit_application(self, user_id: str, application_data: LawyerApplicationSubmit) -> Dict[str, Any]:
+        """Resubmit a lawyer application (creates new version)"""
+        try:
+            # First, check if user can resubmit
+            can_apply_result = await self._can_user_resubmit(user_id)
+            if not can_apply_result["can_apply"]:
+                return {
+                    "success": False,
+                    "error": can_apply_result["reason"]
+                }
+            
+            # Get current latest application
+            current_app_result = await self._get_latest_user_application(user_id)
+            if not current_app_result["success"]:
+                return {
+                    "success": False,
+                    "error": "No previous application found"
+                }
+            
+            current_app = current_app_result["data"]
+            current_version = current_app.get("version", 1)
+            current_app_id = current_app["id"]
+            
+            # Mark current application as not latest
+            mark_old_result = await self._mark_application_as_old(current_app_id)
+            if not mark_old_result["success"]:
+                return mark_old_result
+            
+            # Create new application record with incremented version
+            new_application_id = str(uuid.uuid4())
+            new_application_record = {
+                "id": new_application_id,
+                "user_id": user_id,
+                "full_name": application_data.full_name,
+                "roll_signing_date": application_data.roll_signing_date.isoformat(),
+                "ibp_id": application_data.ibp_id,
+                "roll_number": application_data.roll_number,
+                "selfie": application_data.selfie,
+                "status": "pending",  # New resubmissions start as pending for admin review
+                "version": current_version + 1,
+                "parent_application_id": current_app_id,
+                "is_latest": True,
+                "submitted_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            # Insert new application
+            insert_result = await self._insert_application(new_application_record)
+            if not insert_result["success"]:
+                # Rollback: mark old application as latest again
+                await self._mark_application_as_latest(current_app_id)
+                return insert_result
+            
+            # Update user status: role = 'registered_user', pending_lawyer = true
+            user_update_result = await self._update_user_for_pending_application(user_id)
+            if not user_update_result["success"]:
+                # Rollback both changes
+                await self._delete_application(new_application_id)
+                await self._mark_application_as_latest(current_app_id)
+                return {
+                    "success": False,
+                    "error": "Failed to update user status"
+                }
+            
+            return {
+                "success": True,
+                "message": "Application resubmitted successfully",
+                "application_id": new_application_id,
+                "version": current_version + 1
+            }
+            
+        except Exception as e:
+            logger.error(f"Resubmit application error: {str(e)}")
             return {"success": False, "error": str(e)}
     
     async def get_user_application_status(self, user_id: str) -> Dict[str, Any]:
@@ -278,7 +357,7 @@ class LawyerApplicationService:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.supabase.rest_url}/lawyer_applications?user_id=eq.{user_id}&order=submitted_at.desc&limit=1&select=*",
+                    f"{self.supabase.rest_url}/lawyer_applications?user_id=eq.{user_id}&is_latest=eq.true&select=*",
                     headers=self.supabase._get_headers()
                 )
                 
@@ -401,4 +480,96 @@ class LawyerApplicationService:
                 
         except Exception as e:
             logger.error(f"Clear pending lawyer status error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def get_user_application_history(self, user_id: str) -> Dict[str, Any]:
+        """Get user's complete application history"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.supabase.rest_url}/lawyer_applications?user_id=eq.{user_id}&order=version.asc&select=*",
+                    headers=self.supabase._get_headers()
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    history_response = LawyerApplicationHistoryResponse(
+                        applications=data,
+                        total_applications=len(data)
+                    )
+                    return {
+                        "success": True,
+                        "data": history_response.dict()
+                    }
+                else:
+                    return {"success": False, "error": "Failed to get application history"}
+                    
+        except Exception as e:
+            logger.error(f"Get user application history error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    # Helper methods for resubmission logic
+    async def _can_user_resubmit(self, user_id: str) -> Dict[str, Any]:
+        """Check if user can resubmit an application"""
+        try:
+            # Get user profile
+            user_result = await self.supabase.get_user_profile(user_id)
+            if not user_result["success"]:
+                return {"can_apply": False, "reason": "User not found"}
+            
+            user_data = user_result["data"]
+            
+            # Check if blocked from applying
+            if user_data.get("is_blocked_from_applying", False):
+                return {
+                    "can_apply": False,
+                    "reason": "You are blocked from applying due to multiple rejections"
+                }
+            
+            # Get current application status
+            current_app_result = await self._get_latest_user_application(user_id)
+            if not current_app_result["success"]:
+                return {
+                    "can_apply": False,
+                    "reason": "No previous application found to resubmit"
+                }
+            
+            current_app = current_app_result["data"]
+            current_status = current_app.get("status")
+            
+            # Can only resubmit if status is 'rejected' or 'resubmission'
+            if current_status not in ["rejected", "resubmission"]:
+                return {
+                    "can_apply": False,
+                    "reason": f"Cannot resubmit application with status: {current_status}"
+                }
+            
+            return {"can_apply": True}
+            
+        except Exception as e:
+            logger.error(f"Can user resubmit check error: {str(e)}")
+            return {"can_apply": False, "reason": "Error checking resubmission eligibility"}
+
+    async def _mark_application_as_old(self, application_id: str) -> Dict[str, Any]:
+        """Mark an application as not latest"""
+        try:
+            update_data = {
+                "is_latest": False,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            return await self._update_application(application_id, update_data)
+        except Exception as e:
+            logger.error(f"Mark application as old error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def _mark_application_as_latest(self, application_id: str) -> Dict[str, Any]:
+        """Mark an application as latest (for rollback)"""
+        try:
+            update_data = {
+                "is_latest": True,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            return await self._update_application(application_id, update_data)
+        except Exception as e:
+            logger.error(f"Mark application as latest error: {str(e)}")
             return {"success": False, "error": str(e)}

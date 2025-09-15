@@ -40,6 +40,7 @@ export interface AuthContextType {
   checkLawyerApplicationStatus: () => Promise<any>;
   hasRedirectedToStatus: boolean;
   setHasRedirectedToStatus: (value: boolean) => void;
+  initialAuthCheck: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabaseUser: null,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [initialAuthCheck, setInitialAuthCheck] = useState(false);
   const [hasRedirectedToStatus, setHasRedirectedToStatus] = useState(false);
 
   useEffect(() => {
@@ -59,17 +61,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initialize = async () => {
       try {
         // Get initial session
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
         
-        if (error) {
-          console.error('Error getting session:', error);
+        if (initialSession) {
+          console.log('Initial session found:', initialSession.user?.email);
+          await handleAuthStateChange(initialSession, false);
+        } else {
+          console.log('No initial session found');
+          setAuthState({
+            session: null,
+            user: null,
+            supabaseUser: null,
+          });
           setIsLoading(false);
-          return;
         }
-
-        if (session?.user) {
-          await handleAuthStateChange(session);
-        }
+        
+        setInitialAuthCheck(true);
 
         // Listen for auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -92,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 user: null,
                 supabaseUser: null,
               });
+              setHasRedirectedToStatus(false);
             }
             
             setIsLoading(false);
@@ -137,13 +145,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Only handle navigation on explicit login attempts
       if (shouldNavigate && profile) {
-        // Always set the redirect flag to prevent future redirects
-        setHasRedirectedToStatus(true);
-        
         let applicationStatus = null;
         
         // Check lawyer application status if user has pending_lawyer flag
         if (profile.pending_lawyer) {
+          // Set redirect flag only for pending lawyer users to prevent future status redirects
+          setHasRedirectedToStatus(true);
+          
           const statusData = await checkLawyerApplicationStatus();
           if (statusData && statusData.has_application && statusData.application) {
             applicationStatus = statusData.application.status;
@@ -154,16 +162,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Handle different redirect scenarios
           if (redirectPath === 'loading') {
             // Show loading screen while fetching status
-            router.push('/loading-status' as any);
+            router.replace('/loading' as any);
           } else if (redirectPath && redirectPath.includes('/lawyer-status/')) {
-            router.push(redirectPath as any);
+            router.replace(redirectPath as any);
           } else if (redirectPath) {
-            router.push(redirectPath as any);
+            router.replace(redirectPath as any);
           }
         } else {
           // User doesn't have pending lawyer status, redirect normally
           const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
-          router.push(redirectPath as any);
+          router.replace(redirectPath as any);
         }
       }
     } catch (error) {
@@ -202,19 +210,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    console.log('SignOut: Starting sign out process');
+    
+    // Stop any ongoing polling immediately
     try {
-      // Reset redirect flag on sign out
-      setHasRedirectedToStatus(false);
-      
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Sign out error:', error);
-      }
-      // Auth state change will be handled by the listener
-      router.push('/login' as any);
+      const { lawyerApplicationService } = await import('../services/lawyerApplicationService');
+      lawyerApplicationService.stopStatusPolling();
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.warn('Error stopping polling:', error);
     }
+    
+    // Reset redirect flag on sign out
+    setHasRedirectedToStatus(false);
+    
+    // Clear all application state immediately
+    setAuthState({
+      session: null,
+      user: null,
+      supabaseUser: null,
+    });
+    
+    // Clear Supabase session synchronously first
+    try {
+      await supabase.auth.signOut({ scope: 'global' });
+      console.log('SignOut: Supabase session cleared');
+    } catch (error) {
+      console.warn('SignOut: Supabase signout error:', error);
+    }
+    
+    // Clear browser storage immediately
+    if (typeof window !== 'undefined') {
+      localStorage.clear();
+      sessionStorage.clear();
+      console.log('SignOut: Browser storage cleared');
+    }
+    
+    // Navigate to login
+    console.log('SignOut: Redirecting to login');
+    router.replace('/login' as any);
+    
+    // Do remaining cleanup in background
+    setTimeout(async () => {
+      try {
+        // Clear AsyncStorage
+        try {
+          const AsyncStorage = await import('@react-native-async-storage/async-storage');
+          await AsyncStorage.default.clear();
+        } catch (error) {
+          console.warn('AsyncStorage clear error:', error);
+        }
+        
+        // Clear service cache
+        try {
+          const { lawyerApplicationService } = await import('../services/lawyerApplicationService');
+          lawyerApplicationService.clearCache();
+        } catch (error) {
+          console.warn('Service cleanup error:', error);
+        }
+      } catch (error) {
+        console.warn('Background cleanup error:', error);
+      }
+    }, 100);
   };
 
   const setUserData = (userData: User | null) => {
@@ -298,6 +354,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkLawyerApplicationStatus,
     hasRedirectedToStatus,
     setHasRedirectedToStatus,
+    initialAuthCheck,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

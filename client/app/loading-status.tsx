@@ -10,29 +10,49 @@ export default function LoadingStatus() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadStatusAndRedirect();
-  }, []);
+    if (user) {
+      loadStatusAndRedirect();
+    }
+  }, [user]);
+
 
   const loadStatusAndRedirect = async () => {
     try {
       if (!user) {
-        router.push('/login');
+        router.replace('/login');
         return;
       }
 
       if (!user.pending_lawyer) {
         // User doesn't have pending lawyer status, redirect normally
         const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, false);
-        router.push(redirectPath as any);
+        router.replace(redirectPath as any);
         return;
       }
 
-      // Fetch the actual application status
-      const statusData = await lawyerApplicationService.getApplicationStatus();
-      let applicationStatus = null;
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout')), 5000);
+      });
+
+      // Clear cache first to get fresh data
+      lawyerApplicationService.clearStatusCache();
       
-      if (statusData && statusData.has_application && statusData.application) {
-        applicationStatus = statusData.application.status;
+      // Fetch the actual application status with timeout
+      const statusPromise = lawyerApplicationService.getApplicationStatus();
+      
+      let statusData;
+      try {
+        statusData = await Promise.race([statusPromise, timeoutPromise]);
+      } catch (timeoutError) {
+        // If timeout or error, default to pending status
+        router.replace('/onboarding/lawyer/lawyer-status/pending');
+        return;
+      }
+
+      let applicationStatus = null;
+      if (statusData && (statusData as any).has_application && (statusData as any).application) {
+        applicationStatus = (statusData as any).application.status;
       }
 
       // Get the correct redirect path with the actual status
@@ -44,14 +64,19 @@ export default function LoadingStatus() {
       );
 
       if (redirectPath && redirectPath !== 'loading') {
-        router.push(redirectPath as any);
+        router.replace(redirectPath as any);
       } else {
-        // Fallback to pending if still no status
-        router.push('/onboarding/lawyer/lawyer-status/pending');
+        // If still no valid redirect path, default to pending
+        router.replace('/onboarding/lawyer/lawyer-status/pending');
       }
     } catch (error) {
       console.error('Error loading application status:', error);
-      setError('Failed to load application status. Please check your connection.');
+      // On error, redirect to pending as fallback
+      if (user?.pending_lawyer) {
+        router.replace('/onboarding/lawyer/lawyer-status/pending');
+      } else {
+        setError('Failed to load application status. Please check your connection.');
+      }
     }
   };
 

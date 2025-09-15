@@ -7,8 +7,25 @@ import { onboardingSlides } from '../../data/onboardingData';
 import { useOnboardingAnimation } from '../../hooks/useOnboardingAnimation';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import ActionLink from '../../components/ui/ActionLink';
+import { useAuth } from '../../contexts/AuthContext';
+import { useEffect } from 'react';
+import { getRoleBasedRedirect } from '../../config/routes';
 
 export default function Onboarding() {
+  const { user, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    // If user is already authenticated, redirect them to their appropriate dashboard
+    if (isAuthenticated && user) {
+      const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
+      if (redirectPath === 'loading') {
+        router.replace('/loading-status');
+      } else {
+        router.replace(redirectPath as any);
+      }
+    }
+  }, [isAuthenticated, user]);
+
   const {
     currentSlide,
     fadeAnim,
