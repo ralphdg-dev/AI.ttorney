@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+// C:\Users\Mikko\Desktop\AI.ttorney\client\components\booklawyer\LawyerBookingView.tsx
+import React, { useState, useEffect } from "react";
 import { Alert } from "react-native";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../../constants/Colors";
@@ -26,7 +28,19 @@ interface CalendarDay {
   isSelected?: boolean;
 }
 
-export default function LawyerConsultationScreen() {
+interface LawyerData {
+  id: string;
+  name: string;
+  specialization: string;
+  hours: string;
+  days: string;
+}
+
+export default function LawyerBookingView() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const [lawyerData, setLawyerData] = useState<LawyerData | null>(null);
+  
   const [bottomActiveTab, setBottomActiveTab] = useState("find");
   const [selectedDay, setSelectedDay] = useState(9);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState("9:00AM-10:00AM");
@@ -69,8 +83,21 @@ export default function LawyerConsultationScreen() {
     { id: "10:00AM-11:00AM", time: "10:00AM-11:00AM", available: true },
   ];
 
+  useEffect(() => {
+    // Extract lawyer data from route params
+    if (params.lawyerId) {
+      setLawyerData({
+        id: params.lawyerId as string,
+        name: params.lawyerName as string,
+        specialization: params.lawyerSpecialization as string,
+        hours: params.lawyerHours as string,
+        days: params.lawyerDays as string
+      });
+    }
+  }, [params]);
+
   const handleBackPress = () => {
-    Alert.alert("Back", "Going back to lawyer directory");
+    router.back();
   };
 
   const handleBookConsultation = () => {
@@ -78,13 +105,25 @@ export default function LawyerConsultationScreen() {
       Alert.alert("Error", "Please describe your concern");
       return;
     }
-    Alert.alert("Success", "Consultation booked successfully!");
+    Alert.alert("Success", `Consultation booked with ${lawyerData?.name}!`);
   };
 
   const handleBottomNavChange = (tab: string) => {
     setBottomActiveTab(tab);
-    Alert.alert("Navigation", `Navigating to ${tab}`);
+    if (tab === "find") {
+      router.push("/directory");
+    } else {
+      Alert.alert("Navigation", `Navigating to ${tab}`);
+    }
   };
+
+  if (!lawyerData) {
+    return (
+      <Box className="flex-1 bg-gray-50 items-center justify-center">
+        <Text>Loading lawyer information...</Text>
+      </Box>
+    );
+  }
 
   return (
     <Box className="flex-1 bg-gray-50">
@@ -113,24 +152,26 @@ export default function LawyerConsultationScreen() {
             className="w-20 h-20 rounded-full mb-4 items-center justify-center"
             style={{ backgroundColor: Colors.primary.blue }}
           >
-            <Text className="text-white text-2xl font-bold">J</Text>
+            <Text className="text-white text-2xl font-bold">
+              {lawyerData.name.charAt(0)}
+            </Text>
           </Box>
           <Text
-            className="text-lg font-bold mb-1"
+            className="text-lg font-bold mb-1 text-center"
             style={{ color: Colors.text.head }}
           >
-            Atty. Joaquin Ysabel De Samaniego
+            {lawyerData.name}
           </Text>
           <Text
             className="text-sm mb-4 text-center"
             style={{ color: Colors.text.sub }}
           >
-            Criminal Law | Civil Law | Family Law
+            {lawyerData.specialization}
           </Text>
           <HStack className="items-center mb-2">
             <Ionicons name="time-outline" size={16} color={Colors.text.sub} />
             <Text className="text-sm ml-2" style={{ color: Colors.text.sub }}>
-              8:00 AM - 8:00 PM
+              {lawyerData.hours}
             </Text>
           </HStack>
           <HStack className="items-center">
@@ -140,7 +181,7 @@ export default function LawyerConsultationScreen() {
               color={Colors.text.sub}
             />
             <Text className="text-sm ml-2" style={{ color: Colors.text.sub }}>
-              Monday - Friday
+              {lawyerData.days}
             </Text>
           </HStack>
         </VStack>
@@ -365,7 +406,7 @@ export default function LawyerConsultationScreen() {
             onPress={handleBookConsultation}
           >
             <Text className="text-white font-semibold text-base">
-              Book Consultation
+              Book Consultation with {lawyerData.name.split(' ')[1]}
             </Text>
           </Button>
         </Box>

@@ -1,5 +1,7 @@
+// C:\Users\Mikko\Desktop\AI.ttorney\client\components\directory\screens\DirectoryScreen.tsx
 import React, { useState } from "react";
 import { View, ScrollView, Alert } from "react-native";
+import { useRouter } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import Header from "../../../components/Header";
 import TabNavigation from "../components/TabNavigation";
@@ -22,6 +24,7 @@ interface Lawyer {
 export default function DirectoryScreen() {
   const [activeTab, setActiveTab] = useState<string>("lawyers");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const router = useRouter();
 
   const lawyers: Lawyer[] = [
     {
@@ -62,18 +65,22 @@ export default function DirectoryScreen() {
     },
   ];
 
-
   const handleFilterPress = (): void => {
     Alert.alert("Filter", "Filter options");
   };
 
   const handleBookConsultation = (lawyer: Lawyer): void => {
-    Alert.alert(
-      "Book Consultation",
-      `Booking consultation with ${lawyer.name}`
-    );
+    router.push({
+      pathname: "/booklawyer",
+      params: {
+        lawyerId: lawyer.id.toString(),
+        lawyerName: lawyer.name,
+        lawyerSpecialization: lawyer.specialization,
+        lawyerHours: lawyer.hours,
+        lawyerDays: lawyer.days
+      }
+    });
   };
-
 
   return (
     <SidebarProvider>
@@ -99,11 +106,10 @@ export default function DirectoryScreen() {
             <LawyerCard
               key={lawyer.id}
               lawyer={lawyer}
-              onBookConsultation={handleBookConsultation}
+              onBookConsultation={() => handleBookConsultation(lawyer)}
             />
           ))}
 
-          {/* Add some bottom padding */}
           <View style={tw`h-4`} />
         </ScrollView>
 
