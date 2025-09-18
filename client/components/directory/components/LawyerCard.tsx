@@ -1,4 +1,5 @@
-import React from "react";
+// C:\Users\Mikko\Desktop\AI.ttorney\client\components\directory\components\LawyerCard.tsx
+import React, { useState } from "react";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Text } from "@/components/ui/text";
@@ -10,7 +11,7 @@ import Colors from "../../../constants/Colors";
 interface Lawyer {
   id: number;
   name: string;
-  specialization: string;
+  specializations: string[];
   location: string;
   hours: string;
   days: string;
@@ -23,6 +24,16 @@ interface LawyerCardProps {
 }
 
 export default function LawyerCard({ lawyer, onBookConsultation }: LawyerCardProps) {
+  const [showAllSpecializations, setShowAllSpecializations] = useState(false);
+  
+  // Get the first specialization and count the rest
+  const primarySpecialization = lawyer.specializations[0];
+  const additionalCount = lawyer.specializations.length - 1;
+  
+  const handleSpecializationPress = () => {
+    setShowAllSpecializations(!showAllSpecializations);
+  };
+
   return (
     <Box className="mx-6 mb-4 bg-white rounded-lg border border-gray-200 p-4">
       <HStack className="justify-between items-start mb-2">
@@ -33,14 +44,49 @@ export default function LawyerCard({ lawyer, onBookConsultation }: LawyerCardPro
           >
             {lawyer.name}
           </Text>
+          
+          {/* Specializations with tooltip */}
+          <Pressable onPress={handleSpecializationPress} className="mt-1">
+            <HStack className="items-center">
+              <Text 
+                className="text-sm" 
+                style={{ color: Colors.text.sub }}
+              >
+                {primarySpecialization}
+              </Text>
+              {additionalCount > 0 && (
+                <Text 
+                  className="text-sm ml-1" 
+                  style={{ color: Colors.primary.blue }}
+                >
+                  + {additionalCount} more
+                </Text>
+              )}
+            </HStack>
+          </Pressable>
+          
+          {showAllSpecializations && (
+            <Box className="mt-2 p-3 bg-gray-100 rounded-lg">
+              <Text 
+                className="text-sm font-semibold mb-1" 
+                style={{ color: Colors.text.head }}
+              >
+                All Specializations:
+              </Text>
+              {lawyer.specializations.map((spec, index) => (
+                <Text 
+                  key={index} 
+                  className="text-sm" 
+                  style={{ color: Colors.text.sub }}
+                >
+                  • {spec}
+                </Text>
+              ))}
+            </Box>
+          )}
+          
           <Text 
-            className="text-sm mt-1" 
-            style={{ color: Colors.text.sub }}
-          >
-            {lawyer.specialization}
-          </Text>
-          <Text 
-            className="text-sm" 
+            className="text-sm mt-2" 
             style={{ color: Colors.text.sub }}
           >
             {lawyer.location}

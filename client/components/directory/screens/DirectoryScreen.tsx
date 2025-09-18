@@ -14,7 +14,7 @@ import { SidebarProvider, SidebarWrapper } from "../../AppSidebar";
 interface Lawyer {
   id: number;
   name: string;
-  specialization: string;
+  specializations: string[];
   location: string;
   hours: string;
   days: string;
@@ -30,7 +30,7 @@ export default function DirectoryScreen() {
     {
       id: 1,
       name: "Atty. Joaquin Miguel Angeles",
-      specialization: "Specializes in Litigation + 3 more",
+      specializations: ["Criminal Law", "Civil Law", "Family Law", "Litigation"],
       location: "Quezon City",
       hours: "8:00 AM - 8:00 PM",
       days: "Monday - Friday",
@@ -39,7 +39,7 @@ export default function DirectoryScreen() {
     {
       id: 2,
       name: "Atty. Lyanna Ysabel Cristobal",
-      specialization: "Specializes in Litigation + 3 more",
+      specializations: ["Corporate Law", "Intellectual Property", "Contract Law", "Business Law"],
       location: "Quezon City",
       hours: "8:00 AM - 8:00 PM",
       days: "Monday - Friday",
@@ -48,7 +48,7 @@ export default function DirectoryScreen() {
     {
       id: 3,
       name: "Atty. Ralph De Guzman",
-      specialization: "Specializes in Litigation + 3 more",
+      specializations: ["Real Estate Law", "Property Law", "Landlord-Tenant", "Estate Planning"],
       location: "Quezon City",
       hours: "8:00 AM - 8:00 PM",
       days: "Monday - Friday",
@@ -57,7 +57,7 @@ export default function DirectoryScreen() {
     {
       id: 4,
       name: "Atty. Mikko Samaniego",
-      specialization: "Specializes in Litigation + 3 more",
+      specializations: ["Immigration Law", "International Law", "Human Rights", "Asylum Cases"],
       location: "Quezon City",
       hours: "8:00 AM - 8:00 PM",
       days: "Monday - Friday",
@@ -75,7 +75,7 @@ export default function DirectoryScreen() {
       params: {
         lawyerId: lawyer.id.toString(),
         lawyerName: lawyer.name,
-        lawyerSpecialization: lawyer.specialization,
+        lawyerSpecializations: JSON.stringify(lawyer.specializations),
         lawyerHours: lawyer.hours,
         lawyerDays: lawyer.days
       }
