@@ -37,16 +37,17 @@ interface LawyerData {
   specializations: string[];
   hours: string;
   days: string;
+  hours_available: string[];
 }
 
 export default function LawyerBookingView() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { width } = useWindowDimensions();
-  const isSmallScreen = width < 375; // iPhone SE and similar small devices
-  
+  const isSmallScreen = width < 375;
+
   const [lawyerData, setLawyerData] = useState<LawyerData | null>(null);
-  
+
   const [bottomActiveTab, setBottomActiveTab] = useState("find");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState("9:00AM-10:00AM");
   const [email, setEmail] = useState("user@email.com");
@@ -58,69 +59,74 @@ export default function LawyerBookingView() {
   const [modeDropdownVisible, setModeDropdownVisible] = useState(false);
   const [showAllSpecializations, setShowAllSpecializations] = useState(false);
 
-  // Get current date
   const today = new Date();
   const currentMonth = today.getMonth();
   const currentDate = today.getDate();
   const currentYear = today.getFullYear();
-  
+
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedDay, setSelectedDay] = useState(currentDate);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
 
   const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
   const communicationModes = ["Online", "In-person", "Phone"];
 
-  const timeSlots: TimeSlot[] = [
-    { id: "8:00AM-9:00AM", time: "8:00AM-9:00AM", available: true },
-    { id: "9:00AM-10:00AM", time: "9:00AM-10:00AM", available: true },
-    { id: "10:00AM-11:00AM", time: "10:00AM-11:00AM", available: true },
-  ];
+  const timeSlots: TimeSlot[] =
+    lawyerData?.hours_available.map((time, index) => ({
+      id: `slot-${index}`,
+      time: time,
+      available: true,
+    })) || [];
 
-  // Function to generate all days for the selected month
   const generateCalendarDays = (month: number, year: number) => {
     const days: CalendarDay[] = [];
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    
-    // First day of the month
+
     const firstDay = new Date(year, month, 1);
-    // Last day of the month
     const lastDay = new Date(year, month + 1, 0);
-    
-    // Days from previous month to show
-    const daysFromPrevMonth = firstDay.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    
-    // Days from next month to show (to complete the grid)
+
+    const daysFromPrevMonth = firstDay.getDay();
+
     const totalDays = daysFromPrevMonth + lastDay.getDate();
     const daysFromNextMonth = totalDays <= 35 ? 35 - totalDays : 42 - totalDays;
-    
-    // Add days from previous month
+
     const prevMonthLastDay = new Date(year, month, 0).getDate();
     for (let i = daysFromPrevMonth - 1; i >= 0; i--) {
       const date = prevMonthLastDay - i;
       const dayDate = new Date(year, month - 1, date);
-      
+
       days.push({
         date,
         day: daysOfWeek[dayDate.getDay()],
         month: month - 1,
         year: year,
-        isCurrentMonth: false
+        isCurrentMonth: false,
       });
     }
-    
-    // Add days from current month
+
     for (let i = 1; i <= lastDay.getDate(); i++) {
       const dayDate = new Date(year, month, i);
-      const isToday = dayDate.getDate() === today.getDate() && 
-                     dayDate.getMonth() === today.getMonth() && 
-                     dayDate.getFullYear() === today.getFullYear();
-      const isSelected = i === selectedDay && month === selectedMonth && year === selectedYear;
-      
+      const isToday =
+        dayDate.getDate() === today.getDate() &&
+        dayDate.getMonth() === today.getMonth() &&
+        dayDate.getFullYear() === today.getFullYear();
+      const isSelected =
+        i === selectedDay && month === selectedMonth && year === selectedYear;
+
       days.push({
         date: i,
         day: daysOfWeek[dayDate.getDay()],
@@ -128,32 +134,29 @@ export default function LawyerBookingView() {
         year,
         isToday,
         isSelected,
-        isCurrentMonth: true
+        isCurrentMonth: true,
       });
     }
-    
-    // Add days from next month
+
     for (let i = 1; i <= daysFromNextMonth; i++) {
       const dayDate = new Date(year, month + 1, i);
-      
+
       days.push({
         date: i,
         day: daysOfWeek[dayDate.getDay()],
         month: month + 1,
         year: year,
-        isCurrentMonth: false
+        isCurrentMonth: false,
       });
     }
-    
+
     return days;
   };
 
-  // Initialize calendar days
   useEffect(() => {
     setCalendarDays(generateCalendarDays(selectedMonth, selectedYear));
   }, [selectedMonth, selectedYear, selectedDay]);
 
-  // Navigate to previous month
   const navigateToPreviousMonth = () => {
     if (selectedMonth === 0) {
       setSelectedMonth(11);
@@ -161,10 +164,9 @@ export default function LawyerBookingView() {
     } else {
       setSelectedMonth(selectedMonth - 1);
     }
-    setSelectedDay(1); // Reset to first day of the month
+    setSelectedDay(1);
   };
 
-  // Navigate to next month
   const navigateToNextMonth = () => {
     if (selectedMonth === 11) {
       setSelectedMonth(0);
@@ -172,13 +174,11 @@ export default function LawyerBookingView() {
     } else {
       setSelectedMonth(selectedMonth + 1);
     }
-    setSelectedDay(1); // Reset to first day of the month
+    setSelectedDay(1);
   };
 
-  // Handle day selection
   const handleDaySelect = (day: CalendarDay) => {
     if (!day.isCurrentMonth) {
-      // If selecting a day from previous/next month, switch to that month
       setSelectedMonth(day.month);
       setSelectedYear(day.year);
     }
@@ -186,28 +186,33 @@ export default function LawyerBookingView() {
   };
 
   useEffect(() => {
-    // Extract lawyer data from route params
     if (params.lawyerId) {
       try {
-        const specializations = params.lawyerSpecializations 
+        const specializations = params.lawyerSpecializations
           ? JSON.parse(params.lawyerSpecializations as string)
           : ["General Law"];
-          
+
+        const hours_available = params.lawyerhours_available
+          ? JSON.parse(params.lawyerhours_available as string)
+          : [];
+
         setLawyerData({
           id: params.lawyerId as string,
           name: params.lawyerName as string,
           specializations: specializations,
           hours: params.lawyerHours as string,
-          days: params.lawyerDays as string
+          days: params.lawyerDays as string,
+          hours_available: hours_available,
         });
       } catch (error) {
-        console.error("Error parsing specializations:", error);
+        console.error("Error parsing data:", error);
         setLawyerData({
           id: params.lawyerId as string,
           name: params.lawyerName as string,
           specializations: ["General Law"],
           hours: params.lawyerHours as string,
-          days: params.lawyerDays as string
+          days: params.lawyerDays as string,
+          hours_available: [],
         });
       }
     }
@@ -242,7 +247,6 @@ export default function LawyerBookingView() {
     );
   }
 
-  // Get the first specialization and count the rest
   const primarySpecialization = lawyerData.specializations[0];
   const additionalCount = lawyerData.specializations.length - 1;
 
@@ -254,7 +258,7 @@ export default function LawyerBookingView() {
           <Ionicons name="arrow-back" size={24} color={Colors.primary.blue} />
         </Pressable>
         <Text
-          className={`${isSmallScreen ? 'text-base' : 'text-lg'} font-bold`}
+          className={`${isSmallScreen ? "text-base" : "text-lg"} font-bold`}
           style={{ color: Colors.primary.blue }}
         >
           Talk to a Lawyer
@@ -270,7 +274,9 @@ export default function LawyerBookingView() {
         {/* Lawyer Profile */}
         <VStack className="mx-4 mt-4 mb-5 bg-white rounded-lg p-5 items-center">
           <Box
-            className={`${isSmallScreen ? 'w-16 h-16' : 'w-20 h-20'} rounded-full mb-4 items-center justify-center`}
+            className={`${
+              isSmallScreen ? "w-16 h-16" : "w-20 h-20"
+            } rounded-full mb-4 items-center justify-center`}
             style={{ backgroundColor: Colors.primary.blue }}
           >
             <Text className="text-white text-xl font-bold">
@@ -278,14 +284,16 @@ export default function LawyerBookingView() {
             </Text>
           </Box>
           <Text
-            className={`${isSmallScreen ? 'text-base' : 'text-lg'} font-bold mb-1 text-center`}
+            className={`${
+              isSmallScreen ? "text-base" : "text-lg"
+            } font-bold mb-1 text-center`}
             style={{ color: Colors.text.head }}
           >
             {lawyerData.name}
           </Text>
-          
+
           {/* Specializations */}
-          <Pressable 
+          <Pressable
             onPress={() => setShowAllSpecializations(!showAllSpecializations)}
             className="mb-4"
           >
@@ -309,16 +317,16 @@ export default function LawyerBookingView() {
 
           {showAllSpecializations && (
             <Box className="mb-4 p-3 bg-gray-100 rounded-lg w-full">
-              <Text 
-                className="text-sm font-semibold mb-2 text-center" 
+              <Text
+                className="text-sm font-semibold mb-2 text-center"
                 style={{ color: Colors.text.head }}
               >
                 All Specializations:
               </Text>
               {lawyerData.specializations.map((spec, index) => (
-                <Text 
-                  key={index} 
-                  className="text-sm text-center" 
+                <Text
+                  key={index}
+                  className="text-sm text-center"
                   style={{ color: Colors.text.sub }}
                 >
                   • {spec}
@@ -349,7 +357,9 @@ export default function LawyerBookingView() {
         <VStack className="mx-4 mb-5">
           <HStack className="items-center justify-between mb-4">
             <Text
-              className={`${isSmallScreen ? 'text-base' : 'text-lg'} font-semibold`}
+              className={`${
+                isSmallScreen ? "text-base" : "text-lg"
+              } font-semibold`}
               style={{ color: Colors.text.head }}
             >
               Schedule
@@ -365,8 +375,6 @@ export default function LawyerBookingView() {
                   onPress={() => {
                     setSelectedMonth(index);
                     setMonthDropdownVisible(false);
-                    
-                    // Reset to today if selecting current month
                     if (index === currentMonth) {
                       setSelectedDay(currentDate);
                       setSelectedYear(currentYear);
@@ -375,10 +383,15 @@ export default function LawyerBookingView() {
                     }
                   }}
                 >
-                  <Text style={{ 
-                    color: index === selectedMonth ? Colors.primary.blue : Colors.text.head,
-                    fontWeight: index === selectedMonth ? 'bold' : 'normal'
-                  }}>
+                  <Text
+                    style={{
+                      color:
+                        index === selectedMonth
+                          ? Colors.primary.blue
+                          : Colors.text.head,
+                      fontWeight: index === selectedMonth ? "bold" : "normal",
+                    }}
+                  >
                     {month} {currentYear}
                   </Text>
                 </Pressable>
@@ -389,48 +402,73 @@ export default function LawyerBookingView() {
           {/* Calendar Navigation */}
           <HStack className="items-center justify-between mb-4">
             <Pressable onPress={navigateToPreviousMonth}>
-              <Ionicons name="chevron-back" size={24} color={Colors.primary.blue} />
+              <Ionicons
+                name="chevron-back"
+                size={24}
+                color={Colors.primary.blue}
+              />
             </Pressable>
-            
-            <Text className="text-base font-semibold" style={{ color: Colors.text.head }}>
+
+            <Text
+              className="text-base font-semibold"
+              style={{ color: Colors.text.head }}
+            >
               {months[selectedMonth]} {selectedYear}
             </Text>
-            
+
             <Pressable onPress={navigateToNextMonth}>
-              <Ionicons name="chevron-forward" size={24} color={Colors.primary.blue} />
+              <Ionicons
+                name="chevron-forward"
+                size={24}
+                color={Colors.primary.blue}
+              />
             </Pressable>
           </HStack>
 
           {/* Calendar Grid */}
           <HStack className="flex-wrap justify-between mb-4">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
-              <Box key={day} className={`${isSmallScreen ? 'w-10' : 'w-12'} items-center mb-2`}>
-                <Text className="text-xs font-semibold" style={{ color: Colors.text.sub }}>
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+              <Box
+                key={day}
+                className={`${
+                  isSmallScreen ? "w-10" : "w-12"
+                } items-center mb-2`}
+              >
+                <Text
+                  className="text-xs font-semibold"
+                  style={{ color: Colors.text.sub }}
+                >
                   {day}
                 </Text>
               </Box>
             ))}
-            
+
             {calendarDays.map((day) => (
               <Pressable
                 key={`${day.month}-${day.date}`}
-                className={`${isSmallScreen ? 'w-10 h-10' : 'w-12 h-12'} rounded-lg items-center justify-center mb-1`}
+                className={`${
+                  isSmallScreen ? "w-10 h-10" : "w-12 h-12"
+                } rounded-lg items-center justify-center mb-1`}
                 style={{
-                  backgroundColor: day.isSelected 
-                    ? Colors.primary.blue 
+                  backgroundColor: day.isSelected
+                    ? Colors.primary.blue
                     : day.isToday
-                      ? Colors.primary.lightBlue
-                      : "transparent",
-                  opacity: day.isCurrentMonth ? 1 : 0.4
+                    ? "#E3F2FD"
+                    : "transparent",
+                  opacity: day.isCurrentMonth ? 1 : 0.4,
                 }}
                 onPress={() => handleDaySelect(day)}
               >
                 <Text
-                  className={`${isSmallScreen ? 'text-sm' : 'text-base'} font-medium`}
+                  className={`${
+                    isSmallScreen ? "text-sm" : "text-base"
+                  } font-medium`}
                   style={{
-                    color: day.isSelected ? "white" : 
-                           day.isToday ? Colors.primary.blue : 
-                           Colors.text.head,
+                    color: day.isSelected
+                      ? "white"
+                      : day.isToday
+                      ? Colors.primary.blue
+                      : Colors.text.head,
                   }}
                 >
                   {day.date}
@@ -527,11 +565,7 @@ export default function LawyerBookingView() {
               <Text style={{ color: Colors.text.head, fontSize: 14 }}>
                 {communicationMode}
               </Text>
-              <Ionicons
-                name="chevron-down"
-                size={20}
-                color={Colors.text.sub}
-              />
+              <Ionicons name="chevron-down" size={20} color={Colors.text.sub} />
             </Pressable>
             {modeDropdownVisible && (
               <VStack className="bg-white border border-gray-300 rounded-lg mt-1">
@@ -544,7 +578,9 @@ export default function LawyerBookingView() {
                       setModeDropdownVisible(false);
                     }}
                   >
-                    <Text style={{ color: Colors.text.head, fontSize: 14 }}>{mode}</Text>
+                    <Text style={{ color: Colors.text.head, fontSize: 14 }}>
+                      {mode}
+                    </Text>
                   </Pressable>
                 ))}
               </VStack>
@@ -564,7 +600,7 @@ export default function LawyerBookingView() {
                 color: Colors.text.head,
                 height: 100,
                 textAlignVertical: "top",
-                fontSize: 14
+                fontSize: 14,
               }}
               value={concern}
               onChangeText={setConcern}
@@ -583,7 +619,7 @@ export default function LawyerBookingView() {
             onPress={handleBookConsultation}
           >
             <Text className="text-white font-semibold text-sm">
-              Book Consultation with {lawyerData.name.split(' ')[1]}
+              Book Consultation with {lawyerData.name.split(" ")[1]}
             </Text>
           </Button>
         </Box>
