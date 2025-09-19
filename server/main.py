@@ -10,6 +10,8 @@ import os
 from dotenv import load_dotenv
 from routes import legalTerms
 from contextlib import asynccontextmanager
+from routes.legalConsultations import router as legal_consultations_router
+
 
 # Load environment variables
 load_dotenv()
@@ -74,6 +76,7 @@ from routes import auth
 # Include routers
 app.include_router(auth.router)
 app.include_router(legalTerms.router)
+app.include_router(legal_consultations_router)
 
 # Global exception handler
 @app.exception_handler(Exception)

@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { View, ScrollView, Alert } from "react-native";
+import React, { useState, useMemo, useEffect } from "react";
+import { View, ScrollView, Alert, Text } from "react-native";
 import { useRouter } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import Header from "../../../components/Header";
@@ -11,22 +11,50 @@ import Navbar from "../../Navbar";
 import { SidebarProvider, SidebarWrapper } from "../../AppSidebar";
 
 interface Lawyer {
-  id: number;
+  id: string;
+  lawyer_id: string;
   name: string;
-  specializations: string[];
+  specializations: string;
   location: string;
   hours: string;
-  days: string[];
+  days: string;
   available: boolean;
-  hours_available: string[];
+  hours_available: string;
+  created_at: string;
 }
 
 export default function DirectoryScreen() {
   const [activeTab, setActiveTab] = useState<string>("lawyers");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [lawyersData, setLawyersData] = useState<Lawyer[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const router = useRouter();
 
-  const getDayAbbreviations = (days: string[]): string => {
+  useEffect(() => {
+    fetchLawyers();
+  }, []);
+
+  const fetchLawyers = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:8000/legal-consultations/lawyers');
+      const result = await response.json();
+      
+      if (result.success) {
+        setLawyersData(result.data || []);
+      } else {
+        Alert.alert("Error", "Failed to fetch lawyers: " + result.error);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to connect to server");
+      console.error("Error fetching lawyers:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getDayAbbreviations = (days: string): string => {
+    const dayArray = days.split(',');
     const abbreviationMap: { [key: string]: string } = {
       Monday: "M",
       Tuesday: "T",
@@ -37,10 +65,10 @@ export default function DirectoryScreen() {
       Sunday: "Sun",
     };
 
-    return days.map((day) => abbreviationMap[day] || day).join("");
+    return dayArray.map((day) => abbreviationMap[day.trim()] || day.trim()).join("");
   };
 
-  const isLawyerAvailableToday = (days: string[]): boolean => {
+  const isLawyerAvailableToday = (days: string): boolean => {
     const today = new Date();
     const dayOfWeek = today.getDay();
 
@@ -55,116 +83,40 @@ export default function DirectoryScreen() {
     ];
 
     const currentDay = dayNames[dayOfWeek];
+    const availableDays = days.split(',').map(day => day.trim());
 
-    return days.includes(currentDay);
+    return availableDays.includes(currentDay);
   };
-
-  const lawyersData: Lawyer[] = [
-    {
-      id: 1,
-      name: "Atty. Joaquin Miguel Angeles",
-      specializations: [
-        "Criminal Law",
-        "Civil Law",
-        "Family Law",
-        "Litigation",
-      ],
-      location: "Quezon City",
-      hours: "8:00 AM - 8:00 PM",
-      days: ["Monday", "Wednesday", "Friday"],
-      available: true,
-      hours_available: [
-        "8:00 AM",
-        "10:00 AM",
-        "2:00 PM",
-        "4:00 PM",
-        "6:00 PM",
-        "8:00 PM",
-      ],
-    },
-    {
-      id: 2,
-      name: "Atty. Lyanna Ysabel Cristobal",
-      specializations: [
-        "Corporate Law",
-        "Intellectual Property",
-        "Contract Law",
-        "Business Law",
-      ],
-      location: "Quezon City",
-      hours: "8:00 AM - 8:00 PM",
-      days: ["Tuesday", "Thursday"],
-      available: true,
-      hours_available: [
-        "8:00 AM",
-        "10:00 AM",
-        "2:00 PM",
-        "4:00 PM",
-        "6:00 PM",
-        "8:00 PM",
-      ],
-    },
-    {
-      id: 3,
-      name: "Atty. Ralph De Guzman",
-      specializations: [
-        "Real Estate Law",
-        "Property Law",
-        "Landlord-Tenant",
-        "Estate Planning",
-      ],
-      location: "Quezon City",
-      hours: "8:00 AM - 8:00 PM",
-      days: ["Saturday", "Sunday"],
-      available: true,
-      hours_available: [
-        "8:00 AM",
-        "10:00 AM",
-        "2:00 PM",
-        "4:00 PM",
-        "6:00 PM",
-        "8:00 PM",
-      ],
-    },
-    {
-      id: 4,
-      name: "Atty. Mikko Samaniego",
-      specializations: [
-        "Immigration Law",
-        "International Law",
-        "Human Rights",
-        "Asylum Cases",
-      ],
-      location: "Quezon City",
-      hours: "8:00 AM - 8:00 PM",
-      days: [
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-        "Sunday",
-      ],
-      available: true,
-      hours_available: [
-        "8:00 AM",
-        "10:00 AM",
-        "2:00 PM",
-        "4:00 PM",
-        "6:00 PM",
-        "8:00 PM",
-      ],
-    },
-  ];
 
   const lawyers = useMemo(() => {
     return lawyersData.map((lawyer) => ({
       ...lawyer,
       available: isLawyerAvailableToday(lawyer.days),
       displayDays: getDayAbbreviations(lawyer.days),
+      // Convert specializations string to array for compatibility
+      specializations: lawyer.specializations.split(',').map(s => s.trim()),
+      // Convert hours_available string to array for compatibility
+      hours_available: lawyer.hours_available.split(',').map(h => h.trim()),
     }));
-  }, []);
+  }, [lawyersData]);
+
+  // Filter lawyers based on search query
+  const filteredLawyers = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return lawyers;
+    }
+    
+    const query = searchQuery.toLowerCase().trim();
+    return lawyers.filter(lawyer => {
+      return (
+        lawyer.name.toLowerCase().includes(query) ||
+        lawyer.specializations.some(spec => 
+          spec.toLowerCase().includes(query)
+        ) ||
+        lawyer.location.toLowerCase().includes(query)
+      );
+    });
+  }, [lawyers, searchQuery]);
 
   const handleFilterPress = (): void => {
     Alert.alert("Filter", "Filter options");
@@ -185,7 +137,7 @@ export default function DirectoryScreen() {
       },
     });
   };
-
+  
   return (
     <SidebarProvider>
       <View style={tw`flex-1 bg-gray-50`}>
@@ -207,16 +159,24 @@ export default function DirectoryScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 60 }}
         >
-          {lawyers.map((lawyer) => (
-            <LawyerCard
-              key={lawyer.id}
-              lawyer={{
-                ...lawyer,
-                days: lawyer.displayDays,
-              }}
-              onBookConsultation={() => handleBookConsultation(lawyer)}
-            />
-          ))}
+          {loading ? (
+            <Text style={tw`text-center p-4`}></Text>
+          ) : filteredLawyers.length === 0 ? (
+            <Text style={tw`text-center p-4`}>
+              {searchQuery ? `No lawyers found for "${searchQuery}"` : "No lawyers available"}
+            </Text>
+          ) : (
+            filteredLawyers.map((lawyer) => (
+              <LawyerCard
+                key={lawyer.id}
+                lawyer={{
+                  ...lawyer,
+                  days: lawyer.displayDays,
+                }}
+                onBookConsultation={() => handleBookConsultation(lawyer)}
+              />
+            ))
+          )}
 
           <View style={tw`h-4`} />
         </ScrollView>

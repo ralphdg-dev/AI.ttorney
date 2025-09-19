@@ -187,36 +187,74 @@ export default function LawyerBookingView() {
 
   useEffect(() => {
     if (params.lawyerId) {
-      try {
-        const specializations = params.lawyerSpecializations
-          ? JSON.parse(params.lawyerSpecializations as string)
-          : ["General Law"];
+      // Fetch lawyer data from API
+      const fetchLawyerData = async () => {
+        try {
+          const response = await fetch(
+            `http://localhost:8000/api/legal-consultations/lawyers/${params.lawyerId}`
+          );
+          const result = await response.json();
 
-        const hours_available = params.lawyerhours_available
-          ? JSON.parse(params.lawyerhours_available as string)
-          : [];
+          if (result.success && result.data && result.data.length > 0) {
+            const lawyer = result.data[0];
+            setLawyerData({
+              id: lawyer.id,
+              name: lawyer.name,
+              specializations: lawyer.specializations
+                .split(",")
+                .map((s: string) => s.trim()),
+              hours: lawyer.hours,
+              days: lawyer.days,
+              hours_available: lawyer.hours_available
+                .split(",")
+                .map((h: string) => h.trim()),
+            });
+          } else {
+            // Fallback to params if API fails
+            setLawyerDataFromParams();
+          }
+        } catch (error) {
+          console.error("Error fetching lawyer:", error);
+          // Fallback to params if API fails
+          setLawyerDataFromParams();
+        }
+      };
 
-        setLawyerData({
-          id: params.lawyerId as string,
-          name: params.lawyerName as string,
-          specializations: specializations,
-          hours: params.lawyerHours as string,
-          days: params.lawyerDays as string,
-          hours_available: hours_available,
-        });
-      } catch (error) {
-        console.error("Error parsing data:", error);
-        setLawyerData({
-          id: params.lawyerId as string,
-          name: params.lawyerName as string,
-          specializations: ["General Law"],
-          hours: params.lawyerHours as string,
-          days: params.lawyerDays as string,
-          hours_available: [],
-        });
-      }
+      fetchLawyerData();
     }
   }, [params]);
+
+  // Helper function to set data from params as fallback
+  const setLawyerDataFromParams = () => {
+    try {
+      const specializations = params.lawyerSpecializations
+        ? JSON.parse(params.lawyerSpecializations as string)
+        : ["General Law"];
+
+      const hours_available = params.lawyerhours_available
+        ? JSON.parse(params.lawyerhours_available as string)
+        : [];
+
+      setLawyerData({
+        id: params.lawyerId as string,
+        name: params.lawyerName as string,
+        specializations: specializations,
+        hours: params.lawyerHours as string,
+        days: params.lawyerDays as string,
+        hours_available: hours_available,
+      });
+    } catch (error) {
+      console.error("Error parsing data:", error);
+      setLawyerData({
+        id: params.lawyerId as string,
+        name: params.lawyerName as string,
+        specializations: ["General Law"],
+        hours: params.lawyerHours as string,
+        days: params.lawyerDays as string,
+        hours_available: [],
+      });
+    }
+  };
 
   const handleBackPress = () => {
     router.back();
@@ -619,7 +657,7 @@ export default function LawyerBookingView() {
             onPress={handleBookConsultation}
           >
             <Text className="text-white font-semibold text-sm">
-              Book Consultation with {lawyerData.name.split(" ")[1]}
+              Book Consultation with {lawyerData.name.split(" ")[0]}
             </Text>
           </Button>
         </Box>
@@ -628,4 +666,7 @@ export default function LawyerBookingView() {
       <Navbar activeTab="find" onTabPress={handleBottomNavChange} />
     </Box>
   );
+}
+function getDayAbbreviations(days: any): string {
+  throw new Error("Function not implemented.");
 }
