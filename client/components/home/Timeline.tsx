@@ -1,9 +1,11 @@
-import React from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Post from './Post';
 import Colors from '../../constants/Colors';
+import apiClient from '@/lib/api-client';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface PostData {
   id: string;
@@ -24,70 +26,85 @@ interface TimelineProps {
 
 const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
+  const [posts, setPosts] = useState<PostData[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Sample data for demonstration - Twitter/X style
-  const samplePosts: PostData[] = [
-    {
-      id: '1',
-      user: {
-        name: 'Ralph de Guzman',
-        username: 'twizt3rfries',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-      },
-      timestamp: '1h',
-      category: 'Criminal Law',
-      content: 'Hello po, baka may makasagot agad. Na-involve po ako sa protest actions at ngayon may kaso na akong rebellion at tinatangka pa akong kasuhan ng arson dahil daw sa mga nangyari during the rally. Hindi ko alam kung ano ang dapat kong gawin. May lawyer po ba na pwedeng mag-advise?',
-      comments: 3,
-    },
-    {
-      id: '2',
-      user: {
-        name: 'Anonymous User',
-        username: 'anonymous',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-      },
-      timestamp: '3h',
-      category: 'Traffic Violation',
-      content: 'Hello po! Nahuli daw ako ng NCAP pero hindi ako ang driver ng sasakyan. May way po ba para ma-contest ito? Wala rin akong sasakyan sa pangalan ko.',
-      comments: 12,
-    },
-    {
-      id: '3',
-      user: {
-        name: 'LeBron James',
-        username: 'lebbyjames',
-        avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face',
-      },
-      timestamp: '5h',
-      category: 'Family Law',
-      content: 'Pwede po ba akong humingi ng child support kahit hindi kami kasal ng nanay ng anak ko? May anak kami pero hindi kami nagpakasal. Ano po ang dapat kong gawin para sa anak namin?',
-      comments: 2,
-    },
-    {
-      id: '4',
-      user: {
-        name: 'Willie Revillame',
-        username: 'pengej4cket',
-        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-      },
-      timestamp: '5h',
-      category: 'Labor Law',
-      content: 'Nagresign po ako nang maayos at may clearance na, pero hanggang ngayon wala pa rin akong natatanggap na back pay o final pay. 2 months na po. Ano po dapat kong gawin para ma-claim ito?',
-      comments: 2,
-    },
-    {
-      id: '6',
-      user: {
-        name: 'Juan Dela Cruz',
-        username: 'juan.dc',
-        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
-      },
-      timestamp: '8h',
-      category: 'Civil Law',
-      content: 'May utang sa akin na 50k pero ayaw magbayad. Pwede po ba sa small claims court? Ano po ang requirements at proseso? Salamat po sa makakasagot.',
-      comments: 5,
-    },
-  ];
+  const formatTimeAgo = (isoDate?: string): string => {
+    if (!isoDate) return '';
+    // Treat timestamps without timezone as UTC to avoid local offset issues
+    const hasTz = /Z|[+-]\d{2}:?\d{2}$/.test(isoDate);
+    const normalized = hasTz ? isoDate : `${isoDate}Z`;
+    const createdMs = new Date(normalized).getTime();
+    if (Number.isNaN(createdMs)) return '';
+    const now = Date.now();
+    const diffSec = Math.max(0, Math.floor((now - createdMs) / 1000));
+    if (diffSec < 60) return `${diffSec}s`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 7) return `${diffDay}d`;
+    const diffWeek = Math.floor(diffDay / 7);
+    if (diffWeek < 4) return `${diffWeek}w`;
+    const diffMonth = Math.floor(diffDay / 30);
+    if (diffMonth < 12) return `${diffMonth}mo`;
+    const diffYear = Math.floor(diffDay / 365);
+    return `${diffYear}y`;
+  };
+
+  const mapApiToPost = (row: any): PostData => {
+    const isAnon = !!row?.is_anonymous;
+    const created = row?.created_at || '';
+    return {
+      id: String(row?.id ?? ''),
+      user: isAnon
+        ? { name: 'Anonymous User', username: 'anonymous', avatar: '' }
+        : { name: 'User', username: 'user', avatar: '' },
+      timestamp: formatTimeAgo(created),
+      category: row?.category || 'Others',
+      content: row?.body || '',
+      comments: 0,
+    };
+  };
+
+  const loadPosts = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const res = await apiClient.getRecentForumPosts();
+      if (res.success && Array.isArray((res.data as any)?.data)) {
+        const rows = (res.data as any).data as any[];
+        setPosts(rows.map(mapApiToPost));
+      } else if (res.success && Array.isArray(res.data)) {
+        setPosts((res.data as any[]).map(mapApiToPost));
+      } else {
+        setPosts([]);
+      }
+    } catch {
+      setPosts([]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
+
+  // Refresh when screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      loadPosts();
+    }, [loadPosts])
+  );
+
+  // Lightweight polling for near real-time updates
+  useEffect(() => {
+    const id = setInterval(() => {
+      loadPosts();
+    }, 10000); // 10s
+    return () => clearInterval(id);
+  }, [loadPosts]);
 
   const handleCommentPress = (postId: string) => {
     console.log(`Comment pressed for post ${postId}`);
@@ -118,8 +135,11 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         style={styles.timeline}
         contentContainerStyle={styles.timelineContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={loadPosts} />
+        }
       >
-        {samplePosts.map((post) => (
+        {posts.map((post) => (
           <Post
             key={post.id}
             id={post.id}

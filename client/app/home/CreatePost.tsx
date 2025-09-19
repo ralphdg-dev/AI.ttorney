@@ -7,6 +7,7 @@ import CategoryScroller from '@/components/glossary/CategoryScroller';
 import Colors from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
+import apiClient from '@/lib/api-client';
 
 // Shared categories reference
 
@@ -22,11 +23,23 @@ const CreatePost: React.FC = () => {
     return content.trim().length === 0 || len > MAX_LEN;
   }, [content]);
 
-  const onPressPost = () => {
+  const onPressPost = async () => {
     if (isPostDisabled) return;
-    // TODO: Hook this up to backend; for now just log and navigate back to timeline
-    console.log('Posting content:', { content: content.trim(), categoryId });
-    router.back();
+    try {
+      const payload = {
+        body: content.trim(),
+        category: categoryId || undefined,
+        is_anonymous: isAnonymous,
+      };
+      const resp = await apiClient.createForumPost(payload);
+      if (!resp.success) {
+        console.error('Failed to create post', resp.error);
+        return;
+      }
+      router.back();
+    } catch (e) {
+      console.error('Create post error', e);
+    }
   };
 
   return (

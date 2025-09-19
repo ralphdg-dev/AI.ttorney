@@ -195,6 +195,22 @@ class ApiClient {
   async healthCheck(): Promise<ApiResponse> {
     return this.request('/health');
   }
+
+  // Forum endpoints
+  async createForumPost(data: {
+    body: string;
+    category?: string | null;
+    is_anonymous?: boolean;
+  }): Promise<ApiResponse> {
+    return this.request('/api/forum/posts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getRecentForumPosts(): Promise<ApiResponse> {
+    return this.request('/api/forum/posts/recent');
+  }
 }
 
 export const apiClient = new ApiClient();

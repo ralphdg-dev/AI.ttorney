@@ -7,6 +7,7 @@ import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 import Header from '../../components/Header';
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
+import apiClient from '@/lib/api-client';
 
 type LegalCategory = 'family' | 'criminal' | 'civil' | 'labor' | 'consumer' | 'others';
 
@@ -91,14 +92,16 @@ const LawyerCreatePost: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      const postData = {
+      const payload = {
         body: body.trim(),
-        domain: selectedCategory,
+        category: selectedCategory === 'others' ? undefined : selectedCategory,
         is_anonymous: false,
       };
-      
-      console.log('Creating lawyer post:', postData);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const resp = await apiClient.createForumPost(payload);
+      if (!resp.success) {
+        console.error('Failed to create post', resp.error);
+        return;
+      }
       router.back();
     } catch (error) {
       console.error('Error creating post:', error);
