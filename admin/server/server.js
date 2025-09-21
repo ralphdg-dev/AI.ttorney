@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
+const lawyerApplicationsRoutes = require('./routes/lawyer-applications');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -66,6 +67,7 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/lawyer-applications', lawyerApplicationsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
