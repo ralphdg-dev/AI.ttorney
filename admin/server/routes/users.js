@@ -285,4 +285,187 @@ router.get('/legal-seekers/stats/overview', authenticateAdmin, async (req, res) 
   }
 });
 
+// Get all verified lawyers
+router.get('/lawyers', authenticateAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const offset = (page - 1) * limit;
+
+    console.log('Fetching lawyers with params:', { page, limit, search });
+
+    // First, let's try a simpler query to get verified lawyers
+    let query = supabaseAdmin
+      .from('users')
+      .select(`
+        id,
+        full_name,
+        email,
+        created_at,
+        is_verified
+      `)
+      .eq('role', 'verified_lawyer') // Only verified lawyers
+      .order('created_at', { ascending: false });
+
+    // Add search filter if provided
+    if (search) {
+      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+
+    // Add pagination
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: lawyers, error } = await query;
+
+    if (error) {
+      console.error('Get lawyers error:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch lawyers: ' + error.message 
+      });
+    }
+
+    console.log('Found lawyers:', lawyers?.length || 0);
+
+    // Now try to get lawyer applications for these users
+    let transformedLawyers = [];
+    
+    if (lawyers && lawyers.length > 0) {
+      const userIds = lawyers.map(lawyer => lawyer.id);
+      
+      // Get lawyer applications separately
+      const { data: applications, error: appError } = await supabaseAdmin
+        .from('lawyer_applications')
+        .select('user_id, roll_number, roll_signing_date, status')
+        .in('user_id', userIds)
+        .eq('status', 'approved');
+
+      if (appError) {
+        console.error('Get applications error:', appError);
+        // Continue without applications data
+      }
+
+      console.log('Found applications:', applications?.length || 0);
+
+      // Transform data for frontend
+      transformedLawyers = lawyers.map(lawyer => {
+        const application = applications?.find(app => app.user_id === lawyer.id);
+        return {
+          id: lawyer.id,
+          full_name: lawyer.full_name || 'N/A',
+          email: lawyer.email,
+          roll_number: application?.roll_number || 'N/A',
+          roll_sign_date: application?.roll_signing_date || lawyer.created_at,
+          status: 'Verified',
+          registration_date: lawyer.created_at
+        };
+      });
+    }
+
+    // Get total count for pagination
+    const { count: totalCount } = await supabaseAdmin
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'verified_lawyer');
+
+    console.log('Total lawyers count:', totalCount);
+
+    res.json({
+      success: true,
+      data: transformedLawyers,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalCount || 0,
+        pages: Math.ceil((totalCount || 0) / limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Get lawyers error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error: ' + error.message 
+    });
+  }
+});
+
+// Get single lawyer details
+router.get('/lawyers/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: lawyer, error } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .eq('role', 'verified_lawyer')
+      .single();
+
+    if (error || !lawyer) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Lawyer not found' 
+      });
+    }
+
+    res.json({
+      success: true,
+      data: lawyer
+    });
+
+  } catch (error) {
+    console.error('Get lawyer details error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+// Update lawyer status (suspend/unsuspend)
+router.patch('/lawyers/:id/status', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_verified } = req.body;
+
+    if (typeof is_verified !== 'boolean') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'is_verified must be a boolean value' 
+      });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .update({ 
+        is_verified,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .eq('role', 'verified_lawyer')
+      .select()
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Lawyer not found or update failed' 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Lawyer ${is_verified ? 'verified' : 'suspended'} successfully`,
+      data: data
+    });
+
+  } catch (error) {
+    console.error('Update lawyer status error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
 module.exports = router;

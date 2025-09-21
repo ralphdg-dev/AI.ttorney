@@ -135,6 +135,86 @@ class UsersService {
       throw error;
     }
   }
+
+  // Get all lawyers
+  async getLawyers(params = {}) {
+    try {
+      const { page = 1, limit = 10, search = '' } = params;
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        search
+      });
+
+      const response = await fetch(`${API_BASE_URL}/users/lawyers?${queryParams}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch lawyers');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Get lawyers error:', error);
+      throw error;
+    }
+  }
+
+  // Get single lawyer details
+  async getLawyer(id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/lawyers/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch lawyer');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Get lawyer error:', error);
+      throw error;
+    }
+  }
+
+  // Update lawyer status (suspend/unsuspend)
+  async updateLawyerStatus(id, isVerified) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/lawyers/${id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        },
+        body: JSON.stringify({ is_verified: isVerified })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update lawyer status');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Update lawyer status error:', error);
+      throw error;
+    }
+  }
 }
 
 export default new UsersService();

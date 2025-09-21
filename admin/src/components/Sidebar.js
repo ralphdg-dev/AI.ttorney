@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Home, AlertTriangle, LogOut, Settings } from 'lucide-react';
 import { sections } from './menuConfig';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,17 +24,47 @@ const Avatar = () => {
   );
 };
 
-const Sidebar = ({ activeItem, onItemClick }) => {
+const Sidebar = ({ activeItem }) => {
   const [collapsed, setCollapsed] = React.useState(false);
   const [openGroups, setOpenGroups] = React.useState({});
   const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  // Map menu item IDs to routes
+  const getRouteForItem = (itemId) => {
+    switch (itemId) {
+      case 'dashboard': return '/dashboard';
+      case 'manage-legal-seekers': return '/users/legal-seekers';
+      case 'manage-lawyers': return '/users/lawyers';
+      case 'lawyer-applications': return '/users/lawyer-applications';
+      case 'suspended-accounts': return '/users/suspended-accounts';
+      case 'manage-admins': return '/admin/manage-admins';
+      case 'audit-logs': return '/admin/audit-logs';
+      case 'manage-glossary-terms': return '/legal-resources/glossary-terms';
+      case 'manage-legal-articles': return '/legal-resources/legal-articles';
+      case 'manage-topics-threads': return '/forum/topics-threads';
+      case 'reported-posts': return '/forum/reported-posts';
+      case 'ban-restrict-users': return '/forum/ban-restrict-users';
+      case 'open-tickets': return '/tickets/open';
+      case 'assigned-tickets': return '/tickets/assigned';
+      case 'ticket-history': return '/tickets/history';
+      case 'user-analytics': return '/analytics/users';
+      case 'content-analytics': return '/analytics/content';
+      case 'forum-analytics': return '/analytics/forum';
+      case 'settings': return '/settings';
+      case 'help': return '/help';
+      default: return '/dashboard';
+    }
+  };
 
   const handleItemClick = async (itemId) => {
     if (itemId === 'logout') {
       await logout();
       return;
     }
-    onItemClick && onItemClick(itemId);
+    
+    const route = getRouteForItem(itemId);
+    navigate(route);
   };
 
   const toggleGroup = (label) =>
