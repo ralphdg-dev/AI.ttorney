@@ -1,0 +1,140 @@
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+
+class UsersService {
+  // Get authorization header
+  getAuthHeader() {
+    const token = localStorage.getItem('admin_token');
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+  }
+
+  // Get all legal seekers
+  async getLegalSeekers(params = {}) {
+    try {
+      const { page = 1, limit = 50, search = '', status = 'all' } = params;
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        search,
+        status
+      });
+
+      const response = await fetch(`${API_BASE_URL}/users/legal-seekers?${queryParams}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch legal seekers');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Get legal seekers error:', error);
+      throw error;
+    }
+  }
+
+  // Get single legal seeker details
+  async getLegalSeeker(id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/legal-seekers/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch legal seeker');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Get legal seeker error:', error);
+      throw error;
+    }
+  }
+
+  // Update legal seeker status (verify/unverify)
+  async updateLegalSeekerStatus(id, isVerified) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/legal-seekers/${id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        },
+        body: JSON.stringify({ is_verified: isVerified })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update legal seeker status');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Update legal seeker status error:', error);
+      throw error;
+    }
+  }
+
+  // Delete/deactivate legal seeker
+  async deleteLegalSeeker(id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/legal-seekers/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete legal seeker');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Delete legal seeker error:', error);
+      throw error;
+    }
+  }
+
+  // Get legal seekers statistics
+  async getLegalSeekersStats() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/legal-seekers/stats/overview`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch statistics');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Get legal seekers stats error:', error);
+      throw error;
+    }
+  }
+}
+
+export default new UsersService();
