@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * Reusable data table
  * Props:
- * - columns: Array<{ key: string, header: string, headerClassName?: string, cellClassName?: string, render?: (row) => ReactNode, align?: 'left'|'right'|'center' }>
+ * - columns: Array<{ key: string, header: string, headerRender?: () => ReactNode, headerClassName?: string, cellClassName?: string, render?: (row) => ReactNode, align?: 'left'|'right'|'center' }>
  * - data: any[]
  * - keyField?: string (defaults to 'id'); if absent, uses index
  * - rowKey?: (row, index) => string
