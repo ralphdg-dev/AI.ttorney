@@ -1,26 +1,40 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight, Home, AlertTriangle, LogOut, Settings } from 'lucide-react';
 import { sections } from './menuConfig';
+import { useAuth } from '../contexts/AuthContext';
 
 // sections now imported from menuConfig
 
-const Avatar = () => (
-  <div className="flex items-center space-x-3">
-    <img
-      src="https://i.pravatar.cc/100?img=5"
-      alt="avatar"
-      className="h-10 w-10 rounded-full object-cover"
-    />
-    <div className="leading-tight">
-      <p className="text-[10px] text-gray-500">PRODUCT MANAGER</p>
-      <p className="text-[11px] font-semibold text-gray-900">Andrew Smith</p>
+const Avatar = () => {
+  const { admin } = useAuth();
+  
+  return (
+    <div className="flex items-center space-x-3">
+      <img
+        src="https://i.pravatar.cc/100?img=5"
+        alt="avatar"
+        className="h-10 w-10 rounded-full object-cover"
+      />
+      <div className="leading-tight">
+        <p className="text-[10px] text-gray-500 uppercase">{admin?.role || 'ADMIN'}</p>
+        <p className="text-[11px] font-semibold text-gray-900">{admin?.full_name || 'Admin User'}</p>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const Sidebar = ({ activeItem, onItemClick }) => {
   const [collapsed, setCollapsed] = React.useState(false);
   const [openGroups, setOpenGroups] = React.useState({});
+  const { logout } = useAuth();
+
+  const handleItemClick = async (itemId) => {
+    if (itemId === 'logout') {
+      await logout();
+      return;
+    }
+    onItemClick && onItemClick(itemId);
+  };
 
   const toggleGroup = (label) =>
     setOpenGroups((s) => ({ ...s, [label]: !s[label] }));
@@ -55,7 +69,7 @@ const Sidebar = ({ activeItem, onItemClick }) => {
             {group.items.map((item) => (
               <button
                 key={item.id}
-                onClick={() => onItemClick && onItemClick(item.id)}
+                onClick={() => handleItemClick(item.id)}
                 className={`relative w-full text-left px-3 py-1 my-0.5 rounded-md ml-2 text-[10px] ${
                   activeItem === item.id
                     ? 'bg-gray-50 text-gray-900'
@@ -111,7 +125,7 @@ const Sidebar = ({ activeItem, onItemClick }) => {
             {section.id === 'main' && (
               <div className="mt-2">
                 <button
-                  onClick={() => onItemClick && onItemClick('dashboard')}
+                  onClick={() => handleItemClick('dashboard')}
                   className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start space-x-2'} px-3 py-1.5 rounded-lg text-[11px] ${
                     activeItem === 'dashboard'
                       ? 'bg-gray-50 text-gray-900'
@@ -128,7 +142,7 @@ const Sidebar = ({ activeItem, onItemClick }) => {
             {section.id === 'account' ? (
               <div className="mt-2">
                 <button
-                  onClick={() => onItemClick && onItemClick('settings')}
+                  onClick={() => handleItemClick('settings')}
                   className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start space-x-2'} px-3 py-1.5 rounded-lg text-[11px] ${
                     activeItem === 'settings'
                       ? 'bg-gray-50 text-gray-900'
@@ -156,7 +170,7 @@ const Sidebar = ({ activeItem, onItemClick }) => {
       {/* Footer actions when expanded/collapsed */}
       <div className="mt-auto p-3">
         <button
-          onClick={() => onItemClick && onItemClick('help')}
+          onClick={() => handleItemClick('help')}
           className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start space-x-3'} px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50`}
           title={collapsed ? 'Help' : undefined}
         >
@@ -164,7 +178,7 @@ const Sidebar = ({ activeItem, onItemClick }) => {
           {!collapsed && <span className="text-[10px]">Help</span>}
         </button>
         <button
-          onClick={() => onItemClick && onItemClick('logout')}
+          onClick={() => handleItemClick('logout')}
           className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start space-x-3'} px-3 py-1.5 mt-2 rounded-lg text-red-600 hover:bg-red-50`}
           title={collapsed ? 'Logout' : undefined}
         >
