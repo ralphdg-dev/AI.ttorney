@@ -357,4 +357,52 @@ router.get('/stats/overview', authenticateAdmin, async (req, res) => {
   }
 });
 
+// Generate signed URL for private storage access
+router.post('/signed-url', authenticateAdmin, async (req, res) => {
+  try {
+    const { bucket, filePath } = req.body;
+
+    if (!bucket || !filePath) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bucket and filePath are required'
+      });
+    }
+
+    // Validate bucket names for security
+    const allowedBuckets = ['ibp-ids', 'selfie-ids', 'uploads', 'images', 'lawyer-documents', 'application-files', 'documents', 'files'];
+    if (!allowedBuckets.includes(bucket)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid bucket name'
+      });
+    }
+
+    // Generate signed URL (valid for 1 hour)
+    const { data, error } = await supabaseAdmin.storage
+      .from(bucket)
+      .createSignedUrl(filePath, 3600); // 3600 seconds = 1 hour
+
+    if (error) {
+      console.error('Error creating signed URL:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to create signed URL: ' + error.message
+      });
+    }
+
+    res.json({
+      success: true,
+      signedUrl: data.signedUrl
+    });
+
+  } catch (error) {
+    console.error('Signed URL endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 module.exports = router;

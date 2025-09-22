@@ -113,6 +113,31 @@ class LawyerApplicationsService {
       throw error;
     }
   }
+
+  // Get signed URL for private storage access
+  async getSignedUrl(bucket, filePath) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/lawyer-applications/signed-url`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        },
+        body: JSON.stringify({ bucket, filePath })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get signed URL');
+      }
+
+      return data.signedUrl;
+    } catch (error) {
+      console.error('Get signed URL error:', error);
+      throw error;
+    }
+  }
 }
 
 export default new LawyerApplicationsService();

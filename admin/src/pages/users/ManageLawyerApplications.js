@@ -57,7 +57,7 @@ const RollMatchBadge = ({ status }) => {
 
 const ManageLawyerApplications = () => {
   const [query, setQuery] = React.useState('');
-  const [statusFilter, setStatusFilter] = React.useState('all');
+  const [statusFilter, setStatusFilter] = React.useState('All');
   const [sortBy, setSortBy] = React.useState('Newest');
   const [data, setData] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -75,6 +75,7 @@ const ManageLawyerApplications = () => {
   });
   const [viewOpen, setViewOpen] = React.useState(false);
   const [selected, setSelected] = React.useState(null);
+  const [loadingDetails, setLoadingDetails] = React.useState(false);
   const [confirmationModal, setConfirmationModal] = React.useState({
     open: false,
     type: '',
@@ -93,7 +94,7 @@ const ManageLawyerApplications = () => {
         page: pagination.page,
         limit: pagination.limit,
         search: query,
-        status: statusFilter
+        status: statusFilter === 'All' ? 'all' : statusFilter.toLowerCase()
       };
       
       const response = await lawyerApplicationsService.getLawyerApplications(params);
@@ -112,9 +113,21 @@ const ManageLawyerApplications = () => {
     loadData();
   }, [loadData]);
 
-  const openView = (row) => {
-    setSelected(row);
-    setViewOpen(true);
+  const openView = async (row) => {
+    try {
+      setLoadingDetails(true);
+      setViewOpen(true);
+      
+      // Fetch complete application details
+      const applicationDetails = await lawyerApplicationsService.getLawyerApplication(row.id);
+      setSelected(applicationDetails);
+    } catch (error) {
+      console.error('Failed to fetch application details:', error);
+      // Fallback to using row data if API call fails
+      setSelected(row);
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
   // Helper function to get modal content based on type
@@ -564,7 +577,7 @@ const ManageLawyerApplications = () => {
           filter={{ 
             value: statusFilter, 
             onChange: setStatusFilter, 
-            options: ['all', 'pending', 'approved', 'rejected', 'resubmission'], 
+            options: ['All', 'Pending', 'Approved', 'Rejected', 'Resubmission'], 
             label: 'Filter by status' 
           }}
           sort={{ 
@@ -650,8 +663,13 @@ const ManageLawyerApplications = () => {
       {/* View Modal */}
       <ViewLawyerApplicationModal
         open={viewOpen}
-        onClose={() => setViewOpen(false)}
+        onClose={() => {
+          setViewOpen(false);
+          setSelected(null);
+          setLoadingDetails(false);
+        }}
         application={selected}
+        loading={loadingDetails}
       />
 
       {/* Confirmation Modal */}
