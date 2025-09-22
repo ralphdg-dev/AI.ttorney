@@ -234,6 +234,7 @@ const ManageLawyerApplications = () => {
 
   // Handle resubmission request
   const handleResubmission = (applicationId, applicantName) => {
+    console.log('Handle resubmission called with:', { applicationId, applicantName });
     setConfirmationModal({
       open: true,
       type: 'resubmission',
@@ -246,9 +247,12 @@ const ManageLawyerApplications = () => {
   const confirmResubmission = async (feedback) => {
     const { applicationId, applicantName } = confirmationModal;
     
+    console.log('Confirming resubmission:', { applicationId, applicantName, feedback });
+    
     try {
       setConfirmationModal(prev => ({ ...prev, loading: true }));
-      await lawyerApplicationsService.updateApplicationStatus(applicationId, 'resubmission', feedback);
+      const result = await lawyerApplicationsService.updateApplicationStatus(applicationId, 'resubmission', feedback);
+      console.log('Resubmission result:', result);
       await loadData(); // Reload data
       setConfirmationModal({ open: false, type: '', applicationId: null, applicantName: '', loading: false });
     } catch (err) {
@@ -439,13 +443,53 @@ const ManageLawyerApplications = () => {
       }
     },
     {
+      key: 'application_type',
+      header: 'Application',
+      render: (row) => {
+        const isNew = row.application_type === 'New Application';
+        
+        if (isNew) {
+          return (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">
+              1st Application
+            </span>
+          );
+        }
+        
+        // Extract attempt number from application_type string like "Resubmission (3rd attempt)"
+        const attemptMatch = row.application_type.match(/(\d+)(st|nd|rd|th) attempt/);
+        const attemptNumber = attemptMatch ? attemptMatch[1] : '2';
+        const suffix = attemptMatch ? attemptMatch[2] : 'nd';
+        
+        return (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-50 text-orange-700 border border-orange-200">
+            {attemptNumber}{suffix} Attempt
+          </span>
+        );
+      }
+    },
+    {
+      key: 'prior_status',
+      header: 'Prior Status',
+      render: (row) => {
+        if (!row.prior_status) {
+          return (
+            <span className="text-xs text-gray-400 italic">
+              First Application
+            </span>
+          );
+        }
+        return <StatusBadge status={row.prior_status} />;
+      }
+    },
+    {
       key: 'status',
       header: (
         <button
           className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
           onClick={() => handleSort('status')}
         >
-          <span>Status</span>
+          <span>Current Status</span>
           {sortConfig.key === 'status' ? (
             sortConfig.direction === 'asc' ? (
               <ChevronUp size={14} className="text-blue-600" />

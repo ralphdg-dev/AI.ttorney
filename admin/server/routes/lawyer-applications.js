@@ -60,11 +60,11 @@ router.get('/', authenticateAdmin, async (req, res) => {
 
     console.log('Fetching lawyer applications with params:', { page, limit, search, status });
 
-    // First, get the latest application ID for each user
+    // First, get the latest application ID for each user based on submitted_at
     const { data: latestApplications, error: latestError } = await supabaseAdmin
       .from('lawyer_applications')
-      .select('user_id, id')
-      .order('id', { ascending: false });
+      .select('user_id, id, submitted_at')
+      .order('submitted_at', { ascending: false });
 
     if (latestError) {
       console.error('Error getting latest applications:', latestError);
@@ -74,10 +74,11 @@ router.get('/', authenticateAdmin, async (req, res) => {
       });
     }
 
-    // Get unique latest application IDs per user
+    // Get unique latest application IDs per user based on submitted_at
     const userLatestMap = new Map();
     latestApplications?.forEach(app => {
       if (!userLatestMap.has(app.user_id)) {
+        // Since we ordered by submitted_at desc, the first occurrence is the latest
         userLatestMap.set(app.user_id, app.id);
       }
     });
@@ -110,7 +111,7 @@ router.get('/', authenticateAdmin, async (req, res) => {
         )
       `)
       .in('id', latestApplicationIds)
-      .order('id', { ascending: false });
+      .order('submitted_at', { ascending: false });
 
     // Add status filter if provided
     if (status !== 'all') {
@@ -138,25 +139,59 @@ router.get('/', authenticateAdmin, async (req, res) => {
 
     console.log('Found applications:', applications?.length || 0);
 
-    // Transform data for frontend
-    console.log('Sample application data:', applications?.[0] ? JSON.stringify(applications[0], null, 2) : 'No applications');
+    // Get application type for each application (check if user has previous applications)
+    const applicationsWithType = [];
     
-    const transformedApplications = applications?.map(app => ({
-      id: app.id,
-      user_id: app.user_id,
-      full_name: app.users?.full_name || 'N/A',
-      email: app.users?.email || 'N/A',
-      roll_number: app.roll_number || 'N/A',
-      roll_sign_date: app.roll_signing_date || null,
-      status: app.status || 'pending',
-      pra_status: 'Matched', // Placeholder - you can implement PRA verification later
-      registration_date: app.users?.created_at,
-      application_date: app.users?.created_at, // Use user registration date as application date
-      admin_feedback: app.admin_feedback || null,
-      ibp_card_path: app.ibp_card_path || null,
-      selfie_path: app.selfie_path || null,
-      birthdate: app.users?.birthdate || null
-    })) || [];
+    for (const app of applications || []) {
+      // Check if user has previous applications
+      const { data: previousApps, error: prevError } = await supabaseAdmin
+        .from('lawyer_applications')
+        .select('id, submitted_at, status')
+        .eq('user_id', app.user_id)
+        .lt('submitted_at', app.submitted_at)
+        .order('submitted_at', { ascending: false });
+
+      let applicationType = 'New Application';
+      let priorStatus = null;
+      
+      if (!prevError && previousApps && previousApps.length > 0) {
+        // User has previous applications, this is a resubmission
+        applicationType = `Resubmission (${previousApps.length + 1}${getOrdinalSuffix(previousApps.length + 1)} attempt)`;
+        // Get the status of the most recent previous application
+        priorStatus = previousApps[0].status;
+      }
+
+      applicationsWithType.push({
+        id: app.id,
+        user_id: app.user_id,
+        full_name: app.users?.full_name || 'N/A',
+        email: app.users?.email || 'N/A',
+        roll_number: app.roll_number || 'N/A',
+        roll_sign_date: app.roll_signing_date || null,
+        status: app.status || 'pending',
+        prior_status: priorStatus,
+        application_type: applicationType,
+        pra_status: 'Matched', // Placeholder - you can implement PRA verification later
+        registration_date: app.users?.created_at,
+        application_date: app.submitted_at || app.users?.created_at,
+        admin_notes: app.admin_notes || null,
+        ibp_card_path: app.ibp_id || null,
+        selfie_path: app.selfie || null,
+        birthdate: app.users?.birthdate || null
+      });
+    }
+
+    // Helper function to get ordinal suffix
+    function getOrdinalSuffix(num) {
+      const j = num % 10;
+      const k = num % 100;
+      if (j === 1 && k !== 11) return 'st';
+      if (j === 2 && k !== 12) return 'nd';
+      if (j === 3 && k !== 13) return 'rd';
+      return 'th';
+    }
+
+    const transformedApplications = applicationsWithType;
 
     // Get total count for pagination - count unique users, not applications
     let filteredApplicationIds = latestApplicationIds;
@@ -318,6 +353,8 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
     const { id } = req.params;
     const { status, admin_feedback } = req.body;
 
+    console.log('Update status request:', { id, status, admin_feedback });
+
     if (!['pending', 'approved', 'rejected', 'resubmission'].includes(status)) {
       return res.status(400).json({ 
         success: false, 
@@ -325,12 +362,30 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
       });
     }
 
+    // First check if the application exists
+    const { data: existingApp, error: findError } = await supabaseAdmin
+      .from('lawyer_applications')
+      .select('id, status, user_id')
+      .eq('id', id)
+      .single();
+
+    if (findError || !existingApp) {
+      console.log('Application not found:', { id, findError });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Lawyer application not found' 
+      });
+    }
+
+    console.log('Found application:', existingApp);
+
     const updateData = {
-      status
+      status,
+      updated_at: new Date().toISOString()
     };
 
     if (admin_feedback) {
-      updateData.admin_feedback = admin_feedback;
+      updateData.admin_notes = admin_feedback;
     }
 
     const { data: application, error } = await supabaseAdmin
@@ -341,14 +396,16 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
       .single();
 
     if (error || !application) {
+      console.log('Update failed:', { error, application });
       return res.status(404).json({ 
         success: false, 
-        error: 'Lawyer application not found or update failed' 
+        error: 'Lawyer application update failed: ' + (error?.message || 'Unknown error')
       });
     }
 
-    // If approved, update user role to verified_lawyer
+    // Handle user table updates based on status
     if (status === 'approved') {
+      // Update user role to verified_lawyer
       const { error: userError } = await supabaseAdmin
         .from('users')
         .update({ 
@@ -360,7 +417,52 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
 
       if (userError) {
         console.error('Failed to update user role:', userError);
-        // Continue anyway, application status was updated
+        // Don't fail the whole operation, just log the error
+      }
+    } else if (status === 'rejected') {
+      // Get current user data to check rejection count
+      const { data: userData, error: getUserError } = await supabaseAdmin
+        .from('users')
+        .select('reject_count, is_blocked_from_applying')
+        .eq('id', application.user_id)
+        .single();
+
+      if (getUserError) {
+        console.error('Failed to get user data for rejection tracking:', getUserError);
+      } else {
+        const currentRejectCount = userData.reject_count || 0;
+        const newRejectCount = currentRejectCount + 1;
+        const isBlocked = newRejectCount >= 3;
+
+        // Update user with rejection tracking
+        const { error: userError } = await supabaseAdmin
+          .from('users')
+          .update({ 
+            pending_lawyer: false,
+            reject_count: newRejectCount,
+            last_rejected_at: new Date().toISOString(),
+            is_blocked_from_applying: isBlocked,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', application.user_id);
+
+        if (userError) {
+          console.error('Failed to update user rejection data:', userError);
+        } else {
+          console.log(`User ${application.user_id} rejected. Count: ${newRejectCount}, Blocked: ${isBlocked}`);
+        }
+      }
+    } else if (status === 'resubmission') {
+      // For resubmission, keep pending_lawyer as true so they can resubmit
+      const { error: userError } = await supabaseAdmin
+        .from('users')
+        .update({ 
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', application.user_id);
+
+      if (userError) {
+        console.error('Failed to update user for resubmission:', userError);
       }
     }
 

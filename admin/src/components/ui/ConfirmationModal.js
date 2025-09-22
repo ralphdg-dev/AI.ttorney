@@ -69,7 +69,7 @@ const ConfirmationModal = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
             {getIcon()}
-            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+            <h3 className="text-base font-semibold text-gray-900">{title}</h3>
           </div>
           <button
             onClick={onClose}
@@ -82,11 +82,11 @@ const ConfirmationModal = ({
 
         {/* Content */}
         <div className="p-6">
-          <p className="text-gray-600 mb-4">{message}</p>
+          <p className="text-sm text-gray-600 mb-4">{message}</p>
           
           {applicantName && (
             <div className="bg-gray-50 rounded-lg p-3 mb-4">
-              <p className="text-sm text-gray-700">
+              <p className="text-xs text-gray-700">
                 <span className="font-medium">Applicant:</span> {applicantName}
               </p>
             </div>
@@ -94,7 +94,7 @@ const ConfirmationModal = ({
 
           {showFeedbackInput && (
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs font-medium text-gray-700 mb-2">
                 {feedbackLabel}
               </label>
               <textarea
@@ -102,7 +102,7 @@ const ConfirmationModal = ({
                 onChange={(e) => setFeedback(e.target.value)}
                 placeholder={feedbackPlaceholder}
                 rows={4}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 disabled={loading}
               />
               {showFeedbackInput && (
@@ -118,7 +118,7 @@ const ConfirmationModal = ({
         <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
             disabled={loading}
           >
             {cancelText}
@@ -126,7 +126,7 @@ const ConfirmationModal = ({
           <button
             onClick={handleConfirm}
             disabled={isConfirmDisabled || loading}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getButtonColor()}`}
+            className={`px-3 py-1.5 text-xs font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getButtonColor()}`}
           >
             {loading ? (
               <div className="flex items-center space-x-2">
