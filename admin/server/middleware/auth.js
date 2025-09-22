@@ -14,6 +14,10 @@ const authenticateAdmin = async (req, res, next) => {
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ error: 'Server configuration error.' });
+    }
+    
     // Verify JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     

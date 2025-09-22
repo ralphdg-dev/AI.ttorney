@@ -138,6 +138,30 @@ class LawyerApplicationsService {
       throw error;
     }
   }
+
+  // Get application history for a specific application
+  async getApplicationHistory(applicationId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/lawyer-applications/${applicationId}/history`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch application history');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Get application history error:', error);
+      throw error;
+    }
+  }
 }
 
 export default new LawyerApplicationsService();

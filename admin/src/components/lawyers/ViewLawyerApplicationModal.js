@@ -1,8 +1,41 @@
 import React from 'react';
 import Modal from '../ui/Modal';
+import Tooltip from '../ui/Tooltip';
+import { History, Eye, Clock, FileText, CheckCircle, XCircle, AlertCircle, RotateCcw } from 'lucide-react';
 import lawyerApplicationsService from '../../services/lawyerApplicationsService';
 
-const ViewLawyerApplicationModal = ({ open, onClose, application, loading = false }) => {
+const ViewLawyerApplicationModal = ({ open, onClose, application, loading = false, onViewHistoricalApplication, isHistoricalView = false }) => {
+  // State for application history - must be at the top before any returns
+  const [history, setHistory] = React.useState([]);
+  const [historyLoading, setHistoryLoading] = React.useState(false);
+  const [historyError, setHistoryError] = React.useState(null);
+
+  // Extract the actual application data from the API response
+  const applicationData = application?.data || application;
+
+  // Load application history
+  const loadHistory = React.useCallback(async () => {
+    if (!applicationData?.id) return;
+    
+    try {
+      setHistoryLoading(true);
+      setHistoryError(null);
+      const response = await lawyerApplicationsService.getApplicationHistory(applicationData.id);
+      setHistory(response.data || []);
+    } catch (err) {
+      setHistoryError(err.message);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [applicationData?.id]);
+
+  // Load application history when modal opens (only for main view, not historical view)
+  React.useEffect(() => {
+    if (open && applicationData?.id && history.length === 0 && !isHistoricalView) {
+      loadHistory();
+    }
+  }, [open, applicationData?.id, history.length, loadHistory, isHistoricalView]);
+
   if (!application && !loading) return <Modal open={open} onClose={onClose} title="Lawyer Application Details" />;
   
   if (loading) {
@@ -17,10 +50,6 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
       </Modal>
     );
   }
-
-
-  // Extract the actual application data from the API response
-  const applicationData = application?.data || application;
   
   const {
     full_name: name,
@@ -33,11 +62,95 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
     status,
   } = applicationData || {};
 
-  // Get email from nested users object
-  const email = applicationData?.users?.email;
+  // Get email and name from nested users object or direct field (for historical applications)
+  const email = applicationData?.users?.email || applicationData?.email;
+  const fullName = applicationData?.users?.full_name || applicationData?.full_name || name;
   
   // Set PRA status based on whether roll is matched
   const praStatus = matchedRollId ? 'matched' : 'not_found';
+
+  // Format date for display
+  const formatDate = (dateString, includeTime = true) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    
+    const options = {
+      month: 'short',
+      day: 'numeric', 
+      year: 'numeric'
+    };
+    
+    if (includeTime) {
+      options.hour = '2-digit';
+      options.minute = '2-digit';
+    }
+    
+    return date.toLocaleDateString('en-US', options);
+  };
+
+  // Get status icon and color for history
+  const getStatusDisplay = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'approved':
+      case 'accepted':
+        return {
+          icon: <CheckCircle size={14} />,
+          color: 'text-emerald-600',
+          bgColor: 'bg-emerald-50',
+          borderColor: 'border-emerald-200'
+        };
+      case 'rejected':
+        return {
+          icon: <XCircle size={14} />,
+          color: 'text-red-600',
+          bgColor: 'bg-red-50',
+          borderColor: 'border-red-200'
+        };
+      case 'resubmission':
+        return {
+          icon: <RotateCcw size={14} />,
+          color: 'text-orange-600',
+          bgColor: 'bg-orange-50',
+          borderColor: 'border-orange-200'
+        };
+      case 'pending':
+      default:
+        return {
+          icon: <Clock size={14} />,
+          color: 'text-amber-600',
+          bgColor: 'bg-amber-50',
+          borderColor: 'border-amber-200'
+        };
+    }
+  };
+
+  // Get application type display for history
+  const getApplicationTypeDisplay = (type, isLatest) => {
+    if (isLatest) {
+      return (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1.5"></span>
+          Current
+        </span>
+      );
+    }
+    
+    switch (type?.toLowerCase()) {
+      case 'resubmission':
+        return (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-orange-50 text-orange-700 border border-orange-200">
+            Resubmission
+          </span>
+        );
+      case 'initial':
+      default:
+        return (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-gray-50 text-gray-700 border border-gray-200">
+            Initial
+          </span>
+        );
+    }
+  };
 
   // Component to load images from private Supabase Storage using signed URLs
   const SecureImage = ({ imagePath, alt, className, primaryBucket }) => {
@@ -92,7 +205,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
 
     if (!imagePath) {
       return (
-        <div className="w-full h-48 rounded-md border border-dashed border-gray-300 bg-gray-50 grid place-items-center text-[11px] text-gray-500">
+        <div className="w-full h-40 rounded-md border border-dashed border-gray-300 bg-gray-50 grid place-items-center text-[10px] text-gray-500">
           No image available
         </div>
       );
@@ -100,11 +213,11 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
 
     if (loading) {
       return (
-        <div className="w-full h-48 rounded-md border border-gray-200 bg-gray-100 grid place-items-center text-[11px] text-gray-500">
+        <div className="w-full h-40 rounded-md border border-gray-200 bg-gray-100 grid place-items-center text-[10px] text-gray-500">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-2"></div>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mx-auto mb-1"></div>
             <p>Loading secure image...</p>
-            <p className="text-[10px] text-gray-400 mt-1">Trying: {possibleBuckets[currentBucketIndex]}</p>
+            <p className="text-[9px] text-gray-400 mt-1">Trying: {possibleBuckets[currentBucketIndex]}</p>
           </div>
         </div>
       );
@@ -112,11 +225,11 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
 
     if (error) {
       return (
-        <div className="w-full h-48 rounded-md border border-dashed border-gray-300 bg-gray-50 grid place-items-center text-[11px] text-gray-500">
+        <div className="w-full h-40 rounded-md border border-dashed border-gray-300 bg-gray-50 grid place-items-center text-[10px] text-gray-500">
           <div className="text-center">
             <p>Failed to load image</p>
-            <p className="text-[10px] text-gray-400 mt-1">Tried buckets: {possibleBuckets.join(', ')}</p>
-            <p className="text-[10px] text-gray-400">File: {imagePath}</p>
+            <p className="text-[9px] text-gray-400 mt-1">Tried buckets: {possibleBuckets.join(', ')}</p>
+            <p className="text-[9px] text-gray-400">File: {imagePath}</p>
           </div>
         </div>
       );
@@ -133,9 +246,9 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
           style={{ display: imageLoaded ? 'block' : 'none' }}
         />
         {!imageLoaded && imageUrl && (
-          <div className="w-full h-48 rounded-md border border-gray-200 bg-gray-100 grid place-items-center text-[11px] text-gray-500">
+          <div className="w-full h-40 rounded-md border border-gray-200 bg-gray-100 grid place-items-center text-[10px] text-gray-500">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-2"></div>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mx-auto mb-1"></div>
               <p>Loading image...</p>
             </div>
           </div>
@@ -159,16 +272,6 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
     );
   };
 
-  // Format dates for display
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric', 
-      year: 'numeric'
-    });
-  };
 
   // Status badge component
   const StatusBadge = ({ status }) => {
@@ -208,58 +311,158 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
   return (
     <Modal open={open} onClose={onClose} title="Lawyer Application Details" width="max-w-2xl">
       <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <div className="text-[10px] text-gray-500">Full Name</div>
-            <div className="text-sm font-medium text-gray-900">{name || '-'}</div>
+            <div className="text-[9px] text-gray-500">Full Name</div>
+            <div className="text-xs font-medium text-gray-900">{fullName || '-'}</div>
           </div>
           <div>
-            <div className="text-[10px] text-gray-500">Email</div>
-            <div className="text-sm font-medium text-gray-900">{email || '-'}</div>
+            <div className="text-[9px] text-gray-500">Email</div>
+            <div className="text-xs font-medium text-gray-900">{email || '-'}</div>
           </div>
           <div>
-            <div className="text-[10px] text-gray-500">Roll Number</div>
+            <div className="text-[9px] text-gray-500">Roll Number</div>
             <div className="flex items-center gap-2">
-              <div className="text-sm font-medium text-gray-900">{rollNumber || '-'}</div>
+              <div className="text-xs font-medium text-gray-900">{rollNumber || '-'}</div>
               <RollMatchBadge status={praStatus} />
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-gray-500">Application Status</div>
+            <div className="text-[9px] text-gray-500">Application Status</div>
             <div className="flex items-center gap-2">
               <StatusBadge status={status} />
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-gray-500">Roll Sign Date</div>
-            <div className="text-sm font-medium text-gray-900">{formatDate(rollSignDate)}</div>
+            <div className="text-[9px] text-gray-500">Roll Sign Date</div>
+            <div className="text-xs font-medium text-gray-900">{formatDate(rollSignDate, false)}</div>
           </div>
           <div>
-            <div className="text-[10px] text-gray-500">Application Date</div>
-            <div className="text-sm font-medium text-gray-900">{formatDate(registered)}</div>
+            <div className="text-[9px] text-gray-500">Application Date</div>
+            <div className="text-xs font-medium text-gray-900">{formatDate(registered)}</div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <div className="text-[10px] font-medium text-gray-700 mb-1">IBP Card</div>
+            <div className="text-[9px] font-medium text-gray-700 mb-1">IBP Card</div>
             <SecureImage 
               imagePath={ibpCardPath}
               alt="IBP Card"
-              className="w-full h-48 object-cover rounded-md border border-gray-200"
+              className="w-full h-40 object-cover rounded-md border border-gray-200"
               primaryBucket="ibp-ids"
             />
           </div>
           <div>
-            <div className="text-[10px] font-medium text-gray-700 mb-1">Live Selfie</div>
+            <div className="text-[9px] font-medium text-gray-700 mb-1">Live Selfie</div>
             <SecureImage 
               imagePath={selfiePath}
               alt="Live Selfie"
-              className="w-full h-48 object-cover rounded-md border border-gray-200"
+              className="w-full h-40 object-cover rounded-md border border-gray-200"
               primaryBucket="selfie-ids"
             />
           </div>
         </div>
+
+        {/* Application History Section - Only show for main view, not historical view */}
+        {!isHistoricalView && (
+          <div className="border-t border-gray-200 pt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText className="h-3 w-3 text-gray-600" />
+              <h4 className="text-xs font-medium text-gray-900">Application History</h4>
+              <span className="text-[10px] text-gray-500">({history.length} versions)</span>
+            </div>
+
+            {historyLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#023D7B] mx-auto mb-1"></div>
+                  <p className="text-[10px] text-gray-600">Loading history...</p>
+                </div>
+              </div>
+            ) : historyError ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="text-center">
+                  <AlertCircle className="h-4 w-4 text-red-600 mx-auto mb-1" />
+                  <p className="text-[10px] text-red-600 mb-1">Failed to load history</p>
+                  <button 
+                    onClick={loadHistory}
+                    className="text-[10px] bg-[#023D7B] text-white px-2 py-1 rounded hover:bg-[#013462]"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            ) : history.length > 0 ? (
+              <div className="overflow-hidden border border-gray-200 rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                        Version
+                      </th>
+                      <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                        Submitted
+                      </th>
+                      <th className="px-2 py-1.5 text-right text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {history.map((app, index) => {
+                      const statusDisplay = getStatusDisplay(app.status);
+                      return (
+                        <tr key={app.id} className="hover:bg-gray-50">
+                          <td className="px-2 py-1.5 whitespace-nowrap">
+                            <span className="text-[9px] font-medium text-gray-900">
+                              v{app.version || (history.length - index)}
+                            </span>
+                          </td>
+                          <td className="px-2 py-1.5 whitespace-nowrap">
+                            {getApplicationTypeDisplay(app.application_type, app.is_latest)}
+                          </td>
+                          <td className="px-2 py-1.5 whitespace-nowrap">
+                            <div className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium ${statusDisplay.bgColor} ${statusDisplay.color} ${statusDisplay.borderColor} border`}>
+                              <span className="capitalize">{app.status}</span>
+                            </div>
+                          </td>
+                          <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
+                            {formatDate(app.submitted_at)}
+                          </td>
+                          <td className="px-2 py-1.5 whitespace-nowrap text-right">
+                            <div className="flex items-center justify-end space-x-2 text-gray-600">
+                              <Tooltip content="View">
+                                <button 
+                                  className="p-1 rounded hover:bg-gray-100" 
+                                  aria-label="View" 
+                                  onClick={() => onViewHistoricalApplication && onViewHistoricalApplication(app)}
+                                >
+                                  <Eye size={16} />
+                                </button>
+                              </Tooltip>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <FileText className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                <p className="text-[10px] text-gray-500">No application history found</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </Modal>
   );

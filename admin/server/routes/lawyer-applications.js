@@ -236,6 +236,82 @@ router.get('/:id', authenticateAdmin, async (req, res) => {
   }
 });
 
+// Get application history for a specific user
+router.get('/:id/history', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // First get the application to find the user_id
+    const { data: currentApplication, error: currentError } = await supabaseAdmin
+      .from('lawyer_applications')
+      .select('user_id')
+      .eq('id', id)
+      .single();
+
+    if (currentError || !currentApplication) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Application not found' 
+      });
+    }
+
+    // Get all applications for this user, ordered by submission date
+    const { data: applications, error } = await supabaseAdmin
+      .from('lawyer_applications')
+      .select(`
+        *,
+        users!inner(
+          full_name,
+          email,
+          created_at
+        )
+      `)
+      .eq('user_id', currentApplication.user_id)
+      .order('submitted_at', { ascending: false });
+
+    if (error) {
+      console.error('Get application history error:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch application history: ' + error.message 
+      });
+    }
+
+    // Transform data for frontend
+    const transformedApplications = applications?.map(app => ({
+      id: app.id,
+      user_id: app.user_id,
+      full_name: app.users?.full_name || 'N/A',
+      email: app.users?.email || 'N/A',
+      roll_number: app.roll_number || 'N/A',
+      roll_signing_date: app.roll_signing_date || null,
+      status: app.status || 'pending',
+      submitted_at: app.submitted_at || null,
+      updated_at: app.updated_at || null,
+      version: app.version || 1,
+      parent_application_id: app.parent_application_id || null,
+      is_latest: app.is_latest || false,
+      application_type: app.application_type || 'Initial',
+      admin_notes: app.admin_notes || null,
+      ibp_id: app.ibp_id || null,
+      selfie: app.selfie || null
+    })) || [];
+
+    res.json({
+      success: true,
+      data: transformedApplications,
+      total: transformedApplications.length
+    });
+
+  } catch (error) {
+    console.error('Get application history error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
 // Update lawyer application status (approve/reject)
 router.patch('/:id/status', authenticateAdmin, async (req, res) => {
   try {

@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
@@ -17,31 +18,42 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// Rate limiting
+// Rate limiting - Relaxed for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 1000, // Very high limit for development
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => process.env.NODE_ENV === 'development' // Skip rate limiting in development
 });
 app.use(limiter);
 
-// Stricter rate limiting for auth endpoints
+// Relaxed rate limiting for development
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 50, // limit each IP to 50 login attempts per windowMs (increased for development)
+  max: 1000, // Very high limit for development
   message: { error: 'Too many login attempts, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => process.env.NODE_ENV === 'development' // Skip rate limiting in development
 });
 
-// CORS configuration
+// CORS configuration - Simplified for development
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: true, // Allow all origins in development
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  optionsSuccessStatus: 200
 }));
 
 // Body parsing middleware
@@ -60,9 +72,43 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    service: 'Admin API Server'
+    service: 'Admin API Server',
+    jwt_secret_configured: !!process.env.JWT_SECRET,
+    supabase_configured: !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY)
   });
 });
+
+// Auth status check endpoint
+app.get('/api/auth/status', (req, res) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.json({ 
+      authenticated: false,
+      reason: 'No authorization header'
+    });
+  }
+
+  try {
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    res.json({
+      authenticated: true,
+      adminId: decoded.adminId,
+      tokenExp: new Date(decoded.exp * 1000).toISOString()
+    });
+  } catch (error) {
+    res.json({
+      authenticated: false,
+      reason: error.message
+    });
+  }
+});
+
+// Handle preflight requests explicitly
+app.options('*', cors());
+
 
 // API routes
 app.use('/api/auth', authLimiter, authRoutes);

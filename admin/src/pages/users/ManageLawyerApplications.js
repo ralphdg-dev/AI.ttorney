@@ -76,6 +76,8 @@ const ManageLawyerApplications = () => {
   const [viewOpen, setViewOpen] = React.useState(false);
   const [selected, setSelected] = React.useState(null);
   const [loadingDetails, setLoadingDetails] = React.useState(false);
+  const [historicalViewOpen, setHistoricalViewOpen] = React.useState(false);
+  const [historicalApplication, setHistoricalApplication] = React.useState(null);
   const [confirmationModal, setConfirmationModal] = React.useState({
     open: false,
     type: '',
@@ -128,6 +130,12 @@ const ManageLawyerApplications = () => {
     } finally {
       setLoadingDetails(false);
     }
+  };
+
+  const handleViewHistoricalApplication = (application) => {
+    // Open the historical application in a new modal
+    setHistoricalApplication({ data: application });
+    setHistoricalViewOpen(true);
   };
 
   // Helper function to get modal content based on type
@@ -670,6 +678,19 @@ const ManageLawyerApplications = () => {
         }}
         application={selected}
         loading={loadingDetails}
+        onViewHistoricalApplication={handleViewHistoricalApplication}
+      />
+
+      {/* Historical Application View Modal */}
+      <ViewLawyerApplicationModal
+        open={historicalViewOpen}
+        onClose={() => {
+          setHistoricalViewOpen(false);
+          setHistoricalApplication(null);
+        }}
+        application={historicalApplication}
+        loading={false}
+        isHistoricalView={true}
       />
 
       {/* Confirmation Modal */}
