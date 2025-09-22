@@ -9,6 +9,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
   const [history, setHistory] = React.useState([]);
   const [historyLoading, setHistoryLoading] = React.useState(false);
   const [historyError, setHistoryError] = React.useState(null);
+  const [currentApplicationId, setCurrentApplicationId] = React.useState(null);
 
   // Extract the actual application data from the API response
   const applicationData = application?.data || application;
@@ -31,10 +32,22 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
 
   // Load application history when modal opens (only for main view, not historical view)
   React.useEffect(() => {
-    if (open && applicationData?.id && history.length === 0 && !isHistoricalView) {
-      loadHistory();
+    if (open && applicationData?.id && !isHistoricalView) {
+      // Check if this is a different application
+      if (currentApplicationId !== applicationData.id) {
+        // Clear previous history and load new one
+        setHistory([]);
+        setHistoryError(null);
+        setCurrentApplicationId(applicationData.id);
+        loadHistory();
+      }
+    } else if (!open) {
+      // Clear history when modal closes
+      setHistory([]);
+      setHistoryError(null);
+      setCurrentApplicationId(null);
     }
-  }, [open, applicationData?.id, history.length, loadHistory, isHistoricalView]);
+  }, [open, applicationData?.id, currentApplicationId, loadHistory, isHistoricalView]);
 
   if (!application && !loading) return <Modal open={open} onClose={onClose} title="Lawyer Application Details" />;
   
@@ -216,8 +229,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
         <div className="w-full h-40 rounded-md border border-gray-200 bg-gray-100 grid place-items-center text-[10px] text-gray-500">
           <div className="text-center">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mx-auto mb-1"></div>
-            <p>Loading secure image...</p>
-            <p className="text-[9px] text-gray-400 mt-1">Trying: {possibleBuckets[currentBucketIndex]}</p>
+            <p>Loading image...</p>
           </div>
         </div>
       );
@@ -228,8 +240,6 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
         <div className="w-full h-40 rounded-md border border-dashed border-gray-300 bg-gray-50 grid place-items-center text-[10px] text-gray-500">
           <div className="text-center">
             <p>Failed to load image</p>
-            <p className="text-[9px] text-gray-400 mt-1">Tried buckets: {possibleBuckets.join(', ')}</p>
-            <p className="text-[9px] text-gray-400">File: {imagePath}</p>
           </div>
         </div>
       );
