@@ -162,6 +162,30 @@ class LawyerApplicationsService {
       throw error;
     }
   }
+
+  // Get audit logs for a specific application
+  async getApplicationAuditLogs(applicationId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/lawyer-applications/${applicationId}/audit-logs`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch audit logs');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Get audit logs error:', error);
+      throw error;
+    }
+  }
 }
 
 export default new LawyerApplicationsService();

@@ -328,6 +328,9 @@ router.get('/:id/history', authenticateAdmin, async (req, res) => {
       is_latest: app.is_latest || false,
       application_type: app.application_type || 'Initial',
       admin_notes: app.admin_notes || null,
+      notes: app.admin_notes || null, // Map admin_notes to notes for compatibility
+      admin_name: app.admin_name || null,
+      admin_full_name: app.admin_full_name || null,
       ibp_id: app.ibp_id || null,
       selfie: app.selfie || null
     })) || [];
@@ -354,6 +357,30 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
     const { status, admin_feedback } = req.body;
 
     console.log('Update status request:', { id, status, admin_feedback });
+
+    // Helper function to create audit log
+    const createAuditLog = async (action, targetId, reason = null, metadata = {}) => {
+      try {
+        // Ensure the admin ID exists in the admin table
+        console.log('Creating audit log with admin ID:', req.admin.id);
+        
+        await supabaseAdmin
+          .from('admin_audit_logs')
+          .insert({
+            action,
+            target_table: 'lawyer_applications',
+            actor_id: req.admin.id, // This should reference the admin table
+            role: req.admin.role,
+            target_id: targetId,
+            reason,
+            metadata,
+            created_at: new Date().toISOString()
+          });
+      } catch (auditError) {
+        console.error('Failed to create audit log:', auditError);
+        console.error('Admin data:', req.admin);
+      }
+    };
 
     if (!['pending', 'approved', 'rejected', 'resubmission'].includes(status)) {
       return res.status(400).json({ 
@@ -465,6 +492,19 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
         console.error('Failed to update user for resubmission:', userError);
       }
     }
+
+    // Create audit log for the status change
+    await createAuditLog(
+      `Application ${status}`,
+      id,
+      admin_feedback || null,
+      {
+        old_status: existingApp.status,
+        new_status: status,
+        user_id: application.user_id,
+        admin_notes: admin_feedback || null
+      }
+    );
 
     res.json({
       success: true,
@@ -579,6 +619,63 @@ router.post('/signed-url', authenticateAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Internal server error'
+    });
+  }
+});
+
+// Get audit logs for a specific application
+router.get('/:id/audit-logs', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get audit logs for this application
+    const { data: auditLogs, error } = await supabaseAdmin
+      .from('admin_audit_logs')
+      .select(`
+        *,
+        admin!actor_id(
+          full_name,
+          email,
+          role
+        )
+      `)
+      .eq('target_table', 'lawyer_applications')
+      .eq('target_id', id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Get audit logs error:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch audit logs: ' + error.message 
+      });
+    }
+
+    // Transform data for frontend
+    const transformedLogs = auditLogs?.map(log => ({
+      id: log.id,
+      action: log.action,
+      actor_name: log.admin?.full_name || 'Unknown Admin',
+      actor_full_name: log.admin?.full_name || 'Unknown Admin',
+      actor_email: log.admin?.email || '',
+      role: log.admin?.role || log.role || 'admin',
+      reason: log.reason,
+      notes: log.reason, // Map reason to notes for compatibility
+      details: log.metadata ? JSON.stringify(log.metadata, null, 2) : null,
+      metadata: log.metadata,
+      created_at: log.created_at
+    })) || [];
+
+    res.json({
+      success: true,
+      data: transformedLogs
+    });
+
+  } catch (error) {
+    console.error('Get audit logs error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
     });
   }
 });

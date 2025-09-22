@@ -10,6 +10,11 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
   const [historyLoading, setHistoryLoading] = React.useState(false);
   const [historyError, setHistoryError] = React.useState(null);
   const [currentApplicationId, setCurrentApplicationId] = React.useState(null);
+  
+  // State for audit logs
+  const [auditLogs, setAuditLogs] = React.useState([]);
+  const [auditLoading, setAuditLoading] = React.useState(false);
+  const [auditError, setAuditError] = React.useState(null);
 
   // Extract the actual application data from the API response
   const applicationData = application?.data || application;
@@ -30,30 +35,51 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
     }
   }, [applicationData?.id]);
 
+  // Load audit logs
+  const loadAuditLogs = React.useCallback(async () => {
+    if (!applicationData?.id) return;
+    
+    try {
+      setAuditLoading(true);
+      setAuditError(null);
+      const response = await lawyerApplicationsService.getApplicationAuditLogs(applicationData.id);
+      setAuditLogs(response.data || []);
+    } catch (err) {
+      setAuditError(err.message);
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [applicationData?.id]);
+
   // Load application history when modal opens (only for main view, not historical view)
   React.useEffect(() => {
     if (open && applicationData?.id && !isHistoricalView) {
       // Check if this is a different application
       if (currentApplicationId !== applicationData.id) {
-        // Clear previous history and load new one
+        // Clear previous data and load new one
         setHistory([]);
         setHistoryError(null);
+        setAuditLogs([]);
+        setAuditError(null);
         setCurrentApplicationId(applicationData.id);
         loadHistory();
+        loadAuditLogs();
       }
     } else if (!open) {
-      // Clear history when modal closes
+      // Clear data when modal closes
       setHistory([]);
       setHistoryError(null);
+      setAuditLogs([]);
+      setAuditError(null);
       setCurrentApplicationId(null);
     }
-  }, [open, applicationData?.id, currentApplicationId, loadHistory, isHistoricalView]);
+  }, [open, applicationData?.id, currentApplicationId, loadHistory, loadAuditLogs, isHistoricalView]);
 
   if (!application && !loading) return <Modal open={open} onClose={onClose} title="Lawyer Application Details" />;
   
   if (loading) {
     return (
-      <Modal open={open} onClose={onClose} title="Lawyer Application Details" width="max-w-2xl">
+      <Modal open={open} onClose={onClose} title="Lawyer Application Details" width="max-w-4xl">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#023D7B] mx-auto mb-4"></div>
@@ -319,7 +345,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Lawyer Application Details" width="max-w-2xl">
+    <Modal open={open} onClose={onClose} title="Lawyer Application Details" width="max-w-4xl">
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -374,103 +400,206 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
           </div>
         </div>
 
-        {/* Application History Section - Only show for main view, not historical view */}
+        {/* Application History & Audit Trail Section - Only show for main view, not historical view */}
         {!isHistoricalView && (
           <div className="border-t border-gray-200 pt-4">
-            <div className="flex items-center gap-2 mb-2">
-              <FileText className="h-3 w-3 text-gray-600" />
-              <h4 className="text-xs font-medium text-gray-900">Application History</h4>
-              <span className="text-[10px] text-gray-500">({history.length} versions)</span>
-            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* Application History Column */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="h-3 w-3 text-gray-600" />
+                  <h4 className="text-xs font-medium text-gray-900">Application History</h4>
+                  <span className="text-[10px] text-gray-500">({history.length} versions)</span>
+                </div>
 
-            {historyLoading ? (
-              <div className="flex items-center justify-center py-6">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#023D7B] mx-auto mb-1"></div>
-                  <p className="text-[10px] text-gray-600">Loading history...</p>
-                </div>
-              </div>
-            ) : historyError ? (
-              <div className="flex items-center justify-center py-6">
-                <div className="text-center">
-                  <AlertCircle className="h-4 w-4 text-red-600 mx-auto mb-1" />
-                  <p className="text-[10px] text-red-600 mb-1">Failed to load history</p>
-                  <button 
-                    onClick={loadHistory}
-                    className="text-[10px] bg-[#023D7B] text-white px-2 py-1 rounded hover:bg-[#013462]"
-                  >
-                    Try Again
-                  </button>
-                </div>
-              </div>
-            ) : history.length > 0 ? (
-              <div className="overflow-hidden border border-gray-200 rounded-lg">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                        Version
-                      </th>
-                      <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                        Submitted
-                      </th>
-                      <th className="px-2 py-1.5 text-right text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {history.map((app, index) => {
-                      const statusDisplay = getStatusDisplay(app.status);
-                      return (
-                        <tr key={app.id} className="hover:bg-gray-50">
-                          <td className="px-2 py-1.5 whitespace-nowrap">
-                            <span className="text-[9px] font-medium text-gray-900">
-                              v{app.version || (history.length - index)}
-                            </span>
-                          </td>
-                          <td className="px-2 py-1.5 whitespace-nowrap">
-                            {getApplicationTypeDisplay(app.application_type, app.is_latest)}
-                          </td>
-                          <td className="px-2 py-1.5 whitespace-nowrap">
-                            <div className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium ${statusDisplay.bgColor} ${statusDisplay.color} ${statusDisplay.borderColor} border`}>
-                              <span className="capitalize">{app.status}</span>
-                            </div>
-                          </td>
-                          <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
-                            {formatDate(app.submitted_at)}
-                          </td>
-                          <td className="px-2 py-1.5 whitespace-nowrap text-right">
-                            <div className="flex items-center justify-end space-x-2 text-gray-600">
-                              <Tooltip content="View">
-                                <button 
-                                  className="p-1 rounded hover:bg-gray-100" 
-                                  aria-label="View" 
-                                  onClick={() => onViewHistoricalApplication && onViewHistoricalApplication(app)}
-                                >
-                                  <Eye size={16} />
-                                </button>
-                              </Tooltip>
-                            </div>
-                          </td>
+                {historyLoading ? (
+                  <div className="flex items-center justify-center py-6">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#023D7B] mx-auto mb-1"></div>
+                      <p className="text-[10px] text-gray-600">Loading history...</p>
+                    </div>
+                  </div>
+                ) : historyError ? (
+                  <div className="flex items-center justify-center py-6">
+                    <div className="text-center">
+                      <AlertCircle className="h-4 w-4 text-red-600 mx-auto mb-1" />
+                      <p className="text-[10px] text-red-600 mb-1">Failed to load history</p>
+                      <button 
+                        onClick={loadHistory}
+                        className="text-[10px] bg-[#023D7B] text-white px-2 py-1 rounded hover:bg-[#013462]"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  </div>
+                ) : history.length > 0 ? (
+                  <div className="overflow-hidden border border-gray-200 rounded-lg">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Version
+                          </th>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Notes
+                          </th>
+                          <th className="px-2 py-1.5 text-right text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Action
+                          </th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {history.map((app, index) => {
+                          const statusDisplay = getStatusDisplay(app.status);
+                          return (
+                            <tr key={app.id} className="hover:bg-gray-50">
+                              <td className="px-2 py-1.5 whitespace-nowrap">
+                                <span className="text-[9px] font-medium text-gray-900">
+                                  v{app.version || (history.length - index)}
+                                </span>
+                              </td>
+                              <td className="px-2 py-1.5 whitespace-nowrap">
+                                <div className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium ${statusDisplay.bgColor} ${statusDisplay.color} ${statusDisplay.borderColor} border`}>
+                                  <span className="capitalize">{app.status}</span>
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
+                                {formatDate(app.submitted_at, false)}
+                              </td>
+                              <td className="px-2 py-1.5 max-w-32">
+                                <div className="text-[9px] text-gray-700 truncate" title={app.notes || '-'}>
+                                  {app.notes || '-'}
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5 whitespace-nowrap text-right">
+                                <Tooltip content="View">
+                                  <button 
+                                    className="p-1 rounded hover:bg-gray-100" 
+                                    aria-label="View" 
+                                    onClick={() => onViewHistoricalApplication && onViewHistoricalApplication(app)}
+                                  >
+                                    <Eye size={12} />
+                                  </button>
+                                </Tooltip>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <FileText className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                    <p className="text-[10px] text-gray-500">No application history found</p>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="text-center py-6">
-                <FileText className="h-6 w-6 text-gray-400 mx-auto mb-1" />
-                <p className="text-[10px] text-gray-500">No application history found</p>
+
+              {/* Audit Trail Column */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <History className="h-3 w-3 text-gray-600" />
+                  <h4 className="text-xs font-medium text-gray-900">Audit Trail</h4>
+                  <span className="text-[10px] text-gray-500">({auditLogs.length} entries)</span>
+                </div>
+
+                {auditLoading ? (
+                  <div className="flex items-center justify-center py-6">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#023D7B] mx-auto mb-1"></div>
+                      <p className="text-[10px] text-gray-600">Loading audit trail...</p>
+                    </div>
+                  </div>
+                ) : auditError ? (
+                  <div className="flex items-center justify-center py-6">
+                    <div className="text-center">
+                      <AlertCircle className="h-4 w-4 text-red-600 mx-auto mb-1" />
+                      <p className="text-[10px] text-red-600 mb-1">Failed to load audit trail</p>
+                      <button 
+                        onClick={loadAuditLogs}
+                        className="text-[10px] bg-[#023D7B] text-white px-2 py-1 rounded hover:bg-[#013462]"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  </div>
+                ) : auditLogs.length > 0 ? (
+                  <div className="overflow-hidden border border-gray-200 rounded-lg">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Action
+                          </th>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Admin
+                          </th>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Notes
+                          </th>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {auditLogs.map((log) => {
+                          // Parse metadata for detailed action description
+                          let detailedAction = log.action;
+                          try {
+                            const metadata = typeof log.details === 'string' ? JSON.parse(log.details) : (log.metadata || {});
+                            if (metadata.old_status && metadata.new_status) {
+                              detailedAction = `Changed status from ${metadata.old_status} to ${metadata.new_status}`;
+                            }
+                          } catch {
+                            // Ignore parsing errors, use original action
+                          }
+                          
+                          return (
+                            <tr key={log.id} className="hover:bg-gray-50">
+                              <td className="px-2 py-1.5">
+                                <div className="text-[9px] font-medium text-gray-900">
+                                  {detailedAction}
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5 whitespace-nowrap">
+                                <div className="text-[9px]">
+                                  <div className="font-medium text-gray-900">
+                                    {log.actor_full_name || log.actor_name || 'Unknown Admin'}
+                                  </div>
+                                  <div className="text-gray-500 capitalize">{log.role || 'Admin'}</div>
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5 max-w-32">
+                                <div className="text-[9px] text-gray-700 truncate" title={log.notes || '-'}>
+                                  {log.notes || '-'}
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
+                                {formatDate(log.created_at, false)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <History className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                    <p className="text-[10px] text-gray-500">No audit trail found</p>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>
