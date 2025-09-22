@@ -8,6 +8,7 @@ import { getRoleBasedRedirect } from '../config/routes';
 export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
 
 export interface User {
+  session: any;
   id: string;
   email: string;
   username: string;

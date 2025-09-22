@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { View, ScrollView, Alert, Text } from "react-native";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { View, ScrollView, Alert, Text, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import Header from "../../../components/Header";
@@ -23,25 +23,54 @@ interface Lawyer {
   created_at: string;
 }
 
+const frontendCache = {
+  lawyers: null as any,
+  timestamp: 0,
+  ttl: 5 * 60 * 1000, // 5 minutes in milliseconds
+};
+
 export default function DirectoryScreen() {
   const [activeTab, setActiveTab] = useState<string>("lawyers");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [lawyersData, setLawyersData] = useState<Lawyer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [lastUpdated, setLastUpdated] = useState<number>(0);
   const router = useRouter();
 
-  useEffect(() => {
-    fetchLawyers();
-  }, []);
-
-  const fetchLawyers = async () => {
+  // Memoized fetch function with caching
+  const fetchLawyers = useCallback(async (forceRefresh: boolean = false) => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8000/legal-consultations/lawyers');
+
+      // Check cache if not forcing refresh
+      const now = Date.now();
+      if (
+        !forceRefresh &&
+        frontendCache.lawyers &&
+        now - frontendCache.timestamp < frontendCache.ttl
+      ) {
+        setLawyersData(frontendCache.lawyers);
+        setLastUpdated(frontendCache.timestamp);
+        setLoading(false);
+        return;
+      }
+
+      const url = forceRefresh
+        ? "http://localhost:8000/legal-consultations/lawyers?refresh=true"
+        : "http://localhost:8000/legal-consultations/lawyers";
+
+      const response = await fetch(url);
       const result = await response.json();
-      
+
       if (result.success) {
-        setLawyersData(result.data || []);
+        const lawyers = result.data || [];
+        setLawyersData(lawyers);
+        setLastUpdated(now);
+
+        // Update cache
+        frontendCache.lawyers = lawyers;
+        frontendCache.timestamp = now;
       } else {
         Alert.alert("Error", "Failed to fetch lawyers: " + result.error);
       }
@@ -50,11 +79,26 @@ export default function DirectoryScreen() {
       console.error("Error fetching lawyers:", error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, []);
 
-  const getDayAbbreviations = (days: string): string => {
-    const dayArray = days.split(',');
+  // Initial load
+  useEffect(() => {
+    fetchLawyers();
+  }, [fetchLawyers]);
+
+  // Pull to refresh
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchLawyers(true); // Force refresh
+  }, [fetchLawyers]);
+
+  // Memoized utility functions
+  const getDayAbbreviations = useCallback((days: string): string => {
+    if (!days) return "";
+
+    const dayArray = days.split(",");
     const abbreviationMap: { [key: string]: string } = {
       Monday: "M",
       Tuesday: "T",
@@ -65,10 +109,14 @@ export default function DirectoryScreen() {
       Sunday: "Sun",
     };
 
-    return dayArray.map((day) => abbreviationMap[day.trim()] || day.trim()).join("");
-  };
+    return dayArray
+      .map((day) => abbreviationMap[day.trim()] || day.trim())
+      .join("");
+  }, []);
 
-  const isLawyerAvailableToday = (days: string): boolean => {
+  const isLawyerAvailableToday = useCallback((days: string): boolean => {
+    if (!days) return false;
+
     const today = new Date();
     const dayOfWeek = today.getDay();
 
@@ -83,34 +131,37 @@ export default function DirectoryScreen() {
     ];
 
     const currentDay = dayNames[dayOfWeek];
-    const availableDays = days.split(',').map(day => day.trim());
+    const availableDays = days.split(",").map((day) => day.trim());
 
     return availableDays.includes(currentDay);
-  };
+  }, []);
 
+  // Memoized lawyers data transformation
   const lawyers = useMemo(() => {
     return lawyersData.map((lawyer) => ({
       ...lawyer,
       available: isLawyerAvailableToday(lawyer.days),
       displayDays: getDayAbbreviations(lawyer.days),
-      // Convert specializations string to array for compatibility
-      specializations: lawyer.specializations.split(',').map(s => s.trim()),
-      // Convert hours_available string to array for compatibility
-      hours_available: lawyer.hours_available.split(',').map(h => h.trim()),
+      specializations: lawyer.specializations
+        ? lawyer.specializations.split(",").map((s) => s.trim())
+        : [],
+      hours_available: lawyer.hours_available
+        ? lawyer.hours_available.split(",").map((h) => h.trim())
+        : [],
     }));
-  }, [lawyersData]);
+  }, [lawyersData, isLawyerAvailableToday, getDayAbbreviations]);
 
-  // Filter lawyers based on search query
+  // Memoized search filtering
   const filteredLawyers = useMemo(() => {
     if (!searchQuery.trim()) {
       return lawyers;
     }
-    
+
     const query = searchQuery.toLowerCase().trim();
-    return lawyers.filter(lawyer => {
+    return lawyers.filter((lawyer) => {
       return (
         lawyer.name.toLowerCase().includes(query) ||
-        lawyer.specializations.some(spec => 
+        lawyer.specializations.some((spec) =>
           spec.toLowerCase().includes(query)
         ) ||
         lawyer.location.toLowerCase().includes(query)
@@ -118,26 +169,34 @@ export default function DirectoryScreen() {
     });
   }, [lawyers, searchQuery]);
 
-  const handleFilterPress = (): void => {
+  const handleFilterPress = useCallback((): void => {
     Alert.alert("Filter", "Filter options");
-  };
+  }, []);
 
-  const handleBookConsultation = (
-    lawyer: Lawyer & { displayDays: string }
-  ): void => {
-    router.push({
-      pathname: "/booklawyer",
-      params: {
-        lawyerId: lawyer.id.toString(),
-        lawyerName: lawyer.name,
-        lawyerSpecializations: JSON.stringify(lawyer.specializations),
-        lawyerHours: lawyer.hours,
-        lawyerDays: lawyer.displayDays,
-        lawyerhours_available: JSON.stringify(lawyer.hours_available),
-      },
-    });
-  };
-  
+  const handleBookConsultation = useCallback(
+    (lawyer: Lawyer & { displayDays: string }): void => {
+      router.push({
+        pathname: "/booklawyer",
+        params: {
+          lawyerId: lawyer.id,
+          lawyerName: lawyer.name,
+          lawyerSpecializations: JSON.stringify(lawyer.specializations),
+          lawyerHours: lawyer.hours,
+          lawyerDays: lawyer.displayDays,
+          lawyerhours_available: JSON.stringify(lawyer.hours_available),
+        },
+      });
+    },
+    [router]
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+    }, 300); 
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   return (
     <SidebarProvider>
       <View style={tw`flex-1 bg-gray-50`}>
@@ -158,24 +217,36 @@ export default function DirectoryScreen() {
           style={tw`flex-1`}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 60 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#0000ff"]}
+              tintColor="#0000ff"
+            />
+          }
         >
-          {loading ? (
+          {loading && !refreshing ? (
             <Text style={tw`text-center p-4`}></Text>
           ) : filteredLawyers.length === 0 ? (
             <Text style={tw`text-center p-4`}>
-              {searchQuery ? `No lawyers found for "${searchQuery}"` : "No lawyers available"}
+              {searchQuery
+                ? `No lawyers found for "${searchQuery}"`
+                : "No lawyers available"}
             </Text>
           ) : (
-            filteredLawyers.map((lawyer) => (
-              <LawyerCard
-                key={lawyer.id}
-                lawyer={{
-                  ...lawyer,
-                  days: lawyer.displayDays,
-                }}
-                onBookConsultation={() => handleBookConsultation(lawyer)}
-              />
-            ))
+            <>
+              {filteredLawyers.map((lawyer) => (
+                <LawyerCard
+                  key={lawyer.id}
+                  lawyer={{
+                    ...lawyer,
+                    days: lawyer.displayDays,
+                  }}
+                  onBookConsultation={() => handleBookConsultation(lawyer)}
+                />
+              ))}
+            </>
           )}
 
           <View style={tw`h-4`} />

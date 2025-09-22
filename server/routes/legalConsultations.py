@@ -5,21 +5,31 @@ import logging
 import httpx
 from pydantic import BaseModel
 from datetime import datetime
+from cachetools import TTLCache
+import asyncio
+import time
+import uuid
 
 router = APIRouter(prefix="/legal-consultations", tags=["legal-consultations"])
 logger = logging.getLogger(__name__)
 
+lawyers_cache = TTLCache(maxsize=100, ttl=300) 
+single_lawyer_cache = TTLCache(maxsize=500, ttl=300) 
+
+pending_requests = {}
+request_lock = asyncio.Lock()
+
 class Lawyer(BaseModel):
-    id: int
-    lawyer_id: str
+    id: uuid.UUID
+    lawyer_id: uuid.UUID
     name: str
-    specializations: str
-    location: str
-    hours: str
-    days: str
-    available: str
+    specializations: Optional[str] = None
+    location: Optional[str] = None
+    hours: Optional[str] = None
+    days: Optional[str] = None
+    available: bool
+    hours_available: Optional[str] = None
     created_at: datetime
-    hours_available: str
 
     class Config:
         from_attributes = True
@@ -28,182 +38,233 @@ class LawyerResponse(BaseModel):
     success: bool
     data: Optional[List[Lawyer]] = None
     error: Optional[str] = None
+    cached: bool = False
+    timestamp: Optional[float] = None
 
-@router.get("/lawyers", response_model=LawyerResponse)
-async def get_lawyers():
-    """Get all lawyers from the database"""
+def get_cache_key(*args):
+    """Generate a cache key from arguments"""
+    return ":".join(str(arg) for arg in args)
+
+async def get_lawyers_with_cache(supabase_service, use_cache=True):
+    """Get lawyers with caching support"""
+    cache_key = "all_lawyers"
+    
+    if use_cache and cache_key in lawyers_cache:
+        logger.info("Returning cached lawyers data")
+        cached_data = lawyers_cache[cache_key]
+        cached_data['cached'] = True
+        return cached_data
+    
+    async with request_lock:
+        if cache_key in pending_requests:
+            logger.info("Waiting for ongoing lawyers request to complete")
+            return await pending_requests[cache_key]
+        
+        future = asyncio.Future()
+        pending_requests[cache_key] = future
+        
     try:
-        supabase_service = SupabaseService()
+        start_time = time.time()
+        lawyers = await fetch_lawyers_from_db(supabase_service)
+        elapsed_time = time.time() - start_time
         
-        # Debug: Log the URL we're trying to access
-        url = f"{supabase_service.rest_url}/lawyer_info"
-        logger.info(f"Fetching lawyers from: {url}")
+        logger.info(f"Fetched {len(lawyers)} lawyers in {elapsed_time:.2f} seconds")
         
-        # Use the Supabase client instead of raw HTTP requests
-        try:
-            # Try using the Supabase Python client first
-            response = supabase_service.supabase.table("lawyer_info").select("*").execute()
+        response_data = LawyerResponse(
+            success=True, 
+            data=lawyers,
+            cached=False,
+            timestamp=time.time()
+        )
+        
+        lawyers_cache[cache_key] = response_data.dict()
+        
+        return response_data.dict()
+        
+    except Exception as e:
+        error_response = LawyerResponse(
+            success=False, 
+            error=str(e),
+            cached=False,
+            timestamp=time.time()
+        )
+        return error_response.dict()
+    finally:
+        async with request_lock:
+            if cache_key in pending_requests:
+                future = pending_requests.pop(cache_key)
+                if not future.done():
+                    future.set_result(response_data.dict() if 'response_data' in locals() else error_response.dict())
+
+async def fetch_lawyers_from_db(supabase_service):
+    """Fetch lawyers from database with optimized query"""
+    try:
+        response = supabase_service.supabase.table("lawyer_info").select("*").execute()
+        
+        if hasattr(response, 'data') and response.data:
+            lawyers_data = response.data
+            logger.info(f"Found {len(lawyers_data)} lawyers using Supabase client")
             
-            logger.info(f"Supabase client response: {response}")
-            
-            if hasattr(response, 'data') and response.data:
-                lawyers_data = response.data
-                logger.info(f"Found {len(lawyers_data)} lawyers using Supabase client")
-                
-                lawyers = []
-                for lawyer_data in lawyers_data:
+            lawyers = []
+            for lawyer_data in lawyers_data:
+                try:
                     lawyer = Lawyer(
                         id=lawyer_data.get("id"),
-                        lawyer_id=lawyer_data.get("lawyer_id", ""),
+                        lawyer_id=lawyer_data.get("lawyer_id"),
                         name=lawyer_data.get("name", "Unknown Lawyer"),
-                        specializations=lawyer_data.get("specializations", ""),
-                        location=lawyer_data.get("location", ""),
-                        hours=lawyer_data.get("hours", ""),
-                        days=lawyer_data.get("days", ""),
-                        available=str(lawyer_data.get("available", "")),
-                        hours_available=lawyer_data.get("hours_available", ""),
+                        specializations=lawyer_data.get("specializations"),
+                        location=lawyer_data.get("location"),
+                        hours=lawyer_data.get("hours"),
+                        days=lawyer_data.get("days"),
+                        available=bool(lawyer_data.get("available", False)),
+                        hours_available=lawyer_data.get("hours_available"),
                         created_at=lawyer_data.get("created_at")
                     )
                     lawyers.append(lawyer)
-                
-                return LawyerResponse(success=True, data=lawyers)
+                except Exception as e:
+                    logger.warning(f"Error parsing lawyer data: {e}, data: {lawyer_data}")
+                    continue
             
-        except Exception as client_error:
-            logger.warning(f"Supabase client failed, falling back to HTTP: {str(client_error)}")
+            if not lawyers:
+                raise Exception("No valid lawyer data found")
             
-            # Fallback to HTTP request
-            async with httpx.AsyncClient() as client:
+            return lawyers
+        else:
+            raise Exception("No data returned from Supabase client")
+            
+    except Exception as client_error:
+        logger.warning(f"Supabase client failed, falling back to HTTP: {str(client_error)}")
+        
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                url = f"{supabase_service.rest_url}/lawyer_info"
                 response = await client.get(
                     url,
                     params={"select": "*"},
                     headers=supabase_service._get_headers(use_service_key=True)
                 )
                 
-                logger.info(f"HTTP Response status: {response.status_code}")
-                
                 if response.status_code == 200:
                     lawyers_data = response.json()
+                    if not lawyers_data:
+                        raise Exception("No data returned from HTTP API")
+                    
                     logger.info(f"Found {len(lawyers_data)} lawyers using HTTP")
                     
                     lawyers = []
                     for lawyer_data in lawyers_data:
-                        lawyer = Lawyer(
-                            id=lawyer_data.get("id"),
-                            lawyer_id=lawyer_data.get("lawyer_id", ""),
-                            name=lawyer_data.get("name", "Unknown Lawyer"),
-                            specializations=lawyer_data.get("specializations", ""),
-                            location=lawyer_data.get("location", ""),
-                            hours=lawyer_data.get("hours", ""),
-                            days=lawyer_data.get("days", ""),
-                            available=str(lawyer_data.get("available", "")),
-                            hours_available=lawyer_data.get("hours_available", ""),
-                            created_at=lawyer_data.get("created_at")
-                        )
-                        lawyers.append(lawyer)
+                        try:
+                            lawyer = Lawyer(
+                                id=lawyer_data.get("id"),
+                                lawyer_id=lawyer_data.get("lawyer_id"),
+                                name=lawyer_data.get("name", "Unknown Lawyer"),
+                                specializations=lawyer_data.get("specializations"),
+                                location=lawyer_data.get("location"),
+                                hours=lawyer_data.get("hours"),
+                                days=lawyer_data.get("days"),
+                                available=bool(lawyer_data.get("available", False)),
+                                hours_available=lawyer_data.get("hours_available"),
+                                created_at=lawyer_data.get("created_at")
+                            )
+                            lawyers.append(lawyer)
+                        except Exception as e:
+                            logger.warning(f"Error parsing lawyer data from HTTP: {e}")
+                            continue
                     
-                    return LawyerResponse(success=True, data=lawyers)
+                    if not lawyers:
+                        raise Exception("No valid lawyer data found from HTTP")
+                    
+                    return lawyers
                 else:
-                    error_msg = f"Failed to fetch lawyers: {response.status_code} - {response.text}"
-                    logger.error(error_msg)
-                    return LawyerResponse(success=False, error=error_msg)
-            
+                    raise Exception(f"HTTP request failed: {response.status_code} - {response.text}")
+        except Exception as http_error:
+            logger.error(f"HTTP fallback also failed: {http_error}")
+            raise client_error from http_error
+
+@router.get("/lawyers", response_model=LawyerResponse)
+async def get_lawyers(
+    use_cache: bool = Query(True, description="Use cached data if available"),
+    refresh: bool = Query(False, description="Force refresh cache")
+):
+    """Get all lawyers from the database with caching"""
+    try:
+        if refresh:
+            cache_key = "all_lawyers"
+            lawyers_cache.pop(cache_key, None)
+            logger.info("Cache cleared due to refresh request")
+        
+        supabase_service = SupabaseService()
+        result = await get_lawyers_with_cache(supabase_service, use_cache)
+        return LawyerResponse(**result)
+        
     except Exception as e:
         logger.error(f"Error fetching lawyers: {str(e)}", exc_info=True)
         return LawyerResponse(success=False, error=str(e))
 
-@router.get("/debug/tables")
-async def debug_tables():
-    """Debug endpoint to check available tables"""
-    try:
-        supabase_service = SupabaseService()
-        
-        # Check what tables are available
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{supabase_service.rest_url}/",
-                headers=supabase_service._get_headers(use_service_key=True)
-            )
-            
-            logger.info(f"Available tables: {response.text}")
-            
-            # Try to get information about lawyer_info table specifically
-            table_response = await client.get(
-                f"{supabase_service.rest_url}/lawyer_info",
-                params={"select": "id", "limit": "1"},
-                headers=supabase_service._get_headers(use_service_key=True)
-            )
-            
-            return {
-                "all_tables": response.text if response.status_code == 200 else f"Error: {response.status_code}",
-                "lawyer_info_table": table_response.text if table_response.status_code == 200 else f"Error: {table_response.status_code}"
-            }
-            
-    except Exception as e:
-        return {"error": str(e)}    
-
 @router.get("/lawyers/{lawyer_id}", response_model=LawyerResponse)
-async def get_lawyer(lawyer_id: str):
-    """Get a specific lawyer by ID"""
+async def get_lawyer(
+    lawyer_id: str, 
+    use_cache: bool = Query(True, description="Use cached data if available")
+):
+    """Get a specific lawyer by ID with caching"""
     try:
+        # Validate UUID format
+        try:
+            uuid.UUID(lawyer_id)
+        except ValueError:
+            return LawyerResponse(success=False, error="Invalid lawyer ID format")
+        
+        cache_key = f"lawyer_{lawyer_id}"
+        
+        if use_cache and cache_key in single_lawyer_cache:
+            logger.info(f"Returning cached data for lawyer {lawyer_id}")
+            cached_data = single_lawyer_cache[cache_key]
+            cached_data['cached'] = True
+            return LawyerResponse(**cached_data)
+        
         supabase_service = SupabaseService()
         
-        # Try using the Supabase client first
-        try:
-            response = supabase_service.supabase.table("lawyer_info").select("*").eq("lawyer_id", lawyer_id).execute()
+        response = supabase_service.supabase.table("lawyer_info").select("*").eq("lawyer_id", lawyer_id).execute()
+        
+        if hasattr(response, 'data') and response.data:
+            lawyer_data = response.data[0]
+            lawyer = Lawyer(
+                id=lawyer_data.get("id"),
+                lawyer_id=lawyer_data.get("lawyer_id"),
+                name=lawyer_data.get("name", "Unknown Lawyer"),
+                specializations=lawyer_data.get("specializations"),
+                location=lawyer_data.get("location"),
+                hours=lawyer_data.get("hours"),
+                days=lawyer_data.get("days"),
+                available=bool(lawyer_data.get("available", False)),
+                hours_available=lawyer_data.get("hours_available"),
+                created_at=lawyer_data.get("created_at")
+            )
             
-            if hasattr(response, 'data') and response.data:
-                lawyer_data = response.data[0]
-                lawyer = Lawyer(
-                    id=lawyer_data.get("id"),
-                    lawyer_id=lawyer_data.get("lawyer_id", ""),
-                    name=lawyer_data.get("name", "Unknown Lawyer"),
-                    specializations=lawyer_data.get("specializations", ""),
-                    location=lawyer_data.get("location", ""),
-                    hours=lawyer_data.get("hours", ""),
-                    days=lawyer_data.get("days", ""),
-                    available=str(lawyer_data.get("available", "")),
-                    hours_available=lawyer_data.get("hours_available", ""),
-                    created_at=lawyer_data.get("created_at")
-                )
-                return LawyerResponse(success=True, data=[lawyer])
-            else:
-                return LawyerResponse(success=False, error="Lawyer not found")
-                
-        except Exception as client_error:
-            logger.warning(f"Supabase client failed, falling back to HTTP: {str(client_error)}")
+            result = LawyerResponse(success=True, data=[lawyer], cached=False)
+            single_lawyer_cache[cache_key] = result.dict()
             
-            # Fallback to HTTP request
-            url = f"{supabase_service.rest_url}/lawyer_info"
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    url,
-                    params={"select": "*", "lawyer_id": f"eq.{lawyer_id}"},
-                    headers=supabase_service._get_headers(use_service_key=True)
-                )
-                
-                if response.status_code == 200:
-                    lawyer_data = response.json()
-                    if lawyer_data and len(lawyer_data) > 0:
-                        lawyer = Lawyer(
-                            id=lawyer_data[0].get("id"),
-                            lawyer_id=lawyer_data[0].get("lawyer_id", ""),
-                            name=lawyer_data[0].get("name", "Unknown Lawyer"),
-                            specializations=lawyer_data[0].get("specializations", ""),
-                            location=lawyer_data[0].get("location", ""),
-                            hours=lawyer_data[0].get("hours", ""),
-                            days=lawyer_data[0].get("days", ""),
-                            available=str(lawyer_data[0].get("available", "")),
-                            hours_available=lawyer_data[0].get("hours_available", ""),
-                            created_at=lawyer_data[0].get("created_at")
-                        )
-                        return LawyerResponse(success=True, data=[lawyer])
-                    else:
-                        return LawyerResponse(success=False, error="Lawyer not found")
-                else:
-                    error_msg = f"Failed to fetch lawyer: {response.status_code} - {response.text}"
-                    logger.error(error_msg)
-                    return LawyerResponse(success=False, error=error_msg)
+            return result
+        else:
+            return LawyerResponse(success=False, error="Lawyer not found")
             
     except Exception as e:
         logger.error(f"Error fetching lawyer: {str(e)}", exc_info=True)
         return LawyerResponse(success=False, error=str(e))
+
+@router.delete("/cache/clear")
+async def clear_cache():
+    """Clear all caches"""
+    lawyers_cache.clear()
+    single_lawyer_cache.clear()
+    pending_requests.clear()
+    return {"success": True, "message": "Cache cleared successfully"}
+
+@router.get("/cache/status")
+async def cache_status():
+    """Get cache status"""
+    return {
+        "all_lawyers_cache_size": len(lawyers_cache),
+        "single_lawyer_cache_size": len(single_lawyer_cache),
+        "pending_requests": len(pending_requests)
+    }

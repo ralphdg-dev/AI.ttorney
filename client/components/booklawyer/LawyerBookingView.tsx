@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Alert, useWindowDimensions } from "react-native";
+import { Alert, useWindowDimensions, Modal } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import tw from "tailwind-react-native-classnames";
 import Colors from "../../constants/Colors";
 import Navbar from "@/components/Navbar";
-
+import { useAuth } from "@/contexts/AuthContext";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Box } from "@/components/ui/box";
@@ -40,24 +39,35 @@ interface LawyerData {
   hours_available: string[];
 }
 
+interface ValidationErrors {
+  email?: string;
+  mobileNumber?: string;
+  concern?: string;
+  timeSlot?: string;
+}
+
 export default function LawyerBookingView() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 375;
+  const { user } = useAuth();
 
   const [lawyerData, setLawyerData] = useState<LawyerData | null>(null);
-
-  const [bottomActiveTab, setBottomActiveTab] = useState("find");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState("9:00AM-10:00AM");
-  const [email, setEmail] = useState("user@email.com");
-  const [mobileNumber, setMobileNumber] = useState("09123456789");
+  const [email, setEmail] = useState(user?.email || "");
+  const [mobileNumber, setMobileNumber] = useState("");
   const [communicationMode, setCommunicationMode] = useState("Online");
   const [concern, setConcern] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [monthDropdownVisible, setMonthDropdownVisible] = useState(false);
   const [modeDropdownVisible, setModeDropdownVisible] = useState(false);
   const [showAllSpecializations, setShowAllSpecializations] = useState(false);
+
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
+    {}
+  );
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
   const today = new Date();
   const currentMonth = today.getMonth();
@@ -92,6 +102,70 @@ export default function LawyerBookingView() {
       available: true,
     })) || [];
 
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateMobileNumber = (mobile: string): boolean => {
+    const mobileRegex = /^[+]?[\d\s\-\(\)]{10,}$/;
+    return mobileRegex.test(mobile.trim());
+  };
+
+  const validateBookingForm = (): ValidationErrors => {
+    const errors: ValidationErrors = {};
+
+    if (!email.trim()) {
+      errors.email = "Email address is required";
+    } else if (!validateEmail(email.trim())) {
+      errors.email = "Please enter a valid email address";
+    }
+
+    if (!mobileNumber.trim()) {
+      errors.mobileNumber = "Mobile number is required";
+    } else if (!validateMobileNumber(mobileNumber)) {
+      errors.mobileNumber = "Please enter a valid mobile number";
+    }
+
+    if (!concern.trim()) {
+      errors.concern = "Please describe your concern";
+    }
+
+    if (!selectedTimeSlot) {
+      errors.timeSlot = "Please select a time slot";
+    }
+
+    return errors;
+  };
+
+  const getFormattedDate = (): string => {
+    const date = new Date(selectedYear, selectedMonth, selectedDay);
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const getSelectedTimeSlotText = (): string => {
+    const slot = timeSlots.find((slot) => slot.id === selectedTimeSlot);
+    return slot ? slot.time : selectedTimeSlot;
+  };
+
+  // Format date for API (YYYY-MM-DD)
+  const getFormattedDateForAPI = (): string => {
+    return `${selectedYear}-${(selectedMonth + 1)
+      .toString()
+      .padStart(2, "0")}-${selectedDay.toString().padStart(2, "0")}`;
+  };
+
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, [user?.email]);
+
   const generateCalendarDays = (month: number, year: number) => {
     const days: CalendarDay[] = [];
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -100,11 +174,11 @@ export default function LawyerBookingView() {
     const lastDay = new Date(year, month + 1, 0);
 
     const daysFromPrevMonth = firstDay.getDay();
-
     const totalDays = daysFromPrevMonth + lastDay.getDate();
     const daysFromNextMonth = totalDays <= 35 ? 35 - totalDays : 42 - totalDays;
 
     const prevMonthLastDay = new Date(year, month, 0).getDate();
+
     for (let i = daysFromPrevMonth - 1; i >= 0; i--) {
       const date = prevMonthLastDay - i;
       const dayDate = new Date(year, month - 1, date);
@@ -183,15 +257,17 @@ export default function LawyerBookingView() {
       setSelectedYear(day.year);
     }
     setSelectedDay(day.date);
+    if (validationErrors.timeSlot) {
+      setValidationErrors((prev) => ({ ...prev, timeSlot: undefined }));
+    }
   };
 
   useEffect(() => {
     if (params.lawyerId) {
-      // Fetch lawyer data from API
       const fetchLawyerData = async () => {
         try {
           const response = await fetch(
-            `http://localhost:8000/api/legal-consultations/lawyers/${params.lawyerId}`
+            `http://localhost:8000/legal-consultations/lawyers/${params.lawyerId}`
           );
           const result = await response.json();
 
@@ -210,12 +286,10 @@ export default function LawyerBookingView() {
                 .map((h: string) => h.trim()),
             });
           } else {
-            // Fallback to params if API fails
             setLawyerDataFromParams();
           }
         } catch (error) {
           console.error("Error fetching lawyer:", error);
-          // Fallback to params if API fails
           setLawyerDataFromParams();
         }
       };
@@ -224,7 +298,6 @@ export default function LawyerBookingView() {
     }
   }, [params]);
 
-  // Helper function to set data from params as fallback
   const setLawyerDataFromParams = () => {
     try {
       const specializations = params.lawyerSpecializations
@@ -261,15 +334,104 @@ export default function LawyerBookingView() {
   };
 
   const handleBookConsultation = () => {
-    if (!concern.trim()) {
-      Alert.alert("Error", "Please describe your concern");
+    const errors = validateBookingForm();
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+
+      const firstError = Object.values(errors)[0];
+      Alert.alert("Validation Error", firstError);
       return;
     }
-    Alert.alert("Success", `Consultation booked with ${lawyerData?.name}!`);
+
+    setValidationErrors({});
+    setShowConfirmationModal(true);
+  };
+
+  const proceedWithBooking = async () => {
+    setShowConfirmationModal(false);
+    setIsSubmitting(true);
+
+    try {
+      // Prepare consultation request data
+      const consultationRequestData = {
+        user_id: user?.id || "anonymous", // You might want to handle anonymous users differently
+        lawyer_id: lawyerData?.id,
+        message: concern.trim(),
+        email: email.trim(),
+        mobile_number: mobileNumber.trim(),
+        consultation_date: getFormattedDateForAPI(),
+        consultation_time: getSelectedTimeSlotText(),
+        consultation_mode: communicationMode,
+      };
+
+      console.log("Sending consultation request:", consultationRequestData);
+
+      // Send request to your FastAPI backend
+      const response = await fetch(
+        "http://localhost:8000/consultation-requests/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(consultationRequestData),
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        Alert.alert(
+          "Success",
+          `Consultation request sent to ${lawyerData?.name}!\n\nYou will receive a confirmation email shortly.`,
+          [
+            {
+              text: "OK",
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      } else {
+        throw new Error(
+          result.error || result.detail || "Failed to book consultation"
+        );
+      }
+    } catch (error) {
+      console.error("Booking error:", error);
+      Alert.alert(
+        "Error",
+        error instanceof Error
+          ? error.message
+          : "Failed to book consultation. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    if (validationErrors.email) {
+      setValidationErrors((prev) => ({ ...prev, email: undefined }));
+    }
+  };
+
+  const handleMobileChange = (value: string) => {
+    setMobileNumber(value);
+    if (validationErrors.mobileNumber) {
+      setValidationErrors((prev) => ({ ...prev, mobileNumber: undefined }));
+    }
+  };
+
+  const handleConcernChange = (value: string) => {
+    setConcern(value);
+    if (validationErrors.concern) {
+      setValidationErrors((prev) => ({ ...prev, concern: undefined }));
+    }
   };
 
   const handleBottomNavChange = (tab: string) => {
-    setBottomActiveTab(tab);
     if (tab === "find") {
       router.push("/directory");
     } else {
@@ -404,39 +566,6 @@ export default function LawyerBookingView() {
             </Text>
           </HStack>
 
-          {monthDropdownVisible && (
-            <VStack className="bg-white border border-gray-300 rounded-lg mb-4">
-              {months.map((month, index) => (
-                <Pressable
-                  key={month}
-                  className="px-4 py-2"
-                  onPress={() => {
-                    setSelectedMonth(index);
-                    setMonthDropdownVisible(false);
-                    if (index === currentMonth) {
-                      setSelectedDay(currentDate);
-                      setSelectedYear(currentYear);
-                    } else {
-                      setSelectedDay(1);
-                    }
-                  }}
-                >
-                  <Text
-                    style={{
-                      color:
-                        index === selectedMonth
-                          ? Colors.primary.blue
-                          : Colors.text.head,
-                      fontWeight: index === selectedMonth ? "bold" : "normal",
-                    }}
-                  >
-                    {month} {currentYear}
-                  </Text>
-                </Pressable>
-              ))}
-            </VStack>
-          )}
-
           {/* Calendar Navigation */}
           <HStack className="items-center justify-between mb-4">
             <Pressable onPress={navigateToPreviousMonth}>
@@ -522,6 +651,11 @@ export default function LawyerBookingView() {
           >
             Slots Available
           </Text>
+          {validationErrors.timeSlot && (
+            <Text className="text-red-500 text-sm mb-2">
+              {validationErrors.timeSlot}
+            </Text>
+          )}
           <HStack className="flex-wrap">
             {timeSlots.map((slot) => (
               <Pressable
@@ -537,7 +671,15 @@ export default function LawyerBookingView() {
                       ? Colors.primary.blue
                       : "#E5E7EB",
                 }}
-                onPress={() => setSelectedTimeSlot(slot.id)}
+                onPress={() => {
+                  setSelectedTimeSlot(slot.id);
+                  if (validationErrors.timeSlot) {
+                    setValidationErrors((prev) => ({
+                      ...prev,
+                      timeSlot: undefined,
+                    }));
+                  }
+                }}
               >
                 <Text
                   className="text-xs font-medium"
@@ -561,16 +703,23 @@ export default function LawyerBookingView() {
           >
             Email
           </Text>
-          <Input className="mb-4">
+          <Input className="mb-2">
             <InputField
-              className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
+              className={`border rounded-lg px-4 py-3 bg-white ${
+                validationErrors.email ? "border-red-500" : "border-gray-300"
+              }`}
               style={{ color: Colors.text.head, fontSize: 14 }}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={handleEmailChange}
               placeholder="Enter your email"
               keyboardType="email-address"
             />
           </Input>
+          {validationErrors.email && (
+            <Text className="text-red-500 text-sm mb-2">
+              {validationErrors.email}
+            </Text>
+          )}
 
           <VStack className="mb-4">
             <Text
@@ -579,16 +728,25 @@ export default function LawyerBookingView() {
             >
               Mobile Number
             </Text>
-            <Input className="mb-4">
+            <Input className="mb-2">
               <InputField
-                className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
+                className={`border rounded-lg px-4 py-3 bg-white ${
+                  validationErrors.mobileNumber
+                    ? "border-red-500"
+                    : "border-gray-300"
+                }`}
                 style={{ color: Colors.text.head, fontSize: 14 }}
                 value={mobileNumber}
-                onChangeText={setMobileNumber}
+                onChangeText={handleMobileChange}
                 placeholder="Enter mobile number"
                 keyboardType="phone-pad"
               />
             </Input>
+            {validationErrors.mobileNumber && (
+              <Text className="text-red-500 text-sm mb-2">
+                {validationErrors.mobileNumber}
+              </Text>
+            )}
 
             <Text
               className="text-base font-semibold mb-2"
@@ -631,22 +789,29 @@ export default function LawyerBookingView() {
           >
             Concern
           </Text>
-          <Input>
+          <Input className="mb-2">
             <InputField
-              className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
+              className={`border rounded-lg px-4 py-3 bg-white ${
+                validationErrors.concern ? "border-red-500" : "border-gray-300"
+              }`}
               style={{
                 color: Colors.text.head,
-                height: 100,
+                height: 50,
                 textAlignVertical: "top",
                 fontSize: 14,
               }}
               value={concern}
-              onChangeText={setConcern}
+              onChangeText={handleConcernChange}
               placeholder="State your concern here..."
               multiline
               numberOfLines={4}
             />
           </Input>
+          {validationErrors.concern && (
+            <Text className="text-red-500 text-sm">
+              {validationErrors.concern}
+            </Text>
+          )}
         </VStack>
 
         {/* Book Button */}
@@ -655,18 +820,96 @@ export default function LawyerBookingView() {
             className="py-4 rounded-lg items-center justify-center"
             style={{ backgroundColor: Colors.primary.blue }}
             onPress={handleBookConsultation}
+            disabled={isSubmitting}
           >
             <Text className="text-white font-semibold text-sm">
-              Book Consultation with {lawyerData.name.split(" ")[0]}
+              {isSubmitting
+                ? "Booking..."
+                : `Book Consultation with ${lawyerData.name.split(" ")[0]}`}
             </Text>
           </Button>
         </Box>
       </ScrollView>
 
+      {/* Confirmation Modal */}
+      <Modal
+        visible={showConfirmationModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowConfirmationModal(false)}
+      >
+        <Box className="flex-1 bg-black bg-opacity-50 items-center justify-center px-4">
+          <Box className="bg-white rounded-lg p-6 w-full max-w-sm">
+            <Text
+              className="text-xl font-bold mb-4 text-center"
+              style={{ color: Colors.text.head }}
+            >
+              Confirm Booking
+            </Text>
+
+            <VStack className="mb-6">
+              <Text
+                className="text-base font-semibold mb-2"
+                style={{ color: Colors.text.head }}
+              >
+                Lawyer: {lawyerData.name}
+              </Text>
+
+              <Text className="text-sm mb-1" style={{ color: Colors.text.sub }}>
+                Date: {getFormattedDate()}
+              </Text>
+
+              <Text className="text-sm mb-1" style={{ color: Colors.text.sub }}>
+                Time: {getSelectedTimeSlotText()}
+              </Text>
+
+              <Text className="text-sm mb-1" style={{ color: Colors.text.sub }}>
+                Mode: {communicationMode}
+              </Text>
+
+              <Text className="text-sm mb-1" style={{ color: Colors.text.sub }}>
+                Email: {email}
+              </Text>
+
+              <Text className="text-sm" style={{ color: Colors.text.sub }}>
+                Mobile: {mobileNumber}
+              </Text>
+            </VStack>
+
+            <HStack className="justify-between">
+              <Button
+                className="flex-1 mr-2 py-3 rounded-lg items-center justify-center border"
+                style={{
+                  backgroundColor: "white",
+                  borderColor: Colors.primary.blue,
+                }}
+                onPress={() => setShowConfirmationModal(false)}
+                disabled={isSubmitting}
+              >
+                <Text
+                  className="font-semibold text-sm"
+                  style={{ color: Colors.primary.blue }}
+                >
+                  Cancel
+                </Text>
+              </Button>
+
+              <Button
+                className="flex-1 ml-2 py-3 rounded-lg items-center justify-center"
+                style={{ backgroundColor: Colors.primary.blue }}
+                onPress={proceedWithBooking}
+                disabled={isSubmitting}
+              >
+                <Text className="text-white font-semibold text-sm">
+                  {isSubmitting ? "Confirming..." : "Confirm"}
+                </Text>
+              </Button>
+            </HStack>
+          </Box>
+        </Box>
+      </Modal>
+
       <Navbar activeTab="find" onTabPress={handleBottomNavChange} />
     </Box>
   );
-}
-function getDayAbbreviations(days: any): string {
-  throw new Error("Function not implemented.");
 }

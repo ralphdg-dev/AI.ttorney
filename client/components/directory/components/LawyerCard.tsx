@@ -8,14 +8,14 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "../../../constants/Colors";
 
 interface Lawyer {
-  id: number;
+  id: string;
   name: string;
   specializations: string[];
   location: string;
   hours: string;
   days: string;
   available: boolean;
-  hoursAvailable: string[];
+  hours_available: string[];
 }
 
 interface LawyerCardProps {
