@@ -90,6 +90,34 @@ class LawyerApplicationsService {
     }
   }
 
+  // Update lawyer application (edit functionality)
+  async updateLawyerApplication(id, updateData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/lawyer-applications/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        },
+        body: JSON.stringify({
+          ...updateData,
+          action: 'edit_application' // This helps the backend create proper audit trail
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update lawyer application');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Update lawyer application error:', error);
+      throw error;
+    }
+  }
+
   // Get lawyer applications statistics
   async getApplicationsStats() {
     try {
@@ -117,6 +145,12 @@ class LawyerApplicationsService {
   // Get signed URL for private storage access
   async getSignedUrl(bucket, filePath) {
     try {
+      // Return null immediately if filePath is empty or invalid
+      if (!filePath || filePath.trim() === '' || filePath === 'null' || filePath === 'undefined') {
+        console.log('No file path provided, skipping signed URL request');
+        return null;
+      }
+
       const response = await fetch(`${API_BASE_URL}/lawyer-applications/signed-url`, {
         method: 'POST',
         headers: {
@@ -129,12 +163,22 @@ class LawyerApplicationsService {
       const data = await response.json();
       
       if (!response.ok) {
+        // Handle file not found gracefully
+        if (response.status === 404) {
+          console.log('File not found in storage:', { bucket, filePath });
+          return null;
+        }
         throw new Error(data.error || 'Failed to get signed URL');
       }
 
       return data.signedUrl;
     } catch (error) {
       console.error('Get signed URL error:', error);
+      // Return null instead of throwing for missing files
+      if (error.message.includes('Object not found') || error.message.includes('File not found')) {
+        console.log('File not found, returning null for signed URL');
+        return null;
+      }
       throw error;
     }
   }

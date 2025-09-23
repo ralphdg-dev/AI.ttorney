@@ -350,6 +350,228 @@ router.get('/:id/history', authenticateAdmin, async (req, res) => {
   }
 });
 
+// Update lawyer application (edit functionality)
+router.patch('/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    console.log('Update application request:', { id, updateData });
+
+    // Helper function to create audit log
+    const createAuditLog = async (action, targetId, reason = null, metadata = {}) => {
+      try {
+        console.log('Creating audit log with admin ID:', req.admin.id);
+        
+        await supabaseAdmin
+          .from('admin_audit_logs')
+          .insert({
+            action,
+            target_table: 'lawyer_applications',
+            actor_id: req.admin.id,
+            role: req.admin.role,
+            target_id: targetId,
+            metadata,
+            created_at: new Date().toISOString()
+          });
+      } catch (auditError) {
+        console.error('Failed to create audit log:', auditError);
+        console.error('Admin data:', req.admin);
+      }
+    };
+
+    // First check if the application exists and get current data
+    const { data: existingApp, error: findError } = await supabaseAdmin
+      .from('lawyer_applications')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (findError || !existingApp) {
+      console.log('Application not found:', { id, findError });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Lawyer application not found' 
+      });
+    }
+
+    console.log('Found application:', existingApp);
+
+    // Prepare update data - only include fields that are allowed to be updated
+    const allowedFields = [
+      'roll_number', 
+      'roll_signing_date', 
+      'admin_notes', 
+      'status',
+      'admin_feedback'
+    ];
+
+    const filteredUpdateData = {};
+    Object.keys(updateData).forEach(key => {
+      if (allowedFields.includes(key) && updateData[key] !== undefined) {
+        filteredUpdateData[key] = updateData[key];
+      }
+    });
+
+    // Always update the updated_at timestamp
+    filteredUpdateData.updated_at = new Date().toISOString();
+
+    console.log('Filtered update data:', filteredUpdateData);
+
+    // Update the application
+    const { data: application, error } = await supabaseAdmin
+      .from('lawyer_applications')
+      .update(filteredUpdateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !application) {
+      console.log('Update failed:', { error, application });
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Lawyer application update failed: ' + (error?.message || 'Unknown error')
+      });
+    }
+
+    // Handle user table updates if status was changed
+    if (filteredUpdateData.status) {
+      const status = filteredUpdateData.status;
+      
+      if (status === 'approved') {
+        // Update user role to verified_lawyer
+        const { error: userError } = await supabaseAdmin
+          .from('users')
+          .update({ 
+            role: 'verified_lawyer',
+            pending_lawyer: false,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', application.user_id);
+
+        if (userError) {
+          console.error('Failed to update user role:', userError);
+        }
+      } else if (status === 'rejected') {
+        // Get current user data to check rejection count
+        const { data: userData, error: getUserError } = await supabaseAdmin
+          .from('users')
+          .select('reject_count, is_blocked_from_applying')
+          .eq('id', application.user_id)
+          .single();
+
+        if (!getUserError && userData) {
+          const currentRejectCount = userData.reject_count || 0;
+          const newRejectCount = currentRejectCount + 1;
+          const isBlocked = newRejectCount >= 3;
+
+          // Update user with rejection tracking
+          const { error: userError } = await supabaseAdmin
+            .from('users')
+            .update({ 
+              pending_lawyer: false,
+              reject_count: newRejectCount,
+              last_rejected_at: new Date().toISOString(),
+              is_blocked_from_applying: isBlocked,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', application.user_id);
+
+          if (userError) {
+            console.error('Failed to update user rejection data:', userError);
+          }
+        }
+      } else if (status === 'resubmission') {
+        // For resubmission, keep pending_lawyer as true
+        const { error: userError } = await supabaseAdmin
+          .from('users')
+          .update({ 
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', application.user_id);
+
+        if (userError) {
+          console.error('Failed to update user for resubmission:', userError);
+        }
+      }
+    }
+
+    // Create detailed audit logs for each change
+    const changes = [];
+    
+    // Check for status change
+    if (filteredUpdateData.status && filteredUpdateData.status !== existingApp.status) {
+      changes.push({
+        action: `Status changed from "${existingApp.status || 'none'}" to "${filteredUpdateData.status}"`,
+        field: 'status',
+        old_value: existingApp.status || 'none',
+        new_value: filteredUpdateData.status
+      });
+    }
+    
+    // Check for admin notes change
+    if (filteredUpdateData.admin_notes !== undefined && filteredUpdateData.admin_notes !== (existingApp.admin_notes || '')) {
+      const oldNotes = existingApp.admin_notes || 'none';
+      const newNotes = filteredUpdateData.admin_notes || 'none';
+      changes.push({
+        action: `Admin notes changed from "${oldNotes}" to "${newNotes}"`,
+        field: 'admin_notes',
+        old_value: oldNotes,
+        new_value: newNotes
+      });
+    }
+    
+    // Check for roll number change
+    if (filteredUpdateData.roll_number && filteredUpdateData.roll_number !== existingApp.roll_number) {
+      changes.push({
+        action: `Roll number changed from "${existingApp.roll_number || 'none'}" to "${filteredUpdateData.roll_number}"`,
+        field: 'roll_number',
+        old_value: existingApp.roll_number || 'none',
+        new_value: filteredUpdateData.roll_number
+      });
+    }
+    
+    // Check for roll signing date change
+    if (filteredUpdateData.roll_signing_date && filteredUpdateData.roll_signing_date !== existingApp.roll_signing_date) {
+      changes.push({
+        action: `Roll signing date changed from "${existingApp.roll_signing_date || 'none'}" to "${filteredUpdateData.roll_signing_date}"`,
+        field: 'roll_signing_date',
+        old_value: existingApp.roll_signing_date || 'none',
+        new_value: filteredUpdateData.roll_signing_date
+      });
+    }
+
+    // Create separate audit log entries for each change
+    for (const change of changes) {
+      await createAuditLog(
+        change.action,
+        id,
+        {
+          field: change.field,
+          old_value: change.old_value,
+          new_value: change.new_value,
+          user_id: application.user_id,
+          action: updateData.action || 'edit_application',
+          timestamp: new Date().toISOString()
+        }
+      );
+    }
+
+    res.json({
+      success: true,
+      message: 'Application updated successfully',
+      data: application
+    });
+
+  } catch (error) {
+    console.error('Update lawyer application error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error: ' + error.message 
+    });
+  }
+});
+
 // Update lawyer application status (approve/reject)
 router.patch('/:id/status', authenticateAdmin, async (req, res) => {
   try {
@@ -359,7 +581,7 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
     console.log('Update status request:', { id, status, admin_feedback });
 
     // Helper function to create audit log
-    const createAuditLog = async (action, targetId, reason = null, metadata = {}) => {
+    const createAuditLog = async (action, targetId, metadata = {}) => {
       try {
         // Ensure the admin ID exists in the admin table
         console.log('Creating audit log with admin ID:', req.admin.id);
@@ -372,7 +594,6 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
             actor_id: req.admin.id, // This should reference the admin table
             role: req.admin.role,
             target_id: targetId,
-            reason,
             metadata,
             created_at: new Date().toISOString()
           });
@@ -497,7 +718,6 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
     await createAuditLog(
       `Application ${status}`,
       id,
-      admin_feedback || null,
       {
         old_status: existingApp.status,
         new_status: status,
@@ -580,6 +800,8 @@ router.post('/signed-url', authenticateAdmin, async (req, res) => {
   try {
     const { bucket, filePath } = req.body;
 
+    console.log('Signed URL request:', { bucket, filePath });
+
     if (!bucket || !filePath) {
       return res.status(400).json({
         success: false,
@@ -596,6 +818,35 @@ router.post('/signed-url', authenticateAdmin, async (req, res) => {
       });
     }
 
+    // First check if the file exists
+    const { data: fileData, error: fileError } = await supabaseAdmin.storage
+      .from(bucket)
+      .list('', {
+        search: filePath.split('/').pop() // Get just the filename
+      });
+
+    if (fileError) {
+      console.error('Error checking file existence:', fileError);
+    }
+
+    // Check if file exists in the bucket
+    const fileExists = fileData && fileData.some(file => 
+      filePath.includes(file.name) || filePath.endsWith(file.name)
+    );
+
+    if (!fileExists) {
+      console.log('File not found in storage:', { bucket, filePath, availableFiles: fileData?.map(f => f.name) });
+      return res.status(404).json({
+        success: false,
+        error: 'File not found in storage',
+        details: {
+          bucket,
+          filePath,
+          message: 'The requested file does not exist in the storage bucket'
+        }
+      });
+    }
+
     // Generate signed URL (valid for 1 hour)
     const { data, error } = await supabaseAdmin.storage
       .from(bucket)
@@ -608,6 +859,8 @@ router.post('/signed-url', authenticateAdmin, async (req, res) => {
         error: 'Failed to create signed URL: ' + error.message
       });
     }
+
+    console.log('Signed URL created successfully for:', filePath);
 
     res.json({
       success: true,
@@ -659,8 +912,6 @@ router.get('/:id/audit-logs', authenticateAdmin, async (req, res) => {
       actor_full_name: log.admin?.full_name || 'Unknown Admin',
       actor_email: log.admin?.email || '',
       role: log.admin?.role || log.role || 'admin',
-      reason: log.reason,
-      notes: log.reason, // Map reason to notes for compatibility
       details: log.metadata ? JSON.stringify(log.metadata, null, 2) : null,
       metadata: log.metadata,
       created_at: log.created_at

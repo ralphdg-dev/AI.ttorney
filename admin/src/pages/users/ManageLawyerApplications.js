@@ -78,6 +78,8 @@ const ManageLawyerApplications = () => {
   const [loadingDetails, setLoadingDetails] = React.useState(false);
   const [historicalViewOpen, setHistoricalViewOpen] = React.useState(false);
   const [historicalApplication, setHistoricalApplication] = React.useState(null);
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [editApplication, setEditApplication] = React.useState(null);
   const [confirmationModal, setConfirmationModal] = React.useState({
     open: false,
     type: '',
@@ -136,6 +138,25 @@ const ManageLawyerApplications = () => {
     // Open the historical application in a new modal
     setHistoricalApplication({ data: application });
     setHistoricalViewOpen(true);
+  };
+
+  const handleEdit = async (row) => {
+    try {
+      // Fetch complete application details for editing
+      const applicationDetails = await lawyerApplicationsService.getLawyerApplication(row.id);
+      setEditApplication(applicationDetails);
+      setEditOpen(true);
+    } catch (error) {
+      console.error('Failed to fetch application details for editing:', error);
+      // Fallback to using row data if API call fails
+      setEditApplication(row);
+      setEditOpen(true);
+    }
+  };
+
+  const handleEditSave = (updatedApplication) => {
+    // Refresh the data after successful edit
+    loadData();
   };
 
   // Helper function to get modal content based on type
@@ -564,7 +585,11 @@ const ManageLawyerApplications = () => {
             </button>
           </Tooltip>
           <Tooltip content="Edit">
-            <button className="p-1 rounded hover:bg-gray-100" aria-label="Edit">
+            <button 
+              className="p-1 rounded hover:bg-gray-100" 
+              aria-label="Edit"
+              onClick={() => handleEdit(row)}
+            >
               <Pencil size={16} />
             </button>
           </Tooltip>
@@ -735,6 +760,19 @@ const ManageLawyerApplications = () => {
         application={historicalApplication}
         loading={false}
         isHistoricalView={true}
+      />
+
+      {/* Edit Application Modal */}
+      <ViewLawyerApplicationModal
+        open={editOpen}
+        onClose={() => {
+          setEditOpen(false);
+          setEditApplication(null);
+        }}
+        application={editApplication}
+        loading={false}
+        isEditMode={true}
+        onSave={handleEditSave}
       />
 
       {/* Confirmation Modal */}
