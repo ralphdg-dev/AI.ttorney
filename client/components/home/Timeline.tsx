@@ -64,7 +64,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       timestamp: formatTimeAgo(created),
       category: row?.category || 'Others',
       content: row?.body || '',
-      comments: 0,
+      comments: Number(row?.reply_count || 0),
     };
   };
 

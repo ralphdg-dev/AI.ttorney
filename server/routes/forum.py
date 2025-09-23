@@ -5,6 +5,7 @@ from middleware.auth import get_current_user
 from services.supabase_service import SupabaseService
 import httpx
 import logging
+from middleware.auth import require_role
 
 logger = logging.getLogger(__name__)
 
@@ -164,12 +165,173 @@ async def list_recent_posts(current_user: Dict[str, Any] = Depends(get_current_u
             logger.error(f"List recent posts failed: {response.status_code} - {details}")
             raise HTTPException(status_code=400, detail="Failed to fetch posts")
 
-        data = response.json() if response.content else []
-        return ListPostsResponse(success=True, data=data)
+        posts = response.json() if response.content else []
+
+        # Add reply counts for each post
+        reply_counts: Dict[str, int] = {}
+        try:
+            post_ids = [str(p.get("id")) for p in posts if p.get("id")]
+            if post_ids:
+                ids_param = ",".join(post_ids)
+                async with httpx.AsyncClient() as client:
+                    rep_resp = await client.get(
+                        f"{supabase.rest_url}/forum_replies?select=post_id&post_id=in.({ids_param})",
+                        headers=supabase._get_headers(use_service_key=True)
+                    )
+                if rep_resp.status_code == 200:
+                    replies = rep_resp.json() or []
+                    for r in replies:
+                        pid = str(r.get("post_id"))
+                        reply_counts[pid] = reply_counts.get(pid, 0) + 1
+        except Exception as e:
+            logger.warning(f"Failed to compute reply counts: {str(e)}")
+
+        for p in posts:
+            pid = str(p.get("id"))
+            p["reply_count"] = reply_counts.get(pid, 0)
+
+        return ListPostsResponse(success=True, data=posts)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"List recent forum posts error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+class GetPostResponse(BaseModel):
+    success: bool
+    data: Dict[str, Any]
+
+
+@router.get("/posts/{post_id}", response_model=GetPostResponse)
+async def get_post(post_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Fetch a single forum post by ID."""
+    try:
+        supabase = SupabaseService()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{supabase.rest_url}/forum_posts?select=*&id=eq.{post_id}",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+
+        if response.status_code != 200:
+            details = {}
+            try:
+                details = response.json() if response.content else {}
+            except Exception:
+                details = {"raw": response.text}
+            logger.error(f"Get post failed: {response.status_code} - {details}")
+            raise HTTPException(status_code=400, detail="Failed to fetch post")
+
+        rows = response.json() if response.content else []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        return GetPostResponse(success=True, data=rows[0])
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get forum post error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+class ListRepliesResponse(BaseModel):
+    success: bool
+    data: list
+
+
+@router.get("/posts/{post_id}/replies", response_model=ListRepliesResponse)
+async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    """List replies for a forum post."""
+    try:
+        supabase = SupabaseService()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{supabase.rest_url}/forum_replies?select=*&post_id=eq.{post_id}&order=created_at.desc",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+        if response.status_code != 200:
+            details = {}
+            try:
+                details = response.json() if response.content else {}
+            except Exception:
+                details = {"raw": response.text}
+            logger.error(f"List replies failed: {response.status_code} - {details}")
+            raise HTTPException(status_code=400, detail="Failed to fetch replies")
+        data = response.json() if response.content else []
+        return ListRepliesResponse(success=True, data=data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"List replies error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+class CreateReplyRequest(BaseModel):
+    body: str = Field(..., min_length=1, max_length=5000)
+    is_anonymous: Optional[bool] = False
+
+
+class CreateReplyResponse(BaseModel):
+    success: bool
+    message: str
+    reply_id: Optional[str] = None
+
+
+@router.post("/posts/{post_id}/replies", response_model=CreateReplyResponse)
+async def create_reply(
+    post_id: str,
+    body: CreateReplyRequest,
+    current_user: Dict[str, Any] = Depends(require_role("verified_lawyer"))
+):
+    """Create a reply to a forum post (lawyers only)."""
+    try:
+        user_id = current_user["user"]["id"]
+        supabase = SupabaseService()
+        if not supabase.service_key:
+            logger.error("SUPABASE_SERVICE_ROLE_KEY is not configured; cannot insert into protected tables.")
+            raise HTTPException(status_code=500, detail="Server misconfiguration: service role key missing")
+
+        payload = {
+            "post_id": post_id,
+            "user_id": user_id,
+            "reply_body": body.body.strip(),
+            "is_flagged": False,
+        }
+
+        headers = supabase._get_headers(use_service_key=True)
+        headers["Prefer"] = "return=representation"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{supabase.rest_url}/forum_replies",
+                json=payload,
+                headers=headers
+            )
+
+        if response.status_code not in (200, 201):
+            details = {}
+            try:
+                details = response.json() if response.content else {}
+            except Exception:
+                details = {"raw": response.text}
+            logger.error(f"Create reply failed: {response.status_code} - {details}")
+            raise HTTPException(status_code=400, detail=details.get("message") or details.get("error") or "Failed to create reply")
+
+        created = []
+        try:
+            created = response.json() if response.content else []
+        except Exception:
+            logger.warning("Create reply succeeded but response had no JSON body")
+        reply_id = None
+        if isinstance(created, list) and created:
+            reply_id = str(created[0].get("id"))
+
+        return CreateReplyResponse(success=True, message="Reply created", reply_id=reply_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create reply error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { User, Send, Shield, MessageCircle } from 'lucide-react-native';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 import Header from '../Header';
+import apiClient from '@/lib/api-client';
 
 interface Reply {
   id: string;
@@ -72,66 +73,59 @@ const LawyerViewPost: React.FC = () => {
     return date.toLocaleDateString();
   };
 
-  // Mock data using new database schema
-  const post: PostData = {
-    id: postId as string || '1',
-    title: 'Need Legal Advice on Protest-Related Charges',
-    body: 'Hello po, baka may makasagot agad. Na-involve po ako sa protest actions at ngayon may kaso na akong rebellion at tinatangka pa akong kasuhan ng arson dahil daw sa mga nangyari during the rally. Hindi ko alam kung ano ang dapat kong gawin. May lawyer po ba na pwedeng mag-advise?',
-    domain: 'criminal',
-    created_at: '2024-01-15T09:30:00Z',
-    updated_at: null,
-    user_id: 'user_001',
-    is_anonymous: false,
-    is_flagged: false,
-    user: {
-      name: 'Ralph de Guzman',
-      username: 'twizt3rfries',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-      isLawyer: false,
-    },
-    comments: 3,
-    replies: [
-      {
-        id: '1',
-        body: 'For rebellion cases from protests: The key is proving specific intent. Mere participation in rallies is protected speech. The prosecution must show intent to overthrow the government, not just civil disobedience. Document everything and get legal representation immediately.',
-        created_at: '2024-01-15T10:00:00Z',
-        updated_at: null,
-        user_id: 'lawyer_001',
-        is_anonymous: false,
-        is_flagged: false,
-        user: {
-          name: 'Atty. Maria Santos',
-          username: 'atty_maria',
-          avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-          isLawyer: true,
-          lawyerBadge: 'Criminal Law Specialist'
-        }
-      },
-      {
-        id: '2',
-        body: 'Agree with Atty. Santos. Also, for arson charges - they need to prove you actually set fire to property with intent. Being present during a rally where fires occurred is not enough. Keep all evidence of your actual activities during the protest.',
-        created_at: '2024-01-15T11:30:00Z',
-        updated_at: null,
-        user_id: 'lawyer_002',
-        is_anonymous: false,
-        is_flagged: false,
-        user: {
-          name: 'Atty. John Cruz',
-          username: 'atty_john',
-          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-          isLawyer: true,
-          lawyerBadge: 'Public Interest Lawyer'
-        }
+  const [post, setPost] = useState<PostData | null>(null);
+  const [replies, setReplies] = useState<Reply[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!postId) return;
+      const res = await apiClient.getForumPostById(String(postId));
+      if (res.success && (res.data as any)?.data) {
+        const row = (res.data as any).data;
+        const mapped: PostData = {
+          id: String(row.id),
+          title: undefined,
+          body: row.body,
+          domain: (row.category as any) || 'others',
+          created_at: row.created_at || null,
+          updated_at: row.updated_at || null,
+          user_id: row.user_id || null,
+          is_anonymous: !!row.is_anonymous,
+          is_flagged: !!row.is_flagged,
+          user: undefined,
+          comments: 0,
+          replies: [],
+        };
+        setPost(mapped);
+      } else {
+        setPost(null);
       }
-    ]
-  };
+      const rep = await apiClient.getForumReplies(String(postId));
+      if (rep.success && Array.isArray((rep.data as any)?.data)) {
+        const rows = (rep.data as any).data as any[];
+        const mappedReplies: Reply[] = rows.map((r: any) => ({
+          id: String(r.id),
+          body: r.reply_body ?? r.body,
+          created_at: r.created_at || null,
+          updated_at: r.updated_at || null,
+          user_id: r.user_id || null,
+          is_anonymous: !!r.is_anonymous,
+          is_flagged: !!r.is_flagged,
+          user: undefined,
+        }));
+        setReplies(mappedReplies);
+      } else {
+        setReplies([]);
+      }
+    };
+    load();
+  }, [postId]);
 
   // Derived data
-  const isAnonymous = post.is_anonymous || false;
-  const displayUser = isAnonymous ? { name: 'Anonymous User', avatar: '', isLawyer: false } : (post.user || { name: 'Unknown User', avatar: '', isLawyer: false });
-  const displayTimestamp = formatTimestamp(post.created_at);
-  const displayContent = post.body || '';
-  const replies = post.replies || [];
+  const isAnonymous = post?.is_anonymous || false;
+  const displayUser = isAnonymous ? { name: 'Anonymous User', avatar: '', isLawyer: false } : (post?.user || { name: 'Unknown User', avatar: '', isLawyer: false });
+  const displayTimestamp = formatTimestamp(post?.created_at || null);
+  const displayContent = post?.body || '';
 
   // Category colors mapping
   const categoryColors = {
@@ -147,15 +141,33 @@ const LawyerViewPost: React.FC = () => {
     setReplyText(text);
   };
 
-  const handleSendReply = () => {
-    if (replyText.trim()) {
-      console.log('Sending reply:', replyText);
+  const handleSendReply = async () => {
+    const text = replyText.trim();
+    if (!text || !postId) return;
+    try {
       setIsReplying(true);
-      
-      setTimeout(() => {
+      const resp = await apiClient.createForumReply(String(postId), { body: text, is_anonymous: false });
+      if (resp.success) {
         setReplyText('');
-        setIsReplying(false);
-      }, 800);
+        // reload replies
+        const rep = await apiClient.getForumReplies(String(postId));
+        if (rep.success && Array.isArray((rep.data as any)?.data)) {
+          const rows = (rep.data as any).data as any[];
+          const mappedReplies: Reply[] = rows.map((r: any) => ({
+            id: String(r.id),
+            body: r.reply_body ?? r.body,
+            created_at: r.created_at || null,
+            updated_at: r.updated_at || null,
+            user_id: r.user_id || null,
+            is_anonymous: !!r.is_anonymous,
+            is_flagged: !!r.is_flagged,
+            user: undefined,
+          }));
+          setReplies(mappedReplies);
+        }
+      }
+    } finally {
+      setIsReplying(false);
     }
   };
 
@@ -206,13 +218,13 @@ const LawyerViewPost: React.FC = () => {
                   )}
                 </View>
                 
-                {post.domain && (
+                {post?.domain && (
                   <View style={[
                     tw`px-3 py-1 rounded-full border`,
                     { backgroundColor: categoryColors[post.domain]?.bg || categoryColors.others.bg,
                       borderColor: categoryColors[post.domain]?.border || categoryColors.others.border }
                   ]}>
-                    <Text style={[tw`text-xs font-semibold`, { color: categoryColors[post.domain]?.text || categoryColors.others.text }]}>
+                    <Text style={[tw`text-xs font-semibold`, { color: categoryColors[post.domain]?.text || categoryColors.others.text }]}> 
                       {post.domain?.charAt(0).toUpperCase() + post.domain?.slice(1)}
                     </Text>
                   </View>
