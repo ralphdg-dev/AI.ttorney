@@ -1,7 +1,7 @@
 import React from 'react';
 import Modal from '../ui/Modal';
 import Tooltip from '../ui/Tooltip';
-import { History, Eye, Clock, FileText, CheckCircle, XCircle, AlertCircle, RotateCcw } from 'lucide-react';
+import { History, Eye, Clock, FileText, CheckCircle, XCircle, AlertCircle, RotateCcw, Download, ZoomIn } from 'lucide-react';
 import lawyerApplicationsService from '../../services/lawyerApplicationsService';
 
 // Separate component for images to prevent re-renders
@@ -96,16 +96,65 @@ const StableSecureImage = React.memo(({ imagePath, alt, className, primaryBucket
     );
   }
 
+  const handleDownload = async () => {
+    if (!imageUrl) return;
+    
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${alt.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
+  };
+
+  const handleView = () => {
+    if (!imageUrl) return;
+    window.open(imageUrl, '_blank');
+  };
+
   return (
     <>
-      <img
-        src={imageUrl}
-        alt={alt}
-        className={className}
-        onError={() => setError('Failed to load image')}
-        onLoad={() => setImageLoaded(true)}
-        style={{ display: imageLoaded ? 'block' : 'none' }}
-      />
+      <div className="relative group">
+        <img
+          src={imageUrl}
+          alt={alt}
+          className={className}
+          onError={() => setError('Failed to load image')}
+          onLoad={() => setImageLoaded(true)}
+          style={{ display: imageLoaded ? 'block' : 'none' }}
+        />
+        
+        {/* Hover overlay with buttons */}
+        {imageLoaded && imageUrl && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2 rounded-md">
+            <Tooltip content="View Full Size">
+              <button
+                onClick={handleView}
+                className="p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full transition-all duration-200 hover:scale-110"
+              >
+                <ZoomIn size={16} className="text-gray-700" />
+              </button>
+            </Tooltip>
+            <Tooltip content="Download">
+              <button
+                onClick={handleDownload}
+                className="p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full transition-all duration-200 hover:scale-110"
+              >
+                <Download size={16} className="text-gray-700" />
+              </button>
+            </Tooltip>
+          </div>
+        )}
+      </div>
+      
       {!imageLoaded && imageUrl && (
         <div className="w-full h-40 rounded-md border border-gray-200 bg-gray-100 grid place-items-center text-[10px] text-gray-500">
           <div className="text-center">
