@@ -51,7 +51,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Update last login timestamp
+    // Update last updated timestamp
     await supabaseAdmin
       .from('admin')
       .update({ 

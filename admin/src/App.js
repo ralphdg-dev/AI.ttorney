@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard';
 import ManageLegalSeekers from './pages/users/ManageLegalSeekers';
 import ManageLawyers from './pages/users/ManageLawyers';
 import ManageLawyerApplications from './pages/users/ManageLawyerApplications';
+import ManageAdminsPage from './pages/admin/ManageAdmins';
 
 // Placeholder components for missing pages
 const Settings = () => (
@@ -34,12 +35,6 @@ const SuspendedAccounts = () => (
   </div>
 );
 
-const ManageAdmins = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Manage Admins</h1>
-    <p className="text-gray-600">Admin management coming soon...</p>
-  </div>
-);
 
 const AuditLogs = () => (
   <div className="p-6">
@@ -193,7 +188,7 @@ const AdminDashboard = () => {
               <Route path="/users/suspended-accounts" element={<SuspendedAccounts />} />
               
               {/* Admin Routes */}
-              <Route path="/admin/manage-admins" element={<ManageAdmins />} />
+              <Route path="/admin/manage-admins" element={<ManageAdminsPage />} />
               <Route path="/admin/audit-logs" element={<AuditLogs />} />
               
               {/* Legal Resources Routes */}

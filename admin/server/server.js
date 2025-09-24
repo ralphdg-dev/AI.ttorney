@@ -9,6 +9,7 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const lawyerApplicationsRoutes = require('./routes/lawyer-applications');
+const adminManagementRoutes = require('./routes/admin-management');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -114,6 +115,7 @@ app.options('*', cors());
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/lawyer-applications', lawyerApplicationsRoutes);
+app.use('/api/admin', adminManagementRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
