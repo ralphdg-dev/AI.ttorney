@@ -3,6 +3,8 @@ import Modal from '../ui/Modal';
 import Tooltip from '../ui/Tooltip';
 import { History, Eye, Clock, FileText, CheckCircle, XCircle, AlertCircle, RotateCcw, Download, ZoomIn } from 'lucide-react';
 import lawyerApplicationsService from '../../services/lawyerApplicationsService';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Separate component for images to prevent re-renders
 const StableSecureImage = React.memo(({ imagePath, alt, className, primaryBucket }) => {
@@ -303,6 +305,193 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
       setIsInitialized(false);
     }
   }, [open, isEditMode, applicationData, isInitialized]);
+
+  // Handle PDF export for application history
+  const handleExportHistoryPDF = async () => {
+    console.log('Export history clicked', { history, historyLength: history?.length });
+    
+    if (!history || history.length === 0) {
+      console.log('No history data available');
+      alert('No application history data available to export');
+      return;
+    }
+    
+    try {
+      // Create a new PDF document
+      const doc = new jsPDF();
+      
+      // Set document properties
+      doc.setProperties({
+        title: 'Application History Report',
+        subject: `Application history for ${fullName || 'Unknown'}`,
+        author: 'AI.ttorney Admin Panel',
+        creator: 'AI.ttorney Admin Panel'
+      });
+      
+      // Add header
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Application History Report', 20, 25);
+      
+      // Add applicant info
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let yPos = 40;
+      doc.text(`Applicant: ${fullName || 'Unknown'}`, 20, yPos);
+      yPos += 6;
+      doc.text(`Email: ${email || 'Unknown'}`, 20, yPos);
+      yPos += 6;
+      doc.text(`Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 20, yPos);
+      yPos += 6;
+      doc.text(`Total Records: ${history.length}`, 20, yPos);
+      yPos += 15;
+      
+      // Prepare table data
+      const tableHeaders = ['Version', 'Type', 'Status', 'Date', 'Notes'];
+      const tableData = history.map((app, index) => [
+        `v${app.version || (history.length - index)}`,
+        app.application_type || 'Initial',
+        app.status || 'Pending',
+        formatDate(app.submitted_at, false),
+        (app.notes || app.admin_notes || 'No notes').substring(0, 100) + (app.notes?.length > 100 ? '...' : '')
+      ]);
+      
+      // Add table using autoTable plugin
+      autoTable(doc, {
+        head: [tableHeaders],
+        body: tableData,
+        startY: yPos,
+        styles: {
+          fontSize: 8,
+          cellPadding: 3
+        },
+        headStyles: {
+          fillColor: [248, 249, 250],
+          textColor: [51, 51, 51],
+          fontStyle: 'bold'
+        },
+        alternateRowStyles: {
+          fillColor: [249, 249, 249]
+        },
+        columnStyles: {
+          0: { cellWidth: 20 }, // Version
+          1: { cellWidth: 25 }, // Type
+          2: { cellWidth: 25 }, // Status
+          3: { cellWidth: 30 }, // Date
+          4: { cellWidth: 'auto' } // Notes
+        },
+        margin: { left: 20, right: 20 }
+      });
+      
+      // Save the PDF
+      const fileName = `application-history-${fullName?.replace(/\s+/g, '_') || 'unknown'}-${Date.now()}.pdf`;
+      doc.save(fileName);
+      
+      console.log('History PDF export completed');
+    } catch (error) {
+      console.error('Error exporting history:', error);
+      alert('Failed to export application history. Please try again.');
+    }
+  };
+
+  // Handle PDF export for audit trail
+  const handleExportAuditPDF = async () => {
+    console.log('Export audit trail clicked', { auditLogs, auditLogsLength: auditLogs?.length });
+    
+    if (!auditLogs || auditLogs.length === 0) {
+      console.log('No audit logs data available');
+      alert('No audit trail data available to export');
+      return;
+    }
+    
+    try {
+      // Create a new PDF document
+      const doc = new jsPDF();
+      
+      // Set document properties
+      doc.setProperties({
+        title: 'Audit Trail Report',
+        subject: `Audit trail for ${fullName || 'Unknown'}`,
+        author: 'AI.ttorney Admin Panel',
+        creator: 'AI.ttorney Admin Panel'
+      });
+      
+      // Add header
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Audit Trail Report', 20, 25);
+      
+      // Add applicant info
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let yPos = 40;
+      doc.text(`Applicant: ${fullName || 'Unknown'}`, 20, yPos);
+      yPos += 6;
+      doc.text(`Email: ${email || 'Unknown'}`, 20, yPos);
+      yPos += 6;
+      doc.text(`Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 20, yPos);
+      yPos += 6;
+      doc.text(`Total Records: ${auditLogs.length}`, 20, yPos);
+      yPos += 15;
+      
+      // Prepare table data
+      const tableHeaders = ['Action', 'Admin', 'Role', 'Date'];
+      const tableData = auditLogs.map((log) => {
+        // Parse metadata for detailed action description
+        let detailedAction = log.action;
+        try {
+          const metadata = typeof log.details === 'string' ? JSON.parse(log.details) : (log.metadata || {});
+          if (metadata.old_status && metadata.new_status) {
+            detailedAction = `Changed status from ${metadata.old_status} to ${metadata.new_status}`;
+          }
+        } catch {
+          // Ignore parsing errors, use original action
+        }
+        
+        return [
+          detailedAction.substring(0, 80) + (detailedAction.length > 80 ? '...' : ''),
+          log.actor_full_name || log.actor_name || 'Unknown Admin',
+          log.role || 'Admin',
+          formatDate(log.created_at, false)
+        ];
+      });
+      
+      // Add table using autoTable plugin
+      autoTable(doc, {
+        head: [tableHeaders],
+        body: tableData,
+        startY: yPos,
+        styles: {
+          fontSize: 8,
+          cellPadding: 3
+        },
+        headStyles: {
+          fillColor: [248, 249, 250],
+          textColor: [51, 51, 51],
+          fontStyle: 'bold'
+        },
+        alternateRowStyles: {
+          fillColor: [249, 249, 249]
+        },
+        columnStyles: {
+          0: { cellWidth: 80 }, // Action
+          1: { cellWidth: 40 }, // Admin
+          2: { cellWidth: 25 }, // Role
+          3: { cellWidth: 35 } // Date
+        },
+        margin: { left: 20, right: 20 }
+      });
+      
+      // Save the PDF
+      const fileName = `audit-trail-${fullName?.replace(/\s+/g, '_') || 'unknown'}-${Date.now()}.pdf`;
+      doc.save(fileName);
+      
+      console.log('Audit trail PDF export completed');
+    } catch (error) {
+      console.error('Error exporting audit trail:', error);
+      alert('Failed to export audit trail. Please try again.');
+    }
+  };
 
   // Handle save in edit mode
   const handleSave = async () => {
@@ -639,10 +828,21 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
               
               {/* Application History Column */}
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <FileText className="h-3 w-3 text-gray-600" />
-                  <h4 className="text-xs font-medium text-gray-900">Application History</h4>
-                  <span className="text-[10px] text-gray-500">({history.length} versions)</span>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-3 w-3 text-gray-600" />
+                    <h4 className="text-xs font-medium text-gray-900">Application History</h4>
+                    <span className="text-[10px] text-gray-500">({history.length} versions)</span>
+                  </div>
+                  <Tooltip content="Download as PDF">
+                    <button
+                      onClick={handleExportHistoryPDF}
+                      disabled={!history || history.length === 0}
+                      className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Download size={14} />
+                    </button>
+                  </Tooltip>
                 </div>
 
                 {historyLoading ? (
@@ -745,10 +945,21 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
 
               {/* Audit Trail Column */}
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <History className="h-3 w-3 text-gray-600" />
-                  <h4 className="text-xs font-medium text-gray-900">Audit Trail</h4>
-                  <span className="text-[10px] text-gray-500">({auditLogs.length} entries)</span>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <History className="h-3 w-3 text-gray-600" />
+                    <h4 className="text-xs font-medium text-gray-900">Audit Trail</h4>
+                    <span className="text-[10px] text-gray-500">({auditLogs.length} entries)</span>
+                  </div>
+                  <Tooltip content="Download as PDF">
+                    <button
+                      onClick={handleExportAuditPDF}
+                      disabled={!auditLogs || auditLogs.length === 0}
+                      className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Download size={14} />
+                    </button>
+                  </Tooltip>
                 </div>
 
                 {auditLoading ? (
