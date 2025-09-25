@@ -6,9 +6,9 @@ import {
   Animated,
   Pressable,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import tw from "tailwind-react-native-classnames";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
 import { Button, ButtonText } from "@/components/ui/button";
@@ -17,8 +17,6 @@ import BackButton from "@/components/ui/BackButton";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
 import { Star, BookOpen, Globe } from "lucide-react-native";
-// import { db } from "@/lib/supabase";
-import { Database } from "@/types/database.types";
 import { useFavorites } from "@/contexts/FavoritesContext";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
@@ -42,18 +40,14 @@ export default function TermDetailScreen() {
   const [term, setTerm] = useState<GlossaryTerm | null>(null);
   const [loading, setLoading] = useState(true);
   const [scrollY] = useState(new Animated.Value(0));
+  const { width } = useWindowDimensions();
   
   const isTermFavorite = isFavorite(id);
-
-  const getDynamicLineHeight = (text: string, baseSize: number) => {
-    const charCount = text.length;
-    const lineHeightIncrease = Math.floor(charCount / 50);
-    const minLineHeight = baseSize * 1.2; // 120% of font size
-    const maxLineHeight = baseSize * 1.8; // 180% of font size
-    const newHeight = baseSize + lineHeightIncrease;
-
-    return Math.min(Math.max(newHeight, minLineHeight), maxLineHeight);
-  };
+  
+  // Responsive design breakpoints
+  const isTablet = width >= 768;
+  const isDesktop = width >= 1024;
+  const maxContentWidth = isDesktop ? 800 : isTablet ? 600 : width - 24;
 
   const loadTerm = useCallback(async () => {
     try {
@@ -141,12 +135,10 @@ export default function TermDetailScreen() {
 
   if (loading) {
     return (
-      <View style={tw`flex-1 bg-gray-50`}>
-        <View
-          style={[
-            tw`flex-row items-center justify-between px-5 bg-white`,
-            { paddingTop: 50, paddingBottom: 16 },
-          ]}
+      <View className="flex-1 bg-gray-50">
+        <View 
+          className="flex-row items-center justify-between px-4 md:px-6 lg:px-8 bg-white"
+          style={{ paddingTop: 50, paddingBottom: 16 }}
         >
           <BackButton onPress={handleBack} color={Colors.primary.blue} />
           <GSText size="lg" bold style={{ color: Colors.primary.blue }}>
@@ -154,9 +146,9 @@ export default function TermDetailScreen() {
           </GSText>
           <View style={{ width: 38 }} />
         </View>
-        <View style={tw`flex-1 items-center justify-center`}>
+        <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={Colors.primary.blue} />
-          <GSText className="mt-4" style={{ color: Colors.text.sub }}>
+          <GSText className="mt-4 text-gray-600">
             Loading term details...
           </GSText>
         </View>
@@ -166,12 +158,10 @@ export default function TermDetailScreen() {
 
   if (!term) {
     return (
-      <View style={tw`flex-1 bg-gray-50`}>
+      <View className="flex-1 bg-gray-50">
         <View
-          style={[
-            tw`flex-row items-center justify-between px-5 bg-white`,
-            { paddingTop: 50, paddingBottom: 16 },
-          ]}
+          className="flex-row items-center justify-between px-4 md:px-6 lg:px-8 bg-white"
+          style={{ paddingTop: 50, paddingBottom: 16 }}
         >
           <BackButton onPress={handleBack} color={Colors.primary.blue} />
           <GSText size="lg" bold style={{ color: Colors.primary.blue }}>
@@ -179,11 +169,8 @@ export default function TermDetailScreen() {
           </GSText>
           <View style={{ width: 38 }} />
         </View>
-        <View style={tw`flex-1 items-center justify-center px-6`}>
-          <GSText
-            className="text-center mb-4"
-            style={{ color: Colors.text.sub }}
-          >
+        <View className="flex-1 items-center justify-center px-6">
+          <GSText className="text-center mb-4 text-gray-600">
             The requested term could not be found.
           </GSText>
           <Button onPress={handleBack}>
@@ -195,38 +182,27 @@ export default function TermDetailScreen() {
   }
 
   return (
-    <View style={tw`flex-1 bg-gray-100`}>
+    <View className="flex-1 bg-gray-100">
       <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
 
       {/* Header with term name */}
       <View
-        style={[
-          tw`flex-row items-center justify-between px-4 bg-white`,
-          {
-            paddingTop: 50,
-            paddingBottom: 16,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.1,
-            shadowRadius: 2,
-            elevation: 2,
-          },
-        ]}
+        className="flex-row items-center justify-between px-4 md:px-6 lg:px-8 bg-white shadow-sm"
+        style={{
+          paddingTop: 50,
+          paddingBottom: 16,
+        }}
       >
         <BackButton onPress={handleBack} color={Colors.primary.blue} />
         <GSText
           size="lg"
           bold
-          style={{
-            color: Colors.primary.blue,
-            flex: 1,
-            textAlign: "center",
-            marginHorizontal: 8,
-          }}
+          className="flex-1 text-center mx-2 md:text-xl lg:text-2xl"
+          style={{ color: Colors.primary.blue }}
         >
           {term?.term_en || "Legal Term"}
         </GSText>
-        <Pressable onPress={handleToggleFavorite} style={tw`p-2`}>
+        <Pressable onPress={handleToggleFavorite} className="p-2">
           <Star
             size={22}
             color={isTermFavorite ? "#F59E0B" : "#9CA3AF"}
@@ -236,8 +212,12 @@ export default function TermDetailScreen() {
       </View>
 
       <Animated.ScrollView
-        style={[tw`flex-1`, { backgroundColor: "#F9FAFB" }]}
-        contentContainerStyle={tw`pb-20`}
+        className="flex-1 bg-gray-50"
+        contentContainerStyle={{ 
+          paddingBottom: 100,
+          alignItems: 'center',
+          paddingHorizontal: isDesktop ? 0 : 12
+        }}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={Animated.event(
@@ -245,23 +225,28 @@ export default function TermDetailScreen() {
           { useNativeDriver: false }
         )}
       >
-        {/* Main Content Card */}
-        <View style={tw`bg-white mx-3 mt-2 rounded-lg shadow-sm`}>
+        {/* Main Content Card - Responsive width */}
+        <View 
+          className="bg-white mt-4 rounded-xl shadow-sm border border-gray-100"
+          style={{ 
+            width: maxContentWidth,
+            maxWidth: '100%'
+          }}
+        >
           {/* Term Header Section */}
-          <View style={tw`px-4 pt-4 pb-3 border-b border-gray-100`}>
+          <View className="px-4 md:px-6 lg:px-8 pt-6 pb-4 border-b border-gray-100">
             <GSText
               size="xl"
               bold
-              className="mb-1"
-              style={{ color: Colors.text.head }}
+              className="mb-2 md:text-2xl lg:text-3xl text-gray-900"
             >
               {term.term_en}
             </GSText>
             {term.term_fil && (
               <GSText
                 size="md"
-                className="mb-2"
-                style={{ color: Colors.primary.blue, fontWeight: "500" }}
+                className="mb-3 md:text-lg lg:text-xl font-medium"
+                style={{ color: Colors.primary.blue }}
               >
                 {term.term_fil}
               </GSText>
@@ -269,13 +254,13 @@ export default function TermDetailScreen() {
             {term.category && (
               <Badge
                 variant="outline"
-                className={`self-start rounded-md ${
+                className={`self-start rounded-lg ${
                   getCategoryBadgeClasses(term.category).container
                 }`}
               >
                 <BadgeText
                   size="sm"
-                  className={getCategoryBadgeClasses(term.category).text}
+                  className={`${getCategoryBadgeClasses(term.category).text} md:text-base`}
                 >
                   {term.category}
                 </BadgeText>
@@ -284,23 +269,20 @@ export default function TermDetailScreen() {
           </View>
 
           {/* English Definition */}
-          <View style={tw`px-4 py-4 border-b border-gray-100`}>
-            <HStack className="items-center mb-2">
-              <Globe size={16} color={Colors.primary.blue} />
+          <View className="px-4 md:px-6 lg:px-8 py-5 md:py-6 border-b border-gray-100">
+            <HStack className="items-center mb-3">
+              <Globe size={18} color={Colors.primary.blue} className="md:w-5 md:h-5" />
               <GSText
                 size="md"
                 bold
-                className="ml-2"
-                style={{ color: Colors.text.head }}
+                className="ml-2 md:text-lg lg:text-xl text-gray-900"
               >
                 Definition
               </GSText>
             </HStack>
             <GSText
               size="sm"
-              style={{
-                color: Colors.text.head,
-              }}
+              className="md:text-base lg:text-lg text-gray-800 leading-relaxed"
             >
               {term.definition_en}
             </GSText>
@@ -308,23 +290,20 @@ export default function TermDetailScreen() {
 
           {/* Filipino Definition */}
           {term.definition_fil && (
-            <View style={tw`px-4 py-4 border-b border-gray-100`}>
-              <HStack className="items-center mb-2">
-                <Globe size={16} color={Colors.primary.blue} />
+            <View className="px-4 md:px-6 lg:px-8 py-5 md:py-6 border-b border-gray-100">
+              <HStack className="items-center mb-3">
+                <Globe size={18} color={Colors.primary.blue} className="md:w-5 md:h-5" />
                 <GSText
                   size="md"
                   bold
-                  className="ml-2"
-                  style={{ color: Colors.text.head }}
+                  className="ml-2 md:text-lg lg:text-xl text-gray-900"
                 >
                   Kahulugan sa Filipino
                 </GSText>
               </HStack>
               <GSText
                 size="sm"
-                style={{
-                  color: Colors.text.head,
-                }}
+                className="md:text-base lg:text-lg text-gray-800 leading-relaxed"
               >
                 {term.definition_fil}
               </GSText>
@@ -333,45 +312,31 @@ export default function TermDetailScreen() {
 
           {/* Examples Section */}
           {(term.example_en || term.example_fil) && (
-            <View style={tw`px-4 py-4`}>
-              <HStack className="items-center mb-3">
-                <BookOpen size={16} color={Colors.primary.blue} />
+            <View className="px-4 md:px-6 lg:px-8 py-5 md:py-6">
+              <HStack className="items-center mb-4">
+                <BookOpen size={18} color={Colors.primary.blue} className="md:w-5 md:h-5" />
                 <GSText
                   size="md"
                   bold
-                  className="ml-2"
-                  style={{ color: Colors.text.head }}
+                  className="ml-2 md:text-lg lg:text-xl text-gray-900"
                 >
                   Examples
                 </GSText>
               </HStack>
 
               {term.example_en && (
-                <View style={tw`mb-3`}>
+                <View className="mb-4">
                   <GSText
                     size="sm"
                     bold
-                    className="mb-1"
-                    style={{ color: Colors.text.sub }}
+                    className="mb-2 md:text-base text-gray-700"
                   >
                     English Example:
                   </GSText>
-                  <View
-                    style={[
-                      tw`p-3 rounded-lg`,
-                      {
-                        backgroundColor: "#F8FAFC",
-                        borderLeftWidth: 3,
-                        borderLeftColor: Colors.primary.blue,
-                      },
-                    ]}
-                  >
+                  <View className="p-4 md:p-5 rounded-lg bg-slate-50 border-l-4 border-blue-500">
                     <GSText
                       size="sm"
-                      className="italic"
-                      style={{
-                        color: Colors.text.head,
-                      }}
+                      className="italic md:text-base lg:text-lg text-gray-800 leading-relaxed"
                     >
                       &quot;{term.example_en}&quot;
                     </GSText>
@@ -384,25 +349,14 @@ export default function TermDetailScreen() {
                   <GSText
                     size="sm"
                     bold
-                    className="mb-1"
-                    style={{ color: Colors.text.sub }}
+                    className="mb-2 md:text-base text-gray-700"
                   >
                     Halimbawa sa Filipino:
                   </GSText>
-                  <View
-                    style={[
-                      tw`p-3 rounded-lg`,
-                      {
-                        backgroundColor: "#F0F9FF",
-                        borderLeftWidth: 3,
-                        borderLeftColor: Colors.primary.blue,
-                      },
-                    ]}
-                  >
+                  <View className="p-4 md:p-5 rounded-lg bg-blue-50 border-l-4 border-blue-500">
                     <GSText
                       size="sm"
-                      className="italic"
-                      style={{ color: Colors.text.head }}
+                      className="italic md:text-base lg:text-lg text-gray-800 leading-relaxed"
                     >
                       &quot;{term.example_fil}&quot;
                     </GSText>
