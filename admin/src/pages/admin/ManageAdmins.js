@@ -1,9 +1,10 @@
 import React from 'react';
-import { Eye, Shield, Users, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Eye, Shield, Users, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Plus, Pencil, Archive } from 'lucide-react';
 import DataTable from '../../components/ui/DataTable';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import AddAdminModal from '../../components/admin/AddAdminModal';
+import ViewAdminModal from '../../components/admin/ViewAdminModal';
 import adminManagementService from '../../services/adminManagementService';
 
 const RoleBadge = ({ role }) => {
@@ -75,6 +76,8 @@ const ManageAdmins = () => {
     direction: 'asc'
   });
   const [showAddModal, setShowAddModal] = React.useState(false);
+  const [showViewModal, setShowViewModal] = React.useState(false);
+  const [selectedAdmin, setSelectedAdmin] = React.useState(null);
 
   // Load data from API
   const loadData = React.useCallback(async () => {
@@ -117,7 +120,20 @@ const ManageAdmins = () => {
 
   // Handle view admin details
   const handleView = (admin) => {
-    alert(`View details for: ${admin.full_name}\nEmail: ${admin.email}\nRole: ${admin.role}\nCreated: ${new Date(admin.created_at).toLocaleDateString()}`);
+    setSelectedAdmin(admin);
+    setShowViewModal(true);
+  };
+
+  // Handle edit admin
+  const handleEdit = (admin) => {
+    // TODO: Implement edit functionality
+    console.log('Edit admin:', admin);
+  };
+
+  // Handle archive admin
+  const handleArchive = (admin) => {
+    // TODO: Implement archive functionality
+    console.log('Archive admin:', admin);
   };
 
   // Handle add admin
@@ -128,6 +144,12 @@ const ManageAdmins = () => {
   // Handle modal close
   const handleModalClose = () => {
     setShowAddModal(false);
+  };
+
+  // Handle view modal close
+  const handleViewModalClose = () => {
+    setShowViewModal(false);
+    setSelectedAdmin(null);
   };
 
   // Handle admin creation success
@@ -387,15 +409,6 @@ const ManageAdmins = () => {
         const diffInHours = Math.floor(diffInMinutes / 60);
         const diffInDays = Math.floor(diffInHours / 24);
         
-        console.log('Last login debug:', {
-          raw: row.last_login,
-          parsed: date.toISOString(),
-          now: now.toISOString(),
-          diffInMs,
-          diffInMinutes,
-          diffInHours,
-          diffInDays
-        });
         
         // Show relative time for recent logins, absolute date for older ones
         if (diffInMinutes < 1) {
@@ -426,8 +439,8 @@ const ManageAdmins = () => {
       header: 'Actions',
       align: 'right',
       render: (row) => (
-        <div className="flex items-center justify-end space-x-2 text-gray-600">
-          <Tooltip content="View Details">
+        <div className="flex items-center justify-end space-x-1 text-gray-600">
+          <Tooltip content="View">
             <button 
               className="p-1 rounded hover:bg-gray-100" 
               aria-label="View"
@@ -436,7 +449,24 @@ const ManageAdmins = () => {
               <Eye size={16} />
             </button>
           </Tooltip>
-          {/* Future actions can be added here when edit/delete functionality is implemented */}
+          <Tooltip content="Edit">
+            <button 
+              className="p-1 rounded hover:bg-gray-100" 
+              aria-label="Edit"
+              onClick={() => handleEdit(row)}
+            >
+              <Pencil size={16} />
+            </button>
+          </Tooltip>
+          <Tooltip content="Archive">
+            <button 
+              className="p-1 rounded hover:bg-gray-100" 
+              aria-label="Archive"
+              onClick={() => handleArchive(row)}
+            >
+              <Archive size={16} />
+            </button>
+          </Tooltip>
         </div>
       ),
     },
@@ -602,6 +632,13 @@ const ManageAdmins = () => {
         open={showAddModal}
         onClose={handleModalClose}
         onSave={handleAdminCreated}
+      />
+
+      {/* View Admin Modal */}
+      <ViewAdminModal
+        open={showViewModal}
+        onClose={handleViewModalClose}
+        admin={selectedAdmin}
       />
     </div>
   );
