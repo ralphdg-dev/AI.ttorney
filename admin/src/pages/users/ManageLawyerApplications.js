@@ -217,7 +217,7 @@ const ManageLawyerApplications = () => {
     
     try {
       setConfirmationModal(prev => ({ ...prev, loading: true }));
-      await lawyerApplicationsService.updateApplicationStatus(applicationId, 'approved');
+      await lawyerApplicationsService.updateApplicationStatus(applicationId, 'accepted');
       await loadData(); // Reload data
       setConfirmationModal({ open: false, type: '', applicationId: null, applicantName: '', loading: false });
     } catch (err) {
@@ -495,8 +495,8 @@ const ManageLawyerApplications = () => {
       render: (row) => {
         if (!row.prior_status) {
           return (
-            <span className="text-xs text-gray-400 italic">
-              First Application
+            <span className="text-xs text-gray-400">
+              -
             </span>
           );
         }
@@ -529,8 +529,8 @@ const ManageLawyerApplications = () => {
       header: 'Approval',
       align: 'left',
       render: (row) => {
-        // Hide approval buttons if application is already approved/accepted
-        if (row.status === 'approved' || row.status === 'accepted') {
+        // Hide approval buttons if application is already accepted
+        if (row.status === 'accepted') {
           return null;
         }
 
@@ -654,7 +654,7 @@ const ManageLawyerApplications = () => {
           filter={{ 
             value: statusFilter, 
             onChange: setStatusFilter, 
-            options: ['All', 'Pending', 'Approved', 'Rejected', 'Resubmission'], 
+            options: ['All', 'Pending', 'Accepted', 'Rejected', 'Resubmission'], 
             label: 'Filter by status' 
           }}
           sort={{ 

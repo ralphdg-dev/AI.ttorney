@@ -603,10 +603,10 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
       }
     };
 
-    if (!['pending', 'approved', 'rejected', 'resubmission'].includes(status)) {
+    if (!['pending', 'accepted', 'rejected', 'resubmission'].includes(status)) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Invalid status. Must be one of: pending, approved, rejected, resubmission' 
+        error: 'Invalid status. Must be one of: pending, accepted, rejected, resubmission' 
       });
     }
 
