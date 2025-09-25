@@ -702,6 +702,22 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
       width="max-w-4xl"
     >
       <div className="space-y-4">
+        {/* Informational Note */}
+        {!isHistoricalView && !isEditMode && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-3">
+            <div className="flex items-start gap-2">
+              <div className="flex-shrink-0 mt-0.5">
+                <div className="w-3 h-3 bg-blue-500 rounded-sm flex items-center justify-center">
+                  <span className="text-white text-[8px] font-bold">!</span>
+                </div>
+              </div>
+              <div className="text-[10px] text-blue-700">
+                You are viewing the current application. To view previous versions, 
+                use the <span className="font-medium">"View" button</span> in Application History below.
+              </div>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div className="text-[9px] text-gray-500">Full Name</div>
@@ -883,9 +899,6 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
                             <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
                               Date
                             </th>
-                            <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                              Notes
-                            </th>
                             <th className="px-2 py-1.5 text-right text-[9px] font-medium text-gray-500 uppercase tracking-wider">
                               Action
                             </th>
@@ -912,21 +925,23 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
                                 <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
                                   {formatDate(app.submitted_at, false)}
                                 </td>
-                                <td className="px-2 py-1.5 max-w-32">
-                                  <div className="text-[9px] text-gray-700 truncate" title={app.notes || '-'}>
-                                    {app.notes || '-'}
-                                  </div>
-                                </td>
                                 <td className="px-2 py-1.5 whitespace-nowrap text-right">
-                                  <Tooltip content="View">
-                                    <button 
-                                      className="p-1 rounded hover:bg-gray-100" 
-                                      aria-label="View" 
-                                      onClick={() => onViewHistoricalApplication && onViewHistoricalApplication(app)}
-                                    >
-                                      <Eye size={12} />
-                                    </button>
-                                  </Tooltip>
+                                  {/* Only show view button for historical applications (not the current one) */}
+                                  {index !== 0 ? (
+                                    <Tooltip content="View">
+                                      <button 
+                                        className="p-1 rounded hover:bg-gray-100" 
+                                        aria-label="View" 
+                                        onClick={() => onViewHistoricalApplication && onViewHistoricalApplication(app)}
+                                      >
+                                        <Eye size={12} />
+                                      </button>
+                                    </Tooltip>
+                                  ) : (
+                                    <span className="text-[9px] text-blue-600 font-medium px-2 py-1 bg-blue-50 rounded">
+                                      Current
+                                    </span>
+                                  )}
                                 </td>
                               </tr>
                             );
