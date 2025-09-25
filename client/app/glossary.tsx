@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import {
   View,
   FlatList,
@@ -6,9 +6,9 @@ import {
   useWindowDimensions,
   ActivityIndicator,
   TouchableOpacity,
-  Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
+import tw from "tailwind-react-native-classnames";
 import Header from "@/components/Header";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
@@ -18,17 +18,16 @@ import Navbar from "@/components/Navbar";
 import ToggleGroup from "@/components/ui/ToggleGroup";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
-import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import { SidebarProvider, SidebarWrapper } from "@/components/AppSidebar";
-import { useLegalArticles } from "@/hooks/useLegalArticles";
 import {
   CacheService,
   generateGlossaryCacheKey,
-} from "@/lib/glossary/cacheService";
+} from "./glossary/cacheService";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
+
 const ITEMS_PER_PAGE = 10;
 
 export default function GlossaryScreen() {
@@ -36,68 +35,39 @@ export default function GlossaryScreen() {
   const [activeTab, setActiveTab] = useState<string>("terms");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  
-  // Terms state
   const [terms, setTerms] = useState<TermItem[]>([]);
-  const [termsLoading, setTermsLoading] = useState<boolean>(true);
-  const [termsError, setTermsError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [, setTotalPages] = useState<number>(1);
+  const [, setTotalCount] = useState<number>(0);
   const [isOffline, setIsOffline] = useState<boolean>(false);
-  const [termsTotalPages, setTermsTotalPages] = useState<number>(1);
-  const [termsTotalCount, setTermsTotalCount] = useState<number>(0);
-  
-  // Articles state
-  const { 
-    articles: legalArticles, 
-    loading: articlesLoading, 
-    error: articlesError, 
-    refetch, 
-    getArticlesByCategory, 
-    searchArticles 
-  } = useLegalArticles();
-  const [displayArticles, setDisplayArticles] = useState<ArticleItem[]>([]);
-  const [isSearchingArticles, setIsSearchingArticles] = useState<boolean>(false);
-  const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
-  
-  // Animation and layout
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const { width } = useWindowDimensions();
   const flatListRef = useRef<FlatList>(null);
-  const { width: screenWidth } = useWindowDimensions();
-  
-  // Responsive design
-  const isTablet = screenWidth >= 768;
-  const isDesktop = screenWidth >= 1024;
-  const horizontalPadding = isDesktop ? 32 : isTablet ? 24 : 16;
-  const minCardWidth = isDesktop ? 320 : isTablet ? 280 : 300;
+  const horizontalPadding = 24;
+  const minCardWidth = 360;
   const numColumns = Math.max(
     1,
-    Math.min(isDesktop ? 4 : isTablet ? 3 : 2, Math.floor((screenWidth - horizontalPadding * 2) / minCardWidth))
+    Math.min(3, Math.floor((width - horizontalPadding * 2) / minCardWidth))
   );
 
-  const tabOptions = [
-    { id: "terms", label: "Legal Terms" },
-    { id: "guides", label: "Legal Guides" },
-  ];
-
-  // Initialize articles display
-  useEffect(() => {
-    if (activeTab === "guides" && legalArticles.length > 0) {
-      setDisplayArticles(legalArticles);
-    }
-  }, [legalArticles, activeTab]);
-
-  // Network check
   useEffect(() => {
     const checkNetwork = async () => {
       const connected = await CacheService.isConnected();
       setIsOffline(!connected);
     };
+
     checkNetwork();
+
     CacheService.clearExpired();
   }, []);
 
-  // Format terms from API
-  const formatTerms = useCallback((apiTerms: any[]): TermItem[] => {
+  const tabOptions = [
+    { id: "guides", label: "Legal Guides" },
+    { id: "terms", label: "Legal Terms" },
+  ];
+
+  const formatTerms = (apiTerms: any[]): TermItem[] => {
     const placeholderText = "Information not available";
     return apiTerms.map((item: any) => ({
       id: item.id.toString(),
@@ -109,17 +79,16 @@ export default function GlossaryScreen() {
       filipinoExample: item.example_fil || placeholderText,
       category: item.category || "others",
     }));
-  }, []);
+  };
 
-  // Fetch legal terms
-  const fetchLegalTerms = useCallback(async (
+  const fetchLegalTerms = async (
     page = 1,
     category = activeCategory,
     search = searchQuery
   ) => {
     try {
-      setTermsLoading(true);
-      setTermsError(null);
+      setLoading(true);
+      setError(null);
 
       const cacheKey = generateGlossaryCacheKey(page, category, search);
       const isConnected = await CacheService.isConnected();
@@ -128,14 +97,16 @@ export default function GlossaryScreen() {
       const cachedData = await CacheService.get<any>(cacheKey);
 
       if (cachedData) {
+        console.log("Using cached data for:", cacheKey);
         const formattedTerms = formatTerms(
           cachedData.terms || cachedData.data?.terms || []
         );
         setTerms(formattedTerms);
-        setTermsTotalPages(cachedData.pagination?.pages || 1);
-        setTermsTotalCount(cachedData.pagination?.total || formattedTerms.length);
+        setTotalPages(cachedData.pagination?.pages || 1);
+        setTotalCount(cachedData.pagination?.total || formattedTerms.length);
+        setCurrentPage(page);
         if (!isConnected) {
-          setTermsLoading(false);
+          setLoading(false);
           return;
         }
       }
@@ -164,10 +135,12 @@ export default function GlossaryScreen() {
       }
 
       const data = await response.json();
+
       const formattedTerms = formatTerms(data.terms);
       setTerms(formattedTerms);
-      setTermsTotalPages(data.pagination?.pages || 1);
-      setTermsTotalCount(data.pagination?.total || formattedTerms.length);
+      setTotalPages(data.pagination.pages);
+      setTotalCount(data.pagination.total);
+      setCurrentPage(page);
 
       await CacheService.set(cacheKey, {
         terms: data.terms,
@@ -175,8 +148,10 @@ export default function GlossaryScreen() {
       });
     } catch (err) {
       console.error("Error fetching legal terms:", err);
-      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
-      setTermsError(errorMessage);
+      const errorMessage =
+        err instanceof Error ? err.message : "An unknown error occurred";
+
+      setError(errorMessage);
 
       if (!isOffline && !terms.length) {
         Alert.alert(
@@ -186,165 +161,187 @@ export default function GlossaryScreen() {
         );
       }
     } finally {
-      setTermsLoading(false);
+      setLoading(false);
     }
-  }, [activeCategory, searchQuery, formatTerms, isOffline, terms.length]);
+  };
 
-  // Initial load
   useEffect(() => {
-    if (activeTab === "terms") {
-      fetchLegalTerms(1);
-    }
-  }, [activeTab, fetchLegalTerms]);
+    fetchLegalTerms(1);
+  }, []);
 
-  // Search and category change with debounce
   useEffect(() => {
-    if (activeTab === "terms") {
-      const timeoutId = setTimeout(() => {
-        fetchLegalTerms(1, activeCategory, searchQuery);
-      }, 500);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [activeCategory, searchQuery, activeTab, fetchLegalTerms]);
+    const timeoutId = setTimeout(() => {
+      fetchLegalTerms(1, activeCategory, searchQuery);
+    }, 500);
 
-  // Articles search with debounce
-  useEffect(() => {
-    if (activeTab === "guides") {
-      const searchTimeout = setTimeout(async () => {
-        const trimmedQuery = searchQuery.trim();
-        
-        if (trimmedQuery && trimmedQuery.length >= 2) {
-          setIsSearchingArticles(true);
-          try {
-            const searchResults = await searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
-            setDisplayArticles(searchResults);
-          } catch (err) {
-            console.error("Search error:", err);
-            setDisplayArticles([]);
-          } finally {
-            setIsSearchingArticles(false);
-          }
-        } else {
-          setIsSearchingArticles(false);
-          if (activeCategory === "all") {
-            setDisplayArticles(legalArticles);
-          } else {
-            try {
-              const byCat = await getArticlesByCategory(activeCategory);
-              setDisplayArticles(byCat);
-            } catch (err) {
-              console.error("Category fetch error:", err);
-              setDisplayArticles(legalArticles);
-            }
-          }
-        }
-      }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [activeCategory, searchQuery]);
 
-      return () => clearTimeout(searchTimeout);
-    }
-  }, [searchQuery, activeCategory, activeTab, legalArticles, searchArticles, getArticlesByCategory]);
-
-  // Handle data differently for terms (server-side pagination) vs articles (client-side pagination)
-  const currentData = useMemo(() => {
-    if (activeTab === "terms") {
-      // For terms, return the data as-is since pagination is handled server-side
-      return terms;
-    } else {
-      // For articles, apply client-side filtering
-      return displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
-    }
-  }, [activeTab, terms, displayArticles, bookmarks]);
-
-  // Calculate pagination info based on tab
-  const totalPages = activeTab === "terms" ? termsTotalPages : Math.ceil(currentData.length / ITEMS_PER_PAGE);
-  const totalCount = activeTab === "terms" ? termsTotalCount : currentData.length;
-  
-  const paginatedData = useMemo(() => {
-    if (activeTab === "terms") {
-      // For terms, return all data since server already paginated
-      return currentData;
-    } else {
-      // For articles, apply client-side pagination
-      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-      return currentData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-    }
-  }, [activeTab, currentData, currentPage]);
-
-  // Handlers
-  const handleTabChange = useCallback((id: string) => {
-    if (id === activeTab) return;
-    
-    // Smooth transition animation
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => {
-      setActiveTab(id);
-      setCurrentPage(1);
-      setSearchQuery("");
-      setActiveCategory("all");
+  // Filter terms based on search and category
+  const termsToRender = useMemo(() => {
+    return terms.filter(term => {
+      const matchesSearch = !searchQuery.trim() || 
+        term.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        term.definition.toLowerCase().includes(searchQuery.toLowerCase());
       
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }).start();
+      const matchesCategory = activeCategory === 'all' || term.category === activeCategory;
+      
+      return matchesSearch && matchesCategory;
     });
-  }, [activeTab, fadeAnim]);
+  }, [terms, searchQuery, activeCategory]);
 
-  const handleCategoryChange = useCallback((categoryId: string) => {
+  // Pagination logic
+  const totalPagesLocal = Math.ceil(termsToRender.length / ITEMS_PER_PAGE);
+  const paginatedTerms = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return termsToRender.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [termsToRender, currentPage]);
+
+  const handleFilterPress = (): void => {
+    Alert.alert("Filter", "Filter options");
+  };
+
+  const handleTermPress = (item: TermItem): void => {
+    router.push(`/glossary/${item.id}` as any);
+  };
+
+  const handleCategoryChange = (categoryId: string): void => {
     setActiveCategory(categoryId);
-    setCurrentPage(1);
-    
-    if (activeTab === "guides" && categoryId !== "all") {
-      (async () => {
-        try {
-          const byCat = await getArticlesByCategory(categoryId);
-          setDisplayArticles(byCat);
-        } catch (err) {
-          console.error("Category fetch error:", err);
-          setDisplayArticles(legalArticles);
-        }
-      })();
-    } else if (activeTab === "guides") {
-      setDisplayArticles(legalArticles);
-    }
-    
+    setCurrentPage(1); // Reset to first page when category changes
     setTimeout(() => {
       flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
     }, 50);
-  }, [activeTab, getArticlesByCategory, legalArticles]);
+  };
 
-  const handleItemPress = useCallback((item: TermItem | ArticleItem) => {
-    if (activeTab === "terms") {
-      router.push(`/glossary/${item.id}` as any);
-    } else {
-      router.push(`/article/${item.id}` as any);
-    }
-  }, [activeTab, router]);
+  const handleRefresh = async (): Promise<void> => {
+    await fetchLegalTerms(currentPage);
+  };
 
-  const handleToggleBookmark = useCallback((item: ArticleItem) => {
-    setBookmarks(prev => ({ ...prev, [item.id]: !prev[item.id] }));
-  }, []);
 
-  const handlePageChange = useCallback((page: number) => {
+  const handlePageChange = (page: number): void => {
     setCurrentPage(page);
-    
-    // For terms, fetch new data from server
-    if (activeTab === "terms") {
-      fetchLegalTerms(page, activeCategory, searchQuery);
-    }
-    
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-  }, [activeTab, activeCategory, searchQuery, fetchLegalTerms]);
+  };
 
-  // Render functions
-  const renderListHeader = useCallback(() => (
-    <View className="mb-6">
+  const renderPaginationControls = () => {
+    if (termsToRender.length <= ITEMS_PER_PAGE || totalPagesLocal <= 1) return null;
+
+    // Mobile-friendly pagination with limited page buttons
+    const getVisiblePages = () => {
+      if (totalPagesLocal <= 5) {
+        return Array.from({ length: totalPagesLocal }, (_, i) => i + 1);
+      }
+
+      if (currentPage <= 3) {
+        return [1, 2, 3, 4, "...", totalPagesLocal];
+      }
+
+      if (currentPage >= totalPagesLocal - 2) {
+        return [
+          1,
+          "...",
+          totalPagesLocal - 3,
+          totalPagesLocal - 2,
+          totalPagesLocal - 1,
+          totalPagesLocal,
+        ];
+      }
+
+      return [
+        1,
+        "...",
+        currentPage - 1,
+        currentPage,
+        currentPage + 1,
+        "...",
+        totalPagesLocal,
+      ];
+    };
+
+    const visiblePages = getVisiblePages();
+
+    return (
+      <View style={tw`flex-col items-center`}>
+        {/* Pagination controls */}
+        <View style={tw`flex-row justify-center items-center`}>
+          <TouchableOpacity
+            onPress={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            style={tw`p-3 mx-1 rounded-full ${
+              currentPage === 1
+                ? "bg-gray-200 opacity-50"
+                : "bg-white border border-gray-300"
+            }`}
+          >
+            <Ionicons
+              name="chevron-back"
+              size={20}
+              color={currentPage === 1 ? "#9CA3AF" : Colors.primary.blue}
+            />
+          </TouchableOpacity>
+
+          {visiblePages.map((page, index) =>
+            page === "..." ? (
+              <View key={`ellipsis-${index}`} style={tw`px-2 py-3`}>
+                <GSText className="text-gray-500">...</GSText>
+              </View>
+            ) : (
+              <TouchableOpacity
+                key={page}
+                onPress={() => handlePageChange(page as number)}
+                style={tw`w-10 h-10 mx-1 rounded-lg justify-center items-center ${
+                  currentPage === page
+                    ? "bg-gray-300"
+                    : "bg border border-gray-300"
+                }`}
+              >
+                <GSText
+                  className={
+                    currentPage === page
+                      ? "text-white font-bold"
+                      : "text-gray-700"
+                  }
+                >
+                  {page}
+                </GSText>
+              </TouchableOpacity>
+            )
+          )}
+
+          <TouchableOpacity
+            onPress={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPagesLocal}
+            style={tw`p-3 mx-1 rounded-full ${
+              currentPage === totalPagesLocal
+                ? "bg-gray-200 opacity-50"
+                : "bg-white border border-gray-300"
+            }`}
+          >
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={currentPage === totalPagesLocal ? "#9CA3AF" : Colors.primary.blue}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <GSText size="xs" className="mt-3 text-gray-500">
+          Showing {paginatedTerms.length} of {termsToRender.length} results
+        </GSText>
+      </View>
+    );
+  };
+
+  const renderListHeader = () => (
+    <View>
       <HStack className="items-center mb-4">
         <Ionicons name="pricetags" size={16} color={Colors.text.sub} />
-        <GSText size="sm" className="ml-2 font-semibold text-gray-600">
+        <GSText
+          size="sm"
+          bold
+          className="ml-2"
+          style={{ color: Colors.text.sub }}
+        >
           Choose Category
         </GSText>
       </HStack>
@@ -353,113 +350,20 @@ export default function GlossaryScreen() {
         onCategoryChange={handleCategoryChange}
       />
     </View>
-  ), [activeCategory, handleCategoryChange]);
+  );
 
-  const renderPaginationControls = useCallback(() => {
-    // Show pagination if there are multiple pages
-    if (totalPages <= 1) return null;
+  const renderListFooter = () => <View>{renderPaginationControls()}</View>;
 
-    const getVisiblePages = () => {
-      if (totalPages <= 5) {
-        return Array.from({ length: totalPages }, (_, i) => i + 1);
-      }
-
-      if (currentPage <= 3) {
-        return [1, 2, 3, 4, "...", totalPages];
-      }
-
-      if (currentPage >= totalPages - 2) {
-        return [1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-      }
-
-      return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
-    };
-
-    const visiblePages = getVisiblePages();
-
-    return (
-      <View className="py-6 bg-gray-50">
-        <View className="flex-col items-center">
-          <View className="flex-row justify-center items-center mb-4">
-            <TouchableOpacity
-              onPress={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className={`w-10 h-10 mx-1 rounded-full justify-center items-center ${
-                currentPage === 1
-                  ? "bg-gray-200 opacity-50"
-                  : "bg-white border border-gray-300"
-              }`}
-            >
-              <Ionicons
-                name="chevron-back"
-                size={18}
-                color={currentPage === 1 ? "#9CA3AF" : Colors.primary.blue}
-              />
-            </TouchableOpacity>
-
-            {visiblePages.map((page, index) =>
-              page === "..." ? (
-                <View key={`ellipsis-${index}`} className="w-10 h-10 mx-1 justify-center items-center">
-                  <GSText className="text-gray-500">...</GSText>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  key={page}
-                  onPress={() => handlePageChange(page as number)}
-                  className={`w-10 h-10 mx-1 rounded-lg justify-center items-center border ${
-                    currentPage === page
-                      ? "bg-blue-100 border-blue-300"
-                      : "bg-white border-gray-300"
-                  }`}
-                >
-                  <GSText
-                    className={
-                      currentPage === page
-                        ? "text-blue-700 font-bold"
-                        : "text-gray-700"
-                    }
-                  >
-                    {page}
-                  </GSText>
-                </TouchableOpacity>
-              )
-            )}
-
-            <TouchableOpacity
-              onPress={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className={`w-10 h-10 mx-1 rounded-full justify-center items-center ${
-                currentPage === totalPages
-                  ? "bg-gray-200 opacity-50"
-                  : "bg-white border border-gray-300"
-              }`}
-            >
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={currentPage === totalPages ? "#9CA3AF" : Colors.primary.blue}
-              />
-            </TouchableOpacity>
-          </View>
-
-          <GSText className="text-sm text-gray-600">
-            Showing {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount} results
-          </GSText>
-        </View>
-      </View>
-    );
-  }, [totalCount, totalPages, currentPage, handlePageChange]);
-
-  const renderEmptyState = useCallback(() => {
-    const isLoading = activeTab === "terms" ? termsLoading : (articlesLoading || isSearchingArticles);
-    const error = activeTab === "terms" ? termsError : articlesError;
-
-    if (isLoading) {
+  const renderEmptyState = () => {
+    if (loading) {
       return (
-        <View className="flex-1 justify-center items-center py-20">
+        <View style={tw`flex-1 justify-center items-center py-10`}>
           <ActivityIndicator size="large" color={Colors.primary.blue} />
-          <GSText className="mt-4 text-center text-gray-600">
-            {isOffline ? "Loading cached data..." : `Loading ${activeTab}...`}
+          <GSText
+            className="mt-4 text-center"
+            style={{ color: Colors.text.sub }}
+          >
+            {isOffline ? "Loading cached data..." : "Loading legal terms..."}
           </GSText>
         </View>
       );
@@ -467,24 +371,30 @@ export default function GlossaryScreen() {
 
     if (error) {
       return (
-        <View className="flex-1 justify-center items-center py-20 px-6">
+        <View style={tw`flex-1 justify-center items-center py-10 px-6`}>
           <Ionicons
             name={isOffline ? "cloud-offline" : "warning"}
             size={48}
             color={Colors.text.sub}
           />
-          <GSText className="mt-4 text-center font-bold text-gray-800">
+          <GSText
+            className="mt-4 text-center font-bold"
+            style={{ color: Colors.text.head }}
+          >
             {isOffline ? "Offline Mode" : "Connection Error"}
           </GSText>
-          <GSText className="mt-2 text-center text-gray-600">
+          <GSText
+            className="mt-2 text-center"
+            style={{ color: Colors.text.sub }}
+          >
             {isOffline
               ? "Using cached data. Some features may be limited."
-              : `Unable to load ${activeTab}. Please check your connection and try again.`}
+              : "Unable to load legal terms. Please check your connection and try again."}
           </GSText>
           {!isOffline && (
             <TouchableOpacity
-              onPress={() => activeTab === "terms" ? fetchLegalTerms(currentPage) : refetch()}
-              className="mt-4 px-6 py-3 bg-blue-500 rounded-lg"
+              onPress={() => fetchLegalTerms(currentPage)}
+              style={tw`mt-4 px-4 py-2 bg-blue-500 rounded-lg`}
             >
               <GSText className="text-white font-semibold">Retry</GSText>
             </TouchableOpacity>
@@ -493,14 +403,20 @@ export default function GlossaryScreen() {
       );
     }
 
-    if (currentData.length === 0 && searchQuery.trim()) {
+    if (terms.length === 0 && searchQuery.trim()) {
       return (
-        <View className="flex-1 justify-center items-center py-20">
+        <View style={tw`flex-1 justify-center items-center py-10`}>
           <Ionicons name="search" size={48} color={Colors.text.sub} />
-          <GSText className="mt-4 text-center font-bold text-gray-800">
+          <GSText
+            className="mt-4 text-center font-bold"
+            style={{ color: Colors.text.head }}
+          >
             No results found
           </GSText>
-          <GSText className="mt-2 text-center text-gray-600">
+          <GSText
+            className="mt-2 text-center"
+            style={{ color: Colors.text.sub }}
+          >
             {isOffline
               ? "No cached results for this search. Connect to internet to search."
               : "Try adjusting your search terms or category filter."}
@@ -510,112 +426,121 @@ export default function GlossaryScreen() {
     }
 
     return (
-      <View className="flex-1 justify-center items-center py-20">
-        <Ionicons name={activeTab === "terms" ? "book" : "document-text"} size={48} color={Colors.text.sub} />
-        <GSText className="mt-4 text-center font-bold text-gray-800">
-          No {activeTab} available
+      <View style={tw`flex-1 justify-center items-center py-10`}>
+        <Ionicons name="book" size={48} color={Colors.text.sub} />
+        <GSText
+          className="mt-4 text-center font-bold"
+          style={{ color: Colors.text.head }}
+        >
+          No terms available
         </GSText>
-        <GSText className="mt-2 text-center text-gray-600">
+        <GSText className="mt-2 text-center" style={{ color: Colors.text.sub }}>
           {isOffline
-            ? "No cached data available. Connect to internet to load content."
-            : `${activeTab === "terms" ? "Legal terms" : "Articles"} will appear here once loaded.`}
+            ? "No cached data available. Connect to internet to load terms."
+            : "Legal terms will appear here once loaded."}
         </GSText>
       </View>
     );
-  }, [activeTab, termsLoading, articlesLoading, isSearchingArticles, termsError, articlesError, isOffline, currentData.length, searchQuery, currentPage, fetchLegalTerms, refetch]);
+  };
 
-  const renderItem = useCallback(({ item }: { item: any }) => {
-    if (activeTab === "terms") {
-      return (
-        <TermListItem
-          item={item}
-          onPress={handleItemPress}
-          containerStyle={{
-            width: numColumns > 1 ? (screenWidth - horizontalPadding * 2 - 12) / numColumns : "100%",
-            marginBottom: 12,
-          }}
-        />
-      );
-    } else {
-      return (
-        <ArticleCard
-          item={item}
-          onPress={handleItemPress}
-          onToggleBookmark={handleToggleBookmark}
-          containerStyle={{
-            width: numColumns > 1 ? (screenWidth - horizontalPadding * 2 - 12) / numColumns : "100%",
-            marginHorizontal: 0,
-            marginBottom: 12,
-          }}
-        />
-      );
+  const getItemLayout = (data: any, index: number) => {
+    const ITEM_HEIGHT = 140;
+    const HEADER_HEIGHT = 120;
+    return {
+      length: ITEM_HEIGHT,
+      offset: HEADER_HEIGHT + ITEM_HEIGHT * Math.floor(index / numColumns),
+      index,
+    };
+  };
+
+  const onToggleChange = (id: string) => {
+    setActiveTab(id);
+    if (id === "guides") {
+      router.push("/guides");
     }
-  }, [activeTab, handleItemPress, handleToggleBookmark, numColumns, screenWidth, horizontalPadding]);
+  };
 
   return (
     <SidebarProvider>
-      <View className="flex-1 bg-gray-50">
+      <View style={tw`flex-1 bg-gray-50`}>
         <Header title="Know Your Batas" showMenu={true} />
 
         <ToggleGroup
           options={tabOptions}
           activeOption={activeTab}
-          onOptionChange={handleTabChange}
+          onOptionChange={onToggleChange}
         />
 
-        <Box className={`px-${horizontalPadding / 4} pt-6 pb-4`}>
+        <Box className="px-4 pt-4 pb-2">
           <Input
             variant="outline"
             size="lg"
             className="bg-white rounded-lg border border-gray-300"
           >
-            <InputSlot className="pl-4">
+            <InputSlot className="pl-3">
               <Ionicons name="search" size={20} color="#9CA3AF" />
             </InputSlot>
             <InputField
               value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
+              onChangeText={(text) => {
+                setSearchQuery(text);
+              }}
+              placeholder="Search legal terms..."
               placeholderTextColor="#9CA3AF"
-              className="text-gray-800 text-base"
-              editable={!termsLoading && !articlesLoading}
+              className="text-[#313131]"
+              editable={!loading}
             />
-            <InputSlot className="pr-4">
+            <InputSlot className="pr-3" onPress={handleFilterPress}>
               <Ionicons name="options" size={20} color={Colors.text.sub} />
             </InputSlot>
           </Input>
         </Box>
 
-        <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-          <FlatList
-            ref={flatListRef}
-            data={paginatedData}
-            key={`${numColumns}-${activeCategory}-${currentPage}-${activeTab}`}
-            keyExtractor={(item) => item.id}
-            numColumns={numColumns}
-            ListHeaderComponent={renderListHeader}
-            ListFooterComponent={renderPaginationControls}
-            ListEmptyComponent={renderEmptyState}
-            contentContainerStyle={{
-              paddingHorizontal: horizontalPadding,
-              paddingBottom: 100,
-              flexGrow: 1,
-            }}
-            columnWrapperStyle={
-              numColumns > 1
-                ? { justifyContent: "space-between", marginBottom: 0 }
-                : undefined
-            }
-            renderItem={renderItem}
-            showsVerticalScrollIndicator={false}
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={10}
-            initialNumToRender={8}
-            windowSize={10}
-            refreshing={termsLoading || articlesLoading}
-            onRefresh={() => activeTab === "terms" ? fetchLegalTerms(currentPage) : refetch()}
-          />
-        </Animated.View>
+        <FlatList
+          ref={flatListRef}
+          data={paginatedTerms}
+          key={`${numColumns}-${activeCategory}-${currentPage}`}
+          keyExtractor={(item) => item.id}
+          numColumns={numColumns}
+          ListHeaderComponent={
+            !loading && !error ? renderListHeader : undefined
+          }
+          ListFooterComponent={
+            !loading && !error && terms.length > 0
+              ? renderListFooter
+              : undefined
+          }
+          ListEmptyComponent={renderEmptyState}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingBottom: 80,
+            flexGrow: 1,
+          }}
+          columnWrapperStyle={
+            numColumns > 1
+              ? { justifyContent: "space-between", marginBottom: 12 }
+              : undefined
+          }
+          renderItem={({ item }) => (
+            <TermListItem
+              item={item}
+              onPress={handleTermPress}
+              containerStyle={{
+                width: numColumns > 1 ? (width - 32 - 12) / numColumns : "100%",
+                marginBottom: 12,
+              }}
+            />
+          )}
+          showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={8}
+          initialNumToRender={6}
+          windowSize={8}
+          getItemLayout={numColumns === 1 ? getItemLayout : undefined}
+          refreshing={loading}
+          onRefresh={handleRefresh}
+        />
 
         <Navbar activeTab="learn" />
         <SidebarWrapper />

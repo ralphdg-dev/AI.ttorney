@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { View, useWindowDimensions, Alert, ActivityIndicator, TouchableOpacity } from "react-native";
 import Colors from "@/constants/Colors";
 import { Card } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { VStack } from "@/components/ui/vstack";
 import { Divider } from "@/components/ui/divider";
 import { Accordion, AccordionContent, AccordionHeader, AccordionIcon, AccordionItem, AccordionTitleText, AccordionTrigger, AccordionContentText } from "@/components/ui/accordion";
 import { Star, Languages, BookText, Quote } from "lucide-react-native";
-import { CacheService, generateTermCacheKey } from "@/lib/glossary/cacheService";
+import { CacheService, generateTermCacheKey } from "../../app/glossary/cacheService";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -56,7 +56,7 @@ export default function TermDetail({ termId }: TermDetailProps) {
     };
   };
 
-  const fetchTermDetail = useCallback(async () => {
+  const fetchTermDetail = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -110,11 +110,11 @@ export default function TermDetail({ termId }: TermDetailProps) {
     } finally {
       setLoading(false);
     }
-  }, [termId, isOffline, term]);
+  };
 
   useEffect(() => {
     fetchTermDetail();
-  }, [fetchTermDetail]);
+  }, [termId]);
 
   const handleRefresh = async (): Promise<void> => {
     await fetchTermDetail();
