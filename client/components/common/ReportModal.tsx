@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { X, Heart } from 'lucide-react-native';
 import tw from 'tailwind-react-native-classnames';
+import Colors from '../../constants/Colors';
 
 interface ReportModalProps {
   visible: boolean;
@@ -98,7 +99,8 @@ export default function ReportModal({ visible, onClose, onSubmit, targetType, is
             <TouchableOpacity
               onPress={handleAlreadyReportedClose}
               style={[
-                tw`w-full py-3 rounded-lg bg-blue-600`
+                tw`w-full py-3 rounded-lg`,
+                { backgroundColor: Colors.primary.blue }
               ]}
             >
               <Text style={tw`text-center font-medium text-white`}>
@@ -132,9 +134,14 @@ export default function ReportModal({ visible, onClose, onSubmit, targetType, is
             </Text>
             <TouchableOpacity
               onPress={handleSuccessClose}
-              style={tw`px-6 py-2`}
+              style={[
+                tw`w-full py-3 rounded-lg`,
+                { backgroundColor: Colors.primary.blue }
+              ]}
             >
-              <Text style={tw`text-blue-600 font-medium`}>Close this window</Text>
+              <Text style={tw`text-center font-medium text-white`}>
+                Close this window
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -221,9 +228,11 @@ export default function ReportModal({ visible, onClose, onSubmit, targetType, is
               disabled={!selectedCategory || isSubmitting || isLoading}
               style={[
                 tw`w-full py-3 rounded-lg`,
-                (!selectedCategory || isSubmitting || isLoading) 
-                  ? tw`bg-gray-300` 
-                  : tw`bg-blue-600`
+                {
+                  backgroundColor: (!selectedCategory || isSubmitting || isLoading) 
+                    ? '#D1D5DB' 
+                    : Colors.primary.blue
+                }
               ]}
             >
               <Text style={[
