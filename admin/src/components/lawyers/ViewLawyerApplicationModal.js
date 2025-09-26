@@ -346,42 +346,237 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
       doc.text(`Total Records: ${history.length}`, 20, yPos);
       yPos += 15;
       
-      // Prepare table data
-      const tableHeaders = ['Version', 'Type', 'Status', 'Date', 'Notes'];
-      const tableData = history.map((app, index) => [
-        `v${app.version || (history.length - index)}`,
-        app.application_type || 'Initial',
-        app.status || 'Pending',
-        formatDate(app.submitted_at, false),
-        (app.notes || app.admin_notes || 'No notes').substring(0, 100) + (app.notes?.length > 100 ? '...' : '')
-      ]);
+      // Function to load image as base64
+      const loadImageAsBase64 = async (imagePath, primaryBucket = null) => {
+        if (!imagePath) return null;
+        
+        // Try primary bucket first, then fallback to other buckets
+        const buckets = primaryBucket 
+          ? [primaryBucket, 'uploads', 'images', 'lawyer-documents', 'application-files', 'documents', 'files']
+          : ['uploads', 'images', 'lawyer-documents', 'application-files', 'documents', 'files'];
+        
+        for (const bucket of buckets) {
+          try {
+            console.log(`Trying to load image from bucket: ${bucket}, path: ${imagePath}`);
+            const signedUrl = await lawyerApplicationsService.getSignedUrl(bucket, imagePath);
+            if (!signedUrl) {
+              console.log(`No signed URL for bucket: ${bucket}`);
+              continue;
+            }
+            
+            console.log(`Got signed URL: ${signedUrl}`);
+            const response = await fetch(signedUrl);
+            if (!response.ok) {
+              console.log(`Fetch failed for bucket ${bucket}:`, response.status);
+              continue;
+            }
+            
+            const blob = await response.blob();
+            if (blob.size === 0) {
+              console.log(`Empty blob for bucket: ${bucket}`);
+              continue;
+            }
+            
+            return new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                console.log(`Successfully loaded image from bucket: ${bucket}`);
+                resolve(reader.result);
+              };
+              reader.onerror = () => {
+                console.log(`FileReader error for bucket: ${bucket}`);
+                resolve(null);
+              };
+              reader.readAsDataURL(blob);
+            });
+          } catch (error) {
+            console.warn(`Error loading image from bucket ${bucket}:`, error);
+            continue;
+          }
+        }
+        
+        console.log(`Failed to load image from all buckets: ${imagePath}`);
+        return null;
+      };
+
+      // Prepare comprehensive table data with version column (like DataTable)
+      const tableHeaders = [
+        'Version', 'Full Name', 'Roll Number', 'Status', 'Roll Signing Date',
+        'Reviewed By', 'Reviewed At', 'Admin Notes', 'Submitted At'
+      ];
       
-      // Add table using autoTable plugin
+      // Process all applications with images in a single comprehensive table
+      const processedData = [];
+      
+      for (let i = 0; i < history.length; i++) {
+        const app = history[i];
+        const version = app.version || (history.length - i);
+        
+        // Load images for this application
+        let ibpPath = app.ibp_id || app.ibp_card_path || app.ibp_card;
+        let selfiePath = app.selfie || app.selfie_path || app.live_selfie;
+        
+        // If this is the current version (index 0), try to get paths from the main application data
+        if (i === 0 && (!ibpPath || !selfiePath)) {
+          ibpPath = ibpPath || application?.ibp_id || application?.ibp_card_path || application?.ibp_card;
+          selfiePath = selfiePath || application?.selfie || application?.selfie_path || application?.live_selfie;
+        }
+        
+        console.log('Processing version', version, ':', { ibpPath, selfiePath });
+        
+        // Load images
+        const ibpImage = ibpPath ? await loadImageAsBase64(ibpPath, 'ibp-ids') : null;
+        const selfieImage = selfiePath ? await loadImageAsBase64(selfiePath, 'selfie-ids') : null;
+        
+        processedData.push({
+          version,
+          data: [
+            `v${version}`,
+            app.full_name || fullName || '-',
+            app.roll_number || '-',
+            app.status || 'pending',
+            app.roll_signing_date ? formatDate(app.roll_signing_date, false) : '-',
+            app.reviewed_by || '-',
+            app.reviewed_at ? formatDate(app.reviewed_at, false) : '-',
+            app.admin_notes || '-',
+            formatDate(app.submitted_at, false)
+          ],
+          images: { ibpImage, selfieImage, ibpPath, selfiePath }
+        });
+      }
+      
+      // Extract just the table data
+      const tableData = processedData.map(item => item.data);
+
+      // Add main comprehensive table (like DataTable)
       autoTable(doc, {
         head: [tableHeaders],
         body: tableData,
         startY: yPos,
         styles: {
           fontSize: 8,
-          cellPadding: 3
+          cellPadding: 4,
+          lineColor: [229, 231, 235],
+          lineWidth: 0.1
         },
         headStyles: {
-          fillColor: [248, 249, 250],
-          textColor: [51, 51, 51],
-          fontStyle: 'bold'
+          fillColor: [59, 130, 246],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 9
         },
         alternateRowStyles: {
-          fillColor: [249, 249, 249]
+          fillColor: [248, 250, 252]
         },
         columnStyles: {
-          0: { cellWidth: 20 }, // Version
-          1: { cellWidth: 25 }, // Type
-          2: { cellWidth: 25 }, // Status
-          3: { cellWidth: 30 }, // Date
-          4: { cellWidth: 'auto' } // Notes
+          0: { cellWidth: 15, halign: 'center', fontStyle: 'bold' }, // Version
+          1: { cellWidth: 25 }, // Full Name
+          2: { cellWidth: 20 }, // Roll Number
+          3: { cellWidth: 18, halign: 'center' }, // Status
+          4: { cellWidth: 20 }, // Roll Signing Date
+          5: { cellWidth: 20 }, // Reviewed By
+          6: { cellWidth: 20 }, // Reviewed At
+          7: { cellWidth: 40 }, // Admin Notes
+          8: { cellWidth: 20 } // Submitted At
         },
-        margin: { left: 20, right: 20 }
+        margin: { left: 10, right: 10 },
+        tableWidth: 'auto'
       });
+      
+      let currentY = doc.lastAutoTable.finalY + 20;
+      
+      // Add images section after the main table
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 64, 175);
+      doc.text('Application Documents', 15, currentY);
+      currentY += 15;
+      
+      // Display images for each version
+      for (let i = 0; i < processedData.length; i++) {
+        const { version, images } = processedData[i];
+        const { ibpImage, selfieImage, ibpPath, selfiePath } = images;
+        
+        // Check if we need a new page
+        if (currentY > 220) {
+          doc.addPage();
+          currentY = 30;
+        }
+        
+        // Version header
+        doc.setFillColor(248, 250, 252);
+        doc.rect(10, currentY - 5, 190, 12, 'F');
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(75, 85, 99);
+        doc.text(`Version ${version}`, 15, currentY + 3);
+        currentY += 15;
+        
+        if (ibpImage || selfieImage) {
+          let imageX = 15;
+          
+          // Add IBP Card image
+          if (ibpImage) {
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(107, 114, 128);
+            doc.text('IBP Card', imageX, currentY);
+            
+            try {
+              // Add professional border
+              doc.setDrawColor(209, 213, 219);
+              doc.setLineWidth(0.5);
+              doc.rect(imageX, currentY + 2, 55, 40);
+              
+              doc.addImage(ibpImage, 'JPEG', imageX + 1, currentY + 3, 53, 38);
+            } catch (imgError) {
+              console.warn('Failed to add IBP image:', imgError);
+              doc.setTextColor(239, 68, 68);
+              doc.text('Image failed to load', imageX, currentY + 20);
+            }
+            
+            imageX += 65;
+          }
+          
+          // Add Selfie image
+          if (selfieImage) {
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(107, 114, 128);
+            doc.text('Selfie Photo', imageX, currentY);
+            
+            try {
+              // Add professional border
+              doc.setDrawColor(209, 213, 219);
+              doc.setLineWidth(0.5);
+              doc.rect(imageX, currentY + 2, 55, 40);
+              
+              doc.addImage(selfieImage, 'JPEG', imageX + 1, currentY + 3, 53, 38);
+            } catch (imgError) {
+              console.warn('Failed to add selfie image:', imgError);
+              doc.setTextColor(239, 68, 68);
+              doc.text('Image failed to load', imageX, currentY + 20);
+            }
+          }
+          
+          currentY += 50;
+        } else {
+          // No images available
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'italic');
+          doc.setTextColor(156, 163, 175);
+          doc.text('No documents available for this version', 15, currentY);
+          currentY += 20;
+        }
+        
+        // Add subtle separator between versions
+        if (i < processedData.length - 1) {
+          doc.setDrawColor(229, 231, 235);
+          doc.setLineWidth(0.2);
+          doc.line(15, currentY, 195, currentY);
+          currentY += 10;
+        }
+      }
       
       // Save the PDF
       const fileName = `application-history-${fullName?.replace(/\s+/g, '_') || 'unknown'}-${Date.now()}.pdf`;
