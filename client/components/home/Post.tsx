@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { MessageCircle, MoreHorizontal, User, Bookmark, Flag, ChevronRight } from 'lucide-react-native';
 import Colors from '../../constants/Colors';
+import { BookmarkService } from '../../services/bookmarkService';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface PostProps {
   id: string;
@@ -21,6 +23,7 @@ interface PostProps {
 }
 
 const Post: React.FC<PostProps> = ({
+  id,
   user,
   timestamp,
   category,
@@ -31,6 +34,9 @@ const Post: React.FC<PostProps> = ({
   onBookmarkPress,
   onPostPress,
 }) => {
+  const { user: currentUser } = useAuth();
+  const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+
   const handleMorePress = () => {
     // Toggle more menu
     setMenuOpen((prev) => !prev);
@@ -38,6 +44,42 @@ const Post: React.FC<PostProps> = ({
 
   const handlePostPress = () => {
     onPostPress?.();
+  };
+
+  // Check initial bookmark status
+  useEffect(() => {
+    const checkBookmarkStatus = async () => {
+      if (currentUser?.id && id) {
+        const result = await BookmarkService.isBookmarked(id, currentUser.id);
+        if (result.success) {
+          setBookmarked(result.isBookmarked);
+        }
+      }
+    };
+    checkBookmarkStatus();
+  }, [id, currentUser?.id]);
+
+  const handleBookmarkPress = async () => {
+    if (!currentUser?.id) {
+      // User not authenticated, could show login prompt
+      onBookmarkPress?.();
+      return;
+    }
+
+    setIsBookmarkLoading(true);
+    try {
+      const result = await BookmarkService.toggleBookmark(id, currentUser.id);
+      if (result.success) {
+        setBookmarked(result.isBookmarked);
+        onBookmarkPress?.();
+      } else {
+        console.error('Failed to toggle bookmark:', result.error);
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+    } finally {
+      setIsBookmarkLoading(false);
+    }
   };
 
   // Clean category text by removing "Related Post" and simplifying names
@@ -133,14 +175,19 @@ const Post: React.FC<PostProps> = ({
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.8}
-            onPress={() => {
-              setBookmarked((prev) => !prev);
-              onBookmarkPress?.();
-            }}
+            onPress={handleBookmarkPress}
+            disabled={isBookmarkLoading}
           >
-            <Bookmark size={16} color={bookmarked ? '#F59E0B' : '#374151'} fill={bookmarked ? '#F59E0B' : 'none'} />
-            <Text style={styles.menuText}>
-              {bookmarked ? 'Unbookmark post' : 'Bookmark post'}
+            <Bookmark 
+              size={16} 
+              color={bookmarked ? '#F59E0B' : '#374151'} 
+              fill={bookmarked ? '#F59E0B' : 'none'} 
+            />
+            <Text style={[styles.menuText, isBookmarkLoading && { opacity: 0.5 }]}>
+              {isBookmarkLoading 
+                ? (bookmarked ? 'Unbookmarking...' : 'Bookmarking...') 
+                : (bookmarked ? 'Unbookmark post' : 'Bookmark post')
+              }
             </Text>
           </TouchableOpacity>
           <View style={styles.menuDivider} />

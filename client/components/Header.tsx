@@ -20,6 +20,7 @@ interface HeaderProps {
   onNotificationPress?: () => void;
   onSettingsPress?: () => void;
   variant?: 'default' | 'home' | 'minimal' | 'lawyer-home' | 'lawyer-cases' | 'lawyer-consult' | 'lawyer-clients' | 'lawyer-profile';
+  rightComponent?: React.ReactNode;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -35,6 +36,7 @@ const Header: React.FC<HeaderProps> = ({
   onNotificationPress,
   onSettingsPress,
   variant = 'default',
+  rightComponent,
 }) => {
   const { openSidebar } = useSidebar();
   const router = useRouter();
@@ -117,6 +119,11 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   const renderRightSection = () => {
+    // If a custom rightComponent is provided, use it
+    if (rightComponent) {
+      return rightComponent;
+    }
+
     if (showSearch || showNotifications || showSettings) {
       return (
         <View style={styles.rightActions}>
