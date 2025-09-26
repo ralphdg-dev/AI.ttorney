@@ -13,6 +13,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.aittorney.app',
+    config: {
+      googleMapsApiKey: 'AIzaSyD0OPK0U7WdEwlzNh7XKsYpYVMyHea-G80',
+    },
   },
   android: {
     adaptiveIcon: {
@@ -21,6 +24,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     edgeToEdgeEnabled: true,
     package: 'com.aittorney.app',
+    config: {
+      googleMaps: {
+        apiKey: 'AIzaSyD0OPK0U7WdEwlzNh7XKsYpYVMyHea-G80',
+      },
+    },
   },
   web: {
     bundler: 'metro',
@@ -39,6 +47,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     'expo-font',
+    [
+      'expo-location',
+      {
+        locationAlwaysAndWhenInUsePermission: 'Allow AI.ttorney to use your location to find nearby law firms and legal services.',
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,
@@ -47,5 +61,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
     apiUrl: process.env.EXPO_PUBLIC_API_URL,
+    googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
   },
 });

@@ -93,6 +93,11 @@ app.include_router(route_validation_router, prefix="/api")
 from routes.lawyer_applications import router as lawyer_applications_router
 app.include_router(lawyer_applications_router, prefix="/api")
 
+# Import and include places proxy router
+from routes.places_proxy import router as places_proxy_router
+app.include_router(places_proxy_router)
+
+
 @app.get("/")
 async def root():
     """Health check endpoint"""

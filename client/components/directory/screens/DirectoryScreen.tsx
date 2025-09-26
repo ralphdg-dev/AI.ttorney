@@ -6,6 +6,7 @@ import TabNavigation from "../components/TabNavigation";
 import SearchBar from "../components/SearchBar";
 import FilterButton from "../components/FilterButton";
 import LawyerCard from "../components/LawyerCard";
+import GoogleLawFirmsFinder from "../components/GoogleLawFirmsFinder";
 import Navbar from "../../Navbar";
 import { SidebarProvider, SidebarWrapper } from "../../AppSidebar";
 
@@ -20,7 +21,7 @@ interface Lawyer {
 }
 
 export default function DirectoryScreen() {
-  const [activeTab, setActiveTab] = useState<string>("lawyers");
+  const [activeTab, setActiveTab] = useState<string>("law-firms");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   const lawyers: Lawyer[] = [
@@ -85,27 +86,35 @@ export default function DirectoryScreen() {
 
         <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
-        <View style={tw`relative`}>
-          <SearchBar
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search lawyers..."
-          />
-          <FilterButton onPress={handleFilterPress} />
-        </View>
+        {activeTab === 'law-firms' ? (
+          <GoogleLawFirmsFinder searchQuery={searchQuery} />
+        ) : (
+          <>
+            <View style={tw`relative`}>
+              <SearchBar
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search lawyers..."
+              />
+              <FilterButton onPress={handleFilterPress} />
+            </View>
+          </>
+        )}
 
-        <ScrollView style={tw`flex-1`} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
-          {lawyers.map((lawyer) => (
-            <LawyerCard
-              key={lawyer.id}
-              lawyer={lawyer}
-              onBookConsultation={handleBookConsultation}
-            />
-          ))}
+        {activeTab !== 'law-firms' && (
+          <ScrollView style={tw`flex-1`} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+            {lawyers.map((lawyer) => (
+              <LawyerCard
+                key={lawyer.id}
+                lawyer={lawyer}
+                onBookConsultation={handleBookConsultation}
+              />
+            ))}
 
-          {/* Add some bottom padding */}
-          <View style={tw`h-4`} />
-        </ScrollView>
+            {/* Add some bottom padding */}
+            <View style={tw`h-4`} />
+          </ScrollView>
+        )}
 
         <Navbar activeTab="find" />
         <SidebarWrapper />
