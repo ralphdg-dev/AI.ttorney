@@ -5,6 +5,7 @@ from routes.auth import router as auth_router
 from routes.legalGuides import router as legal_router
 from routes.route_validation import router as route_validation_router
 from routes.consultationRequest import router as consultation_router
+from routes.lawyerInfo import router as lawyer_info_router
 from services.supabase_service import SupabaseService
 import logging
 import os
@@ -79,6 +80,7 @@ app.include_router(auth.router)
 app.include_router(legalTerms.router)
 app.include_router(legal_consultations_router)
 app.include_router(consultation_router)
+app.include_router(lawyer_info_router)
 
 
 # Global exception handler
