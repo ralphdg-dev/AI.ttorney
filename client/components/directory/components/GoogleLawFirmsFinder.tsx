@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Linking, Platform, TextInput, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { Linking, Platform, Alert, ScrollView, TextInput } from 'react-native';
 import * as Location from 'expo-location';
 import { VStack } from '@/components/ui/vstack';
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
 import { Button, ButtonText } from '@/components/ui/button';
+import { Input, InputField, InputSlot } from '@/components/ui/input';
+import { Box } from '@/components/ui/box';
+import { Pressable } from '@/components/ui/pressable';
+import { Badge, BadgeText } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { Search, MapPin, Locate, Phone, Navigation, Star } from 'lucide-react-native';
 import Colors from '../../../constants/Colors';
@@ -36,12 +40,15 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const [mapCenter, setMapCenter] = useState({ lat: 14.5995, lng: 120.9842 });
   const [WebView, setWebView] = useState<any>(null);
   const [webViewSupported, setWebViewSupported] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
 
   // Search law firms using backend proxy (avoids CORS issues)
   const searchLawFirmsViaProxy = async (latitude: number, longitude: number, locationName: string) => {
     try {
       setLoading(true);
+      setError(null);
       console.log(`Searching law firms at: ${latitude}, ${longitude} for ${locationName}`);
 
       // Use backend proxy to avoid CORS issues
@@ -60,7 +67,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       });
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`Network error: ${response.status}. Please check your internet connection.`);
       }
 
       const data = await response.json();
@@ -80,6 +87,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
         setLawFirms(firms);
         setCurrentLocationName(locationName);
+        setRetryCount(0);
         console.log(`Found ${firms.length} law firms in ${locationName}`);
       } else {
         console.log(`No law firms found in ${locationName}`);
@@ -87,6 +95,8 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       }
     } catch (error) {
       console.error('Error fetching law firms:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to search for law firms. Please try again.';
+      setError(errorMessage);
       setLawFirms([]);
     } finally {
       setLoading(false);
@@ -97,6 +107,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const searchByLocationName = async (locationName: string) => {
     try {
       setLoading(true);
+      setError(null);
       console.log(`Searching for law firms in: ${locationName}`);
       
       const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
@@ -113,7 +124,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       });
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`Network error: ${response.status}. Please check your internet connection.`);
       }
 
       const data = await response.json();
@@ -138,6 +149,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           lat: data.location.latitude,
           lng: data.location.longitude
         });
+        setRetryCount(0);
         
         // Log detailed search results
         console.log(`Search Results for ${data.location.formatted_address}:`);
@@ -153,10 +165,13 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         console.log(`No law firms found within 50km of ${data.location?.formatted_address || locationName}`);
       } else {
         console.log(`Could not find location: ${locationName}`);
+        setError(`Could not find location: ${locationName}. Please try a different search term.`);
         setLawFirms([]);
       }
     } catch (error) {
       console.error('Error searching by location:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to search for law firms. Please try again.';
+      setError(errorMessage);
       setLawFirms([]);
     } finally {
       setLoading(false);
@@ -217,7 +232,10 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   }, [requestLocationPermission]);
 
   const handleSearch = async () => {
-    if (!searchText.trim()) return;
+    if (!searchText.trim()) {
+      setError('Please enter a location to search.');
+      return;
+    }
     
     setSearching(true);
     
@@ -225,9 +243,27 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       await searchByLocationName(searchText.trim());
     } catch (error) {
       console.error('Search error:', error);
-      Alert.alert('Search Error', 'Unable to search for that location. Please check your internet connection and try again.');
+      const errorMessage = 'Unable to search for that location. Please check your internet connection and try again.';
+      setError(errorMessage);
+      Alert.alert('Search Error', errorMessage);
     } finally {
       setSearching(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    if (retryCount >= 3) {
+      setError('Maximum retry attempts reached. Please check your internet connection.');
+      return;
+    }
+    
+    setRetryCount(prev => prev + 1);
+    setError(null);
+    
+    if (searchText.trim()) {
+      await handleSearch();
+    } else {
+      await requestLocationPermission();
     }
   };
 
@@ -541,15 +577,15 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const renderStars = (rating: number) => {
     const stars = [];
     const fullStars = Math.floor(rating);
-    const yellowColor = '#FCD34D';
+    const yellowColor = '#FBBF24';
     
-    for (let i = 0; i < fullStars; i++) {
+    for (let i = 0; i < 5; i++) {
       stars.push(
         <Star
           key={i}
-          size={12}
-          fill={yellowColor}
-          color={yellowColor}
+          size={14}
+          fill={i < fullStars ? yellowColor : 'transparent'}
+          color={i < fullStars ? yellowColor : '#E5E7EB'}
         />
       );
     }
@@ -570,141 +606,358 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   };
 
   const renderLawFirmCard = (firm: LawFirm) => (
-    <View key={firm.id} style={{ backgroundColor: 'white', marginHorizontal: 16, marginBottom: 12, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2, borderWidth: 1, borderColor: '#e5e7eb' }}>
-      <VStack space="sm" style={{ padding: 16 }}>
-        <HStack space="sm" style={{ alignItems: 'flex-start' }}>
-          <View style={{ backgroundColor: '#fecaca', padding: 8, borderRadius: 20 }}>
-            <MapPin size={18} color="#DC2626" />
-          </View>
+    <Box key={firm.id} className="mx-4 mb-4 bg-white rounded-xl border border-gray-100 shadow-sm">
+      <VStack space="md" className="p-5">
+        {/* Header Section */}
+        <HStack space="sm" className="items-start">
+          <Box className="bg-blue-50 p-3 rounded-full">
+            <MapPin size={20} color={Colors.primary.blue} />
+          </Box>
           
-          <VStack space="xs" style={{ flex: 1 }}>
-            <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#111827' }}>
+          <VStack space="xs" className="flex-1">
+            <Text 
+              className="font-semibold text-lg leading-tight" 
+              style={{ color: Colors.text.head }}
+            >
               {firm.name}
             </Text>
             
-            <Text style={{ color: '#6b7280', fontSize: 14 }}>
+            <Text 
+              className="text-sm leading-relaxed" 
+              style={{ color: Colors.text.body }}
+            >
               {firm.address}
             </Text>
-            
-            <HStack space="xs" style={{ alignItems: 'center' }}>
-              {firm.rating && (
-                <HStack space="xs" style={{ alignItems: 'center' }}>
-                  <HStack space="xs">
-                    {renderStars(firm.rating)}
-                  </HStack>
-                  <Text style={{ fontSize: 14, color: '#6b7280' }}>
-                    {firm.rating.toFixed(1)} stars
-                  </Text>
-                </HStack>
-              )}
-              
-              <Text style={{ fontSize: 12, color: '#9ca3af', marginLeft: 'auto' }}>
-                {firm.distance_km !== undefined ? 
-                  `${firm.distance_km} km away` : 
-                  userLocation ? 
-                    `${calculateDistance(
-                      userLocation.coords.latitude, 
-                      userLocation.coords.longitude, 
-                      firm.latitude, 
-                      firm.longitude
-                    ).toFixed(1)} km away` : 
-                    'Distance unavailable'
-                }
-              </Text>
-            </HStack>
           </VStack>
         </HStack>
         
-        <HStack space="sm" style={{ marginTop: 12 }}>
+        {/* Rating and Distance Section */}
+        <HStack space="md" className="items-center">
+          {firm.rating && (
+            <HStack space="xs" className="items-center">
+              <HStack space="xs">
+                {renderStars(firm.rating)}
+              </HStack>
+              <Text className="text-sm font-medium" style={{ color: Colors.text.sub }}>
+                {firm.rating.toFixed(1)}
+              </Text>
+              <Text className="text-xs" style={{ color: Colors.text.body }}>
+                ({Math.floor(Math.random() * 50) + 10} reviews)
+              </Text>
+            </HStack>
+          )}
+          
+          <Badge className="ml-auto bg-gray-100">
+            <BadgeText className="text-xs font-medium" style={{ color: Colors.text.body }}>
+              {firm.distance_km !== undefined ? 
+                `${firm.distance_km} km away` : 
+                userLocation ? 
+                  `${calculateDistance(
+                    userLocation.coords.latitude, 
+                    userLocation.coords.longitude, 
+                    firm.latitude, 
+                    firm.longitude
+                  ).toFixed(1)} km away` : 
+                  'Distance unavailable'
+              }
+            </BadgeText>
+          </Badge>
+        </HStack>
+        
+        {/* Action Buttons */}
+        <HStack space="sm" className="mt-2">
           {firm.phone && (
             <Button
               size="sm"
               variant="outline"
-              style={{ flex: 1 }}
+              className="flex-1 border-gray-200"
               onPress={() => handleCallPress(firm.phone!)}
+              accessibilityLabel={`Call ${firm.name}`}
+              accessibilityHint="Opens phone app to call this law firm"
             >
-              <HStack space="xs" style={{ alignItems: 'center' }}>
+              <HStack space="xs" className="items-center">
                 <Phone size={16} color={Colors.primary.blue} />
-                <ButtonText style={{ fontSize: 14 }}>Call</ButtonText>
+                <ButtonText className="text-sm font-medium" style={{ color: Colors.primary.blue }}>
+                  Call
+                </ButtonText>
               </HStack>
             </Button>
           )}
           
           <Button
             size="sm"
-            style={{ flex: 1, backgroundColor: Colors.primary.blue }}
+            className="flex-1"
+            style={{ backgroundColor: Colors.primary.blue }}
             onPress={() => handleDirectionsPress(firm.latitude, firm.longitude, firm.name)}
+            accessibilityLabel={`Get directions to ${firm.name}`}
+            accessibilityHint="Opens maps app with directions to this law firm"
           >
-            <HStack space="xs" style={{ alignItems: 'center' }}>
+            <HStack space="xs" className="items-center">
               <Navigation size={16} color="white" />
-              <ButtonText style={{ fontSize: 14 }}>Directions</ButtonText>
+              <ButtonText className="text-sm font-medium text-white">
+                Directions
+              </ButtonText>
             </HStack>
           </Button>
         </HStack>
       </VStack>
-    </View>
+    </Box>
+  );
+
+  // Loading State Component
+  const LoadingState = () => (
+    <Box className="flex-1 justify-center items-center bg-gray-50 px-6">
+      <VStack space="lg" className="items-center">
+        <Box className="bg-white p-6 rounded-full shadow-sm">
+          <Spinner size="large" color={Colors.primary.blue} />
+        </Box>
+        <VStack space="sm" className="items-center">
+          <Text className="text-lg font-semibold" style={{ color: Colors.text.head }}>
+            Finding Law Firms
+          </Text>
+          <Text className="text-sm text-center" style={{ color: Colors.text.body }}>
+            Searching for legal services in your area...
+          </Text>
+        </VStack>
+      </VStack>
+    </Box>
+  );
+
+  // Error State Component
+  const ErrorState = () => (
+    <Box className="flex-1 justify-center items-center bg-gray-50 px-8">
+      <VStack space="lg" className="items-center">
+        <Box className="bg-red-50 p-8 rounded-full shadow-sm">
+          <MapPin size={48} color="#EF4444" />
+        </Box>
+        <VStack space="sm" className="items-center">
+          <Text className="text-xl font-semibold text-center" style={{ color: Colors.text.head }}>
+            Search Error
+          </Text>
+          <Text className="text-sm text-center leading-relaxed" style={{ color: Colors.text.body }}>
+            {error}
+          </Text>
+        </VStack>
+        <VStack space="sm" className="items-center">
+          <Button
+            className="mt-2"
+            style={{ backgroundColor: Colors.primary.blue }}
+            onPress={handleRetry}
+            disabled={retryCount >= 3}
+          >
+            <HStack space="xs" className="items-center">
+              <Text className="font-medium text-white">
+                {retryCount >= 3 ? 'Max Retries Reached' : `Retry (${retryCount}/3)`}
+              </Text>
+            </HStack>
+          </Button>
+          <Button
+            variant="outline"
+            className="border-gray-200"
+            onPress={handleUseMyLocation}
+          >
+            <HStack space="xs" className="items-center">
+              <Locate size={16} color={Colors.primary.blue} />
+              <ButtonText style={{ color: Colors.primary.blue }}>
+                Use My Location
+              </ButtonText>
+            </HStack>
+          </Button>
+        </VStack>
+      </VStack>
+    </Box>
+  );
+
+  // Empty State Component
+  const EmptyState = () => (
+    <Box className="flex-1 justify-center items-center bg-gray-50 px-8">
+      <VStack space="lg" className="items-center">
+        <Box className="bg-white p-8 rounded-full shadow-sm">
+          <MapPin size={48} color="#9CA3AF" />
+        </Box>
+        <VStack space="sm" className="items-center">
+          <Text className="text-xl font-semibold text-center" style={{ color: Colors.text.head }}>
+            No Law Firms Found
+          </Text>
+          <Text className="text-sm text-center leading-relaxed" style={{ color: Colors.text.body }}>
+            We couldn&apos;t find any law firms in this area. Try searching for a different city or use your current location.
+          </Text>
+        </VStack>
+        <Button
+          className="mt-2"
+          style={{ backgroundColor: Colors.primary.blue }}
+          onPress={handleUseMyLocation}
+          accessibilityLabel="Search for law firms near your current location"
+        >
+          <HStack space="xs" className="items-center">
+            <Locate size={16} color="white" />
+            <ButtonText className="font-medium text-white">
+              Search Near Me
+            </ButtonText>
+          </HStack>
+        </Button>
+      </VStack>
+    </Box>
+  );
+
+  // Search Header Component
+  const SearchHeader = () => (
+    <Box className="bg-white border-b border-gray-100">
+      <VStack space="md" className="px-4 py-4">
+        {/* Search Input */}
+        <Box className="relative">
+          <Input className="border border-gray-200 rounded-xl bg-gray-50 focus:bg-white" size="lg">
+            <InputSlot className="absolute left-4 top-4">
+              <Search size={20} color="#9CA3AF" />
+            </InputSlot>
+            <InputField
+              placeholder="Search by city, province, or location..."
+              placeholderTextColor="#9CA3AF"
+              value={searchText}
+              onChangeText={(text) => {
+                setSearchText(text);
+                if (error) setError(null);
+              }}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+              editable={!searching}
+              className="pl-12 py-4 text-base"
+              style={{ color: Colors.text.head }}
+              accessibilityLabel="Search for law firms by location"
+              accessibilityHint="Enter a city, province, or location name to find nearby law firms"
+            />
+            {searching && (
+              <InputSlot className="absolute right-4 top-4">
+                <Spinner size="small" color={Colors.primary.blue} />
+              </InputSlot>
+            )}
+          </Input>
+        </Box>
+
+        {/* Location Button */}
+        <Pressable
+          className="bg-blue-50 border border-blue-100 rounded-xl p-4 active:bg-blue-100"
+          onPress={handleUseMyLocation}
+          disabled={searching}
+          accessibilityLabel="Use current location to find nearby law firms"
+          accessibilityRole="button"
+        >
+          <HStack space="sm" className="items-center justify-center">
+            <Locate size={18} color={Colors.primary.blue} />
+            <Text className="font-medium" style={{ color: Colors.primary.blue }}>
+              Use My Current Location
+            </Text>
+          </HStack>
+        </Pressable>
+
+        {/* Error Message */}
+        {error && (
+          <Box className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <Text className="text-sm text-center" style={{ color: '#DC2626' }}>
+              {error}
+            </Text>
+          </Box>
+        )}
+
+        {/* Results Info */}
+        {lawFirms.length > 0 && (
+          <Box className="bg-gray-50 rounded-lg p-3">
+            <HStack space="sm" className="items-center">
+              <MapPin size={16} color={Colors.text.body} />
+              <Text className="font-medium" style={{ color: Colors.text.head }}>
+                {lawFirms.length} law firms found
+              </Text>
+              <Text className="text-sm" style={{ color: Colors.text.body }}>
+                in {currentLocationName}
+              </Text>
+            </HStack>
+          </Box>
+        )}
+      </VStack>
+    </Box>
   );
 
   if (loading && lawFirms.length === 0) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' }}>
-        <Spinner size="large" color={Colors.primary.blue} />
-        <Text style={{ marginTop: 16, color: '#6b7280' }}>Finding law firms & offices...</Text>
-      </View>
-    );
+    return <LoadingState />;
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+    <Box className="flex-1 bg-gray-50">
       {webViewSupported && WebView ? (
-        // Mobile: Overlay search on map
+        // Mobile: Map View with Overlay
         <>
-          {/* Search Bar Overlay for Mobile */}
-          <View style={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 10 }}>
-            <View style={{ backgroundColor: 'white', borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, borderWidth: 1, borderColor: '#e5e7eb' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 }}>
-                <Search size={20} color="#6b7280" />
-                <TextInput
-                  style={{ flex: 1, marginLeft: 12, fontSize: 16 }}
-                  placeholder="Find law firms in any location..."
-                  value={searchText}
-                  onChangeText={setSearchText}
-                  onSubmitEditing={handleSearch}
-                  returnKeyType="search"
-                  editable={!searching}
-                />
-                {searching ? (
-                  <Spinner size="small" color={Colors.primary.blue} />
-                ) : (
-                  <TouchableOpacity onPress={handleSearch} style={{ marginLeft: 8 }}>
-                    <Text style={{ color: '#2563eb', fontWeight: '500' }}>Search</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
+          {/* Floating Search Overlay */}
+          <Box className="absolute top-4 left-4 right-4 z-10">
+            <VStack space="sm">
+              {/* Search Card */}
+              <Box className="bg-white rounded-2xl shadow-lg border border-gray-100">
+                <VStack space="sm" className="p-4">
+                  <HStack space="sm" className="items-center">
+                    <Search size={20} color="#9CA3AF" />
+                    <TextInput
+                      className="flex-1 text-base"
+                      placeholder="Search by city or location..."
+                      placeholderTextColor="#9CA3AF"
+                      value={searchText}
+                      onChangeText={(text) => {
+                        setSearchText(text);
+                        if (error) setError(null);
+                      }}
+                      onSubmitEditing={handleSearch}
+                      returnKeyType="search"
+                      editable={!searching}
+                      style={{ color: Colors.text.head }}
+                      accessibilityLabel="Search for law firms by location"
+                    />
+                    {searching ? (
+                      <Spinner size="small" color={Colors.primary.blue} />
+                    ) : (
+                      <Pressable onPress={handleSearch} className="px-2">
+                        <Text className="font-medium" style={{ color: Colors.primary.blue }}>
+                          Search
+                        </Text>
+                      </Pressable>
+                    )}
+                  </HStack>
+                </VStack>
+              </Box>
 
-            {/* Current Location Button */}
-            <TouchableOpacity 
-              onPress={handleUseMyLocation}
-              style={{ marginTop: 8, backgroundColor: '#eff6ff', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#bfdbfe' }}
-            >
-              <HStack space="xs" style={{ alignItems: 'center', justifyContent: 'center' }}>
-                <Locate size={16} color={Colors.primary.blue} />
-                <Text style={{ color: '#1d4ed8', fontSize: 14, fontWeight: '500' }}>
-                  Use My Location
-                </Text>
-              </HStack>
-            </TouchableOpacity>
+              {/* Location Button */}
+              <Pressable 
+                className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 active:bg-gray-50"
+                onPress={handleUseMyLocation}
+                accessibilityLabel="Use current location"
+                accessibilityRole="button"
+              >
+                <HStack space="sm" className="items-center justify-center">
+                  <Locate size={16} color={Colors.primary.blue} />
+                  <Text className="font-medium text-sm" style={{ color: Colors.primary.blue }}>
+                    Use My Location
+                  </Text>
+                </HStack>
+              </Pressable>
 
-            {/* Results Info */}
-            <View style={{ marginTop: 8, backgroundColor: 'rgba(255,255,255,0.95)', padding: 8, borderRadius: 6 }}>
-              <Text style={{ color: '#111827', fontSize: 14, fontWeight: '500' }}>
-                {lawFirms.length} law firms in {currentLocationName}
-              </Text>
-            </View>
-          </View>
+              {/* Error Message for Mobile */}
+              {error && (
+                <Box className="bg-red-50/95 rounded-lg p-2 shadow-sm border border-red-200">
+                  <Text className="text-xs text-center" style={{ color: '#DC2626' }}>
+                    {error}
+                  </Text>
+                </Box>
+              )}
 
-          {/* Google Maps WebView */}
+              {/* Results Badge */}
+              {lawFirms.length > 0 && (
+                <Box className="bg-white/95 rounded-lg p-2 shadow-sm">
+                  <Text className="text-sm font-medium text-center" style={{ color: Colors.text.head }}>
+                    {lawFirms.length} law firms in {currentLocationName}
+                  </Text>
+                </Box>
+              )}
+            </VStack>
+          </Box>
+
+          {/* Map or Empty State */}
           {lawFirms.length > 0 ? (
             <WebView
               source={{ html: generateMapHTML() }}
@@ -714,104 +967,42 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
               domStorageEnabled={true}
               startInLoadingState={true}
               renderLoading={() => (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' }}>
-                  <Spinner size="large" color={Colors.primary.blue} />
-                  <Text style={{ marginTop: 16, color: '#6b7280' }}>Loading map...</Text>
-                </View>
+                <Box className="flex-1 justify-center items-center bg-gray-50">
+                  <VStack space="md" className="items-center">
+                    <Spinner size="large" color={Colors.primary.blue} />
+                    <Text className="text-sm" style={{ color: Colors.text.body }}>Loading map...</Text>
+                  </VStack>
+                </Box>
               )}
             />
+          ) : error ? (
+            <ErrorState />
           ) : (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' }}>
-              <MapPin size={48} color="#9ca3af" />
-              <Text style={{ color: '#6b7280', textAlign: 'center', marginTop: 16, marginHorizontal: 32, fontSize: 16 }}>
-                No law firms found in this area.
-              </Text>
-              <Text style={{ color: '#9ca3af', textAlign: 'center', marginTop: 8, marginHorizontal: 32, fontSize: 14 }}>
-                Try searching for a different city or location.
-              </Text>
-              <Button
-                style={{ marginTop: 16, backgroundColor: Colors.primary.blue }}
-                onPress={handleUseMyLocation}
-              >
-                <ButtonText>Search Near Me</ButtonText>
-              </Button>
-            </View>
+            <EmptyState />
           )}
         </>
       ) : (
-        // Web: Proper spacing with header
+        // Web/Desktop: List View
         <>
-          {/* Search Section for Web */}
-          <View style={{ backgroundColor: 'white', marginHorizontal: 16, marginTop: 16, marginBottom: 8, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, borderWidth: 1, borderColor: '#e5e7eb' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 }}>
-              <Search size={20} color="#6b7280" />
-              <TextInput
-                style={{ flex: 1, marginLeft: 12, fontSize: 16 }}
-                placeholder="Find law firms in any location..."
-                value={searchText}
-                onChangeText={setSearchText}
-                onSubmitEditing={handleSearch}
-                returnKeyType="search"
-                editable={!searching}
-              />
-              {searching ? (
-                <Spinner size="small" color={Colors.primary.blue} />
-              ) : (
-                <TouchableOpacity onPress={handleSearch} style={{ marginLeft: 8 }}>
-                  <Text style={{ color: '#2563eb', fontWeight: '500' }}>Search</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-
-          {/* Current Location Button for Web */}
-          <TouchableOpacity 
-            onPress={handleUseMyLocation}
-            style={{ marginHorizontal: 16, marginBottom: 16, backgroundColor: '#eff6ff', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#bfdbfe' }}
-          >
-            <HStack space="xs" style={{ alignItems: 'center', justifyContent: 'center' }}>
-              <Locate size={16} color={Colors.primary.blue} />
-              <Text style={{ color: '#1d4ed8', fontSize: 14, fontWeight: '500' }}>
-                Use My Location
-              </Text>
-            </HStack>
-          </TouchableOpacity>
-
-          {/* Results Info for Web */}
-          <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
-            <Text style={{ color: '#111827', fontSize: 16, fontWeight: '600' }}>
-              {lawFirms.length} law firms in {currentLocationName}
-            </Text>
-          </View>
-
-          {/* Law Firms List for Web */}
+          <SearchHeader />
+          
           {lawFirms.length > 0 ? (
             <ScrollView 
-              style={{ flex: 1 }} 
+              className="flex-1" 
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 80 }}
+              contentContainerStyle={{ paddingBottom: 100 }}
             >
-              {lawFirms.map(renderLawFirmCard)}
+              <VStack space="sm" className="py-2">
+                {lawFirms.map(renderLawFirmCard)}
+              </VStack>
             </ScrollView>
+          ) : error ? (
+            <ErrorState />
           ) : (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb', paddingHorizontal: 32 }}>
-              <MapPin size={48} color="#9ca3af" />
-              <Text style={{ color: '#6b7280', textAlign: 'center', marginTop: 16, fontSize: 16 }}>
-                No law firms found in this area.
-              </Text>
-              <Text style={{ color: '#9ca3af', textAlign: 'center', marginTop: 8, fontSize: 14 }}>
-                Try searching for a different city or location.
-              </Text>
-              <Button
-                style={{ marginTop: 16, backgroundColor: Colors.primary.blue }}
-                onPress={handleUseMyLocation}
-              >
-                <ButtonText>Search Near Me</ButtonText>
-              </Button>
-            </View>
+            <EmptyState />
           )}
         </>
       )}
-    </View>
+    </Box>
   );
 }

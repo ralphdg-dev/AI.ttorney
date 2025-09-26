@@ -3,5 +3,14 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  }
+  },
+  "json.validate.enable": true,
+  "json.schemaDownload.enable": false,
+  "problems.showCurrentInStatus": false,
+  "json.schemas": [
+    {
+      "fileMatch": ["package.json"],
+      "url": "https://json.schemastore.org/package.json"
+    }
+  ]
 }
