@@ -36,7 +36,7 @@ interface TimeSlot {
 interface ProfileData {
   name: string;
   email: string;
-  phone: string;
+  phone_number: string;
   location: string;
   avatar: string;
   specialization: string;
@@ -52,7 +52,7 @@ const LawyerProfilePage: React.FC = () => {
   const [profileData, setProfileData] = useState<ProfileData>({
     name: "",
     email: "",
-    phone: "",
+    phone_number: "",
     location: "",
     avatar:
       "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
@@ -126,7 +126,7 @@ const LawyerProfilePage: React.FC = () => {
       const userProfileData: ProfileData = {
         name: user.full_name || "Attorney",
         email: user.email || "",
-        phone: profileData.phone,
+        phone_number: profileData.phone_number,
         location: profileData.location,
         avatar: profileData.avatar,
         specialization: profileData.specialization,
@@ -320,7 +320,7 @@ const LawyerProfilePage: React.FC = () => {
                 <Phone size={18} color="#6B7280" />
               </View>
               <Text style={tw`text-sm text-gray-700 flex-1`}>
-                {profileData.phone}
+                {profileData.phone_number}
               </Text>
             </View>
             <View style={tw`flex-row items-center`}>
@@ -419,7 +419,7 @@ const LawyerProfilePage: React.FC = () => {
         profileData={{
           name: profileData.name,
           email: profileData.email,
-          phone: profileData.phone,
+          phone_number: profileData.phone_number,
           location: profileData.location,
           avatar: profileData.avatar,
           specialization: profileData.specialization,

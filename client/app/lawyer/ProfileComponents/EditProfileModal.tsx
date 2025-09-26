@@ -186,25 +186,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     return start < end;
   };
 
-  const saveAvailability = () => {
-    const invalidSlots = localAvailabilitySlots.filter(
-      (slot) => slot.isActive && !validateTimeSlot(slot.startTime, slot.endTime)
-    );
-
-    if (invalidSlots.length > 0) {
-      Alert.alert(
-        "Invalid Time Slots",
-        "Please fix the time slots with invalid times before saving."
-      );
-      return;
-    }
-
-    // Update the parent component with the new availability slots
-    onAvailabilityChange(localAvailabilitySlots);
-    setIsEditingAvailability(false);
-    Alert.alert("Success", "Availability updated successfully!");
-  };
-
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -281,9 +262,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setIsSaving(true);
     try {
       await onSave(editFormData);
+      // Success - the modal will be closed by the parent component
     } catch (error) {
       console.error("Error saving profile:", error);
       Alert.alert("Error", "Failed to save profile. Please try again.");
+      // Don't close the modal on error so user can fix issues
     } finally {
       setIsSaving(false);
     }
@@ -403,13 +386,14 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 Email Address *
               </Text>
               <TextInput
-                style={tw`border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-900`}
+                style={tw`border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-900 bg-gray-200`}
                 value={editFormData.email}
                 onChangeText={(value) => updateFormField("email", value)}
                 placeholder="Enter your email address"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 editable={!isSaving}
+                aria-disabled
               />
               {validationErrors.email && (
                 <Text style={tw`text-red-500 text-xs mt-1`}>
@@ -703,23 +687,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 </View>
               ))}
             </View>
-
-            {isEditingAvailability && (
-              <View style={tw`mt-6 pt-4 border-t border-gray-200`}>
-                <TouchableOpacity
-                  style={[
-                    tw`py-3 rounded-xl flex items-center justify-center`,
-                    { backgroundColor: Colors.primary.blue },
-                  ]}
-                  onPress={handleSave}
-                  activeOpacity={0.8}
-                >
-                  <Text style={tw`text-white font-semibold text-base`}>
-                    Save Availability
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
 
           {/* Professional Information Note */}
