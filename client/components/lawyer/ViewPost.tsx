@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { User, Send, Shield, MessageCircle, Bookmark, MoreHorizontal, Flag } from 'lucide-react-native';
+import { User, Shield, MessageCircle, Bookmark, MoreHorizontal, Flag, Send } from 'lucide-react-native';
+import ReportModal from '../common/ReportModal';
+import { ReportService } from '../../services/reportService';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 import Header from '../Header';
@@ -64,6 +66,8 @@ const LawyerViewPost: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [bookmarked, setBookmarked] = useState(false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [isReportLoading, setIsReportLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Reset states when postId changes
@@ -71,6 +75,8 @@ const LawyerViewPost: React.FC = () => {
     setMenuOpen(false);
     setBookmarked(false);
     setIsBookmarkLoading(false);
+    setReportModalVisible(false);
+    setIsReportLoading(false);
   }, [postId]);
 
   // Helper function to format timestamp with real-time updates
@@ -150,8 +156,42 @@ const LawyerViewPost: React.FC = () => {
 
   const handleReportPress = () => {
     setMenuOpen(false);
-    // TODO: Implement report functionality
-    console.log('Report post functionality to be implemented');
+    setReportModalVisible(true);
+  };
+
+  const handleSubmitReport = async (reason: string, category: string) => {
+    if (!currentUser?.id || !postId) {
+      throw new Error('Missing user ID or post ID');
+    }
+
+    setIsReportLoading(true);
+    try {
+      // Check if user has already reported this post
+      const existingReport = await ReportService.hasUserReported(
+        String(postId), 
+        'post', 
+        currentUser.id
+      );
+
+      if (existingReport.success && existingReport.hasReported) {
+        throw new Error('You have already reported this post');
+      }
+
+      const result = await ReportService.submitReport(
+        String(postId),
+        'post',
+        reason,
+        currentUser.id
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to submit report');
+      }
+
+      console.log('Report submitted successfully');
+    } finally {
+      setIsReportLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -467,6 +507,15 @@ const LawyerViewPost: React.FC = () => {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Report Modal */}
+      <ReportModal
+        visible={reportModalVisible}
+        onClose={() => setReportModalVisible(false)}
+        onSubmit={handleSubmitReport}
+        targetType="post"
+        isLoading={isReportLoading}
+      />
 
     </SafeAreaView>
   );

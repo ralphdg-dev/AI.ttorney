@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { MessageCircle, MoreHorizontal, User, Bookmark, Flag, ChevronRight } from 'lucide-react-native';
+import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
+import ReportModal from '../common/ReportModal';
+import { ReportService } from '../../services/reportService';
 import Colors from '../../constants/Colors';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -36,6 +38,8 @@ const Post: React.FC<PostProps> = ({
 }) => {
   const { user: currentUser } = useAuth();
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [isReportLoading, setIsReportLoading] = useState(false);
 
   const handleMorePress = () => {
     // Toggle more menu
@@ -118,6 +122,41 @@ const Post: React.FC<PostProps> = ({
     return 'OTHERS';
   };
 
+  const handleSubmitReport = async (reason: string, category: string) => {
+    if (!currentUser?.id || !id) {
+      throw new Error('Missing user ID or post ID');
+    }
+
+    setIsReportLoading(true);
+    try {
+      // Check if user has already reported this post
+      const existingReport = await ReportService.hasUserReported(
+        id, 
+        'post', 
+        currentUser.id
+      );
+
+      if (existingReport.success && existingReport.hasReported) {
+        throw new Error('You have already reported this post');
+      }
+
+      const result = await ReportService.submitReport(
+        id,
+        'post',
+        reason,
+        currentUser.id
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to submit report');
+      }
+
+      console.log('Report submitted successfully');
+    } finally {
+      setIsReportLoading(false);
+    }
+  };
+
   const displayText = getDisplayText(cleanCategory);
 
   // Determine if the user is anonymous
@@ -195,7 +234,8 @@ const Post: React.FC<PostProps> = ({
             style={styles.menuItem}
             activeOpacity={0.8}
             onPress={() => {
-              onReportPress?.();
+              setMenuOpen(false);
+              setReportModalVisible(true);
             }}
           >
             <Flag size={16} color="#B91C1C" />
@@ -220,6 +260,15 @@ const Post: React.FC<PostProps> = ({
           <ChevronRight size={18} color="#536471" />
         </TouchableOpacity>
       </View>
+
+      {/* Report Modal */}
+      <ReportModal
+        visible={reportModalVisible}
+        onClose={() => setReportModalVisible(false)}
+        onSubmit={handleSubmitReport}
+        targetType="post"
+        isLoading={isReportLoading}
+      />
     </TouchableOpacity>
   );
 };

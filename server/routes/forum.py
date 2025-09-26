@@ -3,6 +3,8 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from middleware.auth import get_current_user
 from services.supabase_service import SupabaseService
+from services.bookmark_service import BookmarkService
+from services.report_service import ReportService
 import httpx
 import logging
 from middleware.auth import require_role
@@ -334,4 +336,238 @@ async def create_reply(
         logger.error(f"Create reply error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
+# Bookmark endpoints
+class BookmarkRequest(BaseModel):
+    post_id: str = Field(..., description="Post ID to bookmark")
+
+
+class BookmarkResponse(BaseModel):
+    success: bool
+    data: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+@router.post("/bookmarks", response_model=BookmarkResponse)
+async def add_bookmark(
+    request: BookmarkRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Add a bookmark for a forum post"""
+    try:
+        user_id = current_user["user"]["id"]
+        bookmark_service = BookmarkService()
+        result = await bookmark_service.add_bookmark(request.post_id, user_id)
+        
+        if result["success"]:
+            return BookmarkResponse(success=True, data=result.get("data"))
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to add bookmark"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Add bookmark endpoint error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.delete("/bookmarks/{post_id}")
+async def remove_bookmark(
+    post_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Remove a bookmark for a forum post"""
+    try:
+        user_id = current_user["user"]["id"]
+        bookmark_service = BookmarkService()
+        result = await bookmark_service.remove_bookmark(post_id, user_id)
+        
+        if result["success"]:
+            return {"success": True}
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to remove bookmark"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Remove bookmark endpoint error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/bookmarks/check/{post_id}", response_model=BookmarkResponse)
+async def check_bookmark(
+    post_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Check if a post is bookmarked by the current user"""
+    try:
+        user_id = current_user["user"]["id"]
+        bookmark_service = BookmarkService()
+        result = await bookmark_service.check_bookmark(post_id, user_id)
+        
+        if result["success"]:
+            return BookmarkResponse(success=True, data=result.get("data"))
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to check bookmark"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Check bookmark endpoint error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/bookmarks/user", response_model=BookmarkResponse)
+async def get_user_bookmarks(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get all bookmarks for the current user"""
+    try:
+        user_id = current_user["user"]["id"]
+        bookmark_service = BookmarkService()
+        result = await bookmark_service.get_user_bookmarks(user_id)
+        
+        if result["success"]:
+            return BookmarkResponse(success=True, data=result.get("data"))
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to get bookmarks"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get user bookmarks endpoint error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/bookmarks/toggle", response_model=BookmarkResponse)
+async def toggle_bookmark(
+    request: BookmarkRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Toggle bookmark status for a forum post"""
+    try:
+        user_id = current_user["user"]["id"]
+        bookmark_service = BookmarkService()
+        result = await bookmark_service.toggle_bookmark(request.post_id, user_id)
+        
+        if result["success"]:
+            return BookmarkResponse(success=True, data=result.get("data"))
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to toggle bookmark"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Toggle bookmark endpoint error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# Report endpoints
+class ReportRequest(BaseModel):
+    target_id: str = Field(..., description="ID of the post or comment to report")
+    target_type: str = Field(..., description="Type of target: 'post' or 'comment'")
+    reason: str = Field(..., description="Reason for the report")
+
+
+class ReportResponse(BaseModel):
+    success: bool
+    data: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+@router.post("/reports", response_model=ReportResponse)
+async def submit_report(
+    report_data: ReportRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Submit a report for a forum post or comment"""
+    try:
+        user_id = current_user["user"]["id"]
+        report_service = ReportService()
+        result = await report_service.submit_report(
+            report_data.target_id,
+            report_data.target_type,
+            report_data.reason,
+            user_id
+        )
+        
+        if result["success"]:
+            return ReportResponse(success=True, data=result.get("data"))
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to submit report"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Submit report endpoint error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/reports/check/{target_id}/{target_type}", response_model=ReportResponse)
+async def check_user_report(
+    target_id: str,
+    target_type: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Check if the current user has already reported a specific target"""
+    try:
+        user_id = current_user["user"]["id"]
+        report_service = ReportService()
+        result = await report_service.check_user_report(target_id, target_type, user_id)
+        
+        if result["success"]:
+            return ReportResponse(success=True, data=result.get("data"))
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to check report"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Check user report endpoint error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/reports/target/{target_id}/{target_type}", response_model=ReportResponse)
+async def get_reports_for_target(
+    target_id: str,
+    target_type: str,
+    current_user: Dict[str, Any] = Depends(require_role("verified_lawyer"))
+):
+    """Get all reports for a specific target (lawyers only)"""
+    try:
+        report_service = ReportService()
+        result = await report_service.get_reports_for_target(target_id, target_type)
+        
+        if result["success"]:
+            return ReportResponse(success=True, data=result.get("data"))
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to get reports"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get reports for target endpoint error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/reports/user", response_model=ReportResponse)
+async def get_reports_by_user(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get all reports submitted by the current user"""
+    try:
+        user_id = current_user["user"]["id"]
+        report_service = ReportService()
+        result = await report_service.get_reports_by_user(user_id)
+        
+        if result["success"]:
+            return ReportResponse(success=True, data=result.get("data"))
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to get user reports"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get reports by user endpoint error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
