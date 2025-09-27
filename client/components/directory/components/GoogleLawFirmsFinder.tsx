@@ -8,7 +8,6 @@ import { Button, ButtonText } from '@/components/ui/button';
 import { Input, InputField, InputSlot } from '@/components/ui/input';
 import { Box } from '@/components/ui/box';
 import { Pressable } from '@/components/ui/pressable';
-// Badge components removed as they're no longer used
 import { Spinner } from '@/components/ui/spinner';
 import { Search, MapPin, Locate, Phone, Navigation, Star } from 'lucide-react-native';
 import Colors from '../../../constants/Colors';
@@ -299,33 +298,64 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     }
   }, []);
 
-  const handleDirectionsPress = useCallback((latitude: number, longitude: number, name: string) => {
-    const scheme = Platform.select({
-      ios: 'maps:0,0?q=',
-      android: 'geo:0,0?q=',
+  const handleDirectionsPress = useCallback((latitude: number, longitude: number, name: string, address?: string, placeId?: string) => {
+    const latLng = `${latitude},${longitude}`;
+    const encodedName = encodeURIComponent(name);
+    
+    // Enhanced URL schemes prioritizing readable names and addresses
+    // Priority: name + address > address > name > coordinates
+    const fullLocation = address ? `${name}, ${address}` : name;
+    const encodedFullLocation = encodeURIComponent(fullLocation);
+    
+    const iosUrl = address 
+      ? `maps://maps.apple.com/?daddr=${encodedFullLocation}&dirflg=d` 
+      : `maps://maps.apple.com/?daddr=${encodedName}&dirflg=d`;
+    
+    const androidUrl = address 
+      ? `google.navigation:q=${encodedFullLocation}` 
+      : `google.navigation:q=${encodedName}`;
+    
+    const webUrl = address 
+      ? `https://www.google.com/maps/dir/?api=1&destination=${encodedFullLocation}` 
+      : `https://www.google.com/maps/dir/?api=1&destination=${encodedName}`;
+    
+    const primaryUrl = Platform.select({
+      ios: iosUrl,
+      android: androidUrl,
+      default: webUrl
     });
     
-    const latLng = `${latitude},${longitude}`;
-    const label = encodeURIComponent(name);
-    const url = Platform.select({
-      ios: `${scheme}${label}@${latLng}`,
-      android: `${scheme}${latLng}(${label})`,
-    });
-
-    if (url) {
-      Linking.canOpenURL(url)
+    console.log(`Opening directions to: ${fullLocation}`);
+    console.log(`Coordinates: ${latLng}`);
+    
+    if (primaryUrl) {
+      Linking.canOpenURL(primaryUrl)
         .then((supported) => {
           if (supported) {
-            Linking.openURL(url);
+            return Linking.openURL(primaryUrl);
           } else {
-            const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latLng}`;
-            Linking.openURL(googleMapsUrl);
+            // Fallback to Google Maps web with readable location
+            console.log("Primary maps app not available, using Google Maps web");
+            return Linking.openURL(webUrl);
           }
         })
-        .catch((error) => console.error('Error opening maps app:', error));
+        .then(() => {
+          console.log("Successfully opened directions");
+        })
+        .catch((error) => {
+          console.error("Error opening directions:", error);
+          // Final fallback - coordinates with name as query
+          const coordinateUrl = `https://maps.google.com/?q=${encodedName}@${latLng}`;
+          Linking.openURL(coordinateUrl).catch((fallbackError) => {
+            console.error("All direction methods failed:", fallbackError);
+            Alert.alert(
+              "Unable to Open Directions",
+              "Please check if you have a maps app installed on your device."
+            );
+          });
+        });
     }
   }, []);
-
   const handleWebViewMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -670,13 +700,13 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     <Box key={firm.id} className="mx-4 mb-3 bg-white rounded-lg border border-gray-200">
       <VStack space="sm" className="p-4">
         <HStack space="sm" className="items-start">
-          <Box className="bg-blue-50 p-2 rounded-lg">
+          <Box className="p-2 bg-blue-50 rounded-lg">
             <MapPin size={18} color={Colors.primary.blue} />
           </Box>
           
           <VStack space="xs" className="flex-1">
             <Text 
-              className="font-semibold text-base leading-tight" 
+              className="text-base font-semibold leading-tight" 
               style={{ color: Colors.text.head }}
               numberOfLines={2}
             >
@@ -693,7 +723,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           </VStack>
         </HStack>
         
-        <HStack space="md" className="items-center justify-between">
+        <HStack space="md" className="justify-between items-center">
           {firm.rating ? (
             <HStack space="xs" className="items-center">
               <HStack space="xs">
@@ -749,7 +779,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
             size="sm"
             className="flex-1"
             style={{ backgroundColor: Colors.primary.blue }}
-            onPress={() => handleDirectionsPress(firm.latitude, firm.longitude, firm.name)}
+            onPress={() => handleDirectionsPress(firm.latitude, firm.longitude, firm.name, firm.address, firm.place_id)}
             accessibilityLabel={`Get directions to ${firm.name}`}
           >
             <HStack space="xs" className="items-center">
@@ -766,7 +796,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
   // Clean Loading State Component
   const LoadingState = () => (
-    <Box className="flex-1 justify-center items-center bg-gray-50 px-6">
+    <Box className="flex-1 justify-center items-center px-6 bg-gray-50">
       <VStack space="md" className="items-center">
         <Spinner size="large" color={Colors.primary.blue} />
         <VStack space="xs" className="items-center">
@@ -783,7 +813,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
   // Clean Error State Component
   const ErrorState = () => (
-    <Box className="flex-1 justify-center items-center bg-gray-50 px-8">
+    <Box className="flex-1 justify-center items-center px-8 bg-gray-50">
       <VStack space="md" className="items-center">
         <VStack space="sm" className="items-center">
           <Text className="text-lg font-semibold text-center" style={{ color: Colors.text.head }}>
@@ -806,7 +836,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           </Button>
           <Button
             variant="outline"
-            className="border-gray-300 w-full"
+            className="w-full border-gray-300"
             onPress={handleUseMyLocation}
           >
             <HStack space="xs" className="items-center">
@@ -823,7 +853,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
   // Clean Empty State Component
   const EmptyState = () => (
-    <Box className="flex-1 justify-center items-center bg-gray-50 px-8">
+    <Box className="flex-1 justify-center items-center px-8 bg-gray-50">
       <VStack space="md" className="items-center">
         <VStack space="sm" className="items-center">
           <Text className="text-lg font-semibold text-center" style={{ color: Colors.text.head }}>
@@ -866,7 +896,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   }) => (
     <Box className="relative">
       <Input 
-        className="border border-gray-300 rounded-lg bg-white focus:border-blue-400" 
+        className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" 
         size="lg"
         style={{ minHeight: 48 }}
       >
@@ -881,7 +911,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           onSubmitEditing={onSubmitEditing}
           returnKeyType="search"
           editable={!searching}
-          className="pl-10 pr-10 py-3 text-base"
+          className="py-3 pr-10 pl-10 text-base"
           style={{ color: Colors.text.head }}
           accessibilityLabel="Search for law firms by location"
           autoCorrect={false}
@@ -953,14 +983,14 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
       <HStack space="sm" className="items-center">
         <Pressable
-          className="bg-gray-100 rounded-lg px-3 py-2 active:bg-gray-200 flex-1"
+          className="flex-1 px-3 py-2 bg-gray-100 rounded-lg active:bg-gray-200"
           onPress={handleUseMyLocation}
           disabled={searching}
           accessibilityLabel="Use current location"
         >
-          <HStack space="xs" className="items-center justify-center">
+          <HStack space="xs" className="justify-center items-center">
             <Locate size={16} color={Colors.primary.blue} />
-            <Text className="font-medium text-sm" style={{ color: Colors.primary.blue }}>
+            <Text className="text-sm font-medium" style={{ color: Colors.primary.blue }}>
               Use My Location
             </Text>
           </HStack>
@@ -968,7 +998,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       </HStack>
 
       {error && (
-        <Box className="bg-red-50 border border-red-200 rounded-lg p-3">
+        <Box className="p-3 bg-red-50 rounded-lg border border-red-200">
           <Text className="text-sm" style={{ color: '#DC2626' }}>
             {error}
           </Text>
@@ -976,7 +1006,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       )}
 
       {lawFirms.length > 0 && (
-        <Text className="font-medium text-sm px-1" style={{ color: Colors.text.sub }}>
+        <Text className="px-1 text-sm font-medium" style={{ color: Colors.text.sub }}>
           {lawFirms.length} law firms found in {currentLocationName}
         </Text>
       )}
@@ -993,7 +1023,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         // Mobile: Map View with Overlay
         <>
           {/* Floating Search Overlay */}
-          <Box className="absolute top-4 left-4 right-4 z-10">
+          <Box className="absolute top-4 right-4 left-4 z-10">
             <VStack space="sm">
               {/* Clean Mobile Search Card */}
               <Box className="bg-white rounded-lg border border-gray-200">
@@ -1009,7 +1039,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                     <Spinner size="small" color={Colors.primary.blue} />
                   ) : (
                     <Pressable onPress={handleSearch} className="px-2 py-1 bg-blue-500 rounded">
-                      <Text className="font-medium text-white text-xs">
+                      <Text className="text-xs font-medium text-white">
                         Go
                       </Text>
                     </Pressable>
@@ -1019,13 +1049,13 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
               {/* Clean Location Button */}
               <Pressable 
-                className="bg-white rounded-lg px-3 py-2 border border-gray-200 active:bg-gray-50"
+                className="px-3 py-2 bg-white rounded-lg border border-gray-200 active:bg-gray-50"
                 onPress={handleUseMyLocation}
                 accessibilityLabel="Use current location"
               >
-                <HStack space="xs" className="items-center justify-center">
+                <HStack space="xs" className="justify-center items-center">
                   <Locate size={14} color={Colors.primary.blue} />
-                  <Text className="font-medium text-xs" style={{ color: Colors.primary.blue }}>
+                  <Text className="text-xs font-medium" style={{ color: Colors.primary.blue }}>
                     Near Me
                   </Text>
                 </HStack>
@@ -1033,15 +1063,15 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
               {/* Clean Status Messages */}
               {error && (
-                <Box className="bg-red-100 rounded-lg px-3 py-2 border border-red-200">
-                  <Text className="text-xs text-center text-red-700 font-medium">
+                <Box className="px-3 py-2 bg-red-100 rounded-lg border border-red-200">
+                  <Text className="text-xs font-medium text-center text-red-700">
                     {error.length > 40 ? error.substring(0, 40) + '...' : error}
                   </Text>
                 </Box>
               )}
 
               {lawFirms.length > 0 && (
-                <Text className="text-xs text-center font-medium" style={{ color: Colors.text.sub }}>
+                <Text className="text-xs font-medium text-center" style={{ color: Colors.text.sub }}>
                   {lawFirms.length} law firms found
                 </Text>
               )}
