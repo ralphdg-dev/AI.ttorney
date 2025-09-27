@@ -257,6 +257,19 @@ router.get('/:id', authenticateAdmin, async (req, res) => {
       });
     }
 
+    // If there's a reviewed_by field, fetch the admin information
+    if (application.reviewed_by) {
+      const { data: adminData, error: adminError } = await supabaseAdmin
+        .from('admin')
+        .select('full_name, email')
+        .eq('id', application.reviewed_by)
+        .single();
+
+      if (!adminError && adminData) {
+        application.admin = adminData;
+      }
+    }
+
     res.json({
       success: true,
       data: application
@@ -312,6 +325,23 @@ router.get('/:id/history', authenticateAdmin, async (req, res) => {
       });
     }
 
+    // Fetch admin information for applications that have reviewed_by
+    const reviewedByIds = [...new Set(applications?.filter(app => app.reviewed_by).map(app => app.reviewed_by))];
+    let adminMap = new Map();
+    
+    if (reviewedByIds.length > 0) {
+      const { data: adminData, error: adminError } = await supabaseAdmin
+        .from('admin')
+        .select('id, full_name, email')
+        .in('id', reviewedByIds);
+
+      if (!adminError && adminData) {
+        adminData.forEach(admin => {
+          adminMap.set(admin.id, admin);
+        });
+      }
+    }
+
     // Transform data for frontend
     const transformedApplications = applications?.map(app => ({
       id: app.id,
@@ -329,8 +359,10 @@ router.get('/:id/history', authenticateAdmin, async (req, res) => {
       application_type: app.application_type || 'Initial',
       admin_notes: app.admin_notes || null,
       notes: app.admin_notes || null, // Map admin_notes to notes for compatibility
-      admin_name: app.admin_name || null,
-      admin_full_name: app.admin_full_name || null,
+      reviewed_by: app.reviewed_by || null,
+      reviewed_at: app.reviewed_at || null,
+      admin_name: adminMap.get(app.reviewed_by)?.full_name || adminMap.get(app.reviewed_by)?.email || null,
+      admin_full_name: adminMap.get(app.reviewed_by)?.full_name || null,
       ibp_id: app.ibp_id || null,
       selfie: app.selfie || null
     })) || [];
@@ -362,18 +394,30 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
     const createAuditLog = async (action, targetId, reason = null, metadata = {}) => {
       try {
         console.log('Creating audit log with admin ID:', req.admin.id);
+        console.log('Audit log metadata:', metadata);
         
-        await supabaseAdmin
+        const auditData = {
+          action,
+          target_table: 'lawyer_applications',
+          actor_id: req.admin.id,
+          role: req.admin.role,
+          target_id: targetId,
+          metadata: metadata || {},
+          created_at: new Date().toISOString()
+        };
+        
+        console.log('Full audit data being inserted:', auditData);
+        
+        const { data, error } = await supabaseAdmin
           .from('admin_audit_logs')
-          .insert({
-            action,
-            target_table: 'lawyer_applications',
-            actor_id: req.admin.id,
-            role: req.admin.role,
-            target_id: targetId,
-            metadata,
-            created_at: new Date().toISOString()
-          });
+          .insert(auditData)
+          .select();
+          
+        if (error) {
+          console.error('Audit log insert error:', error);
+        } else {
+          console.log('Audit log created successfully:', data);
+        }
       } catch (auditError) {
         console.error('Failed to create audit log:', auditError);
         console.error('Admin data:', req.admin);
@@ -383,7 +427,13 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
     // First check if the application exists and get current data
     const { data: existingApp, error: findError } = await supabaseAdmin
       .from('lawyer_applications')
-      .select('*')
+      .select(`
+        *,
+        users!inner(
+          full_name,
+          email
+        )
+      `)
       .eq('id', id)
       .single();
 
@@ -544,13 +594,21 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
     // Create separate audit log entries for each change
     for (const change of changes) {
       await createAuditLog(
-        change.action,
+        `${change.action} (Version ${existingApp.version || 1})`,
         id,
         {
+          action_type: 'field_edit',
           field: change.field,
           old_value: change.old_value,
           new_value: change.new_value,
+          version: existingApp.version || 1,
           user_id: application.user_id,
+          user_email: existingApp.users?.email || 'unknown',
+          user_full_name: existingApp.users?.full_name || 'unknown',
+          edited_by: req.admin.id,
+          edited_by_name: req.admin.full_name || req.admin.email,
+          edited_at: new Date().toISOString(),
+          application_id: id,
           action: updateData.action || 'edit_application',
           timestamp: new Date().toISOString()
         }
@@ -585,18 +643,30 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
       try {
         // Ensure the admin ID exists in the admin table
         console.log('Creating audit log with admin ID:', req.admin.id);
+        console.log('Audit log metadata:', metadata);
         
-        await supabaseAdmin
+        const auditData = {
+          action,
+          target_table: 'lawyer_applications',
+          actor_id: req.admin.id, // This should reference the admin table
+          role: req.admin.role,
+          target_id: targetId,
+          metadata: metadata || {},
+          created_at: new Date().toISOString()
+        };
+        
+        console.log('Full audit data being inserted:', auditData);
+        
+        const { data, error } = await supabaseAdmin
           .from('admin_audit_logs')
-          .insert({
-            action,
-            target_table: 'lawyer_applications',
-            actor_id: req.admin.id, // This should reference the admin table
-            role: req.admin.role,
-            target_id: targetId,
-            metadata,
-            created_at: new Date().toISOString()
-          });
+          .insert(auditData)
+          .select();
+          
+        if (error) {
+          console.error('Audit log insert error:', error);
+        } else {
+          console.log('Audit log created successfully:', data);
+        }
       } catch (auditError) {
         console.error('Failed to create audit log:', auditError);
         console.error('Admin data:', req.admin);
@@ -610,10 +680,19 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
       });
     }
 
-    // First check if the application exists
+    // First check if the application exists and get user info
     const { data: existingApp, error: findError } = await supabaseAdmin
       .from('lawyer_applications')
-      .select('id, status, user_id')
+      .select(`
+        id, 
+        status, 
+        user_id,
+        version,
+        users!inner(
+          full_name,
+          email
+        )
+      `)
       .eq('id', id)
       .single();
 
@@ -629,7 +708,9 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
 
     const updateData = {
       status,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      reviewed_by: req.admin.id,
+      reviewed_at: new Date().toISOString()
     };
 
     if (admin_feedback) {
@@ -716,13 +797,23 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
 
     // Create audit log for the status change
     await createAuditLog(
-      `Application ${status}`,
+      `Application ${status} (Version ${existingApp.version || 1})`,
       id,
       {
+        action_type: 'status_change',
         old_status: existingApp.status,
         new_status: status,
+        version: existingApp.version || 1,
         user_id: application.user_id,
-        admin_notes: admin_feedback || null
+        user_email: existingApp.users?.email || 'unknown',
+        user_full_name: existingApp.users?.full_name || 'unknown',
+        admin_feedback: admin_feedback || null,
+        admin_notes: admin_feedback || null,
+        reviewed_by: req.admin.id,
+        reviewed_by_name: req.admin.full_name || req.admin.email,
+        reviewed_at: new Date().toISOString(),
+        application_id: id,
+        timestamp: new Date().toISOString()
       }
     );
 

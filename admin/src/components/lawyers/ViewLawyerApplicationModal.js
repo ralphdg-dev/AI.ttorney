@@ -1,177 +1,16 @@
 import React from 'react';
 import Modal from '../ui/Modal';
 import Tooltip from '../ui/Tooltip';
-import { History, Eye, Clock, FileText, CheckCircle, XCircle, AlertCircle, RotateCcw, Download, ZoomIn } from 'lucide-react';
+import { History, FileText } from 'lucide-react';
+import SecureImage from './SecureImage';
+import ApplicationHistory from './ApplicationHistory';
+import AuditTrail from './AuditTrail';
+import StatusBadge from './StatusBadge';
+import RollMatchBadge from './RollMatchBadge';
+import { exportApplicationHistoryPDF, exportAuditTrailPDF } from './PDFExportUtils';
 import lawyerApplicationsService from '../../services/lawyerApplicationsService';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
-// Separate component for images to prevent re-renders
-const StableSecureImage = React.memo(({ imagePath, alt, className, primaryBucket }) => {
-  const [imageLoaded, setImageLoaded] = React.useState(false);
-  const [imageUrl, setImageUrl] = React.useState(null);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState(null);
-  const loadedPathRef = React.useRef(null);
-
-  const possibleBuckets = React.useMemo(() => [
-    primaryBucket,
-    'uploads',
-    'images', 
-    'lawyer-documents',
-    'application-files',
-    'documents',
-    'files'
-  ].filter(Boolean), [primaryBucket]);
-
-  React.useEffect(() => {
-    if (!imagePath) {
-      setImageUrl(null);
-      setError(null);
-      setImageLoaded(false);
-      loadedPathRef.current = null;
-      return;
-    }
-
-    // Don't reload if we already loaded this exact path
-    if (loadedPathRef.current === imagePath && imageUrl) {
-      return;
-    }
-
-    const loadSignedUrl = async () => {
-      setLoading(true);
-      setError(null);
-      setImageLoaded(false);
-
-      for (let i = 0; i < possibleBuckets.length; i++) {
-        try {
-          const signedUrl = await lawyerApplicationsService.getSignedUrl(possibleBuckets[i], imagePath);
-          
-          // Only update if we're still loading the same path
-          if (imagePath === loadedPathRef.current || !loadedPathRef.current) {
-            setImageUrl(signedUrl);
-            setLoading(false);
-            loadedPathRef.current = imagePath;
-          }
-          return;
-        } catch (err) {
-          continue;
-        }
-      }
-
-      if (imagePath === loadedPathRef.current || !loadedPathRef.current) {
-        setError('Image not found in any bucket');
-        setLoading(false);
-        loadedPathRef.current = imagePath;
-      }
-    };
-
-    loadSignedUrl();
-  }, [imagePath, alt]); // Removed possibleBuckets from deps to prevent unnecessary reloads
-
-  if (!imagePath) {
-    return (
-      <div className="w-full h-40 rounded-md border border-dashed border-gray-300 bg-gray-50 grid place-items-center text-[10px] text-gray-500">
-        No image available
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="w-full h-40 rounded-md border border-gray-200 bg-gray-100 grid place-items-center text-[10px] text-gray-500">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mx-auto mb-1"></div>
-          <p>Loading image...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="w-full h-40 rounded-md border border-dashed border-gray-300 bg-gray-50 grid place-items-center text-[10px] text-gray-500">
-        <div className="text-center">
-          <p>Failed to load image</p>
-        </div>
-      </div>
-    );
-  }
-
-  const handleDownload = async () => {
-    if (!imageUrl) return;
-    
-    try {
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${alt.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Download failed:', error);
-    }
-  };
-
-  const handleView = () => {
-    if (!imageUrl) return;
-    window.open(imageUrl, '_blank');
-  };
-
-  return (
-    <>
-      <div className="relative group">
-        <img
-          src={imageUrl}
-          alt={alt}
-          className={className}
-          onError={() => setError('Failed to load image')}
-          onLoad={() => setImageLoaded(true)}
-          style={{ display: imageLoaded ? 'block' : 'none' }}
-        />
-        
-        {/* Hover overlay with buttons */}
-        {imageLoaded && imageUrl && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2 rounded-md">
-            <Tooltip content="View Full Size">
-              <button
-                onClick={handleView}
-                className="p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full transition-all duration-200 hover:scale-110"
-              >
-                <ZoomIn size={16} className="text-gray-700" />
-              </button>
-            </Tooltip>
-            <Tooltip content="Download">
-              <button
-                onClick={handleDownload}
-                className="p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full transition-all duration-200 hover:scale-110"
-              >
-                <Download size={16} className="text-gray-700" />
-              </button>
-            </Tooltip>
-          </div>
-        )}
-      </div>
-      
-      {!imageLoaded && imageUrl && (
-        <div className="w-full h-40 rounded-md border border-gray-200 bg-gray-100 grid place-items-center text-[10px] text-gray-500">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mx-auto mb-1"></div>
-            <p>Loading image...</p>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}, (prevProps, nextProps) => {
-  // Only re-render if imagePath actually changes
-  return prevProps.imagePath === nextProps.imagePath && 
-         prevProps.primaryBucket === nextProps.primaryBucket;
-});
+// Note: StableSecureImage component moved to separate SecureImage.js file
 
 const ViewLawyerApplicationModal = ({ open, onClose, application, loading = false, onViewHistoricalApplication, isHistoricalView = false, isEditMode = false, onSave }) => {
   // State for application history - must be at the top before any returns
@@ -308,384 +147,12 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
 
   // Handle PDF export for application history
   const handleExportHistoryPDF = async () => {
-    console.log('Export history clicked', { history, historyLength: history?.length });
-    
-    if (!history || history.length === 0) {
-      console.log('No history data available');
-      alert('No application history data available to export');
-      return;
-    }
-    
-    try {
-      // Create a new PDF document
-      const doc = new jsPDF();
-      
-      // Set document properties
-      doc.setProperties({
-        title: 'Application History Report',
-        subject: `Application history for ${fullName || 'Unknown'}`,
-        author: 'AI.ttorney Admin Panel',
-        creator: 'AI.ttorney Admin Panel'
-      });
-      
-      // Add header
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Application History Report', 20, 25);
-      
-      // Add applicant info
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      let yPos = 40;
-      doc.text(`Applicant: ${fullName || 'Unknown'}`, 20, yPos);
-      yPos += 6;
-      doc.text(`Email: ${email || 'Unknown'}`, 20, yPos);
-      yPos += 6;
-      doc.text(`Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 20, yPos);
-      yPos += 6;
-      doc.text(`Total Records: ${history.length}`, 20, yPos);
-      yPos += 15;
-      
-      // Function to load image as base64
-      const loadImageAsBase64 = async (imagePath, primaryBucket = null) => {
-        if (!imagePath) return null;
-        
-        // Try primary bucket first, then fallback to other buckets
-        const buckets = primaryBucket 
-          ? [primaryBucket, 'uploads', 'images', 'lawyer-documents', 'application-files', 'documents', 'files']
-          : ['uploads', 'images', 'lawyer-documents', 'application-files', 'documents', 'files'];
-        
-        for (const bucket of buckets) {
-          try {
-            console.log(`Trying to load image from bucket: ${bucket}, path: ${imagePath}`);
-            const signedUrl = await lawyerApplicationsService.getSignedUrl(bucket, imagePath);
-            if (!signedUrl) {
-              console.log(`No signed URL for bucket: ${bucket}`);
-              continue;
-            }
-            
-            console.log(`Got signed URL: ${signedUrl}`);
-            const response = await fetch(signedUrl);
-            if (!response.ok) {
-              console.log(`Fetch failed for bucket ${bucket}:`, response.status);
-              continue;
-            }
-            
-            const blob = await response.blob();
-            if (blob.size === 0) {
-              console.log(`Empty blob for bucket: ${bucket}`);
-              continue;
-            }
-            
-            return new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => {
-                console.log(`Successfully loaded image from bucket: ${bucket}`);
-                resolve(reader.result);
-              };
-              reader.onerror = () => {
-                console.log(`FileReader error for bucket: ${bucket}`);
-                resolve(null);
-              };
-              reader.readAsDataURL(blob);
-            });
-          } catch (error) {
-            console.warn(`Error loading image from bucket ${bucket}:`, error);
-            continue;
-          }
-        }
-        
-        console.log(`Failed to load image from all buckets: ${imagePath}`);
-        return null;
-      };
-
-      // Prepare comprehensive table data with version column (like DataTable)
-      const tableHeaders = [
-        'Version', 'Full Name', 'Roll Number', 'Status', 'Roll Signing Date',
-        'Reviewed By', 'Reviewed At', 'Admin Notes', 'Submitted At'
-      ];
-      
-      // Process all applications with images in a single comprehensive table
-      const processedData = [];
-      
-      for (let i = 0; i < history.length; i++) {
-        const app = history[i];
-        const version = app.version || (history.length - i);
-        
-        // Load images for this application
-        let ibpPath = app.ibp_id || app.ibp_card_path || app.ibp_card;
-        let selfiePath = app.selfie || app.selfie_path || app.live_selfie;
-        
-        // If this is the current version (index 0), try to get paths from the main application data
-        if (i === 0 && (!ibpPath || !selfiePath)) {
-          ibpPath = ibpPath || application?.ibp_id || application?.ibp_card_path || application?.ibp_card;
-          selfiePath = selfiePath || application?.selfie || application?.selfie_path || application?.live_selfie;
-        }
-        
-        console.log('Processing version', version, ':', { ibpPath, selfiePath });
-        
-        // Load images
-        const ibpImage = ibpPath ? await loadImageAsBase64(ibpPath, 'ibp-ids') : null;
-        const selfieImage = selfiePath ? await loadImageAsBase64(selfiePath, 'selfie-ids') : null;
-        
-        processedData.push({
-          version,
-          data: [
-            `v${version}`,
-            app.full_name || fullName || '-',
-            app.roll_number || '-',
-            app.status || 'pending',
-            app.roll_signing_date ? formatDate(app.roll_signing_date, false) : '-',
-            app.reviewed_by || '-',
-            app.reviewed_at ? formatDate(app.reviewed_at, false) : '-',
-            app.admin_notes || '-',
-            formatDate(app.submitted_at, false)
-          ],
-          images: { ibpImage, selfieImage, ibpPath, selfiePath }
-        });
-      }
-      
-      // Extract just the table data
-      const tableData = processedData.map(item => item.data);
-
-      // Add main comprehensive table (like DataTable)
-      autoTable(doc, {
-        head: [tableHeaders],
-        body: tableData,
-        startY: yPos,
-        styles: {
-          fontSize: 8,
-          cellPadding: 4,
-          lineColor: [229, 231, 235],
-          lineWidth: 0.1
-        },
-        headStyles: {
-          fillColor: [59, 130, 246],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          fontSize: 9
-        },
-        alternateRowStyles: {
-          fillColor: [248, 250, 252]
-        },
-        columnStyles: {
-          0: { cellWidth: 15, halign: 'center', fontStyle: 'bold' }, // Version
-          1: { cellWidth: 25 }, // Full Name
-          2: { cellWidth: 20 }, // Roll Number
-          3: { cellWidth: 18, halign: 'center' }, // Status
-          4: { cellWidth: 20 }, // Roll Signing Date
-          5: { cellWidth: 20 }, // Reviewed By
-          6: { cellWidth: 20 }, // Reviewed At
-          7: { cellWidth: 40 }, // Admin Notes
-          8: { cellWidth: 20 } // Submitted At
-        },
-        margin: { left: 10, right: 10 },
-        tableWidth: 'auto'
-      });
-      
-      let currentY = doc.lastAutoTable.finalY + 20;
-      
-      // Add images section after the main table
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(30, 64, 175);
-      doc.text('Application Documents', 15, currentY);
-      currentY += 15;
-      
-      // Display images for each version
-      for (let i = 0; i < processedData.length; i++) {
-        const { version, images } = processedData[i];
-        const { ibpImage, selfieImage, ibpPath, selfiePath } = images;
-        
-        // Check if we need a new page
-        if (currentY > 220) {
-          doc.addPage();
-          currentY = 30;
-        }
-        
-        // Version header
-        doc.setFillColor(248, 250, 252);
-        doc.rect(10, currentY - 5, 190, 12, 'F');
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(75, 85, 99);
-        doc.text(`Version ${version}`, 15, currentY + 3);
-        currentY += 15;
-        
-        if (ibpImage || selfieImage) {
-          let imageX = 15;
-          
-          // Add IBP Card image
-          if (ibpImage) {
-            doc.setFontSize(8);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(107, 114, 128);
-            doc.text('IBP Card', imageX, currentY);
-            
-            try {
-              // Add professional border
-              doc.setDrawColor(209, 213, 219);
-              doc.setLineWidth(0.5);
-              doc.rect(imageX, currentY + 2, 55, 40);
-              
-              doc.addImage(ibpImage, 'JPEG', imageX + 1, currentY + 3, 53, 38);
-            } catch (imgError) {
-              console.warn('Failed to add IBP image:', imgError);
-              doc.setTextColor(239, 68, 68);
-              doc.text('Image failed to load', imageX, currentY + 20);
-            }
-            
-            imageX += 65;
-          }
-          
-          // Add Selfie image
-          if (selfieImage) {
-            doc.setFontSize(8);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(107, 114, 128);
-            doc.text('Selfie Photo', imageX, currentY);
-            
-            try {
-              // Add professional border
-              doc.setDrawColor(209, 213, 219);
-              doc.setLineWidth(0.5);
-              doc.rect(imageX, currentY + 2, 55, 40);
-              
-              doc.addImage(selfieImage, 'JPEG', imageX + 1, currentY + 3, 53, 38);
-            } catch (imgError) {
-              console.warn('Failed to add selfie image:', imgError);
-              doc.setTextColor(239, 68, 68);
-              doc.text('Image failed to load', imageX, currentY + 20);
-            }
-          }
-          
-          currentY += 50;
-        } else {
-          // No images available
-          doc.setFontSize(8);
-          doc.setFont('helvetica', 'italic');
-          doc.setTextColor(156, 163, 175);
-          doc.text('No documents available for this version', 15, currentY);
-          currentY += 20;
-        }
-        
-        // Add subtle separator between versions
-        if (i < processedData.length - 1) {
-          doc.setDrawColor(229, 231, 235);
-          doc.setLineWidth(0.2);
-          doc.line(15, currentY, 195, currentY);
-          currentY += 10;
-        }
-      }
-      
-      // Save the PDF
-      const fileName = `application-history-${fullName?.replace(/\s+/g, '_') || 'unknown'}-${Date.now()}.pdf`;
-      doc.save(fileName);
-      
-      console.log('History PDF export completed');
-    } catch (error) {
-      console.error('Error exporting history:', error);
-      alert('Failed to export application history. Please try again.');
-    }
+    await exportApplicationHistoryPDF(history, fullName, email, application);
   };
 
   // Handle PDF export for audit trail
-  const handleExportAuditPDF = async () => {
-    console.log('Export audit trail clicked', { auditLogs, auditLogsLength: auditLogs?.length });
-    
-    if (!auditLogs || auditLogs.length === 0) {
-      console.log('No audit logs data available');
-      alert('No audit trail data available to export');
-      return;
-    }
-    
-    try {
-      // Create a new PDF document
-      const doc = new jsPDF();
-      
-      // Set document properties
-      doc.setProperties({
-        title: 'Audit Trail Report',
-        subject: `Audit trail for ${fullName || 'Unknown'}`,
-        author: 'AI.ttorney Admin Panel',
-        creator: 'AI.ttorney Admin Panel'
-      });
-      
-      // Add header
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Audit Trail Report', 20, 25);
-      
-      // Add applicant info
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      let yPos = 40;
-      doc.text(`Applicant: ${fullName || 'Unknown'}`, 20, yPos);
-      yPos += 6;
-      doc.text(`Email: ${email || 'Unknown'}`, 20, yPos);
-      yPos += 6;
-      doc.text(`Generated: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 20, yPos);
-      yPos += 6;
-      doc.text(`Total Records: ${auditLogs.length}`, 20, yPos);
-      yPos += 15;
-      
-      // Prepare table data
-      const tableHeaders = ['Action', 'Admin', 'Role', 'Date'];
-      const tableData = auditLogs.map((log) => {
-        // Parse metadata for detailed action description
-        let detailedAction = log.action;
-        try {
-          const metadata = typeof log.details === 'string' ? JSON.parse(log.details) : (log.metadata || {});
-          if (metadata.old_status && metadata.new_status) {
-            detailedAction = `Changed status from ${metadata.old_status} to ${metadata.new_status}`;
-          }
-        } catch {
-          // Ignore parsing errors, use original action
-        }
-        
-        return [
-          detailedAction.substring(0, 80) + (detailedAction.length > 80 ? '...' : ''),
-          log.actor_full_name || log.actor_name || 'Unknown Admin',
-          log.role || 'Admin',
-          formatDate(log.created_at, false)
-        ];
-      });
-      
-      // Add table using autoTable plugin
-      autoTable(doc, {
-        head: [tableHeaders],
-        body: tableData,
-        startY: yPos,
-        styles: {
-          fontSize: 8,
-          cellPadding: 3
-        },
-        headStyles: {
-          fillColor: [248, 249, 250],
-          textColor: [51, 51, 51],
-          fontStyle: 'bold'
-        },
-        alternateRowStyles: {
-          fillColor: [249, 249, 249]
-        },
-        columnStyles: {
-          0: { cellWidth: 80 }, // Action
-          1: { cellWidth: 40 }, // Admin
-          2: { cellWidth: 25 }, // Role
-          3: { cellWidth: 35 } // Date
-        },
-        margin: { left: 20, right: 20 }
-      });
-      
-      // Save the PDF
-      const fileName = `audit-trail-${fullName?.replace(/\s+/g, '_') || 'unknown'}-${Date.now()}.pdf`;
-      doc.save(fileName);
-      
-      console.log('Audit trail PDF export completed');
-    } catch (error) {
-      console.error('Error exporting audit trail:', error);
-      alert('Failed to export audit trail. Please try again.');
-    }
+  const handleExportAuditPDF = () => {
+    exportAuditTrailPDF(auditLogs, fullName, email);
   };
 
   // Handle save in edit mode
@@ -775,119 +242,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
     return date.toLocaleDateString('en-US', options);
   };
 
-  // Get status icon and color for history
-  const getStatusDisplay = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'approved':
-      case 'accepted':
-        return {
-          icon: <CheckCircle size={14} />,
-          color: 'text-emerald-600',
-          bgColor: 'bg-emerald-50',
-          borderColor: 'border-emerald-200'
-        };
-      case 'rejected':
-        return {
-          icon: <XCircle size={14} />,
-          color: 'text-red-600',
-          bgColor: 'bg-red-50',
-          borderColor: 'border-red-200'
-        };
-      case 'resubmission':
-        return {
-          icon: <RotateCcw size={14} />,
-          color: 'text-orange-600',
-          bgColor: 'bg-orange-50',
-          borderColor: 'border-orange-200'
-        };
-      case 'pending':
-      default:
-        return {
-          icon: <Clock size={14} />,
-          color: 'text-amber-600',
-          bgColor: 'bg-amber-50',
-          borderColor: 'border-amber-200'
-        };
-    }
-  };
-
-  // Get application type display for history
-  const getApplicationTypeDisplay = (type, isLatest) => {
-    if (isLatest) {
-      return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
-          <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1.5"></span>
-          Current
-        </span>
-      );
-    }
-    
-    switch (type?.toLowerCase()) {
-      case 'resubmission':
-        return (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-orange-50 text-orange-700 border border-orange-200">
-            Resubmission
-          </span>
-        );
-      case 'initial':
-      default:
-        return (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-gray-50 text-gray-700 border border-gray-200">
-            Initial
-          </span>
-        );
-    }
-  };
-
-  const RollMatchBadge = ({ status }) => {
-    const s = (status || '').toLowerCase();
-    const isMatched = s === 'matched';
-    const styles = isMatched
-      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-      : 'bg-red-50 text-red-700 border border-red-200';
-    const label = isMatched ? 'Matched' : 'Not Found';
-    return (
-      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
-        {label}
-      </span>
-    );
-  };
-
-
-  // Status badge component
-  const StatusBadge = ({ status }) => {
-    const getStatusStyles = (status) => {
-      switch (status?.toLowerCase()) {
-        case 'approved':
-        case 'accepted':
-          return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-        case 'rejected':
-          return 'bg-red-50 text-red-700 border border-red-200';
-        case 'resubmission':
-          return 'bg-orange-50 text-orange-700 border border-orange-200';
-        case 'pending':
-        default:
-          return 'bg-amber-50 text-amber-700 border border-amber-200';
-      }
-    };
-
-    const getStatusLabel = (status) => {
-      switch (status?.toLowerCase()) {
-        case 'approved': return 'Approved';
-        case 'accepted': return 'Accepted';
-        case 'rejected': return 'Rejected';
-        case 'resubmission': return 'Resubmission';
-        case 'pending': return 'Pending';
-        default: return status || 'Pending';
-      }
-    };
-
-    return (
-      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${getStatusStyles(status)}`}>
-        {getStatusLabel(status)}
-      </span>
-    );
-  };
+  // Note: Status badge and roll match badge components moved to separate files
 
   return (
     <Modal 
@@ -913,7 +268,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
             </div>
           </div>
         )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <div className="text-[9px] text-gray-500">Full Name</div>
             <div className="text-xs font-medium text-gray-900">{fullName || '-'}</div>
@@ -957,7 +312,15 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
             <div className="text-[9px] text-gray-500">Application Date</div>
             <div className="text-xs font-medium text-gray-900">{formatDate(registered)}</div>
           </div>
-          <div className="sm:col-span-2">
+          <div>
+            <div className="text-[9px] text-gray-500">Reviewed By</div>
+            <div className="text-xs font-medium text-gray-900">{applicationData?.admin?.full_name || applicationData?.admin?.email || '-'}</div>
+          </div>
+          <div>
+            <div className="text-[9px] text-gray-500">Reviewed At</div>
+            <div className="text-xs font-medium text-gray-900">{applicationData?.reviewed_at ? formatDate(applicationData.reviewed_at) : '-'}</div>
+          </div>
+          <div className="sm:col-span-3">
             <div className="text-[9px] text-gray-500">Notes</div>
             {isEditMode ? (
               <textarea
@@ -978,7 +341,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div className="text-[9px] font-medium text-gray-700 mb-1">IBP Card</div>
-            <StableSecureImage 
+            <SecureImage 
               imagePath={ibpCardPath}
               alt="IBP Card"
               className="w-full h-40 object-cover rounded-md border border-gray-200"
@@ -987,7 +350,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
           </div>
           <div>
             <div className="text-[9px] font-medium text-gray-700 mb-1">Live Selfie</div>
-            <StableSecureImage 
+            <SecureImage 
               imagePath={selfiePath}
               alt="Live Selfie"
               className="w-full h-40 object-cover rounded-md border border-gray-200"
@@ -1039,220 +402,28 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
               
               {/* Application History Column */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-3 w-3 text-gray-600" />
-                    <h4 className="text-xs font-medium text-gray-900">Application History</h4>
-                    <span className="text-[10px] text-gray-500">({history.length} versions)</span>
-                  </div>
-                  <Tooltip content="Download as PDF">
-                    <button
-                      onClick={handleExportHistoryPDF}
-                      disabled={!history || history.length === 0}
-                      className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Download size={14} />
-                    </button>
-                  </Tooltip>
-                </div>
-
-                {historyLoading ? (
-                  <div className="flex items-center justify-center py-6">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#023D7B] mx-auto mb-1"></div>
-                      <p className="text-[10px] text-gray-600">Loading history...</p>
-                    </div>
-                  </div>
-                ) : historyError ? (
-                  <div className="flex items-center justify-center py-6">
-                    <div className="text-center">
-                      <AlertCircle className="h-4 w-4 text-red-600 mx-auto mb-1" />
-                      <p className="text-[10px] text-red-600 mb-1">Failed to load history</p>
-                      <button 
-                        onClick={loadHistory}
-                        className="text-[10px] bg-[#023D7B] text-white px-2 py-1 rounded hover:bg-[#013462]"
-                      >
-                        Try Again
-                      </button>
-                    </div>
-                  </div>
-                ) : history.length > 0 ? (
-                  <div className="overflow-hidden border border-gray-200 rounded-lg">
-                    <div className="max-h-32 overflow-y-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50 sticky top-0">
-                          <tr>
-                            <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                              Version
-                            </th>
-                            <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                              Type
-                            </th>
-                            <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                              Status
-                            </th>
-                            <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                              Date
-                            </th>
-                            <th className="px-2 py-1.5 text-right text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                              Action
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {history.map((app, index) => {
-                            const statusDisplay = getStatusDisplay(app.status);
-                            return (
-                              <tr key={app.id} className="hover:bg-gray-50">
-                                <td className="px-2 py-1.5 whitespace-nowrap">
-                                  <span className="text-[9px] font-medium text-gray-900">
-                                    v{app.version || (history.length - index)}
-                                  </span>
-                                </td>
-                                <td className="px-2 py-1.5 whitespace-nowrap">
-                                  {getApplicationTypeDisplay(app.application_type, index === 0)}
-                                </td>
-                                <td className="px-2 py-1.5 whitespace-nowrap">
-                                  <div className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium ${statusDisplay.bgColor} ${statusDisplay.color} ${statusDisplay.borderColor} border`}>
-                                    <span className="capitalize">{app.status}</span>
-                                  </div>
-                                </td>
-                                <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
-                                  {formatDate(app.submitted_at, false)}
-                                </td>
-                                <td className="px-2 py-1.5 whitespace-nowrap text-right">
-                                  {/* Only show view button for historical applications (not the current one) */}
-                                  {index !== 0 ? (
-                                    <Tooltip content="View">
-                                      <button 
-                                        className="p-1 rounded hover:bg-gray-100" 
-                                        aria-label="View" 
-                                        onClick={() => onViewHistoricalApplication && onViewHistoricalApplication(app)}
-                                      >
-                                        <Eye size={12} />
-                                      </button>
-                                    </Tooltip>
-                                  ) : (
-                                    <span className="text-[9px] text-blue-600 font-medium px-2 py-1 bg-blue-50 rounded">
-                                      Current
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <FileText className="h-6 w-6 text-gray-400 mx-auto mb-1" />
-                    <p className="text-[10px] text-gray-500">No application history found</p>
-                  </div>
-                )}
+                <ApplicationHistory 
+                  history={history}
+                  historyLoading={historyLoading}
+                  historyError={historyError}
+                  onViewHistoricalApplication={onViewHistoricalApplication}
+                  fullName={fullName}
+                  email={email}
+                  application={application}
+                  loadHistory={loadHistory}
+                />
               </div>
 
               {/* Audit Trail Column */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <History className="h-3 w-3 text-gray-600" />
-                    <h4 className="text-xs font-medium text-gray-900">Audit Trail</h4>
-                    <span className="text-[10px] text-gray-500">({auditLogs.length} entries)</span>
-                  </div>
-                  <Tooltip content="Download as PDF">
-                    <button
-                      onClick={handleExportAuditPDF}
-                      disabled={!auditLogs || auditLogs.length === 0}
-                      className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Download size={14} />
-                    </button>
-                  </Tooltip>
-                </div>
-
-                {auditLoading ? (
-                  <div className="flex items-center justify-center py-6">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#023D7B] mx-auto mb-1"></div>
-                      <p className="text-[10px] text-gray-600">Loading audit trail...</p>
-                    </div>
-                  </div>
-                ) : auditError ? (
-                  <div className="flex items-center justify-center py-6">
-                    <div className="text-center">
-                      <AlertCircle className="h-4 w-4 text-red-600 mx-auto mb-1" />
-                      <p className="text-[10px] text-red-600 mb-1">Failed to load audit trail</p>
-                      <button 
-                        onClick={loadAuditLogs}
-                        className="text-[10px] bg-[#023D7B] text-white px-2 py-1 rounded hover:bg-[#013462]"
-                      >
-                        Try Again
-                      </button>
-                    </div>
-                  </div>
-                ) : auditLogs.length > 0 ? (
-                  <div className="overflow-hidden border border-gray-200 rounded-lg">
-                    <div className="max-h-32 overflow-y-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50 sticky top-0">
-                          <tr>
-                            <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                              Action
-                            </th>
-                            <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                              Admin
-                            </th>
-                            <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                              Date
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {auditLogs.map((log) => {
-                            // Parse metadata for detailed action description
-                            let detailedAction = log.action;
-                            try {
-                              const metadata = typeof log.details === 'string' ? JSON.parse(log.details) : (log.metadata || {});
-                              if (metadata.old_status && metadata.new_status) {
-                                detailedAction = `Changed status from ${metadata.old_status} to ${metadata.new_status}`;
-                              }
-                            } catch {
-                              // Ignore parsing errors, use original action
-                            }
-                            
-                            return (
-                              <tr key={log.id} className="hover:bg-gray-50">
-                                <td className="px-2 py-1.5">
-                                  <div className="text-[9px] font-medium text-gray-900">
-                                    {detailedAction}
-                                  </div>
-                                </td>
-                                <td className="px-2 py-1.5 whitespace-nowrap">
-                                  <div className="text-[9px]">
-                                    <div className="font-medium text-gray-900">
-                                      {log.actor_full_name || log.actor_name || 'Unknown Admin'}
-                                    </div>
-                                    <div className="text-gray-500 capitalize">{log.role || 'Admin'}</div>
-                                  </div>
-                                </td>
-                                <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
-                                  {formatDate(log.created_at, false)}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <History className="h-6 w-6 text-gray-400 mx-auto mb-1" />
-                    <p className="text-[10px] text-gray-500">No audit trail found</p>
-                  </div>
-                )}
+                <AuditTrail 
+                  auditLogs={auditLogs}
+                  auditLoading={auditLoading}
+                  auditError={auditError}
+                  fullName={fullName}
+                  email={email}
+                  loadAuditLogs={loadAuditLogs}
+                />
               </div>
             </div>
           </div>
