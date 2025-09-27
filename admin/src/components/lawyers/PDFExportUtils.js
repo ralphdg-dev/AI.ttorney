@@ -281,29 +281,65 @@ export const exportApplicationHistoryPDF = async (history, fullName, email, appl
       'Reviewed By', 'Reviewed At', 'Admin Notes', 'Submitted At'
     ];
     
-    // Process all applications - only load images for the current version to improve performance
+    // Process all applications with optimized parallel image loading
     const processedData = [];
+    
+    // First pass: collect all image paths and prepare data structure
+    const imageLoadPromises = [];
+    const versionData = [];
     
     for (let i = 0; i < history.length; i++) {
       const app = history[i];
       const version = app.version || (history.length - i);
       
-      // Only load images for the current version (first item) to improve performance
-      let ibpImage = null;
-      let selfieImage = null;
-      let ibpPath = null;
-      let selfiePath = null;
+      // Collect image paths
+      let ibpPath = app.ibp_id || app.ibp_card_path || app.ibp_card;
+      let selfiePath = app.selfie || app.selfie_path || app.live_selfie;
       
-      if (i === 0) { // Only process images for current version
-        ibpPath = app.ibp_id || app.ibp_card_path || app.ibp_card || application?.ibp_id || application?.ibp_card_path || application?.ibp_card;
-        selfiePath = app.selfie || app.selfie_path || app.live_selfie || application?.selfie || application?.selfie_path || application?.live_selfie;
-        
-        console.log('Processing version', version, ':', { ibpPath, selfiePath });
-        
-        // Load images only for current version
-        if (ibpPath) ibpImage = await loadImageAsBase64(ibpPath, 'ibp-ids');
-        if (selfiePath) selfieImage = await loadImageAsBase64(selfiePath, 'selfie-ids');
+      // If this is the current version (index 0), try to get paths from the main application data as fallback
+      if (i === 0 && (!ibpPath || !selfiePath)) {
+        ibpPath = ibpPath || application?.ibp_id || application?.ibp_card_path || application?.ibp_card;
+        selfiePath = selfiePath || application?.selfie || application?.selfie_path || application?.live_selfie;
       }
+      
+      // Store version data
+      versionData.push({
+        app,
+        version,
+        ibpPath,
+        selfiePath,
+        index: i
+      });
+      
+      // Add image loading promises (parallel loading)
+      if (ibpPath) {
+        imageLoadPromises.push(
+          loadImageAsBase64(ibpPath, 'ibp-ids').then(img => ({ type: 'ibp', version, img })).catch(() => ({ type: 'ibp', version, img: null }))
+        );
+      }
+      if (selfiePath) {
+        imageLoadPromises.push(
+          loadImageAsBase64(selfiePath, 'selfie-ids').then(img => ({ type: 'selfie', version, img })).catch(() => ({ type: 'selfie', version, img: null }))
+        );
+      }
+    }
+    
+    // Load all images in parallel
+    const imageResults = await Promise.all(imageLoadPromises);
+    
+    // Create image lookup map for fast access
+    const imageMap = new Map();
+    imageResults.forEach(result => {
+      const key = `${result.version}_${result.type}`;
+      imageMap.set(key, result.img);
+    });
+    
+    // Second pass: build processed data with loaded images
+    for (const versionInfo of versionData) {
+      const { app, version, ibpPath, selfiePath } = versionInfo;
+      
+      const ibpImage = ibpPath ? imageMap.get(`${version}_ibp`) || null : null;
+      const selfieImage = selfiePath ? imageMap.get(`${version}_selfie`) || null : null;
       
       // Get admin name for reviewed_by field
       const reviewedByName = app.admin_name || app.admin_full_name || '-';
@@ -382,136 +418,107 @@ export const exportApplicationHistoryPDF = async (history, fullName, email, appl
     doc.line(20, currentY + 2, 277, currentY + 2);
     currentY += 8;
     
-    // Create documents table only for the current/latest version (first in array)
-    if (processedData.length > 0) {
-      const { version, images } = processedData[0]; // Only show current version documents
+    // Create optimized documents tables for ALL versions
+    const tableConfig = {
+      columnStyles: {
+        0: { cellWidth: 128.5, halign: 'center' },
+        1: { cellWidth: 128.5, halign: 'center' }
+      },
+      styles: {
+        cellPadding: 2,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.5,
+        minCellHeight: 45, // Fixed height for consistency
+        overflow: 'linebreak'
+      },
+      headStyles: {
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold',
+        fontSize: 8,
+        halign: 'center',
+        cellPadding: { top: 1, bottom: 1, left: 2, right: 2 },
+        minCellHeight: 6,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.5
+      },
+      head: [['IBP CARD', 'LIVE SELFIE']],
+      margin: { left: 20, right: 20 },
+      tableWidth: 257,
+      theme: 'grid',
+      showHead: 'everyPage',
+      pageBreak: 'avoid',
+      tableLineColor: [0, 0, 0],
+      tableLineWidth: 0.5
+    };
+
+    for (let i = 0; i < processedData.length; i++) {
+      const { version, images } = processedData[i];
       const { ibpImage, selfieImage } = images;
       
-      // Check if we need a new page (adjusted for landscape - height is 210mm, so usable space is ~160)
+      // Skip versions with no images to improve performance
+      if (!ibpImage && !selfieImage) {
+        continue;
+      }
+      
+      // Check if we need a new page
       let needsNewPage = currentY > 160;
       if (needsNewPage) {
         doc.addPage();
         currentY = 30;
       }
       
-      // Version header (only add once)
+      // Version header
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
       doc.text(`Version ${version}`, 20, currentY);
       currentY += 5;
       
-      // Create table structure for documents
-      const tableData = [['', '']]; // Single row for images
-      
-      // Optimized table with smaller height for faster rendering
-      const requiredHeight = ibpImage || selfieImage ? 50 : 30; // Reduced height for performance
-      
-      // Add table with optimized settings for performance
+      // Create table with pre-configured settings
       autoTable(doc, {
-        body: tableData,
+        ...tableConfig,
+        body: [['', '']],
         startY: currentY,
-        columnStyles: {
-          0: { cellWidth: 128.5, halign: 'center' },
-          1: { cellWidth: 128.5, halign: 'center' }
-        },
-        styles: {
-          cellPadding: 2,
-          lineColor: [0, 0, 0],
-          lineWidth: 0.5,
-          minCellHeight: requiredHeight,
-          overflow: 'linebreak'
-        },
-        headStyles: {
-          fillColor: [255, 255, 255],
-          textColor: [0, 0, 0],
-          fontStyle: 'bold',
-          fontSize: 8,
-          halign: 'center',
-          cellPadding: { top: 1, bottom: 1, left: 2, right: 2 },
-          minCellHeight: 6,
-          lineColor: [0, 0, 0],
-          lineWidth: 0.5
-        },
-        head: [['IBP CARD', 'LIVE SELFIE']],
-        margin: { left: 20, right: 20 },
-        tableWidth: 257,
-        theme: 'grid',
-        showHead: 'everyPage',
-        pageBreak: 'avoid',
         didDrawCell: function(data) {
-          // Only draw images in body cells (not header)
           if (data.section === 'body') {
             const cellX = data.cell.x;
             const cellY = data.cell.y;
             const cellWidth = data.cell.width;
             const cellHeight = data.cell.height;
             
-            // Calculate available space with padding
-            const maxWidth = cellWidth - 4;
-            const maxHeight = cellHeight - 4;
+            // Fixed dimensions for consistent performance
+            const imageWidth = 75;
+            const imageHeight = 40;
+            const offsetX = (cellWidth - imageWidth) / 2;
+            const offsetY = (cellHeight - imageHeight) / 2;
             
-            // Add images to cells with optimized rendering for performance
-            if (data.column.index === 0 && ibpImage) {
-              // IBP Card image - optimized for speed
-              try {
-                // Use fixed dimensions for faster rendering
-                const imageWidth = Math.min(maxWidth * 0.9, 80); // Max 80 units wide
-                const imageHeight = Math.min(maxHeight * 0.9, 45); // Max 45 units tall
-                
-                // Center the image in the cell
-                const offsetX = (maxWidth - imageWidth) / 2;
-                const offsetY = (maxHeight - imageHeight) / 2;
-                
-                // Add image with fixed dimensions for consistent performance
-                doc.addImage(ibpImage, 'JPEG', cellX + 2 + offsetX, cellY + 2 + offsetY, imageWidth, imageHeight);
-              } catch (imgError) {
-                console.warn('Failed to add IBP image:', imgError);
+            try {
+              if (data.column.index === 0 && ibpImage) {
+                doc.addImage(ibpImage, 'JPEG', cellX + offsetX, cellY + offsetY, imageWidth, imageHeight);
+              } else if (data.column.index === 1 && selfieImage) {
+                doc.addImage(selfieImage, 'JPEG', cellX + offsetX, cellY + offsetY, imageWidth, imageHeight);
+              } else {
+                // Placeholder for missing images
                 doc.setFontSize(8);
-                doc.setTextColor(100, 100, 100);
-                doc.text('Image failed to load', cellX + cellWidth/2, cellY + cellHeight/2, { align: 'center' });
+                doc.setTextColor(150, 150, 150);
+                doc.text('[NO IMAGE]', cellX + cellWidth/2, cellY + cellHeight/2, { align: 'center' });
               }
-            } else if (data.column.index === 0 && !ibpImage) {
-              // No IBP image placeholder
-              doc.setFontSize(8);
-              doc.setTextColor(100, 100, 100);
-              doc.text('[IMAGE]', cellX + cellWidth/2, cellY + cellHeight/2, { align: 'center' });
-            }
-            
-            if (data.column.index === 1 && selfieImage) {
-              // Selfie image - optimized for speed
-              try {
-                // Use fixed dimensions for faster rendering
-                const imageWidth = Math.min(maxWidth * 0.9, 80); // Max 80 units wide
-                const imageHeight = Math.min(maxHeight * 0.9, 45); // Max 45 units tall
-                
-                // Center the image in the cell
-                const offsetX = (maxWidth - imageWidth) / 2;
-                const offsetY = (maxHeight - imageHeight) / 2;
-                
-                // Add image with fixed dimensions for consistent performance
-                doc.addImage(selfieImage, 'JPEG', cellX + 2 + offsetX, cellY + 2 + offsetY, imageWidth, imageHeight);
-              } catch (imgError) {
-                console.warn('Failed to add selfie image:', imgError);
-                doc.setFontSize(8);
-                doc.setTextColor(100, 100, 100);
-                doc.text('Image failed to load', cellX + cellWidth/2, cellY + cellHeight/2, { align: 'center' });
-              }
-            } else if (data.column.index === 1 && !selfieImage) {
-              // No selfie image placeholder
-              doc.setFontSize(8);
-              doc.setTextColor(100, 100, 100);
-              doc.text('[IMAGE]', cellX + cellWidth/2, cellY + cellHeight/2, { align: 'center' });
+            } catch (imgError) {
+              // Error placeholder
+              doc.setFontSize(7);
+              doc.setTextColor(200, 100, 100);
+              doc.text('[ERROR]', cellX + cellWidth/2, cellY + cellHeight/2, { align: 'center' });
             }
           }
-        },
-        // Allow table to expand based on content
-        tableLineColor: [0, 0, 0],
-        tableLineWidth: 0.5
+        }
       });
       
-      currentY = doc.lastAutoTable.finalY + 15;
-    } else {
+      currentY = doc.lastAutoTable.finalY + 10; // Reduced spacing
+    }
+    
+    // Handle case when no processed data is available
+    if (processedData.length === 0) {
       // No documents available
       doc.setFontSize(8);
       doc.setFont('helvetica', 'italic');
@@ -528,7 +535,6 @@ export const exportApplicationHistoryPDF = async (history, fullName, email, appl
     
     // Log PDF generation in audit trail
     const applicationId = application?.id || application?.data?.id || application;
-    console.log('Application History PDF - Debug application ID:', { application, applicationId });
     
     if (applicationId) {
       // Ensure we have admin info, even if it's minimal
