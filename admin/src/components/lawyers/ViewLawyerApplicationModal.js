@@ -151,12 +151,12 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
 
   // Handle PDF export for application history
   const handleExportHistoryPDF = async () => {
-    await exportApplicationHistoryPDF(history, fullName, email, application, admin);
+    await exportApplicationHistoryPDF(history, fullName, email, applicationData, admin);
   };
 
   // Handle PDF export for audit trail
   const handleExportAuditPDF = () => {
-    exportAuditTrailPDF(auditLogs, fullName, email, admin, application?.id);
+    exportAuditTrailPDF(auditLogs, fullName, email, admin, applicationData?.id);
   };
 
   // Handle save in edit mode
@@ -413,7 +413,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
                   onViewHistoricalApplication={onViewHistoricalApplication}
                   fullName={fullName}
                   email={email}
-                  application={application}
+                  application={applicationData}
                   loadHistory={loadHistory}
                 />
               </div>

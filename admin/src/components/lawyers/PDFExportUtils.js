@@ -281,28 +281,29 @@ export const exportApplicationHistoryPDF = async (history, fullName, email, appl
       'Reviewed By', 'Reviewed At', 'Admin Notes', 'Submitted At'
     ];
     
-    // Process all applications with images in a single comprehensive table
+    // Process all applications - only load images for the current version to improve performance
     const processedData = [];
     
     for (let i = 0; i < history.length; i++) {
       const app = history[i];
       const version = app.version || (history.length - i);
       
-      // Load images for this application
-      let ibpPath = app.ibp_id || app.ibp_card_path || app.ibp_card;
-      let selfiePath = app.selfie || app.selfie_path || app.live_selfie;
+      // Only load images for the current version (first item) to improve performance
+      let ibpImage = null;
+      let selfieImage = null;
+      let ibpPath = null;
+      let selfiePath = null;
       
-      // If this is the current version (index 0), try to get paths from the main application data
-      if (i === 0 && (!ibpPath || !selfiePath)) {
-        ibpPath = ibpPath || application?.ibp_id || application?.ibp_card_path || application?.ibp_card;
-        selfiePath = selfiePath || application?.selfie || application?.selfie_path || application?.live_selfie;
+      if (i === 0) { // Only process images for current version
+        ibpPath = app.ibp_id || app.ibp_card_path || app.ibp_card || application?.ibp_id || application?.ibp_card_path || application?.ibp_card;
+        selfiePath = app.selfie || app.selfie_path || app.live_selfie || application?.selfie || application?.selfie_path || application?.live_selfie;
+        
+        console.log('Processing version', version, ':', { ibpPath, selfiePath });
+        
+        // Load images only for current version
+        if (ibpPath) ibpImage = await loadImageAsBase64(ibpPath, 'ibp-ids');
+        if (selfiePath) selfieImage = await loadImageAsBase64(selfiePath, 'selfie-ids');
       }
-      
-      console.log('Processing version', version, ':', { ibpPath, selfiePath });
-      
-      // Load images
-      const ibpImage = ibpPath ? await loadImageAsBase64(ibpPath, 'ibp-ids') : null;
-      const selfieImage = selfiePath ? await loadImageAsBase64(selfiePath, 'selfie-ids') : null;
       
       // Get admin name for reviewed_by field
       const reviewedByName = app.admin_name || app.admin_full_name || '-';
@@ -382,13 +383,9 @@ export const exportApplicationHistoryPDF = async (history, fullName, email, appl
     currentY += 8;
     
     // Create documents table only for the current/latest version (first in array)
-    console.log('Creating documents table, processedData length:', processedData.length);
-    console.log('ProcessedData versions:', processedData.map(p => p.version));
-    
     if (processedData.length > 0) {
       const { version, images } = processedData[0]; // Only show current version documents
       const { ibpImage, selfieImage } = images;
-      console.log('Showing documents for version:', version, 'Images:', { hasIbp: !!ibpImage, hasSelfie: !!selfieImage });
       
       // Check if we need a new page (adjusted for landscape - height is 210mm, so usable space is ~160)
       let needsNewPage = currentY > 160;
@@ -405,25 +402,12 @@ export const exportApplicationHistoryPDF = async (history, fullName, email, appl
       currentY += 5;
       
       // Create table structure for documents
-      const tableData = [];
+      const tableData = [['', '']]; // Single row for images
       
-      // Calculate the required height based on images
-      let requiredHeight = 40; // minimum height
-      const maxWidth = 81; // 85 - 4 for padding
+      // Optimized table with smaller height for faster rendering
+      const requiredHeight = ibpImage || selfieImage ? 50 : 30; // Reduced height for performance
       
-      // Check both images to determine the tallest one
-      if (ibpImage || selfieImage) {
-        // For now, we'll use a reasonable height that accommodates most images
-        // The table will auto-adjust during rendering
-        requiredHeight = 60; // increased to accommodate natural image heights
-      }
-      
-      // Prepare table row with images
-      const row = ['', ''];
-      tableData.push(row);
-      
-      // Add table with custom cell rendering for images
-      console.log('Creating autoTable for documents with version:', version);
+      // Add table with optimized settings for performance
       autoTable(doc, {
         body: tableData,
         startY: currentY,
@@ -467,41 +451,20 @@ export const exportApplicationHistoryPDF = async (history, fullName, email, appl
             const maxWidth = cellWidth - 4;
             const maxHeight = cellHeight - 4;
             
-            // Add images to cells with proper aspect ratio but constrained to cell
+            // Add images to cells with optimized rendering for performance
             if (data.column.index === 0 && ibpImage) {
-              // IBP Card image
+              // IBP Card image - optimized for speed
               try {
-                // Create temporary image to get dimensions
-                const img = new Image();
-                img.src = ibpImage;
-                
-                // Calculate scaled dimensions that fit within cell
-                let finalWidth = maxWidth;
-                let finalHeight = maxHeight;
-                
-                // If we can get image dimensions, calculate proper scaling
-                if (img.naturalWidth && img.naturalHeight) {
-                  const aspectRatio = img.naturalWidth / img.naturalHeight;
-                  
-                  // Try fitting by width first
-                  finalWidth = maxWidth;
-                  finalHeight = maxWidth / aspectRatio;
-                  
-                  // If height exceeds cell, fit by height instead
-                  if (finalHeight > maxHeight) {
-                    finalHeight = maxHeight;
-                    finalWidth = maxHeight * aspectRatio;
-                  }
-                } else {
-                  // Fallback: use reasonable proportions
-                  finalHeight = Math.min(maxHeight, maxWidth * 0.75); // Assume 4:3 ratio
-                }
+                // Use fixed dimensions for faster rendering
+                const imageWidth = Math.min(maxWidth * 0.9, 80); // Max 80 units wide
+                const imageHeight = Math.min(maxHeight * 0.9, 45); // Max 45 units tall
                 
                 // Center the image in the cell
-                const offsetX = (maxWidth - finalWidth) / 2;
-                const offsetY = (maxHeight - finalHeight) / 2;
+                const offsetX = (maxWidth - imageWidth) / 2;
+                const offsetY = (maxHeight - imageHeight) / 2;
                 
-                doc.addImage(ibpImage, 'JPEG', cellX + 2 + offsetX, cellY + 2 + offsetY, finalWidth, finalHeight);
+                // Add image with fixed dimensions for consistent performance
+                doc.addImage(ibpImage, 'JPEG', cellX + 2 + offsetX, cellY + 2 + offsetY, imageWidth, imageHeight);
               } catch (imgError) {
                 console.warn('Failed to add IBP image:', imgError);
                 doc.setFontSize(8);
@@ -516,39 +479,18 @@ export const exportApplicationHistoryPDF = async (history, fullName, email, appl
             }
             
             if (data.column.index === 1 && selfieImage) {
-              // Selfie image
+              // Selfie image - optimized for speed
               try {
-                // Create temporary image to get dimensions
-                const img = new Image();
-                img.src = selfieImage;
-                
-                // Calculate scaled dimensions that fit within cell
-                let finalWidth = maxWidth;
-                let finalHeight = maxHeight;
-                
-                // If we can get image dimensions, calculate proper scaling
-                if (img.naturalWidth && img.naturalHeight) {
-                  const aspectRatio = img.naturalWidth / img.naturalHeight;
-                  
-                  // Try fitting by width first
-                  finalWidth = maxWidth;
-                  finalHeight = maxWidth / aspectRatio;
-                  
-                  // If height exceeds cell, fit by height instead
-                  if (finalHeight > maxHeight) {
-                    finalHeight = maxHeight;
-                    finalWidth = maxHeight * aspectRatio;
-                  }
-                } else {
-                  // Fallback: use reasonable proportions
-                  finalHeight = Math.min(maxHeight, maxWidth * 0.75); // Assume 4:3 ratio
-                }
+                // Use fixed dimensions for faster rendering
+                const imageWidth = Math.min(maxWidth * 0.9, 80); // Max 80 units wide
+                const imageHeight = Math.min(maxHeight * 0.9, 45); // Max 45 units tall
                 
                 // Center the image in the cell
-                const offsetX = (maxWidth - finalWidth) / 2;
-                const offsetY = (maxHeight - finalHeight) / 2;
+                const offsetX = (maxWidth - imageWidth) / 2;
+                const offsetY = (maxHeight - imageHeight) / 2;
                 
-                doc.addImage(selfieImage, 'JPEG', cellX + 2 + offsetX, cellY + 2 + offsetY, finalWidth, finalHeight);
+                // Add image with fixed dimensions for consistent performance
+                doc.addImage(selfieImage, 'JPEG', cellX + 2 + offsetX, cellY + 2 + offsetY, imageWidth, imageHeight);
               } catch (imgError) {
                 console.warn('Failed to add selfie image:', imgError);
                 doc.setFontSize(8);
@@ -585,14 +527,19 @@ export const exportApplicationHistoryPDF = async (history, fullName, email, appl
     doc.save(fileName);
     
     // Log PDF generation in audit trail
-    if (application?.id) {
+    const applicationId = application?.id || application?.data?.id || application;
+    console.log('Application History PDF - Debug application ID:', { application, applicationId });
+    
+    if (applicationId) {
       // Ensure we have admin info, even if it's minimal
       const auditAdminInfo = adminInfo || { 
         full_name: 'Unknown Admin', 
         name: 'Unknown Admin', 
         role: 'Unknown Role' 
       };
-      await logPDFGeneration(application.id, 'application_history', auditAdminInfo, reportNumber);
+      await logPDFGeneration(applicationId, 'application_history', auditAdminInfo, reportNumber);
+    } else {
+      console.warn('Application History PDF - No application ID found for audit logging');
     }
     
   } catch (error) {
