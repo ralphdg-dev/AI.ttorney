@@ -12,7 +12,6 @@ interface Lawyer {
   name: string;
   specializations: string[];
   location: string;
-  hours: string;
   days: string;
   available: boolean;
   hours_available: string[];
@@ -106,12 +105,6 @@ export default function LawyerCard({
       </HStack>
 
       <HStack className="items-center mb-4">
-        <HStack className="items-center mr-6">
-          <Ionicons name="time-outline" size={16} color={Colors.text.sub} />
-          <Text className="text-sm ml-1" style={{ color: Colors.text.sub }}>
-            {lawyer.hours}
-          </Text>
-        </HStack>
 
         <HStack className="items-center">
           <Ionicons name="calendar-outline" size={16} color={Colors.text.sub} />

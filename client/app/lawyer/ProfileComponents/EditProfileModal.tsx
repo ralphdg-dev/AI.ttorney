@@ -46,9 +46,9 @@ interface EditProfileModalProps {
   profileData: ProfileData;
   availabilitySlots: TimeSlot[];
   onAvailabilityChange: (slots: TimeSlot[]) => void;
+  onRefresh?: () => void;
 }
 
-// Complete list of law specializations in the Philippines
 const LAW_SPECIALIZATIONS = [
   "Administrative Law",
   "Admiralty and Maritime Law",
@@ -100,7 +100,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   profileData,
   availabilitySlots,
   onAvailabilityChange,
+  onRefresh,
 }) => {
+  const [showConfirmModal, setShowConfirmModal] = React.useState(false);
   const [editFormData, setEditFormData] =
     React.useState<ProfileData>(profileData);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -115,13 +117,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [localAvailabilitySlots, setLocalAvailabilitySlots] =
     React.useState<TimeSlot[]>(availabilitySlots);
 
-  // Update form data when profileData changes
   React.useEffect(() => {
     setEditFormData(profileData);
     setValidationErrors({});
   }, [profileData]);
 
-  // Update local availability slots when prop changes
   React.useEffect(() => {
     setLocalAvailabilitySlots(availabilitySlots);
   }, [availabilitySlots]);
@@ -131,7 +131,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     value: string | string[]
   ) => {
     setEditFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear validation error for this field when user starts typing
+
     if (validationErrors[field]) {
       setValidationErrors((prev) => ({ ...prev, [field]: "" }));
     }
@@ -141,13 +141,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     const currentSpecializations = editFormData.specialization || [];
 
     if (currentSpecializations.includes(specialization)) {
-      // Remove specialization if already selected
       updateFormField(
         "specialization",
         currentSpecializations.filter((s) => s !== specialization)
       );
     } else {
-      // Add specialization if not already selected
       updateFormField("specialization", [
         ...currentSpecializations,
         specialization,
@@ -189,14 +187,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
-    // Name validation
     if (!editFormData.name.trim()) {
       errors.name = "Name is required";
     } else if (editFormData.name.trim().length < 2) {
       errors.name = "Name must be at least 2 characters long";
     }
 
-    // Email validation
     if (!editFormData.email.trim()) {
       errors.email = "Email is required";
     } else {
@@ -206,28 +202,24 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       }
     }
 
-    // Phone number validation (Philippine format)
     if (editFormData.phone.trim()) {
-      const phoneRegex = /^09\d{9}$/; // Philippine mobile numbers start with 09 and have 11 digits total
+      const phoneRegex = /^09\d{9}$/;
       const cleanedPhone = editFormData.phone.trim().replace(/\s+/g, "");
 
       if (!phoneRegex.test(cleanedPhone)) {
         errors.phone =
           "Please enter a valid Philippine phone number (e.g., 09123456789)";
       } else {
-        // Format the phone number if valid
         updateFormField("phone", cleanedPhone);
       }
     }
 
-    // Specialization validation - now checks for at least one specialization
     if (
       !editFormData.specialization ||
       editFormData.specialization.length === 0
     ) {
       errors.specialization = "At least one specialization is required";
     } else {
-      // Validate that all selected specializations are valid
       const invalidSpecializations = editFormData.specialization.filter(
         (spec) => !LAW_SPECIALIZATIONS.includes(spec)
       );
@@ -237,12 +229,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       }
     }
 
-    // Location validation
     if (!editFormData.location.trim()) {
       errors.location = "Location is required";
     }
 
-    // Bio validation
     if (!editFormData.bio.trim()) {
       errors.bio = "Bio is required";
     } else if (editFormData.bio.trim().length < 10) {
@@ -258,22 +248,27 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       Alert.alert("Validation Error", "Please fix the errors before saving.");
       return;
     }
+    setShowConfirmModal(true);
+  };
 
+  const confirmSave = async () => {
     setIsSaving(true);
     try {
       await onSave(editFormData);
-      // Success - the modal will be closed by the parent component
+      setShowConfirmModal(false);
+      onClose();
+      if (onRefresh) {
+        onRefresh();
+      }
     } catch (error) {
       console.error("Error saving profile:", error);
       Alert.alert("Error", "Failed to save profile. Please try again.");
-      // Don't close the modal on error so user can fix issues
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
-    // Reset form data to original profile data
     setEditFormData(profileData);
     setLocalAvailabilitySlots(availabilitySlots);
     setValidationErrors({});
@@ -328,15 +323,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 { backgroundColor: isSaving ? "#9CA3AF" : Colors.primary.blue },
               ]}
             >
-              <Text style={tw`text-white font-medium text-sm`}>
-                {isSaving ? "Saving..." : "Save"}
-              </Text>
+              <Text style={tw`text-white font-medium text-sm`}>Save</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <ScrollView style={tw`flex-1 p-4`} showsVerticalScrollIndicator={false}>
-          {/* Avatar Section */}
           <View style={tw`bg-white rounded-lg p-4 mb-4 items-center`}>
             <View style={tw`relative mb-4`}>
               <Image
@@ -357,7 +349,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </Text>
           </View>
 
-          {/* Basic Information */}
           <View style={tw`bg-white rounded-lg p-4 mb-4`}>
             <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
               Basic Information
@@ -526,7 +517,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </View>
           </View>
 
-          {/* Consultation Availability Section */}
           <View style={tw`bg-white rounded-lg p-4 mb-4`}>
             <View style={tw`flex-row items-center justify-between mb-4`}>
               <Text style={tw`text-lg font-bold text-gray-900`}>
@@ -689,7 +679,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </View>
           </View>
 
-          {/* Professional Information Note */}
           <View style={tw`bg-blue-50 rounded-lg p-4 mb-4`}>
             <Text style={tw`text-sm text-blue-800 font-medium mb-1`}>
               Professional Information
@@ -700,9 +689,43 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </Text>
           </View>
         </ScrollView>
+        <Modal
+          visible={showConfirmModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowConfirmModal(false)}
+        >
+          <View
+            style={tw`flex-1 justify-center items-center bg-black bg-opacity-50`}
+          >
+            <View style={tw`bg-white p-6 rounded-lg w-80`}>
+              <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
+                Confirm Save
+              </Text>
+              <Text style={tw`text-sm text-gray-700 mb-6`}>
+                Are you sure you want to save these changes?
+              </Text>
+              <View style={tw`flex-row justify-end`}>
+                <TouchableOpacity
+                  onPress={() => setShowConfirmModal(false)}
+                  style={tw`px-4 py-2 mr-2 rounded-lg bg-gray-200`}
+                >
+                  <Text style={tw`text-gray-700 font-medium`}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={confirmSave}
+                  style={tw`px-4 py-2 rounded-lg bg-blue-900`}
+                >
+                  <Text style={tw`text-white font-medium`}>
+                    {isSaving ? "Saving..." : "Yes, Save"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </Modal>
   );
 };
-
 export default EditProfileModal;

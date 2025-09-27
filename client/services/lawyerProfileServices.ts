@@ -1,4 +1,4 @@
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from "../contexts/AuthContext";
 
 interface TimeSlot {
   id: string;
@@ -29,9 +29,10 @@ class LawyerProfileService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+    this.baseUrl = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
   }
 
+  // In lawyerProfileServices.ts - fix the payload structure
   async saveLawyerProfile(
     profileData: ProfileData,
     availabilitySlots: TimeSlot[],
@@ -39,82 +40,86 @@ class LawyerProfileService {
   ): Promise<LawyerProfileResponse> {
     try {
       // Convert specializations array to string format that matches your table
-      const specializationsString = Array.isArray(profileData.specialization) 
-        ? profileData.specialization.join(', ')
+      const specializationsString = Array.isArray(profileData.specialization)
+        ? profileData.specialization.join(", ")
         : profileData.specialization;
 
+      // Fix: Match the field names exactly with what your backend expects
       const payload = {
         profile_data: {
           name: profileData.name,
-          specializations: specializationsString,
+          specialization: specializationsString, // Changed from specializations to specialization
           location: profileData.location,
           phone_number: profileData.phone,
           bio: profileData.bio,
-          available: true
+          available: true,
         },
-        availability_slots: availabilitySlots.map(slot => ({
+        availability_slots: availabilitySlots.map((slot) => ({
           ...slot,
-          // Ensure time format is consistent (24h format expected by backend)
           startTime: this.ensureTimeFormat(slot.startTime),
-          endTime: this.ensureTimeFormat(slot.endTime)
-        }))
+          endTime: this.ensureTimeFormat(slot.endTime),
+        })),
       };
 
+      console.log("Sending payload to backend:", payload); // Debug log
+
       const response = await fetch(`${this.baseUrl}/api/lawyer/profile`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        throw new Error(
+          errorData.detail || `HTTP error! status: ${response.status}`
+        );
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Error saving lawyer profile:', error);
+      console.error("Error saving lawyer profile:", error);
       throw error;
     }
   }
 
   private ensureTimeFormat(time: string): string {
     // Convert to 24h format if needed, or ensure proper format
-    if (time.includes('AM') || time.includes('PM')) {
+    if (time.includes("AM") || time.includes("PM")) {
       // Convert 12h to 24h if necessary
       return this.convert12to24(time);
     }
-    
+
     // Ensure format is HH:MM
     if (time.length === 4) {
       return `0${time}`; // Convert "900" to "09:00"
     }
-    
-    if (time.length === 5 && time.includes(':')) {
+
+    if (time.length === 5 && time.includes(":")) {
       return time; // Already in HH:MM format
     }
-    
+
     // Default fallback
-    return time.padStart(5, '0');
+    return time.padStart(5, "0");
   }
 
   private convert12to24(time12h: string): string {
     try {
-      const [time, modifier] = time12h.split(' ');
-      let [hours, minutes] = time.split(':');
-      
-      if (hours === '12') {
-        hours = '00';
+      const [time, modifier] = time12h.split(" ");
+      let [hours, minutes] = time.split(":");
+
+      if (hours === "12") {
+        hours = "00";
       }
-      
-      if (modifier === 'PM') {
+
+      if (modifier === "PM") {
         hours = String(parseInt(hours, 10) + 12);
       }
-      
-      return `${hours.padStart(2, '0')}:${minutes}`;
+
+      return `${hours.padStart(2, "0")}:${minutes}`;
     } catch {
       return time12h;
     }
@@ -123,10 +128,10 @@ class LawyerProfileService {
   async getLawyerProfile(accessToken: string): Promise<LawyerProfileResponse> {
     try {
       const response = await fetch(`${this.baseUrl}/api/lawyer/profile`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
         },
       });
 
@@ -135,7 +140,7 @@ class LawyerProfileService {
       }
 
       const result = await response.json();
-      
+
       // Convert backend format to frontend format if needed
       if (result.data) {
         result.data = this.parseBackendToFrontend(result.data);
@@ -143,7 +148,7 @@ class LawyerProfileService {
 
       return result;
     } catch (error) {
-      console.error('Error fetching lawyer profile:', error);
+      console.error("Error fetching lawyer profile:", error);
       throw error;
     }
   }
@@ -160,9 +165,12 @@ export const lawyerProfileService = new LawyerProfileService();
 export const useLawyerProfile = () => {
   const { session } = useAuth();
 
-  const saveProfile = async (profileData: ProfileData, availabilitySlots: TimeSlot[]) => {
+  const saveProfile = async (
+    profileData: ProfileData,
+    availabilitySlots: TimeSlot[]
+  ) => {
     if (!session?.access_token) {
-      throw new Error('No authentication token found');
+      throw new Error("No authentication token found");
     }
 
     return lawyerProfileService.saveLawyerProfile(
@@ -174,7 +182,7 @@ export const useLawyerProfile = () => {
 
   const getProfile = async () => {
     if (!session?.access_token) {
-      throw new Error('No authentication token found');
+      throw new Error("No authentication token found");
     }
 
     return lawyerProfileService.getLawyerProfile(session.access_token);

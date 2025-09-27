@@ -23,7 +23,8 @@ import EditProfileModal from "./ProfileComponents/EditProfileModal";
 import Colors from "../../constants/Colors";
 import { useAuth } from "../../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
-import { useLawyerProfile } from "../.././services/lawyerProfileServices";
+import { useLawyerProfile } from "../../services/lawyerProfileServices";
+import { supabase } from "../../config/supabase";
 
 interface TimeSlot {
   id: string;
@@ -36,15 +37,21 @@ interface TimeSlot {
 interface ProfileData {
   name: string;
   email: string;
-  phone_number: string;
-  location: string;
   avatar: string;
-  specialization: string;
   experience: string;
   verificationStatus: string;
+}
+
+interface ProfessionalInfo {
   rollNumber: string;
   rollSigningDate: string;
+}
+
+interface LawyerContactInfo {
+  phone_number: string;
+  location: string;
   bio: string;
+  specializations: string;
 }
 
 const LawyerProfilePage: React.FC = () => {
@@ -52,17 +59,25 @@ const LawyerProfilePage: React.FC = () => {
   const [profileData, setProfileData] = useState<ProfileData>({
     name: "",
     email: "",
-    phone_number: "",
-    location: "",
     avatar:
       "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
-    specialization: "",
     experience: "8 years",
     verificationStatus: "Verified Lawyer",
-    rollNumber: "SC-2016-001234",
-    rollSigningDate: "2016-03-15",
-    bio: "",
   });
+
+  const [professionalInfo, setProfessionalInfo] = useState<ProfessionalInfo>({
+    rollNumber: "",
+    rollSigningDate: "",
+  });
+
+  const [lawyerContactInfo, setLawyerContactInfo] = useState<LawyerContactInfo>(
+    {
+      phone_number: "",
+      location: "",
+      bio: "",
+      specializations: "",
+    }
+  );
 
   const { saveProfile } = useLawyerProfile();
 
@@ -107,79 +122,242 @@ const LawyerProfilePage: React.FC = () => {
       day: "Saturday",
       startTime: "10:00",
       endTime: "14:00",
-      isActive: false,
+      isActive: true,
     },
     {
       id: "7",
       day: "Sunday",
       startTime: "10:00",
       endTime: "14:00",
-      isActive: false,
+      isActive: true,
     },
   ]);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showAllSpecializations, setShowAllSpecializations] = useState(false);
+  // In LawyerProfilePage.tsx - fix the fetch function
+  const fetchLawyerContactInfo = async () => {
+    if (!user?.id) return;
 
-  // Initialize profile data from user context
-  useEffect(() => {
-    if (user) {
-      const userProfileData: ProfileData = {
-        name: user.full_name || "Attorney",
-        email: user.email || "",
-        phone_number: profileData.phone_number,
-        location: profileData.location,
-        avatar: profileData.avatar,
-        specialization: profileData.specialization,
-        experience: profileData.experience,
-        verificationStatus:
-          user.role === "verified_lawyer"
-            ? "Verified Lawyer"
-            : "Pending Verification",
-        rollNumber: profileData.rollNumber,
-        rollSigningDate: profileData.rollSigningDate,
-        bio: profileData.bio,
-      };
+    try {
+      const { data, error } = await supabase
+        .from("lawyer_info")
+        .select("phone_number, location, bio, specialization") // Changed from specializations to specialization
+        .eq("lawyer_id", user.id)
+        .single();
 
-      setProfileData(userProfileData);
+      if (error) {
+        if (error.code === "PGRST116") {
+          console.log("No lawyer info found for user:", user.id);
+          setLawyerContactInfo({
+            phone_number: "",
+            location: "",
+            bio: "",
+            specializations: "", // Keep this as specializations for frontend consistency
+          });
+        } else {
+          console.error("Error fetching lawyer contact info:", error);
+        }
+      } else if (data) {
+        setLawyerContactInfo({
+          phone_number: data.phone_number || "",
+          location: data.location || "",
+          bio: data.bio || "",
+          specializations: data.specialization || "", // Map from specialization to specializations
+        });
+      }
+    } catch (error) {
+      console.error("Error in fetchLawyerContactInfo:", error);
     }
-  }, [user]);
+  };
 
+  const fetchProfessionalInfo = async () => {
+    if (!user?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("lawyer_applications")
+        .select("roll_number, roll_signing_date")
+        .eq("user_id", user.id)
+        .single();
+
+      if (error) {
+        if (error.code === "PGRST116") {
+          console.log("No professional info found for user:", user.id);
+          setProfessionalInfo({
+            rollNumber: "",
+            rollSigningDate: "",
+          });
+        } else {
+          console.error("Error fetching professional info:", error);
+        }
+      } else if (data) {
+        setProfessionalInfo({
+          rollNumber: data.roll_number || "",
+          rollSigningDate: data.roll_signing_date || "",
+        });
+      }
+    } catch (error) {
+      console.error("Error in fetchProfessionalInfo:", error);
+    }
+  };
+  const saveProfessionalInfo = async (
+    rollNumber: string,
+    rollSigningDate: string
+  ) => {
+    if (!user?.id) return { success: false, error: "User not found" };
+
+    try {
+      const { data: existingRecord } = await supabase
+        .from("lawyer_applications")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+
+      let result;
+
+      if (existingRecord) {
+        result = await supabase
+          .from("lawyer_applications")
+          .update({
+            roll_number: rollNumber,
+            roll_signing_date: rollSigningDate,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", user.id);
+      } else {
+        result = await supabase.from("lawyer_applications").insert({
+          user_id: user.id,
+          roll_number: rollNumber,
+          roll_signing_date: rollSigningDate,
+          status: "approved",
+        });
+      }
+
+      if (result.error) {
+        console.error("Error saving professional info:", result.error);
+        return { success: false, error: result.error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error in saveProfessionalInfo:", error);
+      return {
+        success: false,
+        error: "Failed to save professional information",
+      };
+    }
+  };
+
+  useEffect(() => {
+    const initializeProfileData = async () => {
+      if (user) {
+        const userProfileData: ProfileData = {
+          name: user.full_name || "Attorney",
+          email: user.email || "",
+          avatar: profileData.avatar,
+          experience: profileData.experience,
+          verificationStatus:
+            user.role === "verified_lawyer"
+              ? "Verified Lawyer"
+              : "Pending Verification",
+        };
+
+        setProfileData(userProfileData);
+
+        await Promise.all([fetchLawyerContactInfo(), fetchProfessionalInfo()]);
+      }
+      setIsLoading(false);
+    };
+
+    initializeProfileData();
+  }, [user]);
   const saveLawyerProfileToBackend = async (
     profileData: any,
-    availabilitySlots: any
+    availabilitySlots: any,
+    contactInfo: LawyerContactInfo,
+    professionalInfo: ProfessionalInfo
   ) => {
     try {
-      const result = await saveProfile(profileData, availabilitySlots);
-      return result;
+      // Ensure all required fields are included with correct names
+      const combinedData = {
+        name: profileData.name,
+        email: profileData.email,
+        phone: contactInfo.phone_number, // Use 'phone' not 'phone_number'
+        location: contactInfo.location,
+        bio: contactInfo.bio,
+        specialization: contactInfo.specializations, // Use singular 'specialization'
+      };
+
+      console.log("Saving profile data:", combinedData);
+
+      const [profileResult, professionalResult] = await Promise.all([
+        saveProfile(combinedData, availabilitySlots),
+        saveProfessionalInfo(
+          professionalInfo.rollNumber,
+          professionalInfo.rollSigningDate
+        ),
+      ]);
+
+      return {
+        success: profileResult.success && professionalResult.success,
+        error: !profileResult.success
+          ? profileResult.error
+          : !professionalResult.success
+          ? professionalResult.error
+          : undefined,
+      };
     } catch (error) {
       console.error("Error saving lawyer profile:", error);
       throw error;
     }
   };
 
-  const handleSaveProfile = async (
-    editFormData: Omit<
-      ProfileData,
-      "experience" | "verificationStatus" | "rollNumber" | "rollSigningDate"
-    >
-  ) => {
+  // Enhanced save function with better error handling
+  const handleSaveProfile = async (editFormData: any) => {
     try {
-      // Call your backend API
+      console.log("Starting profile save with data:", editFormData);
+
+      const specializationsString = editFormData.specialization.join(", ");
+
+      // Update local state
+      setLawyerContactInfo((prev) => ({
+        ...prev,
+        phone_number: editFormData.phone,
+        location: editFormData.location,
+        bio: editFormData.bio,
+        specializations: specializationsString,
+      }));
+
+      // Prepare data for backend - ensure field names match backend expectations
+      const profileDataForBackend = {
+        name: editFormData.name,
+        email: editFormData.email,
+        phone: editFormData.phone, // Use 'phone' not 'phone_number'
+        location: editFormData.location,
+        bio: editFormData.bio,
+        specialization: editFormData.specialization, // Array format for the service
+      };
+
+      console.log("Sending to backend service:", profileDataForBackend);
+
       const result = await saveLawyerProfileToBackend(
-        editFormData,
-        availabilitySlots
+        profileDataForBackend,
+        availabilitySlots,
+        {
+          phone_number: editFormData.phone,
+          location: editFormData.location,
+          bio: editFormData.bio,
+          specializations: specializationsString,
+        },
+        {
+          rollNumber: editFormData.rollNumber,
+          rollSigningDate: editFormData.rollSigningDate,
+        }
       );
 
       if (result.success) {
-        // Update local profile data
-        setProfileData((prev) => ({
-          ...prev,
-          ...editFormData,
-        }));
-
-        // Refresh user data from context to ensure consistency
-        await refreshUserData();
-
         Alert.alert("Success", "Profile updated successfully!");
         setIsEditingProfile(false);
       } else {
@@ -191,7 +369,6 @@ const LawyerProfilePage: React.FC = () => {
         "Error",
         error.message || "Failed to update profile. Please try again."
       );
-      throw error;
     }
   };
 
@@ -201,7 +378,6 @@ const LawyerProfilePage: React.FC = () => {
 
   const handleSettings = () => {
     console.log("Settings");
-    // TODO: Navigate to settings screen
   };
 
   const handleLogout = async () => {
@@ -216,19 +392,10 @@ const LawyerProfilePage: React.FC = () => {
     }
   };
 
-  // Show loading state while user data is being fetched
-  if (!user) {
-    return (
-      <SafeAreaView style={tw`flex-1 bg-gray-50 justify-center items-center`}>
-        <Text style={tw`text-lg text-gray-600`}>Loading profile...</Text>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={tw`flex-1 bg-gray-50`}>
       <Header variant="lawyer-profile" title="Profile" showSettings={false} />
-
       <ScrollView
         style={tw`flex-1`}
         showsVerticalScrollIndicator={false}
@@ -256,9 +423,53 @@ const LawyerProfilePage: React.FC = () => {
               <Text style={tw`text-xl font-bold text-gray-900 mb-1`}>
                 {profileData.name}
               </Text>
-              <Text style={tw`text-sm text-gray-600 mb-2`}>
-                {profileData.specialization}
-              </Text>
+
+              {/* Specializations with +more functionality */}
+              <TouchableOpacity
+                onPress={() =>
+                  setShowAllSpecializations(!showAllSpecializations)
+                }
+                style={tw`mb-2`}
+              >
+                <View style={tw`flex-row items-center flex-wrap`}>
+                  <Text style={tw`text-sm text-gray-600`}>
+                    {lawyerContactInfo.specializations
+                      ? lawyerContactInfo.specializations.split(",")[0].trim()
+                      : "General Law"}
+                  </Text>
+                  {lawyerContactInfo.specializations &&
+                    lawyerContactInfo.specializations.split(",").length > 1 && (
+                      <Text
+                        style={[
+                          tw`text-sm ml-1`,
+                          { color: Colors.primary.blue },
+                        ]}
+                      >
+                        +{" "}
+                        {lawyerContactInfo.specializations.split(",").length -
+                          1}{" "}
+                        more
+                      </Text>
+                    )}
+                </View>
+              </TouchableOpacity>
+
+              {/* Show all specializations when expanded */}
+              {showAllSpecializations && lawyerContactInfo.specializations && (
+                <View style={tw`mb-2 mr-2 p-2 bg-gray-100 rounded-lg`}>
+                  <Text style={tw`text-xs font-semibold mb-1 text-gray-900`}>
+                    All Specializations:
+                  </Text>
+                  {lawyerContactInfo.specializations
+                    .split(",")
+                    .map((spec, index) => (
+                      <Text key={index} style={tw`text-xs text-gray-700`}>
+                        • {spec.trim()}
+                      </Text>
+                    ))}
+                </View>
+              )}
+
               <View
                 style={[
                   tw`px-2 py-1 rounded-md self-start`,
@@ -286,7 +497,7 @@ const LawyerProfilePage: React.FC = () => {
           {/* Bio Section */}
           <View style={tw`mt-4 pt-4 border-t border-gray-100`}>
             <Text style={tw`text-sm text-gray-700 leading-5`}>
-              {profileData.bio}
+              {lawyerContactInfo.bio}
             </Text>
           </View>
         </View>
@@ -320,7 +531,7 @@ const LawyerProfilePage: React.FC = () => {
                 <Phone size={18} color="#6B7280" />
               </View>
               <Text style={tw`text-sm text-gray-700 flex-1`}>
-                {profileData.phone_number}
+                {lawyerContactInfo.phone_number || "Not provided"}
               </Text>
             </View>
             <View style={tw`flex-row items-center`}>
@@ -333,7 +544,7 @@ const LawyerProfilePage: React.FC = () => {
                 <MapPin size={18} color="#6B7280" />
               </View>
               <Text style={tw`text-sm text-gray-700 flex-1`}>
-                {profileData.location}
+                {lawyerContactInfo.location || "Not provided"}
               </Text>
             </View>
           </View>
@@ -356,10 +567,15 @@ const LawyerProfilePage: React.FC = () => {
                 Roll Signing Date
               </Text>
               <Text style={tw`text-sm font-semibold text-gray-900`}>
-                {new Date(profileData.rollSigningDate).toLocaleDateString(
-                  "en-US",
-                  { year: "numeric", month: "long", day: "numeric" }
-                )}
+                {professionalInfo.rollSigningDate
+                  ? new Date(
+                      professionalInfo.rollSigningDate
+                    ).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })
+                  : "Not provided"}
               </Text>
             </View>
             <View style={tw`w-full px-2`}>
@@ -367,7 +583,7 @@ const LawyerProfilePage: React.FC = () => {
                 Supreme Court Roll Number
               </Text>
               <Text style={tw`text-sm font-semibold text-gray-900`}>
-                {profileData.rollNumber}
+                {professionalInfo.rollNumber || "Not provided"}
               </Text>
             </View>
           </View>
@@ -410,7 +626,6 @@ const LawyerProfilePage: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-
       {/* Edit Profile Modal */}
       <EditProfileModal
         isVisible={isEditingProfile}
@@ -419,16 +634,23 @@ const LawyerProfilePage: React.FC = () => {
         profileData={{
           name: profileData.name,
           email: profileData.email,
-          phone_number: profileData.phone_number,
-          location: profileData.location,
+          phone: lawyerContactInfo.phone_number,
+          location: lawyerContactInfo.location,
           avatar: profileData.avatar,
-          specialization: profileData.specialization,
-          bio: profileData.bio,
+          bio: lawyerContactInfo.bio,
+          // Convert comma-separated string to array
+          specialization: lawyerContactInfo.specializations
+            ? lawyerContactInfo.specializations
+                .split(",")
+                .map((s) => s.trim())
+                .filter((s) => s)
+            : [],
+          rollNumber: professionalInfo.rollNumber,
+          rollSigningDate: professionalInfo.rollSigningDate,
         }}
         availabilitySlots={availabilitySlots}
         onAvailabilityChange={setAvailabilitySlots}
       />
-
       <LawyerNavbar activeTab="profile" />
     </SafeAreaView>
   );

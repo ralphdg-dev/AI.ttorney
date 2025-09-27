@@ -11,7 +11,7 @@ router = APIRouter()
 
 class LawyerProfile(BaseModel):
     name: str
-    specializations: str
+    specialization: str  # Changed from specializations to specialization
     location: str
     hours: Optional[str] = None
     days: Optional[str] = None
@@ -140,15 +140,15 @@ async def save_lawyer_profile(
         lawyer_info_data = {
             "lawyer_id": user.id,
             "name": profile_data.profile_data.name,
-            "specializations": profile_data.profile_data.specializations,
+            "specialization": profile_data.profile_data.specialization,  # Match table column name
             "location": profile_data.profile_data.location,
             "hours": hours,
             "days": days,
-            "available": True,  # Always TRUE as shown in your examples
+            "available": True,
             "hours_available": hours_available,
             "phone_number": profile_data.profile_data.phone_number,
             "bio": profile_data.profile_data.bio
-        }
+}
         
         # Check if profile already exists
         existing_profile = supabase.table("lawyer_info")\
