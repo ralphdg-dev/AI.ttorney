@@ -3,6 +3,7 @@ import { Eye, Pencil, Archive, Users, Loader2, CheckCircle, XCircle, ChevronUp, 
 import DataTable from '../../components/ui/DataTable';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
+import ViewLegalSeekerModal from '../../components/users/ViewLegalSeekerModal';
 import usersService from '../../services/usersService';
 
 const StatusBadge = ({ status }) => {
@@ -47,6 +48,9 @@ const ManageLegalSeekers = () => {
     key: null,
     direction: 'asc'
   });
+  const [viewOpen, setViewOpen] = React.useState(false);
+  const [selectedUser, setSelectedUser] = React.useState(null);
+  const [loadingDetails, setLoadingDetails] = React.useState(false);
 
   // Load data from API
   const loadData = React.useCallback(async () => {
@@ -104,8 +108,25 @@ const ManageLegalSeekers = () => {
   };
 
   // Handle view user details
-  const handleView = (user) => {
-    alert(`View details for: ${user.full_name}\nEmail: ${user.email}\nStatus: ${user.account_status}`);
+  const handleView = async (user) => {
+    try {
+      setLoadingDetails(true);
+      setViewOpen(true);
+      
+      console.log('handleView - Row user data:', user);
+      
+      // Fetch complete user details from the API
+      const userDetails = await usersService.getLegalSeeker(user.id);
+      console.log('handleView - API response:', userDetails);
+      setSelectedUser(userDetails);
+    } catch (error) {
+      console.error('Failed to fetch user details:', error);
+      console.log('handleView - Using fallback row data:', user);
+      // Fallback to using row data if API call fails
+      setSelectedUser(user);
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
   // Handle edit user
@@ -206,6 +227,10 @@ const ManageLegalSeekers = () => {
             return (a.email || '').localeCompare(b.email || '');
           case 'Email Z-A':
             return (b.email || '').localeCompare(a.email || '');
+          case 'Username A-Z':
+            return (a.username || '').localeCompare(b.username || '');
+          case 'Username Z-A':
+            return (b.username || '').localeCompare(a.username || '');
           case 'Birthdate Oldest':
             return new Date(a.birthdate || '1900-01-01') - new Date(b.birthdate || '1900-01-01');
           case 'Birthdate Newest':
@@ -264,6 +289,26 @@ const ManageLegalSeekers = () => {
         >
           <span>Email</span>
           {sortConfig.key === 'email' ? (
+            sortConfig.direction === 'asc' ? (
+              <ChevronUp size={14} className="text-blue-600" />
+            ) : (
+              <ChevronDown size={14} className="text-blue-600" />
+            )
+          ) : (
+            <div className="w-3.5 h-3.5" />
+          )}
+        </button>
+      )
+    },
+    { 
+      key: 'username', 
+      header: (
+        <button
+          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          onClick={() => handleSort('username')}
+        >
+          <span>Username</span>
+          {sortConfig.key === 'username' ? (
             sortConfig.direction === 'asc' ? (
               <ChevronUp size={14} className="text-blue-600" />
             ) : (
@@ -485,6 +530,8 @@ const ManageLegalSeekers = () => {
               'Name Z-A',
               'Email A-Z',
               'Email Z-A',
+              'Username A-Z',
+              'Username Z-A',
               'Birthdate Oldest',
               'Birthdate Newest',
               'Status A-Z',
@@ -567,6 +614,14 @@ const ManageLegalSeekers = () => {
           </div>
         </div>
       )}
+
+      {/* View Legal Seeker Modal */}
+      <ViewLegalSeekerModal
+        open={viewOpen}
+        onClose={() => setViewOpen(false)}
+        user={selectedUser}
+        loading={loadingDetails}
+      />
     </div>
   );
 };

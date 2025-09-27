@@ -17,11 +17,16 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
         id,
         full_name,
         email,
+        username,
         birthdate,
         created_at,
+        updated_at,
         is_verified,
         pending_lawyer,
-        role
+        role,
+        reject_count,
+        last_rejected_at,
+        is_blocked_from_applying
       `)
       .in('role', ['guest', 'registered_user']) // Only legal seekers, not admins or verified lawyers
       .order('created_at', { ascending: false });
@@ -60,6 +65,7 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
       id: user.id,
       full_name: user.full_name || 'N/A',
       email: user.email,
+      username: user.username || 'N/A',
       birthdate: user.birthdate || 'N/A',
       registration_date: user.created_at,
       account_status: user.is_verified ? 'Verified' : 'Unverified',

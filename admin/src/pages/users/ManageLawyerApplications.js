@@ -493,6 +493,26 @@ const ManageLawyerApplications = () => {
       )
     },
     { 
+      key: 'username', 
+      header: (
+        <button
+          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          onClick={() => handleSort('username')}
+        >
+          <span>Username</span>
+          {sortConfig.key === 'username' ? (
+            sortConfig.direction === 'asc' ? (
+              <ChevronUp size={14} className="text-blue-600" />
+            ) : (
+              <ChevronDown size={14} className="text-blue-600" />
+            )
+          ) : (
+            <div className="w-3.5 h-3.5" />
+          )}
+        </button>
+      )
+    },
+    { 
       key: 'roll_number', 
       header: (
         <button

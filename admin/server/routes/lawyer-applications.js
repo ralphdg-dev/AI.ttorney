@@ -107,6 +107,7 @@ router.get('/', authenticateAdmin, async (req, res) => {
         users!inner(
           full_name,
           email,
+          username,
           created_at
         )
       `)
@@ -177,6 +178,7 @@ router.get('/', authenticateAdmin, async (req, res) => {
         user_id: app.user_id,
         full_name: app.full_name || app.users?.full_name || 'Unknown',
         email: app.users?.email || 'Unknown',
+        username: app.users?.username || 'N/A',
         roll_number: app.roll_number || 'N/A',
         roll_sign_date: app.roll_signing_date || null,
         status: app.status || 'pending',
