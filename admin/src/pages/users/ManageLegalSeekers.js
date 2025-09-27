@@ -1,8 +1,9 @@
 import React from 'react';
-import { Eye, Pencil, Archive, Users, Loader2, CheckCircle, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Eye, Pencil, Archive, ArchiveRestore, Users, Loader2, CheckCircle, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import DataTable from '../../components/ui/DataTable';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
+import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import ViewLegalSeekerModal from '../../components/users/ViewLegalSeekerModal';
 import usersService from '../../services/usersService';
 
@@ -32,7 +33,7 @@ const LawyerApplicationBadge = ({ hasApplication }) => {
 
 const ManageLegalSeekers = () => {
   const [query, setQuery] = React.useState('');
-  const [statusFilter, setStatusFilter] = React.useState('All Status');
+  const [combinedFilter, setCombinedFilter] = React.useState('Active');
   const [sortBy, setSortBy] = React.useState('Newest');
   const [data, setData] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -51,6 +52,13 @@ const ManageLegalSeekers = () => {
   const [viewOpen, setViewOpen] = React.useState(false);
   const [selectedUser, setSelectedUser] = React.useState(null);
   const [loadingDetails, setLoadingDetails] = React.useState(false);
+  const [confirmationModal, setConfirmationModal] = React.useState({
+    open: false,
+    type: '',
+    userId: null,
+    userName: '',
+    loading: false
+  });
 
   // Load data from API
   const loadData = React.useCallback(async () => {
@@ -58,22 +66,35 @@ const ManageLegalSeekers = () => {
       setLoading(true);
       setError(null);
       
-      // Map frontend filter values to backend API values
-      const mapStatusFilter = (filter) => {
-        switch (filter) {
-          case 'All Status': return 'all';
-          case 'Verified': return 'verified';
-          case 'Unverified': return 'unverified';
-          case 'Pending Lawyer': return 'pending_lawyer';
-          default: return 'all';
-        }
-      };
+      // Parse combined filter to extract status and archived parameters
+      let status = 'all';
+      let archived = 'active';
+      
+      if (combinedFilter === 'Active') {
+        status = 'all';
+        archived = 'active';
+      } else if (combinedFilter === 'Archived') {
+        status = 'all';
+        archived = 'archived';
+      } else if (combinedFilter === 'All') {
+        status = 'all';
+        archived = 'all';
+      } else if (combinedFilter.includes('Active -')) {
+        // Handle "Active - Verified", "Active - Unverified", etc.
+        status = combinedFilter.replace('Active - ', '').toLowerCase();
+        archived = 'active';
+      } else if (combinedFilter.includes('Archived -')) {
+        // Handle "Archived - Verified", "Archived - Unverified", etc.
+        status = combinedFilter.replace('Archived - ', '').toLowerCase();
+        archived = 'archived';
+      }
 
       const params = {
         page: pagination.page,
         limit: pagination.limit,
         search: query,
-        status: mapStatusFilter(statusFilter)
+        status,
+        archived
       };
       
       const response = await usersService.getLegalSeekers(params);
@@ -85,7 +106,7 @@ const ManageLegalSeekers = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, query, statusFilter]);
+  }, [pagination.page, pagination.limit, query, combinedFilter]);
 
   // Load data on component mount and when filters change
   React.useEffect(() => {
@@ -134,21 +155,66 @@ const ManageLegalSeekers = () => {
     alert(`Edit user: ${user.full_name} - Edit functionality not implemented yet`);
   };
 
-  // Handle archive user
-  const handleArchive = async (userId, userName) => {
-    if (!window.confirm(`Are you sure you want to archive ${userName}?`)) {
-      return;
+  // Handle archive button click
+  const handleArchive = (user) => {
+    const isCurrentlyArchived = user.archived === true;
+    const modalType = isCurrentlyArchived ? 'unarchive' : 'archive';
+    
+    setConfirmationModal({
+      open: true,
+      type: modalType,
+      userId: user.id,
+      userName: user.full_name || 'Unknown',
+      loading: false
+    });
+  };
+
+  // Helper function to get modal content based on type
+  const getModalContent = () => {
+    const { type, userName } = confirmationModal;
+    
+    switch (type) {
+      case 'archive':
+        return {
+          title: 'Archive User',
+          message: `Are you sure you want to archive ${userName}? Archived users will be hidden from the main list but can be accessed through the "Archived" filter.`,
+          confirmText: 'Archive User',
+          showFeedbackInput: false,
+          onConfirm: confirmArchive
+        };
+      case 'unarchive':
+        return {
+          title: 'Unarchive User',
+          message: `Are you sure you want to unarchive ${userName}? They will be restored to the active users list.`,
+          confirmText: 'Unarchive User',
+          showFeedbackInput: false,
+          onConfirm: confirmArchive
+        };
+      default:
+        return {};
     }
+  };
+
+  const closeModal = () => {
+    setConfirmationModal({ open: false, type: '', userId: null, userName: '', loading: false });
+  };
+
+  // Handle archive/unarchive user
+  const confirmArchive = async () => {
+    const { userId, userName, type } = confirmationModal;
+    const isArchiving = type === 'archive';
     
     try {
-      setActionLoading(prev => ({ ...prev, [userId]: true }));
-      await usersService.deleteLegalSeeker(userId);
+      setConfirmationModal(prev => ({ ...prev, loading: true }));
+      
+      await usersService.archiveLegalSeeker(userId, isArchiving);
       await loadData(); // Reload data
+      setConfirmationModal({ open: false, type: '', userId: null, userName: '', loading: false });
+      
     } catch (err) {
-      console.error('Failed to archive user:', err);
-      alert('Failed to archive user: ' + err.message);
-    } finally {
-      setActionLoading(prev => ({ ...prev, [userId]: false }));
+      console.error(`Failed to ${isArchiving ? 'archive' : 'unarchive'} user:`, err);
+      alert(`Failed to ${isArchiving ? 'archive' : 'unarchive'} user: ` + err.message);
+      setConfirmationModal(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -423,42 +489,59 @@ const ManageLegalSeekers = () => {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      render: (row) => (
-        <div className="flex items-center justify-end space-x-2 text-gray-600">
-          <Tooltip content="View">
-            <button 
-              className="p-1 rounded hover:bg-gray-100" 
-              aria-label="View"
-              onClick={() => handleView(row)}
-            >
-              <Eye size={16} />
-            </button>
-          </Tooltip>
-          <Tooltip content="Edit">
-            <button 
-              className="p-1 rounded hover:bg-gray-100" 
-              aria-label="Edit"
-              onClick={() => handleEdit(row)}
-            >
-              <Pencil size={16} />
-            </button>
-          </Tooltip>
-          <Tooltip content="Archive">
-            <button 
-              className="p-1 rounded hover:bg-gray-100" 
-              aria-label="Archive"
-              onClick={() => handleArchive(row.id, row.full_name)}
-              disabled={actionLoading[row.id]}
-            >
-              {actionLoading[row.id] ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Archive size={16} />
-              )}
-            </button>
-          </Tooltip>
-        </div>
-      ),
+      render: (row) => {
+        const isArchived = row.archived === true;
+        return (
+          <div className="flex items-center justify-end space-x-2 text-gray-600">
+            <Tooltip content="View">
+              <button 
+                className="p-1 rounded hover:bg-gray-100" 
+                aria-label="View"
+                onClick={() => handleView(row)}
+              >
+                <Eye size={16} />
+              </button>
+            </Tooltip>
+            
+            {/* Edit button - always show */}
+            <Tooltip content="Edit">
+              <button 
+                className="p-1 rounded hover:bg-gray-100" 
+                aria-label="Edit"
+                onClick={() => handleEdit(row)}
+              >
+                <Pencil size={16} />
+              </button>
+            </Tooltip>
+            
+            {/* Archive button for active users */}
+            {!isArchived && (
+              <Tooltip content="Archive">
+                <button 
+                  className="p-1 rounded hover:bg-gray-100" 
+                  aria-label="Archive"
+                  onClick={() => handleArchive(row)}
+                >
+                  <Archive size={16} />
+                </button>
+              </Tooltip>
+            )}
+            
+            {/* Unarchive button for archived users */}
+            {isArchived && (
+              <Tooltip content="Unarchive">
+                <button 
+                  className="p-1 rounded hover:bg-green-100 text-green-600" 
+                  aria-label="Unarchive"
+                  onClick={() => handleArchive(row)}
+                >
+                  <RefreshCw size={16} />
+                </button>
+              </Tooltip>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -515,9 +598,19 @@ const ManageLegalSeekers = () => {
           query={query}
           onQueryChange={setQuery}
           filter={{
-            value: statusFilter,
-            onChange: setStatusFilter,
-            options: ['All Status', 'Verified', 'Unverified', 'Pending Lawyer'],
+            value: combinedFilter,
+            onChange: setCombinedFilter,
+            options: [
+              'Active',
+              'Archived', 
+              'All',
+              'Active - Verified',
+              'Active - Unverified',
+              'Active - Pending Lawyer',
+              'Archived - Verified',
+              'Archived - Unverified',
+              'Archived - Pending Lawyer'
+            ],
             label: 'Filter by status',
           }}
           sort={{
@@ -621,6 +714,16 @@ const ManageLegalSeekers = () => {
         onClose={() => setViewOpen(false)}
         user={selectedUser}
         loading={loadingDetails}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        open={confirmationModal.open}
+        onClose={closeModal}
+        type={confirmationModal.type}
+        applicantName={confirmationModal.userName}
+        loading={confirmationModal.loading}
+        {...getModalContent()}
       />
     </div>
   );

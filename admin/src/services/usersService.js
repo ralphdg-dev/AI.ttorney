@@ -1,7 +1,6 @@
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 class UsersService {
-  // Get authorization header
   getAuthHeader() {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -10,12 +9,13 @@ class UsersService {
   // Get all legal seekers
   async getLegalSeekers(params = {}) {
     try {
-      const { page = 1, limit = 50, search = '', status = 'all' } = params;
+      const { page = 1, limit = 50, search = '', status = 'all', archived = 'active' } = params;
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
         search,
-        status
+        status,
+        archived
       });
 
       const response = await fetch(`${API_BASE_URL}/users/legal-seekers?${queryParams}`, {
@@ -215,6 +215,32 @@ class UsersService {
       throw error;
     }
   }
+
+  // Archive/Unarchive legal seeker
+  async archiveLegalSeeker(id, archived) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/legal-seekers/${id}/archive`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        },
+        body: JSON.stringify({ archived })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to archive user');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Archive legal seeker error:', error);
+      throw error;
+    }
+  }
 }
 
-export default new UsersService();
+const usersService = new UsersService();
+export default usersService;

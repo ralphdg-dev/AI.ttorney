@@ -7,10 +7,10 @@ const router = express.Router();
 // Get all legal seekers (registered users who are not admins/lawyers)
 router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
   try {
-    const { page = 1, limit = 50, search = '', status = 'all' } = req.query;
+    const { page = 1, limit = 50, search = '', status = 'all', archived = 'active' } = req.query;
     const offset = (page - 1) * limit;
 
-    // Build the query
+    // Build the query - show ALL legal seekers (exclude only verified lawyers, admins, and superadmins)
     let query = supabaseAdmin
       .from('users')
       .select(`
@@ -26,9 +26,10 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
         role,
         reject_count,
         last_rejected_at,
-        is_blocked_from_applying
+        is_blocked_from_applying,
+        archived
       `)
-      .in('role', ['guest', 'registered_user']) // Only legal seekers, not admins or verified lawyers
+      .not('role', 'in', '("verified_lawyer","admin","superadmin")') // Exclude only verified lawyers and admins
       .order('created_at', { ascending: false });
 
     // Add search filter if provided
@@ -47,10 +48,18 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
       }
     }
 
+    // Add archived filter (handle null values - null means active/not archived)
+    if (archived === 'active') {
+      query = query.or('archived.is.null,archived.eq.false');
+    } else if (archived === 'archived') {
+      query = query.eq('archived', true);
+    }
+    // If archived === 'all', don't add any filter
+
     // Add pagination
     query = query.range(offset, offset + limit - 1);
 
-    const { data: users, error, count } = await query;
+    const { data: users, error } = await query;
 
     if (error) {
       console.error('Get legal seekers error:', error);
@@ -70,14 +79,38 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
       registration_date: user.created_at,
       account_status: user.is_verified ? 'Verified' : 'Unverified',
       has_lawyer_application: user.pending_lawyer ? 'Yes' : 'No',
-      role: user.role
+      role: user.role,
+      archived: user.archived === true || user.archived === 'true'
     }));
 
-    // Get total count for pagination
-    const { count: totalCount } = await supabaseAdmin
+    // Get total count for pagination with same filters
+    let countQuery = supabaseAdmin
       .from('users')
       .select('*', { count: 'exact', head: true })
-      .in('role', ['guest', 'registered_user']);
+      .not('role', 'in', '("verified_lawyer","admin","superadmin")');
+
+    // Apply same filters as main query
+    if (search) {
+      countQuery = countQuery.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+
+    if (status !== 'all') {
+      if (status === 'verified') {
+        countQuery = countQuery.eq('is_verified', true);
+      } else if (status === 'unverified') {
+        countQuery = countQuery.eq('is_verified', false);
+      } else if (status === 'pending_lawyer') {
+        countQuery = countQuery.eq('pending_lawyer', true);
+      }
+    }
+
+    if (archived === 'active') {
+      countQuery = countQuery.or('archived.is.null,archived.eq.false');
+    } else if (archived === 'archived') {
+      countQuery = countQuery.eq('archived', true);
+    }
+
+    const { count: totalCount } = await countQuery;
 
     res.json({
       success: true,
@@ -99,152 +132,7 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
   }
 });
 
-// Get single legal seeker details
-router.get('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const { data: user, error } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error || !user) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Legal seeker not found' 
-      });
-    }
-
-    // Check if user is actually a legal seeker (not admin/lawyer)
-    if (!['guest', 'registered_user'].includes(user.role)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'User is not a legal seeker' 
-      });
-    }
-
-    res.json({
-      success: true,
-      data: user
-    });
-
-  } catch (error) {
-    console.error('Get legal seeker details error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
-    });
-  }
-});
-
-// Update legal seeker status (verify/unverify)
-router.patch('/legal-seekers/:id/status', authenticateAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { is_verified } = req.body;
-
-    if (typeof is_verified !== 'boolean') {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'is_verified must be a boolean value' 
-      });
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('users')
-      .update({ 
-        is_verified,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .in('role', ['guest', 'registered_user']) // Only allow updates to legal seekers
-      .select()
-      .single();
-
-    if (error || !data) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Legal seeker not found or update failed' 
-      });
-    }
-
-    res.json({
-      success: true,
-      message: `User ${is_verified ? 'verified' : 'unverified'} successfully`,
-      data: data
-    });
-
-  } catch (error) {
-    console.error('Update legal seeker status error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
-    });
-  }
-});
-
-// Delete legal seeker (soft delete by setting role to 'guest')
-router.delete('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // First check if user exists and is a legal seeker
-    const { data: existingUser, error: checkError } = await supabaseAdmin
-      .from('users')
-      .select('role')
-      .eq('id', id)
-      .single();
-
-    if (checkError || !existingUser) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Legal seeker not found' 
-      });
-    }
-
-    if (!['guest', 'registered_user'].includes(existingUser.role)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Cannot delete non-legal seeker accounts' 
-      });
-    }
-
-    // Soft delete by setting role to 'guest' and clearing verification
-    const { data, error } = await supabaseAdmin
-      .from('users')
-      .update({ 
-        role: 'guest',
-        is_verified: false,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Failed to delete legal seeker' 
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Legal seeker account deactivated successfully'
-    });
-
-  } catch (error) {
-    console.error('Delete legal seeker error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
-    });
-  }
-});
-
-// Get legal seekers statistics
+// Get legal seekers statistics (must come before /:id route)
 router.get('/legal-seekers/stats/overview', authenticateAdmin, async (req, res) => {
   try {
     // Get total counts
@@ -291,13 +179,158 @@ router.get('/legal-seekers/stats/overview', authenticateAdmin, async (req, res) 
   }
 });
 
+// Get single legal seeker details
+router.get('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: user, error } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !user) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Legal seeker not found' 
+      });
+    }
+
+    // Check if user is actually a legal seeker (not verified lawyer/admin/superadmin)
+    if (['verified_lawyer', 'admin', 'superadmin'].includes(user.role)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'User is not a legal seeker' 
+      });
+    }
+
+    res.json({
+      success: true,
+      data: user
+    });
+
+  } catch (error) {
+    console.error('Get legal seeker details error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+// Update legal seeker status (verify/unverify)
+router.patch('/legal-seekers/:id/status', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_verified } = req.body;
+
+    if (typeof is_verified !== 'boolean') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'is_verified must be a boolean value' 
+      });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .update({ 
+        is_verified,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .not('role', 'in', '("verified_lawyer","admin","superadmin")') // Only allow updates to legal seekers
+      .select()
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Legal seeker not found or update failed' 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `User ${is_verified ? 'verified' : 'unverified'} successfully`,
+      data: data
+    });
+
+  } catch (error) {
+    console.error('Update legal seeker status error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+// Delete legal seeker (soft delete by setting role to 'guest')
+router.delete('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // First check if user exists and is a legal seeker
+    const { data: existingUser, error: checkError } = await supabaseAdmin
+      .from('users')
+      .select('role')
+      .eq('id', id)
+      .single();
+
+    if (checkError || !existingUser) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Legal seeker not found' 
+      });
+    }
+
+    if (['verified_lawyer', 'admin', 'superadmin'].includes(existingUser.role)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Cannot delete non-legal seeker accounts' 
+      });
+    }
+
+    // Soft delete by setting role to 'guest' and clearing verification
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .update({ 
+        role: 'guest',
+        is_verified: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to delete legal seeker' 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Legal seeker account deactivated successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete legal seeker error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+
 // Get all verified lawyers
 router.get('/lawyers', authenticateAdmin, async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '' } = req.query;
     const offset = (page - 1) * limit;
 
-    console.log('Fetching lawyers with params:', { page, limit, search });
 
     // First, let's try a simpler query to get verified lawyers
     let query = supabaseAdmin
@@ -330,7 +363,6 @@ router.get('/lawyers', authenticateAdmin, async (req, res) => {
       });
     }
 
-    console.log('Found lawyers:', lawyers?.length || 0);
 
     // Now try to get lawyer applications for these users
     let transformedLawyers = [];
@@ -350,7 +382,6 @@ router.get('/lawyers', authenticateAdmin, async (req, res) => {
         // Continue without applications data
       }
 
-      console.log('Found applications:', applications?.length || 0);
 
       // Transform data for frontend
       transformedLawyers = lawyers.map(lawyer => {
@@ -373,7 +404,6 @@ router.get('/lawyers', authenticateAdmin, async (req, res) => {
       .select('*', { count: 'exact', head: true })
       .eq('role', 'verified_lawyer');
 
-    console.log('Total lawyers count:', totalCount);
 
     res.json({
       success: true,
@@ -470,6 +500,59 @@ router.patch('/lawyers/:id/status', authenticateAdmin, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
+    });
+  }
+});
+
+// Archive/Unarchive legal seeker
+router.patch('/legal-seekers/:id/archive', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { archived } = req.body;
+
+    // Validate input
+    if (typeof archived !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: 'Archived field must be a boolean'
+      });
+    }
+
+    // Update the user's archived status (only for legal seekers)
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .update({ archived, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .not('role', 'in', '("verified_lawyer","admin","superadmin")') // Only allow archiving legal seekers
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Archive user error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update archive status'
+      });
+    }
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `User ${archived ? 'archived' : 'unarchived'} successfully`,
+      data: data
+    });
+
+  } catch (error) {
+    console.error('Archive user error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
     });
   }
 });
