@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef, memo, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Linking, Platform, Alert, ScrollView, TextInput } from 'react-native';
 import * as Location from 'expo-location';
 import { VStack } from '@/components/ui/vstack';
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
 import { Button, ButtonText } from '@/components/ui/button';
-import { Input, InputField, InputSlot } from '@/components/ui/input';
 import { Box } from '@/components/ui/box';
 import { Pressable } from '@/components/ui/pressable';
 import { Spinner } from '@/components/ui/spinner';
@@ -42,7 +41,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const [webViewSupported, setWebViewSupported] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const searchInputRef = useRef<TextInput>(null);
+  const searchTextRef = useRef<string>('');
 
 
   // Search law firms using backend proxy (avoids CORS issues)
@@ -106,7 +105,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   };
 
   // Search by location name using the new endpoint
-  const searchByLocationName = async (locationName: string) => {
+  const searchByLocationName = useCallback(async (locationName: string) => {
     try {
       setLoading(true);
       setError(null);
@@ -179,7 +178,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // No dependencies needed - uses only props and stable state setters
 
   const requestLocationPermission = useCallback(async () => {
     try {
@@ -205,7 +204,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       // Default to Manila using location search
       await searchByLocationName('Manila, Philippines');
     }
-  }, []);
+  }, [searchByLocationName]);
 
   // Initialize WebView dynamically for platform compatibility
   useEffect(() => {
@@ -235,7 +234,8 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   }, [requestLocationPermission]);
 
   const handleSearch = useCallback(async () => {
-    if (!searchText.trim()) {
+    const currentSearchText = searchTextRef.current.trim();
+    if (!currentSearchText) {
       setError('Please enter a location to search.');
       return;
     }
@@ -243,7 +243,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     setSearching(true);
     
     try {
-      await searchByLocationName(searchText.trim());
+      await searchByLocationName(currentSearchText);
     } catch (error) {
       console.error('Search error:', error);
       const errorMessage = 'Unable to search for that location. Please check your internet connection and try again.';
@@ -252,9 +252,9 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     } finally {
       setSearching(false);
     }
-  }, [searchText]);
+  }, [searchByLocationName]); // Only depend on the search function
 
-  const handleRetry = async () => {
+  const handleRetry = useCallback(async () => {
     if (retryCount >= 3) {
       setError('Maximum retry attempts reached. Please check your internet connection.');
       return;
@@ -263,12 +263,12 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     setRetryCount(prev => prev + 1);
     setError(null);
     
-    if (searchText.trim()) {
+    if (searchTextRef.current.trim()) {
       await handleSearch();
     } else {
       await requestLocationPermission();
     }
-  };
+  }, [retryCount, handleSearch, requestLocationPermission]);
 
   const handleUseMyLocation = useCallback(async () => {
     if (userLocation) {
@@ -278,6 +278,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         'your location'
       );
       setSearchText('');
+      searchTextRef.current = ''; // Keep ref in sync
     } else {
       await requestLocationPermission();
     }
@@ -880,106 +881,44 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     </Box>
   );
 
-  // Clean Search Input Component
-  const SearchInput = memo(({
-    value, 
-    onChangeText, 
-    onSubmitEditing, 
-    searching, 
-    placeholder = "Search by city or location" 
-  }: {
-    value: string;
-    onChangeText: (text: string) => void;
-    onSubmitEditing: () => void;
-    searching: boolean;
-    placeholder?: string;
-  }) => (
-    <Box className="relative">
-      <Input 
-        className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" 
-        size="lg"
-        style={{ minHeight: 48 }}
-      >
-        <InputSlot className="absolute left-3 top-1/2 transform -translate-y-1/2">
-          <Search size={18} color="#6B7280" />
-        </InputSlot>
-        <InputField
-          placeholder={placeholder}
-          placeholderTextColor="#9CA3AF"
-          value={value}
-          onChangeText={onChangeText}
-          onSubmitEditing={onSubmitEditing}
-          returnKeyType="search"
-          editable={!searching}
-          className="py-3 pr-10 pl-10 text-base"
-          style={{ color: Colors.text.head }}
-          accessibilityLabel="Search for law firms by location"
-          autoCorrect={false}
-          autoCapitalize="words"
-          blurOnSubmit={false}
-        />
-        {searching && (
-          <InputSlot className="absolute right-3 top-1/2 transform -translate-y-1/2">
-            <Spinner size="small" color={Colors.primary.blue} />
-          </InputSlot>
-        )}
-      </Input>
-    </Box>
-  ));
-  SearchInput.displayName = 'SearchInput';
 
-  // Mobile-Optimized Search Component
-  const MobileSearchInput = memo(({
-    value, 
-    onChangeText, 
-    onSubmitEditing, 
-    searching 
-  }: {
-    value: string;
-    onChangeText: (text: string) => void;
-    onSubmitEditing: () => void;
-    searching: boolean;
-  }) => (
-    <TextInput
-      ref={searchInputRef}
-      className="flex-1 text-base font-medium"
-      placeholder="Type city name (e.g., Manila)"
-      placeholderTextColor="#9CA3AF"
-      value={value}
-      onChangeText={onChangeText}
-      onSubmitEditing={onSubmitEditing}
-      returnKeyType="search"
-      editable={!searching}
-      style={{ 
-        color: Colors.text.head,
-        paddingVertical: 12, // Better touch target
-        lineHeight: 20
-      }}
-      accessibilityLabel="Search for law firms by location"
-      accessibilityHint="Type a city name to find nearby law firms"
-      autoCorrect={false}
-      autoCapitalize="words"
-      blurOnSubmit={false}
-    />
-  ));
-  MobileSearchInput.displayName = 'MobileSearchInput';
-
-  // Memoized search text change handler
-  const handleSearchTextChange = useCallback((text: string) => {
+  // Simple search text change handler - no memoization needed
+  const handleSearchTextChange = (text: string) => {
     setSearchText(text);
+    searchTextRef.current = text; // Keep ref in sync
+    // Clear error when user starts typing
     if (error) setError(null);
+    // Reset retry count when user types
     if (text.length > 0) setRetryCount(0);
-  }, [error, setRetryCount]);
+  };
 
-  // Clean Search Header Component
-  const renderSearchHeader = useCallback(() => (
+  // Clean Search Header Component - no memoization needed
+  const renderSearchHeader = () => (
     <VStack space="md" className="px-4 py-4 bg-white">
-      <SearchInput
-        value={searchText}
-        onChangeText={handleSearchTextChange}
-        onSubmitEditing={handleSearch}
-        searching={searching}
-      />
+      <Box className="relative">
+        <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ minHeight: 48 }}>
+          <HStack className="items-center px-3">
+            <Search size={18} color="#6B7280" />
+            <TextInput
+              className="flex-1 py-3 px-3 text-base"
+              placeholder="Search by city or location"
+              placeholderTextColor="#9CA3AF"
+              value={searchText}
+              onChangeText={handleSearchTextChange}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+              editable={!searching}
+              style={{ color: Colors.text.head }}
+              autoCorrect={false}
+              autoCapitalize="words"
+              blurOnSubmit={false}
+            />
+            {searching && (
+              <Spinner size="small" color={Colors.primary.blue} />
+            )}
+          </HStack>
+        </Box>
+      </Box>
 
       <HStack space="sm" className="items-center">
         <Pressable
@@ -1011,7 +950,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         </Text>
       )}
     </VStack>
-  ), [SearchInput, searchText, handleSearchTextChange, handleSearch, searching, handleUseMyLocation, error, lawFirms.length, currentLocationName]);
+  );
 
   if (loading && lawFirms.length === 0) {
     return <LoadingState />;
@@ -1029,11 +968,23 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
               <Box className="bg-white rounded-lg border border-gray-200">
                 <HStack space="sm" className="items-center p-3">
                   <Search size={16} color="#6B7280" />
-                  <MobileSearchInput
+                  <TextInput
+                    className="flex-1 text-base font-medium"
+                    placeholder="Type city name (e.g., Manila)"
+                    placeholderTextColor="#9CA3AF"
                     value={searchText}
                     onChangeText={handleSearchTextChange}
                     onSubmitEditing={handleSearch}
-                    searching={searching}
+                    returnKeyType="search"
+                    editable={!searching}
+                    style={{ 
+                      color: Colors.text.head,
+                      paddingVertical: 12,
+                      lineHeight: 20
+                    }}
+                    autoCorrect={false}
+                    autoCapitalize="words"
+                    blurOnSubmit={false}
                   />
                   {searching ? (
                     <Spinner size="small" color={Colors.primary.blue} />
