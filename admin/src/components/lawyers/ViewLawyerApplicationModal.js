@@ -34,6 +34,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
   const [saveLoading, setSaveLoading] = React.useState(false);
   const [saveError, setSaveError] = React.useState(null);
 
+
   // Extract the actual application data from the API response
   const applicationData = application?.data || application;
 
@@ -158,6 +159,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
   const handleExportAuditPDF = () => {
     exportAuditTrailPDF(auditLogs, fullName, email, admin, applicationData?.id);
   };
+
 
   // Handle save in edit mode
   const handleSave = async () => {

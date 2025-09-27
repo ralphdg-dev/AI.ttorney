@@ -9,12 +9,13 @@ class LawyerApplicationsService {
   // Get all lawyer applications
   async getLawyerApplications(params = {}) {
     try {
-      const { page = 1, limit = 10, search = '', status = 'all' } = params;
+      const { page = 1, limit = 10, search = '', status = 'all', archived = 'active' } = params;
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
         search,
-        status
+        status,
+        archived
       });
 
       const response = await fetch(`${API_BASE_URL}/lawyer-applications?${queryParams}`, {
@@ -256,6 +257,31 @@ class LawyerApplicationsService {
       return data;
     } catch (error) {
       console.error('Create audit log error:', error);
+      throw error;
+    }
+  }
+
+  // Archive/Unarchive lawyer application
+  async archiveApplication(applicationId, archived) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/lawyer-applications/${applicationId}/archive`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        },
+        body: JSON.stringify({ archived })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to ${archived ? 'archive' : 'unarchive'} application`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error(`${archived ? 'Archive' : 'Unarchive'} application error:`, error);
       throw error;
     }
   }

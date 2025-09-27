@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Eye, Archive, Check, X, Pencil, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { Users, Eye, Archive, ArchiveRestore, Check, X, Pencil, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RotateCcw, RefreshCw } from 'lucide-react';
 import ViewLawyerApplicationModal from '../../components/lawyers/ViewLawyerApplicationModal';
 import DataTable from '../../components/ui/DataTable';
 import Tooltip from '../../components/ui/Tooltip';
@@ -7,8 +7,12 @@ import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import lawyerApplicationsService from '../../services/lawyerApplicationsService';
 
-const StatusBadge = ({ status }) => {
+const StatusBadge = ({ status, isArchived = false }) => {
   const getStatusStyles = (status) => {
+    if (isArchived) {
+      return 'bg-gray-200 text-gray-600 border border-gray-300';
+    }
+    
     switch (status?.toLowerCase()) {
       case 'approved':
       case 'accepted':
@@ -30,7 +34,7 @@ const StatusBadge = ({ status }) => {
       case 'rejected': return 'Rejected';
       case 'resubmission': return 'Resubmission';
       case 'pending': return 'Pending';
-      default: return status || 'Pending';
+      default: return 'Unknown';
     }
   };
 
@@ -41,12 +45,19 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const RollMatchBadge = ({ status }) => {
+const RollMatchBadge = ({ status, isArchived = false }) => {
   const s = (status || '').toLowerCase();
   const isMatched = s === 'matched';
-  const styles = isMatched
-    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-    : 'bg-red-50 text-red-700 border border-red-200';
+  
+  let styles;
+  if (isArchived) {
+    styles = 'bg-gray-200 text-gray-600 border border-gray-300';
+  } else {
+    styles = isMatched
+      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+      : 'bg-red-50 text-red-700 border border-red-200';
+  }
+  
   const label = isMatched ? 'Matched' : 'Not Found';
   return (
     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
@@ -57,7 +68,7 @@ const RollMatchBadge = ({ status }) => {
 
 const ManageLawyerApplications = () => {
   const [query, setQuery] = React.useState('');
-  const [statusFilter, setStatusFilter] = React.useState('All');
+  const [combinedFilter, setCombinedFilter] = React.useState('Active');
   const [sortBy, setSortBy] = React.useState('Newest');
   const [data, setData] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -94,11 +105,35 @@ const ManageLawyerApplications = () => {
       setLoading(true);
       setError(null);
       
+      // Parse combined filter to extract status and archived parameters
+      let status = 'all';
+      let archived = 'active';
+      
+      if (combinedFilter === 'Active') {
+        status = 'all';
+        archived = 'active';
+      } else if (combinedFilter === 'Archived') {
+        status = 'all';
+        archived = 'archived';
+      } else if (combinedFilter === 'All') {
+        status = 'all';
+        archived = 'all';
+      } else if (combinedFilter.includes('Active -')) {
+        // Handle "Active - Pending", "Active - Accepted", etc.
+        status = combinedFilter.replace('Active - ', '').toLowerCase();
+        archived = 'active';
+      } else if (combinedFilter.includes('Archived -')) {
+        // Handle "Archived - Pending", "Archived - Accepted", etc.
+        status = combinedFilter.replace('Archived - ', '').toLowerCase();
+        archived = 'archived';
+      }
+
       const params = {
         page: pagination.page,
         limit: pagination.limit,
         search: query,
-        status: statusFilter === 'All' ? 'all' : statusFilter.toLowerCase()
+        status,
+        archived
       };
       
       const response = await lawyerApplicationsService.getLawyerApplications(params);
@@ -110,7 +145,7 @@ const ManageLawyerApplications = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, query, statusFilter]);
+  }, [pagination.page, pagination.limit, query, combinedFilter]);
 
   // Load data on component mount and when filters change
   React.useEffect(() => {
@@ -159,6 +194,20 @@ const ManageLawyerApplications = () => {
     loadData();
   };
 
+  // Handle archive button click
+  const handleArchive = (row) => {
+    const isCurrentlyArchived = row.archived === true;
+    const modalType = isCurrentlyArchived ? 'unarchive' : 'archive';
+    
+    setConfirmationModal({
+      open: true,
+      type: modalType,
+      applicationId: row.id,
+      applicantName: row.users?.full_name || row.full_name || 'Unknown',
+      loading: false
+    });
+  };
+
   // Helper function to get modal content based on type
   const getModalContent = () => {
     const { type, applicantName } = confirmationModal;
@@ -191,6 +240,22 @@ const ManageLawyerApplications = () => {
           feedbackLabel: 'Feedback for Resubmission',
           feedbackPlaceholder: 'Please explain what needs to be corrected or improved...',
           onConfirm: confirmResubmission
+        };
+      case 'archive':
+        return {
+          title: 'Archive Application',
+          message: `Are you sure you want to archive this application? Archived applications will be hidden from the main list but can be accessed through the "Archived" filter.`,
+          confirmText: 'Archive Application',
+          showFeedbackInput: false,
+          onConfirm: confirmArchive
+        };
+      case 'unarchive':
+        return {
+          title: 'Unarchive Application',
+          message: `Are you sure you want to unarchive this application? It will be restored to the active applications list.`,
+          confirmText: 'Unarchive Application',
+          showFeedbackInput: false,
+          onConfirm: confirmArchive
         };
       default:
         return {};
@@ -279,6 +344,25 @@ const ManageLawyerApplications = () => {
     } catch (err) {
       console.error('Failed to request resubmission:', err);
       alert('Failed to request resubmission: ' + err.message);
+      setConfirmationModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Handle archive/unarchive application
+  const confirmArchive = async () => {
+    const { applicationId, applicantName, type } = confirmationModal;
+    const isArchiving = type === 'archive';
+    
+    try {
+      setConfirmationModal(prev => ({ ...prev, loading: true }));
+      
+      await lawyerApplicationsService.archiveApplication(applicationId, isArchiving);
+      await loadData(); // Reload data
+      setConfirmationModal({ open: false, type: '', applicationId: null, applicantName: '', loading: false });
+      
+    } catch (err) {
+      console.error(`Failed to ${isArchiving ? 'archive' : 'unarchive'} application:`, err);
+      alert(`Failed to ${isArchiving ? 'archive' : 'unarchive'} application: ` + err.message);
       setConfirmationModal(prev => ({ ...prev, loading: false }));
     }
   };
@@ -430,12 +514,12 @@ const ManageLawyerApplications = () => {
       render: (row) => (
         <div className="flex items-center gap-2">
           <span>{row.roll_number}</span>
-          <RollMatchBadge status={row.pra_status} />
+          <RollMatchBadge status={row.pra_status} isArchived={row.archived === true} />
         </div>
       )
     },
-    { 
-      key: 'roll_sign_date', 
+    {
+      key: 'roll_sign_date',
       header: (
         <button
           className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
@@ -468,10 +552,14 @@ const ManageLawyerApplications = () => {
       header: 'Application',
       render: (row) => {
         const isNew = row.application_type === 'New Application';
+        const isArchived = row.archived === true;
         
         if (isNew) {
+          const styles = isArchived 
+            ? 'bg-gray-200 text-gray-600 border border-gray-300'
+            : 'bg-green-50 text-green-700 border border-green-200';
           return (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">
+            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
               1st Application
             </span>
           );
@@ -482,8 +570,12 @@ const ManageLawyerApplications = () => {
         const attemptNumber = attemptMatch ? attemptMatch[1] : '2';
         const suffix = attemptMatch ? attemptMatch[2] : 'nd';
         
+        const styles = isArchived 
+          ? 'bg-gray-200 text-gray-600 border border-gray-300'
+          : 'bg-orange-50 text-orange-700 border border-orange-200';
+        
         return (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-50 text-orange-700 border border-orange-200">
+          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
             {attemptNumber}{suffix} Attempt
           </span>
         );
@@ -500,7 +592,7 @@ const ManageLawyerApplications = () => {
             </span>
           );
         }
-        return <StatusBadge status={row.prior_status} />;
+        return <StatusBadge status={row.prior_status} isArchived={row.archived === true} />;
       }
     },
     {
@@ -522,7 +614,7 @@ const ManageLawyerApplications = () => {
           )}
         </button>
       ),
-      render: (row) => <StatusBadge status={row.status} />
+      render: (row) => <StatusBadge status={row.status} isArchived={row.archived === true} />
     },
     {
       key: 'approval',
@@ -573,33 +665,59 @@ const ManageLawyerApplications = () => {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      render: (row) => (
-        <div className="flex items-center justify-end space-x-2 text-gray-600">
-          <Tooltip content="View">
-            <button 
-              className="p-1 rounded hover:bg-gray-100" 
-              aria-label="View" 
-              onClick={() => openView(row)}
-            >
-              <Eye size={16} />
-            </button>
-          </Tooltip>
-          <Tooltip content="Edit">
-            <button 
-              className="p-1 rounded hover:bg-gray-100" 
-              aria-label="Edit"
-              onClick={() => handleEdit(row)}
-            >
-              <Pencil size={16} />
-            </button>
-          </Tooltip>
-          <Tooltip content="Archive">
-            <button className="p-1 rounded hover:bg-gray-100" aria-label="Archive">
-              <Archive size={16} />
-            </button>
-          </Tooltip>
-        </div>
-      ),
+      render: (row) => {
+        const isArchived = row.archived === true;
+        return (
+          <div className="flex items-center justify-end space-x-2 text-gray-600">
+            <Tooltip content="View">
+              <button 
+                className="p-1 rounded hover:bg-gray-100" 
+                aria-label="View" 
+                onClick={() => openView(row)}
+              >
+                <Eye size={16} />
+              </button>
+            </Tooltip>
+            
+            {/* Edit button - always show */}
+            <Tooltip content="Edit">
+              <button 
+                className="p-1 rounded hover:bg-gray-100" 
+                aria-label="Edit"
+                onClick={() => handleEdit(row)}
+              >
+                <Pencil size={16} />
+              </button>
+            </Tooltip>
+            
+            {/* Archive button for active applications */}
+            {!isArchived && (
+              <Tooltip content="Archive">
+                <button 
+                  className="p-1 rounded hover:bg-gray-100" 
+                  aria-label="Archive"
+                  onClick={() => handleArchive(row)}
+                >
+                  <Archive size={16} />
+                </button>
+              </Tooltip>
+            )}
+            
+            {/* Unarchive button for archived applications */}
+            {isArchived && (
+              <Tooltip content="Unarchive">
+                <button 
+                  className="p-1 rounded hover:bg-green-100 text-green-600" 
+                  aria-label="Unarchive"
+                  onClick={() => handleArchive(row)}
+                >
+                  <RefreshCw size={16} />
+                </button>
+              </Tooltip>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -652,10 +770,22 @@ const ManageLawyerApplications = () => {
           query={query}
           onQueryChange={setQuery}
           filter={{ 
-            value: statusFilter, 
-            onChange: setStatusFilter, 
-            options: ['All', 'Pending', 'Accepted', 'Rejected', 'Resubmission'], 
-            label: 'Filter by status' 
+            value: combinedFilter, 
+            onChange: setCombinedFilter, 
+            options: [
+              'Active',
+              'Active - Pending', 
+              'Active - Accepted', 
+              'Active - Rejected', 
+              'Active - Resubmission',
+              'Archived',
+              'Archived - Pending',
+              'Archived - Accepted', 
+              'Archived - Rejected', 
+              'Archived - Resubmission',
+              'All'
+            ], 
+            label: 'Filter applications' 
           }}
           sort={{ 
             value: sortBy, 

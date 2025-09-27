@@ -55,15 +55,15 @@ router.get('/test', authenticateAdmin, async (req, res) => {
 // Get all lawyer applications
 router.get('/', authenticateAdmin, async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', status = 'all' } = req.query;
+    const { page = 1, limit = 10, search = '', status = 'all', archived = 'active' } = req.query;
     const offset = (page - 1) * limit;
 
-    console.log('Fetching lawyer applications with params:', { page, limit, search, status });
+    console.log('Fetching lawyer applications with params:', { page, limit, search, status, archived });
 
     // First, get the latest application ID for each user based on submitted_at
     const { data: latestApplications, error: latestError } = await supabaseAdmin
       .from('lawyer_applications')
-      .select('user_id, id, submitted_at')
+      .select('user_id, id, submitted_at, archived')
       .order('submitted_at', { ascending: false });
 
     if (latestError) {
@@ -113,6 +113,14 @@ router.get('/', authenticateAdmin, async (req, res) => {
       .in('id', latestApplicationIds)
       .order('submitted_at', { ascending: false });
 
+    // Add archived filter
+    if (archived === 'active') {
+      query = query.eq('archived', false);
+    } else if (archived === 'archived') {
+      query = query.eq('archived', true);
+    }
+    // If archived === 'all', don't add any archived filter
+
     // Add status filter if provided
     if (status !== 'all') {
       query = query.eq('status', status);
@@ -138,11 +146,14 @@ router.get('/', authenticateAdmin, async (req, res) => {
     }
 
     console.log('Found applications:', applications?.length || 0);
+    console.log('Sample application data:', applications?.[0]); // Debug: check if archived field is included
 
     // Get application type for each application (check if user has previous applications)
     const applicationsWithType = [];
     
     for (const app of applications || []) {
+      // Ensure archived field is properly converted to boolean
+      app.archived = app.archived === true || app.archived === 'true';
       // Check if user has previous applications
       const { data: previousApps, error: prevError } = await supabaseAdmin
         .from('lawyer_applications')
@@ -156,16 +167,16 @@ router.get('/', authenticateAdmin, async (req, res) => {
       
       if (!prevError && previousApps && previousApps.length > 0) {
         // User has previous applications, this is a resubmission
-        applicationType = `Resubmission (${previousApps.length + 1}${getOrdinalSuffix(previousApps.length + 1)} attempt)`;
-        // Get the status of the most recent previous application
-        priorStatus = previousApps[0].status;
+        applicationType = 'Resubmission';
+        priorStatus = previousApps[0]?.status || 'Unknown';
       }
 
       applicationsWithType.push({
+        ...app,
         id: app.id,
         user_id: app.user_id,
-        full_name: app.users?.full_name || 'N/A',
-        email: app.users?.email || 'N/A',
+        full_name: app.full_name || app.users?.full_name || 'Unknown',
+        email: app.users?.email || 'Unknown',
         roll_number: app.roll_number || 'N/A',
         roll_sign_date: app.roll_signing_date || null,
         status: app.status || 'pending',
@@ -177,7 +188,8 @@ router.get('/', authenticateAdmin, async (req, res) => {
         admin_notes: app.admin_notes || null,
         ibp_card_path: app.ibp_id || null,
         selfie_path: app.selfie || null,
-        birthdate: app.users?.birthdate || null
+        birthdate: app.users?.birthdate || null,
+        archived: app.archived // Include the archived field in the response
       });
     }
 
@@ -1121,6 +1133,101 @@ router.post('/:id/audit-logs', authenticateAdmin, async (req, res) => {
 
   } catch (error) {
     console.error('Create audit log error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Archive/Unarchive lawyer application
+router.patch('/:id/archive', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { archived } = req.body; // true to archive, false to unarchive
+    const adminId = req.admin.id;
+
+    // Validate required fields
+    if (typeof archived !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: 'Archived field is required and must be boolean'
+      });
+    }
+
+    // Validate application exists
+    const { data: application, error: appError } = await supabaseAdmin
+      .from('lawyer_applications')
+      .select('id, full_name, archived')
+      .eq('id', id)
+      .single();
+
+    if (appError || !application) {
+      return res.status(404).json({
+        success: false,
+        error: 'Application not found'
+      });
+    }
+
+    // Update archived status
+    const { data: updatedApp, error: updateError } = await supabaseAdmin
+      .from('lawyer_applications')
+      .update({ 
+        archived: archived
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Archive update error:', updateError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update archive status: ' + updateError.message
+      });
+    }
+
+    // Create audit log for archive action
+    const action = archived ? 'ARCHIVED_APPLICATION' : 'UNARCHIVED_APPLICATION';
+    const metadata = {
+      previous_archived: application.archived,
+      new_archived: archived,
+      admin_id: adminId,
+      timestamp: new Date().toISOString()
+    };
+
+    try {
+      const auditData = {
+        action,
+        target_table: 'lawyer_applications',
+        actor_id: adminId,
+        role: req.admin.role,
+        target_id: id,
+        metadata: metadata,
+        created_at: new Date().toISOString()
+      };
+
+      const { error: auditError } = await supabaseAdmin
+        .from('admin_audit_logs')
+        .insert(auditData);
+
+      if (auditError) {
+        console.error('Audit log error:', auditError);
+      }
+    } catch (auditError) {
+      console.error('Failed to create audit log:', auditError);
+    }
+
+    console.log(`Application ${archived ? 'archived' : 'unarchived'}: ${id} by admin ${adminId}`);
+
+    res.json({
+      success: true,
+      data: updatedApp,
+      message: `Application ${archived ? 'archived' : 'unarchived'} successfully`
+    });
+
+  } catch (error) {
+    console.error('Archive operation error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
