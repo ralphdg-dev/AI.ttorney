@@ -32,7 +32,12 @@ async def get_nearby_places(request: NearbySearchRequest):
     """
     try:
         # Get Google Maps API key from environment
-        api_key = os.getenv("GOOGLE_MAPS_API_KEY", "AIzaSyD0OPK0U7WdEwlzNh7XKsYpYVMyHea-G80")
+        api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+        if not api_key:
+            return JSONResponse(
+                status_code=500,
+                content={"success": False, "error": "Google Maps API key not configured"}
+            )
         
         # Construct Google Places API URL
         url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
@@ -101,7 +106,12 @@ async def geocode_address(request: GeocodeRequest):
     Geocode an address to get coordinates
     """
     try:
-        api_key = os.getenv("GOOGLE_MAPS_API_KEY", "AIzaSyD0OPK0U7WdEwlzNh7XKsYpYVMyHea-G80")
+        api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+        if not api_key:
+            return JSONResponse(
+                status_code=500,
+                content={"success": False, "error": "Google Maps API key not configured"}
+            )
         
         url = "https://maps.googleapis.com/maps/api/geocode/json"
         params = {
@@ -167,7 +177,12 @@ async def search_by_location(request: LocationSearchRequest):
     Uses progressive radius search and precise distance calculations
     """
     try:
-        api_key = os.getenv("GOOGLE_MAPS_API_KEY", "AIzaSyD0OPK0U7WdEwlzNh7XKsYpYVMyHea-G80")
+        api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+        if not api_key:
+            return JSONResponse(
+                status_code=500,
+                content={"success": False, "error": "Google Maps API key not configured"}
+            )
         
         # First, geocode the location name
         geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"

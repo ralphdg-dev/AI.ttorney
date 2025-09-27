@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: true,
     bundleIdentifier: 'com.aittorney.app',
     config: {
-      googleMapsApiKey: 'AIzaSyD0OPK0U7WdEwlzNh7XKsYpYVMyHea-G80',
+      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
     },
   },
   android: {
@@ -26,7 +26,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: 'com.aittorney.app',
     config: {
       googleMaps: {
-        apiKey: 'AIzaSyD0OPK0U7WdEwlzNh7XKsYpYVMyHea-G80',
+        apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       },
     },
   },

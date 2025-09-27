@@ -199,6 +199,7 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
   };
 
   const generateMapHTML = () => {
+    const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
     const markers = lawFirms.map(firm => ({
       lat: firm.latitude,
       lng: firm.longitude,
@@ -370,7 +371,7 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
             
             window.initMap = initMap;
         </script>
-        <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD0OPK0U7WdEwlzNh7XKsYpYVMyHea-G80&callback=initMap"></script>
+        <script async defer src="https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&callback=initMap"></script>
     </body>
     </html>
     `;

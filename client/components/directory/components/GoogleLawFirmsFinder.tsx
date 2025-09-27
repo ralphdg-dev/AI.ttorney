@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, memo, useMemo } from 'react';
 import { Linking, Platform, Alert, ScrollView, TextInput } from 'react-native';
 import * as Location from 'expo-location';
 import { VStack } from '@/components/ui/vstack';
@@ -8,7 +8,7 @@ import { Button, ButtonText } from '@/components/ui/button';
 import { Input, InputField, InputSlot } from '@/components/ui/input';
 import { Box } from '@/components/ui/box';
 import { Pressable } from '@/components/ui/pressable';
-import { Badge, BadgeText } from '@/components/ui/badge';
+// Badge components removed as they're no longer used
 import { Spinner } from '@/components/ui/spinner';
 import { Search, MapPin, Locate, Phone, Navigation, Star } from 'lucide-react-native';
 import Colors from '../../../constants/Colors';
@@ -19,6 +19,7 @@ interface LawFirm {
   address: string;
   phone?: string;
   rating?: number;
+  user_ratings_total?: number; // Actual review count from Google Places API
   types: string[];
   latitude: number;
   longitude: number;
@@ -42,6 +43,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const [webViewSupported, setWebViewSupported] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const searchInputRef = useRef<TextInput>(null);
 
 
   // Search law firms using backend proxy (avoids CORS issues)
@@ -79,6 +81,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           address: place.vicinity || place.formatted_address || 'Address not available',
           phone: place.formatted_phone_number,
           rating: place.rating,
+          user_ratings_total: place.user_ratings_total, // Real review count from Google
           types: place.types || [],
           latitude: place.geometry.location.lat,
           longitude: place.geometry.location.lng,
@@ -136,6 +139,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           address: place.vicinity || place.formatted_address || 'Address not available',
           phone: place.formatted_phone_number,
           rating: place.rating,
+          user_ratings_total: place.user_ratings_total, // Real review count from Google
           types: place.types || [],
           latitude: place.geometry.location.lat,
           longitude: place.geometry.location.lng,
@@ -231,7 +235,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     requestLocationPermission();
   }, [requestLocationPermission]);
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     if (!searchText.trim()) {
       setError('Please enter a location to search.');
       return;
@@ -249,7 +253,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     } finally {
       setSearching(false);
     }
-  };
+  }, [searchText]);
 
   const handleRetry = async () => {
     if (retryCount >= 3) {
@@ -267,7 +271,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     }
   };
 
-  const handleUseMyLocation = async () => {
+  const handleUseMyLocation = useCallback(async () => {
     if (userLocation) {
       await searchLawFirmsViaProxy(
         userLocation.coords.latitude, 
@@ -278,9 +282,9 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     } else {
       await requestLocationPermission();
     }
-  };
+  }, [userLocation, requestLocationPermission]);
 
-  const handleCallPress = (phone: string) => {
+  const handleCallPress = useCallback((phone: string) => {
     if (phone) {
       const phoneUrl = `tel:${phone}`;
       Linking.canOpenURL(phoneUrl)
@@ -293,9 +297,9 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         })
         .catch((error) => console.error('Error opening phone app:', error));
     }
-  };
+  }, []);
 
-  const handleDirectionsPress = (latitude: number, longitude: number, name: string) => {
+  const handleDirectionsPress = useCallback((latitude: number, longitude: number, name: string) => {
     const scheme = Platform.select({
       ios: 'maps:0,0?q=',
       android: 'geo:0,0?q=',
@@ -320,9 +324,9 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         })
         .catch((error) => console.error('Error opening maps app:', error));
     }
-  };
+  }, []);
 
-  const handleWebViewMessage = (event: any) => {
+  const handleWebViewMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       
@@ -334,18 +338,105 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     } catch (error) {
       console.error('Error handling WebView message:', error);
     }
-  };
+  }, [handleCallPress, handleDirectionsPress]);
 
-  const generateMapHTML = () => {
+
+  const renderStars = useCallback((rating: number) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const yellowColor = '#FBBF24';
+    
+    for (let i = 0; i < 5; i++) {
+      stars.push(
+        <Star
+          key={i}
+          size={14}
+          fill={i < fullStars ? yellowColor : 'transparent'}
+          color={i < fullStars ? yellowColor : '#E5E7EB'}
+        />
+      );
+    }
+    
+    return stars;
+  }, []);
+
+  const calculateDistance = useCallback((lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // Radius of the Earth in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }, []);
+
+  // Smart sorting algorithm: prioritize nearest + highest rated law firms
+  const sortLawFirmsByQuality = useCallback((firms: LawFirm[]) => {
+    return [...firms].sort((a, b) => {
+      // Calculate distances if not provided
+      const distanceA = a.distance_km !== undefined ? a.distance_km : 
+        userLocation ? calculateDistance(
+          userLocation.coords.latitude, 
+          userLocation.coords.longitude, 
+          a.latitude, 
+          a.longitude
+        ) : 999;
+      
+      const distanceB = b.distance_km !== undefined ? b.distance_km : 
+        userLocation ? calculateDistance(
+          userLocation.coords.latitude, 
+          userLocation.coords.longitude, 
+          b.latitude, 
+          b.longitude
+        ) : 999;
+
+      // Normalize ratings (0-5 scale, default to 3 if no rating)
+      const ratingA = a.rating || 3;
+      const ratingB = b.rating || 3;
+
+      // Smart scoring algorithm:
+      // - Distance weight: 60% (closer is better)
+      // - Rating weight: 40% (higher rating is better)
+      // - Distance penalty increases exponentially for far locations
+      
+      const maxDistance = 50; // km - beyond this, heavy penalty
+      const distancePenaltyA = Math.min(distanceA / maxDistance, 2); // Cap at 2x penalty
+      const distancePenaltyB = Math.min(distanceB / maxDistance, 2);
+      
+      // Calculate composite scores (higher is better)
+      const scoreA = (ratingA / 5) * 0.4 + (1 / (1 + distancePenaltyA)) * 0.6;
+      const scoreB = (ratingB / 5) * 0.4 + (1 / (1 + distancePenaltyB)) * 0.6;
+
+      // Special boost for highly rated nearby firms
+      const nearbyBoostA = (distanceA <= 5 && ratingA >= 4.0) ? 0.1 : 0;
+      const nearbyBoostB = (distanceB <= 5 && ratingB >= 4.0) ? 0.1 : 0;
+
+      const finalScoreA = scoreA + nearbyBoostA;
+      const finalScoreB = scoreB + nearbyBoostB;
+
+      return finalScoreB - finalScoreA; // Sort descending (best first)
+    });
+  }, [userLocation, calculateDistance]);
+
+  // Memoized sorted law firms for optimal performance
+  const sortedLawFirms = useMemo(() => {
+    return sortLawFirmsByQuality(lawFirms);
+  }, [lawFirms, sortLawFirmsByQuality]);
+
+  // Generate sorted map HTML for better marker ordering
+  const generateSortedMapHTML = useCallback(() => {
     const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
     
-    const markers = lawFirms.map(firm => ({
+    const markers = sortedLawFirms.map(firm => ({
       lat: firm.latitude,
       lng: firm.longitude,
       title: firm.name,
       address: firm.address,
       phone: firm.phone,
       rating: firm.rating,
+      user_ratings_total: firm.user_ratings_total,
       id: firm.id,
       distance_km: firm.distance_km
     }));
@@ -478,10 +569,10 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                 });
                 ` : ''}
                 
-                // Add law firm markers
+                // Add law firm markers (sorted by quality)
                 const markers = ${JSON.stringify(markers)};
                 
-                markers.forEach(marker => {
+                markers.forEach((marker, index) => {
                     const mapMarker = new google.maps.Marker({
                         position: { lat: marker.lat, lng: marker.lng },
                         map: map,
@@ -490,7 +581,8 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                             url: "data:image/svg+xml;charset=UTF-8,%3csvg width='32' height='40' viewBox='0 0 32 40' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M16 0C7.2 0 0 7.2 0 16c0 12 16 24 16 24s16-12 16-24c0-8.8-7.2-16-16-16z' fill='%23EA4335'/%3e%3ccircle cx='16' cy='16' r='6' fill='white'/%3e%3c/svg%3e",
                             scaledSize: new google.maps.Size(32, 40),
                             anchor: new google.maps.Point(16, 40)
-                        }
+                        },
+                        zIndex: 1000 - index // Higher quality firms appear on top
                     });
                     
                     mapMarker.addListener("click", () => {
@@ -506,7 +598,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                                 \${marker.rating ? \`
                                     <div class="info-rating">
                                         <span class="stars">\${ratingStars}</span>
-                                        <span class="rating-text">\${marker.rating.toFixed(1)} (\${Math.floor(Math.random() * 50) + 10} reviews)</span>
+                                        <span class="rating-text">\${marker.rating.toFixed(1)} (\${marker.user_ratings_total || "No"} reviews)</span>
                                     </div>
                                 \` : ''}
                                 \${distanceText}
@@ -572,112 +664,81 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     </body>
     </html>
     `;
-  };
+  }, [sortedLawFirms, mapCenter, userLocation]);
 
-  const renderStars = (rating: number) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const yellowColor = '#FBBF24';
-    
-    for (let i = 0; i < 5; i++) {
-      stars.push(
-        <Star
-          key={i}
-          size={14}
-          fill={i < fullStars ? yellowColor : 'transparent'}
-          color={i < fullStars ? yellowColor : '#E5E7EB'}
-        />
-      );
-    }
-    
-    return stars;
-  };
-
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Radius of the Earth in kilometers
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  const renderLawFirmCard = (firm: LawFirm) => (
-    <Box key={firm.id} className="mx-4 mb-4 bg-white rounded-xl border border-gray-100 shadow-sm">
-      <VStack space="md" className="p-5">
-        {/* Header Section */}
+  const renderLawFirmCard = useCallback((firm: LawFirm) => (
+    <Box key={firm.id} className="mx-4 mb-3 bg-white rounded-lg border border-gray-200">
+      <VStack space="sm" className="p-4">
         <HStack space="sm" className="items-start">
-          <Box className="bg-blue-50 p-3 rounded-full">
-            <MapPin size={20} color={Colors.primary.blue} />
+          <Box className="bg-blue-50 p-2 rounded-lg">
+            <MapPin size={18} color={Colors.primary.blue} />
           </Box>
           
           <VStack space="xs" className="flex-1">
             <Text 
-              className="font-semibold text-lg leading-tight" 
+              className="font-semibold text-base leading-tight" 
               style={{ color: Colors.text.head }}
+              numberOfLines={2}
             >
               {firm.name}
             </Text>
             
             <Text 
-              className="text-sm leading-relaxed" 
+              className="text-sm" 
               style={{ color: Colors.text.body }}
+              numberOfLines={2}
             >
               {firm.address}
             </Text>
           </VStack>
         </HStack>
         
-        {/* Rating and Distance Section */}
-        <HStack space="md" className="items-center">
-          {firm.rating && (
+        <HStack space="md" className="items-center justify-between">
+          {firm.rating ? (
             <HStack space="xs" className="items-center">
               <HStack space="xs">
                 {renderStars(firm.rating)}
               </HStack>
-              <Text className="text-sm font-medium" style={{ color: Colors.text.sub }}>
+              <Text className="text-sm font-medium" style={{ color: Colors.text.head }}>
                 {firm.rating.toFixed(1)}
               </Text>
               <Text className="text-xs" style={{ color: Colors.text.body }}>
-                ({Math.floor(Math.random() * 50) + 10} reviews)
+                ({firm.user_ratings_total || "No reviews"})
               </Text>
             </HStack>
+          ) : (
+            <Text className="text-sm" style={{ color: Colors.text.body }}>
+              No ratings
+            </Text>
           )}
           
-          <Badge className="ml-auto bg-gray-100">
-            <BadgeText className="text-xs font-medium" style={{ color: Colors.text.body }}>
-              {firm.distance_km !== undefined ? 
-                `${firm.distance_km} km away` : 
-                userLocation ? 
-                  `${calculateDistance(
-                    userLocation.coords.latitude, 
-                    userLocation.coords.longitude, 
-                    firm.latitude, 
-                    firm.longitude
-                  ).toFixed(1)} km away` : 
-                  'Distance unavailable'
-              }
-            </BadgeText>
-          </Badge>
+          <Text className="text-xs font-medium" style={{ color: Colors.text.sub }}>
+            {firm.distance_km !== undefined ? 
+              `${firm.distance_km} km` : 
+              userLocation ? 
+                `${calculateDistance(
+                  userLocation.coords.latitude, 
+                  userLocation.coords.longitude, 
+                  firm.latitude, 
+                  firm.longitude
+                ).toFixed(1)} km` : 
+                'Distance N/A'
+            }
+          </Text>
         </HStack>
         
-        {/* Action Buttons */}
         <HStack space="sm" className="mt-2">
           {firm.phone && (
             <Button
               size="sm"
               variant="outline"
-              className="flex-1 border-gray-200"
+              className="flex-1 border-gray-300"
               onPress={() => handleCallPress(firm.phone!)}
               accessibilityLabel={`Call ${firm.name}`}
-              accessibilityHint="Opens phone app to call this law firm"
             >
               <HStack space="xs" className="items-center">
                 <Phone size={16} color={Colors.primary.blue} />
-                <ButtonText className="text-sm font-medium" style={{ color: Colors.primary.blue }}>
+                <ButtonText className="text-sm" style={{ color: Colors.primary.blue }}>
                   Call
                 </ButtonText>
               </HStack>
@@ -690,11 +751,10 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
             style={{ backgroundColor: Colors.primary.blue }}
             onPress={() => handleDirectionsPress(firm.latitude, firm.longitude, firm.name)}
             accessibilityLabel={`Get directions to ${firm.name}`}
-            accessibilityHint="Opens maps app with directions to this law firm"
           >
             <HStack space="xs" className="items-center">
               <Navigation size={16} color="white" />
-              <ButtonText className="text-sm font-medium text-white">
+              <ButtonText className="text-sm text-white">
                 Directions
               </ButtonText>
             </HStack>
@@ -702,16 +762,14 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         </HStack>
       </VStack>
     </Box>
-  );
+  ), [handleCallPress, handleDirectionsPress, renderStars, calculateDistance, userLocation]);
 
-  // Loading State Component
+  // Clean Loading State Component
   const LoadingState = () => (
     <Box className="flex-1 justify-center items-center bg-gray-50 px-6">
-      <VStack space="lg" className="items-center">
-        <Box className="bg-white p-6 rounded-full shadow-sm">
-          <Spinner size="large" color={Colors.primary.blue} />
-        </Box>
-        <VStack space="sm" className="items-center">
+      <VStack space="md" className="items-center">
+        <Spinner size="large" color={Colors.primary.blue} />
+        <VStack space="xs" className="items-center">
           <Text className="text-lg font-semibold" style={{ color: Colors.text.head }}>
             Finding Law Firms
           </Text>
@@ -723,37 +781,32 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     </Box>
   );
 
-  // Error State Component
+  // Clean Error State Component
   const ErrorState = () => (
     <Box className="flex-1 justify-center items-center bg-gray-50 px-8">
-      <VStack space="lg" className="items-center">
-        <Box className="bg-red-50 p-8 rounded-full shadow-sm">
-          <MapPin size={48} color="#EF4444" />
-        </Box>
+      <VStack space="md" className="items-center">
         <VStack space="sm" className="items-center">
-          <Text className="text-xl font-semibold text-center" style={{ color: Colors.text.head }}>
+          <Text className="text-lg font-semibold text-center" style={{ color: Colors.text.head }}>
             Search Error
           </Text>
-          <Text className="text-sm text-center leading-relaxed" style={{ color: Colors.text.body }}>
+          <Text className="text-sm text-center" style={{ color: Colors.text.body }}>
             {error}
           </Text>
         </VStack>
-        <VStack space="sm" className="items-center">
+        <VStack space="sm" className="items-center w-full">
           <Button
-            className="mt-2"
+            className="w-full"
             style={{ backgroundColor: Colors.primary.blue }}
             onPress={handleRetry}
             disabled={retryCount >= 3}
           >
-            <HStack space="xs" className="items-center">
-              <Text className="font-medium text-white">
-                {retryCount >= 3 ? 'Max Retries Reached' : `Retry (${retryCount}/3)`}
-              </Text>
-            </HStack>
+            <ButtonText className="font-medium text-white">
+              {retryCount >= 3 ? 'Max Retries Reached' : `Try Again (${retryCount}/3)`}
+            </ButtonText>
           </Button>
           <Button
             variant="outline"
-            className="border-gray-200"
+            className="border-gray-300 w-full"
             onPress={handleUseMyLocation}
           >
             <HStack space="xs" className="items-center">
@@ -768,23 +821,20 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     </Box>
   );
 
-  // Empty State Component
+  // Clean Empty State Component
   const EmptyState = () => (
     <Box className="flex-1 justify-center items-center bg-gray-50 px-8">
-      <VStack space="lg" className="items-center">
-        <Box className="bg-white p-8 rounded-full shadow-sm">
-          <MapPin size={48} color="#9CA3AF" />
-        </Box>
+      <VStack space="md" className="items-center">
         <VStack space="sm" className="items-center">
-          <Text className="text-xl font-semibold text-center" style={{ color: Colors.text.head }}>
+          <Text className="text-lg font-semibold text-center" style={{ color: Colors.text.head }}>
             No Law Firms Found
           </Text>
-          <Text className="text-sm text-center leading-relaxed" style={{ color: Colors.text.body }}>
-            We couldn&apos;t find any law firms in this area. Try searching for a different city or use your current location.
+          <Text className="text-sm text-center" style={{ color: Colors.text.body }}>
+            We couldn&apos;t find any law firms in this area.
           </Text>
         </VStack>
         <Button
-          className="mt-2"
+          className="w-full"
           style={{ backgroundColor: Colors.primary.blue }}
           onPress={handleUseMyLocation}
           accessibilityLabel="Search for law firms near your current location"
@@ -800,82 +850,138 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     </Box>
   );
 
-  // Search Header Component
-  const SearchHeader = () => (
-    <Box className="bg-white border-b border-gray-100">
-      <VStack space="md" className="px-4 py-4">
-        {/* Search Input */}
-        <Box className="relative">
-          <Input className="border border-gray-200 rounded-xl bg-gray-50 focus:bg-white" size="lg">
-            <InputSlot className="absolute left-4 top-4">
-              <Search size={20} color="#9CA3AF" />
-            </InputSlot>
-            <InputField
-              placeholder="Search by city, province, or location..."
-              placeholderTextColor="#9CA3AF"
-              value={searchText}
-              onChangeText={(text) => {
-                setSearchText(text);
-                if (error) setError(null);
-              }}
-              onSubmitEditing={handleSearch}
-              returnKeyType="search"
-              editable={!searching}
-              className="pl-12 py-4 text-base"
-              style={{ color: Colors.text.head }}
-              accessibilityLabel="Search for law firms by location"
-              accessibilityHint="Enter a city, province, or location name to find nearby law firms"
-            />
-            {searching && (
-              <InputSlot className="absolute right-4 top-4">
-                <Spinner size="small" color={Colors.primary.blue} />
-              </InputSlot>
-            )}
-          </Input>
-        </Box>
+  // Clean Search Input Component
+  const SearchInput = memo(({
+    value, 
+    onChangeText, 
+    onSubmitEditing, 
+    searching, 
+    placeholder = "Search by city or location" 
+  }: {
+    value: string;
+    onChangeText: (text: string) => void;
+    onSubmitEditing: () => void;
+    searching: boolean;
+    placeholder?: string;
+  }) => (
+    <Box className="relative">
+      <Input 
+        className="border border-gray-300 rounded-lg bg-white focus:border-blue-400" 
+        size="lg"
+        style={{ minHeight: 48 }}
+      >
+        <InputSlot className="absolute left-3 top-1/2 transform -translate-y-1/2">
+          <Search size={18} color="#6B7280" />
+        </InputSlot>
+        <InputField
+          placeholder={placeholder}
+          placeholderTextColor="#9CA3AF"
+          value={value}
+          onChangeText={onChangeText}
+          onSubmitEditing={onSubmitEditing}
+          returnKeyType="search"
+          editable={!searching}
+          className="pl-10 pr-10 py-3 text-base"
+          style={{ color: Colors.text.head }}
+          accessibilityLabel="Search for law firms by location"
+          autoCorrect={false}
+          autoCapitalize="words"
+          blurOnSubmit={false}
+        />
+        {searching && (
+          <InputSlot className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            <Spinner size="small" color={Colors.primary.blue} />
+          </InputSlot>
+        )}
+      </Input>
+    </Box>
+  ));
+  SearchInput.displayName = 'SearchInput';
 
-        {/* Location Button */}
+  // Mobile-Optimized Search Component
+  const MobileSearchInput = memo(({
+    value, 
+    onChangeText, 
+    onSubmitEditing, 
+    searching 
+  }: {
+    value: string;
+    onChangeText: (text: string) => void;
+    onSubmitEditing: () => void;
+    searching: boolean;
+  }) => (
+    <TextInput
+      ref={searchInputRef}
+      className="flex-1 text-base font-medium"
+      placeholder="Type city name (e.g., Manila)"
+      placeholderTextColor="#9CA3AF"
+      value={value}
+      onChangeText={onChangeText}
+      onSubmitEditing={onSubmitEditing}
+      returnKeyType="search"
+      editable={!searching}
+      style={{ 
+        color: Colors.text.head,
+        paddingVertical: 12, // Better touch target
+        lineHeight: 20
+      }}
+      accessibilityLabel="Search for law firms by location"
+      accessibilityHint="Type a city name to find nearby law firms"
+      autoCorrect={false}
+      autoCapitalize="words"
+      blurOnSubmit={false}
+    />
+  ));
+  MobileSearchInput.displayName = 'MobileSearchInput';
+
+  // Memoized search text change handler
+  const handleSearchTextChange = useCallback((text: string) => {
+    setSearchText(text);
+    if (error) setError(null);
+    if (text.length > 0) setRetryCount(0);
+  }, [error, setRetryCount]);
+
+  // Clean Search Header Component
+  const renderSearchHeader = useCallback(() => (
+    <VStack space="md" className="px-4 py-4 bg-white">
+      <SearchInput
+        value={searchText}
+        onChangeText={handleSearchTextChange}
+        onSubmitEditing={handleSearch}
+        searching={searching}
+      />
+
+      <HStack space="sm" className="items-center">
         <Pressable
-          className="bg-blue-50 border border-blue-100 rounded-xl p-4 active:bg-blue-100"
+          className="bg-gray-100 rounded-lg px-3 py-2 active:bg-gray-200 flex-1"
           onPress={handleUseMyLocation}
           disabled={searching}
-          accessibilityLabel="Use current location to find nearby law firms"
-          accessibilityRole="button"
+          accessibilityLabel="Use current location"
         >
-          <HStack space="sm" className="items-center justify-center">
-            <Locate size={18} color={Colors.primary.blue} />
-            <Text className="font-medium" style={{ color: Colors.primary.blue }}>
-              Use My Current Location
+          <HStack space="xs" className="items-center justify-center">
+            <Locate size={16} color={Colors.primary.blue} />
+            <Text className="font-medium text-sm" style={{ color: Colors.primary.blue }}>
+              Use My Location
             </Text>
           </HStack>
         </Pressable>
+      </HStack>
 
-        {/* Error Message */}
-        {error && (
-          <Box className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <Text className="text-sm text-center" style={{ color: '#DC2626' }}>
-              {error}
-            </Text>
-          </Box>
-        )}
+      {error && (
+        <Box className="bg-red-50 border border-red-200 rounded-lg p-3">
+          <Text className="text-sm" style={{ color: '#DC2626' }}>
+            {error}
+          </Text>
+        </Box>
+      )}
 
-        {/* Results Info */}
-        {lawFirms.length > 0 && (
-          <Box className="bg-gray-50 rounded-lg p-3">
-            <HStack space="sm" className="items-center">
-              <MapPin size={16} color={Colors.text.body} />
-              <Text className="font-medium" style={{ color: Colors.text.head }}>
-                {lawFirms.length} law firms found
-              </Text>
-              <Text className="text-sm" style={{ color: Colors.text.body }}>
-                in {currentLocationName}
-              </Text>
-            </HStack>
-          </Box>
-        )}
-      </VStack>
-    </Box>
-  );
+      {lawFirms.length > 0 && (
+        <Text className="font-medium text-sm px-1" style={{ color: Colors.text.sub }}>
+          {lawFirms.length} law firms found in {currentLocationName}
+        </Text>
+      )}
+    </VStack>
+  ), [SearchInput, searchText, handleSearchTextChange, handleSearch, searching, handleUseMyLocation, error, lawFirms.length, currentLocationName]);
 
   if (loading && lawFirms.length === 0) {
     return <LoadingState />;
@@ -889,78 +995,63 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           {/* Floating Search Overlay */}
           <Box className="absolute top-4 left-4 right-4 z-10">
             <VStack space="sm">
-              {/* Search Card */}
-              <Box className="bg-white rounded-2xl shadow-lg border border-gray-100">
-                <VStack space="sm" className="p-4">
-                  <HStack space="sm" className="items-center">
-                    <Search size={20} color="#9CA3AF" />
-                    <TextInput
-                      className="flex-1 text-base"
-                      placeholder="Search by city or location..."
-                      placeholderTextColor="#9CA3AF"
-                      value={searchText}
-                      onChangeText={(text) => {
-                        setSearchText(text);
-                        if (error) setError(null);
-                      }}
-                      onSubmitEditing={handleSearch}
-                      returnKeyType="search"
-                      editable={!searching}
-                      style={{ color: Colors.text.head }}
-                      accessibilityLabel="Search for law firms by location"
-                    />
-                    {searching ? (
-                      <Spinner size="small" color={Colors.primary.blue} />
-                    ) : (
-                      <Pressable onPress={handleSearch} className="px-2">
-                        <Text className="font-medium" style={{ color: Colors.primary.blue }}>
-                          Search
-                        </Text>
-                      </Pressable>
-                    )}
-                  </HStack>
-                </VStack>
+              {/* Clean Mobile Search Card */}
+              <Box className="bg-white rounded-lg border border-gray-200">
+                <HStack space="sm" className="items-center p-3">
+                  <Search size={16} color="#6B7280" />
+                  <MobileSearchInput
+                    value={searchText}
+                    onChangeText={handleSearchTextChange}
+                    onSubmitEditing={handleSearch}
+                    searching={searching}
+                  />
+                  {searching ? (
+                    <Spinner size="small" color={Colors.primary.blue} />
+                  ) : (
+                    <Pressable onPress={handleSearch} className="px-2 py-1 bg-blue-500 rounded">
+                      <Text className="font-medium text-white text-xs">
+                        Go
+                      </Text>
+                    </Pressable>
+                  )}
+                </HStack>
               </Box>
 
-              {/* Location Button */}
+              {/* Clean Location Button */}
               <Pressable 
-                className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 active:bg-gray-50"
+                className="bg-white rounded-lg px-3 py-2 border border-gray-200 active:bg-gray-50"
                 onPress={handleUseMyLocation}
                 accessibilityLabel="Use current location"
-                accessibilityRole="button"
               >
-                <HStack space="sm" className="items-center justify-center">
-                  <Locate size={16} color={Colors.primary.blue} />
-                  <Text className="font-medium text-sm" style={{ color: Colors.primary.blue }}>
-                    Use My Location
+                <HStack space="xs" className="items-center justify-center">
+                  <Locate size={14} color={Colors.primary.blue} />
+                  <Text className="font-medium text-xs" style={{ color: Colors.primary.blue }}>
+                    Near Me
                   </Text>
                 </HStack>
               </Pressable>
 
-              {/* Error Message for Mobile */}
+              {/* Clean Status Messages */}
               {error && (
-                <Box className="bg-red-50/95 rounded-lg p-2 shadow-sm border border-red-200">
-                  <Text className="text-xs text-center" style={{ color: '#DC2626' }}>
-                    {error}
+                <Box className="bg-red-100 rounded-lg px-3 py-2 border border-red-200">
+                  <Text className="text-xs text-center text-red-700 font-medium">
+                    {error.length > 40 ? error.substring(0, 40) + '...' : error}
                   </Text>
                 </Box>
               )}
 
-              {/* Results Badge */}
               {lawFirms.length > 0 && (
-                <Box className="bg-white/95 rounded-lg p-2 shadow-sm">
-                  <Text className="text-sm font-medium text-center" style={{ color: Colors.text.head }}>
-                    {lawFirms.length} law firms in {currentLocationName}
-                  </Text>
-                </Box>
+                <Text className="text-xs text-center font-medium" style={{ color: Colors.text.sub }}>
+                  {lawFirms.length} law firms found
+                </Text>
               )}
             </VStack>
           </Box>
 
           {/* Map or Empty State */}
-          {lawFirms.length > 0 ? (
+          {sortedLawFirms.length > 0 ? (
             <WebView
-              source={{ html: generateMapHTML() }}
+              source={{ html: generateSortedMapHTML() }}
               style={{ flex: 1 }}
               onMessage={handleWebViewMessage}
               javaScriptEnabled={true}
@@ -982,26 +1073,29 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           )}
         </>
       ) : (
-        // Web/Desktop: List View
-        <>
-          <SearchHeader />
+        // Web/Desktop: Fully Scrollable List View
+        <ScrollView 
+          className="flex-1" 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {renderSearchHeader()}
           
-          {lawFirms.length > 0 ? (
-            <ScrollView 
-              className="flex-1" 
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 100 }}
-            >
-              <VStack space="sm" className="py-2">
-                {lawFirms.map(renderLawFirmCard)}
-              </VStack>
-            </ScrollView>
+          {sortedLawFirms.length > 0 ? (
+            <VStack space="sm" className="py-2">
+              {sortedLawFirms.map(renderLawFirmCard)}
+            </VStack>
           ) : error ? (
-            <ErrorState />
+            <Box className="px-4">
+              <ErrorState />
+            </Box>
           ) : (
-            <EmptyState />
+            <Box className="px-4">
+              <EmptyState />
+            </Box>
           )}
-        </>
+        </ScrollView>
       )}
     </Box>
   );
