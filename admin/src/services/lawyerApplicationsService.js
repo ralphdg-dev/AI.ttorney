@@ -230,6 +230,35 @@ class LawyerApplicationsService {
       throw error;
     }
   }
+
+  // Create audit log entry
+  async createAuditLog(auditData) {
+    try {
+      console.log('Frontend Debug - Sending audit log data:', auditData);
+      
+      const response = await fetch(`${API_BASE_URL}/lawyer-applications/${auditData.application_id}/audit-logs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        },
+        body: JSON.stringify(auditData)
+      });
+
+      const data = await response.json();
+      
+      console.log('Frontend Debug - Received response:', data);
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create audit log');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Create audit log error:', error);
+      throw error;
+    }
+  }
 }
 
 export default new LawyerApplicationsService();

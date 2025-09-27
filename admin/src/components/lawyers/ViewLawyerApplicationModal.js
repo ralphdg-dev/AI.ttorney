@@ -9,10 +9,14 @@ import StatusBadge from './StatusBadge';
 import RollMatchBadge from './RollMatchBadge';
 import { exportApplicationHistoryPDF, exportAuditTrailPDF } from './PDFExportUtils';
 import lawyerApplicationsService from '../../services/lawyerApplicationsService';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Note: StableSecureImage component moved to separate SecureImage.js file
 
 const ViewLawyerApplicationModal = ({ open, onClose, application, loading = false, onViewHistoricalApplication, isHistoricalView = false, isEditMode = false, onSave }) => {
+  // Get current admin info from auth context
+  const { admin } = useAuth();
+  
   // State for application history - must be at the top before any returns
   const [history, setHistory] = React.useState([]);
   const [historyLoading, setHistoryLoading] = React.useState(false);
@@ -147,12 +151,12 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
 
   // Handle PDF export for application history
   const handleExportHistoryPDF = async () => {
-    await exportApplicationHistoryPDF(history, fullName, email, application);
+    await exportApplicationHistoryPDF(history, fullName, email, application, admin);
   };
 
   // Handle PDF export for audit trail
   const handleExportAuditPDF = () => {
-    exportAuditTrailPDF(auditLogs, fullName, email);
+    exportAuditTrailPDF(auditLogs, fullName, email, admin, application?.id);
   };
 
   // Handle save in edit mode
@@ -423,6 +427,7 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
                   fullName={fullName}
                   email={email}
                   loadAuditLogs={loadAuditLogs}
+                  applicationId={application?.id || applicationData?.id}
                 />
               </div>
             </div>

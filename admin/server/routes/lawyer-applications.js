@@ -1002,7 +1002,7 @@ router.get('/:id/audit-logs', authenticateAdmin, async (req, res) => {
       actor_name: log.admin?.full_name || 'Unknown Admin',
       actor_full_name: log.admin?.full_name || 'Unknown Admin',
       actor_email: log.admin?.email || '',
-      role: log.admin?.role || log.role || 'admin',
+      role: log.metadata?.admin_role || log.admin?.role || 'admin',
       details: log.metadata ? JSON.stringify(log.metadata, null, 2) : null,
       metadata: log.metadata,
       created_at: log.created_at
@@ -1018,6 +1018,112 @@ router.get('/:id/audit-logs', authenticateAdmin, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
+    });
+  }
+});
+
+// Create audit log for a specific application (for PDF exports, etc.)
+router.post('/:id/audit-logs', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, metadata } = req.body;
+    const adminId = req.admin.id; // From authenticateAdmin middleware
+
+    // Debug: Log what we're receiving
+    console.log('PDF Audit Log Debug - Received data:', {
+      applicationId: id,
+      action,
+      metadata,
+      adminId,
+      adminInfo: req.admin
+    });
+
+    // Validate required fields
+    if (!action) {
+      return res.status(400).json({
+        success: false,
+        error: 'Action is required'
+      });
+    }
+
+    // Validate application exists
+    const { data: application, error: appError } = await supabaseAdmin
+      .from('lawyer_applications')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (appError || !application) {
+      return res.status(404).json({
+        success: false,
+        error: 'Application not found'
+      });
+    }
+
+    // Create audit log entry
+    const auditLogData = {
+      actor_id: adminId,
+      target_table: 'lawyer_applications',
+      target_id: id,
+      action: action,
+      role: req.admin.role, // Add the role column directly
+      metadata: metadata || {},
+      created_at: new Date().toISOString()
+    };
+
+    console.log('PDF Audit Log Debug - Inserting data:', auditLogData);
+
+    const { data: auditLog, error: auditError } = await supabaseAdmin
+      .from('admin_audit_logs')
+      .insert(auditLogData)
+      .select(`
+        *,
+        admin!actor_id(
+          full_name,
+          email,
+          role
+        )
+      `)
+      .single();
+
+    if (auditError) {
+      console.error('Create audit log error:', auditError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to create audit log: ' + auditError.message
+      });
+    }
+
+    console.log('PDF Audit Log Debug - Stored audit log:', auditLog);
+
+    // Transform response for frontend
+    const transformedLog = {
+      id: auditLog.id,
+      action: auditLog.action,
+      actor_name: auditLog.admin?.full_name || 'Unknown Admin',
+      actor_full_name: auditLog.admin?.full_name || 'Unknown Admin',
+      actor_email: auditLog.admin?.email || '',
+      role: auditLog.metadata?.admin_role || auditLog.admin?.role || 'admin',
+      details: auditLog.metadata ? JSON.stringify(auditLog.metadata, null, 2) : null,
+      metadata: auditLog.metadata,
+      created_at: auditLog.created_at
+    };
+
+    console.log('PDF Audit Log Debug - Transformed response:', transformedLog);
+
+    console.log(`Audit log created: ${action} by ${auditLog.admin?.full_name} for application ${id}`);
+
+    res.status(201).json({
+      success: true,
+      data: transformedLog,
+      message: 'Audit log created successfully'
+    });
+
+  } catch (error) {
+    console.error('Create audit log error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
     });
   }
 });

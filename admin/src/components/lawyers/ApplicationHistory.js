@@ -3,6 +3,7 @@ import { FileText, Download, Eye, AlertCircle } from 'lucide-react';
 import Tooltip from '../ui/Tooltip';
 import StatusBadge from './StatusBadge';
 import { exportApplicationHistoryPDF } from './PDFExportUtils';
+import { useAuth } from '../../contexts/AuthContext';
 
 const ApplicationHistory = ({ 
   history, 
@@ -14,6 +15,8 @@ const ApplicationHistory = ({
   application,
   loadHistory
 }) => {
+  // Get current admin info from auth context
+  const { admin } = useAuth();
   // Format date for display
   const formatDate = (dateString, includeTime = true) => {
     if (!dateString) return '-';
@@ -62,7 +65,7 @@ const ApplicationHistory = ({
   };
 
   const handleExportPDF = async () => {
-    await exportApplicationHistoryPDF(history, fullName, email, application);
+    await exportApplicationHistoryPDF(history, fullName, email, application, admin);
   };
 
   // Return the original table design
@@ -148,7 +151,7 @@ const ApplicationHistory = ({
                       </td>
                       <td className="px-2 py-1.5 whitespace-nowrap text-right">
                         {/* Only show view button for historical applications (not the current one) */}
-                        {index !== 0 ? (
+                        {index !== 0 && (
                           <Tooltip content="View">
                             <button 
                               className="p-1 rounded hover:bg-gray-100" 
@@ -158,10 +161,6 @@ const ApplicationHistory = ({
                               <Eye size={12} />
                             </button>
                           </Tooltip>
-                        ) : (
-                          <span className="text-[9px] text-blue-600 font-medium px-2 py-1 bg-blue-50 rounded">
-                            Current
-                          </span>
                         )}
                       </td>
                     </tr>

@@ -2,6 +2,7 @@ import React from 'react';
 import { History, Download, AlertCircle } from 'lucide-react';
 import Tooltip from '../ui/Tooltip';
 import { exportAuditTrailPDF } from './PDFExportUtils';
+import { useAuth } from '../../contexts/AuthContext';
 
 const AuditTrail = ({ 
   auditLogs, 
@@ -9,8 +10,11 @@ const AuditTrail = ({
   auditError,
   fullName,
   email,
-  loadAuditLogs
+  loadAuditLogs,
+  applicationId
 }) => {
+  // Get current admin info from auth context
+  const { admin } = useAuth();
   // Format date for display
   const formatDate = (dateString, includeTime = true) => {
     if (!dateString) return '-';
@@ -30,8 +34,8 @@ const AuditTrail = ({
     return date.toLocaleDateString('en-US', options);
   };
 
-  const handleExportPDF = () => {
-    exportAuditTrailPDF(auditLogs, fullName, email);
+  const handleExportPDF = async () => {
+    await exportAuditTrailPDF(auditLogs, fullName, email, admin, applicationId);
   };
 
   // Return the original table design
