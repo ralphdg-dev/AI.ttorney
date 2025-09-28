@@ -10,7 +10,7 @@ import Colors from "../../../constants/Colors";
 interface Lawyer {
   id: string;
   name: string;
-  specializations: string[];
+  specialization: string[];
   location: string;
   days: string;
   available: boolean;
@@ -26,13 +26,13 @@ export default function LawyerCard({
   lawyer,
   onBookConsultation,
 }: LawyerCardProps) {
-  const [showAllSpecializations, setShowAllSpecializations] = useState(false);
+  const [showAllspecialization, setShowAllspecialization] = useState(false);
 
-  const primarySpecialization = lawyer.specializations[0];
-  const additionalCount = lawyer.specializations.length - 1;
+  const primarySpecialization = lawyer.specialization[0];
+  const additionalCount = lawyer.specialization.length - 1;
 
   const handleSpecializationPress = () => {
-    setShowAllSpecializations(!showAllSpecializations);
+    setShowAllspecialization(!showAllspecialization);
   };
 
   return (
@@ -46,7 +46,7 @@ export default function LawyerCard({
             {lawyer.name}
           </Text>
 
-          {/* Specializations with tooltip */}
+          {/* specialization with tooltip */}
           <Pressable onPress={handleSpecializationPress} className="mt-1">
             <HStack className="items-center">
               <Text className="text-sm" style={{ color: Colors.text.sub }}>
@@ -63,15 +63,15 @@ export default function LawyerCard({
             </HStack>
           </Pressable>
 
-          {showAllSpecializations && (
+          {showAllspecialization && (
             <Box className="mt-2 p-3 bg-gray-100 rounded-lg">
               <Text
                 className="text-sm font-semibold mb-1"
                 style={{ color: Colors.text.head }}
               >
-                All Specializations:
+                All specialization:
               </Text>
-              {lawyer.specializations.map((spec, index) => (
+              {lawyer.specialization.map((spec, index) => (
                 <Text
                   key={index}
                   className="text-sm"

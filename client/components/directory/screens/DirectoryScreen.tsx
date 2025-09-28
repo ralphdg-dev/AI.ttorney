@@ -14,7 +14,7 @@ interface Lawyer {
   id: string;
   lawyer_id: string;
   name: string;
-  specializations: string;
+  specialization: string;
   location: string;
   hours: string;
   days: string;
@@ -142,11 +142,11 @@ export default function DirectoryScreen() {
       ...lawyer,
       available: isLawyerAvailableToday(lawyer.days),
       displayDays: getDayAbbreviations(lawyer.days),
-      specializations: lawyer.specializations
-        ? lawyer.specializations.split(",").map((s) => s.trim())
+      specialization: lawyer.specialization
+        ? lawyer.specialization.split(",").map((s) => s.trim())
         : [],
       hours_available: lawyer.hours_available
-        ? lawyer.hours_available.split(",").map((h) => h.trim())
+        ? lawyer.hours_available.split(";").map((h) => h.trim())
         : [],
     }));
   }, [lawyersData, isLawyerAvailableToday, getDayAbbreviations]);
@@ -161,7 +161,7 @@ export default function DirectoryScreen() {
     return lawyers.filter((lawyer) => {
       return (
         lawyer.name.toLowerCase().includes(query) ||
-        lawyer.specializations.some((spec) =>
+        lawyer.specialization.some((spec) =>
           spec.toLowerCase().includes(query)
         ) ||
         lawyer.location.toLowerCase().includes(query)
@@ -180,7 +180,7 @@ export default function DirectoryScreen() {
         params: {
           lawyerId: lawyer.id,
           lawyerName: lawyer.name,
-          lawyerSpecializations: JSON.stringify(lawyer.specializations),
+          lawyerspecialization: JSON.stringify(lawyer.specialization),
           lawyerHours: lawyer.hours,
           lawyerDays: lawyer.displayDays,
           lawyerhours_available: JSON.stringify(lawyer.hours_available),

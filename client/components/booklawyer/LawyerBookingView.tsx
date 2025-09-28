@@ -30,13 +30,18 @@ interface CalendarDay {
   isCurrentMonth?: boolean;
 }
 
+interface DayAvailability {
+  day: string;
+  times: string[];
+}
+
 interface LawyerData {
   id: string;
   name: string;
   specializations: string[];
   hours: string;
   days: string;
-  hours_available: string[];
+  hours_available: DayAvailability[];
 }
 
 interface ValidationErrors {
@@ -95,12 +100,47 @@ export default function LawyerBookingView() {
   ];
   const communicationModes = ["Online", "In-person", "Phone"];
 
-  const timeSlots: TimeSlot[] =
-    lawyerData?.hours_available.map((time, index) => ({
-      id: `slot-${index}`,
+  const parseHoursAvailable = (hoursAvailable: string[]): DayAvailability[] => {
+    const dayAvailability: DayAvailability[] = [];
+
+    hoursAvailable.forEach((daySchedule) => {
+      // Example format: "Monday= 8:30AM, 11:00AM, 11:30AM"
+      const [dayPart, timesPart] = daySchedule.split("=");
+      if (dayPart && timesPart) {
+        const day = dayPart.trim();
+        const times = timesPart.split(",").map((time) => time.trim());
+        dayAvailability.push({ day, times });
+      }
+    });
+
+    return dayAvailability;
+  };
+
+  const getTimeSlotsForSelectedDay = (): TimeSlot[] => {
+    if (!lawyerData || !lawyerData.hours_available) return [];
+
+    // Get the day name for the selected date
+    const selectedDate = new Date(selectedYear, selectedMonth, selectedDay);
+    const selectedDayName = selectedDate.toLocaleDateString("en-US", {
+      weekday: "long",
+    });
+
+    // Find availability for the selected day
+    const dayAvailability = lawyerData.hours_available.find(
+      (availability) =>
+        availability.day.toLowerCase() === selectedDayName.toLowerCase()
+    );
+
+    if (!dayAvailability) return [];
+
+    // Convert to TimeSlot format
+    return dayAvailability.times.map((time, index) => ({
+      id: `slot-${selectedDayName}-${index}`,
       time: time,
       available: true,
-    })) || [];
+    }));
+  };
+  const timeSlots: TimeSlot[] = getTimeSlotsForSelectedDay();
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -257,10 +297,15 @@ export default function LawyerBookingView() {
       setSelectedYear(day.year);
     }
     setSelectedDay(day.date);
+
+    // Reset selected time slot when day changes
+    setSelectedTimeSlot("");
+
     if (validationErrors.timeSlot) {
       setValidationErrors((prev) => ({ ...prev, timeSlot: undefined }));
     }
   };
+
 
   useEffect(() => {
     if (params.lawyerId) {
@@ -281,9 +326,9 @@ export default function LawyerBookingView() {
                 .map((s: string) => s.trim()),
               hours: lawyer.hours,
               days: lawyer.days,
-              hours_available: lawyer.hours_available
-                .split(",")
-                .map((h: string) => h.trim()),
+              hours_available: parseHoursAvailable(
+                lawyer.hours_available.split(";").map((h: string) => h.trim())
+              ),
             });
           } else {
             setLawyerDataFromParams();
@@ -314,7 +359,7 @@ export default function LawyerBookingView() {
         specializations: specializations,
         hours: params.lawyerHours as string,
         days: params.lawyerDays as string,
-        hours_available: hours_available,
+        hours_available: parseHoursAvailable(hours_available),
       });
     } catch (error) {
       console.error("Error parsing data:", error);
@@ -656,43 +701,60 @@ export default function LawyerBookingView() {
               {validationErrors.timeSlot}
             </Text>
           )}
-          <HStack className="flex-wrap">
-            {timeSlots.map((slot) => (
-              <Pressable
-                key={slot.id}
-                className="mr-2 mb-2 px-3 py-1.5 rounded-lg border"
-                style={{
-                  backgroundColor:
-                    selectedTimeSlot === slot.id
-                      ? Colors.primary.blue
-                      : "white",
-                  borderColor:
-                    selectedTimeSlot === slot.id
-                      ? Colors.primary.blue
-                      : "#E5E7EB",
-                }}
-                onPress={() => {
-                  setSelectedTimeSlot(slot.id);
-                  if (validationErrors.timeSlot) {
-                    setValidationErrors((prev) => ({
-                      ...prev,
-                      timeSlot: undefined,
-                    }));
-                  }
-                }}
-              >
-                <Text
-                  className="text-xs font-medium"
-                  style={{
-                    color:
-                      selectedTimeSlot === slot.id ? "white" : Colors.text.head,
-                  }}
-                >
-                  {slot.time}
-                </Text>
-              </Pressable>
-            ))}
-          </HStack>
+          <VStack>
+
+            {validationErrors.timeSlot && (
+              <Text className="text-red-500 text-sm mb-2">
+                {validationErrors.timeSlot}
+              </Text>
+            )}
+
+            {timeSlots.length > 0 ? (
+              <HStack className="flex-wrap">
+                {timeSlots.map((slot) => (
+                  <Pressable
+                    key={slot.id}
+                    className="mr-2 mb-2 px-3 py-1.5 rounded-lg border"
+                    style={{
+                      backgroundColor:
+                        selectedTimeSlot === slot.id
+                          ? Colors.primary.blue
+                          : "white",
+                      borderColor:
+                        selectedTimeSlot === slot.id
+                          ? Colors.primary.blue
+                          : "#E5E7EB",
+                    }}
+                    onPress={() => {
+                      setSelectedTimeSlot(slot.id);
+                      if (validationErrors.timeSlot) {
+                        setValidationErrors((prev) => ({
+                          ...prev,
+                          timeSlot: undefined,
+                        }));
+                      }
+                    }}
+                  >
+                    <Text
+                      className="text-xs font-medium"
+                      style={{
+                        color:
+                          selectedTimeSlot === slot.id
+                            ? "white"
+                            : Colors.text.head,
+                      }}
+                    >
+                      {slot.time}
+                    </Text>
+                  </Pressable>
+                ))}
+              </HStack>
+            ) : (
+              <Text className="text-sm text-gray-500">
+                No available slots for the selected day
+              </Text>
+            )}
+          </VStack>
         </VStack>
 
         {/* Contact Info */}
