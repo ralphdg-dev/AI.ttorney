@@ -114,7 +114,7 @@ class ReportService:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.supabase.rest_url}/forum_reports?select=*&target_id=eq.{target_id}&target_type=eq.{target_type}&order=reported_at.desc",
+                    f"{self.supabase.rest_url}/forum_reports?select=*&target_id=eq.{target_id}&target_type=eq.{target_type}&order=submitted_at.desc",
                     headers=self.supabase._get_headers(use_service_key=True)
                 )
             
@@ -140,7 +140,7 @@ class ReportService:
             # Get reports with related post/comment data
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.supabase.rest_url}/forum_reports?select=*&reporter_id=eq.{reporter_id}&order=reported_at.desc",
+                    f"{self.supabase.rest_url}/forum_reports?select=*&reporter_id=eq.{reporter_id}&order=submitted_at.desc",
                     headers=self.supabase._get_headers(use_service_key=True)
                 )
             
