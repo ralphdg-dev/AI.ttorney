@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import Modal from '../ui/Modal';
 import Tooltip from '../ui/Tooltip';
-import { X, Download, History, Activity, ChevronUp, ChevronDown, Eye, FileText, AlertCircle } from 'lucide-react';
+import { X, Download, History, Activity, ChevronUp, ChevronDown, Eye, FileText, AlertCircle, Loader2 } from 'lucide-react';
+import adminManagementService from '../../services/adminManagementService';
+import { useAuth } from '../../contexts/AuthContext';
+import { exportAdminAuditTrailPDF, exportAdminActivityPDF } from './AdminPDFExportUtils';
 
 const StatusBadge = ({ status }) => {
   const getStatusStyles = (status) => {
@@ -56,6 +59,17 @@ const RoleBadge = ({ role }) => {
 
 const ViewAdminModal = ({ open, onClose, admin }) => {
   const [activeTab, setActiveTab] = useState('audit');
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState(null);
+  const { admin: currentAdmin } = useAuth();
+
+  // Load audit logs when modal opens
+  useEffect(() => {
+    if (open && admin?.id) {
+      loadAuditLogs();
+    }
+  }, [open, admin?.id]);
 
   if (!admin) return null;
 
@@ -98,48 +112,150 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
     }
   };
 
-  // Mock data for audit trail and recent activity
-  const auditTrail = [
-    {
-      id: 1,
-      action: 'Admin created',
-      admin: 'System',
-      role: 'System',
-      date: admin.created_at,
-      details: 'Admin account created'
-    },
-    {
-      id: 2,
-      action: 'Status changed',
-      admin: 'John Doe',
-      role: 'Superadmin',
-      date: admin.updated_at,
-      details: `Status changed to "${admin.status}"`
-    },
-    {
-      id: 3,
-      action: 'Last login',
-      admin: admin.full_name,
-      role: admin.role,
-      date: admin.last_login,
-      details: 'Admin logged into system'
+  const loadAuditLogs = async () => {
+    try {
+      setAuditLoading(true);
+      setAuditError(null);
+      
+      const response = await adminManagementService.getAdminAuditLogs(admin.id, { limit: 100 });
+      setAuditLogs(response.data || []);
+    } catch (error) {
+      console.error('Failed to load audit logs:', error);
+      setAuditError(error.message);
+      // Fallback to mock data if API fails
+      setAuditLogs([
+        {
+          id: 1,
+          action: 'Admin created',
+          actor_name: 'System',
+          actor_role: 'system',
+          created_at: admin.created_at,
+          details: JSON.stringify({ action: 'Admin account created' })
+        }
+      ]);
+    } finally {
+      setAuditLoading(false);
     }
-  ].filter(item => item.date); // Filter out items with null dates
+  };
 
+  // Transform audit logs for display
+  const auditTrail = auditLogs.map(log => ({
+    id: log.id,
+    action: log.action,
+    admin: log.actor_name || 'Unknown Admin',
+    role: log.actor_role || 'Admin',
+    date: log.created_at,
+    details: (() => {
+      try {
+        const parsed = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+        return parsed?.action || log.action;
+      } catch {
+        return log.action;
+      }
+    })()
+  }));
+
+  // Recent activity includes PDF generation and other activities from audit logs
   const recentActivity = [
-    {
-      id: 1,
-      action: 'Logged in',
-      date: admin.last_login,
-      details: 'Admin panel access'
-    },
-    {
-      id: 2,
-      action: 'Profile updated',
-      date: admin.updated_at,
-      details: 'Admin profile information updated'
+    // Include PDF generation activities from audit logs
+    ...auditLogs
+      .filter(log => {
+        // Include PDF generation activities and other recent activities
+        const action = log.action.toLowerCase();
+        return action.includes('generated') || 
+               action.includes('pdf') || 
+               action.includes('report') ||
+               action.includes('logged in') ||
+               action.includes('profile') ||
+               action.includes('updated');
+      })
+      .slice(0, 10) // Limit to 10 most recent activities
+      .map(log => ({
+        id: `audit_${log.id}`,
+        action: log.action,
+        date: log.created_at,
+        details: (() => {
+          try {
+            const parsed = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+            if (parsed?.report_type) {
+              const reportType = parsed.report_type === 'admin_audit' ? 'Audit Trail' : 'Activity Report';
+              return `${reportType} PDF (Report #${parsed.report_number})`;
+            }
+            return parsed?.action || log.action;
+          } catch {
+            return log.action;
+          }
+        })()
+      })),
+    // Add traditional activity items if they exist
+    ...[
+      {
+        id: 'login',
+        action: 'Logged in',
+        date: admin.last_login,
+        details: 'Admin panel access'
+      },
+      {
+        id: 'profile',
+        action: 'Profile updated',
+        date: admin.updated_at,
+        details: 'Admin profile information updated'
+      }
+    ].filter(item => item.date)
+  ]
+    .sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort by most recent first
+    .slice(0, 15); // Limit to 15 most recent activities
+
+  // Handle PDF export for audit trail
+  const handleExportAuditTrail = async () => {
+    try {
+      await exportAdminAuditTrailPDF(
+        auditLogs,
+        admin.full_name,
+        admin.email,
+        currentAdmin,
+        admin.id
+      );
+      console.log('Admin audit trail PDF exported and logged successfully');
+      
+      // Refresh audit logs to show the new PDF generation entry
+      setTimeout(() => {
+        loadAuditLogs();
+      }, 1000); // Small delay to ensure the audit log is created
+    } catch (error) {
+      console.error('Failed to export audit trail PDF:', error);
+      alert('Failed to export audit trail PDF. Please try again.');
     }
-  ].filter(item => item.date); // Filter out items with null dates
+  };
+
+  // Handle PDF export for recent activity
+  const handleExportActivity = async () => {
+    try {
+      // Use the dynamic recent activity data that includes PDF generation activities
+      const activityData = recentActivity.map(activity => ({
+        action: activity.action,
+        date: activity.date,
+        details: activity.details
+      }));
+
+      await exportAdminActivityPDF(
+        activityData,
+        admin.full_name,
+        admin.email,
+        currentAdmin,
+        admin.id
+      );
+      console.log('Admin activity PDF exported and logged successfully');
+      
+      // Refresh audit logs to show the new PDF generation entry
+      setTimeout(() => {
+        loadAuditLogs();
+      }, 1000); // Small delay to ensure the audit log is created
+    } catch (error) {
+      console.error('Failed to export activity PDF:', error);
+      alert('Failed to export activity PDF. Please try again.');
+    }
+  };
 
   return (
     <Modal 
@@ -236,6 +352,7 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
                 </div>
                 <Tooltip content="Download as PDF">
                   <button
+                    onClick={handleExportActivity}
                     disabled={!recentActivity || recentActivity.length === 0}
                     className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -301,15 +418,32 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
                 </div>
                 <Tooltip content="Download as PDF">
                   <button
-                    disabled={!auditTrail || auditTrail.length === 0}
+                    onClick={handleExportAuditTrail}
+                    disabled={auditLoading || !auditTrail || auditTrail.length === 0}
                     className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Download size={14} />
+                    {auditLoading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                   </button>
                 </Tooltip>
               </div>
 
-              {auditTrail.length > 0 ? (
+              {auditLoading ? (
+                <div className="text-center py-6">
+                  <Loader2 className="h-6 w-6 text-gray-400 mx-auto mb-1 animate-spin" />
+                  <p className="text-[10px] text-gray-500">Loading audit trail...</p>
+                </div>
+              ) : auditError ? (
+                <div className="text-center py-6">
+                  <AlertCircle className="h-6 w-6 text-red-400 mx-auto mb-1" />
+                  <p className="text-[10px] text-red-500 mb-2">Failed to load audit trail</p>
+                  <button 
+                    onClick={loadAuditLogs}
+                    className="text-[9px] text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : auditTrail.length > 0 ? (
                 <div className="overflow-hidden border border-gray-200 rounded-lg">
                   <div className="max-h-32 overflow-y-auto">
                     <table className="min-w-full divide-y divide-gray-200">

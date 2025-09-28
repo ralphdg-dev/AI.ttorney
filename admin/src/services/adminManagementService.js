@@ -111,6 +111,61 @@ class AdminManagementService {
     }
   }
 
+  // Get admin audit logs
+  async getAdminAuditLogs(adminId, params = {}) {
+    try {
+      const { page = 1, limit = 50 } = params;
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString()
+      });
+
+      const response = await fetch(`${API_BASE_URL}/admin/${adminId}/audit-logs?${queryParams}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch admin audit logs');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Get admin audit logs error:', error);
+      throw error;
+    }
+  }
+
+  // Create admin audit log entry
+  async createAdminAuditLog(adminId, auditData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/${adminId}/audit-logs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        },
+        body: JSON.stringify(auditData)
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create admin audit log');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Create admin audit log error:', error);
+      throw error;
+    }
+  }
+
   // Future methods for admin management (commented out for now)
   /*
 
