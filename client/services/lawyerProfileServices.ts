@@ -1,3 +1,4 @@
+// C:\Users\Mikko\Desktop\AI.ttorney\client\services\lawyerProfileServices.ts
 import { useAuth } from "../contexts/AuthContext";
 
 interface TimeSlot {
@@ -16,8 +17,9 @@ interface ProfileData {
   avatar: string;
   specialization: string[];
   bio: string;
+  days?: string; // Add this
+  hours_available?: string; // Add this
 }
-
 interface LawyerProfileResponse {
   success: boolean;
   message?: string;
@@ -32,27 +34,25 @@ class LawyerProfileService {
     this.baseUrl = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
   }
 
-  // In lawyerProfileServices.ts - fix the payload structure
   async saveLawyerProfile(
     profileData: ProfileData,
     availabilitySlots: TimeSlot[],
     accessToken: string
   ): Promise<LawyerProfileResponse> {
     try {
-      // Convert specializations array to string format that matches your table
       const specializationsString = Array.isArray(profileData.specialization)
         ? profileData.specialization.join(", ")
         : profileData.specialization;
 
-      // Fix: Match the field names exactly with what your backend expects
       const payload = {
         profile_data: {
           name: profileData.name,
-          specialization: specializationsString, // Changed from specializations to specialization
+          specialization: specializationsString,
           location: profileData.location,
           phone_number: profileData.phone,
           bio: profileData.bio,
-          available: true,
+          days: profileData.days || "", // Ensure this is included
+          hours_available: profileData.hours_available || "", // Ensure this is included
         },
         availability_slots: availabilitySlots.map((slot) => ({
           ...slot,
@@ -61,7 +61,10 @@ class LawyerProfileService {
         })),
       };
 
-      console.log("Sending payload to backend:", payload); // Debug log
+      console.log("Sending payload with availability:", {
+        days: profileData.days,
+        hours_available: profileData.hours_available,
+      });
 
       const response = await fetch(`${this.baseUrl}/api/lawyer/profile`, {
         method: "POST",

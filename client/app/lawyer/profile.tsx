@@ -1,3 +1,4 @@
+// C:\Users\Mikko\Desktop\AI.ttorney\client\app\lawyer\profile.tsx
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -40,6 +41,8 @@ interface ProfileData {
   avatar: string;
   experience: string;
   verificationStatus: string;
+  days?: string; // Add this
+  hours_available?: string; // Add this
 }
 
 interface ProfessionalInfo {
@@ -52,6 +55,8 @@ interface LawyerContactInfo {
   location: string;
   bio: string;
   specializations: string;
+  days: string; // Add this
+  hours_available: string; // Add this
 }
 
 const LawyerProfilePage: React.FC = () => {
@@ -76,6 +81,8 @@ const LawyerProfilePage: React.FC = () => {
       location: "",
       bio: "",
       specializations: "",
+      days: "", // Add this
+      hours_available: "", // Add this
     }
   );
 
@@ -136,14 +143,16 @@ const LawyerProfilePage: React.FC = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showAllSpecializations, setShowAllSpecializations] = useState(false);
-  // In LawyerProfilePage.tsx - fix the fetch function
+
   const fetchLawyerContactInfo = async () => {
     if (!user?.id) return;
 
     try {
       const { data, error } = await supabase
         .from("lawyer_info")
-        .select("phone_number, location, bio, specialization") // Changed from specializations to specialization
+        .select(
+          "phone_number, location, bio, specialization, days, hours_available"
+        )
         .eq("lawyer_id", user.id)
         .single();
 
@@ -154,7 +163,9 @@ const LawyerProfilePage: React.FC = () => {
             phone_number: "",
             location: "",
             bio: "",
-            specializations: "", // Keep this as specializations for frontend consistency
+            specializations: "",
+            days: "",
+            hours_available: "",
           });
         } else {
           console.error("Error fetching lawyer contact info:", error);
@@ -164,14 +175,21 @@ const LawyerProfilePage: React.FC = () => {
           phone_number: data.phone_number || "",
           location: data.location || "",
           bio: data.bio || "",
-          specializations: data.specialization || "", // Map from specialization to specializations
+          specializations: data.specialization || "",
+          days: data.days || "",
+          hours_available: data.hours_available || "",
+        });
+
+        // Log the availability data for debugging
+        console.log("Fetched availability data:", {
+          days: data.days,
+          hours_available: data.hours_available,
         });
       }
     } catch (error) {
       console.error("Error in fetchLawyerContactInfo:", error);
     }
   };
-
   const fetchProfessionalInfo = async () => {
     if (!user?.id) return;
 
@@ -273,6 +291,7 @@ const LawyerProfilePage: React.FC = () => {
 
     initializeProfileData();
   }, [user]);
+
   const saveLawyerProfileToBackend = async (
     profileData: any,
     availabilitySlots: any,
@@ -280,17 +299,19 @@ const LawyerProfilePage: React.FC = () => {
     professionalInfo: ProfessionalInfo
   ) => {
     try {
-      // Ensure all required fields are included with correct names
+      // Include days and hours_available in the combined data
       const combinedData = {
         name: profileData.name,
         email: profileData.email,
-        phone: contactInfo.phone_number, // Use 'phone' not 'phone_number'
+        phone: contactInfo.phone_number,
         location: contactInfo.location,
         bio: contactInfo.bio,
-        specialization: contactInfo.specializations, // Use singular 'specialization'
+        specialization: contactInfo.specializations,
+        days: profileData.days, // This should now be populated
+        hours_available: profileData.hours_available, // This should now be populated
       };
 
-      console.log("Saving profile data:", combinedData);
+      console.log("Saving profile data with availability:", combinedData);
 
       const [profileResult, professionalResult] = await Promise.all([
         saveProfile(combinedData, availabilitySlots),
@@ -321,23 +342,27 @@ const LawyerProfilePage: React.FC = () => {
 
       const specializationsString = editFormData.specialization.join(", ");
 
-      // Update local state
+      // Update local state with days and hours_available
       setLawyerContactInfo((prev) => ({
         ...prev,
         phone_number: editFormData.phone,
         location: editFormData.location,
         bio: editFormData.bio,
         specializations: specializationsString,
+        days: editFormData.days || "", // Add this
+        hours_available: editFormData.hours_available || "", // Add this
       }));
 
-      // Prepare data for backend - ensure field names match backend expectations
+      // Prepare data for backend - include days and hours_available
       const profileDataForBackend = {
         name: editFormData.name,
         email: editFormData.email,
-        phone: editFormData.phone, // Use 'phone' not 'phone_number'
+        phone: editFormData.phone,
         location: editFormData.location,
         bio: editFormData.bio,
-        specialization: editFormData.specialization, // Array format for the service
+        specialization: editFormData.specialization,
+        days: editFormData.days || "", // Add this
+        hours_available: editFormData.hours_available || "", // Add this
       };
 
       console.log("Sending to backend service:", profileDataForBackend);
@@ -350,6 +375,8 @@ const LawyerProfilePage: React.FC = () => {
           location: editFormData.location,
           bio: editFormData.bio,
           specializations: specializationsString,
+          days: editFormData.days || "", // Add this
+          hours_available: editFormData.hours_available || "", // Add this
         },
         {
           rollNumber: editFormData.rollNumber,
@@ -360,6 +387,9 @@ const LawyerProfilePage: React.FC = () => {
       if (result.success) {
         Alert.alert("Success", "Profile updated successfully!");
         setIsEditingProfile(false);
+
+        // Refresh the data to show updated availability
+        await fetchLawyerContactInfo();
       } else {
         throw new Error(result.error || "Failed to update profile");
       }
@@ -371,7 +401,6 @@ const LawyerProfilePage: React.FC = () => {
       );
     }
   };
-
   const handleEditProfile = () => {
     setIsEditingProfile(true);
   };
@@ -391,7 +420,6 @@ const LawyerProfilePage: React.FC = () => {
       }
     }
   };
-
 
   return (
     <SafeAreaView style={tw`flex-1 bg-gray-50`}>

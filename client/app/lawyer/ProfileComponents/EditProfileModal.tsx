@@ -1,3 +1,4 @@
+// C:\Users\Mikko\Desktop\AI.ttorney\client\app\lawyer\ProfileComponents\EditProfileModal.tsx
 import React from "react";
 import {
   View,
@@ -24,8 +25,6 @@ import Colors from "../../../constants/Colors";
 interface TimeSlot {
   id: string;
   day: string;
-  startTime: string;
-  endTime: string;
   isActive: boolean;
 }
 
@@ -37,6 +36,10 @@ interface ProfileData {
   avatar: string;
   specialization: string[];
   bio: string;
+  rollNumber: string;
+  rollSigningDate: string;
+  days: string;
+  hours_available: string;
 }
 
 interface EditProfileModalProps {
@@ -48,6 +51,40 @@ interface EditProfileModalProps {
   onAvailabilityChange: (slots: TimeSlot[]) => void;
   onRefresh?: () => void;
 }
+
+const DAYS_OF_WEEK = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
+const TIME_OPTIONS = [
+  { value: "08:00", label: "8:00 AM" },
+  { value: "08:30", label: "8:30 AM" },
+  { value: "09:00", label: "9:00 AM" },
+  { value: "09:30", label: "9:30 AM" },
+  { value: "10:00", label: "10:00 AM" },
+  { value: "10:30", label: "10:30 AM" },
+  { value: "11:00", label: "11:00 AM" },
+  { value: "11:30", label: "11:30 AM" },
+  { value: "12:00", label: "12:00 PM" },
+  { value: "12:30", label: "12:30 PM" },
+  { value: "13:00", label: "1:00 PM" },
+  { value: "13:30", label: "1:30 PM" },
+  { value: "14:00", label: "2:00 PM" },
+  { value: "14:30", label: "2:30 PM" },
+  { value: "15:00", label: "3:00 PM" },
+  { value: "15:30", label: "3:30 PM" },
+  { value: "16:00", label: "4:00 PM" },
+  { value: "16:30", label: "4:30 PM" },
+  { value: "17:00", label: "5:00 PM" },
+  { value: "17:30", label: "5:30 PM" },
+  { value: "18:00", label: "6:00 PM" },
+];
 
 const LAW_SPECIALIZATIONS = [
   "Administrative Law",
@@ -117,14 +154,96 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [localAvailabilitySlots, setLocalAvailabilitySlots] =
     React.useState<TimeSlot[]>(availabilitySlots);
 
+  const [selectedDays, setSelectedDays] = React.useState<string[]>([]);
+  const [dayTimeSlots, setDayTimeSlots] = React.useState<
+    Record<string, string[]>
+  >({});
+  const [showTimeDropdown, setShowTimeDropdown] = React.useState<
+    Record<string, boolean>
+  >({});
+
   React.useEffect(() => {
     setEditFormData(profileData);
     setValidationErrors({});
+
+    // Parse existing days and hours_available from profileData
+    if (profileData.days) {
+      const daysArray = profileData.days
+        .split(", ")
+        .filter((day) => day.trim() !== "");
+      setSelectedDays(daysArray);
+    }
+
+    if (profileData.hours_available) {
+      try {
+        const hoursData = JSON.parse(profileData.hours_available);
+        setDayTimeSlots(hoursData);
+      } catch (error) {
+        console.log("Error parsing hours_available, initializing empty");
+        setDayTimeSlots({});
+      }
+    }
   }, [profileData]);
 
   React.useEffect(() => {
     setLocalAvailabilitySlots(availabilitySlots);
   }, [availabilitySlots]);
+
+  const toggleDay = (day: string) => {
+    setSelectedDays((prev) => {
+      const newSelectedDays = prev.includes(day)
+        ? prev.filter((d) => d !== day)
+        : [...prev, day];
+
+      if (!newSelectedDays.includes(day)) {
+        setDayTimeSlots((prevSlots) => {
+          const newSlots = { ...prevSlots };
+          delete newSlots[day];
+          return newSlots;
+        });
+      } else {
+        setDayTimeSlots((prevSlots) => ({
+          ...prevSlots,
+          [day]: prevSlots[day] || [],
+        }));
+      }
+
+      return newSelectedDays;
+    });
+  };
+
+  const toggleTimeDropdown = (day: string) => {
+    setShowTimeDropdown((prev) => ({
+      ...prev,
+      [day]: !prev[day],
+    }));
+  };
+
+  const addTimeSlot = (day: string, time: string) => {
+    setDayTimeSlots((prev) => {
+      const existingTimes = prev[day] || [];
+      if (existingTimes.includes(time)) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [day]: [...existingTimes, time].sort(),
+      };
+    });
+
+    setShowTimeDropdown((prev) => ({
+      ...prev,
+      [day]: false,
+    }));
+  };
+
+  const removeTimeSlot = (day: string, timeToRemove: string) => {
+    setDayTimeSlots((prev) => ({
+      ...prev,
+      [day]: (prev[day] || []).filter((time) => time !== timeToRemove),
+    }));
+  };
 
   const updateFormField = (
     field: keyof ProfileData,
@@ -155,33 +274,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
   const isSpecializationSelected = (specialization: string) => {
     return editFormData.specialization?.includes(specialization) || false;
-  };
-
-  const toggleSlotStatus = (slotId: string) => {
-    const updatedSlots = localAvailabilitySlots.map((slot) =>
-      slot.id === slotId ? { ...slot, isActive: !slot.isActive } : slot
-    );
-    setLocalAvailabilitySlots(updatedSlots);
-  };
-
-  const updateSlotTime = (
-    slotId: string,
-    field: "startTime" | "endTime",
-    value: string
-  ) => {
-    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (!timeRegex.test(value)) return;
-
-    const updatedSlots = localAvailabilitySlots.map((slot) =>
-      slot.id === slotId ? { ...slot, [field]: value } : slot
-    );
-    setLocalAvailabilitySlots(updatedSlots);
-  };
-
-  const validateTimeSlot = (startTime: string, endTime: string): boolean => {
-    const start = new Date(`2000-01-01T${startTime}:00`);
-    const end = new Date(`2000-01-01T${endTime}:00`);
-    return start < end;
   };
 
   const validateForm = (): boolean => {
@@ -243,18 +335,65 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     return Object.keys(errors).length === 0;
   };
 
+  const formatHoursAvailable = (): string => {
+    const formattedEntries: string[] = [];
+
+    // Sort days according to DAYS_OF_WEEK order
+    const sortedDays = DAYS_OF_WEEK.filter(
+      (day) =>
+        selectedDays.includes(day) &&
+        dayTimeSlots[day] &&
+        dayTimeSlots[day].length > 0
+    );
+
+    sortedDays.forEach((day) => {
+      const times = dayTimeSlots[day] || [];
+      if (times.length > 0) {
+        const formattedTimes = times.map((time) => {
+          const timeOption = TIME_OPTIONS.find((opt) => opt.value === time);
+          return timeOption ? timeOption.label : time;
+        });
+        formattedEntries.push(`${day}: ${formattedTimes.join(", ")}`);
+      }
+    });
+
+    return formattedEntries.join("; ");
+  };
+
   const handleSave = async () => {
     if (!validateForm()) {
       Alert.alert("Validation Error", "Please fix the errors before saving.");
       return;
     }
+
+    // Format the days and hours_available before saving
+    const formattedDays = selectedDays.join(", ");
+    const formattedHoursAvailable = formatHoursAvailable();
+
+    // Update the form data with formatted availability
+    const updatedFormData = {
+      ...editFormData,
+      days: formattedDays,
+      hours_available: formattedHoursAvailable,
+    };
+
+    setEditFormData(updatedFormData);
     setShowConfirmModal(true);
   };
 
   const confirmSave = async () => {
     setIsSaving(true);
     try {
-      await onSave(editFormData);
+      const formattedDays = selectedDays.join(", ");
+      const formattedHoursAvailable = formatHoursAvailable();
+
+      const updatedFormData = {
+        ...editFormData,
+        days: formattedDays,
+        hours_available: formattedHoursAvailable,
+      };
+
+      await onSave(updatedFormData);
       setShowConfirmModal(false);
       onClose();
       if (onRefresh) {
@@ -275,6 +414,29 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setShowSpecializationDropdown(false);
     setIsEditingAvailability(false);
     setSearchQuery("");
+
+    // Reset availability state
+    if (profileData.days) {
+      const daysArray = profileData.days
+        .split(", ")
+        .filter((day) => day.trim() !== "");
+      setSelectedDays(daysArray);
+    } else {
+      setSelectedDays([]);
+    }
+
+    if (profileData.hours_available) {
+      try {
+        const hoursData = JSON.parse(profileData.hours_available);
+        setDayTimeSlots(hoursData);
+      } catch (error) {
+        setDayTimeSlots({});
+      }
+    } else {
+      setDayTimeSlots({});
+    }
+
+    setShowTimeDropdown({});
     onClose();
   };
 
@@ -297,6 +459,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     } else {
       return `${selected.length} specializations selected`;
     }
+  };
+
+  const formatTimeLabel = (time: string) => {
+    const timeOptions = TIME_OPTIONS.find((option) => option.value === time);
+    return timeOptions ? timeOptions.label : time;
   };
 
   return (
@@ -383,8 +550,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 placeholder="Enter your email address"
                 keyboardType="email-address"
                 autoCapitalize="none"
-                editable={!isSaving}
-                aria-disabled
+                editable={false}
               />
               {validationErrors.email && (
                 <Text style={tw`text-red-500 text-xs mt-1`}>
@@ -517,6 +683,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </View>
           </View>
 
+          {/* Consultation Availability Section */}
           <View style={tw`bg-white rounded-lg p-4 mb-4`}>
             <View style={tw`flex-row items-center justify-between mb-4`}>
               <Text style={tw`text-lg font-bold text-gray-900`}>
@@ -548,135 +715,190 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     },
                   ]}
                 >
-                  {isEditingAvailability ? "Cancel" : "Edit"}
+                  {isEditingAvailability ? "Done" : "Edit"}
                 </Text>
               </TouchableOpacity>
             </View>
 
             <Text style={tw`text-sm text-gray-600 mb-4`}>
-              Set your available hours for client consultations. This will be
-              shown to clients when booking.
+              Select days and add available consultation hours. You can add
+              multiple time slots for each day.
             </Text>
 
-            <View style={tw`flex flex-col`}>
-              {localAvailabilitySlots.map((slot) => (
-                <View
-                  key={slot.id}
-                  style={tw`py-3 px-4 bg-gray-50 rounded-lg mb-2`}
-                >
-                  <View style={tw`flex-row items-center justify-between mb-3`}>
-                    <Text style={tw`text-sm font-medium text-gray-900`}>
-                      {slot.day}
+            {isEditingAvailability ? (
+              <View>
+                <Text style={tw`text-sm font-medium text-gray-700 mb-3`}>
+                  Select Available Days:
+                </Text>
+                <View style={tw`flex-row flex-wrap mb-6`}>
+                  {DAYS_OF_WEEK.map((day) => (
+                    <TouchableOpacity
+                      key={day}
+                      style={[
+                        tw`mr-2 mb-2 px-3 py-2 rounded-lg border`,
+                        selectedDays.includes(day)
+                          ? {
+                              backgroundColor: Colors.primary.blue,
+                              borderColor: Colors.primary.blue,
+                            }
+                          : {
+                              backgroundColor: "white",
+                              borderColor: "#D1D5DB",
+                            },
+                      ]}
+                      onPress={() => toggleDay(day)}
+                    >
+                      <Text
+                        style={[
+                          tw`text-sm font-medium`,
+                          selectedDays.includes(day)
+                            ? tw`text-white`
+                            : tw`text-gray-700`,
+                        ]}
+                      >
+                        {day.slice(0, 3)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {selectedDays.map((day) => (
+                  <View key={day} style={tw`mb-6 p-4 bg-gray-50 rounded-lg`}>
+                    <Text style={tw`text-base font-medium text-gray-900 mb-3`}>
+                      {day}
                     </Text>
 
-                    {isEditingAvailability && (
+                    <View style={tw`mb-3`}>
                       <TouchableOpacity
-                        style={[
-                          tw`w-12 h-6 rounded-full border-2 flex-row`,
-                          slot.isActive
-                            ? {
-                                backgroundColor: Colors.primary.blue,
-                                borderColor: Colors.primary.blue,
-                              }
-                            : {
-                                backgroundColor: "#F3F4F6",
-                                borderColor: "#D1D5DB",
-                              },
-                        ]}
-                        onPress={() => toggleSlotStatus(slot.id)}
+                        style={tw`border border-gray-300 rounded-lg px-3 py-2 bg-white flex-row justify-between items-center`}
+                        onPress={() => toggleTimeDropdown(day)}
                       >
-                        <View
-                          style={[
-                            tw`w-4 h-4 rounded-full bg-white my-auto`,
-                            slot.isActive ? tw`ml-6` : tw`ml-1`,
-                          ]}
-                        />
+                        <Text style={tw`text-sm text-gray-900`}>
+                          Select a time
+                        </Text>
+                        <ChevronDown size={16} color="#6B7280" />
                       </TouchableOpacity>
-                    )}
 
-                    {!isEditingAvailability && (
-                      <View
-                        style={[
-                          tw`w-2 h-2 rounded-full`,
-                          {
-                            backgroundColor: slot.isActive
-                              ? "#10B981"
-                              : "#D1D5DB",
-                          },
-                        ]}
-                      />
+                      {showTimeDropdown[day] && (
+                        <View
+                          style={tw`mt-1 border border-gray-300 rounded-lg bg-white max-h-40`}
+                        >
+                          <ScrollView style={tw`max-h-40`}>
+                            {TIME_OPTIONS.map((timeOption) => (
+                              <TouchableOpacity
+                                key={timeOption.value}
+                                style={tw`px-3 py-2 border-b border-gray-100`}
+                                onPress={() =>
+                                  addTimeSlot(day, timeOption.value)
+                                }
+                              >
+                                <Text style={tw`text-sm text-gray-900`}>
+                                  {timeOption.label}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      )}
+                    </View>
+
+                    <View style={tw`flex-row flex-wrap`}>
+                      {(dayTimeSlots[day] || []).map((time, index) => (
+                        <View
+                          key={`${day}-${time}-${index}`}
+                          style={tw`flex-row items-center mr-2 mb-2 px-3 py-1 bg-blue-100 rounded-lg`}
+                        >
+                          <Clock size={14} color={Colors.primary.blue} />
+                          <Text
+                            style={[
+                              tw`text-sm ml-1`,
+                              { color: Colors.primary.blue },
+                            ]}
+                          >
+                            {formatTimeLabel(time)}
+                          </Text>
+                          <TouchableOpacity
+                            style={tw`ml-2`}
+                            onPress={() => removeTimeSlot(day, time)}
+                          >
+                            <X size={14} color="#DC2626" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+
+                    {(!dayTimeSlots[day] || dayTimeSlots[day].length === 0) && (
+                      <Text style={tw`text-xs text-gray-500 italic`}>
+                        No time slots added yet
+                      </Text>
                     )}
                   </View>
+                ))}
 
-                  {slot.isActive ? (
-                    isEditingAvailability ? (
-                      <View style={tw`flex-row items-center space-x-3`}>
-                        <View style={tw`flex-1`}>
-                          <Text style={tw`text-xs text-gray-500 mb-1`}>
-                            Start Time
-                          </Text>
-                          <View
-                            style={tw`flex-row items-center bg-white rounded-lg border border-gray-200 px-3 py-2`}
-                          >
-                            <Clock size={16} color="#6B7280" />
-                            <TextInput
-                              style={tw`flex-1 ml-2 text-sm text-gray-900`}
-                              value={slot.startTime}
-                              onChangeText={(value) =>
-                                updateSlotTime(slot.id, "startTime", value)
-                              }
-                              placeholder="09:00"
-                              keyboardType="numeric"
-                              maxLength={5}
-                            />
-                          </View>
-                        </View>
+                {selectedDays.length === 0 && (
+                  <View style={tw`p-4 bg-yellow-50 rounded-lg`}>
+                    <Text style={tw`text-sm text-yellow-800`}>
+                      Please select at least one day to set your availability.
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View>
+                {selectedDays.length > 0 ? (
+                  <View>
+                    <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+                      Available Days:
+                    </Text>
+                    <Text style={tw`text-sm text-gray-600 mb-4`}>
+                      {selectedDays.join(", ")}
+                    </Text>
 
-                        <View style={tw`flex-1`}>
-                          <Text style={tw`text-xs text-gray-500 mb-1`}>
-                            End Time
-                          </Text>
-                          <View
-                            style={tw`flex-row items-center bg-white rounded-lg border border-gray-200 px-3 py-2`}
-                          >
-                            <Clock size={16} color="#6B7280" />
-                            <TextInput
-                              style={tw`flex-1 ml-2 text-sm text-gray-900`}
-                              value={slot.endTime}
-                              onChangeText={(value) =>
-                                updateSlotTime(slot.id, "endTime", value)
-                              }
-                              placeholder="17:00"
-                              keyboardType="numeric"
-                              maxLength={5}
-                            />
-                          </View>
-                        </View>
-                      </View>
-                    ) : (
-                      <View style={tw`flex-row items-center`}>
-                        <Clock size={14} color="#6B7280" />
-                        <Text style={tw`text-xs text-gray-600 ml-1`}>
-                          {slot.startTime} - {slot.endTime}
+                    <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+                      Time Slots:
+                    </Text>
+                    {selectedDays.map((day) => (
+                      <View key={day} style={tw`mb-2`}>
+                        <Text style={tw`text-sm font-medium text-gray-900`}>
+                          {day}:
                         </Text>
+                        <View style={tw`flex-row flex-wrap mt-1`}>
+                          {(dayTimeSlots[day] || []).map((time, index) => (
+                            <View
+                              key={`${day}-view-${time}-${index}`}
+                              style={tw`flex-row items-center mr-2 mb-1 px-2 py-1 bg-blue-50 rounded`}
+                            >
+                              <Clock size={12} color={Colors.primary.blue} />
+                              <Text
+                                style={[
+                                  tw`text-xs ml-1`,
+                                  { color: Colors.primary.blue },
+                                ]}
+                              >
+                                {formatTimeLabel(time)}
+                              </Text>
+                            </View>
+                          ))}
+                          {(!dayTimeSlots[day] ||
+                            dayTimeSlots[day].length === 0) && (
+                            <Text style={tw`text-xs text-gray-500 italic`}>
+                              No times set
+                            </Text>
+                          )}
+                        </View>
                       </View>
-                    )
-                  ) : (
-                    <Text style={tw`text-xs text-gray-500`}>Unavailable</Text>
-                  )}
-
-                  {isEditingAvailability &&
-                    slot.isActive &&
-                    !validateTimeSlot(slot.startTime, slot.endTime) && (
-                      <View style={tw`mt-2 p-2 bg-red-50 rounded-md`}>
-                        <Text style={tw`text-xs text-red-600`}>
-                          End time must be after start time
-                        </Text>
-                      </View>
-                    )}
-                </View>
-              ))}
-            </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={tw`p-4 bg-gray-50 rounded-lg`}>
+                    <Text style={tw`text-sm text-gray-600 text-center`}>
+                      No availability set. Click Edit to configure your
+                      consultation hours.
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
           <View style={tw`bg-blue-50 rounded-lg p-4 mb-4`}>
@@ -689,6 +911,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </Text>
           </View>
         </ScrollView>
+
         <Modal
           visible={showConfirmModal}
           transparent
@@ -709,12 +932,21 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 <TouchableOpacity
                   onPress={() => setShowConfirmModal(false)}
                   style={tw`px-4 py-2 mr-2 rounded-lg bg-gray-200`}
+                  disabled={isSaving}
                 >
                   <Text style={tw`text-gray-700 font-medium`}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={confirmSave}
-                  style={tw`px-4 py-2 rounded-lg bg-blue-900`}
+                  style={[
+                    tw`px-4 py-2 rounded-lg`,
+                    {
+                      backgroundColor: isSaving
+                        ? "#9CA3AF"
+                        : Colors.primary.blue,
+                    },
+                  ]}
+                  disabled={isSaving}
                 >
                   <Text style={tw`text-white font-medium`}>
                     {isSaving ? "Saving..." : "Yes, Save"}
@@ -728,4 +960,5 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     </Modal>
   );
 };
+
 export default EditProfileModal;

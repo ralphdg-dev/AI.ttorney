@@ -1,3 +1,4 @@
+# C:\Users\Mikko\Desktop\AI.ttorney\server\routes\lawyerInfo.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -13,9 +14,7 @@ class LawyerProfile(BaseModel):
     name: str
     specialization: str  # Changed from specializations to specialization
     location: str
-    hours: Optional[str] = None
     days: Optional[str] = None
-    available: bool = True
     hours_available: Optional[str] = None
     phone_number: Optional[str] = None
     bio: str
@@ -136,19 +135,16 @@ async def save_lawyer_profile(
         days = ', '.join(days_entries) if days_entries else None
         hours_available = ', '.join(hours_available_entries) if hours_available_entries else None
         
-        # Prepare lawyer_info data matching your table format
         lawyer_info_data = {
             "lawyer_id": user.id,
             "name": profile_data.profile_data.name,
-            "specialization": profile_data.profile_data.specialization,  # Match table column name
+            "specialization": profile_data.profile_data.specialization,
             "location": profile_data.profile_data.location,
-            "hours": hours,
-            "days": days,
-            "available": True,
-            "hours_available": hours_available,
+            "days": profile_data.profile_data.days,  # Use directly from frontend
+            "hours_available": profile_data.profile_data.hours_available,  # Use directly from frontend
             "phone_number": profile_data.profile_data.phone_number,
             "bio": profile_data.profile_data.bio
-}
+        }
         
         # Check if profile already exists
         existing_profile = supabase.table("lawyer_info")\
