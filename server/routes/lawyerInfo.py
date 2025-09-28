@@ -31,19 +31,19 @@ class LawyerProfileUpdate(BaseModel):
     availability_slots: List[AvailabilitySlot]
 
 def format_time_12h(time_24h: str) -> str:
-    """Convert 24h time (09:00) to 12h format (9:00AM)"""
+    """Convert 24h time (09:00) to 12h format (9:00 AM)"""
     try:
         hour, minute = time_24h.split(':')
         hour_int = int(hour)
         
         if hour_int == 0:
-            return f"12:{minute}AM"
+            return f"12:{minute} AM"
         elif hour_int < 12:
-            return f"{hour_int}:{minute}AM"
+            return f"{hour_int}:{minute} AM"
         elif hour_int == 12:
-            return f"12:{minute}PM"
+            return f"12:{minute} PM"
         else:
-            return f"{hour_int - 12}:{minute}PM"
+            return f"{hour_int - 12}:{minute} PM"
     except:
         return time_24h
 
@@ -216,23 +216,33 @@ async def get_lawyer_profile(
     user=Depends(get_current_user)
 ):
     try:
-        result = supabase.table("lawyer_info")\
+        # Get lawyer info
+        lawyer_result = supabase.table("lawyer_info")\
             .select("*")\
             .eq("lawyer_id", user.id)\
             .execute()
         
-        if result.error:
+        if lawyer_result.error:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to fetch profile"
             )
         
-        # Parse the data back to frontend format if needed
-        profile_data = result.data[0] if result.data else None
+        # Get professional info too for consistency
+        professional_result = supabase.table("lawyer_applications")\
+            .select("roll_number, roll_signing_date")\
+            .eq("user_id", user.id)\
+            .execute()
+        
+        profile_data = lawyer_result.data[0] if lawyer_result.data else None
+        professional_data = professional_result.data[0] if professional_result.data else None
         
         return {
             "success": True,
-            "data": profile_data
+            "data": {
+                "lawyer_info": profile_data,
+                "professional_info": professional_data
+            }
         }
         
     except Exception as e:

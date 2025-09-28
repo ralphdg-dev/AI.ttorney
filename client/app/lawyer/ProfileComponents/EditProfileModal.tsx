@@ -62,29 +62,18 @@ const DAYS_OF_WEEK = [
   "Sunday",
 ];
 
-const TIME_OPTIONS = [
-  { value: "08:00", label: "8:00 AM" },
-  { value: "08:30", label: "8:30 AM" },
-  { value: "09:00", label: "9:00 AM" },
-  { value: "09:30", label: "9:30 AM" },
-  { value: "10:00", label: "10:00 AM" },
-  { value: "10:30", label: "10:30 AM" },
-  { value: "11:00", label: "11:00 AM" },
-  { value: "11:30", label: "11:30 AM" },
-  { value: "12:00", label: "12:00 PM" },
-  { value: "12:30", label: "12:30 PM" },
-  { value: "13:00", label: "1:00 PM" },
-  { value: "13:30", label: "1:30 PM" },
-  { value: "14:00", label: "2:00 PM" },
-  { value: "14:30", label: "2:30 PM" },
-  { value: "15:00", label: "3:00 PM" },
-  { value: "15:30", label: "3:30 PM" },
-  { value: "16:00", label: "4:00 PM" },
-  { value: "16:30", label: "4:30 PM" },
-  { value: "17:00", label: "5:00 PM" },
-  { value: "17:30", label: "5:30 PM" },
-  { value: "18:00", label: "6:00 PM" },
-];
+const TIME_OPTIONS: { value: string; label: string }[] = [];
+
+for (let h = 0; h < 24; h++) {
+  for (let m of [0, 30]) {
+    if (h === 24 && m === 30) break;
+    const value = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    const hour12 = h % 12 === 0 ? 12 : h % 12;
+    const ampm = h < 12 ? "AM" : "PM";
+    const label = `${hour12}:${m === 0 ? "00" : "30"} ${ampm}`;
+    TIME_OPTIONS.push({ value, label });
+  }
+}
 
 const LAW_SPECIALIZATIONS = [
   "Administrative Law",
@@ -166,7 +155,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setEditFormData(profileData);
     setValidationErrors({});
 
-    // Parse existing days and hours_available from profileData
     if (profileData.days) {
       const daysArray = profileData.days
         .split(", ")
@@ -175,15 +163,95 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     }
 
     if (profileData.hours_available) {
+      console.log("Parsing hours_available:", profileData.hours_available);
       try {
-        const hoursData = JSON.parse(profileData.hours_available);
+        const hoursData: Record<string, string[]> = {};
+
+        const dayEntries = profileData.hours_available.split(";");
+
+        dayEntries.forEach((entry) => {
+          if (entry.trim()) {
+            const parts = entry.split(":");
+            if (parts.length >= 2) {
+              const dayName = parts[0].trim();
+              const timesString = parts.slice(1).join(":").trim();
+              if (DAYS_OF_WEEK.includes(dayName)) {
+                const timeStrings = timesString
+                  .split(",")
+                  .map((time) => time.trim());
+                const timeValues = timeStrings
+                  .map((timeString) => {
+                    return convertTimeTo24Hour(timeString);
+                  })
+                  .filter((time) => time !== "");
+
+                if (timeValues.length > 0) {
+                  hoursData[dayName] = timeValues;
+                }
+              }
+            }
+          }
+        });
+
+        console.log("Parsed hours data:", hoursData);
         setDayTimeSlots(hoursData);
       } catch (error) {
-        console.log("Error parsing hours_available, initializing empty");
+        console.log(
+          "Error parsing hours_available, initializing empty:",
+          error
+        );
         setDayTimeSlots({});
       }
+    } else {
+      setDayTimeSlots({});
     }
   }, [profileData]);
+
+  const convertTimeTo24Hour = (time12h: string): string => {
+    try {
+      console.log("Converting time:", time12h);
+
+      let cleanTime = time12h.trim().toUpperCase();
+
+      if (cleanTime.includes("AM") || cleanTime.includes("PM")) {
+        const timePart = cleanTime.replace(/AM|PM/g, "").trim();
+        const modifier = cleanTime.includes("AM") ? "AM" : "PM";
+
+        if (timePart.includes(":")) {
+          let [hours, minutes] = timePart.split(":");
+          let hoursNum = parseInt(hours, 10);
+
+          if (modifier === "PM" && hoursNum !== 12) {
+            hoursNum += 12;
+          } else if (modifier === "AM" && hoursNum === 12) {
+            hoursNum = 0;
+          }
+
+          return `${hoursNum.toString().padStart(2, "0")}:${minutes.padStart(
+            2,
+            "0"
+          )}`;
+        } else {
+          let hoursNum = parseInt(timePart, 10);
+
+          if (modifier === "PM" && hoursNum !== 12) {
+            hoursNum += 12;
+          } else if (modifier === "AM" && hoursNum === 12) {
+            hoursNum = 0;
+          }
+
+          return `${hoursNum.toString().padStart(2, "0")}:00`;
+        }
+      } else {
+
+        console.log("Time format not recognized, returning as is:", cleanTime);
+        return cleanTime;
+      }
+    } catch (error) {
+      console.error("Error converting time:", error, "Input:", time12h);
+      return "";
+    }
+  };
 
   React.useEffect(() => {
     setLocalAvailabilitySlots(availabilitySlots);
@@ -338,7 +406,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const formatHoursAvailable = (): string => {
     const formattedEntries: string[] = [];
 
-    // Sort days according to DAYS_OF_WEEK order
     const sortedDays = DAYS_OF_WEEK.filter(
       (day) =>
         selectedDays.includes(day) &&
@@ -366,11 +433,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       return;
     }
 
-    // Format the days and hours_available before saving
     const formattedDays = selectedDays.join(", ");
     const formattedHoursAvailable = formatHoursAvailable();
 
-    // Update the form data with formatted availability
     const updatedFormData = {
       ...editFormData,
       days: formattedDays,
@@ -415,7 +480,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setIsEditingAvailability(false);
     setSearchQuery("");
 
-    // Reset availability state
     if (profileData.days) {
       const daysArray = profileData.days
         .split(", ")

@@ -1,5 +1,5 @@
 // C:\Users\Mikko\Desktop\AI.ttorney\client\app\lawyer\profile.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -41,8 +41,8 @@ interface ProfileData {
   avatar: string;
   experience: string;
   verificationStatus: string;
-  days?: string; // Add this
-  hours_available?: string; // Add this
+  days?: string;
+  hours_available?: string;
 }
 
 interface ProfessionalInfo {
@@ -55,8 +55,8 @@ interface LawyerContactInfo {
   location: string;
   bio: string;
   specializations: string;
-  days: string; // Add this
-  hours_available: string; // Add this
+  days: string;
+  hours_available: string;
 }
 
 const LawyerProfilePage: React.FC = () => {
@@ -81,8 +81,8 @@ const LawyerProfilePage: React.FC = () => {
       location: "",
       bio: "",
       specializations: "",
-      days: "", // Add this
-      hours_available: "", // Add this
+      days: "", 
+      hours_available: "",
     }
   );
 
@@ -143,11 +143,13 @@ const LawyerProfilePage: React.FC = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showAllSpecializations, setShowAllSpecializations] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  const fetchLawyerContactInfo = async () => {
+  const fetchLawyerContactInfo = useCallback(async () => {
     if (!user?.id) return;
 
     try {
+      setIsLoading(true);
       const { data, error } = await supabase
         .from("lawyer_info")
         .select(
@@ -179,18 +181,15 @@ const LawyerProfilePage: React.FC = () => {
           days: data.days || "",
           hours_available: data.hours_available || "",
         });
-
-        // Log the availability data for debugging
-        console.log("Fetched availability data:", {
-          days: data.days,
-          hours_available: data.hours_available,
-        });
       }
     } catch (error) {
       console.error("Error in fetchLawyerContactInfo:", error);
+    } finally {
+      setIsLoading(false);
     }
-  };
-  const fetchProfessionalInfo = async () => {
+  }, [user?.id]);
+
+  const fetchProfessionalInfo = useCallback(async () => {
     if (!user?.id) return;
 
     try {
@@ -219,7 +218,8 @@ const LawyerProfilePage: React.FC = () => {
     } catch (error) {
       console.error("Error in fetchProfessionalInfo:", error);
     }
-  };
+  }, [user?.id]);
+
   const saveProfessionalInfo = async (
     rollNumber: string,
     rollSigningDate: string
@@ -271,6 +271,8 @@ const LawyerProfilePage: React.FC = () => {
   useEffect(() => {
     const initializeProfileData = async () => {
       if (user) {
+        console.log("Initializing profile data for user:", user.id);
+
         const userProfileData: ProfileData = {
           name: user.full_name || "Attorney",
           email: user.email || "",
@@ -285,12 +287,39 @@ const LawyerProfilePage: React.FC = () => {
         setProfileData(userProfileData);
 
         await Promise.all([fetchLawyerContactInfo(), fetchProfessionalInfo()]);
+
+        setIsInitialLoad(false);
       }
-      setIsLoading(false);
     };
 
-    initializeProfileData();
-  }, [user]);
+    if (isInitialLoad && user) {
+      initializeProfileData();
+    }
+  }, [user, isInitialLoad, fetchLawyerContactInfo, fetchProfessionalInfo]);
+
+  const refreshProfileData = useCallback(async () => {
+    if (!user) return;
+
+    setIsLoading(true);
+    try {
+      await Promise.all([fetchLawyerContactInfo(), fetchProfessionalInfo()]);
+      await refreshUserData();
+    } catch (error) {
+      console.error("Error refreshing profile data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, fetchLawyerContactInfo, fetchProfessionalInfo, refreshUserData]);
+
+  useEffect(() => {
+    if (user && isInitialLoad) {
+      const timer = setTimeout(() => {
+        refreshProfileData();
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [user, isInitialLoad, refreshProfileData]);
 
   const saveLawyerProfileToBackend = async (
     profileData: any,
@@ -299,7 +328,6 @@ const LawyerProfilePage: React.FC = () => {
     professionalInfo: ProfessionalInfo
   ) => {
     try {
-      // Include days and hours_available in the combined data
       const combinedData = {
         name: profileData.name,
         email: profileData.email,
@@ -307,8 +335,8 @@ const LawyerProfilePage: React.FC = () => {
         location: contactInfo.location,
         bio: contactInfo.bio,
         specialization: contactInfo.specializations,
-        days: profileData.days, // This should now be populated
-        hours_available: profileData.hours_available, // This should now be populated
+        days: profileData.days, 
+        hours_available: profileData.hours_available,
       };
 
       console.log("Saving profile data with availability:", combinedData);
@@ -335,25 +363,28 @@ const LawyerProfilePage: React.FC = () => {
     }
   };
 
-  // Enhanced save function with better error handling
   const handleSaveProfile = async (editFormData: any) => {
     try {
       console.log("Starting profile save with data:", editFormData);
 
       const specializationsString = editFormData.specialization.join(", ");
 
-      // Update local state with days and hours_available
       setLawyerContactInfo((prev) => ({
         ...prev,
         phone_number: editFormData.phone,
         location: editFormData.location,
         bio: editFormData.bio,
         specializations: specializationsString,
-        days: editFormData.days || "", // Add this
-        hours_available: editFormData.hours_available || "", // Add this
+        days: editFormData.days || "",
+        hours_available: editFormData.hours_available || "",
       }));
 
-      // Prepare data for backend - include days and hours_available
+      setProfileData((prev) => ({
+        ...prev,
+        name: editFormData.name,
+        email: editFormData.email,
+      }));
+
       const profileDataForBackend = {
         name: editFormData.name,
         email: editFormData.email,
@@ -361,8 +392,8 @@ const LawyerProfilePage: React.FC = () => {
         location: editFormData.location,
         bio: editFormData.bio,
         specialization: editFormData.specialization,
-        days: editFormData.days || "", // Add this
-        hours_available: editFormData.hours_available || "", // Add this
+        days: editFormData.days || "",
+        hours_available: editFormData.hours_available || "",
       };
 
       console.log("Sending to backend service:", profileDataForBackend);
@@ -375,8 +406,8 @@ const LawyerProfilePage: React.FC = () => {
           location: editFormData.location,
           bio: editFormData.bio,
           specializations: specializationsString,
-          days: editFormData.days || "", // Add this
-          hours_available: editFormData.hours_available || "", // Add this
+          days: editFormData.days || "",
+          hours_available: editFormData.hours_available || "",
         },
         {
           rollNumber: editFormData.rollNumber,
@@ -388,8 +419,7 @@ const LawyerProfilePage: React.FC = () => {
         Alert.alert("Success", "Profile updated successfully!");
         setIsEditingProfile(false);
 
-        // Refresh the data to show updated availability
-        await fetchLawyerContactInfo();
+        await refreshProfileData();
       } else {
         throw new Error(result.error || "Failed to update profile");
       }
@@ -401,6 +431,7 @@ const LawyerProfilePage: React.FC = () => {
       );
     }
   };
+
   const handleEditProfile = () => {
     setIsEditingProfile(true);
   };
@@ -666,7 +697,6 @@ const LawyerProfilePage: React.FC = () => {
           location: lawyerContactInfo.location,
           avatar: profileData.avatar,
           bio: lawyerContactInfo.bio,
-          // Convert comma-separated string to array
           specialization: lawyerContactInfo.specializations
             ? lawyerContactInfo.specializations
                 .split(",")
@@ -675,6 +705,8 @@ const LawyerProfilePage: React.FC = () => {
             : [],
           rollNumber: professionalInfo.rollNumber,
           rollSigningDate: professionalInfo.rollSigningDate,
+          days: lawyerContactInfo.days,
+          hours_available: lawyerContactInfo.hours_available,
         }}
         availabilitySlots={availabilitySlots}
         onAvailabilityChange={setAvailabilitySlots}
