@@ -142,7 +142,7 @@ export default function DirectoryScreen() {
       ...lawyer,
       available: isLawyerAvailableToday(lawyer.days),
       displayDays: getDayAbbreviations(lawyer.days),
-      specialization: lawyer.specialization
+      specialization: lawyer.specialization // Use singular
         ? lawyer.specialization.split(",").map((s) => s.trim())
         : [],
       hours_available: lawyer.hours_available
@@ -180,7 +180,7 @@ export default function DirectoryScreen() {
         params: {
           lawyerId: lawyer.id,
           lawyerName: lawyer.name,
-          lawyerspecialization: JSON.stringify(lawyer.specialization),
+          lawyerSpecialization: JSON.stringify(lawyer.specialization), // Change from lawyerspecialization
           lawyerHours: lawyer.hours,
           lawyerDays: lawyer.displayDays,
           lawyerhours_available: JSON.stringify(lawyer.hours_available),
@@ -191,8 +191,7 @@ export default function DirectoryScreen() {
   );
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-    }, 300); 
+    const timer = setTimeout(() => {}, 300);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);

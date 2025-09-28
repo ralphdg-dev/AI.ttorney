@@ -38,7 +38,7 @@ interface DayAvailability {
 interface LawyerData {
   id: string;
   name: string;
-  specializations: string[];
+  specialization: string[];
   hours: string;
   days: string;
   hours_available: DayAvailability[];
@@ -306,7 +306,6 @@ export default function LawyerBookingView() {
     }
   };
 
-
   useEffect(() => {
     if (params.lawyerId) {
       const fetchLawyerData = async () => {
@@ -321,7 +320,7 @@ export default function LawyerBookingView() {
             setLawyerData({
               id: lawyer.id,
               name: lawyer.name,
-              specializations: lawyer.specializations
+              specialization: lawyer.specialization
                 .split(",")
                 .map((s: string) => s.trim()),
               hours: lawyer.hours,
@@ -345,8 +344,8 @@ export default function LawyerBookingView() {
 
   const setLawyerDataFromParams = () => {
     try {
-      const specializations = params.lawyerSpecializations
-        ? JSON.parse(params.lawyerSpecializations as string)
+      const specialization = params.lawyerSpecialization // Change from lawyerSpecializations
+        ? JSON.parse(params.lawyerSpecialization as string) // Change from lawyerSpecializations
         : ["General Law"];
 
       const hours_available = params.lawyerhours_available
@@ -356,7 +355,7 @@ export default function LawyerBookingView() {
       setLawyerData({
         id: params.lawyerId as string,
         name: params.lawyerName as string,
-        specializations: specializations,
+        specialization: specialization,
         hours: params.lawyerHours as string,
         days: params.lawyerDays as string,
         hours_available: parseHoursAvailable(hours_available),
@@ -366,7 +365,7 @@ export default function LawyerBookingView() {
       setLawyerData({
         id: params.lawyerId as string,
         name: params.lawyerName as string,
-        specializations: ["General Law"],
+        specialization: ["General Law"],
         hours: params.lawyerHours as string,
         days: params.lawyerDays as string,
         hours_available: [],
@@ -492,8 +491,8 @@ export default function LawyerBookingView() {
     );
   }
 
-  const primarySpecialization = lawyerData.specializations[0];
-  const additionalCount = lawyerData.specializations.length - 1;
+  const primarySpecialization = lawyerData.specialization[0];
+  const additionalCount = lawyerData.specialization.length - 1;
 
   return (
     <Box className="flex-1 bg-gray-50">
@@ -568,7 +567,7 @@ export default function LawyerBookingView() {
               >
                 All Specializations:
               </Text>
-              {lawyerData.specializations.map((spec, index) => (
+              {lawyerData.specialization.map((spec, index) => (
                 <Text
                   key={index}
                   className="text-sm text-center"
@@ -580,12 +579,7 @@ export default function LawyerBookingView() {
             </Box>
           )}
 
-          <HStack className="items-center mb-2">
-            <Ionicons name="time-outline" size={16} color={Colors.text.sub} />
-            <Text className="text-sm ml-2" style={{ color: Colors.text.sub }}>
-              {lawyerData.hours}
-            </Text>
-          </HStack>
+          <HStack className="items-center"></HStack>
           <HStack className="items-center">
             <Ionicons
               name="calendar-outline"
@@ -702,7 +696,6 @@ export default function LawyerBookingView() {
             </Text>
           )}
           <VStack>
-
             {validationErrors.timeSlot && (
               <Text className="text-red-500 text-sm mb-2">
                 {validationErrors.timeSlot}

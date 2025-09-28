@@ -26,13 +26,13 @@ export default function LawyerCard({
   lawyer,
   onBookConsultation,
 }: LawyerCardProps) {
-  const [showAllspecialization, setShowAllspecialization] = useState(false);
+  const [showAllSpecialization, setShowAllSpecialization] = useState(false);
 
   const primarySpecialization = lawyer.specialization[0];
   const additionalCount = lawyer.specialization.length - 1;
 
   const handleSpecializationPress = () => {
-    setShowAllspecialization(!showAllspecialization);
+    setShowAllSpecialization(!showAllSpecialization);
   };
 
   return (
@@ -63,13 +63,13 @@ export default function LawyerCard({
             </HStack>
           </Pressable>
 
-          {showAllspecialization && (
+          {showAllSpecialization && (
             <Box className="mt-2 p-3 bg-gray-100 rounded-lg">
               <Text
                 className="text-sm font-semibold mb-1"
                 style={{ color: Colors.text.head }}
               >
-                All specialization:
+                All Specializations: {/* Fix typo */}
               </Text>
               {lawyer.specialization.map((spec, index) => (
                 <Text
@@ -105,7 +105,6 @@ export default function LawyerCard({
       </HStack>
 
       <HStack className="items-center mb-4">
-
         <HStack className="items-center">
           <Ionicons name="calendar-outline" size={16} color={Colors.text.sub} />
           <Text className="text-sm ml-1" style={{ color: Colors.text.sub }}>
