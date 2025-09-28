@@ -211,6 +211,26 @@ const ManageLawyers = () => {
       )
     },
     { 
+      key: 'username', 
+      header: (
+        <button
+          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          onClick={() => handleSort('username')}
+        >
+          <span>Username</span>
+          {sortConfig.key === 'username' ? (
+            sortConfig.direction === 'asc' ? (
+              <ChevronUp size={14} className="text-blue-600" />
+            ) : (
+              <ChevronDown size={14} className="text-blue-600" />
+            )
+          ) : (
+            <div className="w-3.5 h-3.5" />
+          )}
+        </button>
+      )
+    },
+    { 
       key: 'roll_number', 
       header: (
         <button
@@ -257,6 +277,35 @@ const ManageLawyers = () => {
           year: 'numeric'
         });
       }
+    },
+    {
+      key: 'accepting_consultations',
+      header: (
+        <button
+          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          onClick={() => handleSort('accepting_consultations')}
+        >
+          <span>Accepting Consultations</span>
+          {sortConfig.key === 'accepting_consultations' ? (
+            sortConfig.direction === 'asc' ? (
+              <ChevronUp size={14} className="text-blue-600" />
+            ) : (
+              <ChevronDown size={14} className="text-blue-600" />
+            )
+          ) : (
+            <div className="w-3.5 h-3.5" />
+          )}
+        </button>
+      ),
+      render: (row) => (
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+          row.accepting_consultations 
+            ? 'bg-green-50 text-green-700 border border-green-200' 
+            : 'bg-gray-50 text-gray-700 border border-gray-200'
+        }`}>
+          {row.accepting_consultations ? 'Yes' : 'No'}
+        </span>
+      )
     },
     {
       key: 'status',

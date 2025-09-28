@@ -332,22 +332,26 @@ router.get('/lawyers', authenticateAdmin, async (req, res) => {
     const offset = (page - 1) * limit;
 
 
-    // First, let's try a simpler query to get verified lawyers
+    // First, let's try a simpler query to get verified lawyers with lawyer_info
     let query = supabaseAdmin
       .from('users')
       .select(`
         id,
         full_name,
         email,
+        username,
         created_at,
-        is_verified
+        is_verified,
+        lawyer_info (
+          accepting_consultations
+        )
       `)
       .eq('role', 'verified_lawyer') // Only verified lawyers
       .order('created_at', { ascending: false });
 
     // Add search filter if provided
     if (search) {
-      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,username.ilike.%${search}%`);
     }
 
     // Add pagination
@@ -363,6 +367,13 @@ router.get('/lawyers', authenticateAdmin, async (req, res) => {
       });
     }
 
+    // Debug: Log the lawyer_info data to verify the foreign key relationship is working
+    console.log('Lawyers with lawyer_info:', lawyers?.map(l => ({
+      id: l.id,
+      name: l.full_name,
+      lawyer_info: l.lawyer_info
+    })));
+
 
     // Now try to get lawyer applications for these users
     let transformedLawyers = [];
@@ -370,12 +381,13 @@ router.get('/lawyers', authenticateAdmin, async (req, res) => {
     if (lawyers && lawyers.length > 0) {
       const userIds = lawyers.map(lawyer => lawyer.id);
       
-      // Get lawyer applications separately
+      // Get lawyer applications separately - fetch latest version for each user
       const { data: applications, error: appError } = await supabaseAdmin
         .from('lawyer_applications')
-        .select('user_id, roll_number, roll_signing_date, status')
+        .select('user_id, roll_number, roll_signing_date, status, version, is_latest')
         .in('user_id', userIds)
-        .eq('status', 'approved');
+        .eq('status', 'accepted')
+        .order('version', { ascending: false }); // Get highest version first
 
       if (appError) {
         console.error('Get applications error:', appError);
@@ -383,13 +395,32 @@ router.get('/lawyers', authenticateAdmin, async (req, res) => {
       }
 
 
+      // Process applications to get latest version for each user
+      const latestApplications = {};
+      if (applications) {
+        applications.forEach(app => {
+          const userId = app.user_id;
+          if (!latestApplications[userId] || 
+              app.is_latest === true || 
+              (app.version > (latestApplications[userId].version || 0))) {
+            latestApplications[userId] = app;
+          }
+        });
+      }
+
       // Transform data for frontend
       transformedLawyers = lawyers.map(lawyer => {
-        const application = applications?.find(app => app.user_id === lawyer.id);
+        const application = latestApplications[lawyer.id];
+        // Check accepting_consultations from lawyer_info table
+        const lawyerInfo = lawyer.lawyer_info?.[0]; // lawyer_info is an array from the join
+        const acceptingConsultations = lawyerInfo?.accepting_consultations === true;
+        
         return {
           id: lawyer.id,
           full_name: lawyer.full_name || 'N/A',
           email: lawyer.email,
+          username: lawyer.username || 'N/A',
+          accepting_consultations: acceptingConsultations,
           roll_number: application?.roll_number || 'N/A',
           roll_sign_date: application?.roll_signing_date || lawyer.created_at,
           status: 'Verified',
