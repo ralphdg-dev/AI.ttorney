@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Animated } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Post from '../home/Post';
@@ -14,6 +14,8 @@ type User = Database['public']['Tables']['users']['Row'];
 type ForumPostWithUser = ForumPost & {
   user: User;
   reply_count: number;
+  isOptimistic?: boolean;
+  animatedOpacity?: Animated.Value;
 };
 
 const LawyerTimeline: React.FC = () => {
@@ -21,6 +23,7 @@ const LawyerTimeline: React.FC = () => {
 
   const [posts, setPosts] = useState<ForumPostWithUser[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [optimisticPosts, setOptimisticPosts] = useState<ForumPostWithUser[]>([]);
 
   const loadPosts = useCallback(async () => {
     setRefreshing(true);
@@ -67,6 +70,14 @@ const LawyerTimeline: React.FC = () => {
     }, [loadPosts])
   );
 
+  // Lightweight polling for near real-time updates
+  useEffect(() => {
+    const id = setInterval(() => {
+      loadPosts();
+    }, 10000); // 10s
+    return () => clearInterval(id);
+  }, [loadPosts]);
+
   const handleCommentPress = (postId: string) => {
     console.log(`Comment pressed for post ${postId}`);
     // TODO: Navigate to comments screen
@@ -87,6 +98,77 @@ const LawyerTimeline: React.FC = () => {
     router.push('/lawyer/CreatePost' as any);
   };
 
+  // Function to add optimistic post
+  const addOptimisticPost = useCallback((postData: { body: string; category?: string }) => {
+    const animatedOpacity = new Animated.Value(0.5); // Start with 50% opacity
+    const optimisticPost: ForumPostWithUser = {
+      id: `optimistic-${Date.now()}`,
+      title: undefined as any,
+      body: postData.body,
+      domain: (postData.category as any) || 'others',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      user_id: 'current-user',
+      is_anonymous: false,
+      is_flagged: false,
+      user: {
+        id: 'current-user',
+        email: '',
+        username: 'You',
+        full_name: 'You',
+        role: 'registered_user' as any,
+        is_verified: false,
+        birthdate: null,
+        created_at: null,
+        updated_at: null,
+      },
+      reply_count: 0,
+      isOptimistic: true,
+      animatedOpacity,
+    };
+
+    setOptimisticPosts(prev => [optimisticPost, ...prev]);
+    return optimisticPost.id;
+  }, []);
+
+  // Function to confirm optimistic post (make it fully opaque)
+  const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: ForumPostWithUser) => {
+    setOptimisticPosts(prev => {
+      const post = prev.find(p => p.id === optimisticId);
+      if (post?.animatedOpacity) {
+        Animated.timing(post.animatedOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          // Remove optimistic post after animation
+          setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+          // Refresh posts to get the real post
+          if (realPost) {
+            setPosts(current => [realPost, ...current]);
+          } else {
+            loadPosts();
+          }
+        });
+      }
+      return prev;
+    });
+  }, [loadPosts]);
+
+  // Function to remove failed optimistic post
+  const removeOptimisticPost = useCallback((optimisticId: string) => {
+    setOptimisticPosts(prev => prev.filter(p => p.id !== optimisticId));
+  }, []);
+
+  // Expose functions globally for CreatePost to use
+  React.useEffect(() => {
+    (global as any).forumActions = {
+      addOptimisticPost,
+      confirmOptimisticPost,
+      removeOptimisticPost,
+    };
+  }, [addOptimisticPost, confirmOptimisticPost, removeOptimisticPost]);
+
   return (
     <View className="flex-1 bg-white">
       {/* Timeline */}
@@ -95,18 +177,30 @@ const LawyerTimeline: React.FC = () => {
         contentContainerStyle={{ paddingVertical: 10 }}
         showsVerticalScrollIndicator={false}
       >
-        {posts.map((post) => {
-          // Convert database timestamp to relative time
+        {[...optimisticPosts, ...posts].map((post) => {
+          // Convert database timestamp to relative time with real-time updates
           const getRelativeTime = (timestamp: string) => {
-            const now = new Date();
-            const postTime = new Date(timestamp);
-            const diffMs = now.getTime() - postTime.getTime();
-            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-            
-            if (diffHours < 1) return 'now';
-            if (diffHours < 24) return `${diffHours}h`;
-            const diffDays = Math.floor(diffHours / 24);
-            return `${diffDays}d`;
+            if (!timestamp) return '';
+            // Treat timestamps without timezone as UTC to avoid local offset issues
+            const hasTz = /Z|[+-]\d{2}:?\d{2}$/.test(timestamp);
+            const normalized = hasTz ? timestamp : `${timestamp}Z`;
+            const createdMs = new Date(normalized).getTime();
+            if (Number.isNaN(createdMs)) return '';
+            const now = Date.now();
+            const diffSec = Math.max(0, Math.floor((now - createdMs) / 1000));
+            if (diffSec < 60) return `${diffSec}s`;
+            const diffMin = Math.floor(diffSec / 60);
+            if (diffMin < 60) return `${diffMin}m`;
+            const diffHr = Math.floor(diffMin / 60);
+            if (diffHr < 24) return `${diffHr}h`;
+            const diffDay = Math.floor(diffHr / 24);
+            if (diffDay < 7) return `${diffDay}d`;
+            const diffWeek = Math.floor(diffDay / 7);
+            if (diffWeek < 4) return `${diffWeek}w`;
+            const diffMonth = Math.floor(diffDay / 30);
+            if (diffMonth < 12) return `${diffMonth}mo`;
+            const diffYear = Math.floor(diffDay / 365);
+            return `${diffYear}y`;
           };
 
           // Convert domain to display category
@@ -122,7 +216,7 @@ const LawyerTimeline: React.FC = () => {
             }
           };
 
-          return (
+          const postComponent = (
             <Post
               key={post.id}
               id={post.id}
@@ -140,6 +234,20 @@ const LawyerTimeline: React.FC = () => {
               onPostPress={() => handlePostPress(post.id)}
             />
           );
+
+          // Wrap optimistic posts with animated opacity
+          if (post.isOptimistic && post.animatedOpacity) {
+            return (
+              <Animated.View
+                key={post.id}
+                style={{ opacity: post.animatedOpacity }}
+              >
+                {postComponent}
+              </Animated.View>
+            );
+          }
+
+          return postComponent;
         })}
         <View className="h-20" />
       </ScrollView>

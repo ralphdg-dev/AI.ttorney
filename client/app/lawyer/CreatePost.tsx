@@ -91,20 +91,42 @@ const LawyerCreatePost: React.FC = () => {
     
     setIsSubmitting(true);
     
+    const payload = {
+      body: body.trim(),
+      category: selectedCategory === 'others' ? undefined : selectedCategory,
+      is_anonymous: false,
+    };
+
+    // Add optimistic post immediately
+    const optimisticId = (global as any).forumActions?.addOptimisticPost({
+      body: payload.body,
+      category: payload.category
+    });
+
+    // Navigate back immediately to show the optimistic post
+    router.back();
+    
     try {
-      const payload = {
-        body: body.trim(),
-        category: selectedCategory === 'others' ? undefined : selectedCategory,
-        is_anonymous: false,
-      };
       const resp = await apiClient.createForumPost(payload);
       if (!resp.success) {
         console.error('Failed to create post', resp.error);
+        // Remove the optimistic post on failure
+        if (optimisticId) {
+          (global as any).forumActions?.removeOptimisticPost(optimisticId);
+        }
         return;
       }
-      router.back();
+      
+      // Confirm the optimistic post (animate to full opacity)
+      if (optimisticId) {
+        (global as any).forumActions?.confirmOptimisticPost(optimisticId);
+      }
     } catch (error) {
       console.error('Error creating post:', error);
+      // Remove the optimistic post on error
+      if (optimisticId) {
+        (global as any).forumActions?.removeOptimisticPost(optimisticId);
+      }
     } finally {
       setIsSubmitting(false);
     }

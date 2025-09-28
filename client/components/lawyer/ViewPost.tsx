@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, SafeAreaView } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, SafeAreaView, Animated } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { User, Shield, MessageCircle, Bookmark, MoreHorizontal, Flag, Send } from 'lucide-react-native';
 import ReportModal from '../common/ReportModal';
@@ -29,6 +29,9 @@ interface Reply {
   // Legacy props for backward compatibility
   timestamp?: string;
   content?: string;
+  // Optimistic UI props
+  isOptimistic?: boolean;
+  animatedOpacity?: Animated.Value;
 }
 
 interface PostData {
@@ -99,6 +102,7 @@ const LawyerViewPost: React.FC = () => {
 
   const [post, setPost] = useState<PostData | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
+  const [optimisticReplies, setOptimisticReplies] = useState<Reply[]>([]);
 
   // Real-time timer effect
   useEffect(() => {
@@ -259,31 +263,105 @@ const LawyerViewPost: React.FC = () => {
     setReplyText(text);
   };
 
+  // Function to add optimistic reply
+  const addOptimisticReply = useCallback((replyData: { body: string }) => {
+    const animatedOpacity = new Animated.Value(0.5); // Start with 50% opacity
+    const optimisticReply: Reply = {
+      id: `optimistic-reply-${Date.now()}`,
+      body: replyData.body,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      user_id: currentUser?.id || 'current-lawyer',
+      is_anonymous: false,
+      is_flagged: false,
+      user: {
+        name: currentUser?.full_name || 'You',
+        username: currentUser?.username || 'you',
+        avatar: (currentUser as any)?.avatar || '',
+        isLawyer: true,
+        lawyerBadge: 'Verified'
+      },
+      isOptimistic: true,
+      animatedOpacity,
+    };
+
+    setOptimisticReplies(prev => [...prev, optimisticReply]);
+    return optimisticReply.id;
+  }, [currentUser]);
+
+  // Function to confirm optimistic reply (make it fully opaque)
+  const confirmOptimisticReply = useCallback((optimisticId: string) => {
+    setOptimisticReplies(prev => {
+      const reply = prev.find(r => r.id === optimisticId);
+      if (reply?.animatedOpacity) {
+        Animated.timing(reply.animatedOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          // Remove optimistic reply after animation and reload real replies
+          setOptimisticReplies(current => current.filter(r => r.id !== optimisticId));
+          // Reload replies to get the real reply
+          loadReplies();
+        });
+      }
+      return prev;
+    });
+  }, []);
+
+  // Function to remove failed optimistic reply
+  const removeOptimisticReply = useCallback((optimisticId: string) => {
+    setOptimisticReplies(prev => prev.filter(r => r.id !== optimisticId));
+  }, []);
+
+  // Function to reload replies
+  const loadReplies = useCallback(async () => {
+    if (!postId) return;
+    const rep = await apiClient.getForumReplies(String(postId));
+    if (rep.success && Array.isArray((rep.data as any)?.data)) {
+      const rows = (rep.data as any).data as any[];
+      const mappedReplies: Reply[] = rows.map((r: any) => ({
+        id: String(r.id),
+        body: r.reply_body ?? r.body,
+        created_at: r.created_at || null,
+        updated_at: r.updated_at || null,
+        user_id: r.user_id || null,
+        is_anonymous: !!r.is_anonymous,
+        is_flagged: !!r.is_flagged,
+        user: undefined,
+      }));
+      setReplies(mappedReplies);
+    }
+  }, [postId]);
+
   const handleSendReply = async () => {
     const text = replyText.trim();
     if (!text || !postId) return;
+    
+    // Add optimistic reply immediately
+    const optimisticId = addOptimisticReply({ body: text });
+    
+    // Clear input immediately for better UX
+    setReplyText('');
+    
     try {
       setIsReplying(true);
       const resp = await apiClient.createForumReply(String(postId), { body: text, is_anonymous: false });
       if (resp.success) {
-        setReplyText('');
-        // reload replies
-        const rep = await apiClient.getForumReplies(String(postId));
-        if (rep.success && Array.isArray((rep.data as any)?.data)) {
-          const rows = (rep.data as any).data as any[];
-          const mappedReplies: Reply[] = rows.map((r: any) => ({
-            id: String(r.id),
-            body: r.reply_body ?? r.body,
-            created_at: r.created_at || null,
-            updated_at: r.updated_at || null,
-            user_id: r.user_id || null,
-            is_anonymous: !!r.is_anonymous,
-            is_flagged: !!r.is_flagged,
-            user: undefined,
-          }));
-          setReplies(mappedReplies);
-        }
+        // Confirm the optimistic reply (animate to full opacity)
+        confirmOptimisticReply(optimisticId);
+      } else {
+        // Remove the optimistic reply on failure
+        removeOptimisticReply(optimisticId);
+        // Restore the text on failure
+        setReplyText(text);
       }
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      // Remove the optimistic reply on error
+      removeOptimisticReply(optimisticId);
+      // Restore the text on error
+      setReplyText(text);
     } finally {
       setIsReplying(false);
     }
@@ -449,37 +527,53 @@ const LawyerViewPost: React.FC = () => {
           </View>
 
           {/* Replies List */}
-          {replies.map((reply) => (
-            <View key={reply.id} style={tw`mb-4 pb-4 border-b border-gray-100`}>
-              <View style={tw`flex-row items-start`}>
-                <Image 
-                  source={{ uri: reply.user?.avatar || '' }} 
-                  style={tw`w-10 h-10 rounded-full mr-3`}
-                />
-                <View style={tw`flex-1`}>
-                  <View style={tw`flex-row items-center mb-1`}>
-                    <Text style={tw`font-semibold text-gray-900 mr-2`}>
-                      {reply.user?.name || 'Anonymous'}
-                    </Text>
-                    {reply.user?.isLawyer && (
-                      <View style={tw`flex-row items-center bg-emerald-50 px-2 py-1 rounded border border-emerald-200`}>
-                        <Shield size={8} color="#059669" fill="#059669" />
-                        <Text style={tw`text-xs font-semibold text-emerald-700 ml-1`}>
-                          Verified
-                        </Text>
-                      </View>
-                    )}
-                    <Text style={tw`text-sm text-gray-500 ml-2`}>
-                      {formatTimestamp(reply.created_at)}
+          {[...replies, ...optimisticReplies].map((reply) => {
+            const replyComponent = (
+              <View key={reply.id} style={tw`mb-4 pb-4 border-b border-gray-100`}>
+                <View style={tw`flex-row items-start`}>
+                  <Image 
+                    source={{ uri: reply.user?.avatar || '' }} 
+                    style={tw`w-10 h-10 rounded-full mr-3`}
+                  />
+                  <View style={tw`flex-1`}>
+                    <View style={tw`flex-row items-center mb-1`}>
+                      <Text style={tw`font-semibold text-gray-900 mr-2`}>
+                        {reply.user?.name || 'Anonymous'}
+                      </Text>
+                      {reply.user?.isLawyer && (
+                        <View style={tw`flex-row items-center bg-emerald-50 px-2 py-1 rounded border border-emerald-200`}>
+                          <Shield size={8} color="#059669" fill="#059669" />
+                          <Text style={tw`text-xs font-semibold text-emerald-700 ml-1`}>
+                            Verified
+                          </Text>
+                        </View>
+                      )}
+                      <Text style={tw`text-sm text-gray-500 ml-2`}>
+                        {formatTimestamp(reply.created_at)}
+                      </Text>
+                    </View>
+                    <Text style={tw`text-gray-800 leading-5`}>
+                      {reply.body}
                     </Text>
                   </View>
-                  <Text style={tw`text-gray-800 leading-5`}>
-                    {reply.body}
-                  </Text>
                 </View>
               </View>
-            </View>
-          ))}
+            );
+
+            // Wrap optimistic replies with animated opacity
+            if (reply.isOptimistic && reply.animatedOpacity) {
+              return (
+                <Animated.View
+                  key={reply.id}
+                  style={{ opacity: reply.animatedOpacity }}
+                >
+                  {replyComponent}
+                </Animated.View>
+              );
+            }
+
+            return replyComponent;
+          })}
         </View>
       </ScrollView>
 

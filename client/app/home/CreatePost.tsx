@@ -25,20 +25,44 @@ const CreatePost: React.FC = () => {
 
   const onPressPost = async () => {
     if (isPostDisabled) return;
+    
+    const payload = {
+      body: content.trim(),
+      category: categoryId || undefined,
+      is_anonymous: isAnonymous,
+    };
+
+    // Add optimistic post immediately
+    const optimisticId = (global as any).userForumActions?.addOptimisticPost({
+      body: payload.body,
+      category: payload.category,
+      is_anonymous: payload.is_anonymous
+    });
+
+    // Navigate back immediately to show the optimistic post
+    router.back();
+    
     try {
-      const payload = {
-        body: content.trim(),
-        category: categoryId || undefined,
-        is_anonymous: isAnonymous,
-      };
       const resp = await apiClient.createForumPost(payload);
       if (!resp.success) {
         console.error('Failed to create post', resp.error);
+        // Remove the optimistic post on failure
+        if (optimisticId) {
+          (global as any).userForumActions?.removeOptimisticPost(optimisticId);
+        }
         return;
       }
-      router.back();
+      
+      // Confirm the optimistic post (animate to full opacity)
+      if (optimisticId) {
+        (global as any).userForumActions?.confirmOptimisticPost(optimisticId);
+      }
     } catch (e) {
       console.error('Create post error', e);
+      // Remove the optimistic post on error
+      if (optimisticId) {
+        (global as any).userForumActions?.removeOptimisticPost(optimisticId);
+      }
     }
   };
 

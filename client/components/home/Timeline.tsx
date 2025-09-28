@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
+import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Animated } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Post from './Post';
@@ -18,6 +18,8 @@ interface PostData {
   category: string;
   content: string;
   comments: number;
+  isOptimistic?: boolean;
+  animatedOpacity?: Animated.Value;
 }
 
 interface TimelineProps {
@@ -28,6 +30,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [optimisticPosts, setOptimisticPosts] = useState<PostData[]>([]);
 
   const formatTimeAgo = (isoDate?: string): string => {
     if (!isoDate) return '';
@@ -128,6 +131,66 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     router.push(route as any);
   };
 
+  // Function to add optimistic post
+  const addOptimisticPost = useCallback((postData: { body: string; category?: string; is_anonymous?: boolean }) => {
+    const animatedOpacity = new Animated.Value(0.5); // Start with 50% opacity
+    const optimisticPost: PostData = {
+      id: `optimistic-${Date.now()}`,
+      user: postData.is_anonymous 
+        ? { name: 'Anonymous User', username: 'anonymous', avatar: '' }
+        : { name: 'You', username: 'you', avatar: '' },
+      timestamp: 'now',
+      category: postData.category || 'Others',
+      content: postData.body,
+      comments: 0,
+      isOptimistic: true,
+      animatedOpacity,
+    };
+
+    setOptimisticPosts(prev => [optimisticPost, ...prev]);
+    return optimisticPost.id;
+  }, []);
+
+  // Function to confirm optimistic post (make it fully opaque)
+  const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: PostData) => {
+    setOptimisticPosts(prev => {
+      const post = prev.find(p => p.id === optimisticId);
+      if (post?.animatedOpacity) {
+        Animated.timing(post.animatedOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          // Remove optimistic post after animation
+          setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+          // Refresh posts to get the real post
+          if (realPost) {
+            setPosts(current => [realPost, ...current]);
+          } else {
+            loadPosts();
+          }
+        });
+      }
+      return prev;
+    });
+  }, [loadPosts]);
+
+  // Function to remove failed optimistic post
+  const removeOptimisticPost = useCallback((optimisticId: string) => {
+    setOptimisticPosts(prev => prev.filter(p => p.id !== optimisticId));
+  }, []);
+
+  // Expose functions globally for CreatePost to use
+  React.useEffect(() => {
+    if (context === 'user') {
+      (global as any).userForumActions = {
+        addOptimisticPost,
+        confirmOptimisticPost,
+        removeOptimisticPost,
+      };
+    }
+  }, [addOptimisticPost, confirmOptimisticPost, removeOptimisticPost, context]);
+
   return (
     <View style={styles.container}>
       {/* Timeline */}
@@ -139,20 +202,36 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
           <RefreshControl refreshing={refreshing} onRefresh={loadPosts} />
         }
       >
-        {posts.map((post) => (
-          <Post
-            key={post.id}
-            id={post.id}
-            user={post.user}
-            timestamp={post.timestamp}
-            category={post.category}
-            content={post.content}
-            comments={post.comments}
-            onCommentPress={() => handleCommentPress(post.id)}
-            onReportPress={() => handleReportPress(post.id)}
-            onPostPress={() => handlePostPress(post.id)}
-          />
-        ))}
+        {[...optimisticPosts, ...posts].map((post) => {
+          const postComponent = (
+            <Post
+              key={post.id}
+              id={post.id}
+              user={post.user}
+              timestamp={post.timestamp}
+              category={post.category}
+              content={post.content}
+              comments={post.comments}
+              onCommentPress={() => handleCommentPress(post.id)}
+              onReportPress={() => handleReportPress(post.id)}
+              onPostPress={() => handlePostPress(post.id)}
+            />
+          );
+
+          // Wrap optimistic posts with animated opacity
+          if (post.isOptimistic && post.animatedOpacity) {
+            return (
+              <Animated.View
+                key={post.id}
+                style={{ opacity: post.animatedOpacity }}
+              >
+                {postComponent}
+              </Animated.View>
+            );
+          }
+
+          return postComponent;
+        })}
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
