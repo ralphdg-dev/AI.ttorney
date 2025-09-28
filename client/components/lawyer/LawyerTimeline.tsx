@@ -30,29 +30,34 @@ const LawyerTimeline: React.FC = () => {
     const res = await apiClient.getRecentForumPosts();
     if (res.success && Array.isArray((res.data as any)?.data)) {
       const rows = (res.data as any).data as any[];
-      const mapped: ForumPostWithUser[] = rows.map((r: any) => ({
-        id: String(r.id),
-        title: undefined as any,
-        body: r.body,
-        domain: r.category,
-        created_at: r.created_at,
-        updated_at: r.updated_at,
-        user_id: r.user_id,
-        is_anonymous: r.is_anonymous,
-        is_flagged: r.is_flagged,
-        user: {
-          id: r.user_id,
-          email: '',
-          username: r.is_anonymous ? 'anonymous' : 'user',
-          full_name: r.is_anonymous ? 'Anonymous User' : 'User',
-          role: 'registered_user' as any,
-          is_verified: false,
-          birthdate: null,
-          created_at: null,
-          updated_at: null,
-        },
-        reply_count: Number(r.reply_count || 0),
-      }));
+      const mapped: ForumPostWithUser[] = rows.map((r: any) => {
+        const isAnon = !!r.is_anonymous;
+        const userData = r?.users || {};
+        
+        return {
+          id: String(r.id),
+          title: undefined as any,
+          body: r.body,
+          domain: r.category,
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+          user_id: r.user_id,
+          is_anonymous: r.is_anonymous,
+          is_flagged: r.is_flagged,
+          user: {
+            id: r.user_id,
+            email: '',
+            username: isAnon ? 'anonymous' : (userData?.username || 'user'),
+            full_name: isAnon ? 'Anonymous User' : (userData?.full_name || userData?.username || 'User'),
+            role: userData?.role || 'registered_user' as any,
+            is_verified: false,
+            birthdate: null,
+            created_at: null,
+            updated_at: null,
+          },
+          reply_count: Number(r.reply_count || 0),
+        };
+      });
       setPosts(mapped);
     } else {
       setPosts([]);

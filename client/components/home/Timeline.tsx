@@ -59,11 +59,17 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const mapApiToPost = (row: any): PostData => {
     const isAnon = !!row?.is_anonymous;
     const created = row?.created_at || '';
+    const userData = row?.users || {};
+    
     return {
       id: String(row?.id ?? ''),
       user: isAnon
         ? { name: 'Anonymous User', username: 'anonymous', avatar: '' }
-        : { name: 'User', username: 'user', avatar: '' },
+        : { 
+            name: userData?.full_name || userData?.username || 'User', 
+            username: userData?.username || 'user', 
+            avatar: `https://images.unsplash.com/photo-${Math.random() > 0.5 ? '1472099645785-5658abf4ff4e' : '1507003211169-0a1dd7228f2d'}?w=150&h=150&fit=crop&crop=face`
+          },
       timestamp: formatTimeAgo(created),
       category: row?.category || 'Others',
       content: row?.body || '',

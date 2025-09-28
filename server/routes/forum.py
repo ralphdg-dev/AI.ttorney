@@ -149,12 +149,12 @@ async def supabase_info():
 
 @router.get("/posts/recent", response_model=ListPostsResponse)
 async def list_recent_posts(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """List recent posts across all users (debug helper)."""
+    """List recent posts across all users with user information."""
     try:
         supabase = SupabaseService()
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{supabase.rest_url}/forum_posts?select=*&order=created_at.desc&limit=20",
+                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&order=created_at.desc&limit=20",
                 headers=supabase._get_headers(use_service_key=True)
             )
 
@@ -207,12 +207,12 @@ class GetPostResponse(BaseModel):
 
 @router.get("/posts/{post_id}", response_model=GetPostResponse)
 async def get_post(post_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
-    """Fetch a single forum post by ID."""
+    """Fetch a single forum post by ID with user information."""
     try:
         supabase = SupabaseService()
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{supabase.rest_url}/forum_posts?select=*&id=eq.{post_id}",
+                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&id=eq.{post_id}",
                 headers=supabase._get_headers(use_service_key=True)
             )
 
@@ -244,12 +244,12 @@ class ListRepliesResponse(BaseModel):
 
 @router.get("/posts/{post_id}/replies", response_model=ListRepliesResponse)
 async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
-    """List replies for a forum post."""
+    """List replies for a forum post with user information."""
     try:
         supabase = SupabaseService()
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{supabase.rest_url}/forum_replies?select=*&post_id=eq.{post_id}&order=created_at.desc",
+                f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=eq.{post_id}&order=created_at.desc",
                 headers=supabase._get_headers(use_service_key=True)
             )
         if response.status_code != 200:

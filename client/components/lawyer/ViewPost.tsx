@@ -204,6 +204,9 @@ const LawyerViewPost: React.FC = () => {
       const res = await apiClient.getForumPostById(String(postId));
       if (res.success && (res.data as any)?.data) {
         const row = (res.data as any).data;
+        const isAnon = !!row.is_anonymous;
+        const userData = row?.users || {};
+        
         const mapped: PostData = {
           id: String(row.id),
           title: undefined,
@@ -212,9 +215,15 @@ const LawyerViewPost: React.FC = () => {
           created_at: row.created_at || null,
           updated_at: row.updated_at || null,
           user_id: row.user_id || null,
-          is_anonymous: !!row.is_anonymous,
+          is_anonymous: isAnon,
           is_flagged: !!row.is_flagged,
-          user: undefined,
+          user: isAnon ? undefined : {
+            name: userData?.full_name || userData?.username || 'User',
+            username: userData?.username || 'user',
+            avatar: `https://images.unsplash.com/photo-${Math.random() > 0.5 ? '1472099645785-5658abf4ff4e' : '1507003211169-0a1dd7228f2d'}?w=150&h=150&fit=crop&crop=face`,
+            isLawyer: userData?.role === 'verified_lawyer',
+            lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+          },
           comments: 0,
           replies: [],
         };
@@ -225,16 +234,27 @@ const LawyerViewPost: React.FC = () => {
       const rep = await apiClient.getForumReplies(String(postId));
       if (rep.success && Array.isArray((rep.data as any)?.data)) {
         const rows = (rep.data as any).data as any[];
-        const mappedReplies: Reply[] = rows.map((r: any) => ({
-          id: String(r.id),
-          body: r.reply_body ?? r.body,
-          created_at: r.created_at || null,
-          updated_at: r.updated_at || null,
-          user_id: r.user_id || null,
-          is_anonymous: !!r.is_anonymous,
-          is_flagged: !!r.is_flagged,
-          user: undefined,
-        }));
+        const mappedReplies: Reply[] = rows.map((r: any) => {
+          const isReplyAnon = !!r.is_anonymous;
+          const replyUserData = r?.users || {};
+          
+          return {
+            id: String(r.id),
+            body: r.reply_body ?? r.body,
+            created_at: r.created_at || null,
+            updated_at: r.updated_at || null,
+            user_id: r.user_id || null,
+            is_anonymous: isReplyAnon,
+            is_flagged: !!r.is_flagged,
+            user: isReplyAnon ? undefined : {
+              name: replyUserData?.full_name || replyUserData?.username || 'User',
+              username: replyUserData?.username || 'user',
+              avatar: `https://images.unsplash.com/photo-${Math.random() > 0.5 ? '1472099645785-5658abf4ff4e' : '1507003211169-0a1dd7228f2d'}?w=150&h=150&fit=crop&crop=face`,
+              isLawyer: replyUserData?.role === 'verified_lawyer',
+              lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+            },
+          };
+        });
         setReplies(mappedReplies);
       } else {
         setReplies([]);
@@ -245,7 +265,7 @@ const LawyerViewPost: React.FC = () => {
 
   // Derived data
   const isAnonymous = post?.is_anonymous || false;
-  const displayUser = isAnonymous ? { name: 'Anonymous User', avatar: '', isLawyer: false } : (post?.user || { name: 'Unknown User', avatar: '', isLawyer: false });
+  const displayUser = isAnonymous ? { name: 'Anonymous User', avatar: '', isLawyer: false } : (post?.user || { name: 'User', avatar: '', isLawyer: false });
   const displayTimestamp = formatTimestamp(post?.created_at || null);
   const displayContent = post?.body || '';
 
