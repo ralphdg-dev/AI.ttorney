@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Image, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { User, Shield, MessageCircle, Bookmark, MoreHorizontal, Flag } from 'lucide-react-native';
@@ -78,10 +78,20 @@ const ViewPostReadOnly: React.FC = () => {
     setIsReportLoading(false);
   }, [postId]);
 
-  const formatTimestamp = (timestamp: string | null): string => {
+  // Helper function to format timestamp with real-time updates using device time
+  const formatTimestamp = useCallback((timestamp: string | null): string => {
     if (!timestamp) return 'Unknown time';
-    const date = new Date(timestamp);
-    const diffInMinutes = Math.floor((currentTime.getTime() - date.getTime()) / (1000 * 60));
+    
+    // Handle timezone properly - treat timestamps without timezone as UTC
+    const hasTz = /Z|[+-]\d{2}:?\d{2}$/.test(timestamp);
+    const normalized = hasTz ? timestamp : `${timestamp}Z`;
+    
+    const now = new Date().getTime();
+    const postTime = new Date(normalized).getTime();
+    
+    if (isNaN(postTime)) return 'Invalid time';
+    
+    const diffInMinutes = Math.floor((now - postTime) / (1000 * 60));
     
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
@@ -92,14 +102,14 @@ const ViewPostReadOnly: React.FC = () => {
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
     
-    return date.toLocaleDateString();
-  };
+    return new Date(normalized).toLocaleDateString();
+  }, [currentTime]); // Depend on currentTime to trigger re-renders
 
-  // Real-time timer effect
+  // Real-time timer effect - update more frequently for better responsiveness
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000); // Update every minute
+    }, 10000); // Update every 10 seconds for real-time feel
 
     return () => clearInterval(timer);
   }, []);

@@ -82,11 +82,20 @@ const LawyerViewPost: React.FC = () => {
     setIsReportLoading(false);
   }, [postId]);
 
-  // Helper function to format timestamp with real-time updates
-  const formatTimestamp = (timestamp: string | null): string => {
+  // Helper function to format timestamp with real-time updates using device time
+  const formatTimestamp = useCallback((timestamp: string | null): string => {
     if (!timestamp) return 'Unknown time';
-    const date = new Date(timestamp);
-    const diffInMinutes = Math.floor((currentTime.getTime() - date.getTime()) / (1000 * 60));
+    
+    // Handle timezone properly - treat timestamps without timezone as UTC
+    const hasTz = /Z|[+-]\d{2}:?\d{2}$/.test(timestamp);
+    const normalized = hasTz ? timestamp : `${timestamp}Z`;
+    
+    const now = new Date().getTime();
+    const postTime = new Date(normalized).getTime();
+    
+    if (isNaN(postTime)) return 'Invalid time';
+    
+    const diffInMinutes = Math.floor((now - postTime) / (1000 * 60));
     
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
@@ -97,18 +106,18 @@ const LawyerViewPost: React.FC = () => {
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
     
-    return date.toLocaleDateString();
-  };
+    return new Date(normalized).toLocaleDateString();
+  }, [currentTime]); // Depend on currentTime to trigger re-renders
 
   const [post, setPost] = useState<PostData | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [optimisticReplies, setOptimisticReplies] = useState<Reply[]>([]);
 
-  // Real-time timer effect
+  // Real-time timer effect - update more frequently for better responsiveness
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000); // Update every minute
+    }, 10000); // Update every 10 seconds for real-time feel
 
     return () => clearInterval(timer);
   }, []);
@@ -340,16 +349,27 @@ const LawyerViewPost: React.FC = () => {
     const rep = await apiClient.getForumReplies(String(postId));
     if (rep.success && Array.isArray((rep.data as any)?.data)) {
       const rows = (rep.data as any).data as any[];
-      const mappedReplies: Reply[] = rows.map((r: any) => ({
-        id: String(r.id),
-        body: r.reply_body ?? r.body,
-        created_at: r.created_at || null,
-        updated_at: r.updated_at || null,
-        user_id: r.user_id || null,
-        is_anonymous: !!r.is_anonymous,
-        is_flagged: !!r.is_flagged,
-        user: undefined,
-      }));
+      const mappedReplies: Reply[] = rows.map((r: any) => {
+        const isReplyAnon = !!r.is_anonymous;
+        const replyUserData = r?.users || {};
+        
+        return {
+          id: String(r.id),
+          body: r.reply_body ?? r.body,
+          created_at: r.created_at || null,
+          updated_at: r.updated_at || null,
+          user_id: r.user_id || null,
+          is_anonymous: isReplyAnon,
+          is_flagged: !!r.is_flagged,
+          user: isReplyAnon ? undefined : {
+            name: replyUserData?.full_name || replyUserData?.username || 'User',
+            username: replyUserData?.username || 'user',
+            avatar: `https://images.unsplash.com/photo-${Math.random() > 0.5 ? '1472099645785-5658abf4ff4e' : '1507003211169-0a1dd7228f2d'}?w=150&h=150&fit=crop&crop=face`,
+            isLawyer: replyUserData?.role === 'verified_lawyer',
+            lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+          },
+        };
+      });
       setReplies(mappedReplies);
     }
   }, [postId]);
