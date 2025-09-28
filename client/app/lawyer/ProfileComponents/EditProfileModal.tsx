@@ -171,7 +171,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
         dayEntries.forEach((entry) => {
           if (entry.trim()) {
-            const parts = entry.split(":");
+            const parts = entry.split("=");
             if (parts.length >= 2) {
               const dayName = parts[0].trim();
               const timesString = parts.slice(1).join(":").trim();
@@ -420,7 +420,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
           const timeOption = TIME_OPTIONS.find((opt) => opt.value === time);
           return timeOption ? timeOption.label : time;
         });
-        formattedEntries.push(`${day}: ${formattedTimes.join(", ")}`);
+        formattedEntries.push(`${day}= ${formattedTimes.join(", ")}`);
       }
     });
 
