@@ -178,7 +178,8 @@ export default function DirectoryScreen() {
       router.push({
         pathname: "/booklawyer",
         params: {
-          lawyerId: lawyer.id,
+          id: lawyer.id,
+          lawyerId: lawyer.lawyer_id,
           lawyerName: lawyer.name,
           lawyerSpecialization: JSON.stringify(lawyer.specialization), // Change from lawyerspecialization
           lawyerHours: lawyer.hours,

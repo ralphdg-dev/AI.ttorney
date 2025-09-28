@@ -104,7 +104,6 @@ export default function LawyerBookingView() {
     const dayAvailability: DayAvailability[] = [];
 
     hoursAvailable.forEach((daySchedule) => {
-      // Example format: "Monday= 8:30AM, 11:00AM, 11:30AM"
       const [dayPart, timesPart] = daySchedule.split("=");
       if (dayPart && timesPart) {
         const day = dayPart.trim();
@@ -119,13 +118,11 @@ export default function LawyerBookingView() {
   const getTimeSlotsForSelectedDay = (): TimeSlot[] => {
     if (!lawyerData || !lawyerData.hours_available) return [];
 
-    // Get the day name for the selected date
     const selectedDate = new Date(selectedYear, selectedMonth, selectedDay);
     const selectedDayName = selectedDate.toLocaleDateString("en-US", {
       weekday: "long",
     });
 
-    // Find availability for the selected day
     const dayAvailability = lawyerData.hours_available.find(
       (availability) =>
         availability.day.toLowerCase() === selectedDayName.toLowerCase()
@@ -133,13 +130,13 @@ export default function LawyerBookingView() {
 
     if (!dayAvailability) return [];
 
-    // Convert to TimeSlot format
     return dayAvailability.times.map((time, index) => ({
       id: `slot-${selectedDayName}-${index}`,
       time: time,
       available: true,
     }));
   };
+
   const timeSlots: TimeSlot[] = getTimeSlotsForSelectedDay();
 
   const validateEmail = (email: string): boolean => {
@@ -193,11 +190,45 @@ export default function LawyerBookingView() {
     return slot ? slot.time : selectedTimeSlot;
   };
 
-  // Format date for API (YYYY-MM-DD)
   const getFormattedDateForAPI = (): string => {
     return `${selectedYear}-${(selectedMonth + 1)
       .toString()
       .padStart(2, "0")}-${selectedDay.toString().padStart(2, "0")}`;
+  };
+
+  // Initialize lawyer data from params immediately - no API call needed
+  const initializeLawyerData = () => {
+    try {
+      const specialization = params.lawyerSpecialization
+        ? JSON.parse(params.lawyerSpecialization as string)
+        : ["General Law"];
+
+      const hours_available = params.lawyerhours_available
+        ? JSON.parse(params.lawyerhours_available as string)
+        : [];
+
+      const lawyerInfo: LawyerData = {
+        id: params.lawyerId as string,
+        name: params.lawyerName as string,
+        specialization: specialization,
+        hours: params.lawyerHours as string,
+        days: params.lawyerDays as string,
+        hours_available: parseHoursAvailable(hours_available),
+      };
+
+      setLawyerData(lawyerInfo);
+    } catch (error) {
+      console.error("Error parsing lawyer data from params:", error);
+      // Fallback to basic data
+      setLawyerData({
+        id: params.lawyerId as string,
+        name: params.lawyerName as string,
+        specialization: ["General Law"],
+        hours: params.lawyerHours as string,
+        days: params.lawyerDays as string,
+        hours_available: [],
+      });
+    }
   };
 
   useEffect(() => {
@@ -205,6 +236,13 @@ export default function LawyerBookingView() {
       setEmail(user.email);
     }
   }, [user?.email]);
+
+  // Initialize lawyer data from params instead of making API call
+  useEffect(() => {
+    if (params.lawyerId && params.lawyerName) {
+      initializeLawyerData();
+    }
+  }, [params]);
 
   const generateCalendarDays = (month: number, year: number) => {
     const days: CalendarDay[] = [];
@@ -298,78 +336,10 @@ export default function LawyerBookingView() {
     }
     setSelectedDay(day.date);
 
-    // Reset selected time slot when day changes
     setSelectedTimeSlot("");
 
     if (validationErrors.timeSlot) {
       setValidationErrors((prev) => ({ ...prev, timeSlot: undefined }));
-    }
-  };
-
-  useEffect(() => {
-    if (params.lawyerId) {
-      const fetchLawyerData = async () => {
-        try {
-          const response = await fetch(
-            `http://localhost:8000/legal-consultations/lawyers/${params.lawyerId}`
-          );
-          const result = await response.json();
-
-          if (result.success && result.data && result.data.length > 0) {
-            const lawyer = result.data[0];
-            setLawyerData({
-              id: lawyer.id,
-              name: lawyer.name,
-              specialization: lawyer.specialization
-                .split(",")
-                .map((s: string) => s.trim()),
-              hours: lawyer.hours,
-              days: lawyer.days,
-              hours_available: parseHoursAvailable(
-                lawyer.hours_available.split(";").map((h: string) => h.trim())
-              ),
-            });
-          } else {
-            setLawyerDataFromParams();
-          }
-        } catch (error) {
-          console.error("Error fetching lawyer:", error);
-          setLawyerDataFromParams();
-        }
-      };
-
-      fetchLawyerData();
-    }
-  }, [params]);
-
-  const setLawyerDataFromParams = () => {
-    try {
-      const specialization = params.lawyerSpecialization // Change from lawyerSpecializations
-        ? JSON.parse(params.lawyerSpecialization as string) // Change from lawyerSpecializations
-        : ["General Law"];
-
-      const hours_available = params.lawyerhours_available
-        ? JSON.parse(params.lawyerhours_available as string)
-        : [];
-
-      setLawyerData({
-        id: params.lawyerId as string,
-        name: params.lawyerName as string,
-        specialization: specialization,
-        hours: params.lawyerHours as string,
-        days: params.lawyerDays as string,
-        hours_available: parseHoursAvailable(hours_available),
-      });
-    } catch (error) {
-      console.error("Error parsing data:", error);
-      setLawyerData({
-        id: params.lawyerId as string,
-        name: params.lawyerName as string,
-        specialization: ["General Law"],
-        hours: params.lawyerHours as string,
-        days: params.lawyerDays as string,
-        hours_available: [],
-      });
     }
   };
 
@@ -382,7 +352,6 @@ export default function LawyerBookingView() {
 
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
-
       const firstError = Object.values(errors)[0];
       Alert.alert("Validation Error", firstError);
       return;
@@ -397,9 +366,8 @@ export default function LawyerBookingView() {
     setIsSubmitting(true);
 
     try {
-      // Prepare consultation request data
       const consultationRequestData = {
-        user_id: user?.id || "anonymous", // You might want to handle anonymous users differently
+        user_id: user?.id || "anonymous",
         lawyer_id: lawyerData?.id,
         message: concern.trim(),
         email: email.trim(),
@@ -411,7 +379,6 @@ export default function LawyerBookingView() {
 
       console.log("Sending consultation request:", consultationRequestData);
 
-      // Send request to your FastAPI backend
       const response = await fetch(
         "http://localhost:8000/consultation-requests/",
         {
