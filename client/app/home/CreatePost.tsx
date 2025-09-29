@@ -8,6 +8,7 @@ import Colors from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
 import apiClient from '@/lib/api-client';
+import Navbar from '@/components/Navbar';
 
 // Shared categories reference
 
@@ -118,6 +119,8 @@ const CreatePost: React.FC = () => {
           </Text>
         </View>
       </View>
+      
+      <Navbar activeTab="home" />
     </View>
   );
 };
@@ -226,7 +229,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   editorInput: {
-    flex: 1,
+    height: 180,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 10,
