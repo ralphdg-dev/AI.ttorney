@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Linking, Platform, Alert, ScrollView, TextInput } from 'react-native';
+import { Linking, Platform, Alert, ScrollView, TextInput, Keyboard } from 'react-native';
 import * as Location from 'expo-location';
 import { VStack } from '@/components/ui/vstack';
 import { HStack } from '@/components/ui/hstack';
@@ -8,7 +8,7 @@ import { Button, ButtonText } from '@/components/ui/button';
 import { Box } from '@/components/ui/box';
 import { Pressable } from '@/components/ui/pressable';
 import { Spinner } from '@/components/ui/spinner';
-import { Search, MapPin, Locate, Phone, Navigation, Star } from 'lucide-react-native';
+import { Search, MapPin, Locate, Phone, Navigation, Star, X } from 'lucide-react-native';
 import Colors from '../../../constants/Colors';
 
 interface LawFirm {
@@ -23,6 +23,14 @@ interface LawFirm {
   longitude: number;
   place_id: string;
   distance_km?: number;
+}
+
+interface AutocompletePrediction {
+  place_id: string;
+  description: string;
+  main_text: string;
+  secondary_text: string;
+  types: string[];
 }
 
 interface GoogleLawFirmsFinderProps {
@@ -42,7 +50,135 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const searchTextRef = useRef<string>('');
+  
+  // Autocomplete states
+  const [predictions, setPredictions] = useState<AutocompletePrediction[]>([]);
+  const [showPredictions, setShowPredictions] = useState(false);
+  const [loadingPredictions, setLoadingPredictions] = useState(false);
+  const autocompleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Optimized autocomplete with abort controller and session tokens
+  const fetchAutocomplete = useCallback(async (input: string) => {
+    if (input.length < 2) {
+      setPredictions([]);
+      setShowPredictions(false);
+      return;
+    }
+
+    // Cancel previous request if still pending
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+
+    try {
+      setLoadingPredictions(true);
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      
+      const response = await fetch(`${apiUrl}/api/places/autocomplete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          input: input.trim(),
+          location: userLocation ? `${userLocation.coords.latitude},${userLocation.coords.longitude}` : null,
+          radius: 25000
+        }),
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Autocomplete API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.predictions) {
+        setPredictions(data.predictions.slice(0, 5)); // Limit to 5 results
+        setShowPredictions(data.predictions.length > 0);
+      } else {
+        setPredictions([]);
+        setShowPredictions(false);
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('Autocomplete request aborted');
+        return; // Don't update state for aborted requests
+      }
+      console.error('Autocomplete error:', error);
+      setPredictions([]);
+      setShowPredictions(false);
+    } finally {
+      setLoadingPredictions(false);
+      abortControllerRef.current = null;
+    }
+  }, [userLocation]);
+
+  // This function will be replaced by handlePredictionSelectUpdated after searchByLocationName is defined
+
+  // Optimized debounced autocomplete with progressive delay
+  const handleSearchTextChangeWithAutocomplete = useCallback((text: string) => {
+    setSearchText(text);
+    searchTextRef.current = text;
+    
+    // Clear error when user starts typing
+    if (error) setError(null);
+    // Reset retry count when user types
+    if (text.length > 0) setRetryCount(0);
+
+    // Clear existing timeout
+    if (autocompleteTimeoutRef.current) {
+      clearTimeout(autocompleteTimeoutRef.current);
+    }
+
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Progressive debounce: shorter delay for longer queries
+    const debounceDelay = text.length <= 3 ? 400 : text.length <= 5 ? 300 : 200;
+
+    // Set new timeout for autocomplete
+    if (text.length >= 2) {
+      autocompleteTimeoutRef.current = setTimeout(() => {
+        fetchAutocomplete(text);
+      }, debounceDelay);
+    } else {
+      setPredictions([]);
+      setShowPredictions(false);
+    }
+  }, [error, fetchAutocomplete]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (autocompleteTimeoutRef.current) {
+        clearTimeout(autocompleteTimeoutRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Hide predictions when clicking outside (for better UX)
+  const handleSearchFocus = useCallback(() => {
+    if (predictions.length > 0 && searchText.length >= 2) {
+      setShowPredictions(true);
+    }
+  }, [predictions.length, searchText.length]);
+
+  const handleSearchBlur = useCallback(() => {
+    // Delay hiding to allow for prediction selection
+    setTimeout(() => {
+      setShowPredictions(false);
+    }, 150);
+  }, []);
 
   // Search law firms using backend proxy (avoids CORS issues)
   const searchLawFirmsViaProxy = async (latitude: number, longitude: number, locationName: string) => {
@@ -179,6 +315,27 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       setLoading(false);
     }
   }, []); // No dependencies needed - uses only props and stable state setters
+
+  // Optimized prediction selection with session token renewal
+  const handlePredictionSelectUpdated = useCallback(async (prediction: AutocompletePrediction) => {
+    setSearchText(prediction.main_text);
+    searchTextRef.current = prediction.main_text;
+    setShowPredictions(false);
+    setPredictions([]);
+    Keyboard.dismiss();
+    
+    
+    // Search for law firms at the selected location
+    setSearching(true);
+    try {
+      await searchByLocationName(prediction.description);
+    } catch (error) {
+      console.error('Search error after prediction selection:', error);
+      setError('Unable to search at selected location. Please try again.');
+    } finally {
+      setSearching(false);
+    }
+  }, [searchByLocationName]);
 
   const requestLocationPermission = useCallback(async () => {
     try {
@@ -709,7 +866,6 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
             <Text 
               className="text-base font-semibold leading-tight" 
               style={{ color: Colors.text.head }}
-              numberOfLines={2}
             >
               {firm.name}
             </Text>
@@ -717,7 +873,6 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
             <Text 
               className="text-sm" 
               style={{ color: Colors.text.body }}
-              numberOfLines={2}
             >
               {firm.address}
             </Text>
@@ -882,42 +1037,119 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   );
 
 
-  // Simple search text change handler - no memoization needed
+  // Enhanced search text change handler with autocomplete
   const handleSearchTextChange = (text: string) => {
-    setSearchText(text);
-    searchTextRef.current = text; // Keep ref in sync
-    // Clear error when user starts typing
-    if (error) setError(null);
-    // Reset retry count when user types
-    if (text.length > 0) setRetryCount(0);
+    handleSearchTextChangeWithAutocomplete(text);
   };
 
   // Clean Search Header Component - no memoization needed
   const renderSearchHeader = () => (
-    <VStack space="md" className="px-4 py-4 bg-white">
-      <Box className="relative">
+    <VStack space="md" className="px-4 py-4 bg-white" style={{ zIndex: 1000 }}>
+      <Box className="relative" style={{ zIndex: 1000 }}>
         <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ minHeight: 48 }}>
           <HStack className="items-center px-3">
             <Search size={18} color="#6B7280" />
             <TextInput
               className="flex-1 py-3 px-3 text-base"
-              placeholder="Search by city or location"
+              placeholder="Search by street, barangay, or city (e.g., '62 Baco', 'Makati')"
               placeholderTextColor="#9CA3AF"
               value={searchText}
               onChangeText={handleSearchTextChange}
               onSubmitEditing={handleSearch}
+              onFocus={handleSearchFocus}
+              onBlur={handleSearchBlur}
               returnKeyType="search"
               editable={!searching}
               style={{ color: Colors.text.head }}
               autoCorrect={false}
               autoCapitalize="words"
               blurOnSubmit={false}
+              maxLength={100}
             />
+            {searchText.length > 0 && !searching && (
+              <Pressable 
+                onPress={() => {
+                  setSearchText('');
+                  searchTextRef.current = '';
+                  setShowPredictions(false);
+                  setPredictions([]);
+                }} 
+                className="px-2 py-1"
+              >
+                <X size={16} color="#6B7280" />
+              </Pressable>
+            )}
             {searching && (
               <Spinner size="small" color={Colors.primary.blue} />
             )}
           </HStack>
         </Box>
+        
+        {/* Clean Autocomplete Dropdown */}
+        {showPredictions && predictions.length > 0 && (
+          <Box 
+            style={{
+              position: 'absolute',
+              top: 50,
+              left: 0,
+              right: 0,
+              zIndex: 9999,
+              backgroundColor: 'white',
+              borderRadius: 4,
+              borderWidth: 1,
+              borderColor: '#E5E7EB',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+              elevation: 8,
+            }}
+          >
+            {predictions.map((item, index) => (
+              <Pressable
+                key={item.place_id}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  borderBottomWidth: index < predictions.length - 1 ? 0.5 : 0,
+                  borderBottomColor: '#F3F4F6',
+                }}
+                onPress={() => handlePredictionSelectUpdated(item)}
+              >
+                <MapPin size={16} color="#9CA3AF" style={{ marginRight: 12 }} />
+                <VStack space="xs" style={{ flex: 1 }}>
+                  <Text 
+                    size="sm" 
+                    style={{ 
+                      color: '#111827',
+                      fontWeight: '400',
+                    }}
+                  >
+                    {item.main_text}
+                  </Text>
+                  {item.secondary_text && (
+                    <Text 
+                      size="xs" 
+                      style={{ 
+                        color: '#6B7280',
+                      }}
+                    >
+                      {item.secondary_text}
+                    </Text>
+                  )}
+                </VStack>
+              </Pressable>
+            ))}
+            {loadingPredictions && (
+              <HStack space="sm" style={{ padding: 12, justifyContent: 'center' }}>
+                <Spinner size="small" />
+                <Text size="xs" style={{ color: '#6B7280' }}>Loading...</Text>
+              </HStack>
+            )}
+          </Box>
+        )}
       </Box>
 
       <HStack space="sm" className="items-center">
@@ -962,7 +1194,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         // Mobile: Map View with Overlay
         <>
           {/* Floating Search Overlay */}
-          <Box className="absolute top-4 right-4 left-4 z-10">
+          <Box className="absolute top-4 right-4 left-4" style={{ zIndex: 1000 }}>
             <VStack space="sm">
               {/* Clean Mobile Search Card */}
               <Box className="bg-white rounded-lg border border-gray-200">
@@ -970,11 +1202,13 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                   <Search size={16} color="#6B7280" />
                   <TextInput
                     className="flex-1 text-base font-medium"
-                    placeholder="Type city name (e.g., Manila)"
+                    placeholder="Type street, barangay, or city (e.g., '62 Baco', 'Makati')"
                     placeholderTextColor="#9CA3AF"
                     value={searchText}
                     onChangeText={handleSearchTextChange}
                     onSubmitEditing={handleSearch}
+                    onFocus={handleSearchFocus}
+                    onBlur={handleSearchBlur}
                     returnKeyType="search"
                     editable={!searching}
                     style={{ 
@@ -985,7 +1219,21 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                     autoCorrect={false}
                     autoCapitalize="words"
                     blurOnSubmit={false}
+                    maxLength={100}
                   />
+                  {searchText.length > 0 && !searching && (
+                    <Pressable 
+                      onPress={() => {
+                        setSearchText('');
+                        searchTextRef.current = '';
+                        setShowPredictions(false);
+                        setPredictions([]);
+                      }} 
+                      className="px-2 py-1"
+                    >
+                      <X size={16} color="#6B7280" />
+                    </Pressable>
+                  )}
                   {searching ? (
                     <Spinner size="small" color={Colors.primary.blue} />
                   ) : (
@@ -998,7 +1246,67 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                 </HStack>
               </Box>
 
-              {/* Clean Location Button */}
+              {/* Mobile Clean Autocomplete */}
+              {showPredictions && predictions.length > 0 && (
+                <Box 
+                  style={{
+                    backgroundColor: 'white',
+                    borderRadius: 4,
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 4,
+                    elevation: 8,
+                    zIndex: 9999,
+                  }}
+                >
+                  {predictions.map((item, index) => (
+                    <Pressable
+                      key={item.place_id}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        borderBottomWidth: index < predictions.length - 1 ? 0.5 : 0,
+                        borderBottomColor: '#F3F4F6',
+                      }}
+                      onPress={() => handlePredictionSelectUpdated(item)}
+                    >
+                      <MapPin size={16} color="#9CA3AF" style={{ marginRight: 12 }} />
+                      <VStack space="xs" style={{ flex: 1 }}>
+                        <Text 
+                          size="sm" 
+                          style={{ 
+                            color: '#111827',
+                            fontWeight: '400',
+                          }}
+                        >
+                          {item.main_text}
+                        </Text>
+                        {item.secondary_text && (
+                          <Text 
+                            size="xs" 
+                            style={{ 
+                              color: '#6B7280',
+                            }}
+                          >
+                            {item.secondary_text}
+                          </Text>
+                        )}
+                      </VStack>
+                    </Pressable>
+                  ))}
+                  {loadingPredictions && (
+                    <HStack space="sm" style={{ padding: 12, justifyContent: 'center' }}>
+                      <Spinner size="small" />
+                      <Text size="xs" style={{ color: '#6B7280' }}>Loading...</Text>
+                    </HStack>
+                  )}
+                </Box>
+              )}
               <Pressable 
                 className="px-3 py-2 bg-white rounded-lg border border-gray-200 active:bg-gray-50"
                 onPress={handleUseMyLocation}

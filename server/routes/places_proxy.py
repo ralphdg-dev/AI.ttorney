@@ -25,6 +25,11 @@ class LocationSearchRequest(BaseModel):
     radius: int = 15000  # Reduced to 15km for more location-specific results
     type: str = "lawyer"  # This will be overridden in the search logic
 
+class AutocompleteRequest(BaseModel):
+    input: str
+    location: Optional[str] = None  # Bias results to a specific location
+    radius: int = 25000  # 25km radius for autocomplete suggestions
+
 @router.post("/nearby")
 async def get_nearby_places(request: NearbySearchRequest):
     """
@@ -369,6 +374,171 @@ async def search_by_location(request: LocationSearchRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to connect to Google APIs: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post("/autocomplete")
+async def autocomplete_places(request: AutocompleteRequest):
+    """
+    Google Places Autocomplete API for location suggestions
+    Provides smart suggestions for streets, barangays, cities, etc.
+    """
+    try:
+        # Input validation and sanitization
+        if not request.input or len(request.input.strip()) < 2:
+            return {
+                "success": True,
+                "predictions": [],
+                "message": "Minimum 2 characters required"
+            }
+        
+        input_text = request.input.strip()[:100]  # Limit input length
+        
+        api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+        if not api_key:
+            return {
+                "success": False,
+                "error": "Google Maps API key not configured",
+                "predictions": []
+            }
+        
+        # Google Places Autocomplete API parameters (Philippines-focused)
+        url = "https://maps.googleapis.com/maps/api/place/autocomplete/json"
+        params = {
+            "input": input_text,
+            "key": api_key,
+            "components": "country:ph",  # Restrict to Philippines only
+            "language": "en",  # Consistent language
+        }
+        
+        # Add location bias if provided
+        if request.location and "," in request.location:
+            # Expect location in "lat,lng" format
+            params["location"] = request.location
+            params["radius"] = request.radius
+        
+        logger.info(f"Autocomplete search for: {input_text}")
+        
+        # Use timeout and connection limits for better performance
+        timeout = httpx.Timeout(5.0)  # 5 second timeout
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.get(url, params=params)
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Google Places Autocomplete API error: {response.status_code}"
+                )
+            
+            data = response.json()
+            
+            if data.get("status") != "OK":
+                logger.warning(f"Autocomplete API returned status: {data.get('status')}")
+                return {
+                    "success": True,
+                    "predictions": [],
+                    "message": f"No suggestions found for: {request.input}"
+                }
+            
+            predictions = data.get("predictions", [])
+            
+            # Format predictions for frontend use (limit to 5 for performance)
+            formatted_predictions = []
+            for prediction in predictions[:5]:  # Limit to top 5 results
+                formatted_predictions.append({
+                    "place_id": prediction.get("place_id"),
+                    "description": prediction.get("description"),
+                    "main_text": prediction.get("structured_formatting", {}).get("main_text", ""),
+                    "secondary_text": prediction.get("structured_formatting", {}).get("secondary_text", ""),
+                    "types": prediction.get("types", [])
+                })
+            
+            logger.info(f"Found {len(formatted_predictions)} autocomplete suggestions")
+            
+            return {
+                "success": True,
+                "predictions": formatted_predictions,
+                "count": len(formatted_predictions)
+            }
+            
+    except httpx.RequestError as e:
+        logger.error(f"Request error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to connect to Google Places Autocomplete API: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post("/place-details")
+async def get_place_details(place_id: str):
+    """
+    Get detailed information about a specific place using place_id
+    """
+    try:
+        api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+        if not api_key:
+            return {
+                "success": False,
+                "error": "Google Maps API key not configured"
+            }
+        
+        url = "https://maps.googleapis.com/maps/api/place/details/json"
+        params = {
+            "place_id": place_id,
+            "fields": "name,formatted_address,geometry,place_id,types",
+            "key": api_key
+        }
+        
+        logger.info(f"Getting place details for: {place_id}")
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params)
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Google Places Details API error: {response.status_code}"
+                )
+            
+            data = response.json()
+            
+            if data.get("status") != "OK":
+                logger.warning(f"Place Details API returned status: {data.get('status')}")
+                return {
+                    "success": False,
+                    "message": f"Could not get details for place: {place_id}"
+                }
+            
+            result = data.get("result", {})
+            location = result.get("geometry", {}).get("location", {})
+            
+            return {
+                "success": True,
+                "place": {
+                    "place_id": result.get("place_id"),
+                    "name": result.get("name"),
+                    "formatted_address": result.get("formatted_address"),
+                    "latitude": location.get("lat"),
+                    "longitude": location.get("lng"),
+                    "types": result.get("types", [])
+                }
+            }
+            
+    except httpx.RequestError as e:
+        logger.error(f"Request error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to connect to Google Places Details API: {str(e)}"
         )
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
