@@ -467,6 +467,7 @@ class ReportRequest(BaseModel):
     target_id: str = Field(..., description="ID of the post or comment to report")
     target_type: str = Field(..., description="Type of target: 'post' or 'comment'")
     reason: str = Field(..., description="Reason for the report")
+    reason_context: Optional[str] = Field(None, description="Additional context for the report")
 
 
 class ReportResponse(BaseModel):
@@ -488,7 +489,8 @@ async def submit_report(
             report_data.target_id,
             report_data.target_type,
             report_data.reason,
-            user_id
+            user_id,
+            report_data.reason_context
         )
         
         if result["success"]:

@@ -122,7 +122,7 @@ const Post: React.FC<PostProps> = ({
     return 'OTHERS';
   };
 
-  const handleSubmitReport = async (reason: string, category: string) => {
+  const handleSubmitReport = async (reason: string, category: string, reasonContext?: string) => {
     if (!currentUser?.id || !id) {
       throw new Error('Missing user ID or post ID');
     }
@@ -144,7 +144,8 @@ const Post: React.FC<PostProps> = ({
         id,
         'post',
         reason,
-        currentUser.id
+        currentUser.id,
+        reasonContext
       );
 
       if (!result.success) {

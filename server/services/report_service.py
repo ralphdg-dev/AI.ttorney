@@ -11,7 +11,7 @@ class ReportService:
     def __init__(self):
         self.supabase = SupabaseService()
     
-    async def submit_report(self, target_id: str, target_type: str, reason: str, reporter_id: str) -> Dict[str, Any]:
+    async def submit_report(self, target_id: str, target_type: str, reason: str, reporter_id: str, reason_context: str = None) -> Dict[str, Any]:
         """Submit a report for a forum post or comment"""
         try:
             # Validate target type
@@ -50,7 +50,8 @@ class ReportService:
                 "target_id": target_id,
                 "target_type": target_type,
                 "reason": reason,
-                "reporter_id": reporter_id
+                "reporter_id": reporter_id,
+                "reason_context": reason_context
             }
             
             headers = self.supabase._get_headers(use_service_key=True)

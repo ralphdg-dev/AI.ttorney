@@ -22,7 +22,8 @@ export class ReportService {
     targetId: string,
     targetType: 'post' | 'comment',
     reason: string,
-    reporterId: string
+    reporterId: string,
+    reasonContext?: string
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
       console.log('Submitting report:', { targetId, targetType, reason, reporterId });
@@ -34,7 +35,8 @@ export class ReportService {
         body: JSON.stringify({
           target_id: targetId,
           target_type: targetType,
-          reason: reason
+          reason: reason,
+          reason_context: reasonContext
         }),
       });
 

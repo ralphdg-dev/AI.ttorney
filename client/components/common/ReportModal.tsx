@@ -7,7 +7,7 @@ import Colors from '../../constants/Colors';
 interface ReportModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (reason: string, category: string) => Promise<void>;
+  onSubmit: (reason: string, category: string, reasonContext?: string) => Promise<void>;
   targetType: 'post' | 'comment';
   isLoading?: boolean;
 }
@@ -36,13 +36,12 @@ export default function ReportModal({ visible, onClose, onSubmit, targetType, is
       return;
     }
 
-    const reason = selectedCategory === 'something_else' && customReason.trim()
-      ? customReason.trim() 
-      : REPORT_CATEGORIES.find(cat => cat.id === selectedCategory)?.label || selectedCategory;
+    const reason = REPORT_CATEGORIES.find(cat => cat.id === selectedCategory)?.label || selectedCategory;
+    const reasonContext = customReason.trim() || undefined;
 
     setIsSubmitting(true);
     try {
-      await onSubmit(reason, selectedCategory);
+      await onSubmit(reason, selectedCategory, reasonContext);
       setShowSuccess(true);
     } catch (error) {
       console.error('Error submitting report:', error);

@@ -164,7 +164,7 @@ const ViewPostReadOnly: React.FC = () => {
     setReportModalVisible(true);
   };
 
-  const handleSubmitReport = async (reason: string, category: string) => {
+  const handleSubmitReport = async (reason: string, category: string, reasonContext?: string) => {
     if (!currentUser?.id || !postId) {
       throw new Error('Missing user ID or post ID');
     }
@@ -186,7 +186,8 @@ const ViewPostReadOnly: React.FC = () => {
         String(postId),
         'post',
         reason,
-        currentUser.id
+        currentUser.id,
+        reasonContext
       );
 
       if (!result.success) {
