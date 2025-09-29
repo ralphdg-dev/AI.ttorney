@@ -57,6 +57,11 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const [loadingPredictions, setLoadingPredictions] = useState(false);
   const autocompleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Radius filter states
+  const [selectedRadius, setSelectedRadius] = useState(5); // Default 5km
+  const [showRadiusFilter, setShowRadiusFilter] = useState(false);
+  const radiusOptions = [5, 10, 15, 25]; // km options (limited to 25km max)
 
   // Optimized autocomplete with abort controller and session tokens
   const fetchAutocomplete = useCallback(async (input: string) => {
@@ -86,7 +91,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         body: JSON.stringify({
           input: input.trim(),
           location: userLocation ? `${userLocation.coords.latitude},${userLocation.coords.longitude}` : null,
-          radius: 25000
+          radius: selectedRadius * 1000 // Convert km to meters
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -116,7 +121,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       setLoadingPredictions(false);
       abortControllerRef.current = null;
     }
-  }, [userLocation]);
+  }, [userLocation, selectedRadius]);
 
   // This function will be replaced by handlePredictionSelectUpdated after searchByLocationName is defined
 
@@ -181,7 +186,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   }, []);
 
   // Search law firms using backend proxy (avoids CORS issues)
-  const searchLawFirmsViaProxy = async (latitude: number, longitude: number, locationName: string) => {
+  const searchLawFirmsViaProxy = useCallback(async (latitude: number, longitude: number, locationName: string) => {
     try {
       setLoading(true);
       setError(null);
@@ -195,9 +200,9 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          latitude,
-          longitude,
-          radius: 25000,
+          latitude: latitude,
+          longitude: longitude,
+          radius: selectedRadius * 1000, // Convert km to meters
           type: 'lawyer'
         }),
       });
@@ -238,7 +243,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedRadius]);
 
   // Search by location name using the new endpoint
   const searchByLocationName = useCallback(async (locationName: string) => {
@@ -255,7 +260,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         },
         body: JSON.stringify({
           location_name: locationName,
-          radius: 15000, // 15km for more location-specific results
+          radius: selectedRadius * 1000, // Convert km to meters
           type: 'law_firm' // Search for law firms and offices
         }),
       });
@@ -314,7 +319,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     } finally {
       setLoading(false);
     }
-  }, []); // No dependencies needed - uses only props and stable state setters
+  }, [selectedRadius]); // Include selectedRadius dependency
 
   // Optimized prediction selection with session token renewal
   const handlePredictionSelectUpdated = useCallback(async (prediction: AutocompletePrediction) => {
@@ -361,7 +366,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       // Default to Manila using location search
       await searchByLocationName('Manila, Philippines');
     }
-  }, [searchByLocationName]);
+  }, [searchByLocationName, searchLawFirmsViaProxy]);
 
   // Initialize WebView dynamically for platform compatibility
   useEffect(() => {
@@ -439,7 +444,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     } else {
       await requestLocationPermission();
     }
-  }, [userLocation, requestLocationPermission]);
+  }, [userLocation, requestLocationPermission, searchLawFirmsViaProxy]);
 
   const handleCallPress = useCallback((phone: string) => {
     if (phone) {
@@ -1166,7 +1171,82 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
             </Text>
           </HStack>
         </Pressable>
+        
+        {/* Radius Filter Button */}
+        <Pressable
+          className="px-3 py-2 bg-white border border-gray-300 rounded-lg active:bg-gray-50"
+          onPress={() => setShowRadiusFilter(!showRadiusFilter)}
+        >
+          <HStack space="xs" className="items-center">
+            <Text className="text-sm font-medium" style={{ color: Colors.text.head }}>
+              {selectedRadius}km
+            </Text>
+            <Text className="text-xs" style={{ color: '#9CA3AF' }}>▼</Text>
+          </HStack>
+        </Pressable>
       </HStack>
+      
+      {/* Radius Filter Dropdown - Overlapping */}
+      {showRadiusFilter && (
+        <Box 
+          style={{
+            position: 'absolute',
+            top: 110, // Position below the buttons
+            right: 16,
+            backgroundColor: 'white',
+            borderWidth: 1,
+            borderColor: '#E5E7EB',
+            borderRadius: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 8,
+            elevation: 10,
+            zIndex: 9999,
+            minWidth: 120,
+          }}
+        >
+          <VStack space="xs" style={{ padding: 8 }}>
+            <Text style={{ fontSize: 12, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 4, color: '#6B7280' }}>
+              Search radius
+            </Text>
+            {radiusOptions.map((radius) => (
+              <Pressable
+                key={radius}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 4,
+                  backgroundColor: selectedRadius === radius ? '#EFF6FF' : 'transparent',
+                }}
+                onPress={() => {
+                  setSelectedRadius(radius);
+                  setShowRadiusFilter(false);
+                  // Trigger new search with updated radius
+                  if (searchText.trim()) {
+                    handleSearch();
+                  }
+                }}
+              >
+                <HStack className="justify-between items-center">
+                  <Text 
+                    style={{ 
+                      fontSize: 14,
+                      color: selectedRadius === radius ? Colors.primary.blue : Colors.text.head,
+                      fontWeight: selectedRadius === radius ? '500' : '400'
+                    }}
+                  >
+                    {radius} km
+                  </Text>
+                  {selectedRadius === radius && (
+                    <Text style={{ color: Colors.primary.blue, fontSize: 14 }}>✓</Text>
+                  )}
+                </HStack>
+              </Pressable>
+            ))}
+          </VStack>
+        </Box>
+      )}
 
       {error && (
         <Box className="p-3 bg-red-50 rounded-lg border border-red-200">
@@ -1307,24 +1387,11 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                   )}
                 </Box>
               )}
-              <Pressable 
-                className="px-3 py-2 bg-white rounded-lg border border-gray-200 active:bg-gray-50"
-                onPress={handleUseMyLocation}
-                accessibilityLabel="Use current location"
-              >
-                <HStack space="xs" className="justify-center items-center">
-                  <Locate size={14} color={Colors.primary.blue} />
-                  <Text className="text-xs font-medium" style={{ color: Colors.primary.blue }}>
-                    Near Me
-                  </Text>
-                </HStack>
-              </Pressable>
 
               {/* Clean Status Messages */}
               {error && (
                 <Box className="px-3 py-2 bg-red-100 rounded-lg border border-red-200">
                   <Text className="text-xs font-medium text-center text-red-700">
-                    {error.length > 40 ? error.substring(0, 40) + '...' : error}
                   </Text>
                 </Box>
               )}
