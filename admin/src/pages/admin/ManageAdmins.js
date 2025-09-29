@@ -1,35 +1,46 @@
 import React from 'react';
-import { Eye, Shield, Users, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Plus, Pencil, Archive } from 'lucide-react';
+import { Eye, Shield, Users, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Plus, Pencil, Archive, ArchiveRestore, RefreshCw } from 'lucide-react';
 import DataTable from '../../components/ui/DataTable';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import AddAdminModal from '../../components/admin/AddAdminModal';
+import EditAdminModal from '../../components/admin/EditAdminModal';
 import ViewAdminModal from '../../components/admin/ViewAdminModal';
 import adminManagementService from '../../services/adminManagementService';
 
-const RoleBadge = ({ role }) => {
-  const styles = role === 'superadmin'
-    ? 'bg-purple-50 text-purple-700 border border-purple-200'
-    : 'bg-blue-50 text-blue-700 border border-blue-200';
+const RoleBadge = ({ role, isArchived = false }) => {
+  const getStyles = () => {
+    if (isArchived) {
+      return 'bg-gray-200 text-gray-600 border border-gray-300';
+    }
+    
+    return role === 'superadmin'
+      ? 'bg-purple-50 text-purple-700 border border-purple-200'
+      : 'bg-blue-50 text-blue-700 border border-blue-200';
+  };
   
   const displayRole = role === 'superadmin' ? 'Superadmin' : 'Admin';
   
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${getStyles()}`}>
       {displayRole}
     </span>
   );
 };
 
-const StatusBadge = ({ status }) => {
+const StatusBadge = ({ status, isArchived = false }) => {
   const getStatusStyles = (status) => {
+    if (isArchived) {
+      return 'bg-gray-200 text-gray-600 border border-gray-300';
+    }
+    
     switch (status?.toLowerCase()) {
       case 'active':
         return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-      case 'inactive':
+      case 'disabled':
         return 'bg-gray-50 text-gray-700 border border-gray-200';
-      case 'suspended':
-        return 'bg-red-50 text-red-700 border border-red-200';
+      case 'archived':
+        return 'bg-gray-200 text-gray-600 border border-gray-300';
       default:
         return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
     }
@@ -39,10 +50,10 @@ const StatusBadge = ({ status }) => {
     switch (status?.toLowerCase()) {
       case 'active':
         return 'Active';
-      case 'inactive':
-        return 'Inactive';
-      case 'suspended':
-        return 'Suspended';
+      case 'disabled':
+        return 'Disabled';
+      case 'archived':
+        return 'Archived';
       default:
         return 'Active';
     }
@@ -76,6 +87,7 @@ const ManageAdmins = () => {
     direction: 'asc'
   });
   const [showAddModal, setShowAddModal] = React.useState(false);
+  const [showEditModal, setShowEditModal] = React.useState(false);
   const [showViewModal, setShowViewModal] = React.useState(false);
   const [selectedAdmin, setSelectedAdmin] = React.useState(null);
 
@@ -85,7 +97,7 @@ const ManageAdmins = () => {
       setLoading(true);
       setError(null);
       
-      // Map frontend filter values to backend API values
+      // Simple role filter mapping
       const mapRoleFilter = (filter) => {
         switch (filter) {
           case 'All Roles': return 'all';
@@ -94,17 +106,20 @@ const ManageAdmins = () => {
           default: return 'all';
         }
       };
+      
+      const role = mapRoleFilter(roleFilter);
+      console.log('Role filter:', roleFilter, '-> API role:', role);
 
       const params = {
         page: pagination.page,
         limit: pagination.limit,
         search: query,
-        role: mapRoleFilter(roleFilter)
+        role
       };
       
       const response = await adminManagementService.getAdmins(params);
-      setData(response.data);
-      setPagination(response.pagination);
+      setData(response.data || []);
+      setPagination(response.pagination || { page: 1, limit: 50, total: 0, pages: 0 });
     } catch (err) {
       setError(err.message);
       console.error('Failed to load admins:', err);
@@ -126,14 +141,34 @@ const ManageAdmins = () => {
 
   // Handle edit admin
   const handleEdit = (admin) => {
-    // TODO: Implement edit functionality
-    console.log('Edit admin:', admin);
+    setSelectedAdmin(admin);
+    setShowEditModal(true);
   };
 
   // Handle archive admin
-  const handleArchive = (admin) => {
-    // TODO: Implement archive functionality
-    console.log('Archive admin:', admin);
+  const handleArchive = async (admin) => {
+    try {
+      // Update admin status to archived
+      await adminManagementService.updateAdmin(admin.id, { status: 'archived' });
+      // Reload the data to show the updated status
+      loadData();
+    } catch (err) {
+      console.error('Failed to archive admin:', err);
+      // You could show a toast notification here
+    }
+  };
+
+  // Handle unarchive admin
+  const handleUnarchive = async (admin) => {
+    try {
+      // Update admin status back to active
+      await adminManagementService.updateAdmin(admin.id, { status: 'active' });
+      // Reload the data to show the updated status
+      loadData();
+    } catch (err) {
+      console.error('Failed to unarchive admin:', err);
+      // You could show a toast notification here
+    }
   };
 
   // Handle add admin
@@ -144,6 +179,12 @@ const ManageAdmins = () => {
   // Handle modal close
   const handleModalClose = () => {
     setShowAddModal(false);
+  };
+
+  // Handle edit modal close
+  const handleEditModalClose = () => {
+    setShowEditModal(false);
+    setSelectedAdmin(null);
   };
 
   // Handle view modal close
@@ -157,6 +198,13 @@ const ManageAdmins = () => {
     // Reload the data to show the new admin
     loadData();
     setShowAddModal(false);
+  };
+
+  // Handle admin update success
+  const handleAdminUpdated = (updatedAdmin) => {
+    // Reload the data to show the updated admin
+    loadData();
+    setShowEditModal(false);
   };
 
   // Handle column sorting
@@ -318,7 +366,7 @@ const ManageAdmins = () => {
           )}
         </button>
       ),
-      render: (row) => <RoleBadge role={row.role} />,
+      render: (row) => <RoleBadge role={row.role} isArchived={row.status === 'archived'} />,
     },
     { 
       key: 'created_at', 
@@ -432,7 +480,7 @@ const ManageAdmins = () => {
     {
       key: 'status',
       header: 'Status',
-      render: (row) => <StatusBadge status={row.status} />,
+      render: (row) => <StatusBadge status={row.status} isArchived={row.status === 'archived'} />,
     },
     {
       key: 'actions',
@@ -458,15 +506,27 @@ const ManageAdmins = () => {
               <Pencil size={16} />
             </button>
           </Tooltip>
-          <Tooltip content="Archive">
-            <button 
-              className="p-1 rounded hover:bg-gray-100" 
-              aria-label="Archive"
-              onClick={() => handleArchive(row)}
-            >
-              <Archive size={16} />
-            </button>
-          </Tooltip>
+          {row.status === 'archived' ? (
+            <Tooltip content="Unarchive">
+              <button 
+                className="p-1 rounded hover:bg-green-100 text-green-600" 
+                aria-label="Unarchive"
+                onClick={() => handleUnarchive(row)}
+              >
+                <RefreshCw size={16} />
+              </button>
+            </Tooltip>
+          ) : (
+            <Tooltip content="Archive">
+              <button 
+                className="p-1 rounded hover:bg-gray-100" 
+                aria-label="Archive"
+                onClick={() => handleArchive(row)}
+              >
+                <Archive size={16} />
+              </button>
+            </Tooltip>
+          )}
         </div>
       ),
     },
@@ -558,7 +618,7 @@ const ManageAdmins = () => {
       {/* Table */}
       <DataTable
         columns={columns}
-        data={sortedData}
+        data={sortedData.map(row => ({ ...row, archived: row.status === 'archived' }))}
         rowKey={(row) => row.id}
         dense
         emptyMessage="No admins found."
@@ -632,6 +692,14 @@ const ManageAdmins = () => {
         open={showAddModal}
         onClose={handleModalClose}
         onSave={handleAdminCreated}
+      />
+
+      {/* Edit Admin Modal */}
+      <EditAdminModal
+        open={showEditModal}
+        onClose={handleEditModalClose}
+        onSave={handleAdminUpdated}
+        admin={selectedAdmin}
       />
 
       {/* View Admin Modal */}

@@ -166,10 +166,7 @@ class AdminManagementService {
     }
   }
 
-  // Future methods for admin management (commented out for now)
-  /*
-
-  // Update admin details (requires superadmin)
+  // Update admin status (requires superadmin)
   async updateAdmin(id, updateData) {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/${id}`, {
@@ -193,6 +190,9 @@ class AdminManagementService {
       throw error;
     }
   }
+
+  // Future methods for admin management (commented out for now)
+  /*
 
   // Delete admin (requires superadmin)
   async deleteAdmin(id) {

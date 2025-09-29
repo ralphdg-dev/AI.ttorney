@@ -62,6 +62,8 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState(null);
+  const [selectedActivity, setSelectedActivity] = useState(null);
+  const [showActivityModal, setShowActivityModal] = useState(false);
   const { admin: currentAdmin } = useAuth();
 
   // Load audit logs when modal opens
@@ -257,6 +259,18 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
     }
   };
 
+  // Handle viewing activity details
+  const handleViewActivity = (activity) => {
+    setSelectedActivity(activity);
+    setShowActivityModal(true);
+  };
+
+  // Handle closing activity modal
+  const handleCloseActivityModal = () => {
+    setShowActivityModal(false);
+    setSelectedActivity(null);
+  };
+
   return (
     <Modal 
       open={open} 
@@ -376,6 +390,9 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
                           <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
                             Details
                           </th>
+                          <th className="px-2 py-1.5 text-right text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -393,6 +410,16 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
                               <div className="text-[9px] text-gray-700 truncate" title={activity.details || '-'}>
                                 {activity.details || '-'}
                               </div>
+                            </td>
+                            <td className="px-2 py-1.5 text-right">
+                              <Tooltip content="View Details">
+                                <button
+                                  onClick={() => handleViewActivity(activity)}
+                                  className="p-1 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-800"
+                                >
+                                  <Eye size={12} />
+                                </button>
+                              </Tooltip>
                             </td>
                           </tr>
                         ))}
@@ -496,6 +523,100 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
         </div>
 
       </div>
+
+      {/* Activity Detail Modal */}
+      {showActivityModal && selectedActivity && (
+        <Modal
+          open={showActivityModal}
+          onClose={handleCloseActivityModal}
+          title="Activity Details"
+          width="max-w-2xl"
+        >
+          <div className="space-y-4">
+            {/* Activity Header */}
+            <div className="border-b border-gray-200 pb-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-900">
+                  {selectedActivity.action}
+                </h3>
+                <span className="text-xs text-gray-500">
+                  {formatDate(selectedActivity.date)}
+                </span>
+              </div>
+            </div>
+
+            {/* Activity Details */}
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Action Type
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
+                  {selectedActivity.action}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Date & Time
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
+                  {formatDate(selectedActivity.date)}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Details
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md min-h-[60px]">
+                  {selectedActivity.details || 'No additional details available'}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Admin Information
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
+                  <div className="flex items-center justify-between">
+                    <span>{admin.full_name}</span>
+                    <div className="flex items-center gap-2">
+                      <RoleBadge role={admin.role} />
+                      <StatusBadge status={admin.status} />
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {admin.email}
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional metadata if available */}
+              {selectedActivity.id && selectedActivity.id.startsWith('audit_') && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    Activity ID
+                  </label>
+                  <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md font-mono">
+                    {selectedActivity.id}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex justify-end pt-4 border-t border-gray-200">
+              <button
+                onClick={handleCloseActivityModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </Modal>
   );
 };

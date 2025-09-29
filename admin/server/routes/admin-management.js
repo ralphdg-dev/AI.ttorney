@@ -7,10 +7,10 @@ const router = express.Router();
 // Get all admins (view-only for now, requires superadmin role)
 router.get('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   try {
-    const { page = 1, limit = 50, search = '', role = 'all' } = req.query;
+    const { page = 1, limit = 50, search = '', role = 'all', status = 'active' } = req.query;
     const offset = (page - 1) * limit;
 
-    console.log('Fetching admins with params:', { page, limit, search, role });
+    console.log('Fetching admins with params:', { page, limit, search, role, status });
 
     // Build the query - join with auth.users to get last_sign_in_at
     let query = supabaseAdmin
@@ -26,14 +26,12 @@ router.get('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
       `)
       .order('created_at', { ascending: false });
 
-    // Add search filter if provided
-    if (search) {
-      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
-    }
-
-    // Add role filter
+    // Add role filter only (no status filtering)
     if (role !== 'all') {
+      console.log('Applying role filter:', role);
       query = query.eq('role', role);
+    } else {
+      console.log('No role filter - showing all roles');
     }
 
     // Add pagination
@@ -49,7 +47,10 @@ router.get('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
       });
     }
 
-    console.log('Found admins:', admins?.length || 0);
+    console.log('Found admins after filtering:', admins?.length || 0);
+    if (admins && admins.length > 0) {
+      console.log('Sample admin status values:', admins.map(a => a.status));
+    }
 
     // Get auth.users data for last_sign_in_at
     let authUsersData = [];
@@ -79,12 +80,20 @@ router.get('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
       };
     });
 
-    // Get total count for pagination
-    const { count: totalCount } = await supabaseAdmin
+    // Get total count for pagination with same filters
+    let countQuery = supabaseAdmin
       .from('admin')
       .select('*', { count: 'exact', head: true });
 
+    // Apply role filter to count query (no status filtering)
+    if (role !== 'all') {
+      countQuery = countQuery.eq('role', role);
+    }
+
+    const { count: totalCount } = await countQuery;
+
     console.log('Total admins count:', totalCount);
+    console.log('Transformed admins:', transformedAdmins);
 
     res.json({
       success: true,
@@ -212,10 +221,10 @@ router.post('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
     }
 
     // Validate status
-    if (!['active', 'inactive', 'suspended'].includes(status)) {
+    if (!['active', 'disabled', 'archived'].includes(status)) {
       return res.status(400).json({
         success: false,
-        error: 'Status must be either active, inactive, or suspended'
+        error: 'Status must be one of: active, disabled, archived'
       });
     }
 
@@ -564,13 +573,125 @@ router.post('/:id/audit-logs', authenticateAdmin, requireSuperAdmin, async (req,
   }
 });
 
-// Future endpoints for admin management (commented out for now)
-/*
-// Update admin details (requires superadmin)
+// Update admin status (requires superadmin)
 router.patch('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
-  // Implementation for updating admin
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // Validation
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        error: 'Status is required'
+      });
+    }
+
+    // Validate status
+    if (!['active', 'disabled', 'archived'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Status must be one of: active, disabled, archived'
+      });
+    }
+
+    // Check if admin exists
+    const { data: existingAdmin, error: checkError } = await supabaseAdmin
+      .from('admin')
+      .select('id, email, full_name, status')
+      .eq('id', id)
+      .single();
+
+    if (checkError || !existingAdmin) {
+      return res.status(404).json({
+        success: false,
+        error: 'Admin not found'
+      });
+    }
+
+    // Prevent self-modification if trying to deactivate/archive
+    if (req.admin.id === id && ['disabled', 'archived'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'You cannot disable or archive your own account'
+      });
+    }
+
+    // Update admin status
+    const { data: updatedAdmin, error: updateError } = await supabaseAdmin
+      .from('admin')
+      .update({
+        status: status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Admin status update error:', updateError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update admin status: ' + updateError.message
+      });
+    }
+
+    // Log the action
+    console.log(`Admin status updated by ${req.admin.email}: ${existingAdmin.email} status changed from ${existingAdmin.status} to ${status}`);
+
+    // Create audit log entry if table exists
+    try {
+      await supabaseAdmin
+        .from('admin_audit_logs')
+        .insert({
+          admin_id: id,
+          action: `Status changed to ${status}`,
+          actor_id: req.admin.id,
+          actor_name: req.admin.full_name || req.admin.email,
+          actor_role: req.admin.role,
+          details: JSON.stringify({
+            action: 'status_update',
+            old_status: existingAdmin.status,
+            new_status: status,
+            admin_email: existingAdmin.email
+          }),
+          metadata: {
+            action_type: 'status_update',
+            target_email: existingAdmin.email,
+            old_status: existingAdmin.status,
+            new_status: status
+          },
+          created_at: new Date().toISOString()
+        });
+    } catch (auditError) {
+      console.warn('Could not create audit log (table may not exist):', auditError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Admin status updated successfully',
+      data: {
+        id: updatedAdmin.id,
+        email: updatedAdmin.email,
+        full_name: updatedAdmin.full_name,
+        role: updatedAdmin.role,
+        status: updatedAdmin.status,
+        created_at: updatedAdmin.created_at,
+        updated_at: updatedAdmin.updated_at
+      }
+    });
+
+  } catch (error) {
+    console.error('Update admin status error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
 });
 
+// Future endpoints for admin management (commented out for now)
+/*
 // Delete admin (requires superadmin)
 router.delete('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   // Implementation for deleting admin

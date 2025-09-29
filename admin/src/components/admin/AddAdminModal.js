@@ -269,16 +269,16 @@ const AddAdminModal = ({ open, onClose, onSave }) => {
             Status <span className="text-red-500">*</span>
           </label>
           <Select
-            value={formData.status === 'active' ? 'Active' : formData.status === 'inactive' ? 'Inactive' : formData.status === 'suspended' ? 'Suspended' : ''}
+            value={formData.status === 'active' ? 'Active' : formData.status === 'disabled' ? 'Disabled' : formData.status === 'archived' ? 'Archived' : ''}
             onChange={(value) => {
-              const statusValue = value === 'Active' ? 'active' : value === 'Inactive' ? 'inactive' : value === 'Suspended' ? 'suspended' : value;
+              const statusValue = value === 'Active' ? 'active' : value === 'Disabled' ? 'disabled' : value === 'Archived' ? 'archived' : value;
               setFormData(prev => ({ ...prev, status: statusValue }));
               // Clear validation error for this field
               if (validationErrors.status) {
                 setValidationErrors(prev => ({ ...prev, status: '' }));
               }
             }}
-            options={['Active', 'Inactive', 'Suspended']}
+            options={['Active', 'Disabled', 'Archived']}
             variant="form"
             error={!!validationErrors.status}
             disabled={loading}
