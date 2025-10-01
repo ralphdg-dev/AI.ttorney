@@ -67,7 +67,7 @@ export default function SplashScreen() {
       <Text style={tw`text-2xl font-bold`}>Ai.ttorney</Text>
       <Text style={tw`text-gray-500 italic`}>
         Justice at Your Fingertips
-      </Text>{" "}
+      </Text>
     </Animated.View>
   );
 }
