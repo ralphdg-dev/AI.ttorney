@@ -81,7 +81,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
     try {
       setLoadingPredictions(true);
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.103:8000';
       
       const response = await fetch(`${apiUrl}/api/places/autocomplete`, {
         method: 'POST',
@@ -193,7 +193,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       console.log(`Searching law firms at: ${latitude}, ${longitude} for ${locationName}`);
 
       // Use backend proxy to avoid CORS issues
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.103:8000';
       const response = await fetch(`${apiUrl}/api/places/nearby`, {
         method: 'POST',
         headers: {
@@ -252,7 +252,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       setError(null);
       console.log(`Searching for law firms in: ${locationName}`);
       
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.103:8000';
       const response = await fetch(`${apiUrl}/api/places/search-by-location`, {
         method: 'POST',
         headers: {

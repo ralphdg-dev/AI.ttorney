@@ -13,6 +13,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.aittorney.app',
+    infoPlist: {
+      CFBundleURLTypes: [
+        {
+          CFBundleURLName: 'ai-ttorney',
+          CFBundleURLSchemes: ['ai-ttorney', 'exp+ai-ttorney'],
+        },
+      ],
+    },
     config: {
       googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
     },
@@ -24,6 +32,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     edgeToEdgeEnabled: true,
     package: 'com.aittorney.app',
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [
+          {
+            scheme: 'ai-ttorney',
+          },
+          {
+            scheme: 'exp+ai-ttorney',
+          },
+        ],
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
+    ],
     config: {
       googleMaps: {
         apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
