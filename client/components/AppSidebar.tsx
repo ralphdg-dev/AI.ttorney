@@ -3,10 +3,11 @@ import {
   View,
   Text,
   TouchableOpacity,
+  StyleSheet,
   Animated,
   Dimensions,
-  StyleSheet,
   ScrollView,
+  Platform,
   StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -119,12 +120,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         Animated.timing(slideAnim, {
           toValue: 0,
           duration: 280,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(overlayOpacity, {
           toValue: 0.5,
           duration: 280,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start();
     } else if (shouldRender) {
@@ -132,12 +133,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         Animated.timing(slideAnim, {
           toValue: -SIDEBAR_WIDTH,
           duration: 280,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(overlayOpacity, {
           toValue: 0,
           duration: 280,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start(() => {
         setShouldRender(false);
@@ -453,13 +454,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: SIDEBAR_WIDTH,
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 2,
-      height: 0,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
+    boxShadow: '2px 0 10px rgba(0, 0, 0, 0.25)',
     elevation: 16,
   },
   header: {

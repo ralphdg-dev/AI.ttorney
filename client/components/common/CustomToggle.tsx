@@ -1,6 +1,5 @@
-import React from 'react';
-import { TouchableOpacity, View, Animated } from 'react-native';
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
+import { TouchableOpacity, Animated, Platform } from 'react-native';
 
 interface CustomToggleProps {
   value: boolean;
@@ -21,7 +20,7 @@ const CustomToggle: React.FC<CustomToggleProps> = ({
     Animated.timing(animatedValue, {
       toValue: value ? 1 : 0,
       duration: 200,
-      useNativeDriver: false,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [value, animatedValue]);
 
@@ -79,10 +78,7 @@ const CustomToggle: React.FC<CustomToggleProps> = ({
             borderRadius: thumbSize / 2,
             backgroundColor: '#FFFFFF',
             transform: [{ translateX: thumbTranslateX }],
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.2,
-            shadowRadius: 2,
+            boxShadow: '0 2px 2px rgba(0, 0, 0, 0.2)',
             elevation: 3,
           }}
         />

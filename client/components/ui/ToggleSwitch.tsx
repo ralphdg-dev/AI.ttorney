@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { ViewStyle, Pressable, Animated, View } from 'react-native';
+import React, { useEffect, useRef, useMemo } from 'react';
+import { Animated, ViewStyle, Platform, Pressable } from 'react-native';
 import Colors from '@/constants/Colors';
 
 export interface ToggleSwitchProps {
@@ -39,9 +39,9 @@ export default function ToggleSwitch({
     Animated.timing(animated, {
       toValue: value ? 1 : 0,
       duration: 160,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
-  }, [value]);
+  }, [value, animated]);
 
   const translateX = animated.interpolate({
     inputRange: [0, 1],

@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   },
   minimalContainer: {
     borderBottomWidth: 0,
-    shadowOpacity: 0,
+    boxShadow: 'none',
     elevation: 0,
   },
   content: {

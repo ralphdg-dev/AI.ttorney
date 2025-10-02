@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Alert, StatusBar, Animated, Pressable, RefreshControl } from "react-native";
+import { View, Alert, StatusBar, Animated, Pressable, RefreshControl, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { HStack } from "@/components/ui/hstack";
@@ -238,7 +238,7 @@ export default function FavoritesScreen() {
           }
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: false }
+            { useNativeDriver: Platform.OS !== 'web' }
           )}
         >
           {/* Category Filter (match Bookmarked Guides header) */}

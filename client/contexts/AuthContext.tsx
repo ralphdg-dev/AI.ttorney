@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
-import { supabase } from '../config/supabase';
+import { supabase, clearAuthStorage } from '../config/supabase';
 import { router } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
 
@@ -57,6 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [initialAuthCheck, setInitialAuthCheck] = useState(false);
   const [hasRedirectedToStatus, setHasRedirectedToStatus] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+
 
   const checkLawyerApplicationStatus = React.useCallback(async (): Promise<any> => {
     try {
@@ -144,18 +145,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initialize = async () => {
       try {
         // Get initial session
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session error:', error.message);
+          // Clear session on error and redirect to login
+          await clearAuthStorage();
+          setAuthState({ session: null, user: null, supabaseUser: null });
+          setIsLoading(false);
+          setInitialAuthCheck(true);
+          return;
+        }
         
         if (initialSession) {
           console.log('Initial session found:', initialSession.user?.email);
           await handleAuthStateChange(initialSession, false);
         } else {
           console.log('No initial session found');
-          setAuthState({
-            session: null,
-            user: null,
-            supabaseUser: null,
-          });
+          setAuthState({ session: null, user: null, supabaseUser: null });
           setIsLoading(false);
         }
         
@@ -164,25 +171,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Listen for auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
-            if (event === 'SIGNED_IN') {
-              if (session) {
-                // Only navigate on explicit sign in, not token refresh
-                await handleAuthStateChange(session, true);
-              }
-            } else if (event === 'TOKEN_REFRESHED') {
-              if (session) {
-                // Don't navigate on token refresh, just update auth state
-                await handleAuthStateChange(session, false);
-              }
+            console.log('Auth state change:', event, session?.user?.email || 'no session');
+            
+            if (event === 'SIGNED_IN' && session) {
+              await handleAuthStateChange(session, true);
+            } else if (event === 'TOKEN_REFRESHED' && session) {
+              await handleAuthStateChange(session, false);
             } else if (event === 'SIGNED_OUT') {
-              setAuthState({
-                session: null,
-                user: null,
-                supabaseUser: null,
-              });
+              setAuthState({ session: null, user: null, supabaseUser: null });
               setHasRedirectedToStatus(false);
-              
-              // Navigate to login when signed out
               router.replace('/login');
             }
             
@@ -209,27 +206,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      // Reset redirect flag on new login
       setHasRedirectedToStatus(false);
       
-      // Use Supabase Auth for sign in
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        console.error('Sign in error:', error.message);
         return { success: false, error: error.message };
       }
 
       if (data.session) {
-        // Handle auth state change with navigation
         await handleAuthStateChange(data.session, true);
         return { success: true };
       }
 
       return { success: false, error: 'No session created' };
     } catch (error: any) {
+      console.error('Sign in catch:', error);
       return { success: false, error: error.message || 'Network error' };
     } finally {
       setIsLoading(false);
@@ -240,38 +236,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsSigningOut(true);
     
     try {
-      // Clear Supabase session first - this triggers SIGNED_OUT event
-      await supabase.auth.signOut({ scope: 'global' });
-      
-      // Clear AsyncStorage
-      try {
-        const AsyncStorage = await import('@react-native-async-storage/async-storage');
-        await AsyncStorage.default.clear();
-      } catch (error) {
-        console.warn('AsyncStorage clear error:', error);
-      }
-      
-      // Stop any ongoing services
-      try {
-        const { lawyerApplicationService } = await import('../services/lawyerApplicationService');
-        lawyerApplicationService.stopStatusPolling();
-        lawyerApplicationService.clearCache();
-      } catch (error) {
-        console.warn('Error stopping polling:', error);
-      }
-      
-      // Reset redirect flag
+      await clearAuthStorage();
       setHasRedirectedToStatus(false);
-      
     } catch (error) {
-      console.error('SignOut: Error during sign out process:', error);
-      
+      console.error('Sign out error:', error);
       // Force clear state on error
-      setAuthState({
-        session: null,
-        user: null,
-        supabaseUser: null,
-      });
+      setAuthState({ session: null, user: null, supabaseUser: null });
     } finally {
       setIsSigningOut(false);
     }

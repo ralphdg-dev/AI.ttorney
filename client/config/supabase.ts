@@ -1,36 +1,28 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://vmlbrckrlgwlobhnpstx.supabase.co';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtbGJyY2tybGd3bG9iaG5wc3R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4MDI5MDksImV4cCI6MjA2OTM3ODkwOX0.ucK9BXmRg7wYaamFBkTKWTkOavlp7SzNrZwDvNmKsK8';
 
-// Singleton pattern to prevent multiple instances
-let supabaseInstance: SupabaseClient | null = null;
+// Simple, industry-standard Supabase client
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+    storage: Platform.OS === 'web' ? undefined : AsyncStorage,
+  },
+});
 
-const createSupabaseClient = (): SupabaseClient => {
-  if (supabaseInstance) {
-    return supabaseInstance;
+// Simple helper to clear auth storage when needed
+export const clearAuthStorage = async () => {
+  try {
+    if (Platform.OS !== 'web') {
+      await AsyncStorage.removeItem('supabase.auth.token');
+    }
+    await supabase.auth.signOut({ scope: 'global' });
+  } catch (error) {
+    console.error('Error clearing auth storage:', error);
   }
-
-  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: false,
-      storage: Platform.OS === 'web' ? undefined : AsyncStorage,
-    },
-  });
-
-  // Initialize proper storage when available for React Native
-  if (Platform.OS !== 'web') {
-    import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
-      // Update the storage after import to ensure it's properly configured
-      (supabaseInstance!.auth as any).storage = AsyncStorage;
-    });
-  }
-
-  return supabaseInstance;
 };
-
-export const supabase = createSupabaseClient();

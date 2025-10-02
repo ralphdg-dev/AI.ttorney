@@ -10,8 +10,7 @@ import {
 } from "@expo-google-fonts/inter";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
-import { AuthProvider } from "../lib/auth-context";
-import { AuthProvider as CustomAuthProvider } from "../contexts/AuthContext";
+import { AuthProvider } from "../contexts/AuthContext";
 import { FavoritesProvider } from "../contexts/FavoritesContext";
 import { SidebarProvider } from "../components/AppSidebar";
 import { AuthGuard } from "../components/AuthGuard";
@@ -41,30 +40,18 @@ export default function RootLayout() {
   return (
     <GluestackUIProvider mode="light">
       <AuthProvider>
-        <CustomAuthProvider>
           <FavoritesProvider>
             <AuthGuard>
               <RouteErrorBoundary>
                 <SidebarProvider>
                     <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="index" options={{ headerShown: false }} />
-                <Stack.Screen name="onboarding" options={{ headerShown: false }} />
                 <Stack.Screen name="login" options={{ headerShown: false }} />
                 <Stack.Screen name="role-selection" options={{ headerShown: false }} />
-                <Stack.Screen name="nonlaw-reg" options={{ headerShown: false }} />
-                <Stack.Screen name="verifyotp-reg" options={{ headerShown: false }} />
-                <Stack.Screen name="lawyer-starting-page" options={{ headerShown: false }} />
                 <Stack.Screen name="lawyer/index" options={{ headerShown: false }} />
                 <Stack.Screen name="lawyer/forum" options={{ headerShown: false }} />
                 <Stack.Screen name="lawyer/consult" options={{ headerShown: false }} />
                 <Stack.Screen name="lawyer/profile" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="lawyer"
-                  options={{
-                    headerShown: false,
-                    title: "Lawyer Dashboard",
-                  }}
-                />
                 <Stack.Screen
                   name="directory"
                   options={{
@@ -101,13 +88,11 @@ export default function RootLayout() {
                     title: "Term Details",
                   }}
                 />
-                <Stack.Screen name="documents-success" options={{ headerShown: false }} />
                 </Stack>
                 </SidebarProvider>
               </RouteErrorBoundary>
             </AuthGuard>
           </FavoritesProvider>
-        </CustomAuthProvider>
       </AuthProvider>
     </GluestackUIProvider>
   );
