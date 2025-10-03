@@ -1153,8 +1153,23 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           maxHeight: 48,
           height: 48
         }}>
-          <HStack className="items-center px-3" style={{ height: 48 }}>
-            <Search size={18} color="#6B7280" style={{ flexShrink: 0 }} />
+          <HStack style={{ 
+            height: 48, 
+            alignItems: 'center', 
+            paddingHorizontal: 12,
+            justifyContent: 'space-between'
+          }}>
+            {/* Fixed-width container for left icon */}
+            <Box style={{ 
+              width: 24, 
+              height: 48, 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              flexShrink: 0 
+            }}>
+              <Search size={18} color="#6B7280" />
+            </Box>
+            
             <TextInput
               className="flex-1 text-base"
               placeholder="Search by street, barangay, or city"
@@ -1171,8 +1186,10 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                 paddingHorizontal: 12,
                 paddingVertical: 0,
                 height: 48,
+                fontSize: 16,
                 lineHeight: 20,
-                textAlignVertical: 'center'
+                textAlignVertical: 'center',
+                includeFontPadding: false
               }}
               autoCorrect={false}
               autoCapitalize="words"
@@ -1181,22 +1198,45 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
               multiline={false}
               numberOfLines={1}
             />
-            {searchText.length > 0 && !searching && (
-              <Pressable 
-                onPress={() => {
-                  setSearchText('');
-                  searchTextRef.current = '';
-                  setShowPredictions(false);
-                  setPredictions([]);
-                }} 
-                className="px-2 py-1"
-              >
-                <X size={16} color="#6B7280" />
-              </Pressable>
-            )}
-            {searching && (
-              <Spinner size="small" color={Colors.primary.blue} />
-            )}
+            
+            {/* Fixed-width container for right icons */}
+            <Box style={{ 
+              width: 24, 
+              height: 48, 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              flexShrink: 0 
+            }}>
+              {searchText.length > 0 && !searching && (
+                <Pressable 
+                  onPress={() => {
+                    setSearchText('');
+                    searchTextRef.current = '';
+                    setShowPredictions(false);
+                    setPredictions([]);
+                  }}
+                  style={{ 
+                    width: 24, 
+                    height: 24, 
+                    justifyContent: 'center', 
+                    alignItems: 'center',
+                    borderRadius: 12
+                  }}
+                >
+                  <X size={18} color="#6B7280" />
+                </Pressable>
+              )}
+              {searching && (
+                <Box style={{ 
+                  width: 18, 
+                  height: 18, 
+                  justifyContent: 'center', 
+                  alignItems: 'center' 
+                }}>
+                  <Spinner size="small" color={Colors.primary.blue} />
+                </Box>
+              )}
+            </Box>
           </HStack>
         </Box>
         
