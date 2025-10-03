@@ -1,15 +1,33 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Linking, Platform, Alert, ScrollView, TextInput, Keyboard } from 'react-native';
+import { 
+  TextInput, 
+  Pressable, 
+  Linking, 
+  Alert, 
+  ScrollView,
+  Platform,
+  Keyboard
+} from 'react-native';
+import { WebView as RNWebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { VStack } from '@/components/ui/vstack';
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Box } from '@/components/ui/box';
-import { Pressable } from '@/components/ui/pressable';
 import { Spinner } from '@/components/ui/spinner';
-import { Search, MapPin, Locate, Phone, Navigation, Star, X } from 'lucide-react-native';
+import { 
+  Search, 
+  MapPin, 
+  Phone, 
+  Navigation, 
+  Star, 
+  Locate, 
+  X,
+  Check
+} from 'lucide-react-native';
 import Colors from '../../../constants/Colors';
+import { NetworkConfig } from '../../../utils/networkConfig';
 
 interface LawFirm {
   id: string;
@@ -62,6 +80,10 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const [selectedRadius, setSelectedRadius] = useState(5); // Default 5km
   const [showRadiusFilter, setShowRadiusFilter] = useState(false);
   const radiusOptions = [5, 10, 15, 25]; // km options (limited to 25km max)
+  
+  // View states - Two dedicated views approach
+  const [currentView, setCurrentView] = useState<'list' | 'map'>('list'); // Default to List View
+  const [selectedFirmId, setSelectedFirmId] = useState<string | null>(null); // Track selected firm for zoom
 
   // Optimized autocomplete with abort controller and session tokens
   const fetchAutocomplete = useCallback(async (input: string) => {
@@ -77,11 +99,12 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     }
 
     // Create new abort controller for this request
-    abortControllerRef.current = new AbortController();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       setLoadingPredictions(true);
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.103:8000';
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       
       const response = await fetch(`${apiUrl}/api/places/autocomplete`, {
         method: 'POST',
@@ -93,7 +116,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           location: userLocation ? `${userLocation.coords.latitude},${userLocation.coords.longitude}` : null,
           radius: selectedRadius * 1000 // Convert km to meters
         }),
-        signal: abortControllerRef.current.signal,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -145,17 +168,20 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       abortControllerRef.current.abort();
     }
 
-    // Progressive debounce: shorter delay for longer queries
-    const debounceDelay = text.length <= 3 ? 400 : text.length <= 5 ? 300 : 200;
-
-    // Set new timeout for autocomplete
+    // Industry-grade instant autocomplete - no debounce for immediate response
     if (text.length >= 2) {
+      // Show loading state immediately for instant feedback
+      setLoadingPredictions(true);
+      setShowPredictions(true);
+      
+      // Minimal delay only to batch rapid keystrokes
       autocompleteTimeoutRef.current = setTimeout(() => {
         fetchAutocomplete(text);
-      }, debounceDelay);
+      }, 50); // Ultra-fast 50ms delay
     } else {
       setPredictions([]);
       setShowPredictions(false);
+      setLoadingPredictions(false);
     }
   }, [error, fetchAutocomplete]);
 
@@ -193,7 +219,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       console.log(`Searching law firms at: ${latitude}, ${longitude} for ${locationName}`);
 
       // Use backend proxy to avoid CORS issues
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.103:8000';
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(`${apiUrl}/api/places/nearby`, {
         method: 'POST',
         headers: {
@@ -252,7 +278,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       setError(null);
       console.log(`Searching for law firms in: ${locationName}`);
       
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.103:8000';
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(`${apiUrl}/api/places/search-by-location`, {
         method: 'POST',
         headers: {
@@ -374,7 +400,6 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       try {
         // Only load WebView on supported platforms
         if (Platform.OS === 'ios' || Platform.OS === 'android') {
-          const { WebView: RNWebView } = await import('react-native-webview');
           setWebView(() => RNWebView);
           setWebViewSupported(true);
           console.log('WebView loaded successfully for', Platform.OS);
@@ -463,24 +488,11 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
   const handleDirectionsPress = useCallback((latitude: number, longitude: number, name: string, address?: string, placeId?: string) => {
     const latLng = `${latitude},${longitude}`;
-    const encodedName = encodeURIComponent(name);
     
-    // Enhanced URL schemes prioritizing readable names and addresses
-    // Priority: name + address > address > name > coordinates
-    const fullLocation = address ? `${name}, ${address}` : name;
-    const encodedFullLocation = encodeURIComponent(fullLocation);
-    
-    const iosUrl = address 
-      ? `maps://maps.apple.com/?daddr=${encodedFullLocation}&dirflg=d` 
-      : `maps://maps.apple.com/?daddr=${encodedName}&dirflg=d`;
-    
-    const androidUrl = address 
-      ? `google.navigation:q=${encodedFullLocation}` 
-      : `google.navigation:q=${encodedName}`;
-    
-    const webUrl = address 
-      ? `https://www.google.com/maps/dir/?api=1&destination=${encodedFullLocation}` 
-      : `https://www.google.com/maps/dir/?api=1&destination=${encodedName}`;
+    // Use coordinate-based URLs to avoid encoding issues
+    const iosUrl = `maps://maps.apple.com/?daddr=${latLng}&dirflg=d`;
+    const androidUrl = `google.navigation:q=${latLng}`;
+    const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${latLng}`;
     
     const primaryUrl = Platform.select({
       ios: iosUrl,
@@ -488,7 +500,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       default: webUrl
     });
     
-    console.log(`Opening directions to: ${fullLocation}`);
+    console.log(`Opening directions to: ${name}`);
     console.log(`Coordinates: ${latLng}`);
     
     if (primaryUrl) {
@@ -507,8 +519,8 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         })
         .catch((error) => {
           console.error("Error opening directions:", error);
-          // Final fallback - coordinates with name as query
-          const coordinateUrl = `https://maps.google.com/?q=${encodedName}@${latLng}`;
+          // Final fallback - coordinates only
+          const coordinateUrl = `https://maps.google.com/?q=${latLng}`;
           Linking.openURL(coordinateUrl).catch((fallbackError) => {
             console.error("All direction methods failed:", fallbackError);
             Alert.alert(
@@ -519,6 +531,16 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         });
     }
   }, []);
+
+  // Handle "Show on Map" button press
+  const handleShowOnMap = useCallback((firm: LawFirm) => {
+    setSelectedFirmId(firm.id);
+    setCurrentView('map');
+    // Update map center to focus on selected firm
+    setMapCenter({ lat: firm.latitude, lng: firm.longitude });
+  }, []);
+
+
   const handleWebViewMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -650,7 +672,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                 width: 100%; 
             }
             .info-window {
-                max-width: 300px;
+                max-width: 280px;
                 padding: 16px;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             }
@@ -659,7 +681,6 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                 font-size: 16px;
                 margin-bottom: 8px;
                 color: #1a1a1a;
-                line-height: 1.3;
             }
             .info-rating {
                 display: flex;
@@ -672,52 +693,41 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                 margin-right: 6px;
             }
             .info-rating .rating-text {
-                color: #5f6368;
+                color: #666;
+                font-size: 13px;
             }
             .info-distance {
                 font-size: 13px;
-                color: #5f6368;
+                color: #059669;
+                font-weight: 500;
                 margin-bottom: 8px;
             }
             .info-address {
-                color: #5f6368;
+                color: #666;
                 font-size: 14px;
-                margin-bottom: 16px;
+                margin-bottom: 12px;
                 line-height: 1.4;
             }
             .info-buttons {
                 display: flex;
                 gap: 8px;
-                margin-top: 12px;
             }
             .info-button {
                 flex: 1;
-                padding: 10px 16px;
+                padding: 10px 14px;
                 border: none;
-                border-radius: 24px;
+                border-radius: 6px;
                 font-size: 14px;
                 cursor: pointer;
                 font-weight: 500;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 6px;
-                transition: all 0.2s;
             }
             .directions-button {
-                background-color: #1a73e8;
+                background-color: #4285F4;
                 color: white;
             }
-            .directions-button:hover {
-                background-color: #1557b0;
-            }
             .call-button {
-                background-color: #fff;
-                color: #1a73e8;
-                border: 1px solid #dadce0;
-            }
-            .call-button:hover {
-                background-color: #f8f9fa;
+                background-color: #f5f5f5;
+                color: #333;
             }
         </style>
     </head>
@@ -729,13 +739,29 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
             let infoWindow;
             
             function initMap() {
+                // Use higher zoom if a specific firm is selected
+                const zoomLevel = ${selectedFirmId ? '16' : '13'};
+                
                 map = new google.maps.Map(document.getElementById("map"), {
-                    zoom: 13,
+                    zoom: zoomLevel,
                     center: { lat: ${mapCenter.lat}, lng: ${mapCenter.lng} },
                     mapTypeControl: true,
                     streetViewControl: true,
-                    fullscreenControl: false,
+                    fullscreenControl: true,
                     zoomControl: true,
+                    zoomControlOptions: {
+                        position: google.maps.ControlPosition.LEFT_CENTER
+                    },
+                    mapTypeControlOptions: {
+                        position: google.maps.ControlPosition.TOP_LEFT,
+                        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR
+                    },
+                    streetViewControlOptions: {
+                        position: google.maps.ControlPosition.RIGHT_CENTER
+                    },
+                    fullscreenControlOptions: {
+                        position: google.maps.ControlPosition.TOP_RIGHT
+                    },
                     styles: [
                         {
                             featureType: "poi.business",
@@ -743,6 +769,16 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                             stylers: [{ visibility: "off" }]
                         }
                     ]
+                });
+                
+                // Add padding to avoid navbar and bottom navigation overlap
+                map.setOptions({
+                    padding: {
+                        top: 100,    // Space for navbar and location counter
+                        right: 20,   // Space for street view and fullscreen controls
+                        bottom: 180, // Much more space for bottom navigation overlap
+                        left: 20     // Space for zoom controls
+                    }
                 });
                 
                 infoWindow = new google.maps.InfoWindow();
@@ -766,12 +802,18 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                 const markers = ${JSON.stringify(markers)};
                 
                 markers.forEach((marker, index) => {
+                    // Check if this is the selected firm for highlighting
+                    const isSelected = "${selectedFirmId}" === marker.id;
+                    const markerColor = isSelected ? '%234285F4' : '%23EA4335'; // Blue for selected, red for others
+                    const markerSize = isSelected ? '40' : '32'; // Larger for selected
+                    const markerHeight = isSelected ? '50' : '40'; // Taller for selected
+                    
                     const mapMarker = new google.maps.Marker({
                         position: { lat: marker.lat, lng: marker.lng },
                         map: map,
                         title: marker.title,
                         icon: {
-                            url: "data:image/svg+xml;charset=UTF-8,%3csvg width='32' height='40' viewBox='0 0 32 40' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M16 0C7.2 0 0 7.2 0 16c0 12 16 24 16 24s16-12 16-24c0-8.8-7.2-16-16-16z' fill='%23EA4335'/%3e%3ccircle cx='16' cy='16' r='6' fill='white'/%3e%3c/svg%3e",
+                            url: \`data:image/svg+xml;charset=UTF-8,%3csvg width='\${markerSize}' height='\${markerHeight}' viewBox='0 0 \${markerSize} \${markerHeight}' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M\${markerSize/2} 0C\${markerSize*0.225} 0 0 \${markerSize*0.225} 0 \${markerSize/2}c0 \${markerSize*0.375} \${markerSize/2} \${markerSize*0.75} \${markerSize/2} \${markerSize*0.75}s\${markerSize/2}-\${markerSize*0.375} \${markerSize/2}-\${markerSize*0.75}c0-\${markerSize*0.275}-\${markerSize*0.225}-\${markerSize/2}-\${markerSize/2}-\${markerSize/2}z' fill='\${markerColor}'/%3e%3ccircle cx='\${markerSize/2}' cy='\${markerSize/2}' r='\${markerSize*0.1875}' fill='white'/%3e%3c/svg%3e\`,
                             scaledSize: new google.maps.Size(32, 40),
                             anchor: new google.maps.Point(16, 40)
                         },
@@ -798,11 +840,11 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                                 <div class="info-address">\${marker.address}</div>
                                 <div class="info-buttons">
                                     <button class="info-button directions-button" onclick="getDirections(\${marker.lat}, \${marker.lng}, '\${marker.title}')">
-                                        🧭 Directions
+                                        Directions
                                     </button>
                                     \${marker.phone ? \`
                                         <button class="info-button call-button" onclick="callPhone('\${marker.phone}')">
-                                            📞 Call
+                                            Call
                                         </button>
                                     \` : ''}
                                 </div>
@@ -812,6 +854,44 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                         infoWindow.setContent(content);
                         infoWindow.open(map, mapMarker);
                     });
+                    
+                    // Auto-open info window for selected firm
+                    if (isSelected) {
+                        setTimeout(() => {
+                            const ratingStars = marker.rating ? 
+                                '★'.repeat(Math.floor(marker.rating)) : '';
+                                
+                            const distanceText = marker.distance_km ? 
+                                \`<div class="info-distance">\${marker.distance_km} km away</div>\` : '';
+                                
+                            const content = \`
+                                <div class="info-window">
+                                    <div class="info-title" style="color: #4285F4;">\${marker.title} (Selected)</div>
+                                    \${marker.rating ? \`
+                                        <div class="info-rating">
+                                            <span class="stars">\${ratingStars}</span>
+                                            <span class="rating-text">\${marker.rating.toFixed(1)} (\${marker.user_ratings_total || "No"} reviews)</span>
+                                        </div>
+                                    \` : ''}
+                                    \${distanceText}
+                                    <div class="info-address">\${marker.address}</div>
+                                    <div class="info-buttons">
+                                        <button class="info-button directions-button" onclick="getDirections(\${marker.lat}, \${marker.lng}, '\${marker.title}')">
+                                            Directions
+                                        </button>
+                                        \${marker.phone ? \`
+                                            <button class="info-button call-button" onclick="callPhone('\${marker.phone}')">
+                                                Call
+                                            </button>
+                                        \` : ''}
+                                    </div>
+                                </div>
+                            \`;
+                            
+                            infoWindow.setContent(content);
+                            infoWindow.open(map, mapMarker);
+                        }, 800); // Delay to ensure map is loaded and centered
+                    }
                 });
                 
                 // Fit bounds to show all markers
@@ -857,10 +937,10 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     </body>
     </html>
     `;
-  }, [sortedLawFirms, mapCenter, userLocation]);
+  }, [sortedLawFirms, mapCenter, userLocation, selectedFirmId]);
 
   const renderLawFirmCard = useCallback((firm: LawFirm) => (
-    <Box key={firm.id} className="mx-4 mb-3 bg-white rounded-lg border border-gray-200">
+    <Box key={firm.id} className="mx-2 mb-3 bg-white rounded-lg border border-gray-200">
       <VStack space="sm" className="p-4">
         <HStack space="sm" className="items-start">
           <Box className="p-2 bg-blue-50 rounded-lg">
@@ -918,42 +998,59 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           </Text>
         </HStack>
         
-        <HStack space="sm" className="mt-2">
-          {firm.phone && (
+        <VStack space="sm" className="mt-2">
+          <HStack space="sm">
+            {firm.phone && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 border-gray-300"
+                onPress={() => handleCallPress(firm.phone!)}
+                accessibilityLabel={`Call ${firm.name}`}
+              >
+                <HStack space="xs" className="items-center">
+                  <Phone size={16} color={Colors.primary.blue} />
+                  <ButtonText className="text-sm" style={{ color: Colors.primary.blue }}>
+                    Call
+                  </ButtonText>
+                </HStack>
+              </Button>
+            )}
+            
             <Button
               size="sm"
-              variant="outline"
-              className="flex-1 border-gray-300"
-              onPress={() => handleCallPress(firm.phone!)}
-              accessibilityLabel={`Call ${firm.name}`}
+              className="flex-1"
+              style={{ backgroundColor: Colors.primary.blue }}
+              onPress={() => handleDirectionsPress(firm.latitude, firm.longitude, firm.name, firm.address, firm.place_id)}
+              accessibilityLabel={`Get directions to ${firm.name}`}
             >
               <HStack space="xs" className="items-center">
-                <Phone size={16} color={Colors.primary.blue} />
-                <ButtonText className="text-sm" style={{ color: Colors.primary.blue }}>
-                  Call
+                <Navigation size={16} color="white" />
+                <ButtonText className="text-sm text-white">
+                  Directions
                 </ButtonText>
               </HStack>
             </Button>
-          )}
+          </HStack>
           
           <Button
             size="sm"
-            className="flex-1"
-            style={{ backgroundColor: Colors.primary.blue }}
-            onPress={() => handleDirectionsPress(firm.latitude, firm.longitude, firm.name, firm.address, firm.place_id)}
-            accessibilityLabel={`Get directions to ${firm.name}`}
+            variant="outline"
+            className="w-full border-blue-500"
+            onPress={() => handleShowOnMap(firm)}
+            accessibilityLabel={`Show ${firm.name} on map`}
           >
             <HStack space="xs" className="items-center">
-              <Navigation size={16} color="white" />
-              <ButtonText className="text-sm text-white">
-                Directions
+              <MapPin size={16} color={Colors.primary.blue} />
+              <ButtonText className="text-sm" style={{ color: Colors.primary.blue }}>
+                Show on Map
               </ButtonText>
             </HStack>
           </Button>
-        </HStack>
+        </VStack>
       </VStack>
     </Box>
-  ), [handleCallPress, handleDirectionsPress, renderStars, calculateDistance, userLocation]);
+  ), [handleCallPress, handleDirectionsPress, handleShowOnMap, renderStars, calculateDistance, userLocation]);
 
   // Clean Loading State Component
   const LoadingState = () => (
@@ -1051,12 +1148,16 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const renderSearchHeader = () => (
     <VStack space="md" className="px-4 py-4 bg-white" style={{ zIndex: 1000 }}>
       <Box className="relative" style={{ zIndex: 1000 }}>
-        <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ minHeight: 48 }}>
-          <HStack className="items-center px-3">
-            <Search size={18} color="#6B7280" />
+        <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ 
+          minHeight: 48,
+          maxHeight: 48,
+          height: 48
+        }}>
+          <HStack className="items-center px-3" style={{ height: 48 }}>
+            <Search size={18} color="#6B7280" style={{ flexShrink: 0 }} />
             <TextInput
-              className="flex-1 py-3 px-3 text-base"
-              placeholder="Search by street, barangay, or city (e.g., '62 Baco', 'Makati')"
+              className="flex-1 text-base"
+              placeholder="Search by street, barangay, or city"
               placeholderTextColor="#9CA3AF"
               value={searchText}
               onChangeText={handleSearchTextChange}
@@ -1065,11 +1166,20 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
               onBlur={handleSearchBlur}
               returnKeyType="search"
               editable={!searching}
-              style={{ color: Colors.text.head }}
+              style={{ 
+                color: Colors.text.head,
+                paddingHorizontal: 12,
+                paddingVertical: 0,
+                height: 48,
+                lineHeight: 20,
+                textAlignVertical: 'center'
+              }}
               autoCorrect={false}
               autoCapitalize="words"
               blurOnSubmit={false}
               maxLength={100}
+              multiline={false}
+              numberOfLines={1}
             />
             {searchText.length > 0 && !searching && (
               <Pressable 
@@ -1091,26 +1201,40 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         </Box>
         
         {/* Clean Autocomplete Dropdown */}
-        {showPredictions && predictions.length > 0 && (
-          <Box 
+        {showPredictions && (
+          <Box
             style={{
               position: 'absolute',
-              top: 50,
+              top: '100%',
               left: 0,
               right: 0,
-              zIndex: 9999,
               backgroundColor: 'white',
-              borderRadius: 4,
+              borderRadius: 8,
               borderWidth: 1,
               borderColor: '#E5E7EB',
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.1,
               shadowRadius: 4,
-              elevation: 8,
+              elevation: 5,
+              zIndex: 9999,
+              maxHeight: 250,
+              overflow: 'hidden',
             }}
           >
-            {predictions.map((item, index) => (
+            <ScrollView 
+              style={{ maxHeight: 250 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={true}
+            >
+              {loadingPredictions && predictions.length === 0 ? (
+                <HStack space="sm" style={{ padding: 16, justifyContent: 'center', alignItems: 'center' }}>
+                  <Spinner size="small" color={Colors.primary.blue} />
+                  <Text size="sm" style={{ color: '#6B7280' }}>Searching...</Text>
+                </HStack>
+              ) : (
+                predictions.map((item, index) => (
               <Pressable
                 key={item.place_id}
                 style={{
@@ -1124,9 +1248,11 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                 onPress={() => handlePredictionSelectUpdated(item)}
               >
                 <MapPin size={16} color="#9CA3AF" style={{ marginRight: 12 }} />
-                <VStack space="xs" style={{ flex: 1 }}>
+                <VStack space="xs" style={{ flex: 1, minWidth: 0 }}>
                   <Text 
                     size="sm" 
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
                     style={{ 
                       color: '#111827',
                       fontWeight: '400',
@@ -1137,6 +1263,8 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                   {item.secondary_text && (
                     <Text 
                       size="xs" 
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
                       style={{ 
                         color: '#6B7280',
                       }}
@@ -1146,13 +1274,15 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                   )}
                 </VStack>
               </Pressable>
-            ))}
-            {loadingPredictions && (
-              <HStack space="sm" style={{ padding: 12, justifyContent: 'center' }}>
-                <Spinner size="small" />
-                <Text size="xs" style={{ color: '#6B7280' }}>Loading...</Text>
-              </HStack>
+              ))
             )}
+              {loadingPredictions && predictions.length > 0 && (
+                <HStack space="sm" style={{ padding: 12, justifyContent: 'center' }}>
+                  <Spinner size="small" color={Colors.primary.blue} />
+                  <Text size="xs" style={{ color: '#6B7280' }}>Loading more...</Text>
+                </HStack>
+              )}
+            </ScrollView>
           </Box>
         )}
       </Box>
@@ -1174,7 +1304,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         
         {/* Radius Filter Button */}
         <Pressable
-          className="px-3 py-2 bg-white border border-gray-300 rounded-lg active:bg-gray-50"
+          className="px-3 py-2 bg-white rounded-lg border border-gray-300 active:bg-gray-50"
           onPress={() => setShowRadiusFilter(!showRadiusFilter)}
         >
           <HStack space="xs" className="items-center">
@@ -1239,7 +1369,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                     {radius} km
                   </Text>
                   {selectedRadius === radius && (
-                    <Text style={{ color: Colors.primary.blue, fontSize: 14 }}>✓</Text>
+                    <Check size={14} color={Colors.primary.blue} />
                   )}
                 </HStack>
               </Pressable>
@@ -1268,191 +1398,158 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     return <LoadingState />;
   }
 
+  // Render Tab Navigation
+  const renderTabNavigation = () => (
+    <Box className="bg-white border-b border-gray-200">
+      <HStack className="px-3 py-2">
+        <Pressable
+          onPress={() => {
+            setCurrentView('list');
+            setSelectedFirmId(null); // Clear selection when going back to list
+          }}
+          style={{
+            flex: 1,
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            borderRadius: 5,
+            backgroundColor: currentView === 'list' ? Colors.primary.blue : 'transparent',
+            alignItems: 'center',
+            marginRight: 4
+          }}
+        >
+          <Text style={{
+            fontSize: 12,
+            fontWeight: '600',
+            color: currentView === 'list' ? 'white' : Colors.text.sub
+          }}>
+            List ({lawFirms.length})
+          </Text>
+        </Pressable>
+        
+        <Pressable
+          onPress={() => setCurrentView('map')}
+          style={{
+            flex: 1,
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            borderRadius: 5,
+            backgroundColor: currentView === 'map' ? Colors.primary.blue : 'transparent',
+            alignItems: 'center',
+            marginLeft: 4
+          }}
+        >
+          <Text style={{
+            fontSize: 12,
+            fontWeight: '600',
+            color: currentView === 'map' ? 'white' : Colors.text.sub
+          }}>
+            Map
+          </Text>
+        </Pressable>
+      </HStack>
+    </Box>
+  );
+
+  // Render List View (Full Screen)
+  const renderListView = () => (
+    <ScrollView 
+      className="flex-1" 
+      style={{ backgroundColor: '#f9fafb' }}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 120 }}
+      keyboardShouldPersistTaps="handled"
+    >
+      {sortedLawFirms.length > 0 ? (
+        <VStack space="xs" style={{ paddingTop: 12, paddingHorizontal: 8 }}>
+          {sortedLawFirms.map(renderLawFirmCard)}
+        </VStack>
+      ) : error ? (
+        <Box className="px-4">
+          <ErrorState />
+        </Box>
+      ) : (
+        <Box className="px-4">
+          <EmptyState />
+        </Box>
+      )}
+    </ScrollView>
+  );
+
+  // Render Map View (Full Screen)
+  const renderMapView = () => (
+    <Box className="relative flex-1">
+      {/* Law Firm Counter - Top Right */}
+      {lawFirms.length > 0 && (
+        <Box className="absolute top-3 right-3" style={{ zIndex: 1000 }}>
+          <Box style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 12,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.1,
+            shadowRadius: 3,
+            elevation: 3,
+            borderWidth: 1,
+            borderColor: 'rgba(0, 0, 0, 0.1)'
+          }}>
+            <Text style={{
+              fontSize: 11,
+              fontWeight: '600',
+              color: Colors.text.head
+            }}>
+              {lawFirms.length} locations
+            </Text>
+          </Box>
+        </Box>
+      )}
+
+      {/* Full Screen Map */}
+      {webViewSupported && WebView ? (
+        <WebView
+          source={{ html: generateSortedMapHTML() }}
+          style={{ flex: 1 }}
+          onMessage={handleWebViewMessage}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          startInLoadingState={true}
+          renderLoading={() => (
+            <Box className="flex-1 justify-center items-center bg-gray-50">
+              <VStack space="md" className="items-center">
+                <Spinner size="large" color={Colors.primary.blue} />
+                <Text className="text-sm" style={{ color: Colors.text.body }}>Loading map...</Text>
+              </VStack>
+            </Box>
+          )}
+        />
+      ) : (
+        <Box className="flex-1 justify-center items-center bg-gray-100">
+          <VStack space="md" className="items-center">
+            <MapPin size={48} color={Colors.text.sub} />
+            <Text style={{ fontSize: 16, color: Colors.text.sub }}>
+              Map not available on this platform
+            </Text>
+          </VStack>
+        </Box>
+      )}
+    </Box>
+  );
+
   return (
     <Box className="flex-1 bg-gray-50">
-      {webViewSupported && WebView ? (
-        // Mobile: Map View with Overlay
-        <>
-          {/* Floating Search Overlay */}
-          <Box className="absolute top-4 right-4 left-4" style={{ zIndex: 1000 }}>
-            <VStack space="sm">
-              {/* Clean Mobile Search Card */}
-              <Box className="bg-white rounded-lg border border-gray-200">
-                <HStack space="sm" className="items-center p-3">
-                  <Search size={16} color="#6B7280" />
-                  <TextInput
-                    className="flex-1 text-base font-medium"
-                    placeholder="Type street, barangay, or city (e.g., '62 Baco', 'Makati')"
-                    placeholderTextColor="#9CA3AF"
-                    value={searchText}
-                    onChangeText={handleSearchTextChange}
-                    onSubmitEditing={handleSearch}
-                    onFocus={handleSearchFocus}
-                    onBlur={handleSearchBlur}
-                    returnKeyType="search"
-                    editable={!searching}
-                    style={{ 
-                      color: Colors.text.head,
-                      paddingVertical: 12,
-                      lineHeight: 20
-                    }}
-                    autoCorrect={false}
-                    autoCapitalize="words"
-                    blurOnSubmit={false}
-                    maxLength={100}
-                  />
-                  {searchText.length > 0 && !searching && (
-                    <Pressable 
-                      onPress={() => {
-                        setSearchText('');
-                        searchTextRef.current = '';
-                        setShowPredictions(false);
-                        setPredictions([]);
-                      }} 
-                      className="px-2 py-1"
-                    >
-                      <X size={16} color="#6B7280" />
-                    </Pressable>
-                  )}
-                  {searching ? (
-                    <Spinner size="small" color={Colors.primary.blue} />
-                  ) : (
-                    <Pressable onPress={handleSearch} className="px-2 py-1 bg-blue-500 rounded">
-                      <Text className="text-xs font-medium text-white">
-                        Go
-                      </Text>
-                    </Pressable>
-                  )}
-                </HStack>
-              </Box>
-
-              {/* Mobile Clean Autocomplete */}
-              {showPredictions && predictions.length > 0 && (
-                <Box 
-                  style={{
-                    backgroundColor: 'white',
-                    borderRadius: 4,
-                    borderWidth: 1,
-                    borderColor: '#E5E7EB',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 4,
-                    elevation: 8,
-                    zIndex: 9999,
-                  }}
-                >
-                  {predictions.map((item, index) => (
-                    <Pressable
-                      key={item.place_id}
-                      style={{
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        borderBottomWidth: index < predictions.length - 1 ? 0.5 : 0,
-                        borderBottomColor: '#F3F4F6',
-                      }}
-                      onPress={() => handlePredictionSelectUpdated(item)}
-                    >
-                      <MapPin size={16} color="#9CA3AF" style={{ marginRight: 12 }} />
-                      <VStack space="xs" style={{ flex: 1 }}>
-                        <Text 
-                          size="sm" 
-                          style={{ 
-                            color: '#111827',
-                            fontWeight: '400',
-                          }}
-                        >
-                          {item.main_text}
-                        </Text>
-                        {item.secondary_text && (
-                          <Text 
-                            size="xs" 
-                            style={{ 
-                              color: '#6B7280',
-                            }}
-                          >
-                            {item.secondary_text}
-                          </Text>
-                        )}
-                      </VStack>
-                    </Pressable>
-                  ))}
-                  {loadingPredictions && (
-                    <HStack space="sm" style={{ padding: 12, justifyContent: 'center' }}>
-                      <Spinner size="small" />
-                      <Text size="xs" style={{ color: '#6B7280' }}>Loading...</Text>
-                    </HStack>
-                  )}
-                </Box>
-              )}
-
-              {/* Clean Status Messages */}
-              {error && (
-                <Box className="px-3 py-2 bg-red-100 rounded-lg border border-red-200">
-                  <Text className="text-xs font-medium text-center text-red-700">
-                  </Text>
-                </Box>
-              )}
-
-              {lawFirms.length > 0 && (
-                <Text className="text-xs font-medium text-center" style={{ color: Colors.text.sub }}>
-                  {lawFirms.length} law firms found
-                </Text>
-              )}
-            </VStack>
-          </Box>
-
-          {/* Map or Empty State */}
-          {sortedLawFirms.length > 0 ? (
-            <WebView
-              source={{ html: generateSortedMapHTML() }}
-              style={{ flex: 1 }}
-              onMessage={handleWebViewMessage}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              startInLoadingState={true}
-              renderLoading={() => (
-                <Box className="flex-1 justify-center items-center bg-gray-50">
-                  <VStack space="md" className="items-center">
-                    <Spinner size="large" color={Colors.primary.blue} />
-                    <Text className="text-sm" style={{ color: Colors.text.body }}>Loading map...</Text>
-                  </VStack>
-                </Box>
-              )}
-            />
-          ) : error ? (
-            <ErrorState />
-          ) : (
-            <EmptyState />
-          )}
-        </>
-      ) : (
-        // Web/Desktop: Fully Scrollable List View
-        <ScrollView 
-          className="flex-1" 
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 100 }}
-          keyboardShouldPersistTaps="handled"
-        >
+      <VStack className="flex-1">
+        {/* Fixed Search Header */}
+        <Box className="bg-white border-b border-gray-200" style={{ zIndex: 100 }}>
           {renderSearchHeader()}
-          
-          {sortedLawFirms.length > 0 ? (
-            <VStack space="sm" className="py-2">
-              {sortedLawFirms.map(renderLawFirmCard)}
-            </VStack>
-          ) : error ? (
-            <Box className="px-4">
-              <ErrorState />
-            </Box>
-          ) : (
-            <Box className="px-4">
-              <EmptyState />
-            </Box>
-          )}
-        </ScrollView>
-      )}
+        </Box>
+        
+        {/* Tab Navigation */}
+        {renderTabNavigation()}
+        
+        {/* Dynamic Content Based on Current View */}
+        {currentView === 'list' ? renderListView() : renderMapView()}
+      </VStack>
     </Box>
   );
 }

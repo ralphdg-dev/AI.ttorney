@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Alert, Linking, Platform, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Alert, Linking, Platform, ScrollView, TextInput, Keyboard, Dimensions } from 'react-native';
 import * as Location from 'expo-location';
+import { NetworkConfig } from '../../../utils/networkConfig';
 import { VStack } from '@/components/ui/vstack';
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
 import { Button, ButtonText } from '@/components/ui/button';
+import { Box } from '@/components/ui/box';
+import { Pressable } from '@/components/ui/pressable';
 import { Spinner } from '@/components/ui/spinner';
 import { 
   Phone, 
@@ -14,7 +17,10 @@ import {
   AlertCircle, 
   Map,
   ArrowLeft,
-  Smartphone
+  Smartphone,
+  Search,
+  Locate,
+  X
 } from 'lucide-react-native';
 import Colors from '../../../constants/Colors';
 
@@ -53,10 +59,28 @@ interface LawFirm {
   address: string;
   phone?: string;
   rating?: number;
+  user_ratings_total?: number;
   types: string[];
   latitude: number;
   longitude: number;
   place_id: string;
+  distance_km?: number;
+}
+
+interface AutocompletePrediction {
+  place_id: string;
+  description: string;
+  main_text: string;
+  secondary_text: string;
+  types: string[];
+}
+
+interface ScreenSize {
+  width: number;
+  height: number;
+  isSmall: boolean;
+  isMedium: boolean;
+  isLarge: boolean;
 }
 
 interface LawFirmsMapViewProps {
@@ -66,6 +90,7 @@ interface LawFirmsMapViewProps {
 export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
   const [lawFirms, setLawFirms] = useState<LawFirm[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [mapCenter, setMapCenter] = useState(CONSTANTS.DEFAULT_LOCATION);
@@ -73,6 +98,323 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
   const [isExpoGo, setIsExpoGo] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
   const [selectedFirm, setSelectedFirm] = useState<LawFirm | null>(null);
+  
+  // Enhanced search states
+  const [searchText, setSearchText] = useState('');
+  const [currentLocationName, setCurrentLocationName] = useState('Manila, Philippines');
+  const searchTextRef = useRef<string>('');
+  
+  // Autocomplete states
+  const [predictions, setPredictions] = useState<AutocompletePrediction[]>([]);
+  const [showPredictions, setShowPredictions] = useState(false);
+  const [loadingPredictions, setLoadingPredictions] = useState(false);
+  const autocompleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Radius filter states
+  const [selectedRadius, setSelectedRadius] = useState(5); // Default 5km
+  const [showRadiusFilter, setShowRadiusFilter] = useState(false);
+  const radiusOptions = [5, 10, 15, 25]; // km options (limited to 25km max)
+  
+  // Screen size detection for responsive design
+  const [screenSize, setScreenSize] = useState<ScreenSize>(() => {
+    const { width, height } = Dimensions.get('window');
+    return {
+      width,
+      height,
+      isSmall: width < 375,
+      isMedium: width >= 375 && width <= 414,
+      isLarge: width > 414
+    };
+  });
+
+  // Screen size change listener
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenSize({
+        width: window.width,
+        height: window.height,
+        isSmall: window.width < 375,
+        isMedium: window.width >= 375 && window.width <= 414,
+        isLarge: window.width > 414
+      });
+    });
+    
+    return () => subscription?.remove();
+  }, []);
+
+  // Optimized autocomplete with abort controller
+  const fetchAutocomplete = useCallback(async (input: string) => {
+    if (input.length < 2) {
+      setPredictions([]);
+      setShowPredictions(false);
+      return;
+    }
+
+    // Cancel previous request if still pending
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+
+    try {
+      setLoadingPredictions(true);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      
+      const response = await fetch(`${apiUrl}/api/places/autocomplete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          input: input.trim(),
+          location: userLocation ? `${userLocation.coords.latitude},${userLocation.coords.longitude}` : null,
+          radius: selectedRadius * 1000 // Convert km to meters
+        }),
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Autocomplete API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.predictions) {
+        setPredictions(data.predictions.slice(0, 5)); // Limit to 5 results
+        setShowPredictions(data.predictions.length > 0);
+      } else {
+        setPredictions([]);
+        setShowPredictions(false);
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('Autocomplete request aborted');
+        return; // Don't update state for aborted requests
+      }
+      console.error('Autocomplete error:', error);
+      setPredictions([]);
+      setShowPredictions(false);
+    } finally {
+      setLoadingPredictions(false);
+      abortControllerRef.current = null;
+    }
+  }, [userLocation, selectedRadius]);
+
+  // Enhanced debounced autocomplete
+  const handleSearchTextChangeWithAutocomplete = useCallback((text: string) => {
+    setSearchText(text);
+    searchTextRef.current = text;
+
+    // Clear existing timeout
+    if (autocompleteTimeoutRef.current) {
+      clearTimeout(autocompleteTimeoutRef.current);
+    }
+
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Progressive debounce: shorter delay for longer queries
+    const debounceDelay = text.length <= 3 ? 400 : text.length <= 5 ? 300 : 200;
+
+    // Set new timeout for autocomplete
+    if (text.length >= 2) {
+      autocompleteTimeoutRef.current = setTimeout(() => {
+        fetchAutocomplete(text);
+      }, debounceDelay);
+    } else {
+      setPredictions([]);
+      setShowPredictions(false);
+    }
+  }, [fetchAutocomplete]);
+
+  // Search functions
+  const searchByLocationName = useCallback(async (locationName: string) => {
+    try {
+      setSearching(true);
+      console.log(`Searching for law firms in: ${locationName}`);
+
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/places/search-by-location`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          location: locationName.trim(),
+          radius: selectedRadius * 1000 // Convert km to meters
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.results) {
+        const firms: LawFirm[] = data.results.map((place: any) => ({
+          id: place.place_id,
+          name: place.name || 'Law Firm',
+          address: place.formatted_address || place.vicinity || 'Address not available',
+          phone: place.formatted_phone_number || place.international_phone_number,
+          rating: place.rating || 0,
+          user_ratings_total: place.user_ratings_total || 0,
+          types: place.types || [],
+          latitude: place.geometry?.location?.lat || 0,
+          longitude: place.geometry?.location?.lng || 0,
+          place_id: place.place_id,
+          distance_km: place.distance_km || 0
+        }));
+        
+        setLawFirms(firms);
+        setCurrentLocationName(data.location_info?.name || locationName);
+        
+        // Update map center if location coordinates are available
+        if (data.location_info?.coordinates) {
+          setMapCenter({
+            lat: data.location_info.coordinates.lat,
+            lng: data.location_info.coordinates.lng
+          });
+        }
+      } else {
+        throw new Error(data.message || 'No results found');
+      }
+    } catch (error) {
+      console.error('Error searching law firms:', error);
+      Alert.alert('Search Error', 'Unable to search for law firms. Please try again.');
+      setLawFirms([]);
+    } finally {
+      setSearching(false);
+    }
+  }, [selectedRadius]);
+
+  const handlePredictionSelect = useCallback((prediction: AutocompletePrediction) => {
+    setSearchText(prediction.description);
+    setShowPredictions(false);
+    setPredictions([]);
+    Keyboard.dismiss();
+    searchByLocationName(prediction.description);
+  }, [searchByLocationName]);
+
+  const handleSearch = useCallback(() => {
+    if (searchText.trim()) {
+      setShowPredictions(false);
+      Keyboard.dismiss();
+      searchByLocationName(searchText.trim());
+    }
+  }, [searchText, searchByLocationName]);
+
+  const handleUseMyLocation = useCallback(async () => {
+    try {
+      setSearching(true);
+      
+      if (!locationPermission) {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Denied', 'Location permission is required to find nearby law firms.');
+          return;
+        }
+        setLocationPermission(true);
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      
+      setUserLocation(location);
+      const newCenter = {
+        lat: location.coords.latitude,
+        lng: location.coords.longitude
+      };
+      setMapCenter(newCenter);
+      
+      // Search for nearby law firms using the location directly
+      try {
+        const searchLocation = { lat: location.coords.latitude, lng: location.coords.longitude };
+        const apiUrl = await NetworkConfig.getBestApiUrl();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), CONSTANTS.TIMEOUTS.API_REQUEST);
+        
+        const response = await fetch(`${apiUrl}/api/places/nearby`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            latitude: searchLocation.lat,
+            longitude: searchLocation.lng,
+            radius: selectedRadius * 1000, // Convert km to meters
+            type: 'lawyer'
+          }),
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.results) {
+            const firms: LawFirm[] = data.results.map((place: any) => ({
+              id: place.place_id,
+              name: place.name || 'Law Firm',
+              address: place.formatted_address || place.vicinity || 'Address not available',
+              phone: place.formatted_phone_number || place.international_phone_number,
+              rating: place.rating || 0,
+              user_ratings_total: place.user_ratings_total || 0,
+              types: place.types || [],
+              latitude: place.geometry?.location?.lat || 0,
+              longitude: place.geometry?.location?.lng || 0,
+              place_id: place.place_id,
+              distance_km: place.distance_km || 0
+            }));
+            setLawFirms(firms);
+          }
+        }
+      } catch (fetchError) {
+        console.error('Error fetching nearby law firms:', fetchError);
+        // Continue with location update even if fetch fails
+      }
+      
+      setSearchText('');
+      setCurrentLocationName('Your Current Location');
+    } catch (error) {
+      console.error('Error getting current location:', error);
+      Alert.alert('Location Error', 'Unable to get your current location. Please try again.');
+    } finally {
+      setSearching(false);
+    }
+  }, [locationPermission, selectedRadius]);
+
+  // Search focus/blur handlers
+  const handleSearchFocus = useCallback(() => {
+    if (predictions.length > 0 && searchText.length >= 2) {
+      setShowPredictions(true);
+    }
+  }, [predictions.length, searchText.length]);
+
+  const handleSearchBlur = useCallback(() => {
+    // Delay hiding to allow for prediction selection
+    setTimeout(() => {
+      setShowPredictions(false);
+    }, 150);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (autocompleteTimeoutRef.current) {
+        clearTimeout(autocompleteTimeoutRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const fetchNearbyLawFirms = useCallback(async () => {
     try {
@@ -83,7 +425,10 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
         ? { lat: userLocation.coords.latitude, lng: userLocation.coords.longitude }
         : CONSTANTS.DEFAULT_LOCATION;
 
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.103:8000';
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), CONSTANTS.TIMEOUTS.API_REQUEST);
+      
       const response = await fetch(`${apiUrl}/api/places/nearby`, {
         method: 'POST',
         headers: {
@@ -95,7 +440,10 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
           radius: CONSTANTS.SEARCH_RADIUS,
           type: 'lawyer'
         }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -124,43 +472,19 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
       }
     } catch (error) {
       console.error('Error fetching law firms:', error);
-      // For demo purposes, add some sample law firms
-      const sampleLawFirms: LawFirm[] = [
-        {
-          id: 'sample1',
-          name: 'Atty. Santos Law Office',
-          address: 'Makati City, Metro Manila, Philippines',
-          phone: '+63 2 8123 4567',
-          rating: 4.5,
-          types: ['lawyer', 'legal_services'],
-          latitude: 14.5547,
-          longitude: 121.0244,
-          place_id: 'sample1'
-        },
-        {
-          id: 'sample2',
-          name: 'Cruz & Associates Law Firm',
-          address: 'BGC, Taguig City, Metro Manila, Philippines',
-          phone: '+63 2 8987 6543',
-          rating: 4.2,
-          types: ['lawyer', 'legal_services'],
-          latitude: 14.5515,
-          longitude: 121.0473,
-          place_id: 'sample2'
-        },
-        {
-          id: 'sample3',
-          name: 'Legal Aid Center Manila',
-          address: 'Quezon City, Metro Manila, Philippines',
-          phone: '+63 2 8456 7890',
-          rating: 4.0,
-          types: ['lawyer', 'legal_services'],
-          latitude: 14.6760,
-          longitude: 121.0437,
-          place_id: 'sample3'
+      
+      let errorMessage: string = ERROR_MESSAGES.NETWORK_ERROR;
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = ERROR_MESSAGES.LOADING_TIMEOUT;
+        } else if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+          errorMessage = 'Cannot connect to server. Please check your internet connection and try again.';
         }
-      ];
-      setLawFirms(sampleLawFirms);
+      }
+      
+      // Show error to user instead of sample data
+      Alert.alert('Connection Error', errorMessage);
+      setLawFirms([]);
     } finally {
       setLoading(false);
     }
@@ -767,69 +1091,427 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
     return stars;
   };
 
+  // Mobile Search Header Component - Industry-grade responsive design
+  const renderMobileSearchHeader = () => {
+    const fontSize = screenSize.isSmall ? 14 : screenSize.isMedium ? 15 : 16;
+    const placeholderText = screenSize.isSmall 
+      ? "Search area (e.g., 'Makati')" 
+      : "Search by street, barangay, or city (e.g., '62 Baco', 'Makati')";
+    
+    return (
+      <VStack space="md" className="px-4 py-4 bg-white" style={{ zIndex: 1000 }}>
+        <Box className="relative" style={{ zIndex: 1000 }}>
+          {/* Enhanced Search Input with 48px minimum touch target */}
+          <Box 
+            className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" 
+            style={{ minHeight: 48 }}
+          >
+            <HStack className="items-center px-3">
+              <Search size={18} color="#6B7280" />
+              <TextInput
+                className="flex-1 py-3 px-3"
+                style={{ 
+                  fontSize,
+                  color: Colors.text.head,
+                  minHeight: 42 // Ensure touch target
+                }}
+                placeholder={placeholderText}
+                placeholderTextColor="#9CA3AF"
+                value={searchText}
+                onChangeText={handleSearchTextChangeWithAutocomplete}
+                onSubmitEditing={handleSearch}
+                onFocus={handleSearchFocus}
+                onBlur={handleSearchBlur}
+                returnKeyType="search"
+                editable={!searching}
+                autoCorrect={false}
+                autoCapitalize="words"
+                blurOnSubmit={false}
+                maxLength={100}
+              />
+              {searchText.length > 0 && !searching && (
+                <Pressable 
+                  onPress={() => {
+                    setSearchText('');
+                    searchTextRef.current = '';
+                    setShowPredictions(false);
+                    setPredictions([]);
+                  }} 
+                  style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' }}
+                >
+                  <X size={16} color="#6B7280" />
+                </Pressable>
+              )}
+              {searching && (
+                <Spinner size="small" color={Colors.primary.blue} />
+              )}
+            </HStack>
+          </Box>
+          
+          {/* Mobile Autocomplete Dropdown */}
+          {showPredictions && predictions.length > 0 && (
+            <Box 
+              style={{
+                position: 'absolute',
+                top: 52,
+                left: 0,
+                right: 0,
+                zIndex: 9999,
+                backgroundColor: 'white',
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#E5E7EB',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
+                elevation: 10,
+                maxHeight: screenSize.isSmall ? 200 : 250,
+              }}
+            >
+              <ScrollView 
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {predictions.map((item, index) => (
+                  <Pressable
+                    key={item.place_id}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      borderBottomWidth: index < predictions.length - 1 ? 0.5 : 0,
+                      borderBottomColor: '#F3F4F6',
+                      minHeight: 48, // Accessibility touch target
+                    }}
+                    onPress={() => handlePredictionSelect(item)}
+                  >
+                    <MapPin size={16} color="#9CA3AF" style={{ marginRight: 12 }} />
+                    <VStack space="xs" style={{ flex: 1 }}>
+                      <Text 
+                        style={{ 
+                          fontSize: screenSize.isSmall ? 13 : 14,
+                          color: '#111827',
+                          fontWeight: '500',
+                        }}
+                        numberOfLines={1}
+                      >
+                        {item.main_text}
+                      </Text>
+                      {item.secondary_text && (
+                        <Text 
+                          style={{ 
+                            fontSize: screenSize.isSmall ? 11 : 12,
+                            color: '#6B7280',
+                          }}
+                          numberOfLines={1}
+                        >
+                          {item.secondary_text}
+                        </Text>
+                      )}
+                    </VStack>
+                  </Pressable>
+                ))}
+                {loadingPredictions && (
+                  <HStack space="sm" style={{ padding: 12, justifyContent: 'center' }}>
+                    <Spinner size="small" />
+                    <Text style={{ fontSize: 12, color: '#6B7280' }}>Loading...</Text>
+                  </HStack>
+                )}
+              </ScrollView>
+            </Box>
+          )}
+        </Box>
+
+        {/* Action Buttons Row - Mobile Optimized */}
+        <HStack space="sm" className="items-center">
+          <Pressable
+            style={{
+              flex: 1,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              backgroundColor: '#F3F4F6',
+              borderRadius: 8,
+              minHeight: 48, // Accessibility compliance
+            }}
+            onPress={handleUseMyLocation}
+            disabled={searching}
+            accessibilityLabel="Use current location"
+          >
+            <HStack space="xs" className="justify-center items-center">
+              <Locate size={16} color={Colors.primary.blue} />
+              <Text 
+                style={{ 
+                  fontSize: screenSize.isSmall ? 13 : 14,
+                  fontWeight: '500',
+                  color: Colors.primary.blue 
+                }}
+              >
+                {screenSize.isSmall ? 'My Location' : 'Use My Location'}
+              </Text>
+            </HStack>
+          </Pressable>
+          
+          {/* Facebook Marketplace-style Radius Filter */}
+          <Pressable
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              backgroundColor: 'white',
+              borderWidth: 1,
+              borderColor: '#D1D5DB',
+              borderRadius: 8,
+              minHeight: 48,
+              minWidth: screenSize.isSmall ? 70 : 80,
+            }}
+            onPress={() => setShowRadiusFilter(!showRadiusFilter)}
+          >
+            <HStack space="xs" className="items-center justify-center">
+              <Text 
+                style={{ 
+                  fontSize: screenSize.isSmall ? 13 : 14,
+                  fontWeight: '500',
+                  color: Colors.text.head 
+                }}
+              >
+                {selectedRadius}km
+              </Text>
+              <Text style={{ fontSize: 10, color: '#9CA3AF' }}>▼</Text>
+            </HStack>
+          </Pressable>
+        </HStack>
+        
+        {/* Fixed Radius Filter Dropdown - No overlap */}
+        {showRadiusFilter && (
+          <Box 
+            style={{
+              position: 'absolute',
+              top: 110,
+              right: 16,
+              backgroundColor: 'white',
+              borderWidth: 1,
+              borderColor: '#E5E7EB',
+              borderRadius: 12,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
+              elevation: 12,
+              zIndex: 9999,
+              minWidth: 140,
+            }}
+          >
+            <VStack space="xs" style={{ padding: 12 }}>
+              <Text style={{ 
+                fontSize: 13, 
+                fontWeight: '600', 
+                paddingHorizontal: 4, 
+                paddingVertical: 2, 
+                color: '#374151' 
+              }}>
+                Search Radius
+              </Text>
+              {radiusOptions.map((radius) => (
+                <Pressable
+                  key={radius}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 12,
+                    borderRadius: 8,
+                    backgroundColor: selectedRadius === radius ? '#EFF6FF' : 'transparent',
+                    minHeight: 44,
+                    borderWidth: selectedRadius === radius ? 1 : 0,
+                    borderColor: selectedRadius === radius ? '#DBEAFE' : 'transparent',
+                  }}
+                  onPress={() => {
+                    setSelectedRadius(radius);
+                    setShowRadiusFilter(false);
+                    // Trigger new search with updated radius
+                    if (searchText.trim()) {
+                      handleSearch();
+                    }
+                  }}
+                >
+                  <HStack className="justify-between items-center">
+                    <Text 
+                      style={{ 
+                        fontSize: 15,
+                        color: selectedRadius === radius ? Colors.primary.blue : Colors.text.head,
+                        fontWeight: selectedRadius === radius ? '600' : '500'
+                      }}
+                    >
+                      {radius} km
+                    </Text>
+                    {selectedRadius === radius && (
+                      <View style={{
+                        backgroundColor: Colors.primary.blue,
+                        borderRadius: 10,
+                        width: 20,
+                        height: 20,
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}>
+                        <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>✓</Text>
+                      </View>
+                    )}
+                  </HStack>
+                </Pressable>
+              ))}
+            </VStack>
+          </Box>
+        )}
+
+        {/* Results Count - Mobile Optimized */}
+        {lawFirms.length > 0 && (
+          <Text 
+            style={{ 
+              fontSize: screenSize.isSmall ? 12 : 13,
+              fontWeight: '500',
+              color: Colors.text.sub,
+              textAlign: 'center'
+            }}
+          >
+            {lawFirms.length} law firms found in {currentLocationName}
+          </Text>
+        )}
+      </VStack>
+    );
+  };
+
   const renderLawFirmCard = (firm: LawFirm) => (
-    <View key={firm.id} className="bg-white mx-4 mb-4 rounded-lg shadow-sm border border-gray-200">
-      <VStack space="sm" className="p-4">
+    <View 
+      key={firm.id} 
+      style={{
+        backgroundColor: 'white',
+        marginBottom: 12,
+        borderRadius: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: '#f1f5f9'
+      }}
+    >
+      <VStack space="md" style={{ padding: 16 }}>
         <HStack space="sm" className="items-start">
-          <View className="bg-blue-100 p-2 rounded-full">
+          <View 
+            style={{
+              backgroundColor: '#eff6ff',
+              padding: 10,
+              borderRadius: 25,
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
             <MapPin size={20} color={Colors.primary.blue} />
           </View>
           
           <VStack space="xs" className="flex-1">
-            <Text className="font-bold text-base text-gray-900" numberOfLines={2}>
+            <Text 
+              style={{ 
+                fontSize: screenSize.isSmall ? 15 : 16,
+                fontWeight: '700',
+                color: '#111827',
+                lineHeight: 22
+              }}
+              numberOfLines={2}
+            >
               {firm.name}
             </Text>
             
-            <Text className="text-gray-600 text-sm" numberOfLines={3}>
+            <Text 
+              style={{ 
+                fontSize: screenSize.isSmall ? 13 : 14,
+                color: '#6b7280',
+                lineHeight: 20
+              }}
+              numberOfLines={3}
+            >
               {firm.address}
             </Text>
             
-            {firm.rating && (
+            {firm.rating && firm.rating > 0 && (
               <HStack space="xs" className="items-center">
                 <HStack space="xs">
                   {renderStars(firm.rating)}
                 </HStack>
-                <Text className="text-sm text-gray-600">
+                <Text 
+                  style={{ 
+                    fontSize: 13,
+                    color: '#6b7280',
+                    fontWeight: '500'
+                  }}
+                >
                   {firm.rating.toFixed(1)} stars
+                  {firm.user_ratings_total && firm.user_ratings_total > 0 && (
+                    ` (${firm.user_ratings_total} reviews)`
+                  )}
                 </Text>
               </HStack>
             )}
           </VStack>
         </HStack>
         
-        <VStack space="sm" className="mt-3">
+        <VStack space="sm">
           <HStack space="sm">
             {firm.phone && (
               <Button
-                size="sm"
+                size="md"
                 variant="outline"
-                className="flex-1"
+                style={{
+                  flex: 1,
+                  minHeight: 44,
+                  borderColor: Colors.primary.blue,
+                  borderWidth: 1.5
+                }}
                 onPress={() => handleCallPress(firm.phone!)}
               >
                 <HStack space="xs" className="items-center">
                   <Phone size={16} color={Colors.primary.blue} />
-                  <ButtonText className="text-sm">Call</ButtonText>
+                  <ButtonText style={{ 
+                    color: Colors.primary.blue,
+                    fontSize: 14,
+                    fontWeight: '600'
+                  }}>
+                    Call
+                  </ButtonText>
                 </HStack>
               </Button>
             )}
             
             <Button
-              size="sm"
-              className="flex-1"
-              style={{ backgroundColor: Colors.primary.blue }}
+              size="md"
+              style={{ 
+                flex: 1,
+                backgroundColor: Colors.primary.blue,
+                minHeight: 44
+              }}
               onPress={() => handleDirectionsPress(firm.latitude, firm.longitude, firm.name)}
             >
               <HStack space="xs" className="items-center">
                 <Navigation size={16} color="white" />
-                <ButtonText className="text-sm">Directions</ButtonText>
+                <ButtonText style={{ 
+                  fontSize: 14,
+                  fontWeight: '600'
+                }}>
+                  Directions
+                </ButtonText>
               </HStack>
             </Button>
           </HStack>
           
           <Button
-            size="sm"
+            size="md"
             variant="outline"
-            className="w-full"
+            style={{
+              width: '100%',
+              minHeight: 44,
+              borderColor: '#d1d5db',
+              borderWidth: 1
+            }}
             onPress={() => {
               if (webViewSupported && !isExpoGo) {
                 handleViewOnMap(firm);
@@ -841,8 +1523,12 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
             }}
           >
             <HStack space="xs" className="items-center">
-              <MapPin size={16} color={Colors.primary.blue} />
-              <ButtonText className="text-sm">
+              <MapPin size={16} color="#6b7280" />
+              <ButtonText style={{ 
+                color: '#374151',
+                fontSize: 14,
+                fontWeight: '500'
+              }}>
                 {webViewSupported && !isExpoGo ? 'View on Map' : 'Open in Maps'}
               </ButtonText>
             </HStack>
@@ -908,61 +1594,130 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
     );
   }
 
-  // Show web-style layout: map on top, list below (no WebView issues)
+  // Show mobile layout with proper spacing and no overlaps
   if (!webViewSupported || Platform.OS === 'web' || isExpoGo || !showMapView) {
     return (
       <View className="flex-1 bg-gray-50">
+        {/* Fixed Mobile Search Header - No overlap */}
+        <View className="bg-white border-b border-gray-200" style={{ zIndex: 100 }}>
+          {renderMobileSearchHeader()}
+        </View>
+        
         {isExpoGo && (
-          <View className="mx-4 mt-4 bg-blue-100 p-3 rounded-lg border border-blue-300">
+          <View className="mx-4 mt-2 mb-2 bg-blue-50 p-3 rounded-lg border border-blue-200">
             <HStack space="sm" className="items-center justify-center">
               <Smartphone size={16} color={Colors.primary.blue} />
-              <Text className="text-blue-800 text-sm text-center flex-1">
+              <Text className="text-blue-700 text-sm text-center flex-1">
                 Running in Expo Go - Map view requires Development Build for full functionality
               </Text>
             </HStack>
           </View>
         )}
         
-        
-        {/* Map Section - Top Half */}
-        <View style={{ height: CONSTANTS.MAP_HEIGHT }} className="bg-white border-b border-gray-200">
+        {/* Optimized Map Section - Better proportions */}
+        <View 
+          style={{ 
+            height: screenSize.isSmall ? 240 : screenSize.isMedium ? 300 : 360,
+            backgroundColor: '#f8f9fa'
+          }} 
+          className="border-b border-gray-200"
+        >
           {!locationPermission && (
-            <View className="absolute top-2 left-2 right-2 bg-yellow-100 p-2 rounded-lg border border-yellow-300 z-10">
+            <View className="absolute top-3 left-3 right-3 bg-amber-50 p-3 rounded-lg border border-amber-200 z-20">
               <HStack space="xs" className="items-center justify-center">
-                <AlertCircle size={14} color="#D97706" />
-                <Text className="text-yellow-800 text-xs text-center flex-1">
-                  {ERROR_MESSAGES.LOCATION_DENIED}
+                <AlertCircle size={16} color="#D97706" />
+                <Text 
+                  style={{ 
+                    fontSize: screenSize.isSmall ? 12 : 13,
+                    color: '#92400e',
+                    textAlign: 'center',
+                    fontWeight: '500'
+                  }}
+                >
+                  Location access needed for better results
                 </Text>
               </HStack>
             </View>
           )}
           
-          {/* Map Placeholder with Law Firms Count */}
-          <View className="flex-1 bg-gray-100 justify-center items-center relative">
-            <VStack space="sm" className="items-center">
-              <MapPin size={48} color={Colors.primary.blue} />
-              <Text className="text-lg font-semibold" style={{ color: Colors.text.head }}>
-                {lawFirms.length} Law Firms Found
-              </Text>
-              <Text className="text-sm text-center px-4" style={{ color: Colors.text.body }}>
-                {userLocation 
-                  ? `Near your location in ${mapCenter.lat.toFixed(4)}, ${mapCenter.lng.toFixed(4)}`
-                  : 'Near Manila, Philippines'
-                }
-              </Text>
+          {/* Enhanced Map Placeholder - Better visual hierarchy */}
+          <View className="flex-1 justify-center items-center relative" style={{ backgroundColor: '#e5e7eb' }}>
+            <VStack space="md" className="items-center">
+              <View 
+                style={{
+                  backgroundColor: Colors.primary.blue,
+                  borderRadius: 50,
+                  padding: 16,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 4,
+                  elevation: 3
+                }}
+              >
+                <MapPin 
+                  size={screenSize.isSmall ? 32 : 40} 
+                  color="white" 
+                />
+              </View>
+              
+              <VStack space="xs" className="items-center">
+                <Text 
+                  style={{ 
+                    fontSize: screenSize.isSmall ? 18 : 20,
+                    fontWeight: '700',
+                    color: Colors.text.head,
+                    textAlign: 'center'
+                  }}
+                >
+                  {lawFirms.length} Law Firms Found
+                </Text>
+                <Text 
+                  style={{ 
+                    fontSize: screenSize.isSmall ? 13 : 14,
+                    color: Colors.text.body,
+                    textAlign: 'center',
+                    paddingHorizontal: 20,
+                    fontWeight: '500'
+                  }}
+                  numberOfLines={2}
+                >
+                  {userLocation 
+                    ? `Near your location in ${currentLocationName}`
+                    : `Near ${currentLocationName}`
+                  }
+                </Text>
+              </VStack>
             </VStack>
             
-            {/* Interactive Map Button */}
+            {/* Interactive Map Button - Better positioning */}
             {webViewSupported && !isExpoGo && (
               <View className="absolute bottom-4 right-4">
                 <Button
-                  size="sm"
-                  style={{ backgroundColor: Colors.primary.blue }}
+                  size="md"
+                  style={{ 
+                    backgroundColor: Colors.primary.blue,
+                    minHeight: 48,
+                    paddingHorizontal: 16,
+                    borderRadius: 12,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 4,
+                    elevation: 4
+                  }}
                   onPress={() => setShowMapView(true)}
                 >
                   <HStack space="xs" className="items-center">
-                    <Map size={16} color="white" />
-                    <ButtonText className="text-sm">View Interactive Map</ButtonText>
+                    <Map size={18} color="white" />
+                    <ButtonText 
+                      style={{ 
+                        fontSize: 14,
+                        fontWeight: '600'
+                      }}
+                    >
+                      {screenSize.isSmall ? 'Interactive Map' : 'View Interactive Map'}
+                    </ButtonText>
                   </HStack>
                 </Button>
               </View>
@@ -970,29 +1725,74 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
           </View>
         </View>
         
-        {/* Law Firms List - Bottom Half */}
+        {/* Enhanced Law Firms List - Better spacing */}
         <ScrollView 
-          className="flex-1 bg-gray-50" 
+          className="flex-1" 
+          style={{ backgroundColor: '#f9fafb' }}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          keyboardShouldPersistTaps="handled"
         >
-          <View className="p-4 bg-white border-b border-gray-200">
-            <Text className="text-sm font-medium text-center" style={{ color: Colors.text.head }}>
-              {lawFirms.length} Law Firms & Legal Services
-            </Text>
-          </View>
-          
           {lawFirms.length > 0 ? (
-            <VStack space="sm" className="p-4">
+            <VStack space="xs" style={{ paddingTop: 12, paddingHorizontal: 16 }}>
               {lawFirms.map(renderLawFirmCard)}
             </VStack>
           ) : (
-            <View className="flex-1 justify-center items-center py-20">
-              <VStack space="md" className="items-center">
-                <AlertCircle size={48} color="#9CA3AF" />
-                <Text className="text-gray-500 text-center mt-4 mx-8">
-                  {ERROR_MESSAGES.NO_RESULTS}
-                </Text>
+            <View className="flex-1 justify-center items-center" style={{ paddingVertical: 60 }}>
+              <VStack space="lg" className="items-center">
+                <View 
+                  style={{
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: 50,
+                    padding: 20
+                  }}
+                >
+                  <AlertCircle size={48} color="#9CA3AF" />
+                </View>
+                <VStack space="sm" className="items-center">
+                  <Text 
+                    style={{ 
+                      fontSize: screenSize.isSmall ? 16 : 18,
+                      color: '#374151',
+                      textAlign: 'center',
+                      fontWeight: '600'
+                    }}
+                  >
+                    No law firms found
+                  </Text>
+                  <Text 
+                    style={{ 
+                      fontSize: screenSize.isSmall ? 14 : 15,
+                      color: '#6B7280',
+                      textAlign: 'center',
+                      marginHorizontal: 32,
+                      lineHeight: 20
+                    }}
+                  >
+                    Try searching in a different area or use your current location
+                  </Text>
+                </VStack>
+                {!searching && (
+                  <Button
+                    size="md"
+                    variant="outline"
+                    onPress={handleUseMyLocation}
+                    style={{ 
+                      marginTop: 8,
+                      minHeight: 48,
+                      paddingHorizontal: 20,
+                      borderColor: Colors.primary.blue,
+                      borderWidth: 1.5
+                    }}
+                  >
+                    <HStack space="xs" className="items-center">
+                      <Locate size={18} color={Colors.primary.blue} />
+                      <ButtonText style={{ color: Colors.primary.blue, fontWeight: '600' }}>
+                        Use My Location
+                      </ButtonText>
+                    </HStack>
+                  </Button>
+                )}
               </VStack>
             </View>
           )}

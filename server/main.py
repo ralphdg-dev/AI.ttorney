@@ -61,7 +61,10 @@ app.add_middleware(
         "http://localhost:3000",  # React dev server
         "http://localhost:8081",  # Expo dev server
         "exp://localhost:8081",   # Expo dev server
-        # Add your production domains here
+        "http://192.168.68.102:8081",  # Current network Expo dev server
+        "exp://192.168.68.102:8081",   # Current network Expo dev server
+        "http://192.168.68.102:8000",  # API server access
+        "*",  # Allow all origins for Expo Go (development only)
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
