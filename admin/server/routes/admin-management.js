@@ -1,7 +1,6 @@
 const express = require('express');
 const { supabaseAdmin } = require('../config/supabase');
 const { authenticateAdmin, requireSuperAdmin } = require('../middleware/auth');
-
 const router = express.Router();
 
 // Get all admins (view-only for now, requires superadmin role)
@@ -9,8 +8,6 @@ router.get('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   try {
     const { page = 1, limit = 50, search = '', role = 'all', status = 'active' } = req.query;
     const offset = (page - 1) * limit;
-
-    console.log('Fetching admins with params:', { page, limit, search, role, status });
 
     // Build the query - join with auth.users to get last_sign_in_at
     let query = supabaseAdmin
@@ -28,10 +25,7 @@ router.get('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
 
     // Add role filter only (no status filtering)
     if (role !== 'all') {
-      console.log('Applying role filter:', role);
       query = query.eq('role', role);
-    } else {
-      console.log('No role filter - showing all roles');
     }
 
     // Add pagination
@@ -40,17 +34,12 @@ router.get('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
     const { data: admins, error } = await query;
 
     if (error) {
-      console.error('Get admins error:', error);
       return res.status(500).json({ 
         success: false, 
         error: 'Failed to fetch admins: ' + error.message 
       });
     }
 
-    console.log('Found admins after filtering:', admins?.length || 0);
-    if (admins && admins.length > 0) {
-      console.log('Sample admin status values:', admins.map(a => a.status));
-    }
 
     // Get auth.users data for last_sign_in_at
     let authUsersData = [];
@@ -60,8 +49,6 @@ router.get('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
       
       if (!authError && authUsers) {
         authUsersData = authUsers.users.filter(user => adminIds.includes(user.id));
-      } else {
-        console.warn('Could not fetch auth users data:', authError);
       }
     }
 
@@ -92,8 +79,6 @@ router.get('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
 
     const { count: totalCount } = await countQuery;
 
-    console.log('Total admins count:', totalCount);
-    console.log('Transformed admins:', transformedAdmins);
 
     res.json({
       success: true,
@@ -107,7 +92,6 @@ router.get('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get admins error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error: ' + error.message 
@@ -139,7 +123,6 @@ router.get('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get admin details error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -182,7 +165,6 @@ router.get('/stats/overview', authenticateAdmin, requireSuperAdmin, async (req, 
     });
 
   } catch (error) {
-    console.error('Get admin stats error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -271,7 +253,6 @@ router.post('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
     });
 
     if (authError) {
-      console.error('Auth user creation error:', authError);
       return res.status(400).json({
         success: false,
         error: authError.message || 'Failed to create user account'
@@ -293,16 +274,13 @@ router.post('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
         });
       userError = error;
     } catch (err) {
-      console.warn('Users table may not exist or have different schema:', err.message);
       // Continue without users table - admin table is sufficient
       userError = null;
     }
 
     if (userError) {
-      console.error('User record creation error:', userError);
       // Check if it's a schema/table issue
       if (userError.code === '42P01' || userError.message.includes('relation') || userError.message.includes('does not exist')) {
-        console.warn('Users table does not exist - continuing with admin table only');
         userError = null; // Ignore this error and continue
       } else {
         // Clean up auth user if users table insert fails for other reasons
@@ -330,7 +308,6 @@ router.post('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
       .single();
 
     if (adminError) {
-      console.error('Admin record creation error:', adminError);
       
       // Clean up auth user and users table record (if it exists) if admin record creation fails
       await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
@@ -339,7 +316,7 @@ router.post('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
       try {
         await supabaseAdmin.from('users').delete().eq('id', authUser.user.id);
       } catch (cleanupError) {
-        console.warn('Could not clean up users table record (table may not exist):', cleanupError.message);
+        // Ignore cleanup errors
       }
       
       return res.status(500).json({
@@ -348,8 +325,6 @@ router.post('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
       });
     }
 
-    // Log the creation action
-    console.log(`New admin created by ${req.admin.email}: ${newAdmin.email} (${newAdmin.role})`);
 
     res.status(201).json({
       success: true,
@@ -366,7 +341,6 @@ router.post('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Create admin error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -430,7 +404,6 @@ router.patch('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
       .single();
 
     if (updateError) {
-      console.error('Update admin error:', updateError);
       return res.status(500).json({
         success: false,
         error: 'Failed to update admin: ' + updateError.message
@@ -469,13 +442,9 @@ router.patch('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
         .insert(auditData);
 
       if (auditError) {
-        console.error('Failed to create audit log:', auditError);
         // Don't fail the request if audit logging fails
-      } else {
-        console.log(`Admin status updated by ${req.admin.email}: ${currentAdmin.email} (${currentAdmin.status} → ${status})`);
       }
     } catch (auditErr) {
-      console.error('Audit logging error:', auditErr);
       // Continue without failing the request
     }
 
@@ -494,7 +463,6 @@ router.patch('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update admin error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -543,11 +511,9 @@ router.get('/:id/audit-logs', authenticateAdmin, requireSuperAdmin, async (req, 
       .range(offset, offset + limit - 1);
 
     if (auditError) {
-      console.error('Get admin audit logs error:', auditError);
       
       // If table doesn't exist, create mock data based on admin info
       if (auditError.code === '42P01' || auditError.message.includes('relation') || auditError.message.includes('does not exist')) {
-        console.log('admin_audit_logs table does not exist, creating mock audit data');
         
         const mockAuditLogs = [
           {
@@ -609,7 +575,6 @@ router.get('/:id/audit-logs', authenticateAdmin, requireSuperAdmin, async (req, 
     });
 
   } catch (error) {
-    console.error('Get admin audit logs error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -645,7 +610,6 @@ router.post('/:id/audit-logs', authenticateAdmin, requireSuperAdmin, async (req,
     }
 
     // Create audit log entry
-    console.log(`Creating audit log for admin ${id}: ${action} by ${req.admin.email}`);
     const { data: auditLog, error: auditError } = await supabaseAdmin
       .from('admin_audit_logs')
       .insert({
@@ -662,11 +626,9 @@ router.post('/:id/audit-logs', authenticateAdmin, requireSuperAdmin, async (req,
       .single();
 
     if (auditError) {
-      console.error('Create admin audit log error:', auditError);
       
       // If table doesn't exist, just log to console and return success
       if (auditError.code === '42P01' || auditError.message.includes('relation') || auditError.message.includes('does not exist')) {
-        console.log(`Admin audit log (table not found): ${action} for admin ${id} by ${req.admin.email}`);
         return res.json({
           success: true,
           message: 'Audit log recorded (console only - table not found)',
@@ -685,15 +647,13 @@ router.post('/:id/audit-logs', authenticateAdmin, requireSuperAdmin, async (req,
       });
     }
 
-    console.log(`Successfully created audit log for admin ${id}: ${auditLog.id}`);
     res.status(201).json({
       success: true,
       message: 'Audit log created successfully',
-      data: auditLog
+      data: auditLog ? auditLog : {}
     });
 
   } catch (error) {
-    console.error('Create admin audit log error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -757,15 +717,12 @@ router.patch('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
       .single();
 
     if (updateError) {
-      console.error('Admin status update error:', updateError);
       return res.status(500).json({
         success: false,
         error: 'Failed to update admin status: ' + updateError.message
       });
     }
 
-    // Log the action
-    console.log(`Admin status updated by ${req.admin.email}: ${existingAdmin.email} status changed from ${existingAdmin.status} to ${status}`);
 
     // Create audit log entry if table exists
     try {
@@ -792,7 +749,7 @@ router.patch('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
           created_at: new Date().toISOString()
         });
     } catch (auditError) {
-      console.warn('Could not create audit log (table may not exist):', auditError.message);
+      // console.warn('Could not create audit log (table may not exist):', auditError.message);
     }
 
     res.json({
@@ -880,15 +837,12 @@ router.patch('/:id/role', authenticateAdmin, requireSuperAdmin, async (req, res)
       .single();
 
     if (updateError) {
-      console.error('Admin role update error:', updateError);
       return res.status(500).json({
         success: false,
         error: 'Failed to update admin role: ' + updateError.message
       });
     }
 
-    // Log the action
-    console.log(`Admin role updated by ${req.admin.email}: ${existingAdmin.email} role changed from ${existingAdmin.role} to ${role}`);
 
     // Create audit log entry if table exists
     try {
@@ -915,7 +869,7 @@ router.patch('/:id/role', authenticateAdmin, requireSuperAdmin, async (req, res)
           created_at: new Date().toISOString()
         });
     } catch (auditError) {
-      console.warn('Could not create audit log (table may not exist):', auditError.message);
+      // console.warn('Could not create audit log (table may not exist):', auditError.message);
     }
 
     res.json({
@@ -979,11 +933,11 @@ router.get('/:id/recent-activity', authenticateAdmin, requireSuperAdmin, async (
       .range(offset, offset + limit - 1);
 
     if (activityError) {
-      console.error('Get admin recent activity error:', activityError);
+('Get admin recent activity error:', activityError);
       
       // If table doesn't exist, create mock data
       if (activityError.code === '42P01' || activityError.message.includes('relation') || activityError.message.includes('does not exist')) {
-        console.log('admin_audit_logs table does not exist, creating mock activity data');
+        // console.log('admin_audit_logs table does not exist, creating mock activity data');
         
         const mockActivity = [
           {
@@ -1087,11 +1041,11 @@ router.get('/:id/recent-activity', authenticateAdmin, requireSuperAdmin, async (
       .range(offset, offset + limit - 1);
 
     if (activityError) {
-      console.error('Get admin recent activity error:', activityError);
+('Get admin recent activity error:', activityError);
       
       // If table doesn't exist, create mock data
       if (activityError.code === '42P01' || activityError.message.includes('relation') || activityError.message.includes('does not exist')) {
-        console.log('admin_audit_logs table does not exist, creating mock activity data');
+        // console.log('admin_audit_logs table does not exist, creating mock activity data');
         
         const mockActivity = [
           {
