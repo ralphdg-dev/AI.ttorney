@@ -1,18 +1,87 @@
 import React from 'react';
 import { Book, Eye, Pencil, Archive } from 'lucide-react';
-import DataTable from '../../components/ui/DataTable';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 
-const categories = ['All', 'Family', 'Civil', 'Consumer', 'Criminal', 'Labor'];
+const categories = ['All', 'Family', 'Criminal', 'Civil', 'Labor', 'Consumer', 'Others'];
 
 const sampleTerms = [
-  { en: 'Custody', fil: 'Kustodiya', category: 'Family', createdAt: '2025-08-01', updatedAt: '2025-08-15', createdBy: 'Admin Jane' },
-  { en: 'Contract', fil: 'Kontrata', category: 'Civil', createdAt: '2025-07-20', updatedAt: '2025-08-10', createdBy: 'Admin John' },
-  { en: 'Warranty', fil: 'Garantya', category: 'Consumer', createdAt: '2025-07-05', updatedAt: '2025-07-06', createdBy: 'Admin Lea' },
-  { en: 'Bail', fil: 'Piyansa', category: 'Criminal', createdAt: '2025-06-11', updatedAt: '2025-06-12', createdBy: 'Admin Mark' },
-  { en: 'Dismissal', fil: 'Pagkatanggal', category: 'Labor', createdAt: '2025-05-02', updatedAt: '2025-07-01', createdBy: 'Admin Sofia' },
+  { 
+    id: 1,
+    term_en: 'Custody', 
+    term_fil: 'Kustodiya', 
+    definition_en: 'Legal guardianship of a child',
+    definition_fil: 'Legal na pag-aalaga sa isang bata',
+    example_en: 'The court awarded custody to the mother.',
+    example_fil: 'Ibinigay ng korte ang kustodiya sa ina.',
+    category: 'family', 
+    created_at: '2025-08-01T10:30:00Z', 
+    updated_at: '2025-08-15T14:20:00Z', 
+    view_count: 125,
+    is_verified: true,
+    verified_by: 'Admin Jane'
+  },
+  { 
+    id: 2,
+    term_en: 'Contract', 
+    term_fil: 'Kontrata', 
+    definition_en: 'A legally binding agreement between parties',
+    definition_fil: 'Isang legal na kasunduan sa pagitan ng mga partido',
+    example_en: 'They signed a contract for the sale of the house.',
+    example_fil: 'Pumirma sila ng kontrata para sa pagbebenta ng bahay.',
+    category: 'civil', 
+    created_at: '2025-07-20T09:15:00Z', 
+    updated_at: '2025-08-10T16:45:00Z', 
+    view_count: 89,
+    is_verified: true,
+    verified_by: 'Admin John'
+  },
+  { 
+    id: 3,
+    term_en: 'Warranty', 
+    term_fil: 'Garantya', 
+    definition_en: 'A guarantee provided by a seller',
+    definition_fil: 'Garantiya na ibinibigay ng nagbebenta',
+    example_en: 'The product comes with a one-year warranty.',
+    example_fil: 'Ang produkto ay may kasamang isang taong garantiya.',
+    category: 'consumer', 
+    created_at: '2025-07-05T11:00:00Z', 
+    updated_at: '2025-07-06T12:30:00Z', 
+    view_count: 67,
+    is_verified: false,
+    verified_by: null
+  },
+  { 
+    id: 4,
+    term_en: 'Bail', 
+    term_fil: 'Piyansa', 
+    definition_en: 'Money paid to secure temporary release from custody',
+    definition_fil: 'Perang bayad upang makakuha ng pansamantalang kalayaan',
+    example_en: 'The judge set bail at $10,000.',
+    example_fil: 'Itinakda ng hukom ang piyansa sa $10,000.',
+    category: 'criminal', 
+    created_at: '2025-06-11T08:45:00Z', 
+    updated_at: '2025-06-12T10:15:00Z', 
+    view_count: 203,
+    is_verified: true,
+    verified_by: 'Admin Mark'
+  },
+  { 
+    id: 5,
+    term_en: 'Dismissal', 
+    term_fil: 'Pagkatanggal', 
+    definition_en: 'Termination of employment',
+    definition_fil: 'Pagkakaalis sa trabaho',
+    example_en: 'The employee filed a case for wrongful dismissal.',
+    example_fil: 'Naghain ang empleyado ng kaso para sa maling pagkatanggal.',
+    category: 'labor', 
+    created_at: '2025-05-02T13:20:00Z', 
+    updated_at: '2025-07-01T15:10:00Z', 
+    view_count: 156,
+    is_verified: null,
+    verified_by: null
+  },
 ];
 
 const ManageGlossaryTerms = () => {
@@ -31,15 +100,17 @@ const ManageGlossaryTerms = () => {
   const handleEdit = (term) => {
     // For now, simulate edit changes since actual edit modal doesn't exist yet
     const simulatedChanges = {
-      'Filipino Translation': { from: term.fil, to: 'Updated Translation' },
-      'Category': { from: term.category, to: 'Civil' }
+      'Filipino Term': { from: term.term_fil, to: 'Updated Translation' },
+      'Category': { from: term.category, to: 'civil' },
+      'Definition (English)': { from: term.definition_en, to: 'Updated definition' },
+      'Verification Status': { from: term.is_verified ? 'Verified' : 'Unverified', to: 'Verified' }
     };
     
     setConfirmationModal({
       open: true,
       type: 'edit',
-      termId: term.en,
-      termName: term.en,
+      termId: term.id,
+      termName: term.term_en,
       loading: false,
       changes: simulatedChanges
     });
@@ -62,8 +133,8 @@ const ManageGlossaryTerms = () => {
     setConfirmationModal({
       open: true,
       type: 'archive',
-      termId: term.en, // Using English term as ID
-      termName: term.en,
+      termId: term.id,
+      termName: term.term_en,
       loading: false
     });
   };
@@ -164,13 +235,61 @@ const ManageGlossaryTerms = () => {
     }
   };
 
+  // Helper function to format date
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Helper function to format category
+  const formatCategory = (category) => {
+    if (!category) return 'N/A';
+    return category.charAt(0).toUpperCase() + category.slice(1);
+  };
+
+  // Helper function to render verification status
+  const renderVerificationStatus = (isVerified) => {
+    if (isVerified === null) {
+      return <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-700 border border-gray-200">Pending</span>;
+    }
+    const styles = isVerified
+      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+      : 'bg-red-50 text-red-700 border border-red-200';
+    const label = isVerified ? 'Verified' : 'Unverified';
+    return <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>{label}</span>;
+  };
+
   const columns = [
-    { key: 'en', header: 'English Term' },
-    { key: 'fil', header: 'Filipino Term' },
-    { key: 'category', header: 'Category' },
-    { key: 'createdAt', header: 'Created At' },
-    { key: 'updatedAt', header: 'Updated At' },
-    { key: 'createdBy', header: 'Created By' },
+    { key: 'term_en', header: 'English Term' },
+    { key: 'term_fil', header: 'Filipino Term' },
+    { 
+      key: 'category', 
+      header: 'Category',
+      render: (row) => formatCategory(row.category)
+    },
+    { 
+      key: 'is_verified', 
+      header: 'Status',
+      align: 'center',
+      render: (row) => renderVerificationStatus(row.is_verified)
+    },
+    { 
+      key: 'created_at', 
+      header: 'Created At',
+      render: (row) => formatDate(row.created_at)
+    },
+    { 
+      key: 'verified_by', 
+      header: 'Verified By',
+      render: (row) => row.verified_by || 'N/A'
+    },
     {
       key: 'actions',
       header: 'Actions',
@@ -207,21 +326,40 @@ const ManageGlossaryTerms = () => {
 
   const filteredData = React.useMemo(() => {
     let rows = [...sampleTerms];
+    
+    // Search filter
     if (query.trim()) {
       const q = query.toLowerCase();
-      rows = rows.filter((r) => Object.values(r).some((v) => String(v).toLowerCase().includes(q)));
+      rows = rows.filter((r) => 
+        r.term_en?.toLowerCase().includes(q) ||
+        r.term_fil?.toLowerCase().includes(q) ||
+        r.definition_en?.toLowerCase().includes(q) ||
+        r.definition_fil?.toLowerCase().includes(q) ||
+        r.category?.toLowerCase().includes(q) ||
+        r.verified_by?.toLowerCase().includes(q)
+      );
     }
-    if (category !== 'All') rows = rows.filter((r) => r.category === category);
+    
+    // Category filter
+    if (category !== 'All') {
+      rows = rows.filter((r) => formatCategory(r.category) === category);
+    }
 
-    const byDate = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
-    const byDateAsc = (a, b) => new Date(a.createdAt) - new Date(b.createdAt);
-    const byEn = (a, b) => a.en.localeCompare(b.en);
-    const byEnDesc = (a, b) => b.en.localeCompare(a.en);
+    // Sorting
+    const byDate = (a, b) => new Date(b.created_at) - new Date(a.created_at);
+    const byDateAsc = (a, b) => new Date(a.created_at) - new Date(b.created_at);
+    const byEn = (a, b) => (a.term_en || '').localeCompare(b.term_en || '');
+    const byEnDesc = (a, b) => (b.term_en || '').localeCompare(a.term_en || '');
+    const byViews = (a, b) => (b.view_count || 0) - (a.view_count || 0);
+    const byViewsAsc = (a, b) => (a.view_count || 0) - (b.view_count || 0);
+    
     switch (sortBy) {
       case 'Newest': rows.sort(byDate); break;
       case 'Oldest': rows.sort(byDateAsc); break;
       case 'A-Z (English)': rows.sort(byEn); break;
       case 'Z-A (English)': rows.sort(byEnDesc); break;
+      case 'Most Viewed': rows.sort(byViews); break;
+      case 'Least Viewed': rows.sort(byViewsAsc); break;
       default: break;
     }
     return rows;
@@ -247,13 +385,58 @@ const ManageGlossaryTerms = () => {
           query={query}
           onQueryChange={setQuery}
           filter={{ value: category, onChange: setCategory, options: categories, label: 'Category' }}
-          sort={{ value: sortBy, onChange: setSortBy, options: ['Newest', 'Oldest', 'A-Z (English)', 'Z-A (English)'], label: 'Sort by' }}
+          sort={{ value: sortBy, onChange: setSortBy, options: ['Newest', 'Oldest', 'A-Z (English)', 'Z-A (English)', 'Most Viewed', 'Least Viewed'], label: 'Sort by' }}
           primaryButton={{ label: 'Add New', onClick: handleAddNew, className: 'inline-flex items-center gap-1 bg-[#023D7B] text-white text-[11px] px-3 py-1.5 rounded-md hover:bg-[#013462]' }}
         />
       </div>
 
-      {/* Table */}
-      <DataTable columns={columns} data={filteredData} rowKey={(r) => `${r.en}-${r.fil}`} dense />
+      {/* DataTable matching other admin pages */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                {columns.map((column) => (
+                  <th
+                    key={column.key}
+                    className={`px-4 py-2 text-[10px] font-medium text-gray-500 tracking-wide ${
+                      column.align === 'center' ? 'text-center' : 
+                      column.align === 'right' ? 'text-right' : 'text-left'
+                    }`}
+                  >
+                    {column.header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredData.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length} className="px-4 py-2 text-center text-[11px] text-gray-500">
+                    No glossary terms found.
+                  </td>
+                </tr>
+              ) : (
+                filteredData.map((row) => (
+                  <tr key={row.id} className="hover:bg-gray-50">
+                    {columns.map((column) => (
+                      <td
+                        key={column.key}
+                        className={`px-4 py-2 text-[11px] text-gray-700 ${
+                          column.align === 'center' ? 'text-center' : 
+                          column.align === 'right' ? 'text-right' : ''
+                        }`}
+                      >
+                        {column.render ? column.render(row) : row[column.key]}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Confirmation Modal */}
       <ConfirmationModal

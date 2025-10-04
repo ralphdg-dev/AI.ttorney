@@ -12,6 +12,7 @@ import ManageLegalSeekers from './pages/users/ManageLegalSeekers';
 import ManageLawyers from './pages/users/ManageLawyers';
 import ManageLawyerApplications from './pages/users/ManageLawyerApplications';
 import ManageAdminsPage from './pages/admin/ManageAdmins';
+import ManageGlossaryTerms from './pages/content/ManageGlossaryTerms';
 
 // Placeholder components for missing pages
 const Settings = () => (
@@ -43,12 +44,6 @@ const AuditLogs = () => (
   </div>
 );
 
-const GlossaryTerms = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Manage Glossary Terms</h1>
-    <p className="text-gray-600">Glossary terms management coming soon...</p>
-  </div>
-);
 
 const LegalArticles = () => (
   <div className="p-6">
@@ -192,7 +187,7 @@ const AdminDashboard = () => {
               <Route path="/admin/audit-logs" element={<AuditLogs />} />
               
               {/* Legal Resources Routes */}
-              <Route path="/legal-resources/glossary-terms" element={<GlossaryTerms />} />
+              <Route path="/legal-resources/glossary-terms" element={<ManageGlossaryTerms />} />
               <Route path="/legal-resources/legal-articles" element={<LegalArticles />} />
               
               {/* Forum Routes */}
