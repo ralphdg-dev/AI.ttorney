@@ -68,9 +68,11 @@ const RollMatchBadge = ({ status, isArchived = false }) => {
 
 const ManageLawyerApplications = () => {
   const [query, setQuery] = React.useState('');
+  const [debouncedQuery, setDebouncedQuery] = React.useState('');
   const [combinedFilter, setCombinedFilter] = React.useState('Active');
   const [sortBy, setSortBy] = React.useState('Newest');
   const [data, setData] = React.useState([]);
+  const [allData, setAllData] = React.useState([]); // Store all data for client-side filtering
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
   const [pagination, setPagination] = React.useState({
@@ -98,6 +100,15 @@ const ManageLawyerApplications = () => {
     applicantName: '',
     loading: false
   });
+
+  // Debounce search query
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [query]);
 
   // Load data from API
   const loadData = React.useCallback(async () => {
@@ -129,23 +140,23 @@ const ManageLawyerApplications = () => {
       }
 
       const params = {
-        page: pagination.page,
-        limit: pagination.limit,
-        search: query,
+        page: 1, // Always start from page 1 for search
+        limit: 100, // Load more data for better client-side filtering
+        search: '', // Don't send search to server, handle client-side
         status,
         archived
       };
       
       const response = await lawyerApplicationsService.getLawyerApplications(params);
-      setData(response.data);
-      setPagination(response.pagination);
+      setAllData(response.data);
+      setPagination(prev => ({ ...prev, total: response.pagination.total, pages: Math.ceil(response.pagination.total / 10) }));
     } catch (err) {
       setError(err.message);
       console.error('Failed to load lawyer applications:', err);
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, query, combinedFilter]);
+  }, [combinedFilter]); // Only reload when filter changes, not when searching
 
   // Load data on component mount and when filters change
   React.useEffect(() => {
@@ -400,13 +411,26 @@ const ManageLawyerApplications = () => {
     }
   };
 
-  // Sort data based on sortConfig or dropdown sort
-  const sortedData = React.useMemo(() => {
-    let sortedArray = [...data];
+  // Client-side filtering and sorting
+  const filteredAndSortedData = React.useMemo(() => {
+    let filteredArray = [...allData];
+
+    // Apply client-side search filter for immediate feedback
+    if (query.trim()) {
+      const searchTerm = query.toLowerCase().trim();
+      filteredArray = filteredArray.filter(item => {
+        return (
+          (item.full_name || '').toLowerCase().includes(searchTerm) ||
+          (item.email || '').toLowerCase().includes(searchTerm) ||
+          (item.username || '').toLowerCase().includes(searchTerm) ||
+          (item.roll_number || '').toLowerCase().includes(searchTerm)
+        );
+      });
+    }
 
     // Apply column sorting if active
     if (sortConfig.key) {
-      sortedArray = sortedArray.sort((a, b) => {
+      filteredArray = filteredArray.sort((a, b) => {
         const aValue = a[sortConfig.key];
         const bValue = b[sortConfig.key];
 
@@ -427,7 +451,7 @@ const ManageLawyerApplications = () => {
     }
     // Apply dropdown sorting if no column sort is active
     else if (sortBy !== 'Newest') {
-      sortedArray = sortedArray.sort((a, b) => {
+      filteredArray = filteredArray.sort((a, b) => {
         switch (sortBy) {
           case 'Oldest':
             return new Date(a.application_date) - new Date(b.application_date);
@@ -443,13 +467,32 @@ const ManageLawyerApplications = () => {
     }
     // Default sort by newest application date
     else {
-      sortedArray = sortedArray.sort((a, b) => 
+      filteredArray = filteredArray.sort((a, b) => 
         new Date(b.application_date) - new Date(a.application_date)
       );
     }
 
-    return sortedArray;
-  }, [data, sortConfig, sortBy]);
+    return filteredArray;
+  }, [allData, query, sortConfig, sortBy]);
+
+  // Paginate the filtered data
+  const paginatedData = React.useMemo(() => {
+    const startIndex = (pagination.page - 1) * 10;
+    const endIndex = startIndex + 10;
+    return filteredAndSortedData.slice(startIndex, endIndex);
+  }, [filteredAndSortedData, pagination.page]);
+
+  // Update pagination when filtered data changes
+  React.useEffect(() => {
+    const totalFiltered = filteredAndSortedData.length;
+    const totalPages = Math.ceil(totalFiltered / 10);
+    setPagination(prev => ({ 
+      ...prev, 
+      total: totalFiltered, 
+      pages: totalPages,
+      page: prev.page > totalPages && totalPages > 0 ? 1 : prev.page
+    }));
+  }, [filteredAndSortedData]);
 
   const columns = [
     { 
@@ -819,7 +862,7 @@ const ManageLawyerApplications = () => {
       {/* Table */}
       <DataTable
         columns={columns}
-        data={sortedData}
+        data={paginatedData}
         rowKey={(row) => row.id}
         dense
       />

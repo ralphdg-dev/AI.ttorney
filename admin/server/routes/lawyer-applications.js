@@ -99,7 +99,47 @@ router.get('/', authenticateAdmin, async (req, res) => {
       });
     }
 
-    // Build the query for lawyer applications with user data - only latest per user
+    // If search is provided, we need to filter the latestApplicationIds first
+    let searchFilteredIds = latestApplicationIds;
+    
+    if (search) {
+      // Get all applications with user data to filter by search term
+      const { data: searchApplications, error: searchError } = await supabaseAdmin
+        .from('lawyer_applications')
+        .select(`
+          id,
+          roll_number,
+          users!inner(
+            full_name,
+            email,
+            username
+          )
+        `)
+        .in('id', latestApplicationIds);
+
+      if (searchError) {
+        console.error('Search filter error:', searchError);
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Failed to apply search filter: ' + searchError.message 
+        });
+      }
+
+      // Filter applications by search term
+      const searchTerm = search.toLowerCase();
+      const filteredApps = searchApplications.filter(app => {
+        return (
+          (app.users?.full_name || '').toLowerCase().includes(searchTerm) ||
+          (app.users?.email || '').toLowerCase().includes(searchTerm) ||
+          (app.users?.username || '').toLowerCase().includes(searchTerm) ||
+          (app.roll_number || '').toLowerCase().includes(searchTerm)
+        );
+      });
+
+      searchFilteredIds = filteredApps.map(app => app.id);
+    }
+
+    // Build the main query for lawyer applications with user data
     let query = supabaseAdmin
       .from('lawyer_applications')
       .select(`
@@ -111,7 +151,7 @@ router.get('/', authenticateAdmin, async (req, res) => {
           created_at
         )
       `)
-      .in('id', latestApplicationIds)
+      .in('id', searchFilteredIds)
       .order('submitted_at', { ascending: false });
 
     // Add archived filter
@@ -125,11 +165,6 @@ router.get('/', authenticateAdmin, async (req, res) => {
     // Add status filter if provided
     if (status !== 'all') {
       query = query.eq('status', status);
-    }
-
-    // Add search filter if provided
-    if (search) {
-      query = query.or(`users.full_name.ilike.%${search}%,users.email.ilike.%${search}%,roll_number.ilike.%${search}%`);
     }
 
     // Add pagination
@@ -207,21 +242,36 @@ router.get('/', authenticateAdmin, async (req, res) => {
 
     const transformedApplications = applicationsWithType;
 
-    // Get total count for pagination - count unique users, not applications
-    let filteredApplicationIds = latestApplicationIds;
+    // Get total count for pagination - use the searchFilteredIds which already includes search filtering
+    let totalFilteredIds = searchFilteredIds;
+    
+    // Apply additional filters for counting
+    if (archived === 'active') {
+      const { data: archivedFilteredApps } = await supabaseAdmin
+        .from('lawyer_applications')
+        .select('id')
+        .in('id', searchFilteredIds)
+        .eq('archived', false);
+      totalFilteredIds = archivedFilteredApps?.map(app => app.id) || [];
+    } else if (archived === 'archived') {
+      const { data: archivedFilteredApps } = await supabaseAdmin
+        .from('lawyer_applications')
+        .select('id')
+        .in('id', searchFilteredIds)
+        .eq('archived', true);
+      totalFilteredIds = archivedFilteredApps?.map(app => app.id) || [];
+    }
     
     if (status !== 'all') {
-      // If filtering by status, we need to get applications that match the status
       const { data: statusFilteredApps } = await supabaseAdmin
         .from('lawyer_applications')
         .select('id')
-        .in('id', latestApplicationIds)
+        .in('id', totalFilteredIds)
         .eq('status', status);
-      
-      filteredApplicationIds = statusFilteredApps?.map(app => app.id) || [];
+      totalFilteredIds = statusFilteredApps?.map(app => app.id) || [];
     }
 
-    const totalCount = filteredApplicationIds.length;
+    const totalCount = totalFilteredIds.length;
 
     console.log('Total applications count:', totalCount);
 
