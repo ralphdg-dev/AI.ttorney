@@ -57,6 +57,29 @@ const legalSeekerService = {
     }
   },
 
+  // Update legal seeker status
+  updateLegalSeeker: async (userId, updateData) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/legal-seekers/${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...legalSeekerService.getAuthHeader()
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to update legal seeker:', error);
+      throw error;
+    }
+  },
+
   // Get recent activity for a legal seeker (placeholder - will be implemented later)
   getRecentActivity: async (userId, params = {}) => {
     try {

@@ -5,7 +5,9 @@ import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import ViewLegalSeekerModal from '../../components/users/ViewLegalSeekerModal';
+import EditLegalSeekerModal from '../../components/users/EditLegalSeekerModal';
 import usersService from '../../services/usersService';
+import legalSeekerService from '../../services/legalSeekerService';
 
 const StatusBadge = ({ status }) => {
   const styles =
@@ -52,6 +54,7 @@ const ManageLegalSeekers = () => {
     direction: 'asc'
   });
   const [viewOpen, setViewOpen] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
   const [selectedUser, setSelectedUser] = React.useState(null);
   const [loadingDetails, setLoadingDetails] = React.useState(false);
   const [confirmationModal, setConfirmationModal] = React.useState({
@@ -164,20 +167,35 @@ const ManageLegalSeekers = () => {
 
   // Handle edit user
   const handleEdit = (user) => {
-    // For now, simulate edit changes since actual edit modal doesn't exist yet
-    const simulatedChanges = {
-      Status: { from: user.status || 'active', to: 'verified' },
-      'Email Verified': { from: user.is_verified ? 'Yes' : 'No', to: 'Yes' }
-    };
+    setSelectedUser(user);
+    setEditOpen(true);
+  };
+
+  // Handle edit save with change comparison
+  const handleEditSave = (updatedUser, originalUser) => {
+    const changes = {};
     
-    setConfirmationModal({
-      open: true,
-      type: 'edit',
-      userId: user.id,
-      userName: user.full_name,
-      loading: false,
-      changes: simulatedChanges
-    });
+    if (originalUser && updatedUser) {
+      // Check for verification status changes
+      if (originalUser.is_verified !== updatedUser.is_verified) {
+        changes['Email Verified'] = {
+          from: originalUser.is_verified ? 'Verified' : 'Unverified',
+          to: updatedUser.is_verified ? 'Verified' : 'Unverified'
+        };
+      }
+    }
+    
+    // Show confirmation modal with changes
+    if (Object.keys(changes).length > 0) {
+      setConfirmationModal({
+        open: true,
+        type: 'edit',
+        userId: updatedUser.id,
+        userName: updatedUser.full_name || 'Unknown',
+        loading: false,
+        changes: changes
+      });
+    }
   };
 
   // Handle archive button click
@@ -261,10 +279,17 @@ const ManageLegalSeekers = () => {
     try {
       setConfirmationModal(prev => ({ ...prev, loading: true }));
       
-      // TODO: Implement actual edit API call
-      console.log(`Editing user: ${userName}`, changes);
-      alert(`User "${userName}" changes have been saved successfully!`);
+      // Prepare update data based on changes
+      const updateData = {};
       
+      if (changes['Email Verified']) {
+        updateData.is_verified = changes['Email Verified'].to === 'Verified';
+      }
+      
+      // Make the API call
+      await legalSeekerService.updateLegalSeeker(userId, updateData);
+      
+      setEditOpen(false); // Close edit modal
       await loadData(); // Reload data
       setConfirmationModal({ open: false, type: '', userId: null, userName: '', loading: false, changes: null });
       
@@ -802,6 +827,14 @@ const ManageLegalSeekers = () => {
         onClose={() => setViewOpen(false)}
         user={selectedUser}
         loading={loadingDetails}
+      />
+
+      {/* Edit Legal Seeker Modal */}
+      <EditLegalSeekerModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        user={selectedUser}
+        onSave={handleEditSave}
       />
 
       {/* Confirmation Modal */}

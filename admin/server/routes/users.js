@@ -780,4 +780,129 @@ router.post('/legal-seekers/:id/audit-logs', authenticateAdmin, async (req, res)
   }
 });
 
+// Update legal seeker status (PATCH endpoint for editing)
+router.patch('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_verified } = req.body;
+
+    // Validate required fields
+    if (is_verified === undefined || is_verified === null) {
+      return res.status(400).json({
+        success: false,
+        error: 'is_verified status is required'
+      });
+    }
+
+    // Validate is_verified is boolean
+    if (typeof is_verified !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: 'is_verified must be a boolean value'
+      });
+    }
+
+    // Get current user data for comparison and audit logging
+    const { data: currentUser, error: fetchError } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !currentUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'Legal seeker not found'
+      });
+    }
+
+    // Update user with new verification status and updated_at timestamp
+    const { data: updatedUser, error: updateError } = await supabaseAdmin
+      .from('users')
+      .update({
+        is_verified: is_verified,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update legal seeker: ' + updateError.message
+      });
+    }
+
+    // Create audit log entry with CORRECT DATETIME
+    try {
+      const auditData = {
+        action: `Legal seeker verification status updated from "${currentUser.is_verified ? 'verified' : 'unverified'}" to "${is_verified ? 'verified' : 'unverified'}"`,
+        target_table: 'users',
+        actor_id: req.admin.id,
+        actor_name: req.admin.full_name || req.admin.email,
+        role: req.admin.role,
+        target_id: id,
+        created_at: new Date().toISOString(),
+        metadata: {
+          action_type: 'update',
+          field_changed: 'is_verified',
+          old_value: currentUser.is_verified,
+          new_value: is_verified,
+          target_user: {
+            id: currentUser.id,
+            email: currentUser.email,
+            full_name: currentUser.full_name
+          },
+          updated_by: {
+            id: req.admin.id,
+            email: req.admin.email,
+            full_name: req.admin.full_name,
+            role: req.admin.role
+          }
+        }
+      };
+
+      const { error: auditError } = await supabaseAdmin
+        .from('admin_audit_logs')
+        .insert(auditData);
+
+      if (auditError) {
+        // Don't fail the request if audit logging fails
+        console.warn('Failed to create audit log:', auditError);
+      }
+    } catch (auditErr) {
+      // Continue without failing the request
+      console.warn('Audit logging error:', auditErr);
+    }
+
+    res.json({
+      success: true,
+      message: 'Legal seeker updated successfully',
+      data: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        full_name: updatedUser.full_name,
+        username: updatedUser.username,
+        role: updatedUser.role,
+        is_verified: updatedUser.is_verified,
+        created_at: updatedUser.created_at,
+        updated_at: updatedUser.updated_at,
+        birthdate: updatedUser.birthdate,
+        pending_lawyer: updatedUser.pending_lawyer,
+        reject_count: updatedUser.reject_count,
+        last_rejected_at: updatedUser.last_rejected_at,
+        is_blocked_from_applying: updatedUser.is_blocked_from_applying,
+        archived: updatedUser.archived
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 module.exports = router;
