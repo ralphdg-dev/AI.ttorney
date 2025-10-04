@@ -14,7 +14,8 @@ const ConfirmationModal = ({
   feedbackLabel = 'Feedback',
   feedbackPlaceholder = 'Enter your feedback...',
   applicantName = '',
-  loading = false
+  loading = false,
+  changes = null // New prop for structured changes
 }) => {
   const [feedback, setFeedback] = React.useState('');
 
@@ -23,6 +24,35 @@ const ConfirmationModal = ({
       setFeedback('');
     }
   }, [open]);
+
+  // Helper function to capitalize status values
+  const capitalizeStatus = (value) => {
+    if (!value || value === 'Not set') return value;
+    
+    // Handle specific status values
+    const statusMap = {
+      'pending': 'Pending',
+      'approved': 'Approved',
+      'rejected': 'Rejected',
+      'accepted': 'Accepted',
+      'resubmission': 'Resubmission',
+      'active': 'Active',
+      'inactive': 'Inactive',
+      'suspended': 'Suspended',
+      'archived': 'Archived'
+    };
+    
+    return statusMap[value.toLowerCase()] || value.charAt(0).toUpperCase() + value.slice(1);
+  };
+
+  // Helper function to format display value
+  const formatDisplayValue = (fieldName, value) => {
+    // Capitalize status-related fields
+    if (fieldName.toLowerCase().includes('status')) {
+      return capitalizeStatus(value);
+    }
+    return value;
+  };
 
   if (!open) return null;
 
@@ -64,7 +94,7 @@ const ConfirmationModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
@@ -82,13 +112,49 @@ const ConfirmationModal = ({
 
         {/* Content */}
         <div className="p-6">
-          <p className="text-sm text-gray-600 mb-4">{message}</p>
+          {/* Main message */}
+          <p className="text-sm text-gray-600 mb-4">
+            {/* Extract the main message part (before "Changes:") */}
+            {message.includes('Changes:') ? message.split('Changes:')[0].trim() : message}
+          </p>
           
           {applicantName && (
             <div className="bg-gray-50 rounded-lg p-3 mb-4">
               <p className="text-xs text-gray-700">
                 <span className="font-medium">Applicant:</span> {applicantName}
               </p>
+            </div>
+          )}
+
+          {/* Enhanced Changes Display */}
+          {changes && Object.keys(changes).length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-900 mb-3">
+                Changes to be Applied
+              </h4>
+              <div className="space-y-3">
+                {Object.entries(changes).map(([field, change]) => (
+                  <div key={field} className="bg-gray-50 rounded-md p-3 border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-gray-700">{field}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-gray-500 block mb-1">From:</span>
+                        <div className="bg-red-50 border border-red-200 rounded px-2 py-1 text-red-700 font-mono text-xs break-words">
+                          {formatDisplayValue(field, change.from) || 'Not set'}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block mb-1">To:</span>
+                        <div className="bg-green-50 border border-green-200 rounded px-2 py-1 text-green-700 font-mono text-xs break-words">
+                          {formatDisplayValue(field, change.to) || 'Not set'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

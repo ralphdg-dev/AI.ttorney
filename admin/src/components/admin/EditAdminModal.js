@@ -68,27 +68,16 @@ const EditAdminModal = ({ open, onClose, onSave, admin }) => {
       return;
     }
     
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Call the API to update the admin status
-      const response = await adminManagementService.updateAdmin(admin.id, {
-        status: formData.status
-      });
-      
-      // Call the onSave callback to refresh the parent component
-      if (onSave) {
-        onSave(response.data);
-      }
-      
-      // Close the modal
-      onClose();
-      
-    } catch (err) {
-      setError(err.message || 'Failed to update admin status');
-    } finally {
-      setLoading(false);
+    // Create updated admin data for comparison
+    const updatedAdmin = {
+      ...admin,
+      status: formData.status
+    };
+    
+    // Call the onSave callback with both updated and original data for change comparison
+    // The parent component will handle the confirmation modal and actual API call
+    if (onSave) {
+      onSave(updatedAdmin, admin);
     }
   };
 

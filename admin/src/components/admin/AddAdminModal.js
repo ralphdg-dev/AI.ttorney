@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import Select from '../ui/Select';
+import ConfirmationModal from '../ui/ConfirmationModal';
 import { Save, X, Eye, EyeOff } from 'lucide-react';
 import adminManagementService from '../../services/adminManagementService';
 
@@ -19,6 +20,8 @@ const AddAdminModal = ({ open, onClose, onSave }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [confirmationLoading, setConfirmationLoading] = useState(false);
 
   // Reset form when modal closes
   useEffect(() => {
@@ -37,6 +40,8 @@ const AddAdminModal = ({ open, onClose, onSave }) => {
       setLoading(false);
       setShowPassword(false);
       setShowConfirmPassword(false);
+      setShowConfirmation(false);
+      setConfirmationLoading(false);
     }
   }, [open]);
 
@@ -118,8 +123,13 @@ const AddAdminModal = ({ open, onClose, onSave }) => {
       return;
     }
     
+    // Show confirmation modal instead of directly creating admin
+    setShowConfirmation(true);
+  };
+
+  const handleConfirmCreate = async () => {
     try {
-      setLoading(true);
+      setConfirmationLoading(true);
       setError(null);
       
       // Prepare admin data (exclude confirmPassword, combine names)
@@ -139,14 +149,20 @@ const AddAdminModal = ({ open, onClose, onSave }) => {
         onSave(response.data);
       }
       
-      // Close the modal
+      // Close both modals
+      setShowConfirmation(false);
       onClose();
       
     } catch (err) {
       setError(err.message || 'Failed to create admin');
+      setShowConfirmation(false);
     } finally {
-      setLoading(false);
+      setConfirmationLoading(false);
     }
+  };
+
+  const handleCancelConfirmation = () => {
+    setShowConfirmation(false);
   };
 
   const handleCancel = () => {
@@ -384,6 +400,18 @@ const AddAdminModal = ({ open, onClose, onSave }) => {
           </button>
         </div>
       </form>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        open={showConfirmation}
+        onClose={handleCancelConfirmation}
+        onConfirm={handleConfirmCreate}
+        title="Create New Admin"
+        message={`Are you sure you want to create a new admin account for ${formData.email}? This will send login credentials to the specified email address.`}
+        confirmText="Create Admin"
+        loading={confirmationLoading}
+        type="add"
+      />
     </Modal>
   );
 };

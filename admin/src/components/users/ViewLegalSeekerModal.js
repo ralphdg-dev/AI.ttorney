@@ -229,8 +229,11 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
               <div className="text-xs text-gray-700">{formatDate(createdAt)}</div>
             </div>
             <div>
-              <div className="text-[9px] text-gray-500">Updated At</div>
-              <div className="text-xs text-gray-700">{formatDate(updatedAt)}</div>
+              <div className="text-[9px] text-gray-500">Last Edited At</div>
+              <div className="text-xs text-gray-700">
+                {updatedAt ? formatDate(updatedAt) : 
+                 createdAt ? formatDate(createdAt) : 'Never'}
+              </div>
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Birthdate</div>

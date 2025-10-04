@@ -98,7 +98,8 @@ const ManageLawyerApplications = () => {
     type: '',
     applicationId: null,
     applicantName: '',
-    loading: false
+    loading: false,
+    changes: null // For tracking edit changes
   });
 
   // Debounce search query
@@ -200,9 +201,61 @@ const ManageLawyerApplications = () => {
     }
   };
 
-  const handleEditSave = (updatedApplication) => {
-    // Refresh the data after successful edit
-    loadData();
+  const handleEditSave = (updatedApplication, originalApplication) => {
+    // Compare original and updated application to show changes
+    const changes = {};
+    
+    if (originalApplication && updatedApplication) {
+      // Check for status changes
+      if (originalApplication.status !== updatedApplication.status) {
+        changes.Status = {
+          from: originalApplication.status || 'Not set',
+          to: updatedApplication.status || 'Not set'
+        };
+      }
+      
+      // Check for admin notes changes
+      const originalNotes = originalApplication.admin_notes || originalApplication.notes || '';
+      const updatedNotes = updatedApplication.admin_notes || updatedApplication.notes || '';
+      if (originalNotes !== updatedNotes) {
+        changes['Admin Notes'] = {
+          from: originalNotes || 'No notes',
+          to: updatedNotes || 'No notes'
+        };
+      }
+      
+      // Check for roll number changes
+      if (originalApplication.roll_number !== updatedApplication.roll_number) {
+        changes['Roll Number'] = {
+          from: originalApplication.roll_number || 'Not set',
+          to: updatedApplication.roll_number || 'Not set'
+        };
+      }
+      
+      // Check for roll sign date changes
+      if (originalApplication.roll_sign_date !== updatedApplication.roll_sign_date) {
+        changes['Roll Sign Date'] = {
+          from: originalApplication.roll_sign_date || 'Not set',
+          to: updatedApplication.roll_sign_date || 'Not set'
+        };
+      }
+    }
+    
+    // If there are changes, show confirmation modal
+    if (Object.keys(changes).length > 0) {
+      setConfirmationModal({
+        open: true,
+        type: 'edit',
+        applicationId: updatedApplication.id,
+        applicantName: updatedApplication.full_name || 'Unknown',
+        loading: false,
+        changes: changes
+      });
+    } else {
+      // No changes, just close the modal and refresh
+      setEditOpen(false);
+      loadData();
+    }
   };
 
   // Handle archive button click
@@ -221,7 +274,7 @@ const ManageLawyerApplications = () => {
 
   // Helper function to get modal content based on type
   const getModalContent = () => {
-    const { type, applicantName } = confirmationModal;
+    const { type, applicantName, changes } = confirmationModal;
     
     switch (type) {
       case 'approve':
@@ -268,13 +321,22 @@ const ManageLawyerApplications = () => {
           showFeedbackInput: false,
           onConfirm: confirmArchive
         };
+      case 'edit':
+        return {
+          title: 'Confirm Application Changes',
+          message: `Are you sure you want to save these changes to ${applicantName}'s application?`,
+          confirmText: 'Save Changes',
+          showFeedbackInput: false,
+          onConfirm: confirmEdit,
+          changes: changes // Pass the structured changes object
+        };
       default:
         return {};
     }
   };
 
   const closeModal = () => {
-    setConfirmationModal({ open: false, type: '', applicationId: null, applicantName: '', loading: false });
+    setConfirmationModal({ open: false, type: '', applicationId: null, applicantName: '', loading: false, changes: null });
   };
 
   // Handle approve application
@@ -369,11 +431,55 @@ const ManageLawyerApplications = () => {
       
       await lawyerApplicationsService.archiveApplication(applicationId, isArchiving);
       await loadData(); // Reload data
-      setConfirmationModal({ open: false, type: '', applicationId: null, applicantName: '', loading: false });
+      setConfirmationModal({ open: false, type: '', applicationId: null, applicantName: '', loading: false, changes: null });
       
     } catch (err) {
       console.error(`Failed to ${isArchiving ? 'archive' : 'unarchive'} application:`, err);
       alert(`Failed to ${isArchiving ? 'archive' : 'unarchive'} application: ` + err.message);
+      setConfirmationModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Handle edit confirmation
+  const confirmEdit = async () => {
+    const { applicationId, applicantName, changes } = confirmationModal;
+    
+    try {
+      setConfirmationModal(prev => ({ ...prev, loading: true }));
+      
+      // Prepare update data based on changes
+      const updateData = {};
+      
+      if (changes.Status) {
+        updateData.status = changes.Status.to === 'Not set' ? null : changes.Status.to;
+      }
+      
+      if (changes['Admin Notes']) {
+        updateData.admin_notes = changes['Admin Notes'].to === 'No notes' ? '' : changes['Admin Notes'].to;
+      }
+      
+      if (changes['Roll Number']) {
+        updateData.roll_number = changes['Roll Number'].to === 'Not set' ? null : changes['Roll Number'].to;
+      }
+      
+      if (changes['Roll Sign Date']) {
+        updateData.roll_sign_date = changes['Roll Sign Date'].to === 'Not set' ? null : changes['Roll Sign Date'].to;
+      }
+      
+      // Add audit trail information
+      updateData.edit_timestamp = new Date().toISOString();
+      updateData.edit_reason = 'Manual edit via admin panel';
+      
+      // Make the API call
+      await lawyerApplicationsService.updateLawyerApplication(applicationId, updateData);
+      
+      setEditOpen(false); // Close edit modal
+      await loadData(); // Reload data
+      setConfirmationModal({ open: false, type: '', applicationId: null, applicantName: '', loading: false, changes: null });
+      
+    } catch (err) {
+      console.error('Failed to edit application:', err);
+      alert('Failed to edit application: ' + err.message);
       setConfirmationModal(prev => ({ ...prev, loading: false }));
     }
   };

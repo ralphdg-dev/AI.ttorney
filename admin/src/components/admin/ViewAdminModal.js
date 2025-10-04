@@ -59,17 +59,24 @@ const RoleBadge = ({ role }) => {
 
 const ViewAdminModal = ({ open, onClose, admin }) => {
   const [activeTab, setActiveTab] = useState('audit');
+  
+  // State for audit logs (actions performed ON this admin)
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState(null);
+  
+  // State for recent activity (actions performed BY this admin)
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState(null);
+  
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [showActivityModal, setShowActivityModal] = useState(false);
   const { admin: currentAdmin } = useAuth();
-
-  // Load audit logs when modal opens
   useEffect(() => {
     if (open && admin?.id) {
       loadAuditLogs();
+      loadRecentActivity();
     }
   }, [open, admin?.id]);
 
@@ -157,56 +164,31 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
     })()
   }));
 
-  // Recent activity includes PDF generation and other activities from audit logs
-  const recentActivity = [
-    // Include PDF generation activities from audit logs
-    ...auditLogs
-      .filter(log => {
-        // Include PDF generation activities and other recent activities
-        const action = log.action.toLowerCase();
-        return action.includes('generated') || 
-               action.includes('pdf') || 
-               action.includes('report') ||
-               action.includes('logged in') ||
-               action.includes('profile') ||
-               action.includes('updated');
-      })
-      .slice(0, 10) // Limit to 10 most recent activities
-      .map(log => ({
-        id: `audit_${log.id}`,
-        action: log.action,
-        date: log.created_at,
-        details: (() => {
-          try {
-            const parsed = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
-            if (parsed?.report_type) {
-              const reportType = parsed.report_type === 'admin_audit' ? 'Audit Trail' : 'Activity Report';
-              return `${reportType} PDF (Report #${parsed.report_number})`;
-            }
-            return parsed?.action || log.action;
-          } catch {
-            return log.action;
-          }
-        })()
-      })),
-    // Add traditional activity items if they exist
-    ...[
-      {
-        id: 'login',
-        action: 'Logged in',
-        date: admin.last_login,
-        details: 'Admin panel access'
-      },
-      {
-        id: 'profile',
-        action: 'Profile updated',
-        date: admin.updated_at,
-        details: 'Admin profile information updated'
-      }
-    ].filter(item => item.date)
-  ]
-    .sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort by most recent first
-    .slice(0, 15); // Limit to 15 most recent activities
+  // Load recent activity when modal opens
+  const loadRecentActivity = async () => {
+    try {
+      setActivityLoading(true);
+      setActivityError(null);
+      
+      const response = await adminManagementService.getAdminRecentActivity(admin.id, { limit: 50 });
+      setRecentActivity(response.data || []);
+    } catch (error) {
+      console.error('Failed to load recent activity:', error);
+      setActivityError(error.message);
+      // Fallback to mock data if API fails
+      setRecentActivity([
+        {
+          id: 1,
+          action: 'Logged into admin panel',
+          target_table: 'admin',
+          created_at: admin.last_login || new Date().toISOString(),
+          metadata: { action_type: 'login' }
+        }
+      ]);
+    } finally {
+      setActivityLoading(false);
+    }
+  };
 
   // Handle PDF export for audit trail
   const handleExportAuditTrail = async () => {
@@ -223,6 +205,7 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
       // Refresh audit logs to show the new PDF generation entry
       setTimeout(() => {
         loadAuditLogs();
+        loadRecentActivity();
       }, 1000); // Small delay to ensure the audit log is created
     } catch (error) {
       console.error('Failed to export audit trail PDF:', error);
@@ -233,11 +216,11 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
   // Handle PDF export for recent activity
   const handleExportActivity = async () => {
     try {
-      // Use the dynamic recent activity data that includes PDF generation activities
+      // Use the recent activity data from the new API
       const activityData = recentActivity.map(activity => ({
         action: activity.action,
-        date: activity.date,
-        details: activity.details
+        date: activity.created_at,
+        details: activity.metadata?.action_type || activity.action
       }));
 
       await exportAdminActivityPDF(
@@ -249,9 +232,10 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
       );
       console.log('Admin activity PDF exported and logged successfully');
       
-      // Refresh audit logs to show the new PDF generation entry
+      // Refresh both audit logs and recent activity to show the new PDF generation entry
       setTimeout(() => {
         loadAuditLogs();
+        loadRecentActivity();
       }, 1000); // Small delay to ensure the audit log is created
     } catch (error) {
       console.error('Failed to export activity PDF:', error);
@@ -334,10 +318,11 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
 
             <div>
               <label className="block text-[9px] font-medium text-gray-700 mb-1">
-                Last Updated
+                Last Edited At
               </label>
               <div className="text-xs text-gray-900">
-                {formatDate(admin.updated_at)}
+                {admin.updated_at ? formatDate(admin.updated_at) : 
+                 admin.created_at ? formatDate(admin.created_at) : 'Never'}
               </div>
             </div>
 

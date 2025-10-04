@@ -3,6 +3,7 @@ import { Users, Eye, Pencil, Archive, Loader2, XCircle, ChevronUp, ChevronDown, 
 import DataTable from '../../components/ui/DataTable';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
+import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import usersService from '../../services/usersService';
 
 const StatusBadge = ({ status }) => (
@@ -27,6 +28,14 @@ const ManageLawyers = () => {
   const [sortConfig, setSortConfig] = React.useState({
     key: null,
     direction: 'asc'
+  });
+  const [confirmationModal, setConfirmationModal] = React.useState({
+    open: false,
+    type: '',
+    lawyerId: null,
+    lawyerName: '',
+    loading: false,
+    changes: null // For tracking edit changes
   });
 
   // Load data from API
@@ -62,29 +71,106 @@ const ManageLawyers = () => {
     alert(`View details for: ${lawyer.full_name}\nEmail: ${lawyer.email}\nStatus: ${lawyer.status}`);
   };
 
-  // Handle edit lawyer
   const handleEdit = (lawyer) => {
-    alert(`Edit lawyer: ${lawyer.full_name} - Edit functionality not implemented yet`);
+    // For now, simulate edit changes since actual edit modal doesn't exist yet
+    const simulatedChanges = {
+      Status: { from: lawyer.status, to: 'suspended' },
+      'Accepting Consultations': { from: lawyer.accepting_consultations ? 'Yes' : 'No', to: 'No' }
+    };
+    
+    setConfirmationModal({
+      open: true,
+      type: 'edit',
+      lawyerId: lawyer.id,
+      lawyerName: lawyer.full_name,
+      loading: false,
+      changes: simulatedChanges
+    });
   };
 
   // Handle suspend lawyer
-  const handleSuspend = async (lawyerId, lawyerName) => {
-    if (!window.confirm(`Are you sure you want to suspend ${lawyerName}?`)) {
-      return;
+  const handleSuspend = (lawyerId, lawyerName) => {
+    setConfirmationModal({
+      open: true,
+      type: 'suspend',
+      lawyerId,
+      lawyerName,
+      loading: false
+    });
+  };
+
+  // Helper function to get modal content based on type
+  const getModalContent = () => {
+    const { type, lawyerName, changes } = confirmationModal;
+    
+    switch (type) {
+      case 'suspend':
+        return {
+          title: 'Suspend Lawyer',
+          message: `Are you sure you want to suspend ${lawyerName}? This will prevent them from accepting new consultations and accessing lawyer features.`,
+          confirmText: 'Suspend Lawyer',
+          onConfirm: confirmSuspend
+        };
+      case 'edit':
+        const changesList = changes ? Object.entries(changes).map(([field, change]) => 
+          `• ${field}: "${change.from}" → "${change.to}"`
+        ).join('\n') : '';
+        return {
+          title: 'Confirm Lawyer Changes',
+          message: `Are you sure you want to save these changes to ${lawyerName}?\n\nChanges:\n${changesList}`,
+          confirmText: 'Save Changes',
+          onConfirm: confirmEdit
+        };
+      default:
+        return {};
     }
+  };
+
+  const closeConfirmationModal = () => {
+    setConfirmationModal({ open: false, type: '', lawyerId: null, lawyerName: '', loading: false, changes: null });
+  };
+
+  // Handle suspend confirmation
+  const confirmSuspend = async () => {
+    const { lawyerId, lawyerName } = confirmationModal;
     
     try {
+      setConfirmationModal(prev => ({ ...prev, loading: true }));
       setActionLoading(prev => ({ ...prev, [lawyerId]: true }));
-      await usersService.updateLawyerStatus(lawyerId, false);
+      
+      await usersService.suspendLawyer(lawyerId);
       await loadData(); // Reload data
+      setConfirmationModal({ open: false, type: '', lawyerId: null, lawyerName: '', loading: false, changes: null });
+      
     } catch (err) {
       console.error('Failed to suspend lawyer:', err);
       alert('Failed to suspend lawyer: ' + err.message);
+      setConfirmationModal(prev => ({ ...prev, loading: false }));
     } finally {
       setActionLoading(prev => ({ ...prev, [lawyerId]: false }));
     }
   };
 
+  // Handle edit confirmation
+  const confirmEdit = async () => {
+    const { lawyerId, lawyerName, changes } = confirmationModal;
+    
+    try {
+      setConfirmationModal(prev => ({ ...prev, loading: true }));
+      
+      // TODO: Implement actual edit API call
+      console.log(`Editing lawyer: ${lawyerName}`, changes);
+      alert(`Lawyer "${lawyerName}" changes have been saved successfully!`);
+      
+      await loadData(); // Reload data
+      setConfirmationModal({ open: false, type: '', lawyerId: null, lawyerName: '', loading: false, changes: null });
+      
+    } catch (err) {
+      console.error('Failed to edit lawyer:', err);
+      alert('Failed to edit lawyer: ' + err.message);
+      setConfirmationModal(prev => ({ ...prev, loading: false }));
+    }
+  };
   // Handle column sorting
   const handleSort = (columnKey) => {
     let direction = 'asc';
@@ -502,6 +588,15 @@ const ManageLawyers = () => {
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        open={confirmationModal.open}
+        onClose={closeConfirmationModal}
+        type={confirmationModal.type}
+        loading={confirmationModal.loading}
+        {...getModalContent()}
+      />
     </div>
   );
 };

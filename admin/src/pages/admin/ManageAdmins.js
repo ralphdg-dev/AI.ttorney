@@ -1,8 +1,9 @@
 import React from 'react';
-import { Eye, Shield, Users, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Plus, Pencil, Archive, ArchiveRestore, RefreshCw } from 'lucide-react';
+import { Users, Eye, Archive, ArchiveRestore, Plus, Pencil, RefreshCw, Shield, Loader2, XCircle, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import DataTable from '../../components/ui/DataTable';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
+import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import AddAdminModal from '../../components/admin/AddAdminModal';
 import EditAdminModal from '../../components/admin/EditAdminModal';
 import ViewAdminModal from '../../components/admin/ViewAdminModal';
@@ -92,6 +93,14 @@ const ManageAdmins = () => {
   const [showEditModal, setShowEditModal] = React.useState(false);
   const [showViewModal, setShowViewModal] = React.useState(false);
   const [selectedAdmin, setSelectedAdmin] = React.useState(null);
+  const [confirmationModal, setConfirmationModal] = React.useState({
+    open: false,
+    type: '',
+    adminId: null,
+    adminName: '',
+    loading: false,
+    changes: null // For tracking edit changes
+  });
 
   // Debounce search query
   React.useEffect(() => {
@@ -156,34 +165,117 @@ const ManageAdmins = () => {
     setShowEditModal(true);
   };
 
-  // Handle archive admin
-  const handleArchive = async (admin) => {
-    try {
-      // Update admin status to archived
-      await adminManagementService.updateAdmin(admin.id, { status: 'archived' });
-      // Reload the data to show the updated status
-      loadData();
-    } catch (err) {
-      console.error('Failed to archive admin:', err);
-      // You could show a toast notification here
+  // Handle archive button click
+  const handleArchive = (admin) => {
+    const isCurrentlyArchived = admin.status === 'archived';
+    const modalType = isCurrentlyArchived ? 'unarchive' : 'archive';
+    
+    setConfirmationModal({
+      open: true,
+      type: modalType,
+      adminId: admin.id,
+      adminName: admin.full_name || admin.email || 'Unknown',
+      loading: false
+    });
+  };
+
+  // Handle unarchive admin (for backward compatibility)
+  const handleUnarchive = (admin) => {
+    setConfirmationModal({
+      open: true,
+      type: 'unarchive',
+      adminId: admin.id,
+      adminName: admin.full_name || admin.email || 'Unknown',
+      loading: false
+    });
+  };
+
+  // Helper function to get modal content based on type
+  const getModalContent = () => {
+    const { type, adminName, changes } = confirmationModal;
+    
+    switch (type) {
+      case 'archive':
+        return {
+          title: 'Archive Admin',
+          message: `Are you sure you want to archive ${adminName}? Archived admins will be hidden from the main list but can be accessed through the "Archived" filter.`,
+          confirmText: 'Archive Admin',
+          onConfirm: confirmArchive
+        };
+      case 'unarchive':
+        return {
+          title: 'Unarchive Admin',
+          message: `Are you sure you want to unarchive ${adminName}? They will be restored to the active admins list.`,
+          confirmText: 'Unarchive Admin',
+          onConfirm: confirmArchive
+        };
+      case 'edit':
+        return {
+          title: 'Confirm Admin Changes',
+          message: `Are you sure you want to save these changes to ${adminName}?`,
+          confirmText: 'Save Changes',
+          onConfirm: confirmEdit,
+          changes: changes // Pass the structured changes object
+        };
+      default:
+        return {};
     }
   };
 
-  // Handle unarchive admin
-  const handleUnarchive = async (admin) => {
+  const closeConfirmationModal = () => {
+    setConfirmationModal({ open: false, type: '', adminId: null, adminName: '', loading: false, changes: null });
+  };
+
+  // Handle archive/unarchive admin
+  const confirmArchive = async () => {
+    const { adminId, adminName, type } = confirmationModal;
+    const isArchiving = type === 'archive';
+    
     try {
-      // Update admin status back to active
-      await adminManagementService.updateAdmin(admin.id, { status: 'active' });
-      // Reload the data to show the updated status
-      loadData();
+      setConfirmationModal(prev => ({ ...prev, loading: true }));
+      
+      const newStatus = isArchiving ? 'archived' : 'active';
+      await adminManagementService.updateAdmin(adminId, { status: newStatus });
+      await loadData(); // Reload data
+      setConfirmationModal({ open: false, type: '', adminId: null, adminName: '', loading: false, changes: null });
+      
     } catch (err) {
-      console.error('Failed to unarchive admin:', err);
-      // You could show a toast notification here
+      console.error(`Failed to ${isArchiving ? 'archive' : 'unarchive'} admin:`, err);
+      alert(`Failed to ${isArchiving ? 'archive' : 'unarchive'} admin: ` + err.message);
+      setConfirmationModal(prev => ({ ...prev, loading: false }));
     }
   };
 
-  // Handle add admin
+  // Handle edit confirmation
+  const confirmEdit = async () => {
+    const { adminId, changes } = confirmationModal;
+    
+    try {
+      setConfirmationModal(prev => ({ ...prev, loading: true }));
+      
+      // Apply the changes (in this case, only status changes are supported)
+      if (changes && changes.Status) {
+        await adminManagementService.updateAdmin(adminId, { status: changes.Status.to.toLowerCase() });
+      }
+      
+      await loadData(); // Reload data
+      setShowEditModal(false); // Close edit modal
+      setConfirmationModal({ open: false, type: '', adminId: null, adminName: '', loading: false, changes: null });
+      
+    } catch (err) {
+      console.error('Failed to update admin:', err);
+      alert('Failed to update admin: ' + err.message);
+      setConfirmationModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Handle add admin - directly open modal
   const handleAddAdmin = () => {
+    setShowAddModal(true);
+  };
+
+  // Handle confirmed add admin
+  const handleConfirmedAddAdmin = () => {
     setShowAddModal(true);
   };
 
@@ -211,11 +303,43 @@ const ManageAdmins = () => {
     setShowAddModal(false);
   };
 
-  // Handle admin update success
-  const handleAdminUpdated = (updatedAdmin) => {
-    // Reload the data to show the updated admin
-    loadData();
-    setShowEditModal(false);
+  // Handle admin update success - intercept to show confirmation with changes
+  const handleAdminUpdated = (updatedAdmin, originalAdmin) => {
+    // Compare original and updated admin to show changes
+    const changes = {};
+    
+    if (originalAdmin && updatedAdmin) {
+      // Check for status changes
+      if (originalAdmin.status !== updatedAdmin.status) {
+        changes.Status = {
+          from: originalAdmin.status,
+          to: updatedAdmin.status
+        };
+      }
+      
+      // Check for other potential changes (role, etc.)
+      if (originalAdmin.role !== updatedAdmin.role) {
+        changes.Role = {
+          from: originalAdmin.role,
+          to: updatedAdmin.role
+        };
+      }
+    }
+    
+    // If there are changes, show confirmation modal
+    if (Object.keys(changes).length > 0) {
+      setConfirmationModal({
+        open: true,
+        type: 'edit',
+        adminId: updatedAdmin.id,
+        adminName: updatedAdmin.full_name || updatedAdmin.email || 'Unknown',
+        loading: false,
+        changes: changes
+      });
+    } else {
+      // No changes, just close the modal
+      setShowEditModal(false);
+    }
   };
 
   // Handle column sorting
@@ -748,6 +872,15 @@ const ManageAdmins = () => {
         open={showViewModal}
         onClose={handleViewModalClose}
         admin={selectedAdmin}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        open={confirmationModal.open}
+        onClose={closeConfirmationModal}
+        type={confirmationModal.type}
+        loading={confirmationModal.loading}
+        {...getModalContent()}
       />
     </div>
   );

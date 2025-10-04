@@ -161,41 +161,22 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
   };
 
 
-  // Handle save in edit mode
+  // Handle save in edit mode - show confirmation first
   const handleSave = async () => {
     if (!applicationData?.id) return;
     
-    try {
-      setSaveLoading(true);
-      setSaveError(null);
-      
-      // Prepare detailed update data for audit trail
-      const updateData = {
-        status: editStatus.trim(),
-        admin_notes: editNotes.trim(),
-        // Include original values for audit trail comparison
-        previous_status: applicationData.status,
-        previous_admin_notes: applicationData.admin_notes || applicationData.notes || '',
-        // Additional metadata for audit trail
-        edit_timestamp: new Date().toISOString(),
-        edit_reason: 'Manual edit via admin panel'
-      };
-      
-      const response = await lawyerApplicationsService.updateLawyerApplication(
-        applicationData.id, 
-        updateData
-      );
-      
-      if (onSave) {
-        onSave(response.data);
-      }
-      
-      onClose();
-      
-    } catch (err) {
-      setSaveError(err.message || 'Failed to update application');
-    } finally {
-      setSaveLoading(false);
+    // Create updated application data for comparison
+    const updatedApplication = {
+      ...applicationData,
+      status: editStatus.trim(),
+      admin_notes: editNotes.trim(),
+      notes: editNotes.trim() // For compatibility
+    };
+    
+    if (onSave) {
+      // Pass both updated and original data for change comparison
+      // The parent component will handle the confirmation modal and actual API call
+      onSave(updatedApplication, applicationData);
     }
   };
 
@@ -325,6 +306,15 @@ const ViewLawyerApplicationModal = ({ open, onClose, application, loading = fals
           <div>
             <div className="text-[9px] text-gray-500">Reviewed At</div>
             <div className="text-xs font-medium text-gray-900">{applicationData?.reviewed_at ? formatDate(applicationData.reviewed_at) : '-'}</div>
+          </div>
+          <div>
+            <div className="text-[9px] text-gray-500">Last Edited At</div>
+            <div className="text-xs font-medium text-gray-900">
+              {applicationData?.updated_at || applicationData?.edit_timestamp ? 
+                formatDate(applicationData.updated_at || applicationData.edit_timestamp) : 
+                applicationData?.created_at ? formatDate(applicationData.created_at) : '-'
+              }
+            </div>
           </div>
           <div className="sm:col-span-3">
             <div className="text-[9px] text-gray-500">Notes</div>

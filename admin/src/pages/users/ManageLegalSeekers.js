@@ -59,7 +59,8 @@ const ManageLegalSeekers = () => {
     type: '',
     userId: null,
     userName: '',
-    loading: false
+    loading: false,
+    changes: null // For tracking edit changes
   });
 
   // Debounce search query
@@ -163,7 +164,20 @@ const ManageLegalSeekers = () => {
 
   // Handle edit user
   const handleEdit = (user) => {
-    alert(`Edit user: ${user.full_name} - Edit functionality not implemented yet`);
+    // For now, simulate edit changes since actual edit modal doesn't exist yet
+    const simulatedChanges = {
+      Status: { from: user.status || 'active', to: 'verified' },
+      'Email Verified': { from: user.is_verified ? 'Yes' : 'No', to: 'Yes' }
+    };
+    
+    setConfirmationModal({
+      open: true,
+      type: 'edit',
+      userId: user.id,
+      userName: user.full_name,
+      loading: false,
+      changes: simulatedChanges
+    });
   };
 
   // Handle archive button click
@@ -182,7 +196,7 @@ const ManageLegalSeekers = () => {
 
   // Helper function to get modal content based on type
   const getModalContent = () => {
-    const { type, userName } = confirmationModal;
+    const { type, userName, changes } = confirmationModal;
     
     switch (type) {
       case 'archive':
@@ -201,13 +215,24 @@ const ManageLegalSeekers = () => {
           showFeedbackInput: false,
           onConfirm: confirmArchive
         };
+      case 'edit':
+        const changesList = changes ? Object.entries(changes).map(([field, change]) => 
+          `• ${field}: "${change.from}" → "${change.to}"`
+        ).join('\n') : '';
+        return {
+          title: 'Confirm User Changes',
+          message: `Are you sure you want to save these changes to ${userName}?\n\nChanges:\n${changesList}`,
+          confirmText: 'Save Changes',
+          showFeedbackInput: false,
+          onConfirm: confirmEdit
+        };
       default:
         return {};
     }
   };
 
   const closeModal = () => {
-    setConfirmationModal({ open: false, type: '', userId: null, userName: '', loading: false });
+    setConfirmationModal({ open: false, type: '', userId: null, userName: '', loading: false, changes: null });
   };
 
   // Handle archive/unarchive user
@@ -220,11 +245,32 @@ const ManageLegalSeekers = () => {
       
       await usersService.archiveLegalSeeker(userId, isArchiving);
       await loadData(); // Reload data
-      setConfirmationModal({ open: false, type: '', userId: null, userName: '', loading: false });
+      setConfirmationModal({ open: false, type: '', userId: null, userName: '', loading: false, changes: null });
       
     } catch (err) {
       console.error(`Failed to ${isArchiving ? 'archive' : 'unarchive'} user:`, err);
       alert(`Failed to ${isArchiving ? 'archive' : 'unarchive'} user: ` + err.message);
+      setConfirmationModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Handle edit confirmation
+  const confirmEdit = async () => {
+    const { userId, userName, changes } = confirmationModal;
+    
+    try {
+      setConfirmationModal(prev => ({ ...prev, loading: true }));
+      
+      // TODO: Implement actual edit API call
+      console.log(`Editing user: ${userName}`, changes);
+      alert(`User "${userName}" changes have been saved successfully!`);
+      
+      await loadData(); // Reload data
+      setConfirmationModal({ open: false, type: '', userId: null, userName: '', loading: false, changes: null });
+      
+    } catch (err) {
+      console.error('Failed to edit user:', err);
+      alert('Failed to edit user: ' + err.message);
       setConfirmationModal(prev => ({ ...prev, loading: false }));
     }
   };

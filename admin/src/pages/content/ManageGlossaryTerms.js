@@ -3,6 +3,7 @@ import { Book, Eye, Pencil, Archive } from 'lucide-react';
 import DataTable from '../../components/ui/DataTable';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
+import ConfirmationModal from '../../components/ui/ConfirmationModal';
 
 const categories = ['All', 'Family', 'Civil', 'Consumer', 'Criminal', 'Labor'];
 
@@ -18,6 +19,150 @@ const ManageGlossaryTerms = () => {
   const [query, setQuery] = React.useState('');
   const [category, setCategory] = React.useState('All');
   const [sortBy, setSortBy] = React.useState('Newest');
+  const [confirmationModal, setConfirmationModal] = React.useState({
+    open: false,
+    type: '',
+    termId: null,
+    termName: '',
+    loading: false
+  });
+
+  // Handle edit term
+  const handleEdit = (term) => {
+    // For now, simulate edit changes since actual edit modal doesn't exist yet
+    const simulatedChanges = {
+      'Filipino Translation': { from: term.fil, to: 'Updated Translation' },
+      'Category': { from: term.category, to: 'Civil' }
+    };
+    
+    setConfirmationModal({
+      open: true,
+      type: 'edit',
+      termId: term.en,
+      termName: term.en,
+      loading: false,
+      changes: simulatedChanges
+    });
+  };
+
+  // Handle add new term
+  const handleAddNew = () => {
+    setConfirmationModal({
+      open: true,
+      type: 'add',
+      termId: null,
+      termName: '',
+      loading: false,
+      changes: null
+    });
+  };
+
+  // Handle archive term
+  const handleArchive = (term) => {
+    setConfirmationModal({
+      open: true,
+      type: 'archive',
+      termId: term.en, // Using English term as ID
+      termName: term.en,
+      loading: false
+    });
+  };
+
+  // Helper function to get modal content
+  const getModalContent = () => {
+    const { type, termName, changes } = confirmationModal;
+    
+    switch (type) {
+      case 'archive':
+        return {
+          title: 'Archive Glossary Term',
+          message: `Are you sure you want to archive "${termName}"? This term will be hidden from the main list but can be accessed through the "Archived" filter.`,
+          confirmText: 'Archive Term',
+          onConfirm: confirmArchive
+        };
+      case 'edit':
+        const changesList = changes ? Object.entries(changes).map(([field, change]) => 
+          `• ${field}: "${change.from}" → "${change.to}"`
+        ).join('\n') : '';
+        return {
+          title: 'Confirm Term Changes',
+          message: `Are you sure you want to save these changes to "${termName}"?\n\nChanges:\n${changesList}`,
+          confirmText: 'Save Changes',
+          onConfirm: confirmEdit
+        };
+      case 'add':
+        return {
+          title: 'Create New Glossary Term',
+          message: 'Are you sure you want to create a new glossary term? This will add a new English-Filipino legal term to the database.',
+          confirmText: 'Create Term',
+          onConfirm: confirmAdd
+        };
+      default:
+        return {};
+    }
+  };
+
+  const closeConfirmationModal = () => {
+    setConfirmationModal({ open: false, type: '', termId: null, termName: '', loading: false, changes: null });
+  };
+
+  // Handle archive confirmation
+  const confirmArchive = async () => {
+    const { termId, termName } = confirmationModal;
+    
+    try {
+      setConfirmationModal(prev => ({ ...prev, loading: true }));
+      
+      // TODO: Implement actual archive API call
+      console.log(`Archiving term: ${termName}`);
+      alert(`Term "${termName}" has been archived successfully!`);
+      
+      setConfirmationModal({ open: false, type: '', termId: null, termName: '', loading: false, changes: null });
+      
+    } catch (err) {
+      console.error('Failed to archive term:', err);
+      alert('Failed to archive term: ' + err.message);
+      setConfirmationModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Handle edit confirmation
+  const confirmEdit = async () => {
+    const { termId, termName, changes } = confirmationModal;
+    
+    try {
+      setConfirmationModal(prev => ({ ...prev, loading: true }));
+      
+      // TODO: Implement actual edit API call
+      console.log(`Editing term: ${termName}`, changes);
+      alert(`Term "${termName}" changes have been saved successfully!`);
+      
+      setConfirmationModal({ open: false, type: '', termId: null, termName: '', loading: false, changes: null });
+      
+    } catch (err) {
+      console.error('Failed to edit term:', err);
+      alert('Failed to edit term: ' + err.message);
+      setConfirmationModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Handle add confirmation
+  const confirmAdd = async () => {
+    try {
+      setConfirmationModal(prev => ({ ...prev, loading: true }));
+      
+      // TODO: Implement actual add API call
+      console.log('Creating new glossary term');
+      alert('New glossary term has been created successfully!');
+      
+      setConfirmationModal({ open: false, type: '', termId: null, termName: '', loading: false, changes: null });
+      
+    } catch (err) {
+      console.error('Failed to create term:', err);
+      alert('Failed to create term: ' + err.message);
+      setConfirmationModal(prev => ({ ...prev, loading: false }));
+    }
+  };
 
   const columns = [
     { key: 'en', header: 'English Term' },
@@ -30,11 +175,31 @@ const ManageGlossaryTerms = () => {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      render: () => (
+      render: (row) => (
         <div className="flex items-center justify-end space-x-2 text-gray-600">
-          <Tooltip content="View"><button className="p-1 rounded hover:bg-gray-100" aria-label="View"><Eye size={16} /></button></Tooltip>
-          <Tooltip content="Edit"><button className="p-1 rounded hover:bg-gray-100" aria-label="Edit"><Pencil size={16} /></button></Tooltip>
-          <Tooltip content="Archive"><button className="p-1 rounded hover:bg-gray-100" aria-label="Archive"><Archive size={16} /></button></Tooltip>
+          <Tooltip content="View">
+            <button className="p-1 rounded hover:bg-gray-100" aria-label="View">
+              <Eye size={16} />
+            </button>
+          </Tooltip>
+          <Tooltip content="Edit">
+            <button 
+              className="p-1 rounded hover:bg-gray-100" 
+              aria-label="Edit"
+              onClick={() => handleEdit(row)}
+            >
+              <Pencil size={16} />
+            </button>
+          </Tooltip>
+          <Tooltip content="Archive">
+            <button 
+              className="p-1 rounded hover:bg-gray-100" 
+              aria-label="Archive"
+              onClick={() => handleArchive(row)}
+            >
+              <Archive size={16} />
+            </button>
+          </Tooltip>
         </div>
       ),
     },
@@ -83,12 +248,21 @@ const ManageGlossaryTerms = () => {
           onQueryChange={setQuery}
           filter={{ value: category, onChange: setCategory, options: categories, label: 'Category' }}
           sort={{ value: sortBy, onChange: setSortBy, options: ['Newest', 'Oldest', 'A-Z (English)', 'Z-A (English)'], label: 'Sort by' }}
-          primaryButton={{ label: 'Add New', onClick: () => {}, className: 'inline-flex items-center gap-1 bg-[#023D7B] text-white text-[11px] px-3 py-1.5 rounded-md hover:bg-[#013462]' }}
+          primaryButton={{ label: 'Add New', onClick: handleAddNew, className: 'inline-flex items-center gap-1 bg-[#023D7B] text-white text-[11px] px-3 py-1.5 rounded-md hover:bg-[#013462]' }}
         />
       </div>
 
       {/* Table */}
       <DataTable columns={columns} data={filteredData} rowKey={(r) => `${r.en}-${r.fil}`} dense />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        open={confirmationModal.open}
+        onClose={closeConfirmationModal}
+        type={confirmationModal.type}
+        loading={confirmationModal.loading}
+        {...getModalContent()}
+      />
     </div>
   );
 };

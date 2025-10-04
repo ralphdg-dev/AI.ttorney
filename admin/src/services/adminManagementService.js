@@ -111,7 +111,7 @@ class AdminManagementService {
     }
   }
 
-  // Get admin audit logs
+  // Get admin audit logs (actions performed ON this admin)
   async getAdminAuditLogs(adminId, params = {}) {
     try {
       const { page = 1, limit = 50 } = params;
@@ -137,6 +137,36 @@ class AdminManagementService {
       return data;
     } catch (error) {
       console.error('Get admin audit logs error:', error);
+      throw error;
+    }
+  }
+
+  // Get admin recent activity (actions performed BY this admin)
+  async getAdminRecentActivity(adminId, params = {}) {
+    try {
+      const { page = 1, limit = 50 } = params;
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString()
+      });
+
+      const response = await fetch(`${API_BASE_URL}/admin/${adminId}/recent-activity?${queryParams}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch admin recent activity');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Get admin recent activity error:', error);
       throw error;
     }
   }

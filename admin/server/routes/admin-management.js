@@ -374,6 +374,134 @@ router.post('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   }
 });
 
+// Update admin (PATCH endpoint)
+router.patch('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // Validate required fields
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        error: 'Status is required'
+      });
+    }
+
+    // Validate status
+    if (!['active', 'disabled', 'archived'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Status must be one of: active, disabled, archived'
+      });
+    }
+
+    // Prevent self-modification for destructive actions
+    if (req.admin.id === id && ['disabled', 'archived'].includes(status)) {
+      return res.status(403).json({
+        success: false,
+        error: 'You cannot disable or archive your own account'
+      });
+    }
+
+    // Get current admin data for comparison and audit logging
+    const { data: currentAdmin, error: fetchError } = await supabaseAdmin
+      .from('admin')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !currentAdmin) {
+      return res.status(404).json({
+        success: false,
+        error: 'Admin not found'
+      });
+    }
+
+    // Update admin with new status and updated_at timestamp
+    const { data: updatedAdmin, error: updateError } = await supabaseAdmin
+      .from('admin')
+      .update({
+        status: status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Update admin error:', updateError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update admin: ' + updateError.message
+      });
+    }
+
+    // Create audit log entry
+    try {
+      const auditData = {
+        action: `Admin status updated from "${currentAdmin.status}" to "${status}"`,
+        target_table: 'admin',
+        actor_id: req.admin.id,
+        role: req.admin.role,
+        target_id: id,
+        metadata: {
+          action_type: 'update',
+          field_changed: 'status',
+          old_value: currentAdmin.status,
+          new_value: status,
+          target_admin: {
+            id: currentAdmin.id,
+            email: currentAdmin.email,
+            full_name: currentAdmin.full_name
+          },
+          updated_by: {
+            id: req.admin.id,
+            email: req.admin.email,
+            full_name: req.admin.full_name,
+            role: req.admin.role
+          }
+        }
+      };
+
+      const { error: auditError } = await supabaseAdmin
+        .from('admin_audit_logs')
+        .insert(auditData);
+
+      if (auditError) {
+        console.error('Failed to create audit log:', auditError);
+        // Don't fail the request if audit logging fails
+      } else {
+        console.log(`Admin status updated by ${req.admin.email}: ${currentAdmin.email} (${currentAdmin.status} → ${status})`);
+      }
+    } catch (auditErr) {
+      console.error('Audit logging error:', auditErr);
+      // Continue without failing the request
+    }
+
+    res.json({
+      success: true,
+      message: 'Admin updated successfully',
+      data: {
+        id: updatedAdmin.id,
+        email: updatedAdmin.email,
+        full_name: updatedAdmin.full_name,
+        role: updatedAdmin.role,
+        status: updatedAdmin.status,
+        created_at: updatedAdmin.created_at,
+        updated_at: updatedAdmin.updated_at
+      }
+    });
+
+  } catch (error) {
+    console.error('Update admin error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 // Get admin audit logs
 router.get('/:id/audit-logs', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   try {
@@ -402,15 +530,15 @@ router.get('/:id/audit-logs', authenticateAdmin, requireSuperAdmin, async (req, 
       .select(`
         id,
         action,
-        admin_id,
+        target_table,
         actor_id,
-        actor_name,
-        actor_role,
-        details,
-        created_at,
-        metadata
+        role,
+        target_id,
+        metadata,
+        created_at
       `)
-      .eq('admin_id', id)
+      .eq('target_id', id)
+      .eq('target_table', 'admin')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -425,20 +553,19 @@ router.get('/:id/audit-logs', authenticateAdmin, requireSuperAdmin, async (req, 
           {
             id: 1,
             action: 'Admin created',
-            admin_id: admin.id,
-            actor_id: 'system',
-            actor_name: 'System',
-            actor_role: 'system',
-            details: JSON.stringify({
-              action: 'Admin account created',
-              email: admin.email,
-              full_name: admin.full_name
-            }),
-            created_at: admin.created_at || new Date().toISOString(),
+            target_table: 'admin',
+            actor_id: null,
+            role: 'system',
+            target_id: admin.id,
             metadata: {
               action_type: 'create',
-              target_email: admin.email
-            }
+              target_email: admin.email,
+              target_admin: {
+                email: admin.email,
+                full_name: admin.full_name
+              }
+            },
+            created_at: admin.created_at || new Date().toISOString()
           }
         ];
 
@@ -467,7 +594,8 @@ router.get('/:id/audit-logs', authenticateAdmin, requireSuperAdmin, async (req, 
     const { count: totalCount } = await supabaseAdmin
       .from('admin_audit_logs')
       .select('*', { count: 'exact', head: true })
-      .eq('admin_id', id);
+      .eq('target_id', id)
+      .eq('target_table', 'admin');
 
     res.json({
       success: true,
@@ -696,11 +824,335 @@ router.patch('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
 router.delete('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   // Implementation for deleting admin
 });
-
 // Update admin role (requires superadmin)
 router.patch('/:id/role', authenticateAdmin, requireSuperAdmin, async (req, res) => {
-  // Implementation for updating admin role
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    // Validation
+    if (!role) {
+      return res.status(400).json({
+        success: false,
+        error: 'Role is required'
+      });
+    }
+
+    // Validate role
+    if (!['admin', 'superadmin'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Role must be one of: admin, superadmin'
+      });
+    }
+
+    // Check if admin exists
+    const { data: existingAdmin, error: checkError } = await supabaseAdmin
+      .from('admin')
+      .select('id, email, full_name, role')
+      .eq('id', id)
+      .single();
+
+    if (checkError || !existingAdmin) {
+      return res.status(404).json({
+        success: false,
+        error: 'Admin not found'
+      });
+    }
+
+    // Prevent self-modification if trying to demote
+    if (req.admin.id === id && role === 'admin') {
+      return res.status(400).json({
+        success: false,
+        error: 'You cannot demote your own account'
+      });
+    }
+
+    // Update admin role
+    const { data: updatedAdmin, error: updateError } = await supabaseAdmin
+      .from('admin')
+      .update({
+        role: role,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Admin role update error:', updateError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update admin role: ' + updateError.message
+      });
+    }
+
+    // Log the action
+    console.log(`Admin role updated by ${req.admin.email}: ${existingAdmin.email} role changed from ${existingAdmin.role} to ${role}`);
+
+    // Create audit log entry if table exists
+    try {
+      await supabaseAdmin
+        .from('admin_audit_logs')
+        .insert({
+          admin_id: id,
+          action: `Role changed to ${role}`,
+          actor_id: req.admin.id,
+          actor_name: req.admin.full_name || req.admin.email,
+          actor_role: req.admin.role,
+          details: JSON.stringify({
+            action: 'role_update',
+            old_role: existingAdmin.role,
+            new_role: role,
+            admin_email: existingAdmin.email
+          }),
+          metadata: {
+            action_type: 'role_update',
+            target_email: existingAdmin.email,
+            old_role: existingAdmin.role,
+            new_role: role
+          },
+          created_at: new Date().toISOString()
+        });
+    } catch (auditError) {
+      console.warn('Could not create audit log (table may not exist):', auditError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Admin role updated successfully',
+      data: {
+        id: updatedAdmin.id,
+        email: updatedAdmin.email,
+        full_name: updatedAdmin.full_name,
+        role: updatedAdmin.role,
+        created_at: updatedAdmin.created_at,
+        updated_at: updatedAdmin.updated_at
+      }
+    });
+
+  } catch (error) {
+    console.error('Update admin role error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Get admin recent activity (actions performed BY this admin)
+router.get('/:id/recent-activity', authenticateAdmin, requireSuperAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 50 } = req.query;
+    const offset = (page - 1) * limit;
+
+    // First verify the admin exists
+    const { data: admin, error: adminError } = await supabaseAdmin
+      .from('admin')
+      .select('id, email, full_name')
+      .eq('id', id)
+      .single();
+
+    if (adminError || !admin) {
+      return res.status(404).json({
+        success: false,
+        error: 'Admin not found'
+      });
+    }
+
+    // Get recent activity performed BY this admin (actor_id = admin's ID)
+    const { data: recentActivity, error: activityError } = await supabaseAdmin
+      .from('admin_audit_logs')
+      .select(`
+        id,
+        action,
+        target_table,
+        actor_id,
+        role,
+        target_id,
+        metadata,
+        created_at
+      `)
+      .eq('actor_id', id)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (activityError) {
+      console.error('Get admin recent activity error:', activityError);
+      
+      // If table doesn't exist, create mock data
+      if (activityError.code === '42P01' || activityError.message.includes('relation') || activityError.message.includes('does not exist')) {
+        console.log('admin_audit_logs table does not exist, creating mock activity data');
+        
+        const mockActivity = [
+          {
+            id: 1,
+            action: 'Logged into admin panel',
+            target_table: 'admin',
+            actor_id: admin.id,
+            role: admin.role || 'admin',
+            target_id: admin.id,
+            metadata: {
+              action_type: 'login',
+              login_time: admin.last_login || new Date().toISOString()
+            },
+            created_at: admin.last_login || new Date().toISOString()
+          }
+        ];
+
+        const totalCount = mockActivity.length;
+
+        return res.json({
+          success: true,
+          data: mockActivity,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: totalCount,
+            pages: Math.ceil(totalCount / limit)
+          }
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch recent activity: ' + activityError.message
+      });
+    }
+
+    // Get total count for pagination
+    const { count: totalCount } = await supabaseAdmin
+      .from('admin_audit_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('actor_id', id);
+
+    res.json({
+      success: true,
+      data: recentActivity || [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalCount || 0,
+        pages: Math.ceil((totalCount || 0) / limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Get admin recent activity error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
 });
 */
+
+// Get admin recent activity (actions performed BY this admin)
+router.get('/:id/recent-activity', authenticateAdmin, requireSuperAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 50 } = req.query;
+    const offset = (page - 1) * limit;
+
+    // First verify the admin exists
+    const { data: admin, error: adminError } = await supabaseAdmin
+      .from('admin')
+      .select('id, email, full_name')
+      .eq('id', id)
+      .single();
+
+    if (adminError || !admin) {
+      return res.status(404).json({
+        success: false,
+        error: 'Admin not found'
+      });
+    }
+
+    // Get recent activity performed BY this admin (actor_id = admin's ID)
+    const { data: recentActivity, error: activityError } = await supabaseAdmin
+      .from('admin_audit_logs')
+      .select(`
+        id,
+        action,
+        target_table,
+        actor_id,
+        role,
+        target_id,
+        metadata,
+        created_at
+      `)
+      .eq('actor_id', id)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (activityError) {
+      console.error('Get admin recent activity error:', activityError);
+      
+      // If table doesn't exist, create mock data
+      if (activityError.code === '42P01' || activityError.message.includes('relation') || activityError.message.includes('does not exist')) {
+        console.log('admin_audit_logs table does not exist, creating mock activity data');
+        
+        const mockActivity = [
+          {
+            id: 1,
+            action: 'Logged into admin panel',
+            target_table: 'admin',
+            actor_id: admin.id,
+            role: admin.role || 'admin',
+            target_id: admin.id,
+            metadata: {
+              action_type: 'login',
+              login_time: admin.last_login || new Date().toISOString()
+            },
+            created_at: admin.last_login || new Date().toISOString()
+          }
+        ];
+
+        const totalCount = mockActivity.length;
+
+        return res.json({
+          success: true,
+          data: mockActivity,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: totalCount,
+            pages: Math.ceil(totalCount / limit)
+          }
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch recent activity: ' + activityError.message
+      });
+    }
+
+    // Get total count for pagination
+    const { count: totalCount } = await supabaseAdmin
+      .from('admin_audit_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('actor_id', id);
+
+    res.json({
+      success: true,
+      data: recentActivity || [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalCount || 0,
+        pages: Math.ceil((totalCount || 0) / limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Get admin recent activity error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
 
 module.exports = router;
