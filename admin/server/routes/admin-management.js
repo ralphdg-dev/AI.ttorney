@@ -416,8 +416,10 @@ router.patch('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
         action: `Admin status updated from "${currentAdmin.status}" to "${status}"`,
         target_table: 'admin',
         actor_id: req.admin.id,
+        actor_name: req.admin.full_name || req.admin.email,
         role: req.admin.role,
         target_id: id,
+        created_at: new Date().toISOString(),
         metadata: {
           action_type: 'update',
           field_changed: 'status',
