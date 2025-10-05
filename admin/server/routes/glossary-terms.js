@@ -204,9 +204,8 @@ router.post('/', authenticateAdmin, async (req, res) => {
       example_en: example_en?.trim() || null,
       example_fil: example_fil?.trim() || null,
       category: category.toLowerCase(),
-      is_verified: is_verified || null,
+      is_verified: is_verified !== undefined ? is_verified : null,
       verified_by: verified_by?.trim() || null,
-      view_count: 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };

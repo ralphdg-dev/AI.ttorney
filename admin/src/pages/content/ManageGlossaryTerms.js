@@ -4,16 +4,18 @@ import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import ViewTermModal from '../../components/glossary/ViewTermModal';
+import AddTermModal from '../../components/glossary/AddTermModal';
 import Pagination from '../../components/ui/Pagination';
 import glossaryTermsService from '../../services/glossaryTermsService';
 
-const categories = ['All', 'Family', 'Criminal', 'Civil', 'Labor', 'Consumer', 'Others'];
+const categories = ['All', 'Family', 'Criminal', 'Civil', 'Labor', 'Consumer', 'others'];
 
 const ManageGlossaryTerms = () => {
   const [query, setQuery] = React.useState('');
   const [category, setCategory] = React.useState('All');
   const [sortBy, setSortBy] = React.useState('Newest');
   const [viewModalOpen, setViewModalOpen] = React.useState(false);
+  const [addModalOpen, setAddModalOpen] = React.useState(false);
   const [selectedTerm, setSelectedTerm] = React.useState(null);
   const [terms, setTerms] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -108,14 +110,26 @@ const ManageGlossaryTerms = () => {
 
   // Handle add new term
   const handleAddNew = () => {
-    setConfirmationModal({
-      open: true,
-      type: 'add',
-      termId: null,
-      termName: '',
-      loading: false,
-      changes: null
-    });
+    setAddModalOpen(true);
+  };
+
+  // Handle save new term
+  const handleSaveNewTerm = async (termData) => {
+    try {
+      const response = await glossaryTermsService.createGlossaryTerm(termData);
+      
+      if (response.success) {
+        setAddModalOpen(false);
+        await loadData(); // Reload the data to show the new term
+        // Show success message (you could use a toast notification here)
+        alert('Glossary term created successfully!');
+      } else {
+        throw new Error(response.error || 'Failed to create glossary term');
+      }
+    } catch (err) {
+      console.error('Failed to create term:', err);
+      alert('Failed to create term: ' + err.message);
+    }
   };
 
   // Handle archive term
@@ -521,12 +535,18 @@ const ManageGlossaryTerms = () => {
         term={selectedTerm}
       />
 
+      {/* Add Term Modal */}
+      <AddTermModal
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        onSave={handleSaveNewTerm}
+      />
+
       {/* Confirmation Modal */}
       <ConfirmationModal
         open={confirmationModal.open}
         onClose={closeConfirmationModal}
         type={confirmationModal.type}
-        loading={confirmationModal.loading}
         {...getModalContent()}
       />
     </div>
