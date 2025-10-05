@@ -546,17 +546,24 @@ export default function DirectoryScreen() {
                   </UIText>
                 </HStack>
               )}
-
-              {filteredLawyers.map((lawyer) => (
-                <LawyerCard
-                  key={lawyer.id}
-                  lawyer={{
-                    ...lawyer,
-                    days: lawyer.displayDays,
-                  }}
-                  onBookConsultation={() => handleBookConsultation(lawyer)}
-                />
-              ))}
+              {filteredLawyers
+                .filter(
+                  (lawyer) =>
+                    lawyer.days &&
+                    lawyer.days.trim() !== "" &&
+                    lawyer.hours_available &&
+                    lawyer.hours_available.length > 0
+                )
+                .map((lawyer) => (
+                  <LawyerCard
+                    key={lawyer.id}
+                    lawyer={{
+                      ...lawyer,
+                      days: lawyer.displayDays,
+                    }}
+                    onBookConsultation={() => handleBookConsultation(lawyer)}
+                  />
+                ))}
             </>
           )}
 

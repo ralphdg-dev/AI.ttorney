@@ -104,46 +104,58 @@ export default function LawyerCard({
         </HStack>
       </HStack>
 
-      <HStack className="items-center mb-4">
-        <HStack className="items-center">
-          <Ionicons name="calendar-outline" size={16} color={Colors.text.sub} />
-          <Text className="text-sm ml-1" style={{ color: Colors.text.sub }}>
-            {lawyer.days}
-          </Text>
+      {/* Only show if days and hours_available are not empty */}
+      {lawyer.days &&
+        lawyer.days.trim() !== "" &&
+        lawyer.hours_available &&
+        lawyer.hours_available.length > 0 && (
+          <HStack className="items-center mb-4">
+            <HStack className="items-center">
+              <Ionicons
+                name="calendar-outline"
+                size={16}
+                color={Colors.text.sub}
+              />
+              <Text className="text-sm ml-1" style={{ color: Colors.text.sub }}>
+                {lawyer.days}
+              </Text>
 
-          {/* Get today's available hours */}
-          {(() => {
-            const today = new Date();
-            const dayNames = [
-              "Sunday",
-              "Monday",
-              "Tuesday",
-              "Wednesday",
-              "Thursday",
-              "Friday",
-              "Saturday",
-            ];
-            const currentDay = dayNames[today.getDay()];
-            const todayHours = lawyer.hours_available.find((h) =>
-              h.startsWith(`${currentDay}=`)
-            );
+              {/* Display only today's available time */}
+              {(() => {
+                const today = new Date();
+                const dayNames = [
+                  "Sunday",
+                  "Monday",
+                  "Tuesday",
+                  "Wednesday",
+                  "Thursday",
+                  "Friday",
+                  "Saturday",
+                ];
+                const currentDay = dayNames[today.getDay()];
 
-            if (todayHours) {
-              const time = todayHours.split("=")[1]?.trim();
-              return (
-                <Text
-                  className="text-sm ml-2"
-                  style={{ color: Colors.primary.blue }}
-                >
-                  • {time}
-                </Text>
-              );
-            }
+                const todayHours = lawyer.hours_available.find((h) =>
+                  h.startsWith(`${currentDay}=`)
+                );
 
-            return null;
-          })()}
-        </HStack>
-      </HStack>
+                if (todayHours) {
+                  const time = todayHours.split("=")[1]?.trim();
+                  if (time && time !== "") {
+                    return (
+                      <Text
+                        className="text-sm ml-2"
+                        style={{ color: Colors.primary.blue }}
+                      >
+                        • {time}
+                      </Text>
+                    );
+                  }
+                }
+                return null;
+              })()}
+            </HStack>
+          </HStack>
+        )}
 
       <Pressable
         className="py-3 rounded-lg items-center justify-center"
