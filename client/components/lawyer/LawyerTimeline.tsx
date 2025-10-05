@@ -19,7 +19,7 @@ type ForumPostWithUser = ForumPost & {
   animatedOpacity?: Animated.Value;
 };
 
-const LawyerTimeline: React.FC = () => {
+const LawyerTimeline: React.FC = React.memo(() => {
   const router = useRouter();
 
   const [posts, setPosts] = useState<ForumPostWithUser[]>([]);
@@ -176,11 +176,11 @@ const LawyerTimeline: React.FC = () => {
           // Refresh posts first
           loadPosts();
           
-          // Then after a longer delay, remove the optimistic post
+          // Then after a shorter delay, remove the optimistic post
           setTimeout(() => {
             setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
-          }, 1000); // Keep optimistic post for 1 second after confirmation
-        }, 500);
+          }, 200); // Shorter delay for more seamless transition
+        }, 300); // Reduced delay for faster response
       }
       return prev;
     });
@@ -210,6 +210,9 @@ const LawyerTimeline: React.FC = () => {
         className="flex-1"
         contentContainerStyle={{ paddingVertical: 10 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={loadPosts} />
+        }
       >
         {[...optimisticPosts, ...posts].map((post) => {
           // Convert database timestamp to relative time with real-time updates
@@ -313,6 +316,8 @@ const LawyerTimeline: React.FC = () => {
       </TouchableOpacity>
     </View>
   );
-};
+});
+
+LawyerTimeline.displayName = 'LawyerTimeline';
 
 export default LawyerTimeline;

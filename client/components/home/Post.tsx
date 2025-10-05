@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
 import ReportModal from '../common/ReportModal';
@@ -24,7 +24,7 @@ interface PostProps {
   onPostPress?: () => void;
 }
 
-const Post: React.FC<PostProps> = ({
+const Post: React.FC<PostProps> = React.memo(({
   id,
   user,
   timestamp,
@@ -63,7 +63,7 @@ const Post: React.FC<PostProps> = ({
     checkBookmarkStatus();
   }, [id, currentUser?.id]);
 
-  const handleBookmarkPress = async () => {
+  const handleBookmarkPress = useCallback(async () => {
     if (!currentUser?.id) {
       // User not authenticated, could show login prompt
       onBookmarkPress?.();
@@ -84,7 +84,7 @@ const Post: React.FC<PostProps> = ({
     } finally {
       setIsBookmarkLoading(false);
     }
-  };
+  }, [id, currentUser?.id, onBookmarkPress]);
 
   // Clean category text by removing "Related Post" and simplifying names
   const cleanCategory = category.replace(' Related Post', '').replace(' Law', '').toUpperCase();
@@ -122,7 +122,7 @@ const Post: React.FC<PostProps> = ({
     return 'OTHERS';
   };
 
-  const handleSubmitReport = async (reason: string, category: string, reasonContext?: string) => {
+  const handleSubmitReport = useCallback(async (reason: string, category: string, reasonContext?: string) => {
     if (!currentUser?.id || !id) {
       throw new Error('Missing user ID or post ID');
     }
@@ -156,7 +156,7 @@ const Post: React.FC<PostProps> = ({
     } finally {
       setIsReportLoading(false);
     }
-  };
+  }, [currentUser?.id, id]);
 
   const displayText = getDisplayText(cleanCategory);
 
@@ -272,7 +272,7 @@ const Post: React.FC<PostProps> = ({
       />
     </TouchableOpacity>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -425,5 +425,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
 });
+
+Post.displayName = 'Post';
 
 export default Post;

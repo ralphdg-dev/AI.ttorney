@@ -10,6 +10,7 @@ import Header from '../Header';
 import apiClient from '@/lib/api-client';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
+import SkeletonLoader from '../ui/SkeletonLoader';
 
 interface Reply {
   id: string;
@@ -72,6 +73,7 @@ const LawyerViewPost: React.FC = () => {
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Reset states when postId changes
   useEffect(() => {
@@ -269,6 +271,7 @@ const LawyerViewPost: React.FC = () => {
       } else {
         setReplies([]);
       }
+      setLoading(false);
     };
     load();
   }, [postId]);
@@ -295,7 +298,7 @@ const LawyerViewPost: React.FC = () => {
 
   // Function to add optimistic reply
   const addOptimisticReply = useCallback((replyData: { body: string }) => {
-    const animatedOpacity = new Animated.Value(0.5); // Start with 50% opacity
+    const animatedOpacity = new Animated.Value(0); // Start completely transparent
     const optimisticReply: Reply = {
       id: `optimistic-reply-${Date.now()}`,
       body: replyData.body,
@@ -316,6 +319,14 @@ const LawyerViewPost: React.FC = () => {
     };
 
     setOptimisticReplies(prev => [...prev, optimisticReply]);
+    
+    // Smooth fade in animation
+    Animated.timing(animatedOpacity, {
+      toValue: 0.8, // Semi-transparent while posting
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+    
     return optimisticReply.id;
   }, [currentUser]);
 
@@ -324,20 +335,55 @@ const LawyerViewPost: React.FC = () => {
     setOptimisticReplies(prev => {
       const reply = prev.find(r => r.id === optimisticId);
       if (reply?.animatedOpacity) {
+        // Animate to full opacity to show success
         Animated.timing(reply.animatedOpacity, {
           toValue: 1,
-          duration: 300,
+          duration: 150,
           useNativeDriver: true,
-        }).start(() => {
-          // Remove optimistic reply after animation and reload real replies
-          setOptimisticReplies(current => current.filter(r => r.id !== optimisticId));
-          // Reload replies to get the real reply
-          loadReplies();
-        });
+        }).start();
+        
+        // Keep the optimistic reply visible for longer, then remove it gradually
+        setTimeout(() => {
+          // Refresh replies first
+          if (postId) {
+            apiClient.getForumReplies(String(postId)).then(rep => {
+              if (rep.success && Array.isArray((rep.data as any)?.data)) {
+                const rows = (rep.data as any).data as any[];
+                const mappedReplies: Reply[] = rows.map((r: any) => {
+                  const isReplyAnon = !!r.is_anonymous;
+                  const replyUserData = r?.users || {};
+                  
+                  return {
+                    id: String(r.id),
+                    body: r.reply_body ?? r.body,
+                    created_at: r.created_at || null,
+                    updated_at: r.updated_at || null,
+                    user_id: r.user_id || null,
+                    is_anonymous: isReplyAnon,
+                    is_flagged: !!r.is_flagged,
+                    user: isReplyAnon ? undefined : {
+                      name: replyUserData?.full_name || replyUserData?.username || 'User',
+                      username: replyUserData?.username || 'user',
+                      avatar: `https://images.unsplash.com/photo-${Math.random() > 0.5 ? '1472099645785-5658abf4ff4e' : '1507003211169-0a1dd7228f2d'}?w=150&h=150&fit=crop&crop=face`,
+                      isLawyer: replyUserData?.role === 'verified_lawyer',
+                      lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+                    },
+                  };
+                });
+                setReplies(mappedReplies);
+                
+                // Remove optimistic reply only after real replies are loaded and rendered
+                setTimeout(() => {
+                  setOptimisticReplies(current => current.filter(r => r.id !== optimisticId));
+                }, 200); // Shorter delay for more seamless transition
+              }
+            });
+          }
+        }, 300); // Reduced delay for faster response
       }
       return prev;
     });
-  }, []);
+  }, [postId]);
 
   // Function to remove failed optimistic reply
   const removeOptimisticReply = useCallback((optimisticId: string) => {
@@ -414,17 +460,89 @@ const LawyerViewPost: React.FC = () => {
 
   return (
     <SafeAreaView style={tw`flex-1 bg-white`}>
+      {/* Loading Overlay - Covers any parent loading indicators */}
+      {loading && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'white',
+          zIndex: 9999,
+        }}>
+          {/* Header Space */}
+          <View style={{ height: 60 }} />
+          
+          {/* Skeleton Content */}
+          <View style={tw`bg-white px-5 py-6 border-b border-gray-100`}>
+            {/* User Info Skeleton */}
+            <View style={tw`flex-row items-start mb-4`}>
+              <SkeletonLoader width={56} height={56} borderRadius={28} style={tw`mr-4`} />
+              <View style={tw`flex-1`}>
+                <View style={tw`flex-row items-center justify-between mb-1`}>
+                  <SkeletonLoader width={120} height={16} borderRadius={4} style={tw`mb-2`} />
+                </View>
+                <SkeletonLoader width={80} height={12} borderRadius={4} style={tw`mb-3`} />
+                <View style={tw`flex-row items-center justify-between`}>
+                  <SkeletonLoader width={60} height={20} borderRadius={10} />
+                  <SkeletonLoader width={80} height={12} borderRadius={4} />
+                </View>
+              </View>
+            </View>
+
+            {/* Content Skeleton */}
+            <View style={tw`mb-6`}>
+              <SkeletonLoader width="100%" height={16} borderRadius={4} style={tw`mb-2`} />
+              <SkeletonLoader width="90%" height={16} borderRadius={4} style={tw`mb-2`} />
+              <SkeletonLoader width="75%" height={16} borderRadius={4} style={tw`mb-2`} />
+            </View>
+
+            {/* Actions Skeleton */}
+            <View style={tw`flex-row items-center justify-between pt-4 border-t border-gray-100`}>
+              <SkeletonLoader width={80} height={16} borderRadius={4} />
+            </View>
+
+            {/* Reply Input Skeleton */}
+            <View style={tw`mt-6 pt-6 border-t border-gray-100`}>
+              <View style={tw`flex-row items-center`}>
+                <SkeletonLoader width={40} height={40} borderRadius={20} style={tw`mr-3`} />
+                <SkeletonLoader width="70%" height={40} borderRadius={20} />
+                <SkeletonLoader width={40} height={40} borderRadius={20} style={tw`ml-3`} />
+              </View>
+            </View>
+
+            {/* Replies Section Skeleton */}
+            <View style={tw`mt-6 pt-6 border-t border-gray-100`}>
+              <SkeletonLoader width={100} height={18} borderRadius={4} style={tw`mb-4`} />
+              {[1, 2].map((index) => (
+                <View key={index} style={tw`flex-row items-start mb-4 pl-4 border-l-2 border-gray-100`}>
+                  <SkeletonLoader width={40} height={40} borderRadius={20} style={tw`mr-3`} />
+                  <View style={tw`flex-1`}>
+                    <SkeletonLoader width={100} height={14} borderRadius={4} style={tw`mb-2`} />
+                    <SkeletonLoader width="100%" height={14} borderRadius={4} style={tw`mb-1`} />
+                    <SkeletonLoader width="80%" height={14} borderRadius={4} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      )}
+      
       <Header 
         title="Post"
         showBackButton={true}
         onBackPress={() => router.back()}
         rightComponent={
-          <TouchableOpacity
-            onPress={() => setMenuOpen(!menuOpen)}
-            style={tw`p-2`}
-          >
-            <MoreHorizontal size={24} color="#6B7280" />
-          </TouchableOpacity>
+          !loading ? (
+            <TouchableOpacity
+              onPress={() => setMenuOpen(!menuOpen)}
+              style={tw`p-2`}
+            >
+              <MoreHorizontal size={24} color="#6B7280" />
+            </TouchableOpacity>
+          ) : null
         }
       />
 

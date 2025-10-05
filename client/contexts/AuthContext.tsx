@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../config/supabase';
-import { router } from 'expo-router';
+import { router, useSegments } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
 
 // Role hierarchy based on backend schema
@@ -48,6 +48,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const segments = useSegments();
   const [authState, setAuthState] = useState<AuthState>({
     session: null,
     user: null,
@@ -121,8 +122,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           // Handle different redirect scenarios
           if (redirectPath === 'loading') {
-            // Show loading screen while fetching status
-            router.replace('/loading' as any);
+            // Only redirect to loading if not already on a lawyer route
+            const currentPath = `/${segments.join('/')}`;
+            const isOnLawyerRoute = currentPath.startsWith('/lawyer');
+            
+            if (!isOnLawyerRoute) {
+              // Show loading screen while fetching status
+              router.replace('/loading' as any);
+            }
           } else if (redirectPath && redirectPath.includes('/lawyer-status/')) {
             router.replace(redirectPath as any);
           } else if (redirectPath) {

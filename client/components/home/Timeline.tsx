@@ -195,13 +195,13 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         // Keep the optimistic post visible for longer, then remove it gradually
         setTimeout(() => {
           // Refresh posts first
-          loadPosts();
-          
-          // Then after a longer delay, remove the optimistic post
-          setTimeout(() => {
-            setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
-          }, 1000); // Keep optimistic post for 1 second after confirmation
-        }, 500);
+          loadPosts().then(() => {
+            // Remove optimistic post only after real posts are loaded and rendered
+            setTimeout(() => {
+              setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+            }, 200); // Shorter delay for more seamless transition
+          });
+        }, 300); // Reduced delay for faster response
       }
       return prev;
     });
