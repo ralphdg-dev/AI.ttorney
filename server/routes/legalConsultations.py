@@ -272,3 +272,38 @@ async def cache_status():
         "single_lawyer_cache_size": len(single_lawyer_cache),
         "pending_requests": len(pending_requests)
     }
+    
+# Add this to your consultation_requests.py router
+@router.get("/user/{user_id}/active-requests")
+async def check_active_consultation_requests(user_id: str):
+    """Check if user has any active consultation requests"""
+    try:
+        # Check for pending or accepted requests
+        supabase_service = SupabaseService()
+        
+        response = (
+            supabase_service.supabase
+            .table("consultation_requests")
+            .select("id, status")
+            .eq("user_id", user_id)
+            .in_("status", ["pending", "accepted"])
+            .execute()
+            )
+
+        
+        has_active_requests = len(response.data) > 0 if response.data else False
+        
+        return {
+            "success": True,
+            "has_active_requests": has_active_requests,
+            "active_requests_count": len(response.data) if response.data else 0,
+            "requests": response.data if has_active_requests else []
+        }
+        
+    except Exception as e:
+        logger.error(f"Error checking active requests: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "has_active_requests": False
+        }

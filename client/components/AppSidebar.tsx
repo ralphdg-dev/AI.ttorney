@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  ReactNode,
+} from "react";
 import {
   View,
   Text,
@@ -8,10 +15,10 @@ import {
   StyleSheet,
   ScrollView,
   StatusBar,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useFavorites } from '@/contexts/FavoritesContext';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { useFavorites } from "@/contexts/FavoritesContext";
 import {
   X,
   User,
@@ -24,12 +31,12 @@ import {
   MessageSquare,
   Star,
   Calendar,
-} from 'lucide-react-native';
-import Colors from '../constants/Colors';
-import { GlobalStyles } from '../constants/GlobalStyles';
-import { useAuth } from '../contexts/AuthContext';
+} from "lucide-react-native";
+import Colors from "../constants/Colors";
+import { GlobalStyles } from "../constants/GlobalStyles";
+import { useAuth } from "../contexts/AuthContext";
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get("window");
 const SIDEBAR_WIDTH = screenWidth * 0.8;
 
 // Types
@@ -69,12 +76,14 @@ interface MenuItem {
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 // Context Provider
-export const SidebarProvider: React.FC<SidebarProviderProps> = ({ children }) => {
+export const SidebarProvider: React.FC<SidebarProviderProps> = ({
+  children,
+}) => {
   const [isVisible, setIsVisible] = useState(false);
 
   const openSidebar = () => setIsVisible(true);
   const closeSidebar = () => setIsVisible(false);
-  const toggleSidebar = () => setIsVisible(prev => !prev);
+  const toggleSidebar = () => setIsVisible((prev) => !prev);
 
   const value: SidebarContextType = {
     isVisible,
@@ -84,9 +93,7 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({ children }) =>
   };
 
   return (
-    <SidebarContext.Provider value={value}>
-      {children}
-    </SidebarContext.Provider>
+    <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>
   );
 };
 
@@ -94,7 +101,7 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({ children }) =>
 export const useSidebar = (): SidebarContextType => {
   const context = useContext(SidebarContext);
   if (context === undefined) {
-    throw new Error('useSidebar must be used within a SidebarProvider');
+    throw new Error("useSidebar must be used within a SidebarProvider");
   }
   return context;
 };
@@ -104,7 +111,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   isVisible,
   onClose,
   onNavigate,
-  userInfo = { name: 'User', email: 'user@example.com' },
+  userInfo = { name: "User", email: "user@example.com" },
 }) => {
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -147,10 +154,10 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // Get actual favorite count from context
   const { getFavoriteCount } = useFavorites();
-  
+
   const getBadgeCounts = () => ({
     favoriteTerms: getFavoriteCount(), // Count from favorites context
-    bookmarkedGuides: 0, // Count from user_forum_bookmarks table  
+    bookmarkedGuides: 0, // Count from user_forum_bookmarks table
     pendingConsultations: 0, // Count from consultation_requests where status = 'pending'
     unreadNotifications: 0, // Count from notifications table (when implemented)
   });
@@ -159,84 +166,84 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const menuItems: MenuItem[] = [
     {
-      id: 'bookmarks',
-      label: 'Favorite Terms',
+      id: "bookmarks",
+      label: "Favorite Terms",
       icon: Star,
-      route: 'favorite-terms',
+      route: "favorite-terms",
       badge: badgeCounts.favoriteTerms || undefined,
     },
     {
-      id: 'favorites',
-      label: 'Bookmarked Guides',
+      id: "favorites",
+      label: "Bookmarked Guides",
       icon: Bookmark,
-      route: 'bookmarked-guides',
+      route: "bookmarked-guides",
       badge: badgeCounts.bookmarkedGuides || undefined,
     },
     {
-      id: 'consultations',
-      label: 'Consultations',
+      id: "consultations",
+      label: "Consultations",
       icon: Calendar,
-      route: 'consultations',
+      route: "consultations",
       badge: badgeCounts.pendingConsultations || undefined,
     },
     {
-      id: 'divider1',
-      label: '',
+      id: "divider1",
+      label: "",
       icon: View,
       divider: true,
     },
     {
-      id: 'notifications',
-      label: 'Notifications',
+      id: "notifications",
+      label: "Notifications",
       icon: Bell,
-      route: 'notifications',
+      route: "notifications",
       badge: badgeCounts.unreadNotifications || undefined,
     },
     {
-      id: 'settings',
-      label: 'Settings',
+      id: "settings",
+      label: "Settings",
       icon: Settings,
-      route: 'settings',
+      route: "settings",
     },
     {
-      id: 'divider2',
-      label: '',
+      id: "divider2",
+      label: "",
       icon: View,
       divider: true,
     },
     {
-      id: 'help',
-      label: 'Help & Support',
+      id: "help",
+      label: "Help & Support",
       icon: HelpCircle,
-      route: 'help',
+      route: "help",
     },
     {
-      id: 'feedback',
-      label: 'Send Feedback',
+      id: "feedback",
+      label: "Send Feedback",
       icon: MessageSquare,
-      route: 'feedback',
+      route: "feedback",
     },
     {
-      id: 'about',
-      label: 'About AI.ttorney',
+      id: "about",
+      label: "About AI.ttorney",
       icon: FileText,
-      route: 'about',
+      route: "about",
     },
     {
-      id: 'divider3',
-      label: '',
+      id: "divider3",
+      label: "",
       icon: View,
       divider: true,
     },
     {
-      id: 'logout',
-      label: 'Sign Out',
+      id: "logout",
+      label: "Sign Out",
       icon: LogOut,
       action: async () => {
         try {
           await signOut();
         } catch (error) {
-          console.error('Logout error:', error);
+          console.error("Logout error:", error);
         }
       },
     },
@@ -257,7 +264,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
 
     const IconComponent = item.icon;
-    const isLogout = item.id === 'logout';
+    const isLogout = item.id === "logout";
 
     return (
       <TouchableOpacity
@@ -269,22 +276,17 @@ const Sidebar: React.FC<SidebarProps> = ({
         <View style={styles.menuItemContent}>
           <IconComponent
             size={22}
-            color={isLogout ? '#EF4444' : Colors.text.head}
+            color={isLogout ? "#EF4444" : Colors.text.head}
             strokeWidth={1.5}
           />
-          <Text
-            style={[
-              styles.menuItemText,
-              isLogout && styles.logoutText,
-            ]}
-          >
+          <Text style={[styles.menuItemText, isLogout && styles.logoutText]}>
             {item.label}
           </Text>
         </View>
         {item.badge && item.badge > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>
-              {item.badge > 99 ? '99+' : item.badge.toString()}
+              {item.badge > 99 ? "99+" : item.badge.toString()}
             </Text>
           </View>
         )}
@@ -297,7 +299,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="rgba(0,0,0,0.5)" barStyle="light-content" />
-      
+
       {/* Overlay */}
       <Animated.View
         style={[
@@ -327,9 +329,16 @@ const Sidebar: React.FC<SidebarProps> = ({
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.userInfo}
-            onPress={() => handleMenuItemPress({ id: 'profile', label: 'My Profile', icon: User, route: 'profile' })}
+            onPress={() =>
+              handleMenuItemPress({
+                id: "profile",
+                label: "My Profile",
+                icon: User,
+                route: "profile",
+              })
+            }
             activeOpacity={0.7}
           >
             <View style={styles.avatar}>
@@ -381,28 +390,31 @@ export const SidebarWrapper: React.FC<{
 
   const handleNavigate = (route: string) => {
     console.log(`Navigate to ${route}`);
-    
+
     switch (route) {
-      case 'favorite-terms':
-        router.push('/favorite-terms');
+      case "favorite-terms":
+        router.push("/favorite-terms");
         break;
-      case 'bookmarked-guides':
-        router.push('/bookmarked-guides');
+      case "consultations":
+        router.push("/consultations");
         break;
-      case 'notifications':
-        router.push('/notifications');
+      case "bookmarked-guides":
+        router.push("/bookmarked-guides");
         break;
-      case 'help':
-        router.push('/help');
+      case "notifications":
+        router.push("/notifications");
         break;
-      case 'settings':
-        router.push('/settings');
+      case "help":
+        router.push("/help");
         break;
-      case 'about':
-        router.push('/about');
+      case "settings":
+        router.push("/settings");
         break;
-      case 'profile':
-        console.log('Profile page not implemented yet');
+      case "about":
+        router.push("/about");
+        break;
+      case "profile":
+        console.log("Profile page not implemented yet");
         break;
       default:
         console.log(`Route ${route} not implemented yet`);
@@ -411,9 +423,9 @@ export const SidebarWrapper: React.FC<{
 
   // Use actual user data from auth context
   const actualUserInfo = {
-    name: user?.full_name || 'User',
-    email: user?.email || 'user@example.com',
-    avatar: userInfo?.avatar
+    name: user?.full_name || "User",
+    email: user?.email || "user@example.com",
+    avatar: userInfo?.avatar,
   };
 
   return (
@@ -428,7 +440,7 @@ export const SidebarWrapper: React.FC<{
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -436,24 +448,24 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   overlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'black',
+    backgroundColor: "black",
   },
   overlayTouchable: {
     flex: 1,
   },
   sidebar: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     bottom: 0,
     width: SIDEBAR_WIDTH,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
     shadowOffset: {
       width: 2,
       height: 0,
@@ -463,26 +475,26 @@ const styles = StyleSheet.create({
     elevation: 16,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: "#F3F4F6",
   },
   userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#F0F9FF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#F0F9FF",
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
   userDetails: {
@@ -508,9 +520,9 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 16,
     marginHorizontal: 8,
@@ -520,8 +532,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   menuItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
   menuItemText: {
@@ -531,25 +543,25 @@ const styles = StyleSheet.create({
     ...GlobalStyles.text,
   },
   logoutText: {
-    color: '#EF4444',
+    color: "#EF4444",
   },
   badge: {
     backgroundColor: Colors.primary.blue,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 6,
   },
   badgeText: {
     fontSize: 12,
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     ...GlobalStyles.textSemiBold,
   },
   divider: {
     height: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: "#F3F4F6",
     marginHorizontal: 20,
     marginVertical: 8,
   },
@@ -557,8 +569,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    alignItems: 'center',
+    borderTopColor: "#F3F4F6",
+    alignItems: "center",
   },
   footerText: {
     fontSize: 11,
@@ -567,9 +579,9 @@ const styles = StyleSheet.create({
   },
   footerSubtext: {
     fontSize: 9,
-    color: '#9CA3AF',
+    color: "#9CA3AF",
     marginTop: 2,
-    fontStyle: 'italic',
+    fontStyle: "italic",
     ...GlobalStyles.text,
   },
 });

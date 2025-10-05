@@ -63,6 +63,7 @@ const LawyerConsultPage: React.FC = () => {
     rejected_requests: 0,
     today_sessions: 0,
   });
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [confirmationModal, setConfirmationModal] = useState<{
     isOpen: boolean;
     actionType: "accept" | "complete" | "reject" | null;
@@ -218,21 +219,59 @@ const LawyerConsultPage: React.FC = () => {
     }
   };
 
-  const formatTimeAgo = (timestamp: string) => {
-    const now = new Date();
-    const requestedAt = new Date(timestamp);
-    const diffInHours = Math.floor(
-      (now.getTime() - requestedAt.getTime()) / (1000 * 60 * 60)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 30000); // Update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Modified formatTimeAgo to accept current time as parameter
+  const formatTimeAgo = (timestamp: string, currentTime: Date = new Date()) => {
+    if (!timestamp) return "Just now";
+
+    const past = new Date(timestamp);
+    const diffInSeconds = Math.floor(
+      (currentTime.getTime() - past.getTime()) / 1000
     );
 
-    if (diffInHours < 1) {
+    // If the timestamp is in the future, return "Just now"
+    if (diffInSeconds < 0) return "Just now";
+
+    if (diffInSeconds < 60) {
       return "Just now";
-    } else if (diffInHours < 24) {
-      return `${diffInHours} hour${diffInHours > 1 ? "s" : ""} ago`;
-    } else {
-      const diffInDays = Math.floor(diffInHours / 24);
-      return `${diffInDays} day${diffInDays > 1 ? "s" : ""} ago`;
     }
+
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes} minute${diffInMinutes === 1 ? "" : "s"} ago`;
+    }
+
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) {
+      return `${diffInHours} hour${diffInHours === 1 ? "" : "s"} ago`;
+    }
+
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) {
+      return `${diffInDays} day${diffInDays === 1 ? "" : "s"} ago`;
+    }
+
+    const diffInWeeks = Math.floor(diffInDays / 7);
+    if (diffInWeeks < 4) {
+      return `${diffInWeeks} week${diffInWeeks === 1 ? "" : "s"} ago`;
+    }
+
+    // For older dates, return the actual date
+    return past.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year:
+        past.getFullYear() !== currentTime.getFullYear()
+          ? "numeric"
+          : undefined,
+    });
   };
 
   const handleRequestPress = (requestId: string) => {
@@ -696,7 +735,7 @@ const LawyerConsultPage: React.FC = () => {
                       <View style={tw`flex-row items-center mb-1`}>
                         <Clock size={12} color="#6B7280" />
                         <Text style={tw`text-gray-500 text-xs ml-1`}>
-                          {formatTimeAgo(request.requested_at)}
+                          {formatTimeAgo(request.created_at, currentTime)}
                         </Text>
                       </View>
                       <Text

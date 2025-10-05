@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+// components/LawyerCard.tsx
+import React, { useState, useEffect } from "react";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Text } from "@/components/ui/text";
@@ -6,6 +7,8 @@ import { Pressable } from "@/components/ui/pressable";
 import { Box } from "@/components/ui/box";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../../../constants/Colors";
+import { useAuth } from "../../../contexts/AuthContext";
+import { hasActiveConsultationRequest } from "../../utils/consultationUtils";
 
 interface Lawyer {
   id: string;
@@ -27,13 +30,56 @@ export default function LawyerCard({
   onBookConsultation,
 }: LawyerCardProps) {
   const [showAllSpecialization, setShowAllSpecialization] = useState(false);
+  const [hasActiveRequest, setHasActiveRequest] = useState(false);
+  const [checkingRequest, setCheckingRequest] = useState(false);
+  const { user, isAuthenticated } = useAuth();
 
   const primarySpecialization = lawyer.specialization[0];
   const additionalCount = lawyer.specialization.length - 1;
 
+  useEffect(() => {
+    const checkActiveRequests = async () => {
+      if (!isAuthenticated || !user) {
+        setHasActiveRequest(false);
+        return;
+      }
+
+      setCheckingRequest(true);
+      try {
+        const activeRequest = await hasActiveConsultationRequest(user.id);
+        setHasActiveRequest(activeRequest);
+      } catch (error) {
+        console.error("Error checking active requests:", error);
+        setHasActiveRequest(false);
+      } finally {
+        setCheckingRequest(false);
+      }
+    };
+
+    checkActiveRequests();
+  }, [user, isAuthenticated]);
+
   const handleSpecializationPress = () => {
     setShowAllSpecialization(!showAllSpecialization);
   };
+
+  const handleBookPress = () => {
+    if (!hasActiveRequest) {
+      onBookConsultation(lawyer);
+    } else {
+      // You can show an alert or tooltip here
+      alert(
+        "You already have an active consultation request. Please wait for it to be completed or rejected before booking another one."
+      );
+    }
+  };
+
+  const isBookable = lawyer.available && !hasActiveRequest && !checkingRequest;
+  const buttonText = checkingRequest
+    ? "Checking..."
+    : hasActiveRequest
+    ? "Already Booked"
+    : "Book Consultation";
 
   return (
     <Box className="mx-6 mb-4 bg-white rounded-lg border border-gray-200 p-4">
@@ -46,7 +92,7 @@ export default function LawyerCard({
             {lawyer.name}
           </Text>
 
-          {/* specialization with tooltip */}
+          {/* Specialization with tooltip */}
           <Pressable onPress={handleSpecializationPress} className="mt-1">
             <HStack className="items-center">
               <Text className="text-sm" style={{ color: Colors.text.sub }}>
@@ -69,7 +115,7 @@ export default function LawyerCard({
                 className="text-sm font-semibold mb-1"
                 style={{ color: Colors.text.head }}
               >
-                All Specializations: {/* Fix typo */}
+                All Specializations:
               </Text>
               {lawyer.specialization.map((spec, index) => (
                 <Text
@@ -160,18 +206,18 @@ export default function LawyerCard({
       <Pressable
         className="py-3 rounded-lg items-center justify-center"
         style={{
-          backgroundColor: lawyer.available ? Colors.primary.blue : "#E5E7EB",
+          backgroundColor: isBookable ? Colors.primary.blue : "#E5E7EB",
         }}
-        onPress={() => lawyer.available && onBookConsultation(lawyer)}
-        disabled={!lawyer.available}
+        onPress={handleBookPress}
+        disabled={!isBookable || checkingRequest}
       >
         <Text
           className="font-semibold"
           style={{
-            color: lawyer.available ? "white" : "#9CA3AF",
+            color: isBookable ? "white" : "#9CA3AF",
           }}
         >
-          Book Consultation
+          {buttonText}
         </Text>
       </Pressable>
     </Box>

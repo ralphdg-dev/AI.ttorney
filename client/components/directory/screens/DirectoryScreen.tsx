@@ -26,6 +26,7 @@ import Navbar from "../../Navbar";
 import { SidebarProvider, SidebarWrapper } from "../../AppSidebar";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../../../constants/Colors";
+import { useAuth } from "../../../contexts/AuthContext";
 
 interface Lawyer {
   id: string;
@@ -59,11 +60,11 @@ export default function DirectoryScreen() {
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [selectedSpecialization, setSelectedSpecialization] =
     useState<string>("All");
+  const { user, isAuthenticated } = useAuth();
 
   const { height: screenHeight } = Dimensions.get("window");
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(300));
-
 
   useEffect(() => {
     if (filterVisible) {
@@ -251,6 +252,12 @@ export default function DirectoryScreen() {
 
   const handleBookConsultation = useCallback(
     (lawyer: Lawyer & { displayDays: string }): void => {
+      if (!isAuthenticated || !user) {
+        // Redirect to login if not authenticated
+        router.push("/login");
+        return;
+      }
+
       router.push({
         pathname: "/booklawyer",
         params: {
@@ -262,10 +269,11 @@ export default function DirectoryScreen() {
           lawyerDays: lawyer.displayDays,
           lawyerhours_available: JSON.stringify(lawyer.hours_available),
           lawyerBio: lawyer.bio,
+          userId: user.id,
         },
       });
     },
-    [router]
+    [router, user, isAuthenticated]
   );
 
   const hasActiveFilters =
