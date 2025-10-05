@@ -3,91 +3,27 @@ import { Book, Eye, Pencil, Archive } from 'lucide-react';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import ViewTermModal from '../../components/glossary/ViewTermModal';
+import Pagination from '../../components/ui/Pagination';
+import glossaryTermsService from '../../services/glossaryTermsService';
 
 const categories = ['All', 'Family', 'Criminal', 'Civil', 'Labor', 'Consumer', 'Others'];
-
-const sampleTerms = [
-  { 
-    id: 1,
-    term_en: 'Custody', 
-    term_fil: 'Kustodiya', 
-    definition_en: 'Legal guardianship of a child',
-    definition_fil: 'Legal na pag-aalaga sa isang bata',
-    example_en: 'The court awarded custody to the mother.',
-    example_fil: 'Ibinigay ng korte ang kustodiya sa ina.',
-    category: 'family', 
-    created_at: '2025-08-01T10:30:00Z', 
-    updated_at: '2025-08-15T14:20:00Z', 
-    view_count: 125,
-    is_verified: true,
-    verified_by: 'Admin Jane'
-  },
-  { 
-    id: 2,
-    term_en: 'Contract', 
-    term_fil: 'Kontrata', 
-    definition_en: 'A legally binding agreement between parties',
-    definition_fil: 'Isang legal na kasunduan sa pagitan ng mga partido',
-    example_en: 'They signed a contract for the sale of the house.',
-    example_fil: 'Pumirma sila ng kontrata para sa pagbebenta ng bahay.',
-    category: 'civil', 
-    created_at: '2025-07-20T09:15:00Z', 
-    updated_at: '2025-08-10T16:45:00Z', 
-    view_count: 89,
-    is_verified: true,
-    verified_by: 'Admin John'
-  },
-  { 
-    id: 3,
-    term_en: 'Warranty', 
-    term_fil: 'Garantya', 
-    definition_en: 'A guarantee provided by a seller',
-    definition_fil: 'Garantiya na ibinibigay ng nagbebenta',
-    example_en: 'The product comes with a one-year warranty.',
-    example_fil: 'Ang produkto ay may kasamang isang taong garantiya.',
-    category: 'consumer', 
-    created_at: '2025-07-05T11:00:00Z', 
-    updated_at: '2025-07-06T12:30:00Z', 
-    view_count: 67,
-    is_verified: false,
-    verified_by: null
-  },
-  { 
-    id: 4,
-    term_en: 'Bail', 
-    term_fil: 'Piyansa', 
-    definition_en: 'Money paid to secure temporary release from custody',
-    definition_fil: 'Perang bayad upang makakuha ng pansamantalang kalayaan',
-    example_en: 'The judge set bail at $10,000.',
-    example_fil: 'Itinakda ng hukom ang piyansa sa $10,000.',
-    category: 'criminal', 
-    created_at: '2025-06-11T08:45:00Z', 
-    updated_at: '2025-06-12T10:15:00Z', 
-    view_count: 203,
-    is_verified: true,
-    verified_by: 'Admin Mark'
-  },
-  { 
-    id: 5,
-    term_en: 'Dismissal', 
-    term_fil: 'Pagkatanggal', 
-    definition_en: 'Termination of employment',
-    definition_fil: 'Pagkakaalis sa trabaho',
-    example_en: 'The employee filed a case for wrongful dismissal.',
-    example_fil: 'Naghain ang empleyado ng kaso para sa maling pagkatanggal.',
-    category: 'labor', 
-    created_at: '2025-05-02T13:20:00Z', 
-    updated_at: '2025-07-01T15:10:00Z', 
-    view_count: 156,
-    is_verified: null,
-    verified_by: null
-  },
-];
 
 const ManageGlossaryTerms = () => {
   const [query, setQuery] = React.useState('');
   const [category, setCategory] = React.useState('All');
   const [sortBy, setSortBy] = React.useState('Newest');
+  const [viewModalOpen, setViewModalOpen] = React.useState(false);
+  const [selectedTerm, setSelectedTerm] = React.useState(null);
+  const [terms, setTerms] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
+  const [pagination, setPagination] = React.useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
+  });
   const [confirmationModal, setConfirmationModal] = React.useState({
     open: false,
     type: '',
@@ -95,6 +31,60 @@ const ManageGlossaryTerms = () => {
     termName: '',
     loading: false
   });
+
+  // Load data from API
+  const loadData = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Map frontend category to backend format
+      const categoryParam = category === 'All' ? 'all' : category.toLowerCase();
+
+      const params = {
+        page: pagination.page,
+        limit: pagination.limit,
+        search: query.trim(),
+        category: categoryParam,
+        status: 'all' // Show all verification statuses
+      };
+
+      const response = await glossaryTermsService.getGlossaryTerms(params);
+
+      if (response.success) {
+        setTerms(response.data || []);
+        setPagination(prev => ({
+          ...prev,
+          total: response.pagination?.total || 0,
+          pages: response.pagination?.pages || 0
+        }));
+      } else {
+        throw new Error(response.error || 'Failed to load glossary terms');
+      }
+    } catch (err) {
+      console.error('Error loading glossary terms:', err);
+      setError(err.message || 'Failed to load glossary terms');
+      setTerms([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.page, pagination.limit, query, category]);
+
+  // Load data on component mount and when dependencies change
+  React.useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Handle pagination
+  const handlePageChange = (newPage) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+  };
+
+  // Handle view term
+  const handleView = (term) => {
+    setSelectedTerm(term);
+    setViewModalOpen(true);
+  };
 
   // Handle edit term
   const handleEdit = (term) => {
@@ -184,9 +174,11 @@ const ManageGlossaryTerms = () => {
     try {
       setConfirmationModal(prev => ({ ...prev, loading: true }));
       
-      // TODO: Implement actual archive API call
-      console.log(`Archiving term: ${termName}`);
-      alert(`Term "${termName}" has been archived successfully!`);
+      // Delete the term (since we don't have archive functionality, we'll delete)
+      await glossaryTermsService.deleteGlossaryTerm(termId);
+      
+      // Reload data
+      await loadData();
       
       setConfirmationModal({ open: false, type: '', termId: null, termName: '', loading: false, changes: null });
       
@@ -237,21 +229,56 @@ const ManageGlossaryTerms = () => {
 
   // Helper function to format date
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return '-';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric',
+    return date.toLocaleString('en-US', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit',
       hour: '2-digit',
       minute: '2-digit'
     });
   };
 
-  // Helper function to format category
-  const formatCategory = (category) => {
-    if (!category) return 'N/A';
-    return category.charAt(0).toUpperCase() + category.slice(1);
+  // Helper function to get category colors (matching client-side forum post colors)
+  const getCategoryColors = (category) => {
+    switch ((category || '').toLowerCase()) {
+      case 'family':
+        return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', textColor: '#BE123C' };
+      case 'civil':
+        return { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE', textColor: '#7C3AED' };
+      case 'criminal':
+        return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', textColor: '#DC2626' };
+      case 'labor':
+        return { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', textColor: '#1D4ED8' };
+      case 'consumer':
+        return { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', textColor: '#047857' };
+      case 'others':
+        return { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', textColor: '#374151' };
+      default:
+        return { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', textColor: '#374151' };
+    }
+  };
+
+  // Helper function to render category badge
+  const renderCategoryBadge = (category) => {
+    if (!category) return '-';
+    
+    const colors = getCategoryColors(category);
+    const displayText = category.charAt(0).toUpperCase() + category.slice(1);
+    
+    return (
+      <span 
+        className="inline-flex items-center px-2 py-1 rounded text-[10px] font-semibold border"
+        style={{
+          backgroundColor: colors.backgroundColor,
+          borderColor: colors.borderColor,
+          color: colors.textColor
+        }}
+      >
+        {displayText}
+      </span>
+    );
   };
 
   // Helper function to render verification status
@@ -272,7 +299,7 @@ const ManageGlossaryTerms = () => {
     { 
       key: 'category', 
       header: 'Category',
-      render: (row) => formatCategory(row.category)
+      render: (row) => renderCategoryBadge(row.category)
     },
     { 
       key: 'is_verified', 
@@ -288,7 +315,7 @@ const ManageGlossaryTerms = () => {
     { 
       key: 'verified_by', 
       header: 'Verified By',
-      render: (row) => row.verified_by || 'N/A'
+      render: (row) => row.verified_by || '-'
     },
     {
       key: 'actions',
@@ -297,7 +324,11 @@ const ManageGlossaryTerms = () => {
       render: (row) => (
         <div className="flex items-center justify-end space-x-2 text-gray-600">
           <Tooltip content="View">
-            <button className="p-1 rounded hover:bg-gray-100" aria-label="View">
+            <button 
+              className="p-1 rounded hover:bg-gray-100" 
+              aria-label="View"
+              onClick={() => handleView(row)}
+            >
               <Eye size={16} />
             </button>
           </Tooltip>
@@ -324,28 +355,11 @@ const ManageGlossaryTerms = () => {
     },
   ];
 
-  const filteredData = React.useMemo(() => {
-    let rows = [...sampleTerms];
-    
-    // Search filter
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      rows = rows.filter((r) => 
-        r.term_en?.toLowerCase().includes(q) ||
-        r.term_fil?.toLowerCase().includes(q) ||
-        r.definition_en?.toLowerCase().includes(q) ||
-        r.definition_fil?.toLowerCase().includes(q) ||
-        r.category?.toLowerCase().includes(q) ||
-        r.verified_by?.toLowerCase().includes(q)
-      );
-    }
-    
-    // Category filter
-    if (category !== 'All') {
-      rows = rows.filter((r) => formatCategory(r.category) === category);
-    }
+  // All terms with client-side sorting
+  const sortedTerms = React.useMemo(() => {
+    let rows = [...terms];
 
-    // Sorting
+    // Client-side sorting (since API returns data sorted by created_at desc by default)
     const byDate = (a, b) => new Date(b.created_at) - new Date(a.created_at);
     const byDateAsc = (a, b) => new Date(a.created_at) - new Date(b.created_at);
     const byEn = (a, b) => (a.term_en || '').localeCompare(b.term_en || '');
@@ -363,7 +377,30 @@ const ManageGlossaryTerms = () => {
       default: break;
     }
     return rows;
-  }, [query, category, sortBy]);
+  }, [terms, sortBy]);
+
+  // Paginated data for display
+  const paginatedData = React.useMemo(() => {
+    const startIndex = (pagination.page - 1) * pagination.limit;
+    const endIndex = startIndex + pagination.limit;
+    return sortedTerms.slice(startIndex, endIndex);
+  }, [sortedTerms, pagination.page, pagination.limit]);
+
+  // Update pagination when sorted data changes
+  React.useEffect(() => {
+    const totalItems = sortedTerms.length;
+    const totalPages = Math.ceil(totalItems / pagination.limit);
+    setPagination(prev => ({ 
+      ...prev, 
+      total: totalItems, 
+      pages: totalPages 
+    }));
+    
+    // Reset to page 1 if current page is beyond available pages
+    if (pagination.page > totalPages && totalPages > 0) {
+      setPagination(prev => ({ ...prev, page: 1 }));
+    }
+  }, [sortedTerms.length, pagination.limit, pagination.page]);
 
   return (
     <div>
@@ -410,14 +447,43 @@ const ManageGlossaryTerms = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredData.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-4 py-2 text-center text-[11px] text-gray-500">
-                    No glossary terms found.
+                  <td colSpan={columns.length} className="px-4 py-8 text-center text-[11px] text-gray-500">
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#023D7B] mr-2"></div>
+                      Loading glossary terms...
+                    </div>
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={columns.length} className="px-4 py-8 text-center text-[11px] text-red-600">
+                    <div className="flex flex-col items-center">
+                      <p className="mb-2">Error loading glossary terms: {error}</p>
+                      <button 
+                        onClick={loadData}
+                        className="text-[11px] px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginatedData.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length} className="px-4 py-8 text-center text-[11px] text-gray-500">
+                    <div className="flex flex-col items-center">
+                      <Book className="h-8 w-8 text-gray-400 mb-2" />
+                      <p>No glossary terms found</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {query ? 'Try adjusting your search criteria' : 'Click "Add New" to create your first term'}
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                filteredData.map((row) => (
+                paginatedData.map((row) => (
                   <tr key={row.id} className="hover:bg-gray-50">
                     {columns.map((column) => (
                       <td
@@ -437,6 +503,23 @@ const ManageGlossaryTerms = () => {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      <Pagination
+        currentPage={pagination.page}
+        totalPages={pagination.pages}
+        totalItems={pagination.total}
+        itemsPerPage={pagination.limit}
+        onPageChange={handlePageChange}
+        itemName="terms"
+      />
+
+      {/* View Term Modal */}
+      <ViewTermModal
+        open={viewModalOpen}
+        onClose={() => setViewModalOpen(false)}
+        term={selectedTerm}
+      />
 
       {/* Confirmation Modal */}
       <ConfirmationModal
