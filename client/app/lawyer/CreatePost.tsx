@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Shield, ArrowLeft } from 'lucide-react-native';
@@ -14,13 +14,13 @@ import apiClient from '@/lib/api-client';
 const LawyerCreatePost: React.FC = () => {
   const router = useRouter();
   const [content, setContent] = useState('');
-  const [categoryId, setCategoryId] = useState<string>(LEGAL_CATEGORIES[0]?.id ?? 'family');
+  const [categoryId, setCategoryId] = useState<string>('');
   const MAX_LEN = 500;
 
   const isPostDisabled = useMemo(() => {
     const len = content.length;
-    return content.trim().length === 0 || len > MAX_LEN;
-  }, [content]);
+    return content.trim().length === 0 || len > MAX_LEN || !categoryId;
+  }, [content, categoryId]);
 
   const onPressPost = async () => {
     if (isPostDisabled) return;
@@ -56,6 +56,13 @@ const LawyerCreatePost: React.FC = () => {
       if (optimisticId) {
         (global as any).forumActions?.confirmOptimisticPost(optimisticId);
       }
+      
+      // Show success message
+      Alert.alert(
+        'Success!',
+        'Your post has been published successfully.',
+        [{ text: 'OK' }]
+      );
     } catch (e) {
       console.error('Create post error', e);
       // Remove the optimistic post on error
