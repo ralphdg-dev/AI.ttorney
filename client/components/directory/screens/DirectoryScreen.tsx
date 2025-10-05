@@ -8,7 +8,10 @@ import {
   Modal,
   Pressable,
   Dimensions,
+  Animated,
+  Easing,
 } from "react-native";
+import FilterModal from "../components/FilterModal";
 import { useRouter } from "expo-router";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
@@ -18,7 +21,6 @@ import { Pressable as UIPressable } from "@/components/ui/pressable";
 import tw from "tailwind-react-native-classnames";
 import Header from "../../../components/Header";
 import TabNavigation from "../components/TabNavigation";
-import SearchBar from "../components/SearchBar";
 import LawyerCard from "../components/LawyerCard";
 import Navbar from "../../Navbar";
 import { SidebarProvider, SidebarWrapper } from "../../AppSidebar";
@@ -59,25 +61,43 @@ export default function DirectoryScreen() {
     useState<string>("All");
 
   const { height: screenHeight } = Dimensions.get("window");
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [slideAnim] = useState(new Animated.Value(300));
 
-  const SPECIALIZATIONS = [
-    "All",
-    "Family Law",
-    "Labor Law",
-    "Civil Law",
-    "Criminal Law",
-    "Consumer Law",
-  ];
 
-  const DAYS = [
-    { full: "Monday", abbr: "Mon" },
-    { full: "Tuesday", abbr: "Tue" },
-    { full: "Wednesday", abbr: "Wed" },
-    { full: "Thursday", abbr: "Thu" },
-    { full: "Friday", abbr: "Fri" },
-    { full: "Saturday", abbr: "Sat" },
-    { full: "Sunday", abbr: "Sun" },
-  ];
+  useEffect(() => {
+    if (filterVisible) {
+      // Animate fade-in + slide-up
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Animate fade-out + slide-down
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 300,
+          duration: 200,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [filterVisible]);
 
   const fetchLawyers = useCallback(async (forceRefresh: boolean = false) => {
     try {
@@ -305,191 +325,14 @@ export default function DirectoryScreen() {
           </UIPressable>
         </HStack>
 
-        {/* Filter Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
+        <FilterModal
           visible={filterVisible}
-          onRequestClose={() => setFilterVisible(false)}
-        >
-          <Pressable
-            style={[tw`flex-1`, { backgroundColor: "rgba(0, 0, 0, 0.4)" }]}
-            onPress={() => setFilterVisible(false)}
-          >
-            <Pressable
-              style={[
-                tw`bg-white rounded-t-3xl`,
-                {
-                  marginTop: "auto",
-                  maxHeight: screenHeight * 0.8,
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: -4 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 12,
-                  elevation: 20,
-                },
-              ]}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <VStack className="p-6">
-                {/* Modal Header */}
-                <HStack className="items-center justify-between mb-6">
-                  <UIText
-                    className="text-xl font-bold"
-                    style={{ color: Colors.text.head }}
-                  >
-                    Filter Lawyers
-                  </UIText>
-                  <UIPressable
-                    onPress={() => setFilterVisible(false)}
-                    className="p-2"
-                  >
-                    <Ionicons name="close" size={24} color={Colors.text.sub} />
-                  </UIPressable>
-                </HStack>
-
-                <ScrollView
-                  showsVerticalScrollIndicator={false}
-                  style={{ maxHeight: screenHeight * 0.5 }}
-                >
-                  {/* Days Filter Section */}
-                  <VStack className="mb-6">
-                    <HStack className="items-center mb-3">
-                      <Ionicons
-                        name="calendar-outline"
-                        size={18}
-                        color={Colors.primary.blue}
-                      />
-                      <UIText
-                        className="text-base font-semibold ml-2"
-                        style={{ color: Colors.text.head }}
-                      >
-                        Available Days
-                      </UIText>
-                    </HStack>
-
-                    <View style={tw`flex-row flex-wrap -mx-1`}>
-                      {DAYS.map(({ full, abbr }) => {
-                        const selected = selectedDays.includes(full);
-                        return (
-                          <Pressable
-                            key={full}
-                            onPress={() =>
-                              setSelectedDays((prev) =>
-                                selected
-                                  ? prev.filter((d) => d !== full)
-                                  : [...prev, full]
-                              )
-                            }
-                            style={[
-                              tw`px-4 py-2 m-1 rounded-lg border`,
-                              {
-                                backgroundColor: selected
-                                  ? Colors.primary.blue
-                                  : "white",
-                                borderColor: selected
-                                  ? Colors.primary.blue
-                                  : "#E5E7EB",
-                              },
-                            ]}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 14,
-                                fontWeight: "500",
-                                color: selected ? "white" : Colors.text.sub,
-                              }}
-                            >
-                              {abbr}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </VStack>
-
-                  {/* Specialization Filter Section */}
-                  <VStack className="mb-6">
-                    <HStack className="items-center mb-3">
-                      <Ionicons
-                        name="briefcase-outline"
-                        size={18}
-                        color={Colors.primary.blue}
-                      />
-                      <UIText
-                        className="text-base font-semibold ml-2"
-                        style={{ color: Colors.text.head }}
-                      >
-                        Specialization
-                      </UIText>
-                    </HStack>
-
-                    <View style={tw`flex-row flex-wrap -mx-1`}>
-                      {SPECIALIZATIONS.map((spec) => {
-                        const selected = selectedSpecialization === spec;
-                        return (
-                          <Pressable
-                            key={spec}
-                            onPress={() => setSelectedSpecialization(spec)}
-                            style={[
-                              tw`px-4 py-2 m-1 rounded-lg border`,
-                              {
-                                backgroundColor: selected
-                                  ? Colors.primary.blue
-                                  : "white",
-                                borderColor: selected
-                                  ? Colors.primary.blue
-                                  : "#E5E7EB",
-                              },
-                            ]}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 14,
-                                fontWeight: "500",
-                                color: selected ? "white" : Colors.text.sub,
-                              }}
-                            >
-                              {spec}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </VStack>
-                </ScrollView>
-
-                {/* Action Buttons */}
-                <HStack className="items-center justify-between pt-4 border-t border-gray-200">
-                  <UIPressable
-                    onPress={() => {
-                      setSelectedDays([]);
-                      setSelectedSpecialization("All");
-                    }}
-                    className="px-6 py-3 rounded-lg border border-gray-200"
-                  >
-                    <UIText
-                      className="font-semibold"
-                      style={{ color: Colors.text.sub }}
-                    >
-                      Clear All
-                    </UIText>
-                  </UIPressable>
-
-                  <UIPressable
-                    onPress={() => setFilterVisible(false)}
-                    className="px-8 py-3 rounded-lg"
-                    style={{ backgroundColor: Colors.primary.blue }}
-                  >
-                    <UIText className="font-semibold text-white">
-                      Apply Filters
-                    </UIText>
-                  </UIPressable>
-                </HStack>
-              </VStack>
-            </Pressable>
-          </Pressable>
-        </Modal>
+          onClose={() => setFilterVisible(false)}
+          selectedDays={selectedDays}
+          setSelectedDays={setSelectedDays}
+          selectedSpecialization={selectedSpecialization}
+          setSelectedSpecialization={setSelectedSpecialization}
+        />
 
         <ScrollView
           style={tw`flex-1`}
@@ -537,17 +380,6 @@ export default function DirectoryScreen() {
             </VStack>
           ) : (
             <>
-              {hasActiveFilters && (
-                <HStack className="px-6 mb-2 items-center">
-                  <UIText
-                    className="text-sm"
-                    style={{ color: Colors.text.sub }}
-                  >
-                    Showing {filteredLawyers.length} result
-                    {filteredLawyers.length !== 1 ? "s" : ""}
-                  </UIText>
-                </HStack>
-              )}
               {filteredLawyers
                 .filter(
                   (lawyer) =>

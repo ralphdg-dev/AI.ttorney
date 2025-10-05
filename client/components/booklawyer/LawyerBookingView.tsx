@@ -85,7 +85,7 @@ export default function LawyerBookingView() {
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedDay, setSelectedDay] = useState(currentDate);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
-
+  
   const months = [
     "January",
     "February",
