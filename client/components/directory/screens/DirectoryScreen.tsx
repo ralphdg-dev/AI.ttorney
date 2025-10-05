@@ -32,6 +32,7 @@ interface Lawyer {
   specialization: string;
   location: string;
   hours: string;
+  bio: string;
   days: string;
   available: boolean;
   hours_available: string;
@@ -240,6 +241,7 @@ export default function DirectoryScreen() {
           lawyerHours: lawyer.hours,
           lawyerDays: lawyer.displayDays,
           lawyerhours_available: JSON.stringify(lawyer.hours_available),
+          lawyerBio: lawyer.bio,
         },
       });
     },

@@ -23,6 +23,7 @@ class Lawyer(BaseModel):
     id: uuid.UUID
     lawyer_id: uuid.UUID
     name: str
+    bio: str
     specialization: Optional[str] = None
     location: Optional[str] = None
     hours: Optional[str] = None
@@ -116,6 +117,7 @@ async def fetch_lawyers_from_db(supabase_service):
                         location=lawyer_data.get("location"),
                         hours=lawyer_data.get("hours"),
                         days=lawyer_data.get("days"),
+                        bio=lawyer_data.get("bio"),
                         available=bool(lawyer_data.get("available", False)),
                         hours_available=lawyer_data.get("hours_available"),
                         created_at=lawyer_data.get("created_at")
@@ -161,6 +163,7 @@ async def fetch_lawyers_from_db(supabase_service):
                                 specialization=lawyer_data.get("specialization"),
                                 location=lawyer_data.get("location"),
                                 hours=lawyer_data.get("hours"),
+                                bio=lawyer_data.get("bio"),
                                 days=lawyer_data.get("days"),
                                 available=bool(lawyer_data.get("available", False)),
                                 hours_available=lawyer_data.get("hours_available"),
@@ -235,6 +238,7 @@ async def get_lawyer(
                 specialization=lawyer_data.get("specialization"),
                 location=lawyer_data.get("location"),
                 hours=lawyer_data.get("hours"),
+                bio=lawyer_data.get("bio"),
                 days=lawyer_data.get("days"),
                 available=bool(lawyer_data.get("available", False)),
                 hours_available=lawyer_data.get("hours_available"),

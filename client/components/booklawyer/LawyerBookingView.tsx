@@ -41,6 +41,7 @@ interface LawyerData {
   specialization: string[];
   hours: string;
   days: string;
+  bio: string;
   hours_available: DayAvailability[];
 }
 
@@ -65,6 +66,7 @@ export default function LawyerBookingView() {
   const [communicationMode, setCommunicationMode] = useState("Online");
   const [concern, setConcern] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showFullBio, setShowFullBio] = useState(false);
 
   const [modeDropdownVisible, setModeDropdownVisible] = useState(false);
   const [showAllSpecializations, setShowAllSpecializations] = useState(false);
@@ -99,6 +101,9 @@ export default function LawyerBookingView() {
     "December",
   ];
   const communicationModes = ["Online", "In-person", "Phone"];
+
+  const isMediumScreen = width >= 375 && width < 768;
+  const isLargeScreen = width >= 768;
 
   const parseHoursAvailable = (hoursAvailable: string[]): DayAvailability[] => {
     const dayAvailability: DayAvailability[] = [];
@@ -214,6 +219,7 @@ export default function LawyerBookingView() {
         hours: params.lawyerHours as string,
         days: params.lawyerDays as string,
         hours_available: parseHoursAvailable(hours_available),
+        bio: params.lawyerBio as string,
       };
 
       setLawyerData(lawyerInfo);
@@ -227,6 +233,7 @@ export default function LawyerBookingView() {
         hours: params.lawyerHours as string,
         days: params.lawyerDays as string,
         hours_available: [],
+        bio: (params.lawyerBio as string) || "",
       });
     }
   };
@@ -450,6 +457,12 @@ export default function LawyerBookingView() {
     }
   };
 
+  const getTruncatedBio = (bio: string, maxLength: number) => {
+    if (!bio || bio.trim() === "") return "";
+    if (bio.length <= maxLength) return bio;
+    return bio.substring(0, maxLength).trim() + "...";
+  };
+
   if (!lawyerData) {
     return (
       <Box className="flex-1 bg-gray-50 items-center justify-center">
@@ -460,6 +473,9 @@ export default function LawyerBookingView() {
 
   const primarySpecialization = lawyerData.specialization[0];
   const additionalCount = lawyerData.specialization.length - 1;
+  const bioMaxLength = isSmallScreen ? 100 : isMediumScreen ? 100 : 200;
+  const shouldShowReadMore =
+    lawyerData.bio && lawyerData.bio.length > bioMaxLength;
 
   return (
     <Box className="flex-1 bg-gray-50">
@@ -557,6 +573,85 @@ export default function LawyerBookingView() {
               {lawyerData.days}
             </Text>
           </HStack>
+          {lawyerData.bio && lawyerData.bio.trim() !== "" ? (
+            <VStack
+              className={`mt-4 p-4 bg-gray-50 rounded-lg ${
+                isLargeScreen ? "mx-8" : "mx-0"
+              }`}
+            >
+              <HStack className="items-center mb-2">
+                <Ionicons
+                  name="person-outline"
+                  size={18}
+                  color={Colors.primary.blue}
+                />
+                <Text
+                  className={`${
+                    isSmallScreen ? "text-sm" : "text-base"
+                  } font-semibold ml-2`}
+                  style={{ color: Colors.text.head }}
+                >
+                  About
+                </Text>
+              </HStack>
+
+              <Text
+                className={`${
+                  isSmallScreen
+                    ? "text-xs leading-5"
+                    : isMediumScreen
+                    ? "text-sm leading-6"
+                    : "text-base leading-7"
+                }`}
+                style={{
+                  color: Colors.text.sub,
+                  textAlign: "justify",
+                }}
+              >
+                {showFullBio || !shouldShowReadMore
+                  ? lawyerData.bio
+                  : getTruncatedBio(lawyerData.bio, bioMaxLength)}
+              </Text>
+
+              {shouldShowReadMore && (
+                <Pressable
+                  onPress={() => setShowFullBio(!showFullBio)}
+                  className="mt-2"
+                >
+                  <Text
+                    className={`${
+                      isSmallScreen ? "text-xs" : "text-sm"
+                    } font-medium`}
+                    style={{ color: Colors.primary.blue }}
+                  >
+                    {showFullBio ? "Show Less" : "Read More"}
+                  </Text>
+                </Pressable>
+              )}
+            </VStack>
+          ) : (
+            <Box
+              className={`mt-4 p-4 bg-gray-50 rounded-lg ${
+                isLargeScreen ? "mx-8" : "mx-0"
+              }`}
+            >
+              <HStack className="items-center">
+                <Ionicons
+                  name="information-circle-outline"
+                  size={18}
+                  color={Colors.text.sub}
+                />
+                <Text
+                  className={`${
+                    isSmallScreen ? "text-xs" : "text-sm"
+                  } italic ml-2`}
+                  style={{ color: Colors.text.sub }}
+                >
+                  No bio available
+                </Text>
+              </HStack>
+            </Box>
+          )}
         </VStack>
 
         {/* Schedule */}
