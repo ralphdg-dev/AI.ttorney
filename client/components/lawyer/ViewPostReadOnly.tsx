@@ -10,6 +10,7 @@ import Header from '../Header';
 import apiClient from '@/lib/api-client';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
+import SkeletonLoader from '../ui/SkeletonLoader';
 
 interface Reply {
   id: string;
@@ -60,7 +61,7 @@ const ViewPostReadOnly: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [showFullContent, setShowFullContent] = useState(false);
   const [post, setPost] = useState<PostData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [bookmarked, setBookmarked] = useState(false);
@@ -204,9 +205,23 @@ const ViewPostReadOnly: React.FC = () => {
     const load = async () => {
       if (!postId) return;
       setLoading(true);
+      
+      // Fallback: Hide loading after 5 seconds maximum
+      const fallbackTimer = setTimeout(() => {
+        console.log('ViewPostReadOnly - Fallback timer triggered, hiding loading');
+        setLoading(false);
+      }, 5000);
+      
       const res = await apiClient.getForumPostById(String(postId));
-      if (res.success && (res.data as any)?.data) {
-        const row = (res.data as any).data;
+      console.log('ViewPostReadOnly API response:', res); // Debug log
+      
+      // Handle both nested and direct data structures
+      let row = null;
+      if (res.success && res.data) {
+        row = (res.data as any)?.data || res.data; // Try nested first, then direct
+      }
+      
+      if (row) {
         const isAnon = !!row.is_anonymous;
         const userData = row?.users || {};
         
@@ -235,6 +250,7 @@ const ViewPostReadOnly: React.FC = () => {
         setPost(null);
       }
       setLoading(false);
+      clearTimeout(fallbackTimer);
     };
     load();
   }, [postId]);
@@ -243,8 +259,15 @@ const ViewPostReadOnly: React.FC = () => {
     const loadReplies = async () => {
       if (!postId) return;
       const rep = await apiClient.getForumReplies(String(postId));
-      if (rep.success && Array.isArray((rep.data as any)?.data)) {
-        const rows = (rep.data as any).data as any[];
+      console.log('ViewPostReadOnly replies response:', rep); // Debug log
+      
+      // Handle both nested and direct data structures
+      let rows = null;
+      if (rep.success && rep.data) {
+        rows = (rep.data as any)?.data || rep.data;
+      }
+      
+      if (Array.isArray(rows)) {
         const mapped: Reply[] = rows.map((r: any) => {
           const isReplyAnon = !!r.is_anonymous;
           const replyUserData = r?.users || {};
@@ -293,18 +316,81 @@ const ViewPostReadOnly: React.FC = () => {
   const shouldShowReadMore = displayContent.length > 280;
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-white`}>
+    <SafeAreaView style={[tw`flex-1 bg-white`, { position: 'relative', zIndex: 1 }]}>
+      {/* Loading Overlay - Covers any parent loading indicators */}
+      {loading && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'white',
+          zIndex: 9999,
+        }}>
+          {/* Header Space */}
+          <View style={{ height: 60 }} />
+          
+          {/* Skeleton Content */}
+          <View style={tw`bg-white px-5 py-6 border-b border-gray-100`}>
+            {/* User Info Skeleton */}
+            <View style={tw`flex-row items-start mb-4`}>
+              <SkeletonLoader width={56} height={56} borderRadius={28} style={tw`mr-4`} />
+              <View style={tw`flex-1`}>
+                <View style={tw`flex-row items-center justify-between mb-1`}>
+                  <SkeletonLoader width={120} height={16} borderRadius={4} style={tw`mb-2`} />
+                </View>
+                <SkeletonLoader width={80} height={12} borderRadius={4} style={tw`mb-3`} />
+                <View style={tw`flex-row items-center justify-between`}>
+                  <SkeletonLoader width={60} height={20} borderRadius={10} />
+                  <SkeletonLoader width={80} height={12} borderRadius={4} />
+                </View>
+              </View>
+            </View>
+
+            {/* Content Skeleton */}
+            <View style={tw`mb-6`}>
+              <SkeletonLoader width="100%" height={16} borderRadius={4} style={tw`mb-2`} />
+              <SkeletonLoader width="90%" height={16} borderRadius={4} style={tw`mb-2`} />
+              <SkeletonLoader width="75%" height={16} borderRadius={4} style={tw`mb-2`} />
+            </View>
+
+            {/* Actions Skeleton */}
+            <View style={tw`flex-row items-center justify-between pt-4 border-t border-gray-100`}>
+              <SkeletonLoader width={80} height={16} borderRadius={4} />
+            </View>
+
+            {/* Replies Section Skeleton */}
+            <View style={tw`mt-6 pt-6 border-t border-gray-100`}>
+              <SkeletonLoader width={100} height={18} borderRadius={4} style={tw`mb-4`} />
+              {[1, 2].map((index) => (
+                <View key={index} style={tw`flex-row items-start mb-4 pl-4 border-l-2 border-gray-100`}>
+                  <SkeletonLoader width={40} height={40} borderRadius={20} style={tw`mr-3`} />
+                  <View style={tw`flex-1`}>
+                    <SkeletonLoader width={100} height={14} borderRadius={4} style={tw`mb-2`} />
+                    <SkeletonLoader width="100%" height={14} borderRadius={4} style={tw`mb-1`} />
+                    <SkeletonLoader width="80%" height={14} borderRadius={4} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      )}
+      
       <Header 
         title="Post"
         showBackButton={true}
         onBackPress={() => router.back()}
         rightComponent={
-          <TouchableOpacity
-            onPress={() => setMenuOpen(!menuOpen)}
-            style={tw`p-2`}
-          >
-            <MoreHorizontal size={24} color="#6B7280" />
-          </TouchableOpacity>
+          !loading ? (
+            <TouchableOpacity
+              onPress={() => setMenuOpen(!menuOpen)}
+              style={tw`p-2`}
+            >
+              <MoreHorizontal size={24} color="#6B7280" />
+            </TouchableOpacity>
+          ) : null
         }
       />
 
@@ -373,6 +459,7 @@ const ViewPostReadOnly: React.FC = () => {
         contentContainerStyle={{ paddingBottom: 80 }}
         showsVerticalScrollIndicator={false}
       >
+        
         {!post && !loading && (
           <View style={tw`px-5 py-6`}>
             <Text style={tw`text-gray-500`}>Post not found.</Text>

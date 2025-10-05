@@ -17,15 +17,18 @@ const CreatePost: React.FC = () => {
   const [content, setContent] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
   const [isAnonymous, setIsAnonymous] = useState<boolean>(false);
+  const [isPosting, setIsPosting] = useState(false);
   const MAX_LEN = 500;
 
   const isPostDisabled = useMemo(() => {
     const len = content.length;
-    return content.trim().length === 0 || len > MAX_LEN || !categoryId;
-  }, [content, categoryId]);
+    return content.trim().length === 0 || len > MAX_LEN || !categoryId || isPosting;
+  }, [content, categoryId, isPosting]);
 
   const onPressPost = async () => {
-    if (isPostDisabled) return;
+    if (isPostDisabled || isPosting) return;
+    
+    setIsPosting(true);
     
     const payload = {
       body: content.trim(),
@@ -51,26 +54,34 @@ const CreatePost: React.FC = () => {
         if (optimisticId) {
           (global as any).userForumActions?.removeOptimisticPost(optimisticId);
         }
+        Alert.alert(
+          'Error',
+          'Failed to create post. Please try again.',
+          [{ text: 'OK' }]
+        );
         return;
       }
       
-      // Confirm the optimistic post (animate to full opacity)
-      if (optimisticId) {
-        (global as any).userForumActions?.confirmOptimisticPost(optimisticId);
-      }
+      // Wait a bit for smooth transition, then confirm the optimistic post
+      setTimeout(() => {
+        if (optimisticId) {
+          (global as any).userForumActions?.confirmOptimisticPost(optimisticId);
+        }
+      }, 500); // 500ms delay for smooth transition
       
-      // Show success message
-      Alert.alert(
-        'Success!',
-        'Your post has been published successfully.',
-        [{ text: 'OK' }]
-      );
     } catch (e) {
       console.error('Create post error', e);
       // Remove the optimistic post on error
       if (optimisticId) {
         (global as any).userForumActions?.removeOptimisticPost(optimisticId);
       }
+      Alert.alert(
+        'Error',
+        'Something went wrong. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsPosting(false);
     }
   };
 
@@ -85,8 +96,11 @@ const CreatePost: React.FC = () => {
           style={[styles.postButton, isPostDisabled && styles.postButtonDisabled]}
           onPress={onPressPost}
           activeOpacity={isPostDisabled ? 1 : 0.8}
+          disabled={isPostDisabled}
         >
-          <Text style={styles.postButtonText}>Post</Text>
+          <Text style={styles.postButtonText}>
+            {isPosting ? 'Posting...' : 'Post'}
+          </Text>
         </TouchableOpacity>
       </View>
 

@@ -1,6 +1,6 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Comprehensive design system colors for consistent UI across the app.
+ * Includes semantic colors, gradients, and accessibility-compliant color combinations.
  */
 
 const tintColorLight = '#2f95dc';
@@ -23,11 +23,93 @@ export default {
   },
   primary: {
     blue: '#023D7B',
+    lightBlue: '#93C5FD',
+    darkBlue: '#1E3A8A',
+  },
+  secondary: {
+    gray: '#6B7280',
+    lightGray: '#F3F4F6',
+    darkGray: '#374151',
   },
   text: {
+    primary: '#111827',
+    secondary: '#6B7280',
+    tertiary: '#9CA3AF',
     head: '#313131',
     sub: '#373737',
     body: '#4B5563',
+    white: '#FFFFFF',
   },
-  success: '#10B981',
+  background: {
+    primary: '#FFFFFF',
+    secondary: '#F9FAFB',
+    tertiary: '#F3F4F6',
+    overlay: 'rgba(0, 0, 0, 0.5)',
+  },
+  border: {
+    light: '#E5E7EB',
+    medium: '#D1D5DB',
+    dark: '#9CA3AF',
+  },
+  status: {
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#EF4444',
+    info: '#3B82F6',
+  },
+  category: {
+    family: {
+      bg: '#FDF2F8',
+      border: '#FECACA',
+      text: '#BE185D',
+    },
+    labor: {
+      bg: '#EFF6FF',
+      border: '#BFDBFE',
+      text: '#1D4ED8',
+    },
+    civil: {
+      bg: '#F5F3FF',
+      border: '#C4B5FD',
+      text: '#7C3AED',
+    },
+    criminal: {
+      bg: '#FEF3C7',
+      border: '#FCD34D',
+      text: '#D97706',
+    },
+    consumer: {
+      bg: '#ECFDF5',
+      border: '#A7F3D0',
+      text: '#059669',
+    },
+    others: {
+      bg: '#F3F4F6',
+      border: '#D1D5DB',
+      text: '#6B7280',
+    },
+  },
+  shadow: {
+    light: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    medium: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    heavy: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+  },
 };

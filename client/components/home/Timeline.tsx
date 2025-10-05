@@ -6,6 +6,7 @@ import Post from './Post';
 import Colors from '../../constants/Colors';
 import apiClient from '@/lib/api-client';
 import { useFocusEffect } from '@react-navigation/native';
+import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
 
 interface PostData {
   id: string;
@@ -31,6 +32,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const [posts, setPosts] = useState<PostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [optimisticPosts, setOptimisticPosts] = useState<PostData[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const formatTimeAgo = (isoDate?: string): string => {
     if (!isoDate) return '';
@@ -93,12 +95,25 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       setPosts([]);
     } finally {
       setRefreshing(false);
+      // Hide initial loading after first load
+      if (initialLoading) {
+        setTimeout(() => setInitialLoading(false), 300);
+      }
     }
-  }, []);
+  }, [initialLoading]);
 
   useEffect(() => {
     loadPosts();
-  }, [loadPosts]);
+    
+    // Fallback: Hide loading after 3 seconds maximum
+    const fallbackTimer = setTimeout(() => {
+      if (initialLoading) {
+        setInitialLoading(false);
+      }
+    }, 3000);
+    
+    return () => clearTimeout(fallbackTimer);
+  }, [loadPosts, initialLoading]);
 
   // Refresh when screen gains focus
   useFocusEffect(
@@ -139,7 +154,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
 
   // Function to add optimistic post
   const addOptimisticPost = useCallback((postData: { body: string; category?: string; is_anonymous?: boolean }) => {
-    const animatedOpacity = new Animated.Value(0.5); // Start with 50% opacity
+    const animatedOpacity = new Animated.Value(0); // Start completely transparent
     const optimisticPost: PostData = {
       id: `optimistic-${Date.now()}`,
       user: postData.is_anonymous 
@@ -154,6 +169,14 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     };
 
     setOptimisticPosts(prev => [optimisticPost, ...prev]);
+    
+    // Smooth fade in animation
+    Animated.timing(animatedOpacity, {
+      toValue: 0.7, // Semi-transparent while posting
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+    
     return optimisticPost.id;
   }, []);
 
@@ -162,20 +185,23 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     setOptimisticPosts(prev => {
       const post = prev.find(p => p.id === optimisticId);
       if (post?.animatedOpacity) {
+        // Animate to full opacity to show success
         Animated.timing(post.animatedOpacity, {
           toValue: 1,
-          duration: 300,
+          duration: 200,
           useNativeDriver: true,
-        }).start(() => {
-          // Remove optimistic post after animation
-          setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
-          // Refresh posts to get the real post
-          if (realPost) {
-            setPosts(current => [realPost, ...current]);
-          } else {
-            loadPosts();
-          }
-        });
+        }).start();
+        
+        // Keep the optimistic post visible for longer, then remove it gradually
+        setTimeout(() => {
+          // Refresh posts first
+          loadPosts();
+          
+          // Then after a longer delay, remove the optimistic post
+          setTimeout(() => {
+            setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+          }, 1000); // Keep optimistic post for 1 second after confirmation
+        }, 500);
       }
       return prev;
     });
@@ -183,7 +209,23 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
 
   // Function to remove failed optimistic post
   const removeOptimisticPost = useCallback((optimisticId: string) => {
-    setOptimisticPosts(prev => prev.filter(p => p.id !== optimisticId));
+    setOptimisticPosts(prev => {
+      const post = prev.find(p => p.id === optimisticId);
+      if (post?.animatedOpacity) {
+        // Animate out smoothly
+        Animated.timing(post.animatedOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => {
+          setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+        });
+      } else {
+        // Immediate removal if no animation
+        return prev.filter(p => p.id !== optimisticId);
+      }
+      return prev;
+    });
   }, []);
 
   // Expose functions globally for CreatePost to use
@@ -199,6 +241,9 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
 
   return (
     <View style={styles.container}>
+      {/* Forum Loading Animation */}
+      <ForumLoadingAnimation visible={initialLoading} />
+      
       {/* Timeline */}
       <ScrollView 
         style={styles.timeline}

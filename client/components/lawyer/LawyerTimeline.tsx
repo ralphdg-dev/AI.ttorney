@@ -7,6 +7,7 @@ import Colors from '../../constants/Colors';
 import { Database } from '../../types/database.types';
 import apiClient from '@/lib/api-client';
 import { useFocusEffect } from '@react-navigation/native';
+import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
 
 type ForumPost = Database['public']['Tables']['forum_posts']['Row'];
 type User = Database['public']['Tables']['users']['Row'];
@@ -24,6 +25,7 @@ const LawyerTimeline: React.FC = () => {
   const [posts, setPosts] = useState<ForumPostWithUser[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [optimisticPosts, setOptimisticPosts] = useState<ForumPostWithUser[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const loadPosts = useCallback(async () => {
     setRefreshing(true);
@@ -63,11 +65,24 @@ const LawyerTimeline: React.FC = () => {
       setPosts([]);
     }
     setRefreshing(false);
-  }, []);
+    // Hide initial loading after first load
+    if (initialLoading) {
+      setTimeout(() => setInitialLoading(false), 300);
+    }
+  }, [initialLoading]);
 
   useEffect(() => {
     loadPosts();
-  }, [loadPosts]);
+    
+    // Fallback: Hide loading after 3 seconds maximum
+    const fallbackTimer = setTimeout(() => {
+      if (initialLoading) {
+        setInitialLoading(false);
+      }
+    }, 3000);
+    
+    return () => clearTimeout(fallbackTimer);
+  }, [loadPosts, initialLoading]);
 
   useFocusEffect(
     useCallback(() => {
@@ -105,7 +120,7 @@ const LawyerTimeline: React.FC = () => {
 
   // Function to add optimistic post
   const addOptimisticPost = useCallback((postData: { body: string; category?: string }) => {
-    const animatedOpacity = new Animated.Value(0.5); // Start with 50% opacity
+    const animatedOpacity = new Animated.Value(0); // Start completely transparent
     const optimisticPost: ForumPostWithUser = {
       id: `optimistic-${Date.now()}`,
       title: undefined as any,
@@ -133,6 +148,14 @@ const LawyerTimeline: React.FC = () => {
     };
 
     setOptimisticPosts(prev => [optimisticPost, ...prev]);
+    
+    // Smooth fade in animation
+    Animated.timing(animatedOpacity, {
+      toValue: 0.7, // Semi-transparent while posting
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+    
     return optimisticPost.id;
   }, []);
 
@@ -141,20 +164,23 @@ const LawyerTimeline: React.FC = () => {
     setOptimisticPosts(prev => {
       const post = prev.find(p => p.id === optimisticId);
       if (post?.animatedOpacity) {
+        // Animate to full opacity to show success
         Animated.timing(post.animatedOpacity, {
           toValue: 1,
-          duration: 300,
+          duration: 200,
           useNativeDriver: true,
-        }).start(() => {
-          // Remove optimistic post after animation
-          setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
-          // Refresh posts to get the real post
-          if (realPost) {
-            setPosts(current => [realPost, ...current]);
-          } else {
-            loadPosts();
-          }
-        });
+        }).start();
+        
+        // Keep the optimistic post visible for longer, then remove it gradually
+        setTimeout(() => {
+          // Refresh posts first
+          loadPosts();
+          
+          // Then after a longer delay, remove the optimistic post
+          setTimeout(() => {
+            setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+          }, 1000); // Keep optimistic post for 1 second after confirmation
+        }, 500);
       }
       return prev;
     });
@@ -176,6 +202,9 @@ const LawyerTimeline: React.FC = () => {
 
   return (
     <View className="flex-1 bg-white">
+      {/* Forum Loading Animation */}
+      <ForumLoadingAnimation visible={initialLoading} />
+      
       {/* Timeline */}
       <ScrollView 
         className="flex-1"
