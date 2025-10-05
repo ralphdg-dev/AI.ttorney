@@ -110,6 +110,38 @@ export default function LawyerCard({
           <Text className="text-sm ml-1" style={{ color: Colors.text.sub }}>
             {lawyer.days}
           </Text>
+
+          {/* Get today's available hours */}
+          {(() => {
+            const today = new Date();
+            const dayNames = [
+              "Sunday",
+              "Monday",
+              "Tuesday",
+              "Wednesday",
+              "Thursday",
+              "Friday",
+              "Saturday",
+            ];
+            const currentDay = dayNames[today.getDay()];
+            const todayHours = lawyer.hours_available.find((h) =>
+              h.startsWith(`${currentDay}=`)
+            );
+
+            if (todayHours) {
+              const time = todayHours.split("=")[1]?.trim();
+              return (
+                <Text
+                  className="text-sm ml-2"
+                  style={{ color: Colors.primary.blue }}
+                >
+                  • {time}
+                </Text>
+              );
+            }
+
+            return null;
+          })()}
         </HStack>
       </HStack>
 

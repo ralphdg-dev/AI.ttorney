@@ -67,7 +67,7 @@ export default function DirectoryScreen() {
     "Criminal Law",
     "Consumer Law",
   ];
-  
+
   const DAYS = [
     { full: "Monday", abbr: "Mon" },
     { full: "Tuesday", abbr: "Tue" },
@@ -246,7 +246,8 @@ export default function DirectoryScreen() {
     [router]
   );
 
-  const hasActiveFilters = selectedDays.length > 0 || selectedSpecialization !== "All";
+  const hasActiveFilters =
+    selectedDays.length > 0 || selectedSpecialization !== "All";
 
   return (
     <SidebarProvider>
@@ -288,9 +289,13 @@ export default function DirectoryScreen() {
             onPress={() => setFilterVisible(true)}
             className="bg-white border border-gray-200 p-3 rounded-lg relative"
           >
-            <Ionicons name="filter-outline" size={20} color={Colors.primary.blue} />
+            <Ionicons
+              name="filter-outline"
+              size={20}
+              color={Colors.primary.blue}
+            />
             {hasActiveFilters && (
-              <Box 
+              <Box
                 className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
                 style={{ backgroundColor: Colors.primary.blue }}
               />
@@ -306,10 +311,7 @@ export default function DirectoryScreen() {
           onRequestClose={() => setFilterVisible(false)}
         >
           <Pressable
-            style={[
-              tw`flex-1`,
-              { backgroundColor: "rgba(0, 0, 0, 0.4)" }
-            ]}
+            style={[tw`flex-1`, { backgroundColor: "rgba(0, 0, 0, 0.4)" }]}
             onPress={() => setFilterVisible(false)}
           >
             <Pressable
@@ -323,14 +325,14 @@ export default function DirectoryScreen() {
                   shadowOpacity: 0.1,
                   shadowRadius: 12,
                   elevation: 20,
-                }
+                },
               ]}
               onPress={(e) => e.stopPropagation()}
             >
               <VStack className="p-6">
                 {/* Modal Header */}
                 <HStack className="items-center justify-between mb-6">
-                  <UIText 
+                  <UIText
                     className="text-xl font-bold"
                     style={{ color: Colors.text.head }}
                   >
@@ -344,22 +346,26 @@ export default function DirectoryScreen() {
                   </UIPressable>
                 </HStack>
 
-                <ScrollView 
+                <ScrollView
                   showsVerticalScrollIndicator={false}
                   style={{ maxHeight: screenHeight * 0.5 }}
                 >
                   {/* Days Filter Section */}
                   <VStack className="mb-6">
                     <HStack className="items-center mb-3">
-                      <Ionicons name="calendar-outline" size={18} color={Colors.primary.blue} />
-                      <UIText 
+                      <Ionicons
+                        name="calendar-outline"
+                        size={18}
+                        color={Colors.primary.blue}
+                      />
+                      <UIText
                         className="text-base font-semibold ml-2"
                         style={{ color: Colors.text.head }}
                       >
                         Available Days
                       </UIText>
                     </HStack>
-                    
+
                     <View style={tw`flex-row flex-wrap -mx-1`}>
                       {DAYS.map(({ full, abbr }) => {
                         const selected = selectedDays.includes(full);
@@ -376,9 +382,13 @@ export default function DirectoryScreen() {
                             style={[
                               tw`px-4 py-2 m-1 rounded-lg border`,
                               {
-                                backgroundColor: selected ? Colors.primary.blue : "white",
-                                borderColor: selected ? Colors.primary.blue : "#E5E7EB",
-                              }
+                                backgroundColor: selected
+                                  ? Colors.primary.blue
+                                  : "white",
+                                borderColor: selected
+                                  ? Colors.primary.blue
+                                  : "#E5E7EB",
+                              },
                             ]}
                           >
                             <Text
@@ -399,15 +409,19 @@ export default function DirectoryScreen() {
                   {/* Specialization Filter Section */}
                   <VStack className="mb-6">
                     <HStack className="items-center mb-3">
-                      <Ionicons name="briefcase-outline" size={18} color={Colors.primary.blue} />
-                      <UIText 
+                      <Ionicons
+                        name="briefcase-outline"
+                        size={18}
+                        color={Colors.primary.blue}
+                      />
+                      <UIText
                         className="text-base font-semibold ml-2"
                         style={{ color: Colors.text.head }}
                       >
                         Specialization
                       </UIText>
                     </HStack>
-                    
+
                     <View style={tw`flex-row flex-wrap -mx-1`}>
                       {SPECIALIZATIONS.map((spec) => {
                         const selected = selectedSpecialization === spec;
@@ -418,9 +432,13 @@ export default function DirectoryScreen() {
                             style={[
                               tw`px-4 py-2 m-1 rounded-lg border`,
                               {
-                                backgroundColor: selected ? Colors.primary.blue : "white",
-                                borderColor: selected ? Colors.primary.blue : "#E5E7EB",
-                              }
+                                backgroundColor: selected
+                                  ? Colors.primary.blue
+                                  : "white",
+                                borderColor: selected
+                                  ? Colors.primary.blue
+                                  : "#E5E7EB",
+                              },
                             ]}
                           >
                             <Text
@@ -448,7 +466,7 @@ export default function DirectoryScreen() {
                     }}
                     className="px-6 py-3 rounded-lg border border-gray-200"
                   >
-                    <UIText 
+                    <UIText
                       className="font-semibold"
                       style={{ color: Colors.text.sub }}
                     >
@@ -486,43 +504,49 @@ export default function DirectoryScreen() {
         >
           {loading && !refreshing ? (
             <VStack className="items-center justify-center py-8">
-              <UIText style={{ color: Colors.text.sub }}>Loading lawyers...</UIText>
+              <UIText style={{ color: Colors.text.sub }}>
+                Loading lawyers...
+              </UIText>
             </VStack>
           ) : filteredLawyers.length === 0 ? (
             <VStack className="items-center justify-center py-12 px-6">
-              <Ionicons 
-                name="search-outline" 
-                size={48} 
-                color={Colors.text.sub} 
+              <Ionicons
+                name="search-outline"
+                size={48}
+                color={Colors.text.sub}
                 style={{ marginBottom: 12 }}
               />
-              <UIText 
+              <UIText
                 className="text-center text-base font-semibold mb-2"
                 style={{ color: Colors.text.head }}
               >
                 No lawyers found
               </UIText>
-              <UIText 
+              <UIText
                 className="text-center text-sm"
                 style={{ color: Colors.text.sub }}
               >
                 {searchQuery
                   ? `Try adjusting your search for "${searchQuery}"`
-                  : hasActiveFilters 
-                    ? "Try adjusting your filters"
-                    : "No lawyers are currently available"}
+                  : hasActiveFilters
+                  ? "Try adjusting your filters"
+                  : "No lawyers are currently available"}
               </UIText>
             </VStack>
           ) : (
             <>
               {hasActiveFilters && (
                 <HStack className="px-6 mb-2 items-center">
-                  <UIText className="text-sm" style={{ color: Colors.text.sub }}>
-                    Showing {filteredLawyers.length} result{filteredLawyers.length !== 1 ? 's' : ''}
+                  <UIText
+                    className="text-sm"
+                    style={{ color: Colors.text.sub }}
+                  >
+                    Showing {filteredLawyers.length} result
+                    {filteredLawyers.length !== 1 ? "s" : ""}
                   </UIText>
                 </HStack>
               )}
-              
+
               {filteredLawyers.map((lawyer) => (
                 <LawyerCard
                   key={lawyer.id}
