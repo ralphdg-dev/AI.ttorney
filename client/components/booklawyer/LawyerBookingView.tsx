@@ -616,38 +616,52 @@ export default function LawyerBookingView() {
               </Box>
             ))}
 
-            {calendarDays.map((day) => (
-              <Pressable
-                key={`${day.month}-${day.date}`}
-                className={`${
-                  isSmallScreen ? "w-10 h-10" : "w-12 h-12"
-                } rounded-lg items-center justify-center mb-1`}
-                style={{
-                  backgroundColor: day.isSelected
-                    ? Colors.primary.blue
-                    : day.isToday
-                    ? "#E3F2FD"
-                    : "transparent",
-                  opacity: day.isCurrentMonth ? 1 : 0.4,
-                }}
-                onPress={() => handleDaySelect(day)}
-              >
-                <Text
+            {calendarDays.map((day) => {
+              const dayDate = new Date(day.year, day.month, day.date);
+              const isPastDay =
+                dayDate <
+                new Date(
+                  today.getFullYear(),
+                  today.getMonth(),
+                  today.getDate()
+                );
+
+              return (
+                <Pressable
+                  key={`${day.month}-${day.date}`}
                   className={`${
-                    isSmallScreen ? "text-sm" : "text-base"
-                  } font-medium`}
+                    isSmallScreen ? "w-10 h-10" : "w-12 h-12"
+                  } rounded-lg items-center justify-center mb-1`}
+                  disabled={!day.isCurrentMonth || isPastDay} // 🔒 disable past days
                   style={{
-                    color: day.isSelected
-                      ? "white"
-                      : day.isToday
+                    backgroundColor: day.isSelected
                       ? Colors.primary.blue
-                      : Colors.text.head,
+                      : day.isToday
+                      ? "#E3F2FD"
+                      : "transparent",
+                    opacity: !day.isCurrentMonth || isPastDay ? 0.3 : 1, // faded style for past days
+                  }}
+                  onPress={() => {
+                    if (!isPastDay) handleDaySelect(day);
                   }}
                 >
-                  {day.date}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    className={`${
+                      isSmallScreen ? "text-sm" : "text-base"
+                    } font-medium`}
+                    style={{
+                      color: day.isSelected
+                        ? "white"
+                        : day.isToday
+                        ? Colors.primary.blue
+                        : Colors.text.head,
+                    }}
+                  >
+                    {day.date}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </HStack>
 
           {/* Time Slots */}
@@ -671,43 +685,83 @@ export default function LawyerBookingView() {
 
             {timeSlots.length > 0 ? (
               <HStack className="flex-wrap">
-                {timeSlots.map((slot) => (
-                  <Pressable
-                    key={slot.id}
-                    className="mr-2 mb-2 px-3 py-1.5 rounded-lg border"
-                    style={{
-                      backgroundColor:
-                        selectedTimeSlot === slot.id
-                          ? Colors.primary.blue
-                          : "white",
-                      borderColor:
-                        selectedTimeSlot === slot.id
-                          ? Colors.primary.blue
-                          : "#E5E7EB",
-                    }}
-                    onPress={() => {
-                      setSelectedTimeSlot(slot.id);
-                      if (validationErrors.timeSlot) {
-                        setValidationErrors((prev) => ({
-                          ...prev,
-                          timeSlot: undefined,
-                        }));
-                      }
-                    }}
-                  >
-                    <Text
-                      className="text-xs font-medium"
+                {timeSlots.map((slot) => {
+                  const selectedDate = new Date(
+                    selectedYear,
+                    selectedMonth,
+                    selectedDay
+                  );
+                  const isTodaySelected =
+                    selectedDate.toDateString() === today.toDateString();
+
+                  let isPastTime = false;
+
+                  if (isTodaySelected) {
+                    // Extract time from slot.time (like "9:00AM-10:00AM")
+                    const [start] = slot.time.split("-");
+                    const timeStr = start.trim().toUpperCase();
+                    const match = timeStr.match(
+                      /(\d{1,2}):?(\d{0,2})?\s?(AM|PM)/i
+                    );
+
+                    if (match) {
+                      let [_, hour, minute, period] = match;
+                      let h = parseInt(hour);
+                      const m = minute ? parseInt(minute) : 0;
+                      if (period.toUpperCase() === "PM" && h < 12) h += 12;
+                      if (period.toUpperCase() === "AM" && h === 12) h = 0;
+
+                      const slotTime = new Date();
+                      slotTime.setHours(h, m, 0, 0);
+
+                      isPastTime = slotTime.getTime() < today.getTime();
+                    }
+                  }
+
+                  const isDisabled = isPastTime || !slot.available;
+
+                  return (
+                    <Pressable
+                      key={slot.id}
+                      className="mr-2 mb-2 px-3 py-1.5 rounded-lg border"
+                      disabled={isDisabled} // 🔒 disable old times
                       style={{
-                        color:
+                        backgroundColor:
                           selectedTimeSlot === slot.id
-                            ? "white"
-                            : Colors.text.head,
+                            ? Colors.primary.blue
+                            : "white",
+                        borderColor:
+                          selectedTimeSlot === slot.id
+                            ? Colors.primary.blue
+                            : "#E5E7EB",
+                        opacity: isDisabled ? 0.4 : 1, // visually faded
+                      }}
+                      onPress={() => {
+                        if (!isDisabled) {
+                          setSelectedTimeSlot(slot.id);
+                          if (validationErrors.timeSlot) {
+                            setValidationErrors((prev) => ({
+                              ...prev,
+                              timeSlot: undefined,
+                            }));
+                          }
+                        }
                       }}
                     >
-                      {slot.time}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <Text
+                        className="text-xs font-medium"
+                        style={{
+                          color:
+                            selectedTimeSlot === slot.id
+                              ? "white"
+                              : Colors.text.head,
+                        }}
+                      >
+                        {slot.time}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </HStack>
             ) : (
               <Text className="text-sm text-gray-500">
