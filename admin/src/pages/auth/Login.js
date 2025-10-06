@@ -1,8 +1,10 @@
 import React from 'react';
 import { Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../components/ui/Toast';
 
 const Login = () => {
+  const { showSuccess, showError, ToastContainer } = useToast();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
@@ -26,17 +28,24 @@ const Login = () => {
     e.preventDefault();
     
     if (!email || !password) {
+      showError('Please enter both email and password');
       return;
     }
 
     const result = await login(email, password);
     if (result.success) {
-      window.location.href = '/';
+      showSuccess('Login successful! Redirecting to dashboard...');
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
+    } else {
+      showError(result.error || 'Login failed. Please check your credentials.');
     }
   };
 
   return (
     <div className="min-h-[calc(100vh-0px)] grid place-items-center bg-gray-50">
+      <ToastContainer />
       <div className="w-full max-w-sm">
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-6">
           <div className="flex items-center gap-2 mb-4">

@@ -1,12 +1,14 @@
 import React from 'react';
-import { Users, Eye, Archive, ArchiveRestore, Plus, Pencil, RefreshCw, Shield, Loader2, XCircle, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
-import DataTable from '../../components/ui/DataTable';
+import { Users, Eye, Pencil, Archive, ArchiveRestore, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Loader2, XCircle, Shield } from 'lucide-react';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import ViewAdminModal from '../../components/admin/ViewAdminModal';
 import AddAdminModal from '../../components/admin/AddAdminModal';
 import EditAdminModal from '../../components/admin/EditAdminModal';
-import ViewAdminModal from '../../components/admin/ViewAdminModal';
+import Pagination from '../../components/ui/Pagination';
+import DataTable from '../../components/ui/DataTable';
+import { useToast } from '../../components/ui/Toast';
 import adminManagementService from '../../services/adminManagementService';
 
 const RoleBadge = ({ role, isArchived = false }) => {
@@ -65,15 +67,16 @@ const StatusBadge = ({ status, isArchived = false }) => {
 
   return (
     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
-      {displayStatus}
     </span>
   );
 };
 
 const ManageAdmins = () => {
+  const { showSuccess, showError, showWarning, ToastContainer } = useToast();
   const [query, setQuery] = React.useState('');
   const [debouncedQuery, setDebouncedQuery] = React.useState('');
-  const [roleFilter, setRoleFilter] = React.useState('All Roles');
+  const [status, setStatus] = React.useState('All');
+  const [roleFilter, setRoleFilter] = React.useState('All');
   const [sortBy, setSortBy] = React.useState('Newest');
   const [data, setData] = React.useState([]);
   const [allData, setAllData] = React.useState([]); // Store all data for client-side filtering
@@ -141,13 +144,16 @@ const ManageAdmins = () => {
       setAllData(response.data || []);
       setPagination(prev => ({ ...prev, total: response.pagination?.total || 0, pages: Math.ceil((response.pagination?.total || 0) / 10) }));
     } catch (err) {
-      setError(err.message);
-      console.error('Failed to load admins:', err);
+      console.error('Error loading admins:', err);
+      const errorMessage = err.message || 'Failed to load admins';
+      setError(errorMessage);
+      setAllData([]);
+      setData([]);
+      showError(errorMessage);
     } finally {
       setLoading(false);
     }
   }, [pagination.page, pagination.limit, debouncedQuery, roleFilter]);
-
   // Load data on component mount and when filters change
   React.useEffect(() => {
     loadData();
@@ -239,9 +245,11 @@ const ManageAdmins = () => {
       await loadData(); // Reload data
       setConfirmationModal({ open: false, type: '', adminId: null, adminName: '', loading: false, changes: null });
       
+      showSuccess(`Admin "${adminName}" ${isArchiving ? 'archived' : 'unarchived'} successfully!`);
+      
     } catch (err) {
       console.error(`Failed to ${isArchiving ? 'archive' : 'unarchive'} admin:`, err);
-      alert(`Failed to ${isArchiving ? 'archive' : 'unarchive'} admin: ` + err.message);
+      showError(`Failed to ${isArchiving ? 'archive' : 'unarchive'} admin: ` + err.message);
       setConfirmationModal(prev => ({ ...prev, loading: false }));
     }
   };
@@ -262,9 +270,11 @@ const ManageAdmins = () => {
       setShowEditModal(false); // Close edit modal
       setConfirmationModal({ open: false, type: '', adminId: null, adminName: '', loading: false, changes: null });
       
+      showSuccess(`Admin status updated successfully!`);
+      
     } catch (err) {
       console.error('Failed to update admin:', err);
-      alert('Failed to update admin: ' + err.message);
+      showError('Failed to update admin: ' + err.message);
       setConfirmationModal(prev => ({ ...prev, loading: false }));
     }
   };
@@ -301,6 +311,7 @@ const ManageAdmins = () => {
     // Reload the data to show the new admin
     loadData();
     setShowAddModal(false);
+    showSuccess(`Admin "${newAdmin.full_name || newAdmin.email}" created successfully!`);
   };
 
   // Handle admin update success - intercept to show confirmation with changes
@@ -728,6 +739,7 @@ const ManageAdmins = () => {
 
   return (
     <div>
+      <ToastContainer />
       {/* Header */}
       <div className="mb-3">
         <div className="flex items-stretch gap-2">

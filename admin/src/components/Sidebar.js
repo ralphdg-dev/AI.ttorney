@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Home, AlertTriangle, LogOut, Settings } from 'lucide-react';
 import { sections } from './menuConfig';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from './ui/Toast';
 
 // sections now imported from menuConfig
 
@@ -25,6 +26,7 @@ const Avatar = () => {
 };
 
 const Sidebar = ({ activeItem }) => {
+  const { showSuccess, showError, ToastContainer } = useToast();
   const [collapsed, setCollapsed] = React.useState(false);
   const [openGroups, setOpenGroups] = React.useState({});
   const { logout } = useAuth();
@@ -59,7 +61,13 @@ const Sidebar = ({ activeItem }) => {
 
   const handleItemClick = async (itemId) => {
     if (itemId === 'logout') {
-      await logout();
+      try {
+        showSuccess('Logging out...');
+        await logout();
+        showSuccess('Successfully logged out!');
+      } catch (error) {
+        showError('Failed to logout. Please try again.');
+      }
       return;
     }
     
@@ -119,11 +127,13 @@ const Sidebar = ({ activeItem }) => {
   };
 
   return (
-    <aside
-      className={`h-screen sticky top-0 bg-white shadow-sm border-r border-gray-200 flex flex-col relative ${
-        collapsed ? 'w-16' : 'w-56'
-      } transition-all duration-200`}
-    >
+    <>
+      <ToastContainer />
+      <aside
+        className={`h-screen sticky top-0 bg-white shadow-sm border-r border-gray-200 flex flex-col relative ${
+          collapsed ? 'w-16' : 'w-56'
+        } transition-all duration-200`}
+      >
       {/* Floating collapse/expand toggle */}
       <button
         className="absolute -right-3 top-10 z-20 h-9 w-9 flex items-center justify-center rounded-2xl bg-white border border-gray-200 shadow-md hover:shadow-lg text-gray-800"
@@ -214,10 +224,11 @@ const Sidebar = ({ activeItem }) => {
           title={collapsed ? 'Logout' : undefined}
         >
           <LogOut size={18} />
-          {!collapsed && <span className="text-[10px] font-medium">Logout Account</span>}
+          {!collapsed && <span className="text-[10px] font-medium">Logout</span>}
         </button>
       </div>
     </aside>
+    </>
   );
 };
 

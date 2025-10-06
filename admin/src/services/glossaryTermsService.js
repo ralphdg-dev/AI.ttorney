@@ -132,6 +132,41 @@ const glossaryTermsService = {
       console.error('Failed to delete glossary term:', error);
       throw error;
     }
+  },
+
+  // Create audit log entry for glossary term actions
+  async createAuditLog(termId, action, metadata = {}) {
+    try {
+      const auditData = {
+        target_table: 'glossary_terms',
+        target_id: termId,
+        action: action,
+        metadata: {
+          ...metadata,
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      const response = await fetch(`${API_BASE_URL}/glossary-terms/${termId}/audit-logs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...glossaryTermsService.getAuthHeader()
+        },
+        body: JSON.stringify(auditData)
+      });
+
+      if (!response.ok) {
+        // Don't throw error for audit logging failures, just log them
+        console.warn('Failed to create audit log:', response.status);
+        return null;
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.warn('Failed to create audit log:', error);
+      return null;
+    }
   }
 };
 

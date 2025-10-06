@@ -4,7 +4,7 @@ import Select from '../ui/Select';
 import ConfirmationModal from '../ui/ConfirmationModal';
 import { Save, X } from 'lucide-react';
 
-const AddTermModal = ({ open, onClose, onSave }) => {
+const EditTermModal = ({ open, onClose, onSave, term }) => {
   const [formData, setFormData] = useState({
     term_en: '',
     term_fil: '',
@@ -15,11 +15,35 @@ const AddTermModal = ({ open, onClose, onSave }) => {
     category: '',
     is_verified: false
   });
+  const [originalData, setOriginalData] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationLoading, setConfirmationLoading] = useState(false);
+
+  // Initialize form with term data when modal opens
+  useEffect(() => {
+    if (open && term) {
+      const initialData = {
+        term_en: term.term_en || '',
+        term_fil: term.term_fil || '',
+        definition_en: term.definition_en || '',
+        definition_fil: term.definition_fil || '',
+        example_en: term.example_en || '',
+        example_fil: term.example_fil || '',
+        category: term.category || '',
+        is_verified: term.is_verified || false
+      };
+      setFormData(initialData);
+      setOriginalData(initialData);
+      setError(null);
+      setValidationErrors({});
+      setLoading(false);
+      setShowConfirmation(false);
+      setConfirmationLoading(false);
+    }
+  }, [open, term]);
 
   // Reset form when modal closes
   useEffect(() => {
@@ -34,6 +58,7 @@ const AddTermModal = ({ open, onClose, onSave }) => {
         category: '',
         is_verified: false
       });
+      setOriginalData({});
       setError(null);
       setValidationErrors({});
       setLoading(false);
@@ -100,6 +125,52 @@ const AddTermModal = ({ open, onClose, onSave }) => {
     return Object.keys(errors).length === 0;
   };
 
+  // Detect changes between original and current form data
+  const detectChanges = () => {
+    const changes = {};
+    
+    Object.keys(formData).forEach(key => {
+      const originalValue = originalData[key] || '';
+      const currentValue = formData[key] || '';
+      
+      // Handle different field types
+      if (key === 'is_verified') {
+        if (originalData[key] !== formData[key]) {
+          changes['Verification Status'] = {
+            from: originalData[key] ? 'Verified' : 'Unverified',
+            to: formData[key] ? 'Verified' : 'Unverified'
+          };
+        }
+      } else if (key === 'category') {
+        if (originalValue !== currentValue) {
+          changes['Category'] = {
+            from: originalValue ? originalValue.charAt(0).toUpperCase() + originalValue.slice(1) : 'Not set',
+            to: currentValue ? currentValue.charAt(0).toUpperCase() + currentValue.slice(1) : 'Not set'
+          };
+        }
+      } else {
+        // Handle text fields
+        const fieldNames = {
+          term_en: 'English Term',
+          term_fil: 'Filipino Term',
+          definition_en: 'Definition (English)',
+          definition_fil: 'Definition (Filipino)',
+          example_en: 'Example (English)',
+          example_fil: 'Example (Filipino)'
+        };
+        
+        if (originalValue !== currentValue) {
+          changes[fieldNames[key]] = {
+            from: originalValue || 'Not set',
+            to: currentValue || 'Not set'
+          };
+        }
+      }
+    });
+    
+    return changes;
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -123,11 +194,20 @@ const AddTermModal = ({ open, onClose, onSave }) => {
       return;
     }
     
-    // Show confirmation modal instead of directly creating term
+    // Detect changes
+    const changes = detectChanges();
+    
+    // If no changes, just close the modal
+    if (Object.keys(changes).length === 0) {
+      setError('No changes detected');
+      return;
+    }
+    
+    // Show confirmation modal with changes
     setShowConfirmation(true);
   };
 
-  const handleConfirmCreate = async () => {
+  const handleConfirmEdit = async () => {
     try {
       setConfirmationLoading(true);
       setError(null);
@@ -135,8 +215,9 @@ const AddTermModal = ({ open, onClose, onSave }) => {
       // Get current admin user info
       const currentAdmin = JSON.parse(localStorage.getItem('admin_user') || '{}');
       
-      // Prepare term data according to database schema
-      const termData = {
+      // Prepare updated term data
+      const updatedTermData = {
+        ...formData,
         term_en: formData.term_en.trim(),
         term_fil: formData.term_fil.trim() || null,
         definition_en: formData.definition_en.trim() || null,
@@ -144,19 +225,18 @@ const AddTermModal = ({ open, onClose, onSave }) => {
         example_en: formData.example_en.trim() || null,
         example_fil: formData.example_fil.trim() || null,
         category: formData.category.toLowerCase(),
-        is_verified: formData.is_verified,
         verified_by: formData.is_verified ? (currentAdmin.full_name || currentAdmin.email || 'Admin') : null
       };
       
-      // Call the onSave callback
-      await onSave(termData);
+      // Call the onSave callback with both updated and original data for change comparison
+      await onSave(updatedTermData, originalData, term);
       
       // Close both modals
       setShowConfirmation(false);
       onClose();
       
     } catch (err) {
-      setError(err.message || 'Failed to create glossary term');
+      setError(err.message || 'Failed to update glossary term');
       setShowConfirmation(false);
     } finally {
       setConfirmationLoading(false);
@@ -171,11 +251,19 @@ const AddTermModal = ({ open, onClose, onSave }) => {
     onClose();
   };
 
+  // Get changes for confirmation modal
+  const getChangesForConfirmation = () => {
+    const changes = detectChanges();
+    return Object.entries(changes).map(([field, change]) => 
+      `• ${field}: "${change.from}" → "${change.to}"`
+    ).join('\n');
+  };
+
   return (
     <Modal 
       open={open} 
       onClose={onClose} 
-      title="Add New Glossary Term"
+      title={`Edit Glossary Term: ${term?.term_en || ''}`}
       width="max-w-2xl"
     >
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -359,7 +447,7 @@ const AddTermModal = ({ open, onClose, onSave }) => {
             </span>
           </label>
           <p className="text-[10px] text-gray-500 mt-1 ml-6">
-            Check this box to mark the term as verified upon creation
+            Check this box to mark the term as verified
           </p>
         </div>
 
@@ -381,12 +469,12 @@ const AddTermModal = ({ open, onClose, onSave }) => {
             {loading ? (
               <>
                 <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Creating...
+                Saving...
               </>
             ) : (
               <>
                 <Save size={14} />
-                Create Term
+                Save Changes
               </>
             )}
           </button>
@@ -397,15 +485,15 @@ const AddTermModal = ({ open, onClose, onSave }) => {
       <ConfirmationModal
         open={showConfirmation}
         onClose={handleCancelConfirmation}
-        onConfirm={handleConfirmCreate}
-        title="Create New Glossary Term"
-        message={`Are you sure you want to create the glossary term "${formData.term_en}"? This will add a new English-Filipino legal term to the database.`}
-        confirmText="Create Term"
+        onConfirm={handleConfirmEdit}
+        title="Confirm Term Changes"
+        message={`Are you sure you want to save these changes to "${formData.term_en}"?\n\nChanges:\n${getChangesForConfirmation()}`}
+        confirmText="Save Changes"
         loading={confirmationLoading}
-        type="add"
+        type="edit"
       />
     </Modal>
   );
 };
 
-export default AddTermModal;
+export default EditTermModal;

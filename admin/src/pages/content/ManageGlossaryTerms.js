@@ -5,17 +5,21 @@ import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import ViewTermModal from '../../components/glossary/ViewTermModal';
 import AddTermModal from '../../components/glossary/AddTermModal';
+import EditTermModal from '../../components/glossary/EditTermModal';
 import Pagination from '../../components/ui/Pagination';
+import { useToast } from '../../components/ui/Toast';
 import glossaryTermsService from '../../services/glossaryTermsService';
 
-const categories = ['All', 'Family', 'Criminal', 'Civil', 'Labor', 'Consumer', 'others'];
+const categories = ['All', 'Family', 'Criminal', 'Civil', 'Labor', 'Consumer'];
 
 const ManageGlossaryTerms = () => {
+  const { showSuccess, showError, showWarning, ToastContainer } = useToast();
   const [query, setQuery] = React.useState('');
   const [category, setCategory] = React.useState('All');
   const [sortBy, setSortBy] = React.useState('Newest');
   const [viewModalOpen, setViewModalOpen] = React.useState(false);
   const [addModalOpen, setAddModalOpen] = React.useState(false);
+  const [editModalOpen, setEditModalOpen] = React.useState(false);
   const [selectedTerm, setSelectedTerm] = React.useState(null);
   const [terms, setTerms] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -65,8 +69,10 @@ const ManageGlossaryTerms = () => {
       }
     } catch (err) {
       console.error('Error loading glossary terms:', err);
-      setError(err.message || 'Failed to load glossary terms');
+      const errorMessage = err.message || 'Failed to load glossary terms';
+      setError(errorMessage);
       setTerms([]);
+      showError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -90,22 +96,86 @@ const ManageGlossaryTerms = () => {
 
   // Handle edit term
   const handleEdit = (term) => {
-    // For now, simulate edit changes since actual edit modal doesn't exist yet
-    const simulatedChanges = {
-      'Filipino Term': { from: term.term_fil, to: 'Updated Translation' },
-      'Category': { from: term.category, to: 'civil' },
-      'Definition (English)': { from: term.definition_en, to: 'Updated definition' },
-      'Verification Status': { from: term.is_verified ? 'Verified' : 'Unverified', to: 'Verified' }
-    };
+    setSelectedTerm(term);
+    setEditModalOpen(true);
+  };
+
+  // Handle edit term save with change detection
+  const handleEditTermSave = (updatedTerm, originalTerm, term) => {
+    const changes = {};
     
-    setConfirmationModal({
-      open: true,
-      type: 'edit',
-      termId: term.id,
-      termName: term.term_en,
-      loading: false,
-      changes: simulatedChanges
-    });
+    // Detect changes between original and updated term
+    if (originalTerm.term_en !== updatedTerm.term_en) {
+      changes['English Term'] = {
+        from: originalTerm.term_en || 'Not set',
+        to: updatedTerm.term_en || 'Not set'
+      };
+    }
+    
+    if (originalTerm.term_fil !== updatedTerm.term_fil) {
+      changes['Filipino Term'] = {
+        from: originalTerm.term_fil || 'Not set',
+        to: updatedTerm.term_fil || 'Not set'
+      };
+    }
+    
+    if (originalTerm.definition_en !== updatedTerm.definition_en) {
+      changes['Definition (English)'] = {
+        from: originalTerm.definition_en || 'Not set',
+        to: updatedTerm.definition_en || 'Not set'
+      };
+    }
+    
+    if (originalTerm.definition_fil !== updatedTerm.definition_fil) {
+      changes['Definition (Filipino)'] = {
+        from: originalTerm.definition_fil || 'Not set',
+        to: updatedTerm.definition_fil || 'Not set'
+      };
+    }
+    
+    if (originalTerm.example_en !== updatedTerm.example_en) {
+      changes['Example (English)'] = {
+        from: originalTerm.example_en || 'Not set',
+        to: updatedTerm.example_en || 'Not set'
+      };
+    }
+    
+    if (originalTerm.example_fil !== updatedTerm.example_fil) {
+      changes['Example (Filipino)'] = {
+        from: originalTerm.example_fil || 'Not set',
+        to: updatedTerm.example_fil || 'Not set'
+      };
+    }
+    
+    if (originalTerm.category !== updatedTerm.category) {
+      changes['Category'] = {
+        from: originalTerm.category ? originalTerm.category.charAt(0).toUpperCase() + originalTerm.category.slice(1) : 'Not set',
+        to: updatedTerm.category ? updatedTerm.category.charAt(0).toUpperCase() + updatedTerm.category.slice(1) : 'Not set'
+      };
+    }
+    
+    if (originalTerm.is_verified !== updatedTerm.is_verified) {
+      changes['Verification Status'] = {
+        from: originalTerm.is_verified ? 'Verified' : 'Unverified',
+        to: updatedTerm.is_verified ? 'Verified' : 'Unverified'
+      };
+    }
+    
+    // Show confirmation modal with changes or warning if no changes
+    if (Object.keys(changes).length > 0) {
+      setConfirmationModal({
+        open: true,
+        type: 'edit',
+        termId: term.id,
+        termName: updatedTerm.term_en,
+        loading: false,
+        changes: changes,
+        updatedData: updatedTerm
+      });
+    } else {
+      // No changes detected
+      showWarning('No changes detected. Please modify at least one field to save changes.');
+    }
   };
 
   // Handle add new term
@@ -121,14 +191,13 @@ const ManageGlossaryTerms = () => {
       if (response.success) {
         setAddModalOpen(false);
         await loadData(); // Reload the data to show the new term
-        // Show success message (you could use a toast notification here)
-        alert('Glossary term created successfully!');
+        showSuccess(`Glossary term "${termData.term_en}" created successfully!`);
       } else {
         throw new Error(response.error || 'Failed to create glossary term');
       }
     } catch (err) {
       console.error('Failed to create term:', err);
-      alert('Failed to create term: ' + err.message);
+      showError('Failed to create term: ' + err.message);
     }
   };
 
@@ -178,7 +247,10 @@ const ManageGlossaryTerms = () => {
   };
 
   const closeConfirmationModal = () => {
-    setConfirmationModal({ open: false, type: '', termId: null, termName: '', loading: false, changes: null });
+    setConfirmationModal({ 
+      open: false, type: '', termId: null, termName: '', 
+      loading: false, changes: null, updatedData: null 
+    });
   };
 
   // Handle archive confirmation
@@ -194,31 +266,67 @@ const ManageGlossaryTerms = () => {
       // Reload data
       await loadData();
       
-      setConfirmationModal({ open: false, type: '', termId: null, termName: '', loading: false, changes: null });
+      setConfirmationModal({ 
+        open: false, type: '', termId: null, termName: '', 
+        loading: false, changes: null, updatedData: null 
+      });
+      
+      showSuccess(`Glossary term "${termName}" archived successfully!`);
       
     } catch (err) {
       console.error('Failed to archive term:', err);
-      alert('Failed to archive term: ' + err.message);
+      showError('Failed to archive term: ' + err.message);
       setConfirmationModal(prev => ({ ...prev, loading: false }));
     }
   };
 
   // Handle edit confirmation
   const confirmEdit = async () => {
-    const { termId, termName, changes } = confirmationModal;
+    const { termId, termName, changes, updatedData } = confirmationModal;
     
     try {
       setConfirmationModal(prev => ({ ...prev, loading: true }));
       
-      // TODO: Implement actual edit API call
-      console.log(`Editing term: ${termName}`, changes);
-      alert(`Term "${termName}" changes have been saved successfully!`);
+      // Get current admin user info for audit logging
+      const currentAdmin = JSON.parse(localStorage.getItem('admin_user') || '{}');
       
-      setConfirmationModal({ open: false, type: '', termId: null, termName: '', loading: false, changes: null });
+      // Update the term via API
+      const response = await glossaryTermsService.updateGlossaryTerm(termId, updatedData);
+      
+      if (response.success) {
+        // Create audit log entry
+        const auditMetadata = {
+          changes: changes,
+          edited_by: currentAdmin.full_name || currentAdmin.email || 'Admin',
+          admin_role: currentAdmin.role || 'admin',
+          edit_reason: 'Manual edit via admin panel'
+        };
+        
+        // Log the edit action (don't fail if audit logging fails)
+        await glossaryTermsService.createAuditLog(
+          termId,
+          'GLOSSARY_TERM_EDITED',
+          auditMetadata
+        );
+        
+        // Close edit modal and reload data
+        setEditModalOpen(false);
+        await loadData();
+        
+        setConfirmationModal({ 
+          open: false, type: '', termId: null, termName: '', 
+          loading: false, changes: null, updatedData: null 
+        });
+        
+        showSuccess(`Glossary term "${termName}" updated successfully!`);
+        
+      } else {
+        throw new Error(response.error || 'Failed to update glossary term');
+      }
       
     } catch (err) {
       console.error('Failed to edit term:', err);
-      alert('Failed to edit term: ' + err.message);
+      showError('Failed to edit term: ' + err.message);
       setConfirmationModal(prev => ({ ...prev, loading: false }));
     }
   };
@@ -232,7 +340,10 @@ const ManageGlossaryTerms = () => {
       console.log('Creating new glossary term');
       alert('New glossary term has been created successfully!');
       
-      setConfirmationModal({ open: false, type: '', termId: null, termName: '', loading: false, changes: null });
+      setConfirmationModal({ 
+        open: false, type: '', termId: null, termName: '', 
+        loading: false, changes: null, updatedData: null 
+      });
       
     } catch (err) {
       console.error('Failed to create term:', err);
@@ -418,6 +529,7 @@ const ManageGlossaryTerms = () => {
 
   return (
     <div>
+      <ToastContainer />
       {/* Header */}
       <div className="mb-3">
         <div className="flex items-stretch gap-2">
@@ -540,6 +652,14 @@ const ManageGlossaryTerms = () => {
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
         onSave={handleSaveNewTerm}
+      />
+
+      {/* Edit Term Modal */}
+      <EditTermModal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        onSave={handleEditTermSave}
+        term={selectedTerm}
       />
 
       {/* Confirmation Modal */}

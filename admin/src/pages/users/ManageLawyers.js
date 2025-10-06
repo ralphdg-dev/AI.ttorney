@@ -1,18 +1,21 @@
 import React from 'react';
-import { Users, Eye, Pencil, Archive, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import DataTable from '../../components/ui/DataTable';
+import { Users, Eye, Pencil, UserX } from 'lucide-react';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import ViewLegalSeekerModal from '../../components/users/ViewLegalSeekerModal';
+import Pagination from '../../components/ui/Pagination';
+import { useToast } from '../../components/ui/Toast';
 import usersService from '../../services/usersService';
 
 const StatusBadge = ({ status }) => (
-  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
     {status}
   </span>
 );
 
 const ManageLawyers = () => {
+  const { showSuccess, showError, showWarning, ToastContainer } = useToast();
   const [query, setQuery] = React.useState('');
   const [sortBy, setSortBy] = React.useState('Newest');
   const [data, setData] = React.useState([]);
@@ -54,8 +57,11 @@ const ManageLawyers = () => {
       setData(response.data);
       setPagination(response.pagination);
     } catch (err) {
-      setError(err.message);
-      console.error('Failed to load lawyers:', err);
+      console.error('Error loading lawyers:', err);
+      const errorMessage = err.message || 'Failed to load lawyers';
+      setError(errorMessage);
+      setData([]);
+      showError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -138,13 +144,15 @@ const ManageLawyers = () => {
       setConfirmationModal(prev => ({ ...prev, loading: true }));
       setActionLoading(prev => ({ ...prev, [lawyerId]: true }));
       
-      await usersService.suspendLawyer(lawyerId);
+      await usersService.updateLawyerStatus(lawyerId, false); // false = suspended/unverified
       await loadData(); // Reload data
       setConfirmationModal({ open: false, type: '', lawyerId: null, lawyerName: '', loading: false, changes: null });
       
+      showSuccess(`Lawyer "${lawyerName}" suspended successfully!`);
+      
     } catch (err) {
       console.error('Failed to suspend lawyer:', err);
-      alert('Failed to suspend lawyer: ' + err.message);
+      showError('Failed to suspend lawyer: ' + err.message);
       setConfirmationModal(prev => ({ ...prev, loading: false }));
     } finally {
       setActionLoading(prev => ({ ...prev, [lawyerId]: false }));
@@ -488,6 +496,7 @@ const ManageLawyers = () => {
 
   return (
     <div>
+      <ToastContainer />
       {/* Header */}
       <div className="mb-3">
         <div className="flex items-stretch gap-2">

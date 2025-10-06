@@ -1,21 +1,18 @@
-import React from 'react';
-import { FileText, Eye, Pencil, Archive } from 'lucide-react';
-import DataTable from '../../components/ui/DataTable';
+import React, { useState, useEffect } from 'react';
+import { BookOpen, Eye, Pencil, Archive } from 'lucide-react';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
-
-const categories = ['All', 'Family', 'Civil', 'Consumer', 'Criminal', 'Labor'];
-
-const sampleArticles = [
-  { enTitle: 'Child Custody Basics', filTitle: 'Mga Pangunahing Kaalaman sa Kustodiya', category: 'Family', createdAt: '2025-08-01', updatedAt: '2025-08-15', createdBy: 'Admin Jane' },
-  { enTitle: 'Contract Breach Remedies', filTitle: 'Mga Remedyo sa Paglabag ng Kontrata', category: 'Civil', createdAt: '2025-07-20', updatedAt: '2025-08-10', createdBy: 'Admin John' },
-  { enTitle: 'Consumer Return Rights', filTitle: 'Mga Karapatan sa Pagbalik ng Produkto', category: 'Consumer', createdAt: '2025-07-05', updatedAt: '2025-07-06', createdBy: 'Admin Lea' },
-  { enTitle: 'Understanding Bail', filTitle: 'Pag-unawa sa Piyansa', category: 'Criminal', createdAt: '2025-06-11', updatedAt: '2025-06-12', createdBy: 'Admin Mark' },
-  { enTitle: 'Unlawful Dismissal', filTitle: 'Di-makatarungang Pagkatanggal', category: 'Labor', createdAt: '2025-05-02', updatedAt: '2025-07-01', createdBy: 'Admin Sofia' },
-];
+import ViewArticleModal from '../../components/articles/ViewArticleModal';
+import AddArticleModal from '../../components/articles/AddArticleModal';
+import Pagination from '../../components/ui/Pagination';
+import { useToast } from '../../components/ui/Toast';
+import legalArticlesService from '../../services/legalArticlesService';
 
 const ManageLegalArticles = () => {
+  const [articles, setArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [query, setQuery] = React.useState('');
   const [category, setCategory] = React.useState('All');
   const [sortBy, setSortBy] = React.useState('Newest');
@@ -24,107 +21,26 @@ const ManageLegalArticles = () => {
     type: '',
     articleId: null,
     articleTitle: '',
-    loading: false
+    loading: false,
+    changes: null
   });
 
-  // Handle edit article
-  const handleEdit = (article) => {
-    // For now, simulate edit changes since actual edit modal doesn't exist yet
-    const simulatedChanges = {
-      'Filipino Title': { from: article.filTitle, to: 'Updated Filipino Title' },
-      'Category': { from: article.category, to: 'Criminal' }
+  useEffect(() => {
+    const fetchArticles = async () => {
+      try {
+        const response = await legalArticlesService.getLegalArticles();
+        setArticles(response.data);
+      } catch (err) {
+        console.error('Error loading legal articles:', err);
+        const errorMessage = err.message || 'Failed to load legal articles';
+        setError(errorMessage);
+        setArticles([]);
+      } finally {
+        setLoading(false);
+      }
     };
-    
-    setConfirmationModal({
-      open: true,
-      type: 'edit',
-      articleId: article.enTitle,
-      articleTitle: article.enTitle,
-      loading: false,
-      changes: simulatedChanges
-    });
-  };
-
-  // Handle add new article
-  const handleAddNew = () => {
-    setConfirmationModal({
-      open: true,
-      type: 'add',
-      articleId: null,
-      articleTitle: '',
-      loading: false,
-      changes: null
-    });
-  };
-
-  // Handle archive article
-  const handleArchive = (article) => {
-    setConfirmationModal({
-      open: true,
-      type: 'archive',
-      articleId: article.enTitle, // Using English title as ID
-      articleTitle: article.enTitle,
-      loading: false
-    });
-  };
-
-  // Helper function to get modal content
-  const getModalContent = () => {
-    const { type, articleTitle, changes } = confirmationModal;
-    
-    switch (type) {
-      case 'archive':
-        return {
-          title: 'Archive Legal Article',
-          message: `Are you sure you want to archive "${articleTitle}"? This article will be hidden from the main list but can be accessed through the "Archived" filter.`,
-          confirmText: 'Archive Article',
-          onConfirm: confirmArchive
-        };
-      case 'edit':
-        const changesList = changes ? Object.entries(changes).map(([field, change]) => 
-          `• ${field}: "${change.from}" → "${change.to}"`
-        ).join('\n') : '';
-        return {
-          title: 'Confirm Article Changes',
-          message: `Are you sure you want to save these changes to "${articleTitle}"?\n\nChanges:\n${changesList}`,
-          confirmText: 'Save Changes',
-          onConfirm: confirmEdit
-        };
-      case 'add':
-        return {
-          title: 'Create New Legal Article',
-          message: 'Are you sure you want to create a new legal article? This will add a new English-Filipino legal article to the database.',
-          confirmText: 'Create Article',
-          onConfirm: confirmAdd
-        };
-      default:
-        return {};
-    }
-  };
-
-  const closeConfirmationModal = () => {
-    setConfirmationModal({ open: false, type: '', articleId: null, articleTitle: '', loading: false, changes: null });
-  };
-
-  // Handle archive confirmation
-  const confirmArchive = async () => {
-    const { articleId, articleTitle } = confirmationModal;
-    
-    try {
-      setConfirmationModal(prev => ({ ...prev, loading: true }));
-      
-      // TODO: Implement actual archive API call
-      console.log(`Archiving article: ${articleTitle}`);
-      alert(`Article "${articleTitle}" has been archived successfully!`);
-      
-      setConfirmationModal({ open: false, type: '', articleId: null, articleTitle: '', loading: false, changes: null });
-      
-    } catch (err) {
-      console.error('Failed to archive article:', err);
-      alert('Failed to archive article: ' + err.message);
-      setConfirmationModal(prev => ({ ...prev, loading: false }));
-    }
-  };
+    fetchArticles();
+  }, []);
 
   // Handle edit confirmation
   const confirmEdit = async () => {
@@ -229,6 +145,7 @@ const ManageLegalArticles = () => {
 
   return (
     <div>
+      <ToastContainer />
       {/* Header */}
       <div className="mb-3">
         <div className="flex items-stretch gap-2">

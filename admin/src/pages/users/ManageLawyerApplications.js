@@ -1,10 +1,13 @@
 import React from 'react';
-import { Users, Eye, Archive, ArchiveRestore, Check, X, Pencil, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RotateCcw, RefreshCw } from 'lucide-react';
-import ViewLawyerApplicationModal from '../../components/lawyers/ViewLawyerApplicationModal';
-import DataTable from '../../components/ui/DataTable';
+import { FileText, Eye, Pencil, Archive, ArchiveRestore, CheckCircle, XCircle, AlertTriangle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Check, RotateCcw, X, RefreshCw, Loader2, Users } from 'lucide-react';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import ViewLawyerApplicationModal from '../../components/lawyers/ViewLawyerApplicationModal';
+import RollMatchBadge from '../../components/lawyers/RollMatchBadge';
+import Pagination from '../../components/ui/Pagination';
+import DataTable from '../../components/ui/DataTable';
+import { useToast } from '../../components/ui/Toast';
 import lawyerApplicationsService from '../../services/lawyerApplicationsService';
 
 const StatusBadge = ({ status, isArchived = false }) => {
@@ -14,61 +17,35 @@ const StatusBadge = ({ status, isArchived = false }) => {
     }
     
     switch (status?.toLowerCase()) {
+      case 'pending':
+        return 'bg-yellow-50 text-yellow-700 border border-yellow-200';
       case 'approved':
       case 'accepted':
         return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
       case 'rejected':
         return 'bg-red-50 text-red-700 border border-red-200';
       case 'resubmission':
-        return 'bg-orange-50 text-orange-700 border border-orange-200';
-      case 'pending':
+        return 'bg-blue-50 text-blue-700 border border-blue-200';
       default:
-        return 'bg-amber-50 text-amber-700 border border-amber-200';
+        return 'bg-gray-50 text-gray-700 border border-gray-200';
     }
   };
 
-  const getStatusLabel = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'approved': return 'Approved';
-      case 'accepted': return 'Accepted';
-      case 'rejected': return 'Rejected';
-      case 'resubmission': return 'Resubmission';
-      case 'pending': return 'Pending';
-      default: return 'Unknown';
-    }
-  };
+  const displayStatus = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown';
+  const styles = getStatusStyles(status);
 
-  return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${getStatusStyles(status)}`}>
-      {getStatusLabel(status)}
-    </span>
-  );
-};
-
-const RollMatchBadge = ({ status, isArchived = false }) => {
-  const s = (status || '').toLowerCase();
-  const isMatched = s === 'matched';
-  
-  let styles;
-  if (isArchived) {
-    styles = 'bg-gray-200 text-gray-600 border border-gray-300';
-  } else {
-    styles = isMatched
-      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-      : 'bg-red-50 text-red-700 border border-red-200';
-  }
-  
-  const label = isMatched ? 'Matched' : 'Not Found';
   return (
     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
-      {label}
+      {displayStatus}
     </span>
   );
 };
 
 const ManageLawyerApplications = () => {
+  const { showSuccess, showError, showWarning, ToastContainer } = useToast();
   const [query, setQuery] = React.useState('');
   const [debouncedQuery, setDebouncedQuery] = React.useState('');
+  const [status, setStatus] = React.useState('All');
   const [combinedFilter, setCombinedFilter] = React.useState('Active');
   const [sortBy, setSortBy] = React.useState('Newest');
   const [data, setData] = React.useState([]);
@@ -103,6 +80,13 @@ const ManageLawyerApplications = () => {
   });
 
   // Debounce search query
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [query]);
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(query);
@@ -921,6 +905,7 @@ const ManageLawyerApplications = () => {
 
   return (
     <div>
+      <ToastContainer />
       {/* Header */}
       <div className="mb-3">
         <div className="flex items-stretch gap-2">

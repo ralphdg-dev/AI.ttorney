@@ -1,42 +1,46 @@
 import React from 'react';
-import { Eye, Pencil, Archive, ArchiveRestore, Users, Loader2, CheckCircle, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
-import DataTable from '../../components/ui/DataTable';
+import { Users, Eye, Pencil, Archive, ArchiveRestore } from 'lucide-react';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import ViewLegalSeekerModal from '../../components/users/ViewLegalSeekerModal';
-import EditLegalSeekerModal from '../../components/users/EditLegalSeekerModal';
+import Pagination from '../../components/ui/Pagination';
+import { useToast } from '../../components/ui/Toast';
 import usersService from '../../services/usersService';
 import legalSeekerService from '../../services/legalSeekerService';
 
 const StatusBadge = ({ status }) => {
-  const styles =
-    status === 'Verified'
-      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-      : 'bg-amber-50 text-amber-700 border border-amber-200';
-  return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
-      {status}
-    </span>
-  );
-};
+  const getStatusStyles = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'verified':
+        return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+      case 'unverified':
+        return 'bg-red-50 text-red-700 border border-red-200';
+      case 'active':
+        return 'bg-green-50 text-green-700 border border-green-200';
+      case 'inactive':
+        return 'bg-gray-50 text-gray-700 border border-gray-200';
+      case 'suspended':
+        return 'bg-red-50 text-red-700 border border-red-200';
+      default:
+        return 'bg-gray-50 text-gray-700 border border-gray-200';
+    }
+  };
 
-const LawyerApplicationBadge = ({ hasApplication }) => {
-  const isYes = hasApplication === 'Yes';
-  const styles = isYes
-    ? 'bg-blue-50 text-blue-700 border border-blue-200'
-    : 'bg-gray-50 text-gray-600 border border-gray-200';
+  const displayStatus = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown';
+  const styles = getStatusStyles(status);
+
   return (
     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
-      {hasApplication}
+      {displayStatus}
     </span>
   );
 };
 
 const ManageLegalSeekers = () => {
+  const { showSuccess, showError, showWarning, ToastContainer } = useToast();
   const [query, setQuery] = React.useState('');
-  const [debouncedQuery, setDebouncedQuery] = React.useState('');
-  const [combinedFilter, setCombinedFilter] = React.useState('Active');
+  const [status, setStatus] = React.useState('All');
   const [sortBy, setSortBy] = React.useState('Newest');
   const [data, setData] = React.useState([]);
   const [allData, setAllData] = React.useState([]); // Store all data for client-side filtering
@@ -689,6 +693,7 @@ const ManageLegalSeekers = () => {
 
   return (
     <div>
+      <ToastContainer />
       {/* Header */}
       <div className="mb-3">
         <div className="flex items-stretch gap-2">
