@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  Animated,
+  Easing,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -17,6 +19,7 @@ import {
   TrendingUp,
   MapPin,
 } from "lucide-react-native";
+import { ConsultationListSkeleton } from "./consultation/ConsultationCardSkeleton";
 import LawyerNavbar from "../../components/lawyer/LawyerNavbar";
 import Header from "../../components/Header";
 import ConfirmationModal from "../../components/lawyer/ConfirmationModal";
@@ -63,6 +66,50 @@ const LawyerConsultPage: React.FC = () => {
     rejected_requests: 0,
     today_sessions: 0,
   });
+
+  const SkeletonBox = ({ width, height, style }: any) => {
+    const animatedValue = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(animatedValue, {
+            toValue: 1,
+            duration: 1000,
+            easing: Easing.ease,
+            useNativeDriver: true,
+          }),
+          Animated.timing(animatedValue, {
+            toValue: 0,
+            duration: 1000,
+            easing: Easing.ease,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }, []);
+
+    const opacity = animatedValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.3, 0.7],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          {
+            width,
+            height,
+            backgroundColor: "#E5E7EB",
+            borderRadius: 6,
+            opacity,
+          },
+          style,
+        ]}
+      />
+    );
+  };
+
   const [currentTime, setCurrentTime] = useState(new Date());
   const [confirmationModal, setConfirmationModal] = useState<{
     isOpen: boolean;
@@ -405,9 +452,56 @@ const LawyerConsultPage: React.FC = () => {
           showSearch={true}
           onSearchPress={() => console.log("Search consultations")}
         />
-        <View style={tw`flex-1 justify-center items-center`}>
-          <Text>Loading consultation requests...</Text>
-        </View>
+        <ScrollView
+          style={tw`flex-1`}
+          contentContainerStyle={tw`pb-24`}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Stats Grid Skeleton */}
+          <View style={tw`px-4 pt-6 pb-2`}>
+            <SkeletonBox width="30%" height={24} style={{ marginBottom: 16 }} />
+            <View style={tw`flex-row flex-wrap -mr-3`}>
+              {[1, 2, 3, 4].map((i) => (
+                <View
+                  key={i}
+                  style={[
+                    tw`bg-white rounded-xl p-4 flex-1 border border-gray-100 mr-3 mb-3`,
+                    { minWidth: 144 },
+                  ]}
+                >
+                  <View style={tw`flex-row items-center justify-between mb-2`}>
+                    <SkeletonBox
+                      width={40}
+                      height={40}
+                      style={{ borderRadius: 8 }}
+                    />
+                    <SkeletonBox width={40} height={32} />
+                  </View>
+                  <SkeletonBox width="80%" height={14} />
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Filter tabs skeleton */}
+          <View style={tw`px-4 py-4`}>
+            <View style={tw`flex-row -mr-3`}>
+              {[1, 2, 3, 4].map((i) => (
+                <SkeletonBox
+                  key={i}
+                  width={100}
+                  height={40}
+                  style={{ borderRadius: 20, marginRight: 12 }}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Consultation cards skeleton */}
+          <View style={tw`px-4`}>
+            <ConsultationListSkeleton count={3} />
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
