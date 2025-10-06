@@ -61,6 +61,166 @@ const STATUS_CONFIG = {
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
+// Skeleton Loading Component
+const SkeletonCard = () => {
+  const pulseAnim = useState(new Animated.Value(0.3))[0];
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <Box className="mx-4 md:mx-6 mb-3 md:mb-4 bg-white rounded-lg border border-gray-200 p-3 md:p-4">
+      <HStack className="justify-between items-start mb-3">
+        <VStack className="flex-1 mr-2" space="xs">
+          {/* Lawyer name skeleton */}
+          <Animated.View 
+            style={[
+              tw`rounded`,
+              { 
+                height: screenWidth < 768 ? 18 : 20,
+                width: '70%',
+                backgroundColor: '#E5E7EB',
+                opacity: pulseAnim
+              }
+            ]}
+          />
+          {/* Specialization skeleton */}
+          <Animated.View 
+            style={[
+              tw`rounded mt-1`,
+              { 
+                height: screenWidth < 768 ? 14 : 16,
+                width: '50%',
+                backgroundColor: '#E5E7EB',
+                opacity: pulseAnim
+              }
+            ]}
+          />
+        </VStack>
+
+        {/* Status badge skeleton */}
+        <Animated.View 
+          style={[
+            tw`rounded-full`,
+            { 
+              height: screenWidth < 768 ? 24 : 28,
+              width: 80,
+              backgroundColor: '#E5E7EB',
+              opacity: pulseAnim
+            }
+          ]}
+        />
+      </HStack>
+
+      {/* Message skeleton */}
+      <VStack className="mb-3" space="xs">
+        <Animated.View 
+          style={[
+            tw`rounded`,
+            { 
+              height: screenWidth < 768 ? 14 : 16,
+              width: '90%',
+              backgroundColor: '#E5E7EB',
+              opacity: pulseAnim
+            }
+          ]}
+        />
+        <Animated.View 
+          style={[
+            tw`rounded`,
+            { 
+              height: screenWidth < 768 ? 14 : 16,
+              width: '60%',
+              backgroundColor: '#E5E7EB',
+              opacity: pulseAnim
+            }
+          ]}
+        />
+      </VStack>
+
+      {/* Date and time skeleton */}
+      <VStack className="mb-3" space="sm">
+        <HStack className="items-center">
+          <Animated.View 
+            style={[
+              tw`rounded`,
+              { 
+                height: screenWidth < 768 ? 16 : 18,
+                width: 16,
+                backgroundColor: '#E5E7EB',
+                opacity: pulseAnim
+              }
+            ]}
+          />
+          <Animated.View 
+            style={[
+              tw`rounded ml-2`,
+              { 
+                height: screenWidth < 768 ? 14 : 16,
+                width: 100,
+                backgroundColor: '#E5E7EB',
+                opacity: pulseAnim
+              }
+            ]}
+          />
+        </HStack>
+
+        <HStack className="items-center">
+          <Animated.View 
+            style={[
+              tw`rounded`,
+              { 
+                height: screenWidth < 768 ? 16 : 18,
+                width: 16,
+                backgroundColor: '#E5E7EB',
+                opacity: pulseAnim
+              }
+            ]}
+          />
+          <Animated.View 
+            style={[
+              tw`rounded ml-2`,
+              { 
+                height: screenWidth < 768 ? 14 : 16,
+                width: 80,
+                backgroundColor: '#E5E7EB',
+                opacity: pulseAnim
+              }
+            ]}
+          />
+        </HStack>
+      </VStack>
+
+      {/* Button skeleton */}
+      <Animated.View 
+        style={[
+          tw`rounded-lg`,
+          { 
+            height: screenWidth < 768 ? 36 : 42,
+            width: '100%',
+            backgroundColor: '#E5E7EB',
+            opacity: pulseAnim
+          }
+        ]}
+      />
+    </Box>
+  );
+};
+
 export default function ConsultationsScreen() {
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -225,19 +385,6 @@ export default function ConsultationsScreen() {
     { id: "rejected", label: "Rejected" },
   ];
 
-  if (loading && consultations.length === 0) {
-    return (
-      <SidebarProvider>
-        <View style={tw`flex-1 bg-gray-50`}>
-          <Header title="My Consultations" showMenu={true} />
-          <View style={tw`flex-1 items-center justify-center`}>
-            <UIText style={tw`mt-4 text-lg text-gray-600`}>Loading consultations...</UIText>
-          </View>
-        </View>
-      </SidebarProvider>
-    );
-  }
-
   return (
     <SidebarProvider>
       <View style={tw`flex-1 bg-gray-50`}>
@@ -258,7 +405,6 @@ export default function ConsultationsScreen() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{
-                    flex: 1,
                     marginLeft: 8,
                     fontSize: screenWidth < 768 ? 14 : 16,
                     color: Colors.text.head,
@@ -276,7 +422,7 @@ export default function ConsultationsScreen() {
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={tw`px-4 md:px-6 pb-2`}
+          contentContainerStyle={tw`px-6`}
         >
           <HStack style={{ alignItems: "center" }}>
             {filters.map((filter) => {
@@ -309,9 +455,7 @@ export default function ConsultationsScreen() {
 
         {/* Consultations List */}
         <ScrollView
-          style={tw`flex-1`}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 80 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -321,7 +465,14 @@ export default function ConsultationsScreen() {
             />
           }
         >
-          {filteredConsultations.length === 0 ? (
+          {loading ? (
+            // Show skeleton cards while loading
+            <>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </>
+          ) : filteredConsultations.length === 0 ? (
             <VStack className="items-center justify-center py-12 px-4 md:px-6">
               <Ionicons
                 name="calendar-outline"
@@ -752,12 +903,6 @@ export default function ConsultationsScreen() {
                           className="text-sm"
                           style={{ color: Colors.text.sub }}
                         >
-                          {selectedConsultation.status === 'pending' && 
-                            "Your consultation request is pending review by the lawyer. You'll be notified once they respond."}
-                          {selectedConsultation.status === 'approved' && 
-                            "Your consultation has been approved! Please be available at the scheduled time."}
-                          {selectedConsultation.status === 'rejected' && 
-                            "Your consultation request has been declined. You can try contacting another lawyer."}
                           {selectedConsultation.status === 'completed' && 
                             "This consultation has been completed. Thank you for using our service."}
                         </UIText>

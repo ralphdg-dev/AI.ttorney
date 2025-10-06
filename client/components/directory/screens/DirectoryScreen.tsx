@@ -11,6 +11,8 @@ import {
   Animated,
   Easing,
 } from "react-native";
+import { LawyerListSkeleton } from "../components/LawyerListSkeleton";
+
 import FilterModal from "../components/FilterModal";
 import { useRouter } from "expo-router";
 import { VStack } from "@/components/ui/vstack";
@@ -356,11 +358,7 @@ export default function DirectoryScreen() {
           }
         >
           {loading && !refreshing ? (
-            <VStack className="items-center justify-center py-8">
-              <UIText style={{ color: Colors.text.sub }}>
-                Loading lawyers...
-              </UIText>
-            </VStack>
+            <LawyerListSkeleton count={3} />
           ) : filteredLawyers.length === 0 ? (
             <VStack className="items-center justify-center py-12 px-6">
               <Ionicons
