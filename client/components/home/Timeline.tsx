@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Animated } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Animated, ListRenderItem } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Post from './Post';
@@ -7,6 +7,8 @@ import Colors from '../../constants/Colors';
 import apiClient from '@/lib/api-client';
 import { useFocusEffect } from '@react-navigation/native';
 import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
+import { useOptimizedList } from '@/hooks/useOptimizedList';
+import { SkeletonList } from '@/components/ui/SkeletonLoader';
 
 interface PostData {
   id: string;
@@ -239,52 +241,86 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     }
   }, [addOptimisticPost, confirmOptimisticPost, removeOptimisticPost, context]);
 
+  // Memoized key extractor
+  const keyExtractor = useCallback((item: PostData) => item.id, []);
+
+  // Memoized render item
+  const renderItem: ListRenderItem<PostData> = useCallback(({ item, index }) => {
+    const postComponent = (
+      <Post
+        id={item.id}
+        user={item.user}
+        timestamp={item.timestamp}
+        category={item.category}
+        content={item.content}
+        comments={item.comments}
+        onCommentPress={() => handleCommentPress(item.id)}
+        onReportPress={() => handleReportPress(item.id)}
+        onPostPress={() => handlePostPress(item.id)}
+        index={index}
+        isOptimistic={item.isOptimistic}
+      />
+    );
+
+    // Wrap optimistic posts with animated opacity
+    if (item.isOptimistic && item.animatedOpacity) {
+      return (
+        <Animated.View
+          style={{ opacity: item.animatedOpacity }}
+        >
+          {postComponent}
+        </Animated.View>
+      );
+    }
+
+    return postComponent;
+  }, [handleCommentPress, handleReportPress, handlePostPress]);
+
+  // Combined posts data
+  const allPosts = useMemo(() => [...optimisticPosts, ...posts], [optimisticPosts, posts]);
+
+  // Use optimized list hook
+  const optimizedListProps = useOptimizedList({
+    data: allPosts,
+    keyExtractor,
+    renderItem,
+    windowSize: 10,
+    initialNumToRender: 5,
+    maxToRenderPerBatch: 3,
+    updateCellsBatchingPeriod: 50,
+    removeClippedSubviews: true,
+  });
+
+  // Memoized refresh control
+  const refreshControl = useMemo(() => (
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={loadPosts}
+      colors={[Colors.primary.blue]}
+      tintColor={Colors.primary.blue}
+    />
+  ), [refreshing, loadPosts]);
+
   return (
     <View style={styles.container}>
       {/* Forum Loading Animation */}
       <ForumLoadingAnimation visible={initialLoading} />
       
-      {/* Timeline */}
-      <ScrollView 
-        style={styles.timeline}
-        contentContainerStyle={styles.timelineContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={loadPosts} />
-        }
-      >
-        {[...optimisticPosts, ...posts].map((post) => {
-          const postComponent = (
-            <Post
-              key={post.id}
-              id={post.id}
-              user={post.user}
-              timestamp={post.timestamp}
-              category={post.category}
-              content={post.content}
-              comments={post.comments}
-              onCommentPress={() => handleCommentPress(post.id)}
-              onReportPress={() => handleReportPress(post.id)}
-              onPostPress={() => handlePostPress(post.id)}
-            />
-          );
-
-          // Wrap optimistic posts with animated opacity
-          if (post.isOptimistic && post.animatedOpacity) {
-            return (
-              <Animated.View
-                key={post.id}
-                style={{ opacity: post.animatedOpacity }}
-              >
-                {postComponent}
-              </Animated.View>
-            );
-          }
-
-          return postComponent;
-        })}
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+      {/* Show skeleton loading for initial load */}
+      {initialLoading && allPosts.length === 0 ? (
+        <View style={styles.skeletonContainer}>
+          <SkeletonList itemCount={8} itemHeight={200} spacing={12} />
+        </View>
+      ) : (
+        <FlatList
+          {...optimizedListProps}
+          style={styles.timeline}
+          contentContainerStyle={styles.timelineContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
+          ListFooterComponent={<View style={styles.bottomSpacer} />}
+        />
+      )}
 
       {/* Floating Create Post Button */}
       <TouchableOpacity style={styles.createPostButton} onPress={handleCreatePost} activeOpacity={0.8}>
@@ -301,9 +337,16 @@ const styles = StyleSheet.create({
   },
   timeline: {
     flex: 1,
+    backgroundColor: Colors.background.primary,
   },
   timelineContent: {
-    paddingVertical: 10, // Add some padding at the top and bottom
+    paddingVertical: 10,
+    paddingBottom: 100, // Account for bottom navigation
+  },
+  skeletonContainer: {
+    flex: 1,
+    backgroundColor: Colors.background.primary,
+    paddingHorizontal: 16,
   },
   bottomSpacer: {
     height: 80, // Add a spacer at the bottom to prevent content from being hidden

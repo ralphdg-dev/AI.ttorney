@@ -1,202 +1,269 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { MoreHorizontal, Flag, ShieldCheck } from 'lucide-react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, TextInput, TouchableOpacity, FlatList, ListRenderItem } from 'react-native';
+import { Send, User, Shield } from 'lucide-react-native';
+import Colors from '../../constants/Colors';
+import { useAuth } from '../../contexts/AuthContext';
+import Card from '../ui/Card';
+import Button from '../ui/Button';
+import FadeInView from '../ui/FadeInView';
+import LoadingSpinner from '../ui/LoadingSpinner';
+import { SkeletonCard } from '../ui/SkeletonLoader';
+import { useOptimizedList } from '../../hooks/useOptimizedList';
 
-interface Reply {
+interface Comment {
   id: string;
-  user: {
+  body: string;
+  created_at: string;
+  user?: {
     name: string;
     username: string;
     avatar: string;
+    isLawyer?: boolean;
   };
-  timestamp: string;
-  content: string;
+  is_anonymous?: boolean;
 }
 
 interface CommentsProps {
-  replies: Reply[];
+  postId: string;
+  comments: Comment[];
+  loading?: boolean;
+  onAddComment?: (comment: string) => Promise<void>;
+  onRefresh?: () => void;
 }
 
-const Comments: React.FC<CommentsProps> = ({ replies }) => {
-  const [openReplyId, setOpenReplyId] = useState<string | null>(null);
+const Comments: React.FC<CommentsProps> = React.memo(({
+  postId,
+  comments,
+  loading = false,
+  onAddComment,
+  onRefresh,
+}) => {
+  const { user: currentUser } = useAuth();
+  const [newComment, setNewComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isCommentDisabled = useMemo(() => {
+    return newComment.trim().length === 0 || newComment.length > 500;
+  }, [newComment]);
+
+  const handleSubmitComment = useCallback(async () => {
+    if (isCommentDisabled || !onAddComment) return;
+
+    setIsSubmitting(true);
+    try {
+      await onAddComment(newComment.trim());
+      setNewComment('');
+    } catch (error) {
+      console.error('Error submitting comment:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [newComment, isCommentDisabled, onAddComment]);
+
+  const renderComment: ListRenderItem<Comment> = useCallback(({ item, index }) => (
+    <FadeInView delay={index * 30} key={item.id}>
+      <Card variant="default" padding="medium" style={styles.commentCard}>
+        <View style={styles.commentHeader}>
+          <View style={styles.commentAvatar}>
+            <User size={16} color={Colors.text.secondary} />
+          </View>
+          <View style={styles.commentUserInfo}>
+            <View style={styles.commentUserNameRow}>
+              <Text style={styles.commentUserName}>
+                {item.is_anonymous ? 'Anonymous' : (item.user?.name || 'Anonymous')}
+              </Text>
+              {item.user?.isLawyer && (
+                <Shield size={12} color={Colors.primary.blue} />
+              )}
+            </View>
+            <Text style={styles.commentTimestamp}>
+              {new Date(item.created_at).toLocaleDateString()}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.commentContent}>{item.body}</Text>
+      </Card>
+    </FadeInView>
+  ), []);
+
+  const keyExtractor = useCallback((item: Comment) => item.id, []);
+
+  const optimizedListProps = useOptimizedList({
+    data: comments,
+    keyExtractor,
+    renderItem: renderComment,
+    windowSize: 8,
+    initialNumToRender: 5,
+    maxToRenderPerBatch: 3,
+  });
+
+  if (loading && comments.length === 0) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Comments</Text>
+        <SkeletonCard style={styles.skeletonComment} />
+        <SkeletonCard style={styles.skeletonComment} />
+        <SkeletonCard style={styles.skeletonComment} />
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.repliesContainer}>
-      <Text style={styles.repliesTitle}>Replies</Text>
-      {replies.map((reply) => (
-        <View key={reply.id} style={styles.replyContainer}>
-          <View style={styles.replyUserRow}>
-            <Image 
-              source={{ uri: reply.user.avatar }} 
-              style={styles.replyAvatar} 
-            />
-            <View style={styles.replyUserInfo}>
-              <View style={styles.replyNameRow}>
-                <Text style={styles.replyUserName}>Atty. {reply.user.name}</Text>
-                <Text style={styles.replyTimestamp}>• {reply.timestamp}</Text>
-              </View>
-              <View style={styles.replyMetaRow}>
-                <ShieldCheck size={14} color="#16A34A" />
-                <Text style={styles.replyVerifiedText}>Verified</Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={styles.replyMoreButton}
-              onPress={() => setOpenReplyId((prev) => (prev === reply.id ? null : reply.id))}
-            >
-              <MoreHorizontal size={16} color="#536471" />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.replyCard}>
-            <Text style={styles.replyContent}>{reply.content}</Text>
-          </View>
+    <View style={styles.container}>
+      <Text style={styles.title}>Comments ({comments.length})</Text>
 
-          {/* Reply dropdown (local, report only) */}
-          {openReplyId === reply.id && (
-            <>
-              <TouchableOpacity
-                style={styles.overlay}
-                activeOpacity={1}
-                onPress={() => setOpenReplyId(null)}
+      {/* Comment Input */}
+      {currentUser && (
+        <FadeInView delay={0}>
+          <Card variant="outlined" padding="medium" style={styles.inputCard}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Write a comment..."
+              placeholderTextColor={Colors.text.tertiary}
+              value={newComment}
+              onChangeText={setNewComment}
+              multiline
+              maxLength={500}
+              textAlignVertical="top"
+            />
+            <View style={styles.inputActions}>
+              <Text style={[
+                styles.characterCount,
+                newComment.length > 500 && styles.characterCountExceeded
+              ]}>
+                {newComment.length}/500
+              </Text>
+              <Button
+                title="Post"
+                variant="primary"
+                size="small"
+                disabled={isCommentDisabled}
+                loading={isSubmitting}
+                onPress={handleSubmitComment}
+                icon={<Send size={14} color={Colors.text.white} />}
+                iconPosition="right"
               />
-              <View style={styles.menuContainer}>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    console.log('Report reply', reply.id);
-                    // keep open per UX or close if desired
-                  }}
-                >
-                  <Flag size={16} color="#B91C1C" />
-                  <Text style={[styles.menuText, { color: '#B91C1C' }]}>Report reply</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-        </View>
-      ))}
+            </View>
+          </Card>
+        </FadeInView>
+      )}
+
+      {/* Comments List */}
+      {comments.length > 0 ? (
+        <FlatList
+          {...optimizedListProps}
+          style={styles.commentsList}
+          contentContainerStyle={styles.commentsListContent}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={false} // Disable scroll since it's inside a ScrollView
+        />
+      ) : (
+        <FadeInView delay={200}>
+          <Card variant="flat" padding="large" style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>
+              No comments yet. Be the first to share your thoughts!
+            </Text>
+          </Card>
+        </FadeInView>
+      )}
     </View>
   );
-};
+});
 
-const styles = StyleSheet.create({
-  repliesContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+const styles = {
+  container: {
+    marginTop: 24,
   },
-  repliesTitle: {
+  title: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#0F1419',
+    fontWeight: '600' as const,
+    color: Colors.text.primary,
     marginBottom: 16,
   },
-  replyContainer: {
-    paddingVertical: 12,
-    borderBottomWidth: 0,
-    borderBottomColor: 'transparent',
-    position: 'relative',
+  inputCard: {
+    marginBottom: 16,
   },
-  replyUserRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 4,
+  commentInput: {
+    minHeight: 80,
+    fontSize: 14,
+    color: Colors.text.primary,
+    textAlignVertical: 'top' as const,
+    marginBottom: 12,
   },
-  replyMoreButton: {
-    marginLeft: 'auto',
-    padding: 6,
-    borderRadius: 16,
+  inputActions: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
   },
-  replyAvatar: {
+  characterCount: {
+    fontSize: 12,
+    color: Colors.text.tertiary,
+  },
+  characterCountExceeded: {
+    color: Colors.status.error,
+  },
+  commentsList: {
+    flex: 1,
+  },
+  commentsListContent: {
+    paddingBottom: 16,
+  },
+  commentCard: {
+    marginBottom: 12,
+  },
+  commentHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginBottom: 8,
+  },
+  commentAvatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
+    backgroundColor: Colors.background.secondary,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     marginRight: 12,
   },
-  replyUserInfo: {
+  commentUserInfo: {
     flex: 1,
   },
-  replyNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    marginBottom: 2,
-    gap: 6,
+  commentUserNameRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
   },
-  replyUserName: {
+  commentUserName: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#0F1419',
-    marginRight: 4,
+    fontWeight: '600' as const,
+    color: Colors.text.primary,
+    marginRight: 8,
   },
-  replyTimestamp: {
+  commentTimestamp: {
     fontSize: 12,
-    color: '#536471',
+    color: Colors.text.tertiary,
+    marginTop: 2,
   },
-  replyMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  replyVerifiedText: {
-    fontSize: 12,
-    color: '#16A34A',
-    fontWeight: '600',
-  },
-  replyContent: {
+  commentContent: {
     fontSize: 14,
-    lineHeight: 18,
-    color: '#0F1419',
+    lineHeight: 20,
+    color: Colors.text.primary,
   },
-  replyCard: {
-    backgroundColor: '#FAFAFA', // light gray
-    borderColor: '#E5E7EB', // lighter border
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginLeft: 44, // align under the text area
-    marginTop: 4,
+  emptyState: {
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingVertical: 32,
   },
-  // Local dropdown styles
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 19,
-  },
-  menuContainer: {
-    position: 'absolute',
-    top: 28,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    minWidth: 200,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-    zIndex: 20,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-  },
-  menuText: {
+  emptyStateText: {
     fontSize: 14,
-    color: '#111827',
+    color: Colors.text.secondary,
+    textAlign: 'center' as const,
   },
-});
+  skeletonComment: {
+    height: 80,
+    marginBottom: 12,
+  },
+};
 
-export default Comments; 
+Comments.displayName = 'Comments';
+
+export default Comments;
