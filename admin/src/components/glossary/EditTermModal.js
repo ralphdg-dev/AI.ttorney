@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import Select from '../ui/Select';
-import ConfirmationModal from '../ui/ConfirmationModal';
 import { Save, X } from 'lucide-react';
 
 const EditTermModal = ({ open, onClose, onSave, term }) => {
@@ -19,8 +18,6 @@ const EditTermModal = ({ open, onClose, onSave, term }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [confirmationLoading, setConfirmationLoading] = useState(false);
 
   // Initialize form with term data when modal opens
   useEffect(() => {
@@ -40,8 +37,6 @@ const EditTermModal = ({ open, onClose, onSave, term }) => {
       setError(null);
       setValidationErrors({});
       setLoading(false);
-      setShowConfirmation(false);
-      setConfirmationLoading(false);
     }
   }, [open, term]);
 
@@ -62,8 +57,6 @@ const EditTermModal = ({ open, onClose, onSave, term }) => {
       setError(null);
       setValidationErrors({});
       setLoading(false);
-      setShowConfirmation(false);
-      setConfirmationLoading(false);
     }
   }, [open]);
 
@@ -197,66 +190,34 @@ const EditTermModal = ({ open, onClose, onSave, term }) => {
     // Detect changes
     const changes = detectChanges();
     
-    // If no changes, just close the modal
+    // If no changes, show warning
     if (Object.keys(changes).length === 0) {
       setError('No changes detected');
       return;
     }
     
-    // Show confirmation modal with changes
-    setShowConfirmation(true);
-  };
-
-  const handleConfirmEdit = async () => {
-    try {
-      setConfirmationLoading(true);
-      setError(null);
-      
-      // Get current admin user info
-      const currentAdmin = JSON.parse(localStorage.getItem('admin_user') || '{}');
-      
-      // Prepare updated term data
-      const updatedTermData = {
-        ...formData,
-        term_en: formData.term_en.trim(),
-        term_fil: formData.term_fil.trim() || null,
-        definition_en: formData.definition_en.trim() || null,
-        definition_fil: formData.definition_fil.trim() || null,
-        example_en: formData.example_en.trim() || null,
-        example_fil: formData.example_fil.trim() || null,
-        category: formData.category.toLowerCase(),
-        verified_by: formData.is_verified ? (currentAdmin.full_name || currentAdmin.email || 'Admin') : null
-      };
-      
-      // Call the onSave callback with both updated and original data for change comparison
-      await onSave(updatedTermData, originalData, term);
-      
-      // Close both modals
-      setShowConfirmation(false);
-      onClose();
-      
-    } catch (err) {
-      setError(err.message || 'Failed to update glossary term');
-      setShowConfirmation(false);
-    } finally {
-      setConfirmationLoading(false);
-    }
-  };
-
-  const handleCancelConfirmation = () => {
-    setShowConfirmation(false);
+    // Get current admin user info
+    const currentAdmin = JSON.parse(localStorage.getItem('admin_user') || '{}');
+    
+    // Prepare updated term data
+    const updatedTermData = {
+      ...formData,
+      term_en: formData.term_en.trim(),
+      term_fil: formData.term_fil.trim() || null,
+      definition_en: formData.definition_en.trim() || null,
+      definition_fil: formData.definition_fil.trim() || null,
+      example_en: formData.example_en.trim() || null,
+      example_fil: formData.example_fil.trim() || null,
+      category: formData.category.toLowerCase(),
+      verified_by: formData.is_verified ? (currentAdmin.full_name || currentAdmin.email || 'Admin') : null
+    };
+    
+    // Call the onSave callback with both updated and original data for change comparison
+    onSave(updatedTermData, originalData, term);
   };
 
   const handleCancel = () => {
     onClose();
-  };
-
-  // Get changes for confirmation modal
-  const getChangesForConfirmation = () => {
-    const changes = detectChanges();
-    return Object.entries(changes).map(([field, change]) => 
-      `• ${field}: "${change.from}" → "${change.to}"`
-    ).join('\n');
   };
 
   return (
@@ -480,18 +441,6 @@ const EditTermModal = ({ open, onClose, onSave, term }) => {
           </button>
         </div>
       </form>
-
-      {/* Confirmation Modal */}
-      <ConfirmationModal
-        open={showConfirmation}
-        onClose={handleCancelConfirmation}
-        onConfirm={handleConfirmEdit}
-        title="Confirm Term Changes"
-        message={`Are you sure you want to save these changes to "${formData.term_en}"?\n\nChanges:\n${getChangesForConfirmation()}`}
-        confirmText="Save Changes"
-        loading={confirmationLoading}
-        type="edit"
-      />
     </Modal>
   );
 };

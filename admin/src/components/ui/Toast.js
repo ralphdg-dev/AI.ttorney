@@ -24,7 +24,7 @@ const Toast = ({ message, type = 'success', duration = 4000, onClose }) => {
   if (!isVisible) return null;
 
   const getToastStyles = () => {
-    const baseStyles = "fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg border text-sm font-medium transition-all duration-300 ease-in-out max-w-md";
+    const baseStyles = "fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg border text-sm font-medium transition-all duration-300 ease-in-out max-w-lg min-w-80";
     
     if (isExiting) {
       return `${baseStyles} opacity-0 transform -translate-x-1/2 -translate-y-4`;
