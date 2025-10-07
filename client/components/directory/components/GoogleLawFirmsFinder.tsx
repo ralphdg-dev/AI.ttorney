@@ -17,15 +17,14 @@ import { Button, ButtonText } from '@/components/ui/button/';
 import { Box } from '@/components/ui/box';
 import { Spinner } from '@/components/ui/spinner';
 import { 
-  Search, 
   MapPin, 
   Phone, 
   Navigation, 
   Star, 
   Locate, 
-  X,
   Check
 } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../../constants/Colors';
 import { NetworkConfig } from '../../../utils/networkConfig';
 
@@ -1156,19 +1155,10 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           <HStack style={{ 
             height: 48, 
             alignItems: 'center', 
-            paddingHorizontal: 12,
-            justifyContent: 'space-between'
+            paddingLeft: 20,
+            paddingRight: 16
           }}>
-            {/* Fixed-width container for left icon */}
-            <Box style={{ 
-              width: 24, 
-              height: 48, 
-              justifyContent: 'center', 
-              alignItems: 'center', 
-              flexShrink: 0 
-            }}>
-              <Search size={18} color="#6B7280" />
-            </Box>
+            <Ionicons name="search" size={20} color="#9CA3AF" style={{ marginRight: 14 }} />
             
             <TextInput
               className="flex-1 text-base"
@@ -1183,8 +1173,6 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
               editable={!searching}
               style={{ 
                 color: Colors.text.head,
-                paddingHorizontal: 12,
-                paddingVertical: 0,
                 height: 48,
                 fontSize: 16,
                 lineHeight: 20,
@@ -1223,7 +1211,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                     borderRadius: 12
                   }}
                 >
-                  <X size={18} color="#6B7280" />
+                  <Ionicons name="close" size={18} color="#6B7280" />
                 </Pressable>
               )}
               {searching && (
