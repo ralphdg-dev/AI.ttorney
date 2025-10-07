@@ -82,7 +82,7 @@ export default function LawyerCard({
     : "Book Consultation";
 
   return (
-    <Box className="mx-6 mb-4 bg-white rounded-lg border border-gray-200 p-4">
+    <Box className="mx-2 mb-3 bg-white rounded-lg border border-gray-200 p-4">
       <HStack className="justify-between items-start mb-2">
         <VStack className="flex-1">
           <Text

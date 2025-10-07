@@ -287,135 +287,152 @@ export default function DirectoryScreen() {
 
         <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {/* Search and Filter Section */}
-        <HStack className="items-center px-6 mb-4">
-          <Box className="flex-1 mr-2">
-            <Box className="relative">
-              <View
-                style={[
-                  tw`flex-row items-center bg-white border border-gray-200 rounded-lg px-4 py-3`,
-                ]}
-              >
-                <Ionicons name="search" size={20} color="#9CA3AF" />
-                <input
-                  placeholder="Search lawyers..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{
-                    flex: 1,
-                    marginLeft: 12,
-                    fontSize: 14,
-                    color: Colors.text.head,
-                    border: "none",
-                    outline: "none",
-                    backgroundColor: "transparent",
-                  }}
-                />
-              </View>
-            </Box>
-          </Box>
-
-          {/* Filter Button */}
-          <UIPressable
-            onPress={() => setFilterVisible(true)}
-            className="bg-white border border-gray-200 p-3 rounded-lg relative"
-          >
-            <Ionicons
-              name="filter-outline"
-              size={20}
-              color={Colors.primary.blue}
-            />
-            {hasActiveFilters && (
-              <Box
-                className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
-                style={{ backgroundColor: Colors.primary.blue }}
-              />
-            )}
-          </UIPressable>
-        </HStack>
-
-        <FilterModal
-          visible={filterVisible}
-          onClose={() => setFilterVisible(false)}
-          selectedDays={selectedDays}
-          setSelectedDays={setSelectedDays}
-          selectedSpecialization={selectedSpecialization}
-          setSelectedSpecialization={setSelectedSpecialization}
-        />
-
         {/* Conditional Content Based on Active Tab */}
         {activeTab === "law-firms" ? (
-          /* Law Firms Tab - Google Maps Integration */
+          /* Law Firms Tab - Google Maps Integration with its own search */
           <View style={tw`flex-1`}>
             <GoogleLawFirmsFinder searchQuery={searchQuery} />
           </View>
         ) : (
-          /* Lawyers Tab - Individual Lawyers List */
-          <ScrollView
-            style={tw`flex-1`}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 60 }}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                colors={[Colors.primary.blue]}
-                tintColor={Colors.primary.blue}
-              />
-            }
-          >
-            {loading && !refreshing ? (
-              <LawyerListSkeleton count={3} />
-            ) : filteredLawyers.length === 0 ? (
-              <VStack className="items-center justify-center py-12 px-6">
-                <Ionicons
-                  name="search-outline"
-                  size={48}
-                  color={Colors.text.sub}
-                  style={{ marginBottom: 12 }}
-                />
-                <UIText
-                  className="text-center text-base font-semibold mb-2"
-                  style={{ color: Colors.text.head }}
-                >
-                  No lawyers found
-                </UIText>
-                <UIText
-                  className="text-center text-sm"
-                  style={{ color: Colors.text.sub }}
-                >
-                  {searchQuery
-                    ? `Try adjusting your search for "${searchQuery}"`
-                    : hasActiveFilters
-                    ? "Try adjusting your filters"
-                    : "No lawyers are currently available"}
-                </UIText>
-              </VStack>
-            ) : (
-              <>
-                {filteredLawyers
-                  .filter(
-                    (lawyer) =>
-                      lawyer.days &&
-                      lawyer.days.trim() !== "" &&
-                      lawyer.hours_available &&
-                      lawyer.hours_available.length > 0
-                  )
-                  .map((lawyer) => (
-                    <LawyerCard
-                      key={lawyer.id}
-                      lawyer={{
-                        ...lawyer,
-                        days: lawyer.displayDays,
+          /* Lawyers Tab - Search and Filter Section */
+          <VStack className="flex-1">
+            <VStack space="md" className="px-4 py-4 bg-white border-b border-gray-200" style={{ zIndex: 1000 }}>
+              <Box className="relative" style={{ zIndex: 1000 }}>
+                <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ 
+                  minHeight: 48,
+                  maxHeight: 48,
+                  height: 48
+                }}>
+                  <HStack style={{ 
+                    height: 48, 
+                    alignItems: 'center', 
+                    paddingLeft: 20,
+                    paddingRight: 16
+                  }}>
+                    <Ionicons name="search" size={20} color="#9CA3AF" style={{ marginRight: 14 }} />
+                    
+                    <input
+                      placeholder="Search lawyers by name..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      style={{
+                        flex: 1,
+                        height: 48,
+                        fontSize: 16,
+                        color: Colors.text.head,
+                        border: "none",
+                        outline: "none",
+                        backgroundColor: "transparent",
                       }}
-                      onBookConsultation={() => handleBookConsultation(lawyer)}
                     />
-                  ))}
-              </>
-            )}
+                    
+                    {/* Fixed-width container for right icons */}
+                    <Box style={{ 
+                      width: 24, 
+                      height: 48, 
+                      justifyContent: 'center', 
+                      alignItems: 'center', 
+                      flexShrink: 0 
+                    }}>
+                      {searchQuery.length > 0 && (
+                        <UIPressable
+                          onPress={() => setSearchQuery("")}
+                          style={{
+                            width: 24,
+                            height: 24,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            borderRadius: 12
+                          }}
+                        >
+                          <Ionicons name="close" size={18} color="#6B7280" />
+                        </UIPressable>
+                      )}
+                    </Box>
+                  </HStack>
+                </Box>
+              </Box>
 
-            <View style={tw`h-4`} />
-          </ScrollView>
+            </VStack>
+
+            <FilterModal
+              visible={filterVisible}
+              onClose={() => setFilterVisible(false)}
+              selectedDays={selectedDays}
+              setSelectedDays={setSelectedDays}
+              selectedSpecialization={selectedSpecialization}
+              setSelectedSpecialization={setSelectedSpecialization}
+            />
+
+            {/* Lawyers Tab - Individual Lawyers List */}
+            <ScrollView 
+              className="flex-1" 
+              style={{ backgroundColor: '#f9fafb' }}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 120 }}
+              keyboardShouldPersistTaps="handled"
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  colors={[Colors.primary.blue]}
+                  tintColor={Colors.primary.blue}
+                />
+              }
+            >
+              {loading && !refreshing ? (
+                <LawyerListSkeleton count={3} />
+              ) : filteredLawyers.length === 0 ? (
+                <VStack className="items-center justify-center py-12 px-6">
+                  <Ionicons
+                    name="search-outline"
+                    size={48}
+                    color={Colors.text.sub}
+                    style={{ marginBottom: 12 }}
+                  />
+                  <UIText
+                    className="text-center text-base font-semibold mb-2"
+                    style={{ color: Colors.text.head }}
+                  >
+                    No lawyers found
+                  </UIText>
+                  <UIText
+                    className="text-center text-sm"
+                    style={{ color: Colors.text.sub }}
+                  >
+                    {searchQuery
+                      ? `Try adjusting your search for "${searchQuery}"`
+                      : hasActiveFilters
+                      ? "Try adjusting your filters"
+                      : "No lawyers are currently available"}
+                  </UIText>
+                </VStack>
+              ) : (
+                <VStack space="xs" style={{ paddingTop: 12, paddingHorizontal: 8 }}>
+                  {filteredLawyers
+                    .filter(
+                      (lawyer) =>
+                        lawyer.days &&
+                        lawyer.days.trim() !== "" &&
+                        lawyer.hours_available &&
+                        lawyer.hours_available.length > 0
+                    )
+                    .map((lawyer) => (
+                      <LawyerCard
+                        key={lawyer.id}
+                        lawyer={{
+                          ...lawyer,
+                          days: lawyer.displayDays,
+                        }}
+                        onBookConsultation={() => handleBookConsultation(lawyer)}
+                      />
+                    ))}
+                </VStack>
+              )}
+
+              <View style={tw`h-4`} />
+            </ScrollView>
+          </VStack>
         )}
 
         <Navbar activeTab="find" />
