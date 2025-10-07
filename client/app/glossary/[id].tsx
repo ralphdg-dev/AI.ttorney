@@ -7,6 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
   useWindowDimensions,
+  Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { HStack } from "@/components/ui/hstack";
@@ -222,7 +223,7 @@ export default function TermDetailScreen() {
         scrollEventThrottle={16}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
+          { useNativeDriver: Platform.OS !== 'web' }
         )}
       >
         {/* Main Content Card - Responsive width */}

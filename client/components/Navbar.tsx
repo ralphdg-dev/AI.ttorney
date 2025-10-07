@@ -145,13 +145,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    boxShadow: '0 -2px 3px rgba(0, 0, 0, 0.1)',
     elevation: 8,
   },
   navbar: {

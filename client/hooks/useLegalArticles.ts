@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { db, supabase } from '@/lib/supabase';
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../config/supabase';
 import { ArticleItem } from '@/components/guides/ArticleCard';
 
 export interface LegalArticle {
@@ -47,10 +47,6 @@ export const useLegalArticles = () => {
   const [articles, setArticles] = useState<ArticleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchArticles();
-  }, []);
 
   const fetchArticlesFromServer = async (searchQuery?: string) => {
     try {
@@ -102,7 +98,7 @@ export const useLegalArticles = () => {
     }
   };
 
-  const fetchArticles = async () => {
+  const fetchArticles = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -171,7 +167,11 @@ export const useLegalArticles = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchArticles();
+  }, [fetchArticles]);
 
   const getArticleById = async (id: string): Promise<ArticleItem | null> => {
     try {
@@ -313,7 +313,6 @@ export const useLegalArticles = () => {
         data = await searchArticlesFromServer(query, category);
       } else {
         // Use direct Supabase search with ilike for case-insensitive search
-        const searchTerm = `%${query}%`;
         let supabaseQuery = supabase
           .from('legal_articles')
           .select('id, title_en, title_fil, description_en, description_fil, content_en, content_fil, category, image_article, is_verified, created_at, updated_at')

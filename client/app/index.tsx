@@ -1,4 +1,4 @@
-import { Text, Image, Animated } from "react-native";
+import { Text, Image, Animated, Platform } from "react-native";
 import { Redirect } from "expo-router";
 import { useEffect, useState, useRef } from "react";
 import tw from "tailwind-react-native-classnames";
@@ -40,7 +40,7 @@ export default function SplashScreen() {
           Animated.timing(fadeAnim, {
             toValue: 0,
             duration: 500, // Faster fade
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }).start(() => {
             setRedirectPath(targetPath);
             setShouldRedirect(true);
@@ -67,7 +67,7 @@ export default function SplashScreen() {
       <Text style={tw`text-2xl font-bold`}>Ai.ttorney</Text>
       <Text style={tw`text-gray-500 italic`}>
         Justice at Your Fingertips
-      </Text>{" "}
+      </Text>
     </Animated.View>
   );
 }

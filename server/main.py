@@ -61,7 +61,10 @@ app.add_middleware(
         "http://localhost:3000",  # React dev server
         "http://localhost:8081",  # Expo dev server
         "exp://localhost:8081",   # Expo dev server
-        # Add your production domains here
+        "http://192.168.68.102:8081",  # Current network Expo dev server
+        "exp://192.168.68.102:8081",   # Current network Expo dev server
+        "http://192.168.68.102:8000",  # API server access
+        "*",  # Allow all origins for Expo Go (development only)
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -94,6 +97,11 @@ app.include_router(route_validation_router, prefix="/api")
 from routes.lawyer_applications import router as lawyer_applications_router
 app.include_router(lawyer_applications_router, prefix="/api")
 app.include_router(forum_router, prefix="/api")
+
+# Import and include places proxy router
+from routes.places_proxy import router as places_proxy_router
+app.include_router(places_proxy_router)
+
 
 @app.get("/")
 async def root():

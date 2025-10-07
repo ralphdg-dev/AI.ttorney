@@ -1,13 +1,14 @@
-import React, { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
+  TouchableOpacity,
   FlatList,
+  Animated,
+  Platform,
+  ActivityIndicator,
   Alert,
   useWindowDimensions,
-  ActivityIndicator,
-  TouchableOpacity,
-  Animated,
-} from "react-native";
+} from 'react-native';
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
 import { Box } from "@/components/ui/box";
@@ -26,7 +27,7 @@ import { useLegalArticles } from "@/hooks/useLegalArticles";
 import {
   CacheService,
   generateGlossaryCacheKey,
-} from "@/lib/glossary/cacheService";
+} from "@/services/cacheService";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 const ITEMS_PER_PAGE = 10;
@@ -278,7 +279,7 @@ export default function GlossaryScreen() {
     Animated.timing(fadeAnim, {
       toValue: 0,
       duration: 150,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start(() => {
       setActiveTab(id);
       setCurrentPage(1);
@@ -288,7 +289,7 @@ export default function GlossaryScreen() {
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 150,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     });
   }, [activeTab, fadeAnim]);

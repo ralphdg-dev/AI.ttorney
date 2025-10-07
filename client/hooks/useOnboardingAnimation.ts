@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { Animated } from 'react-native';
+import { Animated, Platform } from 'react-native';
 import { State } from 'react-native-gesture-handler';
 
 export function useOnboardingAnimation(totalSlides: number) {
@@ -23,14 +23,14 @@ export function useOnboardingAnimation(totalSlides: number) {
     Animated.timing(progressAnims[currentSlide], {
       toValue: 0,
       duration: 150,
-      useNativeDriver: false,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
 
     // Animate in new slide progress
     Animated.timing(progressAnims[newSlide], {
       toValue: 1,
       duration: 150,
-      useNativeDriver: false,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   };
 
@@ -40,7 +40,7 @@ export function useOnboardingAnimation(totalSlides: number) {
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 150,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start(() => {
         const newSlide = currentSlide + 1;
         setCurrentSlide(newSlide);
@@ -49,7 +49,7 @@ export function useOnboardingAnimation(totalSlides: number) {
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 150,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }).start();
       });
     } else {
@@ -63,7 +63,7 @@ export function useOnboardingAnimation(totalSlides: number) {
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 150,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start(() => {
         const newSlide = currentSlide - 1;
         setCurrentSlide(newSlide);
@@ -72,7 +72,7 @@ export function useOnboardingAnimation(totalSlides: number) {
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 150,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }).start();
       });
     }
