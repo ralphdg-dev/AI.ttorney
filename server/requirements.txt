@@ -1,10 +1,11 @@
-supabase==2.18.1
+supabase==2.21.1
 python-dotenv==1.1.1
-fastapi==0.116.1
-uvicorn==0.35.0
-pydantic==2.11.7
+fastapi==0.118.0
+uvicorn==0.37.0
+pydantic==2.11.10
 httpx==0.28.1
 email-validator==2.3.0
-PyJWT==2.8.0
+PyJWT==2.10.1
 python-multipart==0.0.20
-googlemaps==4.10.0 
+googlemaps==4.10.0
+cachetools==6.2.0 

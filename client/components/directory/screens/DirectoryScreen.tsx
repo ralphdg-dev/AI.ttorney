@@ -3,11 +3,7 @@ import {
   View,
   ScrollView,
   Alert,
-  Text,
   RefreshControl,
-  Modal,
-  Pressable,
-  Dimensions,
   Animated,
   Easing,
 } from "react-native";
@@ -35,13 +31,13 @@ interface Lawyer {
   id: string;
   lawyer_id: string;
   name: string;
-  specialization: string;
+  specialization: string | string[];
   location: string;
   hours: string;
   bio: string;
   days: string;
   available: boolean;
-  hours_available: string;
+  hours_available: string | string[];
   created_at: string;
 }
 
@@ -57,7 +53,6 @@ export default function DirectoryScreen() {
   const [lawyersData, setLawyersData] = useState<Lawyer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [lastUpdated, setLastUpdated] = useState<number>(0);
   const router = useRouter();
   const [filterVisible, setFilterVisible] = useState(false);
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
@@ -65,7 +60,6 @@ export default function DirectoryScreen() {
     useState<string>("All");
   const { user, isAuthenticated } = useAuth();
 
-  const { height: screenHeight } = Dimensions.get("window");
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(300));
 
@@ -101,7 +95,7 @@ export default function DirectoryScreen() {
         }),
       ]).start();
     }
-  }, [filterVisible]);
+  }, [filterVisible, fadeAnim, slideAnim]);
 
   const fetchLawyers = useCallback(async (forceRefresh: boolean = false) => {
     try {
@@ -114,7 +108,6 @@ export default function DirectoryScreen() {
         now - frontendCache.timestamp < frontendCache.ttl
       ) {
         setLawyersData(frontendCache.lawyers);
-        setLastUpdated(frontendCache.timestamp);
         setLoading(false);
         return;
       }
@@ -129,7 +122,6 @@ export default function DirectoryScreen() {
       if (result.success) {
         const lawyers = result.data || [];
         setLawyersData(lawyers);
-        setLastUpdated(now);
 
         frontendCache.lawyers = lawyers;
         frontendCache.timestamp = now;
@@ -200,11 +192,15 @@ export default function DirectoryScreen() {
       ...lawyer,
       available: isLawyerAvailableToday(lawyer.days),
       displayDays: getDayAbbreviations(lawyer.days),
-      specialization: lawyer.specialization
-        ? lawyer.specialization.split(",").map((s) => s.trim())
+      specialization: Array.isArray(lawyer.specialization)
+        ? lawyer.specialization
+        : lawyer.specialization
+        ? lawyer.specialization.split(",").map((s: string) => s.trim())
         : [],
-      hours_available: lawyer.hours_available
-        ? lawyer.hours_available.split(";").map((h) => h.trim())
+      hours_available: Array.isArray(lawyer.hours_available)
+        ? lawyer.hours_available
+        : lawyer.hours_available
+        ? lawyer.hours_available.split(";").map((h: string) => h.trim())
         : [],
     }));
   }, [lawyersData, isLawyerAvailableToday, getDayAbbreviations]);
@@ -233,7 +229,9 @@ export default function DirectoryScreen() {
 
     if (selectedSpecialization !== "All") {
       filtered = filtered.filter((lawyer) => {
-        const specs = lawyer.specialization.map((s) => s.toLowerCase());
+        const specs = Array.isArray(lawyer.specialization)
+          ? lawyer.specialization.map((s: string) => s.toLowerCase())
+          : [];
         const validSpecs = [
           "family law",
           "labor law",
@@ -243,7 +241,7 @@ export default function DirectoryScreen() {
         ];
 
         if (selectedSpecialization === "Others Law") {
-          return specs.some((s) => !validSpecs.includes(s));
+          return specs.some((s: string) => !validSpecs.includes(s));
         }
 
         return specs.includes(selectedSpecialization.toLowerCase());
@@ -345,71 +343,80 @@ export default function DirectoryScreen() {
           setSelectedSpecialization={setSelectedSpecialization}
         />
 
-        <ScrollView
-          style={tw`flex-1`}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 60 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[Colors.primary.blue]}
-              tintColor={Colors.primary.blue}
-            />
-          }
-        >
-          {loading && !refreshing ? (
-            <LawyerListSkeleton count={3} />
-          ) : filteredLawyers.length === 0 ? (
-            <VStack className="items-center justify-center py-12 px-6">
-              <Ionicons
-                name="search-outline"
-                size={48}
-                color={Colors.text.sub}
-                style={{ marginBottom: 12 }}
+        {/* Conditional Content Based on Active Tab */}
+        {activeTab === "law-firms" ? (
+          /* Law Firms Tab - Google Maps Integration */
+          <View style={tw`flex-1`}>
+            <GoogleLawFirmsFinder searchQuery={searchQuery} />
+          </View>
+        ) : (
+          /* Lawyers Tab - Individual Lawyers List */
+          <ScrollView
+            style={tw`flex-1`}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 60 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[Colors.primary.blue]}
+                tintColor={Colors.primary.blue}
               />
-              <UIText
-                className="text-center text-base font-semibold mb-2"
-                style={{ color: Colors.text.head }}
-              >
-                No lawyers found
-              </UIText>
-              <UIText
-                className="text-center text-sm"
-                style={{ color: Colors.text.sub }}
-              >
-                {searchQuery
-                  ? `Try adjusting your search for "${searchQuery}"`
-                  : hasActiveFilters
-                  ? "Try adjusting your filters"
-                  : "No lawyers are currently available"}
-              </UIText>
-            </VStack>
-          ) : (
-            <>
-              {filteredLawyers
-                .filter(
-                  (lawyer) =>
-                    lawyer.days &&
-                    lawyer.days.trim() !== "" &&
-                    lawyer.hours_available &&
-                    lawyer.hours_available.length > 0
-                )
-                .map((lawyer) => (
-                  <LawyerCard
-                    key={lawyer.id}
-                    lawyer={{
-                      ...lawyer,
-                      days: lawyer.displayDays,
-                    }}
-                    onBookConsultation={() => handleBookConsultation(lawyer)}
-                  />
-                ))}
-            </>
-          )}
+            }
+          >
+            {loading && !refreshing ? (
+              <LawyerListSkeleton count={3} />
+            ) : filteredLawyers.length === 0 ? (
+              <VStack className="items-center justify-center py-12 px-6">
+                <Ionicons
+                  name="search-outline"
+                  size={48}
+                  color={Colors.text.sub}
+                  style={{ marginBottom: 12 }}
+                />
+                <UIText
+                  className="text-center text-base font-semibold mb-2"
+                  style={{ color: Colors.text.head }}
+                >
+                  No lawyers found
+                </UIText>
+                <UIText
+                  className="text-center text-sm"
+                  style={{ color: Colors.text.sub }}
+                >
+                  {searchQuery
+                    ? `Try adjusting your search for "${searchQuery}"`
+                    : hasActiveFilters
+                    ? "Try adjusting your filters"
+                    : "No lawyers are currently available"}
+                </UIText>
+              </VStack>
+            ) : (
+              <>
+                {filteredLawyers
+                  .filter(
+                    (lawyer) =>
+                      lawyer.days &&
+                      lawyer.days.trim() !== "" &&
+                      lawyer.hours_available &&
+                      lawyer.hours_available.length > 0
+                  )
+                  .map((lawyer) => (
+                    <LawyerCard
+                      key={lawyer.id}
+                      lawyer={{
+                        ...lawyer,
+                        days: lawyer.displayDays,
+                      }}
+                      onBookConsultation={() => handleBookConsultation(lawyer)}
+                    />
+                  ))}
+              </>
+            )}
 
-          <View style={tw`h-4`} />
-        </ScrollView>
+            <View style={tw`h-4`} />
+          </ScrollView>
+        )}
 
         <Navbar activeTab="find" />
         <SidebarWrapper />

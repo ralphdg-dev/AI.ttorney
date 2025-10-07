@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, clearAuthStorage } from '../config/supabase';
-import { router } from 'expo-router';
+import { router, useSegments } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
 
 // Role hierarchy based on backend schema
@@ -146,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error handling auth state change:', error);
     }
-  }, [checkLawyerApplicationStatus]);
+  }, [checkLawyerApplicationStatus, segments]);
 
   useEffect(() => {
     // Initialize auth state and listen for auth changes
