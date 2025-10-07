@@ -1,10 +1,10 @@
-import React, { useState } from "react";
-import { Alert } from "react-native";
+import React, { useState, useEffect } from "react";
+import { Alert, useWindowDimensions, Modal } from "react-native";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import tw from "tailwind-react-native-classnames";
 import Colors from "../../constants/Colors";
 import Navbar from "@/components/Navbar";
-
+import { useAuth } from "@/contexts/AuthContext";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Box } from "@/components/ui/box";
@@ -23,22 +23,69 @@ interface TimeSlot {
 interface CalendarDay {
   date: number;
   day: string;
+  month: number;
+  year: number;
+  isToday?: boolean;
   isSelected?: boolean;
+  isCurrentMonth?: boolean;
 }
 
-export default function LawyerConsultationScreen() {
-  const [bottomActiveTab, setBottomActiveTab] = useState("find");
-  const [selectedDay, setSelectedDay] = useState(9);
+interface DayAvailability {
+  day: string;
+  times: string[];
+}
+
+interface LawyerData {
+  id: string;
+  name: string;
+  specialization: string[];
+  hours: string;
+  days: string;
+  bio: string;
+  hours_available: DayAvailability[];
+}
+
+interface ValidationErrors {
+  email?: string;
+  mobileNumber?: string;
+  concern?: string;
+  timeSlot?: string;
+}
+
+export default function LawyerBookingView() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const { width } = useWindowDimensions();
+  const isSmallScreen = width < 375;
+  const { user } = useAuth();
+
+  const [lawyerData, setLawyerData] = useState<LawyerData | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState("9:00AM-10:00AM");
-  const [email, setEmail] = useState("user@email.com");
-  const [mobileNumber, setMobileNumber] = useState("09123456789");
+  const [email, setEmail] = useState(user?.email || "");
+  const [mobileNumber, setMobileNumber] = useState("");
   const [communicationMode, setCommunicationMode] = useState("Online");
   const [concern, setConcern] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showFullBio, setShowFullBio] = useState(false);
 
-  const [selectedMonth, setSelectedMonth] = useState("August");
-  const [monthDropdownVisible, setMonthDropdownVisible] = useState(false);
   const [modeDropdownVisible, setModeDropdownVisible] = useState(false);
+  const [showAllSpecializations, setShowAllSpecializations] = useState(false);
 
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
+    {}
+  );
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentDate = today.getDate();
+  const currentYear = today.getFullYear();
+
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedDay, setSelectedDay] = useState(currentDate);
+  const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
+  
   const months = [
     "January",
     "February",
@@ -55,51 +102,395 @@ export default function LawyerConsultationScreen() {
   ];
   const communicationModes = ["Online", "In-person", "Phone"];
 
-  const calendarDays: CalendarDay[] = [
-    { date: 7, day: "Sun" },
-    { date: 8, day: "Mon" },
-    { date: 9, day: "Tue", isSelected: true },
-    { date: 10, day: "Wed" },
-    { date: 11, day: "Thu" },
-  ];
+  const isMediumScreen = width >= 375 && width < 768;
+  const isLargeScreen = width >= 768;
 
-  const timeSlots: TimeSlot[] = [
-    { id: "8:00AM-9:00AM", time: "8:00AM-9:00AM", available: true },
-    { id: "9:00AM-10:00AM", time: "9:00AM-10:00AM", available: true },
-    { id: "10:00AM-11:00AM", time: "10:00AM-11:00AM", available: true },
-  ];
+  const parseHoursAvailable = (hoursAvailable: string[]): DayAvailability[] => {
+    const dayAvailability: DayAvailability[] = [];
+
+    hoursAvailable.forEach((daySchedule) => {
+      const [dayPart, timesPart] = daySchedule.split("=");
+      if (dayPart && timesPart) {
+        const day = dayPart.trim();
+        const times = timesPart.split(",").map((time) => time.trim());
+        dayAvailability.push({ day, times });
+      }
+    });
+
+    return dayAvailability;
+  };
+
+  const getTimeSlotsForSelectedDay = (): TimeSlot[] => {
+    if (!lawyerData || !lawyerData.hours_available) return [];
+
+    const selectedDate = new Date(selectedYear, selectedMonth, selectedDay);
+    const selectedDayName = selectedDate.toLocaleDateString("en-US", {
+      weekday: "long",
+    });
+
+    const dayAvailability = lawyerData.hours_available.find(
+      (availability) =>
+        availability.day.toLowerCase() === selectedDayName.toLowerCase()
+    );
+
+    if (!dayAvailability) return [];
+
+    return dayAvailability.times.map((time, index) => ({
+      id: `slot-${selectedDayName}-${index}`,
+      time: time,
+      available: true,
+    }));
+  };
+
+  const timeSlots: TimeSlot[] = getTimeSlotsForSelectedDay();
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateMobileNumber = (mobile: string): boolean => {
+    const mobileRegex = /^[+]?[\d\s\-\(\)]{10,}$/;
+    return mobileRegex.test(mobile.trim());
+  };
+
+  const validateBookingForm = (): ValidationErrors => {
+    const errors: ValidationErrors = {};
+
+    if (!email.trim()) {
+      errors.email = "Email address is required";
+    } else if (!validateEmail(email.trim())) {
+      errors.email = "Please enter a valid email address";
+    }
+
+    if (!mobileNumber.trim()) {
+      errors.mobileNumber = "Mobile number is required";
+    } else if (!validateMobileNumber(mobileNumber)) {
+      errors.mobileNumber = "Please enter a valid mobile number";
+    }
+
+    if (!concern.trim()) {
+      errors.concern = "Please describe your concern";
+    }
+
+    if (!selectedTimeSlot) {
+      errors.timeSlot = "Please select a time slot";
+    }
+
+    return errors;
+  };
+
+  const getFormattedDate = (): string => {
+    const date = new Date(selectedYear, selectedMonth, selectedDay);
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const getSelectedTimeSlotText = (): string => {
+    const slot = timeSlots.find((slot) => slot.id === selectedTimeSlot);
+    return slot ? slot.time : selectedTimeSlot;
+  };
+
+  const getFormattedDateForAPI = (): string => {
+    return `${selectedYear}-${(selectedMonth + 1)
+      .toString()
+      .padStart(2, "0")}-${selectedDay.toString().padStart(2, "0")}`;
+  };
+
+  // Initialize lawyer data from params immediately - no API call needed
+  const initializeLawyerData = () => {
+    try {
+      const specialization = params.lawyerSpecialization
+        ? JSON.parse(params.lawyerSpecialization as string)
+        : ["General Law"];
+
+      const hours_available = params.lawyerhours_available
+        ? JSON.parse(params.lawyerhours_available as string)
+        : [];
+
+      const lawyerInfo: LawyerData = {
+        id: params.lawyerId as string,
+        name: params.lawyerName as string,
+        specialization: specialization,
+        hours: params.lawyerHours as string,
+        days: params.lawyerDays as string,
+        hours_available: parseHoursAvailable(hours_available),
+        bio: params.lawyerBio as string,
+      };
+
+      setLawyerData(lawyerInfo);
+    } catch (error) {
+      console.error("Error parsing lawyer data from params:", error);
+      // Fallback to basic data
+      setLawyerData({
+        id: params.lawyerId as string,
+        name: params.lawyerName as string,
+        specialization: ["General Law"],
+        hours: params.lawyerHours as string,
+        days: params.lawyerDays as string,
+        hours_available: [],
+        bio: (params.lawyerBio as string) || "",
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, [user?.email]);
+
+  // Initialize lawyer data from params instead of making API call
+  useEffect(() => {
+    if (params.lawyerId && params.lawyerName) {
+      initializeLawyerData();
+    }
+  }, [params]);
+
+  const generateCalendarDays = (month: number, year: number) => {
+    const days: CalendarDay[] = [];
+    const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    const daysFromPrevMonth = firstDay.getDay();
+    const totalDays = daysFromPrevMonth + lastDay.getDate();
+    const daysFromNextMonth = totalDays <= 35 ? 35 - totalDays : 42 - totalDays;
+
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+
+    for (let i = daysFromPrevMonth - 1; i >= 0; i--) {
+      const date = prevMonthLastDay - i;
+      const dayDate = new Date(year, month - 1, date);
+
+      days.push({
+        date,
+        day: daysOfWeek[dayDate.getDay()],
+        month: month - 1,
+        year: year,
+        isCurrentMonth: false,
+      });
+    }
+
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      const dayDate = new Date(year, month, i);
+      const isToday =
+        dayDate.getDate() === today.getDate() &&
+        dayDate.getMonth() === today.getMonth() &&
+        dayDate.getFullYear() === today.getFullYear();
+      const isSelected =
+        i === selectedDay && month === selectedMonth && year === selectedYear;
+
+      days.push({
+        date: i,
+        day: daysOfWeek[dayDate.getDay()],
+        month,
+        year,
+        isToday,
+        isSelected,
+        isCurrentMonth: true,
+      });
+    }
+
+    for (let i = 1; i <= daysFromNextMonth; i++) {
+      const dayDate = new Date(year, month + 1, i);
+
+      days.push({
+        date: i,
+        day: daysOfWeek[dayDate.getDay()],
+        month: month + 1,
+        year: year,
+        isCurrentMonth: false,
+      });
+    }
+
+    return days;
+  };
+
+  useEffect(() => {
+    setCalendarDays(generateCalendarDays(selectedMonth, selectedYear));
+  }, [selectedMonth, selectedYear, selectedDay]);
+
+  const navigateToPreviousMonth = () => {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11);
+      setSelectedYear(selectedYear - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
+    setSelectedDay(1);
+  };
+
+  const navigateToNextMonth = () => {
+    if (selectedMonth === 11) {
+      setSelectedMonth(0);
+      setSelectedYear(selectedYear + 1);
+    } else {
+      setSelectedMonth(selectedMonth + 1);
+    }
+    setSelectedDay(1);
+  };
+
+  const handleDaySelect = (day: CalendarDay) => {
+    if (!day.isCurrentMonth) {
+      setSelectedMonth(day.month);
+      setSelectedYear(day.year);
+    }
+    setSelectedDay(day.date);
+
+    setSelectedTimeSlot("");
+
+    if (validationErrors.timeSlot) {
+      setValidationErrors((prev) => ({ ...prev, timeSlot: undefined }));
+    }
+  };
 
   const handleBackPress = () => {
-    Alert.alert("Back", "Going back to lawyer directory");
+    router.back();
   };
 
   const handleBookConsultation = () => {
-    if (!concern.trim()) {
-      Alert.alert("Error", "Please describe your concern");
+    const errors = validateBookingForm();
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      const firstError = Object.values(errors)[0];
+      Alert.alert("Validation Error", firstError);
       return;
     }
-    Alert.alert("Success", "Consultation booked successfully!");
+
+    setValidationErrors({});
+    setShowConfirmationModal(true);
+  };
+
+  const proceedWithBooking = async () => {
+    setShowConfirmationModal(false);
+    setIsSubmitting(true);
+
+    try {
+      const consultationRequestData = {
+        user_id: user?.id || "anonymous",
+        lawyer_id: lawyerData?.id,
+        message: concern.trim(),
+        email: email.trim(),
+        mobile_number: mobileNumber.trim(),
+        consultation_date: getFormattedDateForAPI(),
+        consultation_time: getSelectedTimeSlotText(),
+        consultation_mode: communicationMode,
+      };
+
+      console.log("Sending consultation request:", consultationRequestData);
+
+      const response = await fetch(
+        "http://localhost:8000/consultation-requests/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(consultationRequestData),
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        Alert.alert(
+          "Success",
+          `Consultation request sent to ${lawyerData?.name}!\n\nYou will receive a confirmation email shortly.`,
+          [
+            {
+              text: "OK",
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      } else {
+        throw new Error(
+          result.error || result.detail || "Failed to book consultation"
+        );
+      }
+    } catch (error) {
+      console.error("Booking error:", error);
+      Alert.alert(
+        "Error",
+        error instanceof Error
+          ? error.message
+          : "Failed to book consultation. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    if (validationErrors.email) {
+      setValidationErrors((prev) => ({ ...prev, email: undefined }));
+    }
+  };
+
+  const handleMobileChange = (value: string) => {
+    setMobileNumber(value);
+    if (validationErrors.mobileNumber) {
+      setValidationErrors((prev) => ({ ...prev, mobileNumber: undefined }));
+    }
+  };
+
+  const handleConcernChange = (value: string) => {
+    setConcern(value);
+    if (validationErrors.concern) {
+      setValidationErrors((prev) => ({ ...prev, concern: undefined }));
+    }
   };
 
   const handleBottomNavChange = (tab: string) => {
-    setBottomActiveTab(tab);
-    Alert.alert("Navigation", `Navigating to ${tab}`);
+    if (tab === "find") {
+      router.push("/directory");
+    } else {
+      Alert.alert("Navigation", `Navigating to ${tab}`);
+    }
   };
+
+  const getTruncatedBio = (bio: string, maxLength: number) => {
+    if (!bio || bio.trim() === "") return "";
+    if (bio.length <= maxLength) return bio;
+    return bio.substring(0, maxLength).trim() + "...";
+  };
+
+  if (!lawyerData) {
+    return (
+      <Box className="flex-1 bg-gray-50 items-center justify-center">
+        <Text>Loading lawyer information...</Text>
+      </Box>
+    );
+  }
+
+  const primarySpecialization = lawyerData.specialization[0];
+  const additionalCount = lawyerData.specialization.length - 1;
+  const bioMaxLength = isSmallScreen ? 100 : isMediumScreen ? 100 : 200;
+  const shouldShowReadMore =
+    lawyerData.bio && lawyerData.bio.length > bioMaxLength;
 
   return (
     <Box className="flex-1 bg-gray-50">
       {/* Header */}
-      <HStack className="items-center justify-between px-6 pt-12 pb-4 bg-white">
+      <HStack className="items-center justify-between px-4 pt-10 pb-3 bg-white">
         <Pressable onPress={handleBackPress} className="p-2">
           <Ionicons name="arrow-back" size={24} color={Colors.primary.blue} />
         </Pressable>
         <Text
-          className="text-lg font-bold"
+          className={`${isSmallScreen ? "text-base" : "text-lg"} font-bold`}
           style={{ color: Colors.primary.blue }}
         >
           Talk to a Lawyer
         </Text>
-        <Box className="w-10" />
+        <Box className="w-8" />
       </HStack>
 
       <ScrollView
@@ -108,31 +499,70 @@ export default function LawyerConsultationScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Lawyer Profile */}
-        <VStack className="mx-6 mt-4 mb-6 bg-white rounded-lg p-6 items-center">
+        <VStack className="mx-4 mt-4 mb-5 bg-white rounded-lg p-5 items-center">
           <Box
-            className="w-20 h-20 rounded-full mb-4 items-center justify-center"
+            className={`${
+              isSmallScreen ? "w-16 h-16" : "w-20 h-20"
+            } rounded-full mb-4 items-center justify-center`}
             style={{ backgroundColor: Colors.primary.blue }}
           >
-            <Text className="text-white text-2xl font-bold">J</Text>
+            <Text className="text-white text-xl font-bold">
+              {lawyerData.name.charAt(0)}
+            </Text>
           </Box>
           <Text
-            className="text-lg font-bold mb-1"
+            className={`${
+              isSmallScreen ? "text-base" : "text-lg"
+            } font-bold mb-1 text-center`}
             style={{ color: Colors.text.head }}
           >
-            Atty. Joaquin Ysabel De Samaniego
+            {lawyerData.name}
           </Text>
-          <Text
-            className="text-sm mb-4 text-center"
-            style={{ color: Colors.text.sub }}
+
+          {/* Specializations */}
+          <Pressable
+            onPress={() => setShowAllSpecializations(!showAllSpecializations)}
+            className="mb-4"
           >
-            Criminal Law | Civil Law | Family Law
-          </Text>
-          <HStack className="items-center mb-2">
-            <Ionicons name="time-outline" size={16} color={Colors.text.sub} />
-            <Text className="text-sm ml-2" style={{ color: Colors.text.sub }}>
-              8:00 AM - 8:00 PM
-            </Text>
-          </HStack>
+            <HStack className="items-center flex-wrap justify-center">
+              <Text
+                className="text-sm text-center"
+                style={{ color: Colors.text.sub }}
+              >
+                {primarySpecialization}
+              </Text>
+              {additionalCount > 0 && (
+                <Text
+                  className="text-sm ml-1"
+                  style={{ color: Colors.primary.blue }}
+                >
+                  + {additionalCount} more
+                </Text>
+              )}
+            </HStack>
+          </Pressable>
+
+          {showAllSpecializations && (
+            <Box className="mb-4 p-3 bg-gray-100 rounded-lg w-full">
+              <Text
+                className="text-sm font-semibold mb-2 text-center"
+                style={{ color: Colors.text.head }}
+              >
+                All Specializations:
+              </Text>
+              {lawyerData.specialization.map((spec, index) => (
+                <Text
+                  key={index}
+                  className="text-sm text-center"
+                  style={{ color: Colors.text.sub }}
+                >
+                  • {spec}
+                </Text>
+              ))}
+            </Box>
+          )}
+
+          <HStack className="items-center"></HStack>
           <HStack className="items-center">
             <Ionicons
               name="calendar-outline"
@@ -140,82 +570,193 @@ export default function LawyerConsultationScreen() {
               color={Colors.text.sub}
             />
             <Text className="text-sm ml-2" style={{ color: Colors.text.sub }}>
-              Monday - Friday
+              {lawyerData.days}
             </Text>
           </HStack>
+          {lawyerData.bio && lawyerData.bio.trim() !== "" ? (
+            <VStack
+              className={`mt-4 p-4 bg-gray-50 rounded-lg ${
+                isLargeScreen ? "mx-8" : "mx-0"
+              }`}
+            >
+              <HStack className="items-center mb-2">
+                <Ionicons
+                  name="person-outline"
+                  size={18}
+                  color={Colors.primary.blue}
+                />
+                <Text
+                  className={`${
+                    isSmallScreen ? "text-sm" : "text-base"
+                  } font-semibold ml-2`}
+                  style={{ color: Colors.text.head }}
+                >
+                  About
+                </Text>
+              </HStack>
+
+              <Text
+                className={`${
+                  isSmallScreen
+                    ? "text-xs leading-5"
+                    : isMediumScreen
+                    ? "text-sm leading-6"
+                    : "text-base leading-7"
+                }`}
+                style={{
+                  color: Colors.text.sub,
+                  textAlign: "justify",
+                }}
+              >
+                {showFullBio || !shouldShowReadMore
+                  ? lawyerData.bio
+                  : getTruncatedBio(lawyerData.bio, bioMaxLength)}
+              </Text>
+
+              {shouldShowReadMore && (
+                <Pressable
+                  onPress={() => setShowFullBio(!showFullBio)}
+                  className="mt-2"
+                >
+                  <Text
+                    className={`${
+                      isSmallScreen ? "text-xs" : "text-sm"
+                    } font-medium`}
+                    style={{ color: Colors.primary.blue }}
+                  >
+                    {showFullBio ? "Show Less" : "Read More"}
+                  </Text>
+                </Pressable>
+              )}
+            </VStack>
+          ) : (
+            <Box
+              className={`mt-4 p-4 bg-gray-50 rounded-lg ${
+                isLargeScreen ? "mx-8" : "mx-0"
+              }`}
+            >
+              <HStack className="items-center">
+                <Ionicons
+                  name="information-circle-outline"
+                  size={18}
+                  color={Colors.text.sub}
+                />
+                <Text
+                  className={`${
+                    isSmallScreen ? "text-xs" : "text-sm"
+                  } italic ml-2`}
+                  style={{ color: Colors.text.sub }}
+                >
+                  No bio available
+                </Text>
+              </HStack>
+            </Box>
+          )}
         </VStack>
 
         {/* Schedule */}
-        <VStack className="mx-6 mb-6">
+        <VStack className="mx-4 mb-5">
           <HStack className="items-center justify-between mb-4">
             <Text
-              className="text-lg font-semibold"
+              className={`${
+                isSmallScreen ? "text-base" : "text-lg"
+              } font-semibold`}
               style={{ color: Colors.text.head }}
             >
               Schedule
             </Text>
-            <Pressable
-              className="border border-gray-300 rounded-lg px-3 py-1 bg-white flex-row items-center"
-              onPress={() => setMonthDropdownVisible(!monthDropdownVisible)}
-            >
-              <Text style={{ color: Colors.text.head }}>{selectedMonth}</Text>
+          </HStack>
+
+          {/* Calendar Navigation */}
+          <HStack className="items-center justify-between mb-4">
+            <Pressable onPress={navigateToPreviousMonth}>
               <Ionicons
-                name="chevron-down"
-                size={16}
-                color={Colors.text.sub}
-                style={tw`ml-1`}
+                name="chevron-back"
+                size={24}
+                color={Colors.primary.blue}
+              />
+            </Pressable>
+
+            <Text
+              className="text-base font-semibold"
+              style={{ color: Colors.text.head }}
+            >
+              {months[selectedMonth]} {selectedYear}
+            </Text>
+
+            <Pressable onPress={navigateToNextMonth}>
+              <Ionicons
+                name="chevron-forward"
+                size={24}
+                color={Colors.primary.blue}
               />
             </Pressable>
           </HStack>
 
-          {monthDropdownVisible && (
-            <VStack className="bg-white border border-gray-300 rounded-lg mb-4">
-              {months.map((month) => (
-                <Pressable
-                  key={month}
-                  className="px-4 py-2"
-                  onPress={() => {
-                    setSelectedMonth(month);
-                    setMonthDropdownVisible(false);
-                  }}
-                >
-                  <Text style={{ color: Colors.text.head }}>{month}</Text>
-                </Pressable>
-              ))}
-            </VStack>
-          )}
-
-          {/* Calendar Days */}
-          <HStack className="justify-between mb-6">
-            {calendarDays.map((day) => (
-              <Pressable
-                key={day.date}
-                className="w-12 h-16 rounded-lg items-center justify-center"
-                style={{
-                  backgroundColor:
-                    selectedDay === day.date ? Colors.primary.blue : "white",
-                }}
-                onPress={() => setSelectedDay(day.date)}
+          {/* Calendar Grid */}
+          <HStack className="flex-wrap justify-between mb-4">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+              <Box
+                key={day}
+                className={`${
+                  isSmallScreen ? "w-10" : "w-12"
+                } items-center mb-2`}
               >
                 <Text
-                  className="text-lg font-bold mb-1"
-                  style={{
-                    color:
-                      selectedDay === day.date ? "white" : Colors.text.head,
-                  }}
+                  className="text-xs font-semibold"
+                  style={{ color: Colors.text.sub }}
                 >
-                  {day.date}
+                  {day}
                 </Text>
-                <Text
-                  className="text-xs"
-                  style={{
-                    color: selectedDay === day.date ? "white" : Colors.text.sub,
-                  }}
-                >
-                  {day.day}
-                </Text>
-              </Pressable>
+              </Box>
             ))}
+
+            {calendarDays.map((day) => {
+              const dayDate = new Date(day.year, day.month, day.date);
+              const isPastDay =
+                dayDate <
+                new Date(
+                  today.getFullYear(),
+                  today.getMonth(),
+                  today.getDate()
+                );
+
+              return (
+                <Pressable
+                  key={`${day.month}-${day.date}`}
+                  className={`${
+                    isSmallScreen ? "w-10 h-10" : "w-12 h-12"
+                  } rounded-lg items-center justify-center mb-1`}
+                  disabled={!day.isCurrentMonth || isPastDay} // 🔒 disable past days
+                  style={{
+                    backgroundColor: day.isSelected
+                      ? Colors.primary.blue
+                      : day.isToday
+                      ? "#E3F2FD"
+                      : "transparent",
+                    opacity: !day.isCurrentMonth || isPastDay ? 0.3 : 1, // faded style for past days
+                  }}
+                  onPress={() => {
+                    if (!isPastDay) handleDaySelect(day);
+                  }}
+                >
+                  <Text
+                    className={`${
+                      isSmallScreen ? "text-sm" : "text-base"
+                    } font-medium`}
+                    style={{
+                      color: day.isSelected
+                        ? "white"
+                        : day.isToday
+                        ? Colors.primary.blue
+                        : Colors.text.head,
+                    }}
+                  >
+                    {day.date}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </HStack>
 
           {/* Time Slots */}
@@ -225,114 +766,193 @@ export default function LawyerConsultationScreen() {
           >
             Slots Available
           </Text>
-          <HStack className="flex-wrap">
-            {timeSlots.map((slot) => (
-              <Pressable
-                key={slot.id}
-                className="mr-3 mb-3 px-4 py-2 rounded-lg border"
-                style={{
-                  backgroundColor:
-                    selectedTimeSlot === slot.id
-                      ? Colors.primary.blue
-                      : "white",
-                  borderColor:
-                    selectedTimeSlot === slot.id
-                      ? Colors.primary.blue
-                      : "#E5E7EB",
-                }}
-                onPress={() => setSelectedTimeSlot(slot.id)}
-              >
-                <Text
-                  className="text-sm font-medium"
-                  style={{
-                    color:
-                      selectedTimeSlot === slot.id ? "white" : Colors.text.head,
-                  }}
-                >
-                  {slot.time}
-                </Text>
-              </Pressable>
-            ))}
-          </HStack>
+          {validationErrors.timeSlot && (
+            <Text className="text-red-500 text-sm mb-2">
+              {validationErrors.timeSlot}
+            </Text>
+          )}
+          <VStack>
+            {validationErrors.timeSlot && (
+              <Text className="text-red-500 text-sm mb-2">
+                {validationErrors.timeSlot}
+              </Text>
+            )}
+
+            {timeSlots.length > 0 ? (
+              <HStack className="flex-wrap">
+                {timeSlots.map((slot) => {
+                  const selectedDate = new Date(
+                    selectedYear,
+                    selectedMonth,
+                    selectedDay
+                  );
+                  const isTodaySelected =
+                    selectedDate.toDateString() === today.toDateString();
+
+                  let isPastTime = false;
+
+                  if (isTodaySelected) {
+                    // Extract time from slot.time (like "9:00AM-10:00AM")
+                    const [start] = slot.time.split("-");
+                    const timeStr = start.trim().toUpperCase();
+                    const match = timeStr.match(
+                      /(\d{1,2}):?(\d{0,2})?\s?(AM|PM)/i
+                    );
+
+                    if (match) {
+                      let [_, hour, minute, period] = match;
+                      let h = parseInt(hour);
+                      const m = minute ? parseInt(minute) : 0;
+                      if (period.toUpperCase() === "PM" && h < 12) h += 12;
+                      if (period.toUpperCase() === "AM" && h === 12) h = 0;
+
+                      const slotTime = new Date();
+                      slotTime.setHours(h, m, 0, 0);
+
+                      isPastTime = slotTime.getTime() < today.getTime();
+                    }
+                  }
+
+                  const isDisabled = isPastTime || !slot.available;
+
+                  return (
+                    <Pressable
+                      key={slot.id}
+                      className="mr-2 mb-2 px-3 py-1.5 rounded-lg border"
+                      disabled={isDisabled} // 🔒 disable old times
+                      style={{
+                        backgroundColor:
+                          selectedTimeSlot === slot.id
+                            ? Colors.primary.blue
+                            : "white",
+                        borderColor:
+                          selectedTimeSlot === slot.id
+                            ? Colors.primary.blue
+                            : "#E5E7EB",
+                        opacity: isDisabled ? 0.4 : 1, // visually faded
+                      }}
+                      onPress={() => {
+                        if (!isDisabled) {
+                          setSelectedTimeSlot(slot.id);
+                          if (validationErrors.timeSlot) {
+                            setValidationErrors((prev) => ({
+                              ...prev,
+                              timeSlot: undefined,
+                            }));
+                          }
+                        }
+                      }}
+                    >
+                      <Text
+                        className="text-xs font-medium"
+                        style={{
+                          color:
+                            selectedTimeSlot === slot.id
+                              ? "white"
+                              : Colors.text.head,
+                        }}
+                      >
+                        {slot.time}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </HStack>
+            ) : (
+              <Text className="text-sm text-gray-500">
+                No available slots for the selected day
+              </Text>
+            )}
+          </VStack>
         </VStack>
 
         {/* Contact Info */}
-        <VStack className="mx-6 mb-6">
+        <VStack className="mx-4 mb-5">
           <Text
-            className="text-base font-semibold mb-4"
+            className="text-base font-semibold mb-3"
             style={{ color: Colors.text.head }}
           >
             Email
           </Text>
-          <Input className="mb-4">
+          <Input className="mb-2">
             <InputField
-              className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
-              style={{ color: Colors.text.head }}
+              className={`border rounded-lg px-4 py-3 bg-white ${
+                validationErrors.email ? "border-red-500" : "border-gray-300"
+              }`}
+              style={{ color: Colors.text.head, fontSize: 14 }}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={handleEmailChange}
               placeholder="Enter your email"
               keyboardType="email-address"
             />
           </Input>
+          {validationErrors.email && (
+            <Text className="text-red-500 text-sm mb-2">
+              {validationErrors.email}
+            </Text>
+          )}
 
-          <HStack className="justify-between mb-4">
-            <VStack className="flex-1 mr-2">
-              <Text
-                className="text-base font-semibold mb-2"
-                style={{ color: Colors.text.head }}
-              >
-                Mobile Number
+          <VStack className="mb-4">
+            <Text
+              className="text-base font-semibold mb-2"
+              style={{ color: Colors.text.head }}
+            >
+              Mobile Number
+            </Text>
+            <Input className="mb-2">
+              <InputField
+                className={`border rounded-lg px-4 py-3 bg-white ${
+                  validationErrors.mobileNumber
+                    ? "border-red-500"
+                    : "border-gray-300"
+                }`}
+                style={{ color: Colors.text.head, fontSize: 14 }}
+                value={mobileNumber}
+                onChangeText={handleMobileChange}
+                placeholder="Enter mobile number"
+                keyboardType="phone-pad"
+              />
+            </Input>
+            {validationErrors.mobileNumber && (
+              <Text className="text-red-500 text-sm mb-2">
+                {validationErrors.mobileNumber}
               </Text>
-              <Input>
-                <InputField
-                  className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
-                  style={{ color: Colors.text.head }}
-                  value={mobileNumber}
-                  onChangeText={setMobileNumber}
-                  placeholder="Enter mobile number"
-                  keyboardType="phone-pad"
-                />
-              </Input>
-            </VStack>
+            )}
 
-            <VStack className="flex-1 ml-2">
-              <Text
-                className="text-base font-semibold mb-2"
-                style={{ color: Colors.text.head }}
-              >
-                Mode of communication
+            <Text
+              className="text-base font-semibold mb-2"
+              style={{ color: Colors.text.head }}
+            >
+              Mode of communication
+            </Text>
+            <Pressable
+              className="border border-gray-300 rounded-lg px-4 py-3 bg-white flex-row items-center justify-between"
+              onPress={() => setModeDropdownVisible(!modeDropdownVisible)}
+            >
+              <Text style={{ color: Colors.text.head, fontSize: 14 }}>
+                {communicationMode}
               </Text>
-              <Pressable
-                className="border border-gray-300 rounded-lg px-4 py-3 bg-white flex-row items-center justify-between"
-                onPress={() => setModeDropdownVisible(!modeDropdownVisible)}
-              >
-                <Text style={{ color: Colors.text.head }}>
-                  {communicationMode}
-                </Text>
-                <Ionicons
-                  name="chevron-down"
-                  size={20}
-                  color={Colors.text.sub}
-                />
-              </Pressable>
-              {modeDropdownVisible && (
-                <VStack className="bg-white border border-gray-300 rounded-lg mt-2">
-                  {communicationModes.map((mode) => (
-                    <Pressable
-                      key={mode}
-                      className="px-4 py-2"
-                      onPress={() => {
-                        setCommunicationMode(mode);
-                        setModeDropdownVisible(false);
-                      }}
-                    >
-                      <Text style={{ color: Colors.text.head }}>{mode}</Text>
-                    </Pressable>
-                  ))}
-                </VStack>
-              )}
-            </VStack>
-          </HStack>
+              <Ionicons name="chevron-down" size={20} color={Colors.text.sub} />
+            </Pressable>
+            {modeDropdownVisible && (
+              <VStack className="bg-white border border-gray-300 rounded-lg mt-1">
+                {communicationModes.map((mode) => (
+                  <Pressable
+                    key={mode}
+                    className="px-4 py-2"
+                    onPress={() => {
+                      setCommunicationMode(mode);
+                      setModeDropdownVisible(false);
+                    }}
+                  >
+                    <Text style={{ color: Colors.text.head, fontSize: 14 }}>
+                      {mode}
+                    </Text>
+                  </Pressable>
+                ))}
+              </VStack>
+            )}
+          </VStack>
 
           <Text
             className="text-base font-semibold mb-2"
@@ -340,36 +960,125 @@ export default function LawyerConsultationScreen() {
           >
             Concern
           </Text>
-          <Input>
+          <Input className="mb-2">
             <InputField
-              className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
+              className={`border rounded-lg px-4 py-3 bg-white ${
+                validationErrors.concern ? "border-red-500" : "border-gray-300"
+              }`}
               style={{
                 color: Colors.text.head,
-                height: 120,
+                height: 50,
                 textAlignVertical: "top",
+                fontSize: 14,
               }}
               value={concern}
-              onChangeText={setConcern}
+              onChangeText={handleConcernChange}
               placeholder="State your concern here..."
               multiline
-              numberOfLines={5}
+              numberOfLines={4}
             />
           </Input>
+          {validationErrors.concern && (
+            <Text className="text-red-500 text-sm">
+              {validationErrors.concern}
+            </Text>
+          )}
         </VStack>
 
         {/* Book Button */}
-        <Box className="mx-6">
+        <Box className="mx-4 mb-8">
           <Button
             className="py-4 rounded-lg items-center justify-center"
             style={{ backgroundColor: Colors.primary.blue }}
             onPress={handleBookConsultation}
+            disabled={isSubmitting}
           >
-            <Text className="text-white font-semibold text-base">
-              Book Consultation
+            <Text className="text-white font-semibold text-sm">
+              {isSubmitting
+                ? "Booking..."
+                : `Book Consultation with ${lawyerData.name.split(" ")[0]}`}
             </Text>
           </Button>
         </Box>
       </ScrollView>
+
+      {/* Confirmation Modal */}
+      <Modal
+        visible={showConfirmationModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowConfirmationModal(false)}
+      >
+        <Box className="flex-1 bg-black bg-opacity-50 items-center justify-center px-4">
+          <Box className="bg-white rounded-lg p-6 w-full max-w-sm">
+            <Text
+              className="text-xl font-bold mb-4 text-center"
+              style={{ color: Colors.text.head }}
+            >
+              Confirm Booking
+            </Text>
+
+            <VStack className="mb-6">
+              <Text
+                className="text-base font-semibold mb-2"
+                style={{ color: Colors.text.head }}
+              >
+                Lawyer: {lawyerData.name}
+              </Text>
+
+              <Text className="text-sm mb-1" style={{ color: Colors.text.sub }}>
+                Date: {getFormattedDate()}
+              </Text>
+
+              <Text className="text-sm mb-1" style={{ color: Colors.text.sub }}>
+                Time: {getSelectedTimeSlotText()}
+              </Text>
+
+              <Text className="text-sm mb-1" style={{ color: Colors.text.sub }}>
+                Mode: {communicationMode}
+              </Text>
+
+              <Text className="text-sm mb-1" style={{ color: Colors.text.sub }}>
+                Email: {email}
+              </Text>
+
+              <Text className="text-sm" style={{ color: Colors.text.sub }}>
+                Mobile: {mobileNumber}
+              </Text>
+            </VStack>
+
+            <HStack className="justify-between">
+              <Button
+                className="flex-1 mr-2 py-3 rounded-lg items-center justify-center border"
+                style={{
+                  backgroundColor: "white",
+                  borderColor: Colors.primary.blue,
+                }}
+                onPress={() => setShowConfirmationModal(false)}
+                disabled={isSubmitting}
+              >
+                <Text
+                  className="font-semibold text-sm"
+                  style={{ color: Colors.primary.blue }}
+                >
+                  Cancel
+                </Text>
+              </Button>
+
+              <Button
+                className="flex-1 ml-2 py-3 rounded-lg items-center justify-center"
+                style={{ backgroundColor: Colors.primary.blue }}
+                onPress={proceedWithBooking}
+                disabled={isSubmitting}
+              >
+                <Text className="text-white font-semibold text-sm">
+                  {isSubmitting ? "Confirming..." : "Confirm"}
+                </Text>
+              </Button>
+            </HStack>
+          </Box>
+        </Box>
+      </Modal>
 
       <Navbar activeTab="find" onTabPress={handleBottomNavChange} />
     </Box>

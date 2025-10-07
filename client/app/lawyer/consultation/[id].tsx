@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { ScrollView, View, Text, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { ScrollView, View, Text, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Mail, Phone, Calendar, Clock, MessageSquare, Settings, AlertTriangle } from 'lucide-react-native';
 import { Button, ButtonText } from '../../../components/ui/button';
 import { HStack } from '../../../components/ui/hstack';
+import { useAuth } from '../../../contexts/AuthContext';
 import Colors from '../../../constants/Colors';
 import tw from 'tailwind-react-native-classnames';
 import Header from '../../../components/Header';
@@ -13,62 +14,149 @@ import ConfirmationModal from '../../../components/lawyer/ConfirmationModal';
 
 interface ConsultationRequest {
   id: string;
-  client: {
-    name: string;
-    avatar: string;
-    email: string;
-    phone: string;
-  };
+  user_id: string;
+  lawyer_id: string | null;
   message: string;
-  mode: 'onsite' | 'online';
+  email: string | null;
+  mobile_number: string | null;
   status: 'pending' | 'accepted' | 'rejected' | 'completed';
-  requested_at: string | null;
   consultation_date: string | null;
   consultation_time: string | null;
-  user_id: string | null;
-  lawyer_id: string | null;
-  responded_at?: string | null;
+  consultation_mode: 'online' | 'onsite' | null;
+  requested_at: string;
+  responded_at: string | null;
+  created_at: string;
+  updated_at: string;
+  client_name: string;
+  client_email: string;
+  client_username: string | null;
 }
 
 const ConsultationDetailPage: React.FC = () => {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { user, session } = useAuth();
+  const [consultation, setConsultation] = useState<ConsultationRequest | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [actionType, setActionType] = useState<'accept' | 'reject' | 'complete' | null>(null);
 
-  // Sample data - in real app, fetch based on ID
-  const consultation: ConsultationRequest = {
-    id: id as string || '550e8400-e29b-41d4-a716-446655440001',
-    client: {
-      name: 'Sarah Johnson',
-      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-      email: 'sarah.johnson@email.com',
-      phone: '+63 912 345 6789',
-    },
-    message: 'I need urgent consultation regarding child custody modification due to changed circumstances. My ex-spouse has relocated and I need to understand my legal options. This is a complex situation involving interstate custody laws and I would appreciate your expertise in family law matters.',
-    mode: 'online',
-    status: 'pending',
-    requested_at: '2 hours ago',
-    consultation_date: '2024-09-15',
-    consultation_time: '14:30',
-    user_id: '123e4567-e89b-12d3-a456-426614174001',
-    lawyer_id: null,
+  // Fetch consultation details
+  const fetchConsultationDetails = async () => {
+    if (!id || !session?.access_token) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/consult-actions/${id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setConsultation(data);
+      } else {
+        Alert.alert('Error', 'Failed to load consultation details');
+        router.back();
+      }
+    } catch (error) {
+      console.error('Error fetching consultation details:', error);
+      Alert.alert('Error', 'Failed to load consultation details');
+      router.back();
+    } finally {
+      setLoading(false);
+    }
   };
 
+  useEffect(() => {
+    if (id && session?.access_token) {
+      fetchConsultationDetails();
+    }
+  }, [id, session?.access_token]);
 
+  const formatTimeAgo = (timestamp: string) => {
+    const now = new Date();
+    const requestedAt = new Date(timestamp);
+    const diffInHours = Math.floor((now.getTime() - requestedAt.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) {
+      return 'Just now';
+    } else if (diffInHours < 24) {
+      return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+    } else {
+      const diffInDays = Math.floor(diffInHours / 24);
+      return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+    }
+  };
 
-  const handleAction = (action: 'accept' | 'reject' | 'complete') => {
+  const handleAction = async (action: 'accept' | 'reject' | 'complete') => {
+    if (!consultation || !session?.access_token) return;
+
+    try {
+      let endpoint = '';
+      switch (action) {
+        case 'accept':
+          endpoint = 'accept';
+          break;
+        case 'reject':
+          endpoint = 'reject';
+          break;
+        case 'complete':
+          endpoint = 'complete';
+          break;
+      }
+
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/consult-actions/${consultation.id}/${endpoint}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.ok) {
+        // Refresh the consultation data
+        await fetchConsultationDetails();
+        Alert.alert('Success', `Consultation ${action}ed successfully`);
+      } else {
+        Alert.alert('Error', `Failed to ${action} consultation`);
+      }
+    } catch (error) {
+      console.error('Error updating consultation:', error);
+      Alert.alert('Error', `Failed to ${action} consultation`);
+    } finally {
+      setShowConfirmModal(false);
+      setActionType(null);
+    }
+  };
+
+  const handleActionClick = (action: 'accept' | 'reject' | 'complete') => {
     setActionType(action);
     setShowConfirmModal(true);
   };
 
-  const confirmAction = () => {
-    console.log(`${actionType} consultation ${id}`);
-    setShowConfirmModal(false);
-    setActionType(null);
-    // TODO: Implement actual API call
-    // Navigate back or update status
-  };
+  if (loading || !consultation) {
+    return (
+      <SafeAreaView style={tw`flex-1 bg-gray-50`}>
+        <Header 
+          title="Loading..."
+          showBackButton={true}
+          onBackPress={() => router.back()}
+        />
+        <View style={tw`flex-1 justify-center items-center`}>
+          <Text>Loading consultation details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={tw`flex-1 bg-gray-50`}>
@@ -113,18 +201,19 @@ const ConsultationDetailPage: React.FC = () => {
           <View style={tw`bg-white rounded-2xl p-6 mb-4 shadow-sm border border-gray-100`}>
             <View style={tw`flex-row justify-between items-start mb-4`}>
               <View style={tw`flex-row items-center flex-1`}>
-                <Image 
-                  source={{ uri: consultation.client.avatar }} 
-                  style={tw`w-16 h-16 rounded-full mr-4`}
-                />
+                <View style={tw`w-16 h-16 rounded-full bg-gray-200 items-center justify-center mr-4`}>
+                  <Text style={tw`text-gray-600 font-semibold text-lg`}>
+                    {consultation.client_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                  </Text>
+                </View>
                 <View style={tw`flex-1`}>
                   <Text style={tw`text-xl font-bold text-gray-900 mb-1`}>
-                    {consultation.client.name}
+                    {consultation.client_name}
                   </Text>
                   <View style={tw`flex-row items-center`}>
                     <Clock size={14} color="#6B7280" />
                     <Text style={tw`text-sm text-gray-600 ml-2`}>
-                      Requested {consultation.requested_at}
+                      Requested {formatTimeAgo(consultation.requested_at)}
                     </Text>
                   </View>
                 </View>
@@ -152,12 +241,14 @@ const ConsultationDetailPage: React.FC = () => {
               <Text style={tw`text-sm font-semibold text-gray-700 mb-3`}>Contact Information</Text>
               <View style={tw`flex-row items-center mb-2`}>
                 <Mail size={16} color={Colors.primary.blue} />
-                <Text style={tw`text-gray-700 ml-3 flex-1`}>{consultation.client.email}</Text>
+                <Text style={tw`text-gray-700 ml-3 flex-1`}>{consultation.client_email}</Text>
               </View>
-              <View style={tw`flex-row items-center`}>
-                <Phone size={16} color={Colors.primary.blue} />
-                <Text style={tw`text-gray-700 ml-3 flex-1`}>{consultation.client.phone}</Text>
-              </View>
+              {consultation.mobile_number && (
+                <View style={tw`flex-row items-center`}>
+                  <Phone size={16} color={Colors.primary.blue} />
+                  <Text style={tw`text-gray-700 ml-3 flex-1`}>{consultation.mobile_number}</Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -168,61 +259,57 @@ const ConsultationDetailPage: React.FC = () => {
             </Text>
 
             <View style={tw`gap-4`}>
-              <View style={tw`flex-row justify-between items-center mb-3`}>
-                <View style={tw`flex-row items-center`}>
-                  <Settings size={16} color="#6B7280" />
-                  <Text style={tw`font-medium text-gray-600 ml-2`}>Mode</Text>
-                </View>
-                <View style={[
-                  tw`px-3 py-1 rounded-full border`,
-                  consultation.mode === 'online' ? 
-                    { backgroundColor: '#E8F4FD', borderColor: '#C1E4F7' } :
-                    { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }
-                ]}>
-                  <Text style={[
-                    tw`text-xs font-medium capitalize`,
-                    consultation.mode === 'online' ? 
-                      { color: Colors.primary.blue } :
-                      { color: '#16A34A' }
+              {consultation.consultation_mode && (
+                <View style={tw`flex-row justify-between items-center mb-3`}>
+                  <View style={tw`flex-row items-center`}>
+                    <Settings size={16} color="#6B7280" />
+                    <Text style={tw`font-medium text-gray-600 ml-2`}>Mode</Text>
+                  </View>
+                  <View style={[
+                    tw`px-3 py-1 rounded-full border`,
+                    consultation.consultation_mode === 'online' ? 
+                      { backgroundColor: '#E8F4FD', borderColor: '#C1E4F7' } :
+                      { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }
                   ]}>
-                    {consultation.mode}
+                    <Text style={[
+                      tw`text-xs font-medium capitalize`,
+                      consultation.consultation_mode === 'online' ? 
+                        { color: Colors.primary.blue } :
+                        { color: '#16A34A' }
+                    ]}>
+                      {consultation.consultation_mode}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {consultation.consultation_date && (
+                <View style={tw`flex-row justify-between items-center mb-3`}>
+                  <View style={tw`flex-row items-center`}>
+                    <Calendar size={16} color="#6B7280" />
+                    <Text style={tw`font-medium text-gray-600 ml-2`}>Preferred Date</Text>
+                  </View>
+                  <Text style={tw`text-gray-700 font-medium`}>
+                    {new Date(consultation.consultation_date).toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric'
+                    })}
                   </Text>
                 </View>
-              </View>
+              )}
 
-              <View style={tw`flex-row justify-between items-center mb-3`}>
-                <View style={tw`flex-row items-center`}>
-                  <Calendar size={16} color="#6B7280" />
-                  <Text style={tw`font-medium text-gray-600 ml-2`}>Preferred Date</Text>
+              {consultation.consultation_time && (
+                <View style={tw`flex-row justify-between items-center`}>
+                  <View style={tw`flex-row items-center`}>
+                    <Clock size={16} color="#6B7280" />
+                    <Text style={tw`font-medium text-gray-600 ml-2`}>Preferred Time</Text>
+                  </View>
+                  <Text style={tw`text-gray-700 font-medium`}>
+                    {consultation.consultation_time}
+                  </Text>
                 </View>
-                <Text style={tw`text-gray-700 font-medium`}>
-                  {consultation.consultation_date 
-                    ? new Date(consultation.consultation_date).toLocaleDateString('en-US', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric'
-                      })
-                    : 'Not specified'
-                  }
-                </Text>
-              </View>
-
-              <View style={tw`flex-row justify-between items-center`}>
-                <View style={tw`flex-row items-center`}>
-                  <Clock size={16} color="#6B7280" />
-                  <Text style={tw`font-medium text-gray-600 ml-2`}>Preferred Time</Text>
-                </View>
-                <Text style={tw`text-gray-700 font-medium`}>
-                  {consultation.consultation_time 
-                    ? new Date(`2000-01-01T${consultation.consultation_time}`).toLocaleTimeString('en-US', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true
-                      })
-                    : 'Not specified'
-                  }
-                </Text>
-              </View>
+              )}
             </View>
           </View>
 
@@ -246,14 +333,14 @@ const ConsultationDetailPage: React.FC = () => {
                 <Button 
                   className="flex-1 py-3 rounded-lg"
                   style={{ backgroundColor: '#EF4444' }}
-                  onPress={() => handleAction('reject')}
+                  onPress={() => handleActionClick('reject')}
                 >
                   <ButtonText className="font-semibold text-base text-white">Decline</ButtonText>
                 </Button>
                 <Button 
                   className="flex-1 py-3 rounded-lg"
                   style={{ backgroundColor: Colors.primary.blue }}
-                  onPress={() => handleAction('accept')}
+                  onPress={() => handleActionClick('accept')}
                 >
                   <ButtonText className="font-semibold text-base text-white">Accept</ButtonText>
                 </Button>
@@ -264,7 +351,7 @@ const ConsultationDetailPage: React.FC = () => {
               <Button 
                 className="py-3 rounded-lg"
                 action="positive"
-                onPress={() => handleAction('complete')}
+                onPress={() => handleActionClick('complete')}
               >
                 <ButtonText className="font-semibold text-base">Mark as Completed</ButtonText>
               </Button>
@@ -294,9 +381,9 @@ const ConsultationDetailPage: React.FC = () => {
       <ConfirmationModal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
-        onConfirm={confirmAction}
+        onConfirm={() => actionType && handleAction(actionType)}
         actionType={actionType}
-        clientName={consultation.client.name}
+        clientName={consultation.client_name}
       />
     </SafeAreaView>
   );
