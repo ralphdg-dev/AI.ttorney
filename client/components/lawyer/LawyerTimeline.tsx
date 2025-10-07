@@ -288,7 +288,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
     return optimisticPost.id;
   }, []);
 
-  // Function to confirm optimistic post (make it fully opaque)
+  // Function to confirm optimistic post (make it fully opaque and keep it seamless)
   const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: ForumPostWithUser) => {
     setOptimisticPosts(prev => {
       const post = prev.find(p => p.id === optimisticId);
@@ -300,19 +300,36 @@ const LawyerTimeline: React.FC = React.memo(() => {
           useNativeDriver: true,
         }).start();
         
-        // Keep the optimistic post visible for longer, then remove it gradually
+        // Keep optimistic post visible and let duplicate detection handle seamless transition
+        // The post will automatically be filtered out when the real post appears
+        // Only remove it after a reasonable time to ensure the real post has loaded
         setTimeout(() => {
-          // Remove optimistic post without triggering additional API calls
           setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
-        }, 500); // Allow time for natural refresh cycle to pick up the real post
+        }, 3000); // Extended delay - duplicate detection prevents visual duplicates
       }
       return prev;
     });
-  }, []);
+  }, [loadPosts]);
 
   // Function to remove failed optimistic post
   const removeOptimisticPost = useCallback((optimisticId: string) => {
-    setOptimisticPosts(prev => prev.filter(p => p.id !== optimisticId));
+    setOptimisticPosts(prev => {
+      const post = prev.find(p => p.id === optimisticId);
+      if (post?.animatedOpacity) {
+        // Animate out smoothly
+        Animated.timing(post.animatedOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => {
+          setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+        });
+      } else {
+        // Immediate removal if no animation
+        return prev.filter(p => p.id !== optimisticId);
+      }
+      return prev;
+    });
   }, []);
 
   // Expose functions globally for CreatePost to use
@@ -340,7 +357,23 @@ const LawyerTimeline: React.FC = React.memo(() => {
         onScroll={() => setOpenMenuPostId(null)}
         scrollEventThrottle={16}
       >
-        {[...optimisticPosts, ...posts].map((post) => {
+        {(() => {
+          // Filter out real posts that match optimistic posts to prevent duplicates
+          const filteredRealPosts = posts.filter(realPost => {
+            // Check if there's an optimistic post with similar content and timestamp
+            const hasOptimisticMatch = optimisticPosts.some(optPost => {
+              // Match by content and approximate timestamp (within 30 seconds)
+              const contentMatch = optPost.body.trim() === realPost.body.trim();
+              const timeMatch = optPost.created_at && realPost.created_at && Math.abs(
+                new Date(optPost.created_at).getTime() - new Date(realPost.created_at).getTime()
+              ) < 30000; // 30 seconds tolerance
+              return contentMatch && timeMatch;
+            });
+            return !hasOptimisticMatch;
+          });
+          
+          return [...optimisticPosts, ...filteredRealPosts];
+        })().map((post) => {
           // Convert database timestamp to relative time with real-time updates
           const getRelativeTime = (timestamp: string) => {
             if (!timestamp) return '';

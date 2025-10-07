@@ -366,7 +366,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     return optimisticPost.id;
   }, []);
 
-  // Function to confirm optimistic post (make it fully opaque)
+  // Function to confirm optimistic post (make it fully opaque and keep it seamless)
   const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: PostData) => {
     setOptimisticPosts(prev => {
       const post = prev.find(p => p.id === optimisticId);
@@ -378,15 +378,16 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
           useNativeDriver: true,
         }).start();
         
-        // Keep the optimistic post visible for longer, then remove it gradually
+        // Keep optimistic post visible and let duplicate detection handle seamless transition
+        // The post will automatically be filtered out when the real post appears
+        // Only remove it after a reasonable time to ensure the real post has loaded
         setTimeout(() => {
-          // Remove optimistic post without triggering additional API calls
           setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
-        }, 500); // Allow time for natural refresh cycle to pick up the real post
+        }, 3000); // Extended delay - duplicate detection prevents visual duplicates
       }
       return prev;
     });
-  }, []);
+  }, [loadPosts]);
 
   // Function to remove failed optimistic post
   const removeOptimisticPost = useCallback((optimisticId: string) => {
@@ -458,8 +459,24 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     return postComponent;
   }, [handleCommentPress, handleBookmarkPress, handleReportPress, handlePostPress, handleMenuToggle, openMenuPostId]);
 
-  // Combined posts data
-  const allPosts = useMemo(() => [...optimisticPosts, ...posts], [optimisticPosts, posts]);
+  // Combined posts data with duplicate detection for seamless transition
+  const allPosts = useMemo(() => {
+    // Filter out real posts that match optimistic posts to prevent duplicates
+    const filteredRealPosts = posts.filter(realPost => {
+      // Check if there's an optimistic post with similar content and timestamp
+      const hasOptimisticMatch = optimisticPosts.some(optPost => {
+        // Match by content and approximate timestamp (within 30 seconds)
+        const contentMatch = optPost.content.trim() === realPost.content.trim();
+        const timeMatch = Math.abs(
+          new Date(optPost.timestamp).getTime() - new Date(realPost.timestamp).getTime()
+        ) < 30000; // 30 seconds tolerance
+        return contentMatch && timeMatch;
+      });
+      return !hasOptimisticMatch;
+    });
+    
+    return [...optimisticPosts, ...filteredRealPosts];
+  }, [optimisticPosts, posts]);
 
   // Use simple list hook
   const listProps = useList({
