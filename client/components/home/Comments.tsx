@@ -92,9 +92,6 @@ const Comments: React.FC<CommentsProps> = React.memo(({
     data: comments,
     keyExtractor,
     renderItem: renderComment,
-    windowSize: 8,
-    initialNumToRender: 5,
-    maxToRenderPerBatch: 3,
   });
 
   if (loading && comments.length === 0) {
@@ -156,6 +153,9 @@ const Comments: React.FC<CommentsProps> = React.memo(({
           contentContainerStyle={styles.commentsListContent}
           showsVerticalScrollIndicator={false}
           scrollEnabled={false} // Disable scroll since it's inside a ScrollView
+          windowSize={8}
+          initialNumToRender={5}
+          maxToRenderPerBatch={3}
         />
       ) : (
         <FadeInView delay={200}>

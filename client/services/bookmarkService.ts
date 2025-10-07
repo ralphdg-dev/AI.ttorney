@@ -3,13 +3,29 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
 export class BookmarkService {
-  private static async getAuthHeaders(): Promise<HeadersInit> {
+  private static async getAuthHeaders(session?: any): Promise<HeadersInit> {
     try {
+      // First try to get token from AuthContext session if provided
+      if (session?.access_token) {
+        console.log(`[BookmarkService] Using session token from AuthContext`);
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        };
+      }
+      
+      // Fallback to AsyncStorage
       const token = await AsyncStorage.getItem('access_token');
-      return {
-        'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` })
-      };
+      if (token) {
+        console.log(`[BookmarkService] Using token from AsyncStorage`);
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        };
+      }
+      
+      console.warn(`[BookmarkService] No authentication token found`);
+      return { 'Content-Type': 'application/json' };
     } catch (error) {
       console.error('Error getting auth token:', error);
       return { 'Content-Type': 'application/json' };
@@ -18,11 +34,11 @@ export class BookmarkService {
   /**
    * Add a bookmark for a forum post
    */
-  static async addBookmark(postId: string, userId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  static async addBookmark(postId: string, userId: string, session?: any): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
       console.log('Adding bookmark with data:', { post_id: postId, user_id: userId });
       
-      const headers = await this.getAuthHeaders();
+      const headers = await this.getAuthHeaders(session);
       const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks`, {
         method: 'POST',
         headers,
@@ -47,11 +63,11 @@ export class BookmarkService {
   /**
    * Remove a bookmark for a forum post
    */
-  static async removeBookmark(postId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+  static async removeBookmark(postId: string, userId: string, session?: any): Promise<{ success: boolean; error?: string }> {
     try {
       console.log('Removing bookmark for:', { postId, userId });
       
-      const headers = await this.getAuthHeaders();
+      const headers = await this.getAuthHeaders(session);
       const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks/${postId}`, {
         method: 'DELETE',
         headers,
@@ -74,11 +90,11 @@ export class BookmarkService {
   /**
    * Check if a post is bookmarked by a user
    */
-  static async isBookmarked(postId: string, userId: string): Promise<{ success: boolean; isBookmarked: boolean; error?: string }> {
+  static async isBookmarked(postId: string, userId: string, session?: any): Promise<{ success: boolean; isBookmarked: boolean; error?: string }> {
     try {
       console.log('Checking bookmark status for:', { postId, userId });
       
-      const headers = await this.getAuthHeaders();
+      const headers = await this.getAuthHeaders(session);
       const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks/check/${postId}`, {
         method: 'GET',
         headers,
@@ -103,9 +119,9 @@ export class BookmarkService {
   /**
    * Get all bookmarks for a user
    */
-  static async getUserBookmarks(userId: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  static async getUserBookmarks(userId: string, session?: any): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
-      const headers = await this.getAuthHeaders();
+      const headers = await this.getAuthHeaders(session);
       const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks/user`, {
         method: 'GET',
         headers,
@@ -128,11 +144,11 @@ export class BookmarkService {
   /**
    * Toggle bookmark status (add if not bookmarked, remove if bookmarked)
    */
-  static async toggleBookmark(postId: string, userId: string): Promise<{ success: boolean; isBookmarked: boolean; error?: string }> {
+  static async toggleBookmark(postId: string, userId: string, session?: any): Promise<{ success: boolean; isBookmarked: boolean; error?: string }> {
     try {
       console.log('Starting toggle bookmark for:', { postId, userId });
       
-      const headers = await this.getAuthHeaders();
+      const headers = await this.getAuthHeaders(session);
       const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks/toggle`, {
         method: 'POST',
         headers,
