@@ -117,7 +117,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const [shouldRender, setShouldRender] = useState(false);
-  const [acceptedConsultationsCount, setAcceptedConsultationsCount] = useState(0);
+  const [acceptedConsultationsCount, setAcceptedConsultationsCount] =
+    useState(0);
   const insets = useSafeAreaInsets();
   const { signOut, user } = useAuth();
 
@@ -128,19 +129,19 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       try {
         const { count, error } = await supabase
-          .from('consultation_requests')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('status', 'accepted');
+          .from("consultation_requests")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .in("status", ["accepted", "rejected"]);
 
         if (error) {
-          console.error('Error fetching accepted consultations count:', error);
+          console.error("Error fetching accepted consultations count:", error);
           return;
         }
 
         setAcceptedConsultationsCount(count || 0);
       } catch (error) {
-        console.error('Error in fetchAcceptedConsultations:', error);
+        console.error("Error in fetchAcceptedConsultations:", error);
       }
     };
 
