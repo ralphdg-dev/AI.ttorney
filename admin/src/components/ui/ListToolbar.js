@@ -17,6 +17,7 @@ const ListToolbar = ({
   onQueryChange,
   totalText,
   filter,
+  secondaryFilter,
   sort,
   primaryButton,
 }) => {
@@ -53,6 +54,18 @@ const ListToolbar = ({
               onChange={(v) => filter.onChange?.(v)}
               options={filter.options || []}
               ariaLabel={filter.label || 'Filter'}
+              leftIcon={<FilterIcon size={14} />}
+              className="pl-1 pr-2"
+            />
+          ) : null}
+
+          {/* Secondary Filter */}
+          {secondaryFilter ? (
+            <Select
+              value={secondaryFilter.value}
+              onChange={(v) => secondaryFilter.onChange?.(v)}
+              options={secondaryFilter.options || []}
+              ariaLabel={secondaryFilter.label || 'Secondary Filter'}
               leftIcon={<FilterIcon size={14} />}
               className="pl-1 pr-2"
             />

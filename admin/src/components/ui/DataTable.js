@@ -3,14 +3,15 @@ import React from 'react';
 /**
  * Reusable data table
  * Props:
- * - columns: Array<{ key: string, header: string, headerClassName?: string, cellClassName?: string, render?: (row) => ReactNode, align?: 'left'|'right'|'center' }>
+ * - columns: Array<{ key: string, header: string, headerRender?: () => ReactNode, headerClassName?: string, cellClassName?: string, render?: (row) => ReactNode, align?: 'left'|'right'|'center' }>
  * - data: any[]
  * - keyField?: string (defaults to 'id'); if absent, uses index
  * - rowKey?: (row, index) => string
+ * - rowClassName?: (row, index) => string
  * - dense?: boolean (smaller paddings)
  * - emptyMessage?: string
  */
-const DataTable = ({ columns = [], data = [], keyField = 'id', rowKey, dense = true, emptyMessage = 'No records found.' }) => {
+const DataTable = ({ columns = [], data = [], keyField = 'id', rowKey, rowClassName, dense = true, emptyMessage = 'No records found.' }) => {
   const cellPad = dense ? 'px-4 py-2' : 'px-6 py-3';
   const headerText = 'text-[10px] font-medium text-gray-500 tracking-wide';
   const cellText = 'text-[11px] text-gray-700';
@@ -39,18 +40,24 @@ const DataTable = ({ columns = [], data = [], keyField = 'id', rowKey, dense = t
                 </td>
               </tr>
             )}
-            {data.map((row, index) => (
-              <tr key={rowKey ? rowKey(row, index) : row[keyField] ?? index} className="hover:bg-gray-50">
-                {columns.map((col) => (
-                  <td
-                    key={col.key}
-                    className={`${cellPad} ${cellText} ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.cellClassName || ''}`}
-                  >
-                    {col.render ? col.render(row, index) : row[col.key]}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {data.map((row, index) => {
+              const customRowClass = rowClassName ? rowClassName(row, index) : '';
+              const isArchived = row.archived === true;
+              const baseRowClass = isArchived ? 'bg-gray-100' : 'hover:bg-gray-50';
+              
+              return (
+                <tr key={rowKey ? rowKey(row, index) : row[keyField] ?? index} className={`${baseRowClass} ${customRowClass}`}>
+                  {columns.map((col) => (
+                    <td
+                      key={col.key}
+                      className={`${cellPad} ${cellText} ${isArchived ? 'text-gray-600' : ''} ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.cellClassName || ''}`}
+                    >
+                      {col.render ? col.render(row, index) : row[col.key]}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

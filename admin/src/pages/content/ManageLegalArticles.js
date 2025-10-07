@@ -1,23 +1,84 @@
-import React from 'react';
-import { FileText, Eye, Pencil, Archive } from 'lucide-react';
-import DataTable from '../../components/ui/DataTable';
+import React, { useState, useEffect } from 'react';
+import { BookOpen, Eye, Pencil, Archive } from 'lucide-react';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
-
-const categories = ['All', 'Family', 'Civil', 'Consumer', 'Criminal', 'Labor'];
-
-const sampleArticles = [
-  { enTitle: 'Child Custody Basics', filTitle: 'Mga Pangunahing Kaalaman sa Kustodiya', category: 'Family', createdAt: '2025-08-01', updatedAt: '2025-08-15', createdBy: 'Admin Jane' },
-  { enTitle: 'Contract Breach Remedies', filTitle: 'Mga Remedyo sa Paglabag ng Kontrata', category: 'Civil', createdAt: '2025-07-20', updatedAt: '2025-08-10', createdBy: 'Admin John' },
-  { enTitle: 'Consumer Return Rights', filTitle: 'Mga Karapatan sa Pagbalik ng Produkto', category: 'Consumer', createdAt: '2025-07-05', updatedAt: '2025-07-06', createdBy: 'Admin Lea' },
-  { enTitle: 'Understanding Bail', filTitle: 'Pag-unawa sa Piyansa', category: 'Criminal', createdAt: '2025-06-11', updatedAt: '2025-06-12', createdBy: 'Admin Mark' },
-  { enTitle: 'Unlawful Dismissal', filTitle: 'Di-makatarungang Pagkatanggal', category: 'Labor', createdAt: '2025-05-02', updatedAt: '2025-07-01', createdBy: 'Admin Sofia' },
-];
+import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import ViewArticleModal from '../../components/articles/ViewArticleModal';
+import AddArticleModal from '../../components/articles/AddArticleModal';
+import Pagination from '../../components/ui/Pagination';
+import { useToast } from '../../components/ui/Toast';
+import legalArticlesService from '../../services/legalArticlesService';
 
 const ManageLegalArticles = () => {
+  const [articles, setArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [query, setQuery] = React.useState('');
   const [category, setCategory] = React.useState('All');
   const [sortBy, setSortBy] = React.useState('Newest');
+  const [confirmationModal, setConfirmationModal] = React.useState({
+    open: false,
+    type: '',
+    articleId: null,
+    articleTitle: '',
+    loading: false,
+    changes: null
+  });
+
+  useEffect(() => {
+    const fetchArticles = async () => {
+      try {
+        const response = await legalArticlesService.getLegalArticles();
+        setArticles(response.data);
+      } catch (err) {
+        console.error('Error loading legal articles:', err);
+        const errorMessage = err.message || 'Failed to load legal articles';
+        setError(errorMessage);
+        setArticles([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchArticles();
+  }, []);
+
+  // Handle edit confirmation
+  const confirmEdit = async () => {
+    const { articleId, articleTitle, changes } = confirmationModal;
+    
+    try {
+      setConfirmationModal(prev => ({ ...prev, loading: true }));
+      
+      // TODO: Implement actual edit API call
+      console.log(`Editing article: ${articleTitle}`, changes);
+      alert(`Article "${articleTitle}" changes have been saved successfully!`);
+      
+      setConfirmationModal({ open: false, type: '', articleId: null, articleTitle: '', loading: false, changes: null });
+      
+    } catch (err) {
+      console.error('Failed to edit article:', err);
+      alert('Failed to edit article: ' + err.message);
+      setConfirmationModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Handle add confirmation
+  const confirmAdd = async () => {
+    try {
+      setConfirmationModal(prev => ({ ...prev, loading: true }));
+      
+      // TODO: Implement actual add API call
+      console.log('Creating new legal article');
+      alert('New legal article has been created successfully!');
+      
+      setConfirmationModal({ open: false, type: '', articleId: null, articleTitle: '', loading: false, changes: null });
+      
+    } catch (err) {
+      console.error('Failed to create article:', err);
+      alert('Failed to create article: ' + err.message);
+      setConfirmationModal(prev => ({ ...prev, loading: false }));
+    }
+  };
 
   const columns = [
     { key: 'enTitle', header: 'English Title' },
@@ -30,11 +91,31 @@ const ManageLegalArticles = () => {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      render: () => (
+      render: (row) => (
         <div className="flex items-center justify-end space-x-2 text-gray-600">
-          <Tooltip content="View"><button className="p-1 rounded hover:bg-gray-100" aria-label="View"><Eye size={16} /></button></Tooltip>
-          <Tooltip content="Edit"><button className="p-1 rounded hover:bg-gray-100" aria-label="Edit"><Pencil size={16} /></button></Tooltip>
-          <Tooltip content="Archive"><button className="p-1 rounded hover:bg-gray-100" aria-label="Archive"><Archive size={16} /></button></Tooltip>
+          <Tooltip content="View">
+            <button className="p-1 rounded hover:bg-gray-100" aria-label="View">
+              <Eye size={16} />
+            </button>
+          </Tooltip>
+          <Tooltip content="Edit">
+            <button 
+              className="p-1 rounded hover:bg-gray-100" 
+              aria-label="Edit"
+              onClick={() => handleEdit(row)}
+            >
+              <Pencil size={16} />
+            </button>
+          </Tooltip>
+          <Tooltip content="Archive">
+            <button 
+              className="p-1 rounded hover:bg-gray-100" 
+              aria-label="Archive"
+              onClick={() => handleArchive(row)}
+            >
+              <Archive size={16} />
+            </button>
+          </Tooltip>
         </div>
       ),
     },
@@ -64,6 +145,7 @@ const ManageLegalArticles = () => {
 
   return (
     <div>
+      <ToastContainer />
       {/* Header */}
       <div className="mb-3">
         <div className="flex items-stretch gap-2">
@@ -83,12 +165,21 @@ const ManageLegalArticles = () => {
           onQueryChange={setQuery}
           filter={{ value: category, onChange: setCategory, options: categories, label: 'Category' }}
           sort={{ value: sortBy, onChange: setSortBy, options: ['Newest', 'Oldest', 'A-Z (Title)', 'Z-A (Title)'], label: 'Sort by' }}
-          primaryButton={{ label: 'Add New', onClick: () => {}, className: 'inline-flex items-center gap-1 bg-[#023D7B] text-white text-[11px] px-3 py-1.5 rounded-md hover:bg-[#013462]' }}
+          primaryButton={{ label: 'Add New', onClick: handleAddNew, className: 'inline-flex items-center gap-1 bg-[#023D7B] text-white text-[11px] px-3 py-1.5 rounded-md hover:bg-[#013462]' }}
         />
       </div>
 
       {/* Table */}
       <DataTable columns={columns} data={filteredData} rowKey={(r) => `${r.enTitle}-${r.filTitle}`} dense />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        open={confirmationModal.open}
+        onClose={closeConfirmationModal}
+        type={confirmationModal.type}
+        loading={confirmationModal.loading}
+        {...getModalContent()}
+      />
     </div>
   );
 };

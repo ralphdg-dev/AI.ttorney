@@ -1,26 +1,79 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Home, AlertTriangle, LogOut, Settings } from 'lucide-react';
 import { sections } from './menuConfig';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from './ui/Toast';
 
 // sections now imported from menuConfig
 
-const Avatar = () => (
-  <div className="flex items-center space-x-3">
-    <img
-      src="https://i.pravatar.cc/100?img=5"
-      alt="avatar"
-      className="h-10 w-10 rounded-full object-cover"
-    />
-    <div className="leading-tight">
-      <p className="text-[10px] text-gray-500">PRODUCT MANAGER</p>
-      <p className="text-[11px] font-semibold text-gray-900">Andrew Smith</p>
+const Avatar = () => {
+  const { admin } = useAuth();
+  
+  return (
+    <div className="flex items-center space-x-3">
+      <img
+        src="https://i.pravatar.cc/100?img=5"
+        alt="avatar"
+        className="h-10 w-10 rounded-full object-cover"
+      />
+      <div className="leading-tight">
+        <p className="text-[10px] text-gray-500 uppercase">{admin?.role || 'ADMIN'}</p>
+        <p className="text-[11px] font-semibold text-gray-900">{admin?.full_name || 'Admin User'}</p>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
-const Sidebar = ({ activeItem, onItemClick }) => {
+const Sidebar = ({ activeItem }) => {
+  const { showSuccess, showError, ToastContainer } = useToast();
   const [collapsed, setCollapsed] = React.useState(false);
   const [openGroups, setOpenGroups] = React.useState({});
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  // Map menu item IDs to routes
+  const getRouteForItem = (itemId) => {
+    switch (itemId) {
+      case 'dashboard': return '/dashboard';
+      case 'manage-legal-seekers': return '/users/legal-seekers';
+      case 'manage-lawyers': return '/users/lawyers';
+      case 'lawyer-applications': return '/users/lawyer-applications';
+      case 'suspended-accounts': return '/users/suspended-accounts';
+      case 'manage-admins': return '/admin/manage-admins';
+      case 'audit-logs': return '/admin/audit-logs';
+      case 'manage-glossary-terms': return '/legal-resources/glossary-terms';
+      case 'manage-legal-articles': return '/legal-resources/legal-articles';
+      case 'manage-topics-threads': return '/forum/topics-threads';
+      case 'reported-posts': return '/forum/reported-posts';
+      case 'ban-restrict-users': return '/forum/ban-restrict-users';
+      case 'open-tickets': return '/tickets/open';
+      case 'assigned-tickets': return '/tickets/assigned';
+      case 'ticket-history': return '/tickets/history';
+      case 'user-analytics': return '/analytics/users';
+      case 'content-analytics': return '/analytics/content';
+      case 'forum-analytics': return '/analytics/forum';
+      case 'settings': return '/settings';
+      case 'help': return '/help';
+      default: return '/dashboard';
+    }
+  };
+
+  const handleItemClick = async (itemId) => {
+    if (itemId === 'logout') {
+      try {
+        showSuccess('Logging out...');
+        await logout();
+        showSuccess('Successfully logged out!');
+      } catch (error) {
+        showError('Failed to logout. Please try again.');
+      }
+      return;
+    }
+    
+    const route = getRouteForItem(itemId);
+    navigate(route);
+  };
 
   const toggleGroup = (label) =>
     setOpenGroups((s) => ({ ...s, [label]: !s[label] }));
@@ -55,7 +108,7 @@ const Sidebar = ({ activeItem, onItemClick }) => {
             {group.items.map((item) => (
               <button
                 key={item.id}
-                onClick={() => onItemClick && onItemClick(item.id)}
+                onClick={() => handleItemClick(item.id)}
                 className={`relative w-full text-left px-3 py-1 my-0.5 rounded-md ml-2 text-[10px] ${
                   activeItem === item.id
                     ? 'bg-gray-50 text-gray-900'
@@ -74,11 +127,13 @@ const Sidebar = ({ activeItem, onItemClick }) => {
   };
 
   return (
-    <aside
-      className={`h-screen sticky top-0 bg-white shadow-sm border-r border-gray-200 flex flex-col relative ${
-        collapsed ? 'w-16' : 'w-56'
-      } transition-all duration-200`}
-    >
+    <>
+      <ToastContainer />
+      <aside
+        className={`h-screen sticky top-0 bg-white shadow-sm border-r border-gray-200 flex flex-col relative ${
+          collapsed ? 'w-16' : 'w-56'
+        } transition-all duration-200`}
+      >
       {/* Floating collapse/expand toggle */}
       <button
         className="absolute -right-3 top-10 z-20 h-9 w-9 flex items-center justify-center rounded-2xl bg-white border border-gray-200 shadow-md hover:shadow-lg text-gray-800"
@@ -111,7 +166,7 @@ const Sidebar = ({ activeItem, onItemClick }) => {
             {section.id === 'main' && (
               <div className="mt-2">
                 <button
-                  onClick={() => onItemClick && onItemClick('dashboard')}
+                  onClick={() => handleItemClick('dashboard')}
                   className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start space-x-2'} px-3 py-1.5 rounded-lg text-[11px] ${
                     activeItem === 'dashboard'
                       ? 'bg-gray-50 text-gray-900'
@@ -128,7 +183,7 @@ const Sidebar = ({ activeItem, onItemClick }) => {
             {section.id === 'account' ? (
               <div className="mt-2">
                 <button
-                  onClick={() => onItemClick && onItemClick('settings')}
+                  onClick={() => handleItemClick('settings')}
                   className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start space-x-2'} px-3 py-1.5 rounded-lg text-[11px] ${
                     activeItem === 'settings'
                       ? 'bg-gray-50 text-gray-900'
@@ -156,7 +211,7 @@ const Sidebar = ({ activeItem, onItemClick }) => {
       {/* Footer actions when expanded/collapsed */}
       <div className="mt-auto p-3">
         <button
-          onClick={() => onItemClick && onItemClick('help')}
+          onClick={() => handleItemClick('help')}
           className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start space-x-3'} px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50`}
           title={collapsed ? 'Help' : undefined}
         >
@@ -164,15 +219,16 @@ const Sidebar = ({ activeItem, onItemClick }) => {
           {!collapsed && <span className="text-[10px]">Help</span>}
         </button>
         <button
-          onClick={() => onItemClick && onItemClick('logout')}
+          onClick={() => handleItemClick('logout')}
           className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start space-x-3'} px-3 py-1.5 mt-2 rounded-lg text-red-600 hover:bg-red-50`}
           title={collapsed ? 'Logout' : undefined}
         >
           <LogOut size={18} />
-          {!collapsed && <span className="text-[10px] font-medium">Logout Account</span>}
+          {!collapsed && <span className="text-[10px] font-medium">Logout</span>}
         </button>
       </div>
     </aside>
+    </>
   );
 };
 

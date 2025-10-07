@@ -5,6 +5,6 @@
 /* Set Inter as the default font for the entire app */
 @layer base {
   html {
-    @apply font-sans;
+    @apply font-sans text-sm;
   }
 }

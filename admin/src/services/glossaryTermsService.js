@@ -1,0 +1,173 @@
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+
+const glossaryTermsService = {
+  getAuthHeader() {
+    const token = localStorage.getItem('admin_token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  },
+
+  // Get all glossary terms with filtering and pagination
+  async getGlossaryTerms(params = {}) {
+    try {
+      const { 
+        page = 1, 
+        limit = 50, 
+        search = '', 
+        category = 'all',
+        status = 'all'
+      } = params;
+
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        search,
+        category,
+        status
+      });
+
+      const response = await fetch(`${API_BASE_URL}/glossary-terms?${queryParams}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...glossaryTermsService.getAuthHeader()
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to fetch glossary terms:', error);
+      throw error;
+    }
+  },
+
+  // Get single glossary term by ID
+  async getGlossaryTerm(id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/glossary-terms/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...glossaryTermsService.getAuthHeader()
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to fetch glossary term:', error);
+      throw error;
+    }
+  },
+
+  // Create new glossary term
+  async createGlossaryTerm(termData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/glossary-terms`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...glossaryTermsService.getAuthHeader()
+        },
+        body: JSON.stringify(termData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to create glossary term:', error);
+      throw error;
+    }
+  },
+
+  // Update glossary term
+  async updateGlossaryTerm(id, termData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/glossary-terms/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...glossaryTermsService.getAuthHeader()
+        },
+        body: JSON.stringify(termData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to update glossary term:', error);
+      throw error;
+    }
+  },
+
+  // Delete glossary term
+  async deleteGlossaryTerm(id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/glossary-terms/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...glossaryTermsService.getAuthHeader()
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to delete glossary term:', error);
+      throw error;
+    }
+  },
+
+  // Create audit log entry for glossary term actions
+  async createAuditLog(termId, action, metadata = {}) {
+    try {
+      const auditData = {
+        target_table: 'glossary_terms',
+        target_id: termId,
+        action: action,
+        metadata: {
+          ...metadata,
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      const response = await fetch(`${API_BASE_URL}/glossary-terms/${termId}/audit-logs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...glossaryTermsService.getAuthHeader()
+        },
+        body: JSON.stringify(auditData)
+      });
+
+      if (!response.ok) {
+        // Don't throw error for audit logging failures, just log them
+        console.warn('Failed to create audit log:', response.status);
+        return null;
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.warn('Failed to create audit log:', error);
+      return null;
+    }
+  }
+};
+
+export default glossaryTermsService;

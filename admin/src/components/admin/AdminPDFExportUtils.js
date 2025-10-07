@@ -1,0 +1,429 @@
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import adminManagementService from '../../services/adminManagementService';
+import logoImage from '../../assets/images/logo.png';
+
+// Helper function to log audit trail for PDF generation
+const logPDFGeneration = async (adminId, reportType, adminInfo, reportNumber = null) => {
+  if (!adminId || !adminInfo) {
+    console.warn('Missing required data for audit logging:', { adminId: !!adminId, adminInfo: !!adminInfo });
+    return;
+  }
+  
+  try {
+    // Create presentable action name
+    const reportTypeDisplay = reportType === 'admin_audit' ? 'Admin Audit Trail' : 'Admin Activity Report';
+    const presentableAction = `Generated ${reportTypeDisplay} Report #${reportNumber}`;
+    
+    const auditData = {
+      action: presentableAction,
+      details: {
+        report_type: reportType,
+        report_number: reportNumber,
+        generated_by: adminInfo.full_name || adminInfo.name || 'Unknown Admin',
+        admin_role: adminInfo.role || 'Unknown Role',
+        timestamp: new Date().toISOString(),
+        original_action: `PDF_EXPORT_${reportType.toUpperCase()}` // Keep original for filtering if needed
+      },
+      metadata: {
+        report_type: reportType,
+        report_number: reportNumber,
+        generated_by: adminInfo.full_name || adminInfo.name || 'Unknown Admin',
+        admin_role: adminInfo.role || 'Unknown Role',
+        timestamp: new Date().toISOString()
+      }
+    };
+    
+    // Call the audit logging service
+    console.log(`Logging PDF generation: ${presentableAction} for admin ${adminId}`);
+    await adminManagementService.createAdminAuditLog(adminId, auditData);
+    console.log(`Successfully logged PDF generation audit for admin ${adminId}`);
+  } catch (error) {
+    console.error('Failed to log PDF generation audit:', error);
+    // Still continue with PDF generation even if audit logging fails
+  }
+};
+
+// Helper function to capitalize first letter
+const capitalizeFirst = (str) => {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
+
+// Helper function to format dates
+const formatDate = (dateString, includeTime = true) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  
+  const options = {
+    month: 'short',
+    day: 'numeric', 
+    year: 'numeric'
+  };
+  
+  if (includeTime) {
+    options.hour = '2-digit';
+    options.minute = '2-digit';
+  }
+  
+  return date.toLocaleDateString('en-US', options);
+};
+
+// Add professional PDF header
+const addPDFHeader = async (doc, title, reportNumber, generatedBy = null) => {
+  // Add professional header with white background (landscape: 297mm x 210mm)
+  doc.setFillColor(255, 255, 255);
+  doc.rect(15, 15, 267, 25, 'F');
+  
+  // Load and add logo beside company name
+  try {
+    if (logoImage) {
+      // Use the imported logo image
+      doc.addImage(logoImage, 'PNG', 20, 20, 15, 15);
+    } else {
+      console.warn('Logo import failed, trying fallback paths');
+      
+      // Fallback to fetch method
+      const logoPaths = [
+        '/admin/src/assets/images/logo.png',
+        './admin/src/assets/images/logo.png',
+        '../assets/images/logo.png',
+        '/assets/images/logo.png'
+      ];
+      
+      let logoLoaded = false;
+      
+      for (const logoPath of logoPaths) {
+        try {
+          const response = await fetch(logoPath);
+          if (response.ok) {
+            const blob = await response.blob();
+            const logoBase64 = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.readAsDataURL(blob);
+            });
+            
+            // Add logo to PDF
+            doc.addImage(logoBase64, 'PNG', 20, 20, 15, 15);
+            logoLoaded = true;
+            console.log('Logo loaded successfully from fallback:', logoPath);
+            break;
+          }
+        } catch (pathError) {
+          console.warn(`Failed to load logo from ${logoPath}:`, pathError);
+          continue;
+        }
+      }
+      
+      if (!logoLoaded) {
+        console.warn('Logo not found in any of the expected paths');
+      }
+    }
+  } catch (error) {
+    console.warn('Logo loading failed, continuing without logo:', error);
+  }
+  
+  // Company name/logo area (moved right to accommodate logo)
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Ai.ttorney', 40, 30);
+  
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Justice at Your Fingertips', 40, 35);
+  
+  // Document title on the right (adjusted for landscape)
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text(title, 200, 28);
+  
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Report #${reportNumber}`, 200, 33);
+  doc.text(`Date: ${new Date().toLocaleDateString()}`, 200, 37);
+  
+  // Add generated by information if available
+  if (generatedBy) {
+    doc.text(`Generated by: ${generatedBy}`, 200, 41);
+  }
+};
+
+// Add admin information section
+const addAdminInfo = (doc, fullName, email, totalRecords, yPos = 48) => {
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ADMIN INFORMATION', 20, yPos);
+  
+  // Draw line under header (adjusted for landscape)
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.5);
+  doc.line(20, yPos + 2, 277, yPos + 2);
+  
+  yPos += 10;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  
+  // Left column
+  doc.text('Name:', 20, yPos);
+  doc.text(fullName || 'Unknown', 45, yPos);
+  
+  doc.text('Email:', 20, yPos + 6);
+  doc.text(email || 'Unknown', 45, yPos + 6);
+  
+  // Right column (adjusted for landscape)
+  doc.text('Generated:', 180, yPos);
+  doc.text(new Date().toLocaleString(), 205, yPos);
+  
+  doc.text('Total Records:', 180, yPos + 6);
+  doc.text(totalRecords.toString(), 205, yPos + 6);
+  
+  return yPos + 10;
+};
+
+// Add footer to all pages
+const addPDFFooter = (doc) => {
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    
+    // Footer line (adjusted for landscape)
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.1);
+    doc.line(20, 200, 277, 200);
+    
+    // Footer text (adjusted for landscape)
+    doc.text('Ai.ttorney', 20, 205);
+    doc.text(`Page ${i} of ${pageCount}`, 250, 205);
+  }
+};
+
+// Export admin audit trail PDF
+export const exportAdminAuditTrailPDF = async (auditLogs, adminFullName, adminEmail, adminInfo = null, adminId = null) => {
+  
+  if (!auditLogs || auditLogs.length === 0) {
+    console.log('No audit logs data available');
+    alert('No audit trail data available to export');
+    return;
+  }
+  
+  try {
+    // Create a new PDF document in landscape orientation
+    const doc = new jsPDF('landscape');
+    
+    // Set document properties
+    doc.setProperties({
+      title: 'Admin Audit Trail Report',
+      subject: `Admin audit trail for ${adminFullName || 'Unknown'}`,
+      author: 'AI.ttorney Admin Panel',
+      creator: 'AI.ttorney Admin Panel'
+    });
+    
+    // Add header
+    const reportNumber = Date.now().toString().slice(-6);
+    const generatedBy = adminInfo ? `${adminInfo.full_name || adminInfo.name || 'Unknown Admin'} (${adminInfo.role || 'Unknown Role'})` : null;
+    await addPDFHeader(doc, 'ADMIN AUDIT TRAIL', reportNumber, generatedBy);
+    
+    // Add admin information
+    let yPos = addAdminInfo(doc, adminFullName, adminEmail, auditLogs.length);
+    
+    // Prepare table data
+    const tableHeaders = ['Action', 'Actor', 'Role', 'Date', 'Details'];
+    
+    const tableData = auditLogs.map((log) => {
+      // Parse details for additional information
+      let detailedAction = log.action;
+      let details = '-';
+      
+      try {
+        const parsedDetails = typeof log.details === 'string' ? JSON.parse(log.details) : (log.details || {});
+        if (parsedDetails.action) {
+          details = parsedDetails.action;
+        }
+        if (parsedDetails.old_status && parsedDetails.new_status) {
+          detailedAction = `Changed status from ${capitalizeFirst(parsedDetails.old_status)} to ${capitalizeFirst(parsedDetails.new_status)}`;
+        }
+        if (parsedDetails.old_role && parsedDetails.new_role) {
+          detailedAction = `Changed role from ${capitalizeFirst(parsedDetails.old_role)} to ${capitalizeFirst(parsedDetails.new_role)}`;
+        }
+      } catch {
+        // Ignore parsing errors, use original action
+      }
+      
+      return [
+        detailedAction.substring(0, 50) + (detailedAction.length > 50 ? '...' : ''),
+        log.actor_name || 'Unknown Admin',
+        capitalizeFirst(log.actor_role || 'Admin'),
+        formatDate(log.created_at, false),
+        details.substring(0, 40) + (details.length > 40 ? '...' : '')
+      ];
+    });
+    
+    // Add clean professional table with proper sizing
+    autoTable(doc, {
+      head: [tableHeaders],
+      body: tableData,
+      startY: yPos,
+      styles: {
+        fontSize: 7,
+        cellPadding: 2,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.3,
+        textColor: [0, 0, 0],
+        fontStyle: 'normal',
+        overflow: 'linebreak'
+      },
+      headStyles: {
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold',
+        fontSize: 7,
+        halign: 'left'
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245]
+      },
+      columnStyles: {
+        0: { cellWidth: 70, halign: 'left' }, // Action
+        1: { cellWidth: 45, halign: 'left' }, // Actor
+        2: { cellWidth: 35, halign: 'left' }, // Role
+        3: { cellWidth: 40, halign: 'left' }, // Date
+        4: { cellWidth: 67, halign: 'left' } // Details
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: 257,
+      theme: 'grid'
+    });
+    
+    // Add footer
+    addPDFFooter(doc);
+    
+    // Save the PDF
+    const fileName = `Admin_Audit_Trail_${adminFullName?.replace(/\s+/g, '_') || 'Unknown'}_${reportNumber}.pdf`;
+    doc.save(fileName);
+    
+    // Log PDF generation in audit trail
+    if (adminId) {
+      console.log(`Admin Audit Trail PDF generated: ${fileName}`);
+      // Ensure we have admin info, even if it's minimal
+      const auditAdminInfo = adminInfo || { 
+        full_name: 'Unknown Admin', 
+        name: 'Unknown Admin', 
+        role: 'Unknown Role' 
+      };
+      await logPDFGeneration(adminId, 'admin_audit', auditAdminInfo, reportNumber);
+    } else {
+      console.warn('Admin Audit Trail PDF generated but no adminId provided for audit logging');
+    }
+    
+  } catch (error) {
+    console.error('Error exporting admin audit trail:', error);
+    alert('Failed to export admin audit trail. Please try again.');
+  }
+};
+
+// Export admin activity report PDF (for recent activity)
+export const exportAdminActivityPDF = async (activityLogs, adminFullName, adminEmail, adminInfo = null, adminId = null) => {
+  
+  if (!activityLogs || activityLogs.length === 0) {
+    console.log('No activity logs data available');
+    alert('No activity data available to export');
+    return;
+  }
+  
+  try {
+    // Create a new PDF document in landscape orientation
+    const doc = new jsPDF('landscape');
+    
+    // Set document properties
+    doc.setProperties({
+      title: 'Admin Activity Report',
+      subject: `Admin activity report for ${adminFullName || 'Unknown'}`,
+      author: 'AI.ttorney Admin Panel',
+      creator: 'AI.ttorney Admin Panel'
+    });
+    
+    // Add header
+    const reportNumber = Date.now().toString().slice(-6);
+    const generatedBy = adminInfo ? `${adminInfo.full_name || adminInfo.name || 'Unknown Admin'} (${adminInfo.role || 'Unknown Role'})` : null;
+    await addPDFHeader(doc, 'ADMIN ACTIVITY REPORT', reportNumber, generatedBy);
+    
+    // Add admin information
+    let yPos = addAdminInfo(doc, adminFullName, adminEmail, activityLogs.length);
+    
+    // Prepare table data
+    const tableHeaders = ['Action', 'Date', 'Details'];
+    
+    const tableData = activityLogs.map((activity) => {
+      return [
+        activity.action || 'Unknown Action',
+        formatDate(activity.date, true),
+        (activity.details || '-').substring(0, 80) + ((activity.details || '').length > 80 ? '...' : '')
+      ];
+    });
+    
+    // Add clean professional table with proper sizing
+    autoTable(doc, {
+      head: [tableHeaders],
+      body: tableData,
+      startY: yPos,
+      styles: {
+        fontSize: 7,
+        cellPadding: 2,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.3,
+        textColor: [0, 0, 0],
+        fontStyle: 'normal',
+        overflow: 'linebreak'
+      },
+      headStyles: {
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold',
+        fontSize: 7,
+        halign: 'left'
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245]
+      },
+      columnStyles: {
+        0: { cellWidth: 85, halign: 'left' }, // Action
+        1: { cellWidth: 60, halign: 'left' }, // Date
+        2: { cellWidth: 112, halign: 'left' } // Details
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: 257,
+      theme: 'grid'
+    });
+    
+    // Add footer
+    addPDFFooter(doc);
+    
+    // Save the PDF
+    const fileName = `Admin_Activity_Report_${adminFullName?.replace(/\s+/g, '_') || 'Unknown'}_${reportNumber}.pdf`;
+    doc.save(fileName);
+    
+    // Log PDF generation in audit trail
+    if (adminId) {
+      console.log(`Admin Activity Report PDF generated: ${fileName}`);
+      // Ensure we have admin info, even if it's minimal
+      const auditAdminInfo = adminInfo || { 
+        full_name: 'Unknown Admin', 
+        name: 'Unknown Admin', 
+        role: 'Unknown Role' 
+      };
+      await logPDFGeneration(adminId, 'admin_activity', auditAdminInfo, reportNumber);
+    } else {
+      console.warn('Admin Activity Report PDF generated but no adminId provided for audit logging');
+    }
+    
+  } catch (error) {
+    console.error('Error exporting admin activity report:', error);
+    alert('Failed to export admin activity report. Please try again.');
+  }
+};
