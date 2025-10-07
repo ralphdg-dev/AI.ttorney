@@ -35,6 +35,7 @@ import {
 import Colors from "../constants/Colors";
 import { GlobalStyles } from "../constants/GlobalStyles";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../config/supabase";
 
 const { width: screenWidth } = Dimensions.get("window");
 const SIDEBAR_WIDTH = screenWidth * 0.8;
@@ -116,8 +117,37 @@ const Sidebar: React.FC<SidebarProps> = ({
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const [shouldRender, setShouldRender] = useState(false);
+  const [acceptedConsultationsCount, setAcceptedConsultationsCount] = useState(0);
   const insets = useSafeAreaInsets();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+
+  // Fetch accepted consultations count
+  useEffect(() => {
+    const fetchAcceptedConsultations = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { count, error } = await supabase
+          .from('consultation_requests')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'accepted');
+
+        if (error) {
+          console.error('Error fetching accepted consultations count:', error);
+          return;
+        }
+
+        setAcceptedConsultationsCount(count || 0);
+      } catch (error) {
+        console.error('Error in fetchAcceptedConsultations:', error);
+      }
+    };
+
+    if (isVisible && user?.id) {
+      fetchAcceptedConsultations();
+    }
+  }, [isVisible, user?.id]);
 
   useEffect(() => {
     if (isVisible) {
@@ -156,10 +186,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { getFavoriteCount } = useFavorites();
 
   const getBadgeCounts = () => ({
-    favoriteTerms: getFavoriteCount(), // Count from favorites context
-    bookmarkedGuides: 0, // Count from user_forum_bookmarks table
-    pendingConsultations: 0, // Count from consultation_requests where status = 'pending'
-    unreadNotifications: 0, // Count from notifications table (when implemented)
+    favoriteTerms: getFavoriteCount(),
+    bookmarkedGuides: 0,
+    acceptedConsultations: acceptedConsultationsCount,
+    unreadNotifications: 0,
   });
 
   const badgeCounts = getBadgeCounts();
@@ -184,7 +214,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: "Consultations",
       icon: Calendar,
       route: "consultations",
-      badge: badgeCounts.pendingConsultations || undefined,
+      badge: badgeCounts.acceptedConsultations || undefined,
     },
     {
       id: "divider1",

@@ -24,7 +24,7 @@ interface Consultation {
   specialization: string;
   consultation_date: string;
   consultation_time: string;
-  status: "pending" | "approved" | "rejected" | "completed";
+  status: "pending" | "accepted" | "rejected" | "completed";
   created_at: string;
   message?: string;
   email?: string;
@@ -39,11 +39,11 @@ const STATUS_CONFIG = {
     icon: "time-outline" as const,
     label: "Pending",
   },
-  approved: {
+  accepted: {
     color: "#10B981",
     bgColor: "#D1FAE5",
     icon: "checkmark-circle-outline" as const,
-    label: "Approved",
+    label: "Accepted",
   },
   rejected: {
     color: "#EF4444",
@@ -380,7 +380,7 @@ export default function ConsultationsScreen() {
   const filters = [
     { id: "all", label: "All" },
     { id: "pending", label: "Pending" },
-    { id: "approved", label: "Approved" },
+    { id: "accepted", label: "Accepted" },
     { id: "completed", label: "Completed" },
     { id: "rejected", label: "Rejected" },
   ];
