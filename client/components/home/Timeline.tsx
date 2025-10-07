@@ -1,9 +1,14 @@
-import React from 'react';
-import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Animated, ListRenderItem } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Post from './Post';
 import Colors from '../../constants/Colors';
+import apiClient from '@/lib/api-client';
+import { useFocusEffect } from '@react-navigation/native';
+import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
+import { useOptimizedList } from '@/hooks/useOptimizedList';
+import { SkeletonList } from '@/components/ui/SkeletonLoader';
 
 interface PostData {
   id: string;
@@ -16,6 +21,8 @@ interface PostData {
   category: string;
   content: string;
   comments: number;
+  isOptimistic?: boolean;
+  animatedOpacity?: Animated.Value;
 }
 
 interface TimelineProps {
@@ -24,70 +31,106 @@ interface TimelineProps {
 
 const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
+  const [posts, setPosts] = useState<PostData[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [optimisticPosts, setOptimisticPosts] = useState<PostData[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
 
-  // Sample data for demonstration - Twitter/X style
-  const samplePosts: PostData[] = [
-    {
-      id: '1',
-      user: {
-        name: 'Ralph de Guzman',
-        username: 'twizt3rfries',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-      },
-      timestamp: '1h',
-      category: 'Criminal Law',
-      content: 'Hello po, baka may makasagot agad. Na-involve po ako sa protest actions at ngayon may kaso na akong rebellion at tinatangka pa akong kasuhan ng arson dahil daw sa mga nangyari during the rally. Hindi ko alam kung ano ang dapat kong gawin. May lawyer po ba na pwedeng mag-advise?',
-      comments: 3,
-    },
-    {
-      id: '2',
-      user: {
-        name: 'Anonymous User',
-        username: 'anonymous',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-      },
-      timestamp: '3h',
-      category: 'Traffic Violation',
-      content: 'Hello po! Nahuli daw ako ng NCAP pero hindi ako ang driver ng sasakyan. May way po ba para ma-contest ito? Wala rin akong sasakyan sa pangalan ko.',
-      comments: 12,
-    },
-    {
-      id: '3',
-      user: {
-        name: 'LeBron James',
-        username: 'lebbyjames',
-        avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face',
-      },
-      timestamp: '5h',
-      category: 'Family Law',
-      content: 'Pwede po ba akong humingi ng child support kahit hindi kami kasal ng nanay ng anak ko? May anak kami pero hindi kami nagpakasal. Ano po ang dapat kong gawin para sa anak namin?',
-      comments: 2,
-    },
-    {
-      id: '4',
-      user: {
-        name: 'Willie Revillame',
-        username: 'pengej4cket',
-        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-      },
-      timestamp: '5h',
-      category: 'Labor Law',
-      content: 'Nagresign po ako nang maayos at may clearance na, pero hanggang ngayon wala pa rin akong natatanggap na back pay o final pay. 2 months na po. Ano po dapat kong gawin para ma-claim ito?',
-      comments: 2,
-    },
-    {
-      id: '6',
-      user: {
-        name: 'Juan Dela Cruz',
-        username: 'juan.dc',
-        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
-      },
-      timestamp: '8h',
-      category: 'Civil Law',
-      content: 'May utang sa akin na 50k pero ayaw magbayad. Pwede po ba sa small claims court? Ano po ang requirements at proseso? Salamat po sa makakasagot.',
-      comments: 5,
-    },
-  ];
+  const formatTimeAgo = (isoDate?: string): string => {
+    if (!isoDate) return '';
+    // Treat timestamps without timezone as UTC to avoid local offset issues
+    const hasTz = /Z|[+-]\d{2}:?\d{2}$/.test(isoDate);
+    const normalized = hasTz ? isoDate : `${isoDate}Z`;
+    const createdMs = new Date(normalized).getTime();
+    if (Number.isNaN(createdMs)) return '';
+    const now = Date.now();
+    const diffSec = Math.max(0, Math.floor((now - createdMs) / 1000));
+    if (diffSec < 60) return `${diffSec}s`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 7) return `${diffDay}d`;
+    const diffWeek = Math.floor(diffDay / 7);
+    if (diffWeek < 4) return `${diffWeek}w`;
+    const diffMonth = Math.floor(diffDay / 30);
+    if (diffMonth < 12) return `${diffMonth}mo`;
+    const diffYear = Math.floor(diffDay / 365);
+    return `${diffYear}y`;
+  };
+
+  const mapApiToPost = (row: any): PostData => {
+    const isAnon = !!row?.is_anonymous;
+    const created = row?.created_at || '';
+    const userData = row?.users || {};
+    
+    return {
+      id: String(row?.id ?? ''),
+      user: isAnon
+        ? { name: 'Anonymous User', username: 'anonymous', avatar: '' }
+        : { 
+            name: userData?.full_name || userData?.username || 'User', 
+            username: userData?.username || 'user', 
+            avatar: `https://images.unsplash.com/photo-${Math.random() > 0.5 ? '1472099645785-5658abf4ff4e' : '1507003211169-0a1dd7228f2d'}?w=150&h=150&fit=crop&crop=face`
+          },
+      timestamp: formatTimeAgo(created),
+      category: row?.category || 'Others',
+      content: row?.body || '',
+      comments: Number(row?.reply_count || 0),
+    };
+  };
+
+  const loadPosts = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const res = await apiClient.getRecentForumPosts();
+      if (res.success && Array.isArray((res.data as any)?.data)) {
+        const rows = (res.data as any).data as any[];
+        setPosts(rows.map(mapApiToPost));
+      } else if (res.success && Array.isArray(res.data)) {
+        setPosts((res.data as any[]).map(mapApiToPost));
+      } else {
+        setPosts([]);
+      }
+    } catch {
+      setPosts([]);
+    } finally {
+      setRefreshing(false);
+      // Hide initial loading after first load
+      if (initialLoading) {
+        setTimeout(() => setInitialLoading(false), 300);
+      }
+    }
+  }, [initialLoading]);
+
+  useEffect(() => {
+    loadPosts();
+    
+    // Fallback: Hide loading after 3 seconds maximum
+    const fallbackTimer = setTimeout(() => {
+      if (initialLoading) {
+        setInitialLoading(false);
+      }
+    }, 3000);
+    
+    return () => clearTimeout(fallbackTimer);
+  }, [loadPosts, initialLoading]);
+
+  // Refresh when screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      loadPosts();
+    }, [loadPosts])
+  );
+
+  // Lightweight polling for near real-time updates
+  useEffect(() => {
+    const id = setInterval(() => {
+      loadPosts();
+    }, 10000); // 10s
+    return () => clearInterval(id);
+  }, [loadPosts]);
 
   const handleCommentPress = (postId: string) => {
     console.log(`Comment pressed for post ${postId}`);
@@ -111,30 +154,173 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     router.push(route as any);
   };
 
+  // Function to add optimistic post
+  const addOptimisticPost = useCallback((postData: { body: string; category?: string; is_anonymous?: boolean }) => {
+    const animatedOpacity = new Animated.Value(0); // Start completely transparent
+    const optimisticPost: PostData = {
+      id: `optimistic-${Date.now()}`,
+      user: postData.is_anonymous 
+        ? { name: 'Anonymous User', username: 'anonymous', avatar: '' }
+        : { name: 'You', username: 'you', avatar: '' },
+      timestamp: 'now',
+      category: postData.category || 'Others',
+      content: postData.body,
+      comments: 0,
+      isOptimistic: true,
+      animatedOpacity,
+    };
+
+    setOptimisticPosts(prev => [optimisticPost, ...prev]);
+    
+    // Smooth fade in animation
+    Animated.timing(animatedOpacity, {
+      toValue: 0.7, // Semi-transparent while posting
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+    
+    return optimisticPost.id;
+  }, []);
+
+  // Function to confirm optimistic post (make it fully opaque)
+  const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: PostData) => {
+    setOptimisticPosts(prev => {
+      const post = prev.find(p => p.id === optimisticId);
+      if (post?.animatedOpacity) {
+        // Animate to full opacity to show success
+        Animated.timing(post.animatedOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+        
+        // Keep the optimistic post visible for longer, then remove it gradually
+        setTimeout(() => {
+          // Refresh posts first
+          loadPosts().then(() => {
+            // Remove optimistic post only after real posts are loaded and rendered
+            setTimeout(() => {
+              setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+            }, 200); // Shorter delay for more seamless transition
+          });
+        }, 300); // Reduced delay for faster response
+      }
+      return prev;
+    });
+  }, [loadPosts]);
+
+  // Function to remove failed optimistic post
+  const removeOptimisticPost = useCallback((optimisticId: string) => {
+    setOptimisticPosts(prev => {
+      const post = prev.find(p => p.id === optimisticId);
+      if (post?.animatedOpacity) {
+        // Animate out smoothly
+        Animated.timing(post.animatedOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => {
+          setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+        });
+      } else {
+        // Immediate removal if no animation
+        return prev.filter(p => p.id !== optimisticId);
+      }
+      return prev;
+    });
+  }, []);
+
+  // Expose functions globally for CreatePost to use
+  React.useEffect(() => {
+    if (context === 'user') {
+      (global as any).userForumActions = {
+        addOptimisticPost,
+        confirmOptimisticPost,
+        removeOptimisticPost,
+      };
+    }
+  }, [addOptimisticPost, confirmOptimisticPost, removeOptimisticPost, context]);
+
+  // Memoized key extractor
+  const keyExtractor = useCallback((item: PostData) => item.id, []);
+
+  // Memoized render item
+  const renderItem: ListRenderItem<PostData> = useCallback(({ item, index }) => {
+    const postComponent = (
+      <Post
+        id={item.id}
+        user={item.user}
+        timestamp={item.timestamp}
+        category={item.category}
+        content={item.content}
+        comments={item.comments}
+        onCommentPress={() => handleCommentPress(item.id)}
+        onReportPress={() => handleReportPress(item.id)}
+        onPostPress={() => handlePostPress(item.id)}
+        index={index}
+        isOptimistic={item.isOptimistic}
+      />
+    );
+
+    // Wrap optimistic posts with animated opacity
+    if (item.isOptimistic && item.animatedOpacity) {
+      return (
+        <Animated.View
+          style={{ opacity: item.animatedOpacity }}
+        >
+          {postComponent}
+        </Animated.View>
+      );
+    }
+
+    return postComponent;
+  }, [handleCommentPress, handleReportPress, handlePostPress]);
+
+  // Combined posts data
+  const allPosts = useMemo(() => [...optimisticPosts, ...posts], [optimisticPosts, posts]);
+
+  // Use optimized list hook
+  const optimizedListProps = useOptimizedList({
+    data: allPosts,
+    keyExtractor,
+    renderItem,
+    windowSize: 10,
+    initialNumToRender: 5,
+    maxToRenderPerBatch: 3,
+    updateCellsBatchingPeriod: 50,
+    removeClippedSubviews: true,
+  });
+
+  // Memoized refresh control
+  const refreshControl = useMemo(() => (
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={loadPosts}
+      colors={[Colors.primary.blue]}
+      tintColor={Colors.primary.blue}
+    />
+  ), [refreshing, loadPosts]);
+
   return (
     <View style={styles.container}>
-      {/* Timeline */}
-      <ScrollView 
-        style={styles.timeline}
-        contentContainerStyle={styles.timelineContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {samplePosts.map((post) => (
-          <Post
-            key={post.id}
-            id={post.id}
-            user={post.user}
-            timestamp={post.timestamp}
-            category={post.category}
-            content={post.content}
-            comments={post.comments}
-            onCommentPress={() => handleCommentPress(post.id)}
-            onReportPress={() => handleReportPress(post.id)}
-            onPostPress={() => handlePostPress(post.id)}
-          />
-        ))}
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+      {/* Forum Loading Animation */}
+      <ForumLoadingAnimation visible={initialLoading} />
+      
+      {/* Show skeleton loading for initial load */}
+      {initialLoading && allPosts.length === 0 ? (
+        <View style={styles.skeletonContainer}>
+          <SkeletonList itemCount={8} itemHeight={200} spacing={12} />
+        </View>
+      ) : (
+        <FlatList
+          {...optimizedListProps}
+          style={styles.timeline}
+          contentContainerStyle={styles.timelineContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
+          ListFooterComponent={<View style={styles.bottomSpacer} />}
+        />
+      )}
 
       {/* Floating Create Post Button */}
       <TouchableOpacity style={styles.createPostButton} onPress={handleCreatePost} activeOpacity={0.8}>
@@ -151,9 +337,16 @@ const styles = StyleSheet.create({
   },
   timeline: {
     flex: 1,
+    backgroundColor: Colors.background.primary,
   },
   timelineContent: {
-    paddingVertical: 10, // Add some padding at the top and bottom
+    paddingVertical: 10,
+    paddingBottom: 100, // Account for bottom navigation
+  },
+  skeletonContainer: {
+    flex: 1,
+    backgroundColor: Colors.background.primary,
+    paddingHorizontal: 16,
   },
   bottomSpacer: {
     height: 80, // Add a spacer at the bottom to prevent content from being hidden

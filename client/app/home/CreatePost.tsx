@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { LEGAL_CATEGORIES } from '@/constants/categories';
@@ -7,26 +7,82 @@ import CategoryScroller from '@/components/glossary/CategoryScroller';
 import Colors from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
+import apiClient from '@/lib/api-client';
+import Navbar from '@/components/Navbar';
 
 // Shared categories reference
 
 const CreatePost: React.FC = () => {
   const router = useRouter();
   const [content, setContent] = useState('');
-  const [categoryId, setCategoryId] = useState<string>(LEGAL_CATEGORIES[0]?.id ?? 'family');
+  const [categoryId, setCategoryId] = useState<string>('');
   const [isAnonymous, setIsAnonymous] = useState<boolean>(false);
+  const [isPosting, setIsPosting] = useState(false);
   const MAX_LEN = 500;
 
   const isPostDisabled = useMemo(() => {
     const len = content.length;
-    return content.trim().length === 0 || len > MAX_LEN;
-  }, [content]);
+    return content.trim().length === 0 || len > MAX_LEN || !categoryId || isPosting;
+  }, [content, categoryId, isPosting]);
 
-  const onPressPost = () => {
-    if (isPostDisabled) return;
-    // TODO: Hook this up to backend; for now just log and navigate back to timeline
-    console.log('Posting content:', { content: content.trim(), categoryId });
+  const onPressPost = async () => {
+    if (isPostDisabled || isPosting) return;
+    
+    setIsPosting(true);
+    
+    const payload = {
+      body: content.trim(),
+      category: categoryId || undefined,
+      is_anonymous: isAnonymous,
+    };
+
+    // Add optimistic post immediately
+    const optimisticId = (global as any).userForumActions?.addOptimisticPost({
+      body: payload.body,
+      category: payload.category,
+      is_anonymous: payload.is_anonymous
+    });
+
+    // Navigate back immediately to show the optimistic post
     router.back();
+    
+    try {
+      const resp = await apiClient.createForumPost(payload);
+      if (!resp.success) {
+        console.error('Failed to create post', resp.error);
+        // Remove the optimistic post on failure
+        if (optimisticId) {
+          (global as any).userForumActions?.removeOptimisticPost(optimisticId);
+        }
+        Alert.alert(
+          'Error',
+          'Failed to create post. Please try again.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      // Wait a bit for smooth transition, then confirm the optimistic post
+      setTimeout(() => {
+        if (optimisticId) {
+          (global as any).userForumActions?.confirmOptimisticPost(optimisticId);
+        }
+      }, 500); // 500ms delay for smooth transition
+      
+    } catch (e) {
+      console.error('Create post error', e);
+      // Remove the optimistic post on error
+      if (optimisticId) {
+        (global as any).userForumActions?.removeOptimisticPost(optimisticId);
+      }
+      Alert.alert(
+        'Error',
+        'Something went wrong. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   return (
@@ -40,8 +96,11 @@ const CreatePost: React.FC = () => {
           style={[styles.postButton, isPostDisabled && styles.postButtonDisabled]}
           onPress={onPressPost}
           activeOpacity={isPostDisabled ? 1 : 0.8}
+          disabled={isPostDisabled}
         >
-          <Text style={styles.postButtonText}>Post</Text>
+          <Text style={styles.postButtonText}>
+            {isPosting ? 'Posting...' : 'Post'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -81,6 +140,8 @@ const CreatePost: React.FC = () => {
           </Text>
         </View>
       </View>
+      
+      <Navbar activeTab="home" />
     </View>
   );
 };
@@ -189,7 +250,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   editorInput: {
-    flex: 1,
+    height: 180,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 10,

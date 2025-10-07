@@ -1,10 +1,13 @@
-import React from 'react';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Animated } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Post from '../home/Post';
 import Colors from '../../constants/Colors';
 import { Database } from '../../types/database.types';
+import apiClient from '@/lib/api-client';
+import { useFocusEffect } from '@react-navigation/native';
+import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
 
 type ForumPost = Database['public']['Tables']['forum_posts']['Row'];
 type User = Database['public']['Tables']['users']['Row'];
@@ -12,129 +15,88 @@ type User = Database['public']['Tables']['users']['Row'];
 type ForumPostWithUser = ForumPost & {
   user: User;
   reply_count: number;
+  isOptimistic?: boolean;
+  animatedOpacity?: Animated.Value;
 };
 
-const LawyerTimeline: React.FC = () => {
+const LawyerTimeline: React.FC = React.memo(() => {
   const router = useRouter();
 
-  // Sample data for demonstration using forum_posts schema
-  const samplePosts: ForumPostWithUser[] = [
-    {
-      id: 'post_001',
-      title: 'Need urgent legal advice regarding protest-related charges',
-      body: 'Hello po, baka may makasagot agad. Na-involve po ako sa protest actions at ngayon may kaso na akong rebellion at tinatangka pa akong kasuhan ng arson dahil daw sa mga nangyari during the rally. Hindi ko alam kung ano ang dapat kong gawin. May lawyer po ba na pwedeng mag-advise?',
-      domain: 'criminal',
-      created_at: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-      updated_at: null,
-      user_id: 'user_001',
-      is_anonymous: false,
-      is_flagged: false,
-      user: {
-        id: 'user_001',
-        email: 'ralph@example.com',
-        username: 'twizt3rfries',
-        full_name: 'Ralph de Guzman',
-        role: 'registered_user',
-        is_verified: true,
-        birthdate: null,
-        created_at: null,
-        updated_at: null,
-      },
-      reply_count: 3,
-    },
-    {
-      id: 'post_002',
-      title: 'NCAP violation - not the actual driver',
-      body: 'Hello po! Nahuli daw ako ng NCAP pero hindi ako ang driver ng sasakyan. May way po ba para ma-contest ito? Wala rin akong sasakyan sa pangalan ko.',
-      domain: 'civil',
-      created_at: new Date(Date.now() - 10800000).toISOString(), // 3 hours ago
-      updated_at: null,
-      user_id: 'user_002',
-      is_anonymous: true,
-      is_flagged: false,
-      user: {
-        id: 'user_002',
-        email: 'anon@example.com',
-        username: 'anonymous',
-        full_name: 'Anonymous User',
-        role: 'registered_user',
-        is_verified: true,
-        birthdate: null,
-        created_at: null,
-        updated_at: null,
-      },
-      reply_count: 12,
-    },
-    {
-      id: 'post_003',
-      title: 'Child support without marriage',
-      body: 'Pwede po ba akong humingi ng child support kahit hindi kami kasal ng nanay ng anak ko? May anak kami pero hindi kami nagpakasal. Ano po ang dapat kong gawin para sa anak namin?',
-      domain: 'family',
-      created_at: new Date(Date.now() - 18000000).toISOString(), // 5 hours ago
-      updated_at: null,
-      user_id: 'user_003',
-      is_anonymous: false,
-      is_flagged: false,
-      user: {
-        id: 'user_003',
-        email: 'lebron@example.com',
-        username: 'lebbyjames',
-        full_name: 'LeBron James',
-        role: 'registered_user',
-        is_verified: true,
-        birthdate: null,
-        created_at: null,
-        updated_at: null,
-      },
-      reply_count: 2,
-    },
-    {
-      id: 'post_004',
-      title: 'Final pay not released after 2 months',
-      body: 'Nagresign po ako nang maayos at may clearance na, pero hanggang ngayon wala pa rin akong natatanggap na back pay o final pay. 2 months na po. Ano po dapat kong gawin para ma-claim ito?',
-      domain: 'labor',
-      created_at: new Date(Date.now() - 18000000).toISOString(), // 5 hours ago
-      updated_at: null,
-      user_id: 'user_004',
-      is_anonymous: false,
-      is_flagged: false,
-      user: {
-        id: 'user_004',
-        email: 'willie@example.com',
-        username: 'pengej4cket',
-        full_name: 'Willie Revillame',
-        role: 'registered_user',
-        is_verified: true,
-        birthdate: null,
-        created_at: null,
-        updated_at: null,
-      },
-      reply_count: 2,
-    },
-    {
-      id: 'post_005',
-      title: 'Small claims court for 50k debt',
-      body: 'May utang sa akin na 50k pero ayaw magbayad. Pwede po ba sa small claims court? Ano po ang requirements at proseso? Salamat po sa makakasagot.',
-      domain: 'civil',
-      created_at: new Date(Date.now() - 28800000).toISOString(), // 8 hours ago
-      updated_at: null,
-      user_id: 'user_005',
-      is_anonymous: false,
-      is_flagged: false,
-      user: {
-        id: 'user_005',
-        email: 'juan@example.com',
-        username: 'juan.dc',
-        full_name: 'Juan Dela Cruz',
-        role: 'registered_user',
-        is_verified: true,
-        birthdate: null,
-        created_at: null,
-        updated_at: null,
-      },
-      reply_count: 5,
-    },
-  ];
+  const [posts, setPosts] = useState<ForumPostWithUser[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [optimisticPosts, setOptimisticPosts] = useState<ForumPostWithUser[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  const loadPosts = useCallback(async () => {
+    setRefreshing(true);
+    const res = await apiClient.getRecentForumPosts();
+    if (res.success && Array.isArray((res.data as any)?.data)) {
+      const rows = (res.data as any).data as any[];
+      const mapped: ForumPostWithUser[] = rows.map((r: any) => {
+        const isAnon = !!r.is_anonymous;
+        const userData = r?.users || {};
+        
+        return {
+          id: String(r.id),
+          title: undefined as any,
+          body: r.body,
+          domain: r.category,
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+          user_id: r.user_id,
+          is_anonymous: r.is_anonymous,
+          is_flagged: r.is_flagged,
+          user: {
+            id: r.user_id,
+            email: '',
+            username: isAnon ? 'anonymous' : (userData?.username || 'user'),
+            full_name: isAnon ? 'Anonymous User' : (userData?.full_name || userData?.username || 'User'),
+            role: userData?.role || 'registered_user' as any,
+            is_verified: false,
+            birthdate: null,
+            created_at: null,
+            updated_at: null,
+          },
+          reply_count: Number(r.reply_count || 0),
+        };
+      });
+      setPosts(mapped);
+    } else {
+      setPosts([]);
+    }
+    setRefreshing(false);
+    // Hide initial loading after first load
+    if (initialLoading) {
+      setTimeout(() => setInitialLoading(false), 300);
+    }
+  }, [initialLoading]);
+
+  useEffect(() => {
+    loadPosts();
+    
+    // Fallback: Hide loading after 3 seconds maximum
+    const fallbackTimer = setTimeout(() => {
+      if (initialLoading) {
+        setInitialLoading(false);
+      }
+    }, 3000);
+    
+    return () => clearTimeout(fallbackTimer);
+  }, [loadPosts, initialLoading]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadPosts();
+    }, [loadPosts])
+  );
+
+  // Lightweight polling for near real-time updates
+  useEffect(() => {
+    const id = setInterval(() => {
+      loadPosts();
+    }, 10000); // 10s
+    return () => clearInterval(id);
+  }, [loadPosts]);
 
   const handleCommentPress = (postId: string) => {
     console.log(`Comment pressed for post ${postId}`);
@@ -156,26 +118,126 @@ const LawyerTimeline: React.FC = () => {
     router.push('/lawyer/CreatePost' as any);
   };
 
+  // Function to add optimistic post
+  const addOptimisticPost = useCallback((postData: { body: string; category?: string }) => {
+    const animatedOpacity = new Animated.Value(0); // Start completely transparent
+    const optimisticPost: ForumPostWithUser = {
+      id: `optimistic-${Date.now()}`,
+      title: undefined as any,
+      body: postData.body,
+      domain: (postData.category as any) || 'others',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      user_id: 'current-user',
+      is_anonymous: false,
+      is_flagged: false,
+      user: {
+        id: 'current-user',
+        email: '',
+        username: 'You',
+        full_name: 'You',
+        role: 'registered_user' as any,
+        is_verified: false,
+        birthdate: null,
+        created_at: null,
+        updated_at: null,
+      },
+      reply_count: 0,
+      isOptimistic: true,
+      animatedOpacity,
+    };
+
+    setOptimisticPosts(prev => [optimisticPost, ...prev]);
+    
+    // Smooth fade in animation
+    Animated.timing(animatedOpacity, {
+      toValue: 0.7, // Semi-transparent while posting
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+    
+    return optimisticPost.id;
+  }, []);
+
+  // Function to confirm optimistic post (make it fully opaque)
+  const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: ForumPostWithUser) => {
+    setOptimisticPosts(prev => {
+      const post = prev.find(p => p.id === optimisticId);
+      if (post?.animatedOpacity) {
+        // Animate to full opacity to show success
+        Animated.timing(post.animatedOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+        
+        // Keep the optimistic post visible for longer, then remove it gradually
+        setTimeout(() => {
+          // Refresh posts first
+          loadPosts();
+          
+          // Then after a shorter delay, remove the optimistic post
+          setTimeout(() => {
+            setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+          }, 200); // Shorter delay for more seamless transition
+        }, 300); // Reduced delay for faster response
+      }
+      return prev;
+    });
+  }, [loadPosts]);
+
+  // Function to remove failed optimistic post
+  const removeOptimisticPost = useCallback((optimisticId: string) => {
+    setOptimisticPosts(prev => prev.filter(p => p.id !== optimisticId));
+  }, []);
+
+  // Expose functions globally for CreatePost to use
+  React.useEffect(() => {
+    (global as any).forumActions = {
+      addOptimisticPost,
+      confirmOptimisticPost,
+      removeOptimisticPost,
+    };
+  }, [addOptimisticPost, confirmOptimisticPost, removeOptimisticPost]);
+
   return (
     <View className="flex-1 bg-white">
+      {/* Forum Loading Animation */}
+      <ForumLoadingAnimation visible={initialLoading} />
+      
       {/* Timeline */}
       <ScrollView 
         className="flex-1"
         contentContainerStyle={{ paddingVertical: 10 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={loadPosts} />
+        }
       >
-        {samplePosts.map((post) => {
-          // Convert database timestamp to relative time
+        {[...optimisticPosts, ...posts].map((post) => {
+          // Convert database timestamp to relative time with real-time updates
           const getRelativeTime = (timestamp: string) => {
-            const now = new Date();
-            const postTime = new Date(timestamp);
-            const diffMs = now.getTime() - postTime.getTime();
-            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-            
-            if (diffHours < 1) return 'now';
-            if (diffHours < 24) return `${diffHours}h`;
-            const diffDays = Math.floor(diffHours / 24);
-            return `${diffDays}d`;
+            if (!timestamp) return '';
+            // Treat timestamps without timezone as UTC to avoid local offset issues
+            const hasTz = /Z|[+-]\d{2}:?\d{2}$/.test(timestamp);
+            const normalized = hasTz ? timestamp : `${timestamp}Z`;
+            const createdMs = new Date(normalized).getTime();
+            if (Number.isNaN(createdMs)) return '';
+            const now = Date.now();
+            const diffSec = Math.max(0, Math.floor((now - createdMs) / 1000));
+            if (diffSec < 60) return `${diffSec}s`;
+            const diffMin = Math.floor(diffSec / 60);
+            if (diffMin < 60) return `${diffMin}m`;
+            const diffHr = Math.floor(diffMin / 60);
+            if (diffHr < 24) return `${diffHr}h`;
+            const diffDay = Math.floor(diffHr / 24);
+            if (diffDay < 7) return `${diffDay}d`;
+            const diffWeek = Math.floor(diffDay / 7);
+            if (diffWeek < 4) return `${diffWeek}w`;
+            const diffMonth = Math.floor(diffDay / 30);
+            if (diffMonth < 12) return `${diffMonth}mo`;
+            const diffYear = Math.floor(diffDay / 365);
+            return `${diffYear}y`;
           };
 
           // Convert domain to display category
@@ -191,7 +253,7 @@ const LawyerTimeline: React.FC = () => {
             }
           };
 
-          return (
+          const postComponent = (
             <Post
               key={post.id}
               id={post.id}
@@ -209,6 +271,20 @@ const LawyerTimeline: React.FC = () => {
               onPostPress={() => handlePostPress(post.id)}
             />
           );
+
+          // Wrap optimistic posts with animated opacity
+          if (post.isOptimistic && post.animatedOpacity) {
+            return (
+              <Animated.View
+                key={post.id}
+                style={{ opacity: post.animatedOpacity }}
+              >
+                {postComponent}
+              </Animated.View>
+            );
+          }
+
+          return postComponent;
         })}
         <View className="h-20" />
       </ScrollView>
@@ -240,6 +316,8 @@ const LawyerTimeline: React.FC = () => {
       </TouchableOpacity>
     </View>
   );
-};
+});
+
+LawyerTimeline.displayName = 'LawyerTimeline';
 
 export default LawyerTimeline;

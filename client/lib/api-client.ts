@@ -195,6 +195,37 @@ class ApiClient {
   async healthCheck(): Promise<ApiResponse> {
     return this.request('/health');
   }
+
+  // Forum endpoints
+  async createForumPost(data: {
+    body: string;
+    category?: string | null;
+    is_anonymous?: boolean;
+  }): Promise<ApiResponse> {
+    return this.request('/api/forum/posts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getRecentForumPosts(): Promise<ApiResponse> {
+    return this.request('/api/forum/posts/recent');
+  }
+
+  async getForumPostById(postId: string): Promise<ApiResponse> {
+    return this.request(`/api/forum/posts/${postId}`);
+  }
+
+  async getForumReplies(postId: string): Promise<ApiResponse> {
+    return this.request(`/api/forum/posts/${postId}/replies`);
+  }
+
+  async createForumReply(postId: string, data: { body: string; is_anonymous?: boolean }): Promise<ApiResponse> {
+    return this.request(`/api/forum/posts/${postId}/replies`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

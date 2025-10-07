@@ -1,233 +1,270 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Shield, Library, Users, Gavel, ScrollText, Briefcase, ShoppingCart } from 'lucide-react-native';
-import tw from 'tailwind-react-native-classnames';
+import { Shield, ArrowLeft } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LEGAL_CATEGORIES } from '@/constants/categories';
+import CategoryScroller from '@/components/glossary/CategoryScroller';
 import Colors from '../../constants/Colors';
-import Header from '../../components/Header';
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
+import apiClient from '@/lib/api-client';
 
-type LegalCategory = 'family' | 'criminal' | 'civil' | 'labor' | 'consumer' | 'others';
-
-interface CategoryOption {
-  id: LegalCategory;
-  label: string;
-  icon: React.ComponentType<any>;
-  color: string;
-  bgColor: string;
-}
-
-const LEGAL_CATEGORIES: CategoryOption[] = [
-  {
-    id: 'others',
-    label: 'General',
-    icon: Library,
-    color: '#374151',
-    bgColor: '#F9FAFB'
-  },
-  {
-    id: 'family',
-    label: 'Family',
-    icon: Users,
-    color: '#BE123C',
-    bgColor: '#FEF2F2'
-  },
-  {
-    id: 'criminal',
-    label: 'Criminal',
-    icon: Gavel,
-    color: '#EA580C',
-    bgColor: '#FFF7ED'
-  },
-  {
-    id: 'civil',
-    label: 'Civil',
-    icon: ScrollText,
-    color: '#7C3AED',
-    bgColor: '#F5F3FF'
-  },
-  {
-    id: 'labor',
-    label: 'Labor',
-    icon: Briefcase,
-    color: '#1D4ED8',
-    bgColor: '#EFF6FF'
-  },
-  {
-    id: 'consumer',
-    label: 'Consumer',
-    icon: ShoppingCart,
-    color: '#047857',
-    bgColor: '#ECFDF5'
-  }
-];
 
 const LawyerCreatePost: React.FC = () => {
   const router = useRouter();
-  const [body, setBody] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<LegalCategory>('others');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [content, setContent] = useState('');
+  const [categoryId, setCategoryId] = useState<string>('');
+  const [isPosting, setIsPosting] = useState(false);
+  const MAX_LEN = 500;
 
-  const BODY_MAX_LENGTH = 2000;
+  const isPostDisabled = useMemo(() => {
+    const len = content.length;
+    return content.trim().length === 0 || len > MAX_LEN || !categoryId || isPosting;
+  }, [content, categoryId, isPosting]);
 
-  const validation = useMemo(() => {
-    const bodyTrimmed = body.trim();
+  const onPressPost = async () => {
+    if (isPostDisabled || isPosting) return;
     
-    return {
-      body: {
-        isValid: bodyTrimmed.length >= 50 && bodyTrimmed.length <= BODY_MAX_LENGTH,
-        message: bodyTrimmed.length < 50 ? 'Content must be at least 50 characters' : 
-                bodyTrimmed.length > BODY_MAX_LENGTH ? `Content must be under ${BODY_MAX_LENGTH} characters` : ''
-      }
+    setIsPosting(true);
+    
+    const payload = {
+      body: content.trim(),
+      category: categoryId || undefined,
+      is_anonymous: false, // Lawyers always post non-anonymously
     };
-  }, [body]);
 
-  const canSubmit = validation.body.isValid && !isSubmitting;
+    // Add optimistic post immediately
+    const optimisticId = (global as any).forumActions?.addOptimisticPost({
+      body: payload.body,
+      category: payload.category
+    });
 
-  const handleSubmit = async () => {
-    if (!canSubmit) return;
-    
-    setIsSubmitting(true);
+    // Navigate back immediately to show the optimistic post
+    router.back();
     
     try {
-      const postData = {
-        body: body.trim(),
-        domain: selectedCategory,
-        is_anonymous: false,
-      };
+      const resp = await apiClient.createForumPost(payload);
+      if (!resp.success) {
+        console.error('Failed to create post', resp.error);
+        // Remove the optimistic post on failure
+        if (optimisticId) {
+          (global as any).forumActions?.removeOptimisticPost(optimisticId);
+        }
+        Alert.alert(
+          'Error',
+          'Failed to create post. Please try again.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
       
-      console.log('Creating lawyer post:', postData);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      router.back();
-    } catch (error) {
-      console.error('Error creating post:', error);
+      // Wait a bit for smooth transition, then confirm the optimistic post
+      setTimeout(() => {
+        if (optimisticId) {
+          (global as any).forumActions?.confirmOptimisticPost(optimisticId);
+        }
+      }, 500); // 500ms delay for smooth transition
+      
+    } catch (e) {
+      console.error('Create post error', e);
+      // Remove the optimistic post on error
+      if (optimisticId) {
+        (global as any).forumActions?.removeOptimisticPost(optimisticId);
+      }
+      Alert.alert(
+        'Error',
+        'Something went wrong. Please try again.',
+        [{ text: 'OK' }]
+      );
     } finally {
-      setIsSubmitting(false);
+      setIsPosting(false);
     }
   };
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-50`}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
       <KeyboardAvoidingView 
-        style={tw`flex-1`}
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-          <View style={tw`flex-1`}>
-        <Header 
-          title="New Post"
-          showBackButton={true}
-          onBackPress={() => router.back()}
-        />
+        <View style={{ flex: 1 }}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <ArrowLeft size={20} color="#536471" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.postButton, isPostDisabled && styles.postButtonDisabled]}
+              onPress={onPressPost}
+              activeOpacity={isPostDisabled ? 1 : 0.8}
+              disabled={isPostDisabled}
+            >
+              <Text style={styles.postButtonText}>
+                {isPosting ? 'Posting...' : 'Post'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        {/* Post Button */}
-        <View style={tw`px-4 py-2 bg-white border-b border-gray-100`}>
-          <TouchableOpacity
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-            style={[
-              tw`px-6 py-2 rounded-full self-end`,
-              {
-                backgroundColor: canSubmit ? '#059669' : '#D1D5DB'
-              }
-            ]}
-            activeOpacity={canSubmit ? 0.8 : 1}
-          >
-            <Text style={tw`text-white font-bold text-sm`}>
-              {isSubmitting ? 'Posting...' : 'Post'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView 
-          style={tw`flex-1`}
-          contentContainerStyle={tw`p-4 pb-8`}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          bounces={false}
-        >
           {/* Guidelines */}
-          <View style={[tw`rounded-2xl p-4 mb-4 border`, { backgroundColor: '#E8F4FD', borderColor: '#C1E4F7' }]}>
-            <View style={tw`flex-row items-center mb-2`}>
+          <View style={styles.guidelinesContainer}>
+            <View style={styles.guidelinesHeader}>
               <Shield size={16} color={Colors.primary.blue} />
-              <Text style={[tw`ml-2 font-semibold text-sm`, { color: Colors.primary.blue }]}>Guidelines</Text>
+              <Text style={styles.guidelinesTitle}>Professional Guidelines</Text>
             </View>
-            <Text style={[tw`text-sm leading-5`, { color: Colors.primary.blue }]}>
+            <Text style={styles.guidelinesText}>
               Follow ethics rules • Share general info only • Avoid specific case advice • No legal promotion
             </Text>
           </View>
 
-          {/* Category Selection */}
-          <Text style={tw`text-gray-900 font-semibold text-base mb-3 px-1`}>Category</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={tw`px-1 mb-4`}
-          >
-            {LEGAL_CATEGORIES.map((category) => {
-              const Icon = category.icon;
-              return (
-                <TouchableOpacity
-                  key={category.id}
-                  onPress={() => setSelectedCategory(category.id)}
-                  style={[
-                    tw`items-center justify-center w-20 h-20 rounded-2xl border-2 mr-4`,
-                    {
-                      backgroundColor: selectedCategory === category.id ? category.bgColor : '#FFFFFF',
-                      borderColor: selectedCategory === category.id ? category.color : '#E5E7EB',
-                    }
-                  ]}
-                  activeOpacity={0.7}
-                >
-                  <Icon 
-                    size={28} 
-                    color={selectedCategory === category.id ? category.color : '#9CA3AF'} 
-                    strokeWidth={2} 
-                  />
-                  <Text 
-                    style={[
-                      tw`font-medium text-xs text-center mt-1`,
-                      { color: selectedCategory === category.id ? category.color : '#6B7280' }
-                    ]}
-                  >
-                    {category.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {/* Content Input Card */}
-          <View style={tw`bg-white rounded-2xl p-4 mb-4 shadow-sm`}>
-            <Text style={tw`text-gray-900 font-semibold text-base mb-3`}>Share Your Legal Insight</Text>
-            <TextInput
-              style={[
-                tw`text-gray-900 text-base leading-6 border border-gray-200 rounded-lg p-3`,
-                { minHeight: 120, textAlignVertical: 'top' }
-              ]}
-              placeholder="Help others understand the law better."
-              placeholderTextColor="#9CA3AF"
-              value={body}
-              onChangeText={setBody}
-              maxLength={BODY_MAX_LENGTH}
-              multiline
-              scrollEnabled
+          {/* Categories */}
+          <View style={styles.categoriesWrapper}>
+            <View style={styles.chooseCategoryHeader}>
+              <Ionicons name="pricetags" size={16} color={Colors.text.sub} />
+              <Text style={styles.chooseCategoryText}>Choose Category</Text>
+            </View>
+            <CategoryScroller
+              activeCategory={categoryId}
+              onCategoryChange={setCategoryId}
+              includeAllOption={false}
             />
-            <View style={tw`flex-row justify-end items-center mt-2 pt-2 border-t border-gray-100`}>
-              <Text style={tw`text-gray-400 text-xs`}>
-                {body.length}/{BODY_MAX_LENGTH}
+          </View>
+
+          {/* Composer */}
+          <View style={styles.editorContainer}>
+            <Text style={styles.editorTitle}>Share your legal insight</Text>
+            <TextInput
+              style={styles.editorInput}
+              placeholder="Share your expertise..."
+              placeholderTextColor="#9CA3AF"
+              value={content}
+              onChangeText={setContent}
+              multiline
+              textAlignVertical="top"
+            />
+            <View style={styles.counterRow}>
+              <Text style={[styles.counterText, content.length > MAX_LEN && styles.counterTextExceeded]}>
+                {content.length}/{MAX_LEN}
               </Text>
             </View>
           </View>
-
-        </ScrollView>
-          </View>
+        </View>
       </KeyboardAvoidingView>
       
       <LawyerNavbar activeTab="forum" />
     </SafeAreaView>
   );
+};
+
+const styles = {
+  header: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E1E8ED',
+    backgroundColor: '#FFFFFF',
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+  },
+  postButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: '#023D7B',
+    borderRadius: 8,
+  },
+  postButtonDisabled: {
+    backgroundColor: '#93C5FD',
+  },
+  postButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700' as const,
+    fontSize: 14,
+  },
+  guidelinesContainer: {
+    backgroundColor: '#E8F4FD',
+    borderColor: '#C1E4F7',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 8,
+  },
+  guidelinesHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginBottom: 8,
+  },
+  guidelinesTitle: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#023D7B',
+  },
+  guidelinesText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#023D7B',
+  },
+  categoriesWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  chooseCategoryHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginBottom: 8,
+    paddingHorizontal: 8,
+  },
+  chooseCategoryText: {
+    marginLeft: 8,
+    fontSize: 12,
+    fontWeight: '700' as const,
+    color: Colors?.text?.sub ?? '#6B7280',
+  },
+  editorContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  editorTitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#111827',
+    marginBottom: 12,
+  },
+  editorInput: {
+    height: 180,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#111827',
+    backgroundColor: '#FFFFFF',
+  },
+  counterRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'flex-end' as const,
+    marginTop: 8,
+  },
+  counterText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600' as const,
+  },
+  counterTextExceeded: {
+    color: '#DC2626',
+  },
 };
 
 export default LawyerCreatePost;

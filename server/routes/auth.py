@@ -62,6 +62,7 @@ async def sign_in(credentials: UserSignIn):
         "message": "Sign in successful",
         "user": result["user"],
         "session": result["session"],
+        "access_token": result.get("access_token"),
         "profile": result["profile"],
         "redirect_path": result.get("redirect_path", "/home")
     }

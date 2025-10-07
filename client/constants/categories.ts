@@ -6,7 +6,7 @@ export interface LegalCategory {
 // Shared categories used by Legal Guides, Legal Terms, and Create Post
 export const LEGAL_CATEGORIES: LegalCategory[] = [
   { id: 'family', label: 'Family' },
-  { id: 'work', label: 'Labor' },
+  { id: 'labor', label: 'Labor' },
   { id: 'civil', label: 'Civil' },
   { id: 'criminal', label: 'Criminal' },
   { id: 'consumer', label: 'Consumer' },

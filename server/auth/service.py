@@ -128,6 +128,8 @@ class AuthService:
                 "success": True,
                 "user": user,
                 "session": session,
+                # Surface access token even if "session" is null in REST response
+                "access_token": auth_response["data"].get("access_token"),
                 "profile": profile,
                 "redirect_path": redirect_path
             }

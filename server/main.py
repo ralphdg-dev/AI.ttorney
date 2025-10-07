@@ -70,6 +70,7 @@ app.add_middleware(
 
 # Import routes after app creation to avoid circular imports
 from routes import auth
+from routes.forum import router as forum_router
 
 # Include routers
 app.include_router(auth.router)
@@ -92,6 +93,7 @@ app.include_router(route_validation_router, prefix="/api")
 # Import and include lawyer application router
 from routes.lawyer_applications import router as lawyer_applications_router
 app.include_router(lawyer_applications_router, prefix="/api")
+app.include_router(forum_router, prefix="/api")
 
 @app.get("/")
 async def root():
