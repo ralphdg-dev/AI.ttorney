@@ -9,14 +9,47 @@ import CategoryScroller from '@/components/glossary/CategoryScroller';
 import Colors from '../../constants/Colors';
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 import apiClient from '@/lib/api-client';
+import { useAuth } from '@/contexts/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const LawyerCreatePost: React.FC = () => {
   const router = useRouter();
+  const { session, isAuthenticated } = useAuth();
   const [content, setContent] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
   const [isPosting, setIsPosting] = useState(false);
   const MAX_LEN = 500;
+
+  // Helper function to get auth headers using AuthContext
+  const getAuthHeaders = async (): Promise<HeadersInit> => {
+    try {
+      // First try to get token from AuthContext session
+      if (session?.access_token) {
+        console.log(`[LawyerCreatePost] Using session token from AuthContext`);
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        };
+      }
+      
+      // Fallback to AsyncStorage
+      const token = await AsyncStorage.getItem('access_token');
+      if (token) {
+        console.log(`[LawyerCreatePost] Using token from AsyncStorage`);
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        };
+      }
+      
+      console.log(`[LawyerCreatePost] No authentication token available`);
+      return { 'Content-Type': 'application/json' };
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return { 'Content-Type': 'application/json' };
+    }
+  };
 
   const isPostDisabled = useMemo(() => {
     const len = content.length;
@@ -25,6 +58,16 @@ const LawyerCreatePost: React.FC = () => {
 
   const onPressPost = async () => {
     if (isPostDisabled || isPosting) return;
+    
+    // Check authentication first
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Authentication Required',
+        'Please log in to create a post.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     
     setIsPosting(true);
     
@@ -44,7 +87,25 @@ const LawyerCreatePost: React.FC = () => {
     router.back();
     
     try {
-      const resp = await apiClient.createForumPost(payload);
+      // Use direct API call with authentication
+      const headers = await getAuthHeaders();
+      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      
+      console.log(`[LawyerCreatePost] Creating post at ${API_BASE_URL}/api/forum/posts`);
+      const response = await fetch(`${API_BASE_URL}/api/forum/posts`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[LawyerCreatePost] Failed to create post: ${response.status}`, errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const resp = await response.json();
+      console.log(`[LawyerCreatePost] Post created successfully:`, resp);
       if (!resp.success) {
         console.error('Failed to create post', resp.error);
         // Remove the optimistic post on failure

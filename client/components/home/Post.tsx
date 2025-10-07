@@ -28,6 +28,9 @@ interface PostProps {
   index?: number; // For staggered animations
   isLoading?: boolean; // For optimistic posts
   isOptimistic?: boolean; // To identify optimistic posts
+  // Dropdown state management
+  isMenuOpen?: boolean;
+  onMenuToggle?: (postId: string) => void;
 }
 
 const Post: React.FC<PostProps> = React.memo(({
@@ -44,13 +47,14 @@ const Post: React.FC<PostProps> = React.memo(({
   index = 0,
   isLoading = false,
   isOptimistic = false,
+  isMenuOpen = false,
+  onMenuToggle,
 }) => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, session } = useAuth();
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [isReportLoading, setIsReportLoading] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   // Memoized category styling
   const categoryStyle = useMemo(() => {
@@ -67,14 +71,14 @@ const Post: React.FC<PostProps> = React.memo(({
   useEffect(() => {
     const checkBookmarkStatus = async () => {
       if (currentUser?.id && id) {
-        const result = await BookmarkService.isBookmarked(id, currentUser.id);
+        const result = await BookmarkService.isBookmarked(id, currentUser.id, session);
         if (result.success) {
           setIsBookmarked(result.isBookmarked);
         }
       }
     };
     checkBookmarkStatus();
-  }, [id, currentUser?.id]);
+  }, [id, currentUser?.id, session]);
 
   const handleBookmarkPress = useCallback(async () => {
     if (!currentUser?.id) {
@@ -84,7 +88,7 @@ const Post: React.FC<PostProps> = React.memo(({
 
     setIsBookmarkLoading(true);
     try {
-      const result = await BookmarkService.toggleBookmark(id, currentUser.id);
+      const result = await BookmarkService.toggleBookmark(id, currentUser.id, session);
       if (result.success) {
         setIsBookmarked(result.isBookmarked);
         onBookmarkPress?.();
@@ -96,11 +100,11 @@ const Post: React.FC<PostProps> = React.memo(({
     } finally {
       setIsBookmarkLoading(false);
     }
-  }, [currentUser?.id, id, onBookmarkPress]);
+  }, [currentUser?.id, id, onBookmarkPress, session]);
 
   const handleMorePress = useCallback(() => {
-    setMenuOpen(prev => !prev);
-  }, []);
+    onMenuToggle?.(id);
+  }, [onMenuToggle, id]);
 
   const handlePostPress = useCallback(() => {
     onPostPress?.();
@@ -114,31 +118,48 @@ const Post: React.FC<PostProps> = React.memo(({
     setReportModalVisible(true);
   }, []);
 
-  const handleReportSubmit = useCallback(async (reason: string, description: string) => {
+  const handleReportSubmit = useCallback(async (reason: string, category: string, reasonContext?: string) => {
     if (!currentUser?.id) return;
 
     setIsReportLoading(true);
     try {
+      // First check if user has already reported this post
+      const checkResult = await ReportService.hasUserReported(
+        id,
+        'post',
+        currentUser.id,
+        session
+      );
+
+      if (checkResult.success && checkResult.hasReported) {
+        // User has already reported this post - throw error to trigger "already reported" modal
+        throw new Error('You have already reported this post');
+      }
+
+      // User hasn't reported this post - proceed with submission
       const result = await ReportService.submitReport(
         id,
         'post',
         reason,
-        description,
-        currentUser.id
+        currentUser.id,
+        reasonContext || category,
+        session
       );
 
       if (result.success) {
-        setReportModalVisible(false);
+        // Don't close modal immediately - let ReportModal handle success state and auto-close
         onReportPress?.();
       } else {
         console.error('Failed to submit report:', result.error);
+        throw new Error(result.error || 'Failed to submit report');
       }
     } catch (error) {
       console.error('Error submitting report:', error);
+      throw error; // Re-throw to let ReportModal handle the error display
     } finally {
       setIsReportLoading(false);
     }
-  }, [currentUser?.id, id, onReportPress]);
+  }, [currentUser?.id, id, onReportPress, session]);
 
   // Clean category text by removing "Related Post" and simplifying names
   const cleanCategory = category.replace(' Related Post', '').replace(' Law', '').toUpperCase();
@@ -227,7 +248,7 @@ const Post: React.FC<PostProps> = React.memo(({
         <Text style={styles.content}>{content}</Text>
 
         {/* More Menu */}
-        {menuOpen && (
+        {isMenuOpen && (
           <View style={styles.moreMenu}>
             <TouchableOpacity
               style={styles.menuItem}

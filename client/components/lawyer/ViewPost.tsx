@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, SafeAreaView, Animated } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { User, Shield, MessageCircle, Bookmark, MoreHorizontal, Flag, Send } from 'lucide-react-native';
@@ -11,6 +11,7 @@ import apiClient from '@/lib/api-client';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
 import SkeletonLoader from '../ui/SkeletonLoader';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Reply {
   id: string;
@@ -63,7 +64,7 @@ interface PostData {
 const LawyerViewPost: React.FC = () => {
   const router = useRouter();
   const { postId } = useLocalSearchParams();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, session } = useAuth();
   const [isReplying, setIsReplying] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [showFullContent, setShowFullContent] = useState(false);
@@ -74,6 +75,97 @@ const LawyerViewPost: React.FC = () => {
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Create authenticated API client wrapper
+  const authenticatedApiClient = useMemo(() => {
+    const getAuthHeaders = async () => {
+      try {
+        if (session?.access_token) {
+          return { 'Authorization': `Bearer ${session.access_token}` };
+        }
+        const token = await AsyncStorage.getItem('access_token');
+        if (token) {
+          return { 'Authorization': `Bearer ${token}` };
+        }
+        return {};
+      } catch (error) {
+        console.error('Error getting auth token:', error);
+        return {};
+      }
+    };
+
+    return {
+      async getForumPostById(postId: string) {
+        const headers = await getAuthHeaders();
+        const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+        
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json', ...headers } as HeadersInit,
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            return { success: true, data };
+          } else {
+            console.error(`Failed to get post: ${response.status}`);
+            return { success: false, error: `HTTP ${response.status}` };
+          }
+        } catch (error) {
+          console.error('Error getting post:', error);
+          return { success: false, error: String(error) };
+        }
+      },
+
+      async getForumReplies(postId: string) {
+        const headers = await getAuthHeaders();
+        const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+        
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json', ...headers } as HeadersInit,
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            return { success: true, data };
+          } else {
+            console.error(`Failed to get replies: ${response.status}`);
+            return { success: false, error: `HTTP ${response.status}` };
+          }
+        } catch (error) {
+          console.error('Error getting replies:', error);
+          return { success: false, error: String(error) };
+        }
+      },
+
+      async createForumReply(postId: string, replyData: { body: string; is_anonymous: boolean }) {
+        const headers = await getAuthHeaders();
+        const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+        
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...headers } as HeadersInit,
+            body: JSON.stringify(replyData),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            return { success: true, data };
+          } else {
+            console.error(`Failed to create reply: ${response.status}`);
+            return { success: false, error: `HTTP ${response.status}` };
+          }
+        } catch (error) {
+          console.error('Error creating reply:', error);
+          return { success: false, error: String(error) };
+        }
+      }
+    };
+  }, [session]);
 
   // Reset states when postId changes
   useEffect(() => {
@@ -130,7 +222,7 @@ const LawyerViewPost: React.FC = () => {
       if (currentUser?.id && postId) {
         setIsBookmarkLoading(true);
         
-        const result = await BookmarkService.isBookmarked(String(postId), currentUser.id);
+        const result = await BookmarkService.isBookmarked(String(postId), currentUser.id, session);
         if (result.success) {
           setBookmarked(result.isBookmarked);
         }
@@ -153,7 +245,7 @@ const LawyerViewPost: React.FC = () => {
     console.log('Attempting to toggle bookmark for:', { postId: String(postId), userId: currentUser.id });
     setIsBookmarkLoading(true);
     try {
-      const result = await BookmarkService.toggleBookmark(String(postId), currentUser.id);
+      const result = await BookmarkService.toggleBookmark(String(postId), currentUser.id, session);
       console.log('Bookmark toggle result:', result);
       if (result.success) {
         setBookmarked(result.isBookmarked);
@@ -185,7 +277,8 @@ const LawyerViewPost: React.FC = () => {
       const existingReport = await ReportService.hasUserReported(
         String(postId), 
         'post', 
-        currentUser.id
+        currentUser.id,
+        session
       );
 
       if (existingReport.success && existingReport.hasReported) {
@@ -197,7 +290,8 @@ const LawyerViewPost: React.FC = () => {
         'post',
         reason,
         currentUser.id,
-        reasonContext
+        reasonContext,
+        session
       );
 
       if (!result.success) {
@@ -213,7 +307,7 @@ const LawyerViewPost: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       if (!postId) return;
-      const res = await apiClient.getForumPostById(String(postId));
+      const res = await authenticatedApiClient.getForumPostById(String(postId));
       if (res.success && (res.data as any)?.data) {
         const row = (res.data as any).data;
         const isAnon = !!row.is_anonymous;
@@ -232,7 +326,7 @@ const LawyerViewPost: React.FC = () => {
           user: isAnon ? undefined : {
             name: userData?.full_name || userData?.username || 'User',
             username: userData?.username || 'user',
-            avatar: `https://images.unsplash.com/photo-${Math.random() > 0.5 ? '1472099645785-5658abf4ff4e' : '1507003211169-0a1dd7228f2d'}?w=150&h=150&fit=crop&crop=face`,
+            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
             isLawyer: userData?.role === 'verified_lawyer',
             lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
           },
@@ -243,7 +337,7 @@ const LawyerViewPost: React.FC = () => {
       } else {
         setPost(null);
       }
-      const rep = await apiClient.getForumReplies(String(postId));
+      const rep = await authenticatedApiClient.getForumReplies(String(postId));
       if (rep.success && Array.isArray((rep.data as any)?.data)) {
         const rows = (rep.data as any).data as any[];
         const mappedReplies: Reply[] = rows.map((r: any) => {
@@ -261,7 +355,7 @@ const LawyerViewPost: React.FC = () => {
             user: isReplyAnon ? undefined : {
               name: replyUserData?.full_name || replyUserData?.username || 'User',
               username: replyUserData?.username || 'user',
-              avatar: `https://images.unsplash.com/photo-${Math.random() > 0.5 ? '1472099645785-5658abf4ff4e' : '1507003211169-0a1dd7228f2d'}?w=150&h=150&fit=crop&crop=face`,
+              avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
               isLawyer: replyUserData?.role === 'verified_lawyer',
               lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
             },
@@ -278,7 +372,9 @@ const LawyerViewPost: React.FC = () => {
 
   // Derived data
   const isAnonymous = post?.is_anonymous || false;
-  const displayUser = isAnonymous ? { name: 'Anonymous User', avatar: '', isLawyer: false } : (post?.user || { name: 'User', avatar: '', isLawyer: false });
+  const displayUser = isAnonymous 
+    ? { name: 'Anonymous User', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png', isLawyer: false } // Detective icon for anonymous users
+    : (post?.user || { name: 'User', avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', isLawyer: false }); // Gray default for regular users
   const displayTimestamp = formatTimestamp(post?.created_at || null);
   const displayContent = post?.body || '';
 
@@ -310,7 +406,7 @@ const LawyerViewPost: React.FC = () => {
       user: {
         name: currentUser?.full_name || 'You',
         username: currentUser?.username || 'you',
-        avatar: (currentUser as any)?.avatar || '',
+        avatar: (currentUser as any)?.avatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
         isLawyer: true,
         lawyerBadge: 'Verified'
       },
@@ -364,7 +460,7 @@ const LawyerViewPost: React.FC = () => {
                     user: isReplyAnon ? undefined : {
                       name: replyUserData?.full_name || replyUserData?.username || 'User',
                       username: replyUserData?.username || 'user',
-                      avatar: `https://images.unsplash.com/photo-${Math.random() > 0.5 ? '1472099645785-5658abf4ff4e' : '1507003211169-0a1dd7228f2d'}?w=150&h=150&fit=crop&crop=face`,
+                      avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
                       isLawyer: replyUserData?.role === 'verified_lawyer',
                       lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
                     },
@@ -411,7 +507,7 @@ const LawyerViewPost: React.FC = () => {
           user: isReplyAnon ? undefined : {
             name: replyUserData?.full_name || replyUserData?.username || 'User',
             username: replyUserData?.username || 'user',
-            avatar: `https://images.unsplash.com/photo-${Math.random() > 0.5 ? '1472099645785-5658abf4ff4e' : '1507003211169-0a1dd7228f2d'}?w=150&h=150&fit=crop&crop=face`,
+            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
             isLawyer: replyUserData?.role === 'verified_lawyer',
             lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
           },
@@ -433,7 +529,7 @@ const LawyerViewPost: React.FC = () => {
     
     try {
       setIsReplying(true);
-      const resp = await apiClient.createForumReply(String(postId), { body: text, is_anonymous: false });
+      const resp = await authenticatedApiClient.createForumReply(String(postId), { body: text, is_anonymous: false });
       if (resp.success) {
         // Confirm the optimistic reply (animate to full opacity)
         confirmOptimisticReply(optimisticId);
@@ -691,7 +787,7 @@ const LawyerViewPost: React.FC = () => {
               <View key={reply.id} style={tw`mb-4 pb-4 border-b border-gray-100`}>
                 <View style={tw`flex-row items-start`}>
                   <Image 
-                    source={{ uri: reply.user?.avatar || '' }} 
+                    source={{ uri: reply.user?.avatar || (reply.is_anonymous ? 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png' : 'https://cdn-icons-png.flaticon.com/512/847/847969.png') }} 
                     style={tw`w-10 h-10 rounded-full mr-3`}
                   />
                   <View style={tw`flex-1`}>

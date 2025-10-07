@@ -3,13 +3,29 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
 export class ReportService {
-  private static async getAuthHeaders(): Promise<HeadersInit> {
+  private static async getAuthHeaders(session?: any): Promise<HeadersInit> {
     try {
+      // First try to get token from AuthContext session if provided
+      if (session?.access_token) {
+        console.log(`[ReportService] Using session token from AuthContext`);
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        };
+      }
+      
+      // Fallback to AsyncStorage
       const token = await AsyncStorage.getItem('access_token');
-      return {
-        'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` })
-      };
+      if (token) {
+        console.log(`[ReportService] Using token from AsyncStorage`);
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        };
+      }
+      
+      console.warn(`[ReportService] No authentication token found`);
+      return { 'Content-Type': 'application/json' };
     } catch (error) {
       console.error('Error getting auth token:', error);
       return { 'Content-Type': 'application/json' };
@@ -23,12 +39,13 @@ export class ReportService {
     targetType: 'post' | 'comment',
     reason: string,
     reporterId: string,
-    reasonContext?: string
+    reasonContext?: string,
+    session?: any
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
       console.log('Submitting report:', { targetId, targetType, reason, reporterId });
       
-      const headers = await this.getAuthHeaders();
+      const headers = await this.getAuthHeaders(session);
       const response = await fetch(`${API_BASE_URL}/api/forum/reports`, {
         method: 'POST',
         headers,
@@ -61,12 +78,13 @@ export class ReportService {
   static async hasUserReported(
     targetId: string,
     targetType: 'post' | 'comment',
-    reporterId: string
+    reporterId: string,
+    session?: any
   ): Promise<{ success: boolean; hasReported: boolean; error?: string }> {
     try {
       console.log('Checking if user has reported:', { targetId, targetType, reporterId });
       
-      const headers = await this.getAuthHeaders();
+      const headers = await this.getAuthHeaders(session);
       const response = await fetch(`${API_BASE_URL}/api/forum/reports/check/${targetId}/${targetType}`, {
         method: 'GET',
         headers,

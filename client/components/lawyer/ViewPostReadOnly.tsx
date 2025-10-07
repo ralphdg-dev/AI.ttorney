@@ -11,6 +11,7 @@ import apiClient from '@/lib/api-client';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
 import SkeletonLoader from '../ui/SkeletonLoader';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Reply {
   id: string;
@@ -58,7 +59,7 @@ interface PostData {
 const ViewPostReadOnly: React.FC = () => {
   const router = useRouter();
   const { postId } = useLocalSearchParams();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, session, isAuthenticated } = useAuth();
   const [showFullContent, setShowFullContent] = useState(false);
   const [post, setPost] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,6 +70,36 @@ const ViewPostReadOnly: React.FC = () => {
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Helper function to get auth headers using AuthContext
+  const getAuthHeaders = async (): Promise<HeadersInit> => {
+    try {
+      // First try to get token from AuthContext session
+      if (session?.access_token) {
+        console.log(`[ViewPost] Using session token from AuthContext`);
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        };
+      }
+      
+      // Fallback to AsyncStorage
+      const token = await AsyncStorage.getItem('access_token');
+      if (token) {
+        console.log(`[ViewPost] Using token from AsyncStorage`);
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        };
+      }
+      
+      console.log(`[ViewPost] No authentication token available`);
+      return { 'Content-Type': 'application/json' };
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return { 'Content-Type': 'application/json' };
+    }
+  };
 
   // Reset states when postId changes
   useEffect(() => {
@@ -121,7 +152,7 @@ const ViewPostReadOnly: React.FC = () => {
       if (currentUser?.id && postId) {
         setIsBookmarkLoading(true);
         
-        const result = await BookmarkService.isBookmarked(String(postId), currentUser.id);
+        const result = await BookmarkService.isBookmarked(String(postId), currentUser.id, session);
         if (result.success) {
           setBookmarked(result.isBookmarked);
         }
@@ -144,7 +175,7 @@ const ViewPostReadOnly: React.FC = () => {
     console.log('Attempting to toggle bookmark for:', { postId: String(postId), userId: currentUser.id });
     setIsBookmarkLoading(true);
     try {
-      const result = await BookmarkService.toggleBookmark(String(postId), currentUser.id);
+      const result = await BookmarkService.toggleBookmark(String(postId), currentUser.id, session);
       console.log('Bookmark toggle result:', result);
       if (result.success) {
         setBookmarked(result.isBookmarked);
@@ -176,7 +207,8 @@ const ViewPostReadOnly: React.FC = () => {
       const existingReport = await ReportService.hasUserReported(
         String(postId), 
         'post', 
-        currentUser.id
+        currentUser.id,
+        session
       );
 
       if (existingReport.success && existingReport.hasReported) {
@@ -188,7 +220,8 @@ const ViewPostReadOnly: React.FC = () => {
         'post',
         reason,
         currentUser.id,
-        reasonContext
+        reasonContext,
+        session
       );
 
       if (!result.success) {
@@ -204,6 +237,14 @@ const ViewPostReadOnly: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       if (!postId) return;
+      
+      // Check authentication first
+      if (!isAuthenticated) {
+        console.error(`[ViewPost] User is not authenticated - cannot load post`);
+        setLoading(false);
+        return;
+      }
+      
       setLoading(true);
       
       // Fallback: Hide loading after 5 seconds maximum
@@ -212,54 +253,100 @@ const ViewPostReadOnly: React.FC = () => {
         setLoading(false);
       }, 5000);
       
-      const res = await apiClient.getForumPostById(String(postId));
-      console.log('ViewPostReadOnly API response:', res); // Debug log
-      
-      // Handle both nested and direct data structures
-      let row = null;
-      if (res.success && res.data) {
-        row = (res.data as any)?.data || res.data; // Try nested first, then direct
-      }
-      
-      if (row) {
-        const isAnon = !!row.is_anonymous;
-        const userData = row?.users || {};
+      try {
+        // Use direct API call with authentication
+        const headers = await getAuthHeaders();
+        const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
         
-        const mapped: PostData = {
-          id: String(row.id),
-          title: undefined,
-          body: row.body,
-          domain: (row.category as any) || 'others',
-          created_at: row.created_at || null,
-          updated_at: row.updated_at || null,
-          user_id: row.user_id || null,
-          is_anonymous: isAnon,
-          is_flagged: !!row.is_flagged,
-          user: isAnon ? undefined : {
-            name: userData?.full_name || userData?.username || 'User',
-            username: userData?.username || 'user',
-            avatar: `https://images.unsplash.com/photo-${Math.random() > 0.5 ? '1472099645785-5658abf4ff4e' : '1507003211169-0a1dd7228f2d'}?w=150&h=150&fit=crop&crop=face`,
-            isLawyer: userData?.role === 'verified_lawyer',
-            lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
-          },
-          comments: 0,
-          replies: [],
-        };
-        setPost(mapped);
-      } else {
+        console.log(`[ViewPost] Loading post ${postId} from ${API_BASE_URL}/api/forum/posts/${postId}`);
+        const response = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
+          method: 'GET',
+          headers,
+        });
+        
+        if (!response.ok) {
+          console.error(`[ViewPost] Failed to load post: ${response.status}`);
+          const errorText = await response.text();
+          console.error(`[ViewPost] Error response:`, errorText);
+          setPost(null);
+          setLoading(false);
+          clearTimeout(fallbackTimer);
+          return;
+        }
+        
+        const res = await response.json();
+        console.log('ViewPostReadOnly API response:', res); // Debug log
+        
+        // Handle both nested and direct data structures
+        let row = null;
+        if (res.success && res.data) {
+          row = (res.data as any)?.data || res.data; // Try nested first, then direct
+        } else if (res.data) {
+          row = res.data; // Direct data structure
+        }
+        
+        if (row) {
+          const isAnon = !!row.is_anonymous;
+          const userData = row?.users || {};
+          
+          const mapped: PostData = {
+            id: String(row.id),
+            title: undefined,
+            body: row.body,
+            domain: (row.category as any) || 'others',
+            created_at: row.created_at || null,
+            updated_at: row.updated_at || null,
+            user_id: row.user_id || null,
+            is_anonymous: isAnon,
+            is_flagged: !!row.is_flagged,
+            user: isAnon ? undefined : {
+              name: userData?.full_name || userData?.username || 'User',
+              username: userData?.username || 'user',
+              avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
+              isLawyer: userData?.role === 'verified_lawyer',
+              lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+            },
+            comments: 0,
+            replies: [],
+          };
+          setPost(mapped);
+        } else {
+          setPost(null);
+        }
+      } catch (error) {
+        console.error(`[ViewPost] Error loading post:`, error);
         setPost(null);
+      } finally {
+        setLoading(false);
+        clearTimeout(fallbackTimer);
       }
-      setLoading(false);
-      clearTimeout(fallbackTimer);
     };
     load();
-  }, [postId]);
+  }, [postId, isAuthenticated]);
 
   useEffect(() => {
     const loadReplies = async () => {
-      if (!postId) return;
-      const rep = await apiClient.getForumReplies(String(postId));
-      console.log('ViewPostReadOnly replies response:', rep); // Debug log
+      if (!postId || !isAuthenticated) return;
+      
+      try {
+        // Use direct API call with authentication
+        const headers = await getAuthHeaders();
+        const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+        
+        console.log(`[ViewPost] Loading replies for post ${postId}`);
+        const response = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
+          method: 'GET',
+          headers,
+        });
+        
+        if (!response.ok) {
+          console.error(`[ViewPost] Failed to load replies: ${response.status}`);
+          setReplies([]);
+          return;
+        }
+        
+        const rep = await response.json();
+        console.log('ViewPostReadOnly replies response:', rep); // Debug log
       
       // Handle both nested and direct data structures
       let rows = null;
@@ -283,7 +370,7 @@ const ViewPostReadOnly: React.FC = () => {
             user: isReplyAnon ? undefined : {
               name: replyUserData?.full_name || replyUserData?.username || 'User',
               username: replyUserData?.username || 'user',
-              avatar: `https://images.unsplash.com/photo-${Math.random() > 0.5 ? '1472099645785-5658abf4ff4e' : '1507003211169-0a1dd7228f2d'}?w=150&h=150&fit=crop&crop=face`,
+              avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
               isLawyer: replyUserData?.role === 'verified_lawyer',
               lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
             },
@@ -293,12 +380,18 @@ const ViewPostReadOnly: React.FC = () => {
       } else {
         setReplies([]);
       }
+      } catch (error) {
+        console.error(`[ViewPost] Error loading replies:`, error);
+        setReplies([]);
+      }
     };
     loadReplies();
-  }, [postId]);
+  }, [postId, isAuthenticated]);
 
   const isAnonymous = post?.is_anonymous || false;
-  const displayUser = isAnonymous ? { name: 'Anonymous User', avatar: '', isLawyer: false } : (post?.user || { name: 'User', avatar: '', isLawyer: false });
+  const displayUser = isAnonymous 
+    ? { name: 'Anonymous User', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png', isLawyer: false } // Detective icon for anonymous users
+    : (post?.user || { name: 'User', avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', isLawyer: false }); // Gray default for regular users
   const displayTimestamp = formatTimestamp(post?.created_at || null);
   const displayContent = post?.body || '';
   const repliesToShow = replies;
@@ -537,7 +630,7 @@ const ViewPostReadOnly: React.FC = () => {
               <View key={reply.id} style={tw`mb-4 pb-4 border-b border-gray-100`}>
                 <View style={tw`flex-row items-start`}>
                   <Image 
-                    source={{ uri: reply.user?.avatar || '' }} 
+                    source={{ uri: reply.user?.avatar || (reply.is_anonymous ? 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png' : 'https://cdn-icons-png.flaticon.com/512/847/847969.png') }} 
                     style={tw`w-10 h-10 rounded-full mr-3`}
                   />
                   <View style={tw`flex-1`}>
