@@ -152,11 +152,11 @@ export default function DirectoryScreen() {
 
     const dayArray = days.split(",");
     const abbreviationMap: { [key: string]: string } = {
-      Monday: "M",
-      Tuesday: "T",
-      Wednesday: "W",
-      Thursday: "Th",
-      Friday: "F",
+      Monday: "Mon",
+      Tuesday: "Tue",
+      Wednesday: "Wed",
+      Thursday: "Thurs",
+      Friday: "Fri",
       Saturday: "Sat",
       Sunday: "Sun",
     };

@@ -7,7 +7,6 @@ export class BookmarkService {
     try {
       // First try to get token from AuthContext session if provided
       if (session?.access_token) {
-        console.log(`[BookmarkService] Using session token from AuthContext`);
         return {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
@@ -17,17 +16,16 @@ export class BookmarkService {
       // Fallback to AsyncStorage
       const token = await AsyncStorage.getItem('access_token');
       if (token) {
-        console.log(`[BookmarkService] Using token from AsyncStorage`);
         return {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         };
       }
       
-      console.warn(`[BookmarkService] No authentication token found`);
+      if (__DEV__) console.warn('BookmarkService: No authentication token found');
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      if (__DEV__) console.error('BookmarkService auth error:', error);
       return { 'Content-Type': 'application/json' };
     }
   }
@@ -36,8 +34,6 @@ export class BookmarkService {
    */
   static async addBookmark(postId: string, userId: string, session?: any): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      console.log('Adding bookmark with data:', { post_id: postId, user_id: userId });
-      
       const headers = await this.getAuthHeaders(session);
       const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks`, {
         method: 'POST',
@@ -48,14 +44,14 @@ export class BookmarkService {
       const result = await response.json();
       
       if (response.ok && result.success) {
-        console.log('Bookmark added successfully:', result.data);
+        if (__DEV__) console.log('Bookmark added:', postId);
         return { success: true, data: result.data };
       } else {
-        console.error('API error adding bookmark:', result.error || result.detail);
+        if (__DEV__) console.error('Add bookmark error:', result.error || result.detail);
         return { success: false, error: result.error || result.detail || 'Failed to add bookmark' };
       }
     } catch (error) {
-      console.error('Exception adding bookmark:', error);
+      if (__DEV__) console.error('Add bookmark exception:', error);
       return { success: false, error: 'Failed to add bookmark' };
     }
   }
@@ -65,8 +61,6 @@ export class BookmarkService {
    */
   static async removeBookmark(postId: string, userId: string, session?: any): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('Removing bookmark for:', { postId, userId });
-      
       const headers = await this.getAuthHeaders(session);
       const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks/${postId}`, {
         method: 'DELETE',
@@ -74,15 +68,15 @@ export class BookmarkService {
       });
       
       if (response.ok) {
-        console.log('Bookmark removed successfully');
+        if (__DEV__) console.log('Bookmark removed:', postId);
         return { success: true };
       } else {
         const result = await response.json();
-        console.error('API error removing bookmark:', result.detail);
+        if (__DEV__) console.error('Remove bookmark error:', result.detail);
         return { success: false, error: result.detail || 'Failed to remove bookmark' };
       }
     } catch (error) {
-      console.error('Error removing bookmark:', error);
+      if (__DEV__) console.error('Remove bookmark exception:', error);
       return { success: false, error: 'Failed to remove bookmark' };
     }
   }
@@ -90,9 +84,20 @@ export class BookmarkService {
   /**
    * Check if a post is bookmarked by a user
    */
+  // Cache for bookmark status to prevent excessive API calls
+  private static bookmarkCache = new Map<string, { isBookmarked: boolean; timestamp: number }>();
+  private static readonly CACHE_DURATION = 30000; // 30 seconds
+  
   static async isBookmarked(postId: string, userId: string, session?: any): Promise<{ success: boolean; isBookmarked: boolean; error?: string }> {
     try {
-      console.log('Checking bookmark status for:', { postId, userId });
+      // Check cache first
+      const cacheKey = `${userId}-${postId}`;
+      const cached = this.bookmarkCache.get(cacheKey);
+      const now = Date.now();
+      
+      if (cached && (now - cached.timestamp) < this.CACHE_DURATION) {
+        return { success: true, isBookmarked: cached.isBookmarked };
+      }
       
       const headers = await this.getAuthHeaders(session);
       const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks/check/${postId}`, {
@@ -103,15 +108,18 @@ export class BookmarkService {
       if (response.ok) {
         const result = await response.json();
         const isBookmarked = !!result.data?.bookmarked;
-        console.log('Bookmark check result:', { isBookmarked, data: result.data });
+        
+        // Cache the result
+        this.bookmarkCache.set(cacheKey, { isBookmarked, timestamp: now });
+        
         return { success: true, isBookmarked };
       } else {
         const result = await response.json();
-        console.error('API error checking bookmark:', result.detail);
+        if (__DEV__) console.error('Bookmark check error:', result.detail);
         return { success: false, isBookmarked: false, error: result.detail || 'Failed to check bookmark' };
       }
     } catch (error) {
-      console.error('Error checking bookmark:', error);
+      if (__DEV__) console.error('Bookmark check exception:', error);
       return { success: false, isBookmarked: false, error: 'Failed to check bookmark status' };
     }
   }
@@ -146,8 +154,6 @@ export class BookmarkService {
    */
   static async toggleBookmark(postId: string, userId: string, session?: any): Promise<{ success: boolean; isBookmarked: boolean; error?: string }> {
     try {
-      console.log('Starting toggle bookmark for:', { postId, userId });
-      
       const headers = await this.getAuthHeaders(session);
       const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks/toggle`, {
         method: 'POST',
@@ -158,16 +164,32 @@ export class BookmarkService {
       if (response.ok) {
         const result = await response.json();
         const isBookmarked = !!result.data?.bookmarked;
-        console.log('Toggle result:', { isBookmarked, data: result.data });
+        
+        // Update cache
+        const cacheKey = `${userId}-${postId}`;
+        this.bookmarkCache.set(cacheKey, { isBookmarked, timestamp: Date.now() });
+        
+        if (__DEV__) console.log('Bookmark toggled:', { postId, isBookmarked });
         return { success: true, isBookmarked };
       } else {
         const result = await response.json();
-        console.error('API error toggling bookmark:', result.detail);
+        if (__DEV__) console.error('Toggle bookmark error:', result.detail);
         return { success: false, isBookmarked: false, error: result.detail || 'Failed to toggle bookmark' };
       }
     } catch (error) {
-      console.error('Error toggling bookmark:', error);
+      if (__DEV__) console.error('Toggle bookmark exception:', error);
       return { success: false, isBookmarked: false, error: 'Failed to toggle bookmark' };
     }
+  }
+  
+  // Method to clear cache when needed
+  static clearCache(): void {
+    this.bookmarkCache.clear();
+  }
+  
+  // Method to invalidate specific cache entry
+  static invalidateCache(postId: string, userId: string): void {
+    const cacheKey = `${userId}-${postId}`;
+    this.bookmarkCache.delete(cacheKey);
   }
 }

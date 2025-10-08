@@ -3,8 +3,25 @@ from auth.models import UserSignUp, UserSignIn, UserResponse
 from typing import Optional, Dict, Any
 import logging
 import hashlib
+import time
 
 logger = logging.getLogger(__name__)
+
+# Authentication cache to prevent repetitive user lookups
+_auth_cache = {}  # token_hash -> (user_data, timestamp)
+AUTH_CACHE_DURATION = 30  # 30 seconds cache for auth data
+
+def clear_auth_cache(access_token: str = None):
+    """Clear authentication cache for a specific token or all tokens"""
+    global _auth_cache
+    if access_token:
+        token_hash = hashlib.sha256(access_token.encode()).hexdigest()[:16]
+        if token_hash in _auth_cache:
+            del _auth_cache[token_hash]
+            logger.debug(f"Auth cache cleared for token {token_hash}")
+    else:
+        _auth_cache.clear()
+        logger.debug("All auth cache cleared")
 
 class AuthService:
     def __init__(self):
@@ -153,6 +170,8 @@ class AuthService:
         """Sign out user"""
         try:
             response = await self.supabase.sign_out(access_token)
+            # Clear auth cache for this token
+            clear_auth_cache(access_token)
             return response
         except Exception as e:
             logger.error(f"Sign out error: {str(e)}")
@@ -160,8 +179,22 @@ class AuthService:
     
     @staticmethod
     async def get_user(access_token: str) -> Optional[Dict[str, Any]]:
-        """Get current user from token"""
+        """Get current user from token with caching"""
         try:
+            # Create cache key from token hash
+            token_hash = hashlib.sha256(access_token.encode()).hexdigest()[:16]
+            current_time = time.time()
+            
+            # Check cache first
+            if token_hash in _auth_cache:
+                user_data, timestamp = _auth_cache[token_hash]
+                age = current_time - timestamp
+                if age < AUTH_CACHE_DURATION:
+                    if __debug__:
+                        logger.info(f"🔐 USING CACHED AUTH for user {user_data.get('user', {}).get('id', 'unknown')[:8]}... (age: {age:.1f}s)")
+                    return user_data
+            
+            # Fetch from Supabase
             supabase_service = SupabaseService()
             user_response = await supabase_service.get_user(access_token)
             
@@ -173,10 +206,17 @@ class AuthService:
             # Get profile from public.users table
             profile_response = await supabase_service.get_user_profile(user["id"])
             
-            return {
+            user_data = {
                 "user": user,
                 "profile": profile_response["data"] if profile_response["success"] else None
             }
+            
+            # Cache the result
+            _auth_cache[token_hash] = (user_data, current_time)
+            if __debug__:
+                logger.info(f"🔐 CACHED AUTH for user {user.get('id', 'unknown')[:8]}... (30s duration)")
+            
+            return user_data
             
         except Exception as e:
             logger.error(f"Get user error: {str(e)}")
