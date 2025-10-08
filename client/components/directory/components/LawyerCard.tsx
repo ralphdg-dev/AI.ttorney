@@ -117,17 +117,23 @@ export default function LawyerCard({
 
   return (
     <Box
-      className="mx-6 mb-3 bg-white rounded-xl border border-gray-100 overflow-hidden"
-      style={{ elevation: 1.5 }}
+      className="mx-2 mb-3 bg-white rounded-lg border border-gray-200 overflow-hidden"
+      style={{ 
+        elevation: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      }}
     >
       {/* Header Section */}
-      <Box className="p-3 pb-2">
-        <HStack className="justify-between items-start mb-2">
+      <Box className="p-4 pb-3">
+        <HStack className="justify-between items-start mb-3">
           {/* Left Section - Name & Specialization */}
           <VStack className="flex-1 pr-2">
             {/* Lawyer Name */}
             <Text
-              className="font-bold text-base mb-0.5"
+              className="font-semibold text-base mb-0.5"
               style={{ color: Colors.text.head }}
             >
               Atty. {lawyer.name}
@@ -136,10 +142,10 @@ export default function LawyerCard({
             {/* Specialization */}
             <Pressable onPress={handleSpecializationPress}>
               <HStack className="items-center flex-wrap">
-                <Box className="bg-blue-50 px-2.5 py-0.5 rounded-full mr-1 mb-1">
+                <Box className="bg-gray-100 px-2 py-0.5 rounded-full mr-1 mb-1">
                   <Text
-                    className="text-[11px] font-medium"
-                    style={{ color: Colors.primary.blue }}
+                    className="text-xs font-medium"
+                    style={{ color: Colors.text.head }}
                   >
                     {primarySpecialization}
                   </Text>
@@ -151,7 +157,7 @@ export default function LawyerCard({
                     className="bg-gray-100 px-2 py-0.5 rounded-full mb-1"
                   >
                     <Text
-                      className="text-[11px] font-medium"
+                      className="text-xs font-medium"
                       style={{ color: Colors.text.sub }}
                     >
                       +{additionalCount} more
@@ -165,22 +171,25 @@ export default function LawyerCard({
           {/* Right Section - Location Badge */}
           <VStack className="items-end">
             <Box
-              className="px-2.5 py-1 mt-[3px] rounded-full flex-row items-center mb-1"
+              className="px-2 py-1 rounded-full flex-row items-center"
               style={{
-                backgroundColor: "#F3F4F6", // light gray background
+                backgroundColor: "#F9FAFB",
+                borderWidth: 1,
+                borderColor: "#E5E7EB"
               }}
             >
               <Ionicons
                 name="location-outline"
-                size={11}
-                color="#6B7280" // gray-500
-                style={{ marginRight: 4 }}
+                size={10}
+                color="#6B7280"
+                style={{ marginRight: 3 }}
               />
               <Text
-                className="text-[10px] font-semibold"
+                className="text-xs font-medium"
                 style={{
-                  color: "#6B7280", // gray text
+                  color: "#6B7280",
                 }}
+                ellipsizeMode="tail"
                 numberOfLines={1}
               >
                 {lawyer.location}
@@ -191,21 +200,21 @@ export default function LawyerCard({
 
         {/* All Specializations Dropdown */}
         {showAllSpecialization && (
-          <Box className=" p-2.5 mb-3 bg-gray-50 rounded-lg border border-gray-100">
+          <Box className="p-3 mb-3 bg-white rounded-lg border border-gray-200" style={{ elevation: 0.5 }}>
             <Text
-              className="text-xs font-semibold mb-1.5"
+              className="text-sm font-semibold mb-2"
               style={{ color: Colors.text.head }}
             >
               All Specializations
             </Text>
-            <VStack className="gap-0.5">
+            <VStack className="gap-1">
               {lawyer.specialization.map((spec, index) => (
                 <HStack key={index} className="items-center">
                   <Box
-                    className="w-1 h-1 rounded-full mr-1.5"
-                    style={{ backgroundColor: Colors.primary.blue }}
+                    className="w-1.5 h-1.5 rounded-full mr-2"
+                    style={{ backgroundColor: "#9CA3AF" }}
                   />
-                  <Text className="text-xs" style={{ color: Colors.text.sub }}>
+                  <Text className="text-sm font-medium" style={{ color: Colors.text.head }}>
                     {spec}
                   </Text>
                 </HStack>
@@ -216,18 +225,18 @@ export default function LawyerCard({
       </Box>
 
       {/* Divider */}
-      <Box className="h-px bg-gray-100 -mt-2" />
+      <Box className="h-px bg-gray-100 mx-3" />
 
       {/* Schedule Section */}
-      <Box className="p-3 pt-2.5">
+      <Box className="p-4 pt-2">
         {/* Available Days */}
         {hasAvailableDays && (
-          <VStack className="mb-2">
+          <VStack className="mb-3">
             <HStack className="items-center mb-1">
               <Ionicons
                 name="calendar-outline"
-                size={15}
-                color={Colors.primary.blue}
+                size={14}
+                color="#6B7280"
               />
               <Text
                 className="text-xs ml-1.5 font-medium"
@@ -240,10 +249,10 @@ export default function LawyerCard({
               {lawyer.days.match(/[A-Z][a-z]+/g)?.map((day, index) => (
                 <Box
                   key={index}
-                  className="bg-white px-2 py-0.5 rounded border border-gray-200"
+                  className="bg-gray-50 px-2 py-0.5 rounded border border-gray-200"
                 >
                   <Text
-                    className="text-[11px] font-medium"
+                    className="text-xs font-medium"
                     style={{ color: Colors.text.head }}
                   >
                     {day}
@@ -256,56 +265,57 @@ export default function LawyerCard({
 
         {/* Today's Available Times */}
         {hasTimesToday ? (
-          <Box className="bg-blue-50 rounded-lg p-2.5 mb-3">
+          <VStack className="mb-3">
             <HStack className="items-center mb-1">
               <Ionicons
                 name="time-outline"
-                size={15}
-                color={Colors.primary.blue}
+                size={14}
+                color="#374151"
               />
               <Text
                 className="text-xs ml-1.5 font-semibold"
-                style={{ color: Colors.primary.blue }}
+                style={{ color: Colors.text.head }}
               >
-                Available Time Today
+                Available Today
               </Text>
             </HStack>
             <HStack className="flex-wrap gap-1.5">
               {todayTimes.slice(0, 4).map((time, index) => (
                 <Box
                   key={index}
-                  className="bg-white px-2.5 py-0.5 rounded border border-blue-200"
+                  className="bg-white px-2 py-0.5 rounded border border-gray-300"
+                  style={{ elevation: 0.5 }}
                 >
                   <Text
-                    className="text-[11px] font-medium"
-                    style={{ color: Colors.primary.blue }}
+                    className="text-xs font-semibold"
+                    style={{ color: Colors.text.head }}
                   >
                     {time}
                   </Text>
                 </Box>
-              ))}
+                ))}
               {todayTimes.length > 4 && (
-                <Box className="bg-white px-2.5 py-0.5 rounded border border-blue-200">
+                <Box className="bg-white px-2 py-0.5 rounded border border-gray-300" style={{ elevation: 0.5 }}>
                   <Text
-                    className="text-[11px] font-medium"
-                    style={{ color: Colors.primary.blue }}
+                    className="text-xs font-semibold"
+                    style={{ color: Colors.text.head }}
                   >
                     +{todayTimes.length - 4} more
                   </Text>
                 </Box>
               )}
             </HStack>
-          </Box>
+          </VStack>
         ) : (
-          <Box className="bg-gray-50 rounded-lg p-2.5 mb-3">
+          <VStack className="mb-3">
             <HStack className="items-center">
               <Ionicons
                 name="information-circle-outline"
-                size={14}
+                size={12}
                 color={Colors.text.sub}
               />
               <Text
-                className="text-[11px] ml-1"
+                className="text-xs ml-1 font-medium"
                 style={{ color: Colors.text.sub }}
               >
                 {hasAvailableHours
@@ -313,37 +323,29 @@ export default function LawyerCard({
                   : "Check booking for available schedule"}
               </Text>
             </HStack>
-          </Box>
+          </VStack>
         )}
 
         {/* Book Button */}
         <Pressable
           className="py-2.5 rounded-lg items-center justify-center"
           style={{
-            backgroundColor: isBookable ? Colors.primary.blue : "#F3F4F6",
-            elevation: isBookable ? 2 : 0,
+            backgroundColor: isBookable ? Colors.primary.blue : "#F9FAFB",
+            borderWidth: isBookable ? 0 : 1,
+            borderColor: isBookable ? "transparent" : "#D1D5DB",
+            elevation: isBookable ? 1 : 0,
           }}
           onPress={handleBookPress}
           disabled={!isBookable || checkingRequest}
         >
-          <HStack className="items-center">
-            {!checkingRequest && isBookable && (
-              <Ionicons
-                name="calendar"
-                size={16}
-                color="white"
-                style={{ marginRight: 4 }}
-              />
-            )}
-            <Text
-              className="font-semibold text-sm"
-              style={{
-                color: isBookable ? "white" : "#9CA3AF",
-              }}
-            >
-              {buttonText}
-            </Text>
-          </HStack>
+          <Text
+            className="font-semibold text-sm"
+            style={{
+              color: isBookable ? "white" : "#6B7280",
+            }}
+          >
+            {buttonText}
+          </Text>
         </Pressable>
       </Box>
     </Box>
