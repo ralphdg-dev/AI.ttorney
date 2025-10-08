@@ -88,7 +88,8 @@ export default function LawyerCard({
     lawyer.hours_available && lawyer.hours_available.length > 0;
 
   return (
-    <Box className="mx-2 mb-3 bg-white rounded-lg border border-gray-200 p-4">
+    <Box className="mx-2 mb-3 bg-white rounded-lg border border-gray-200">
+      <VStack space="sm" className="p-4">
       <HStack className="justify-between items-start mb-2">
         <VStack className="flex-1">
           <Text
@@ -197,6 +198,7 @@ export default function LawyerCard({
           {buttonText}
         </Text>
       </Pressable>
+      </VStack>
     </Box>
   );
 }

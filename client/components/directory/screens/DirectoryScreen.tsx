@@ -3,13 +3,11 @@ import {
   View,
   ScrollView,
   Alert,
-  Text,
   RefreshControl,
-  Modal,
-  Pressable,
-  Dimensions,
   Animated,
   Easing,
+  TextInput,
+  Pressable,
 } from "react-native";
 import { LawyerListSkeleton } from "../components/LawyerListSkeleton";
 
@@ -28,6 +26,7 @@ import LawyerCard from "../components/LawyerCard";
 import Navbar from "../../Navbar";
 import { SidebarProvider, SidebarWrapper } from "../../AppSidebar";
 import { Ionicons } from "@expo/vector-icons";
+import { Spinner } from "@/components/ui/spinner";
 import Colors from "../../../constants/Colors";
 import { useAuth } from "../../../contexts/AuthContext";
 
@@ -35,13 +34,13 @@ interface Lawyer {
   id: string;
   lawyer_id: string;
   name: string;
-  specialization: string;
+  specialization: string | string[];
   location: string;
   hours: string;
   bio: string;
   days: string;
   available: boolean;
-  hours_available: string;
+  hours_available: string | string[];
   created_at: string;
 }
 
@@ -57,7 +56,6 @@ export default function DirectoryScreen() {
   const [lawyersData, setLawyersData] = useState<Lawyer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [lastUpdated, setLastUpdated] = useState<number>(0);
   const router = useRouter();
   const [filterVisible, setFilterVisible] = useState(false);
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
@@ -65,7 +63,6 @@ export default function DirectoryScreen() {
     useState<string>("All");
   const { user, isAuthenticated } = useAuth();
 
-  const { height: screenHeight } = Dimensions.get("window");
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(300));
 
@@ -101,7 +98,7 @@ export default function DirectoryScreen() {
         }),
       ]).start();
     }
-  }, [filterVisible]);
+  }, [filterVisible, fadeAnim, slideAnim]);
 
   const fetchLawyers = useCallback(async (forceRefresh: boolean = false) => {
     try {
@@ -114,7 +111,6 @@ export default function DirectoryScreen() {
         now - frontendCache.timestamp < frontendCache.ttl
       ) {
         setLawyersData(frontendCache.lawyers);
-        setLastUpdated(frontendCache.timestamp);
         setLoading(false);
         return;
       }
@@ -129,7 +125,6 @@ export default function DirectoryScreen() {
       if (result.success) {
         const lawyers = result.data || [];
         setLawyersData(lawyers);
-        setLastUpdated(now);
 
         frontendCache.lawyers = lawyers;
         frontendCache.timestamp = now;
@@ -180,11 +175,15 @@ export default function DirectoryScreen() {
     return lawyersData.map((lawyer) => ({
       ...lawyer,
       displayDays: getDayAbbreviations(lawyer.days),
-      specialization: lawyer.specialization
-        ? lawyer.specialization.split(",").map((s) => s.trim())
+      specialization: Array.isArray(lawyer.specialization)
+        ? lawyer.specialization
+        : typeof lawyer.specialization === 'string' && lawyer.specialization
+        ? lawyer.specialization.split(",").map((s: string) => s.trim())
         : [],
-      hours_available: lawyer.hours_available
-        ? lawyer.hours_available.split(";").map((h) => h.trim())
+      hours_available: Array.isArray(lawyer.hours_available)
+        ? lawyer.hours_available
+        : typeof lawyer.hours_available === 'string' && lawyer.hours_available
+        ? lawyer.hours_available.split(";").map((h: string) => h.trim())
         : [],
     }));
   }, [lawyersData, getDayAbbreviations]);
@@ -216,7 +215,7 @@ export default function DirectoryScreen() {
 
     if (selectedSpecialization !== "All") {
       filtered = filtered.filter((lawyer) => {
-        const specs = lawyer.specialization.map((s) => s.toLowerCase());
+        const specs = lawyer.specialization.map((s: string) => s.toLowerCase());
         const validSpecs = [
           "family law",
           "labor law",
@@ -226,7 +225,7 @@ export default function DirectoryScreen() {
         ];
 
         if (selectedSpecialization === "Others Law") {
-          return specs.some((s) => !validSpecs.includes(s));
+          return specs.some((s: string) => !validSpecs.includes(s));
         }
 
         return specs.includes(selectedSpecialization.toLowerCase());
@@ -277,54 +276,113 @@ export default function DirectoryScreen() {
           // Law Firms Tab - Google Law Firms Finder
           <GoogleLawFirmsFinder searchQuery={searchQuery} />
         ) : (
-          // Lawyers Tab - Original Content
+          // Lawyers Tab - Using SearchHeader for consistency
           <>
-            {/* Search and Filter Section */}
-            <HStack className="items-center px-6 mb-4">
-              <Box className="flex-1 mr-2">
-                <Box className="relative">
-                  <View
-                    style={[
-                      tw`flex-row items-center bg-white border border-gray-200 rounded-lg px-4 py-3`,
-                    ]}
+            {/* Search Header - Consistent with Law Firms */}
+            <Box className="bg-white border-b border-gray-200" style={{ zIndex: 100 }}>
+              <VStack space="md" className="px-4 py-4 bg-white" style={{ zIndex: 1000 }}>
+                <HStack space="sm" className="items-center">
+                  <Box className="flex-1 relative" style={{ zIndex: 1000 }}>
+                    <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ 
+                      minHeight: 48,
+                      maxHeight: 48,
+                      height: 48
+                    }}>
+                      <HStack style={{ 
+                        height: 48, 
+                        alignItems: 'center', 
+                        paddingLeft: 20,
+                        paddingRight: 16
+                      }}>
+                        <Ionicons name="search" size={20} color="#9CA3AF" style={{ marginRight: 14 }} />
+                        
+                        <TextInput
+                          className="flex-1 text-base"
+                          placeholder="Search lawyers..."
+                          placeholderTextColor="#9CA3AF"
+                          value={searchQuery}
+                          onChangeText={setSearchQuery}
+                          returnKeyType="search"
+                          editable={!loading}
+                          style={{ 
+                            color: Colors.text.head,
+                            height: 48,
+                            fontSize: 16,
+                            lineHeight: 20,
+                            textAlignVertical: 'center',
+                            includeFontPadding: false
+                          }}
+                          autoCorrect={false}
+                          autoCapitalize="words"
+                          blurOnSubmit={false}
+                          maxLength={100}
+                          multiline={false}
+                          numberOfLines={1}
+                        />
+                        
+                        {/* Fixed-width container for right icons */}
+                        <Box style={{ 
+                          width: 24, 
+                          height: 48, 
+                          justifyContent: 'center', 
+                          alignItems: 'center', 
+                          flexShrink: 0 
+                        }}>
+                          {searchQuery.length > 0 && !loading && (
+                            <Pressable 
+                              onPress={() => setSearchQuery('')}
+                              style={{ 
+                                width: 24, 
+                                height: 24, 
+                                justifyContent: 'center', 
+                                alignItems: 'center',
+                                borderRadius: 12
+                              }}
+                            >
+                              <Ionicons name="close" size={18} color="#6B7280" />
+                            </Pressable>
+                          )}
+                          {loading && (
+                            <Box style={{ 
+                              width: 18, 
+                              height: 18, 
+                              justifyContent: 'center', 
+                              alignItems: 'center' 
+                            }}>
+                              <Spinner size="small" color={Colors.primary.blue} />
+                            </Box>
+                          )}
+                        </Box>
+                      </HStack>
+                    </Box>
+                  </Box>
+                  
+                  {/* Filter Button - Right of Search Bar */}
+                  <UIPressable
+                    onPress={() => setFilterVisible(true)}
+                    className="bg-white border border-gray-300 px-3 py-2 rounded-lg relative active:bg-gray-50"
+                    style={{ height: 48, justifyContent: 'center' }}
                   >
-                    <Ionicons name="search" size={20} color="#9CA3AF" />
-                    <input
-                      placeholder="Search lawyers..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{
-                        flex: 1,
-                        marginLeft: 12,
-                        fontSize: 14,
-                        color: Colors.text.head,
-                        border: "none",
-                        outline: "none",
-                        backgroundColor: "transparent",
-                      }}
-                    />
-                  </View>
-                </Box>
-              </Box>
-
-              {/* Filter Button */}
-              <UIPressable
-                onPress={() => setFilterVisible(true)}
-                className="bg-white border border-gray-200 p-3 rounded-lg relative"
-              >
-                <Ionicons
-                  name="filter-outline"
-                  size={20}
-                  color={Colors.primary.blue}
-                />
-                {hasActiveFilters && (
-                  <Box
-                    className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
-                    style={{ backgroundColor: Colors.primary.blue }}
-                  />
-                )}
-              </UIPressable>
-            </HStack>
+                    <HStack space="xs" className="items-center">
+                      <Ionicons
+                        name="filter-outline"
+                        size={16}
+                        color={Colors.primary.blue}
+                      />
+                      <UIText className="text-sm font-medium" style={{ color: Colors.text.head }}>
+                        Filter
+                      </UIText>
+                    </HStack>
+                    {hasActiveFilters && (
+                      <Box
+                        className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
+                        style={{ backgroundColor: Colors.primary.blue }}
+                      />
+                    )}
+                  </UIPressable>
+                </HStack>
+              </VStack>
+            </Box>
 
             <FilterModal
               visible={filterVisible}
@@ -336,9 +394,9 @@ export default function DirectoryScreen() {
             />
 
             <ScrollView
-              style={tw`flex-1`}
+              style={tw`flex-1 bg-gray-50`}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 60 }}
+              contentContainerStyle={{ paddingBottom: 60, paddingHorizontal: 8, paddingTop: 12 }}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
