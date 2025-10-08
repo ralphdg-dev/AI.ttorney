@@ -29,6 +29,9 @@ const Navbar: React.FC<NavbarProps> = ({
   const getActiveTab = () => {
     if (activeTab) return activeTab;
     
+    // Check consultations first to prevent other routes from matching
+    if (pathname.includes('/consultations')) return null; // Don't highlight any tab for consultations
+    
     if (pathname.includes('/home') || pathname === '/') return 'home';
     if (pathname.includes('/glossary') || pathname.includes('/guides')) return 'learn';
     if (pathname.includes('/chatbot')) return 'ask';

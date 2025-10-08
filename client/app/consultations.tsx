@@ -219,7 +219,7 @@ export default function ConsultationsScreen() {
           setSelectedStatus={setActiveFilter}
         />
 
-        <Navbar activeTab="find" />
+        <Navbar />
         <SidebarWrapper />
       </View>
     </SidebarProvider>
