@@ -205,7 +205,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       badge: badgeCounts.favoriteTerms || undefined,
     },
     {
-      id: "favorites",
+      id: "bookmarked-guides",
       label: "Bookmarked Guides",
       icon: Bookmark,
       route: "bookmarked-guides",

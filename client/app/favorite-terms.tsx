@@ -11,6 +11,10 @@ import { Box } from "@/components/ui/box";
 import { Ionicons } from "@expo/vector-icons";
 import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
+import {
+  SidebarProvider,
+  SidebarWrapper,
+} from "@/components/AppSidebar";
 import Colors from "@/constants/Colors";
 import { Star, Search, Heart, BookOpen, Filter, SortAsc } from "lucide-react-native";
 import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
@@ -175,7 +179,8 @@ export default function FavoritesScreen() {
   }
 
   return (
-    <View style={tw`flex-1 bg-gray-100`}>
+    <SidebarProvider>
+      <View style={tw`flex-1 bg-gray-100`}>
       <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
       
       {/* Header */}
@@ -309,7 +314,9 @@ export default function FavoritesScreen() {
       )}
       
       {/* Bottom Navigation */}
-      <Navbar activeTab="learn" />
+      <Navbar />
+      <SidebarWrapper />
     </View>
+    </SidebarProvider>
   );
 }

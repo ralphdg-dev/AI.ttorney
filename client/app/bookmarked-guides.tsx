@@ -11,8 +11,12 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import Navbar from "@/components/Navbar";
-import ArticleCard, { ArticleItem } from "@/components/guides/ArticleCard";
-import { Button, ButtonText } from "@/components/ui/button";
+import {
+  SidebarProvider,
+  SidebarWrapper,
+} from "@/components/AppSidebar";
+import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
+import Button from "@/components/ui/Button";
 import { Filter, SortAsc } from "lucide-react-native";
 
 export default function BookmarkedGuidesScreen() {
@@ -164,15 +168,18 @@ export default function BookmarkedGuidesScreen() {
       <GSText size="sm" className="mb-4 text-center" style={{ color: Colors.text.sub }}>
         Save helpful legal guides to access them quickly here.
       </GSText>
-      <Button onPress={() => router.push('/guides')} style={{ backgroundColor: Colors.primary.blue }}>
-        <ButtonText>Browse Legal Guides</ButtonText>
-      </Button>
+      <Button 
+        title="Browse Legal Guides"
+        onPress={() => router.push('/guides')} 
+        variant="primary"
+      />
     </View>
   );
 
   return (
-    <View style={tw`flex-1 bg-gray-50`}>
-      <Header title="Bookmarked Guides" showMenu={true} />
+    <SidebarProvider>
+      <View style={tw`flex-1 bg-gray-50`}>
+        <Header title="Bookmarked Guides" showMenu={true} />
 
       <Box className="px-6 pt-6 mb-4">
         <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
@@ -229,7 +236,9 @@ export default function BookmarkedGuidesScreen() {
         />
       )}
 
-      <Navbar activeTab="learn" />
+      <Navbar />
+      <SidebarWrapper />
     </View>
+    </SidebarProvider>
   );
 }

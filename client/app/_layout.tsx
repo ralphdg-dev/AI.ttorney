@@ -143,6 +143,34 @@ export default function RootLayout() {
                         title: "User Consultations",
                       }}
                     />
+                    <Stack.Screen
+                      name="bookmarked-guides"
+                      options={{
+                        headerShown: false,
+                        title: "Bookmarked Guides",
+                      }}
+                    />
+                    <Stack.Screen
+                      name="favorite-terms"
+                      options={{
+                        headerShown: false,
+                        title: "Favorite Terms",
+                      }}
+                    />
+                    <Stack.Screen
+                      name="notifications"
+                      options={{
+                        headerShown: false,
+                        title: "Notifications",
+                      }}
+                    />
+                    <Stack.Screen
+                      name="help"
+                      options={{
+                        headerShown: false,
+                        title: "Help",
+                      }}
+                    />
                   </Stack>
                 </SidebarProvider>
               </RouteErrorBoundary>
