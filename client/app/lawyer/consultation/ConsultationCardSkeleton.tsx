@@ -93,7 +93,6 @@ export function ConsultationCardSkeleton() {
       {/* Action buttons */}
       <View style={tw`flex-row gap-2`}>
         <SkeletonBox width="48%" height={48} style={{ borderRadius: 12, marginRight: 12 }} />
-        <SkeletonBox width="48%" height={48} style={{ borderRadius: 12 }} />
       </View>
     </View>
   );
@@ -108,3 +107,5 @@ export function ConsultationListSkeleton({ count = 3 }: { count?: number }) {
     </>
   );
 }
+
+export default ConsultationCardSkeleton;

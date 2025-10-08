@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { View, Text, ScrollView, RefreshControl, Animated } from "react-native";
+import { useFocusEffect } from '@react-navigation/native';
 import tw from "tailwind-react-native-classnames";
 import Header from "../components/Header";
 import Navbar from "../../client/components/Navbar";
@@ -30,13 +31,22 @@ export default function ConsultationsScreen() {
   const [filterModalVisible, setFilterModalVisible] = useState<boolean>(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
   const scaleAnim = useState(new Animated.Value(0.8))[0];
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const fetchConsultations = async () => {
-    if (!user?.id) return;
+    console.log('fetchConsultations called - user:', user?.id, 'auth:', isAuthenticated);
+    if (!user?.id) {
+      console.log('No user ID, skipping fetch');
+      return;
+    }
 
     try {
+      console.log('Setting loading true and fetching...');
       setLoading(true);
+
+      // Check if supabase client has session
+      const session = await supabase.auth.getSession();
+      console.log('Supabase session check:', !!session.data.session);
 
       const { data, error } = await supabase
         .from("consultation_requests")
@@ -65,6 +75,7 @@ export default function ConsultationsScreen() {
         return;
       }
 
+      console.log('Supabase returned data:', data?.length, 'consultations');
       const transformedData: Consultation[] = (data || []).map((item) => ({
         id: item.id,
         lawyer_name: (item.lawyer_info as any)?.name || "Unknown Lawyer",
@@ -79,10 +90,12 @@ export default function ConsultationsScreen() {
         responded_at: item.responded_at,
       }));
 
+      console.log('Setting consultations state with', transformedData.length, 'items');
       setConsultations(transformedData);
     } catch (error) {
       console.error("Error in fetchConsultations:", error);
     } finally {
+      console.log('fetchConsultations completed, setting loading false');
       setLoading(false);
     }
   };
@@ -93,11 +106,36 @@ export default function ConsultationsScreen() {
     setRefreshing(false);
   };
 
+  // Fetch consultations when auth is ready and user is authenticated
   useEffect(() => {
-    if (isAuthenticated && user?.id) {
-      fetchConsultations();
+    console.log('useEffect triggered:', { authLoading, isAuthenticated, userId: user?.id });
+    
+    // Wait for auth to finish loading
+    if (authLoading) {
+      console.log('Auth still loading, waiting...');
+      return;
     }
-  }, [isAuthenticated, user?.id]);
+    
+    // Check if user is authenticated and has ID
+    if (isAuthenticated && user?.id) {
+      console.log('Auth ready, calling fetchConsultations');
+      fetchConsultations();
+    } else {
+      console.log('Not authenticated or no user ID, stopping loading');
+      setLoading(false); // Stop loading if not authenticated
+    }
+  }, [authLoading, isAuthenticated, user?.id]);
+
+  // Also fetch when screen comes into focus (for navigation)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Screen focused, checking if should fetch consultations');
+      if (!authLoading && isAuthenticated && user?.id) {
+        console.log('Screen focused and auth ready, fetching consultations');
+        fetchConsultations();
+      }
+    }, [authLoading, isAuthenticated, user?.id])
+  );
 
   const openDetailsModal = (consultation: Consultation) => {
     setSelectedConsultation(consultation);
@@ -162,7 +200,7 @@ export default function ConsultationsScreen() {
           onSearchChange={setSearchQuery}
           onFilterPress={() => setFilterModalVisible(true)}
           placeholder="Search consultations..."
-          loading={loading}
+          loading={authLoading || loading}
           editable={true}
           maxLength={100}
           hasActiveFilters={activeFilter !== "all"}
@@ -181,7 +219,7 @@ export default function ConsultationsScreen() {
             />
           }
         >
-          {loading ? (
+          {(authLoading || loading) ? (
             <View>
               <ConsultationSkeleton />
               <ConsultationSkeleton />
