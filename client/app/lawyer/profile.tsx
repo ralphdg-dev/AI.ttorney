@@ -17,6 +17,7 @@ import {
   Mail,
   Phone,
   MapPin,
+  Clock,
 } from "lucide-react-native";
 import LawyerNavbar from "../../components/lawyer/LawyerNavbar";
 import Header from "../../components/Header";
@@ -59,6 +60,29 @@ interface LawyerContactInfo {
   hours_available: string;
 }
 
+const DAYS_OF_WEEK = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
+const TIME_OPTIONS: { value: string; label: string }[] = [];
+
+for (let h = 0; h < 24; h++) {
+  for (let m of [0, 30]) {
+    if (h === 24 && m === 30) break;
+    const value = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    const hour12 = h % 12 === 0 ? 12 : h % 12;
+    const ampm = h < 12 ? "AM" : "PM";
+    const label = `${hour12}:${m === 0 ? "00" : "30"} ${ampm}`;
+    TIME_OPTIONS.push({ value, label });
+  }
+}
+
 const LawyerProfilePage: React.FC = () => {
   const { user, signOut, refreshUserData } = useAuth();
   const [profileData, setProfileData] = useState<ProfileData>({
@@ -81,7 +105,7 @@ const LawyerProfilePage: React.FC = () => {
       location: "",
       bio: "",
       specializations: "",
-      days: "", 
+      days: "",
       hours_available: "",
     }
   );
@@ -144,6 +168,95 @@ const LawyerProfilePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showAllSpecializations, setShowAllSpecializations] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Parse availability data for display
+  const parseAvailabilityData = () => {
+    const selectedDays = lawyerContactInfo.days
+      ? lawyerContactInfo.days.split(", ").filter((day) => day.trim() !== "")
+      : [];
+
+    const dayTimeSlots: Record<string, string[]> = {};
+
+    if (lawyerContactInfo.hours_available) {
+      try {
+        const dayEntries = lawyerContactInfo.hours_available.split(";");
+
+        dayEntries.forEach((entry) => {
+          if (entry.trim()) {
+            const parts = entry.split("=");
+            if (parts.length >= 2) {
+              const dayName = parts[0].trim();
+              const timesString = parts.slice(1).join(":").trim();
+              if (DAYS_OF_WEEK.includes(dayName)) {
+                const timeStrings = timesString
+                  .split(",")
+                  .map((time) => time.trim());
+                dayTimeSlots[dayName] = timeStrings;
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.log("Error parsing availability data:", error);
+      }
+    }
+
+    return { selectedDays, dayTimeSlots };
+  };
+
+  const { selectedDays, dayTimeSlots } = parseAvailabilityData();
+
+  const formatTimeLabel = (time: string) => {
+    const timeOption = TIME_OPTIONS.find((option) => {
+      // Handle both 24-hour and 12-hour formats
+      const time24 = convertTo24Hour(time);
+      return option.value === time24;
+    });
+    return timeOption ? timeOption.label : time;
+  };
+
+  const convertTo24Hour = (time12h: string): string => {
+    try {
+      let cleanTime = time12h.trim().toUpperCase();
+
+      if (cleanTime.includes("AM") || cleanTime.includes("PM")) {
+        const timePart = cleanTime.replace(/AM|PM/g, "").trim();
+        const modifier = cleanTime.includes("AM") ? "AM" : "PM";
+
+        if (timePart.includes(":")) {
+          let [hours, minutes] = timePart.split(":");
+          let hoursNum = parseInt(hours, 10);
+
+          if (modifier === "PM" && hoursNum !== 12) {
+            hoursNum += 12;
+          } else if (modifier === "AM" && hoursNum === 12) {
+            hoursNum = 0;
+          }
+
+          return `${hoursNum.toString().padStart(2, "0")}:${minutes.padStart(
+            2,
+            "0"
+          )}`;
+        } else {
+          let hoursNum = parseInt(timePart, 10);
+
+          if (modifier === "PM" && hoursNum !== 12) {
+            hoursNum += 12;
+          } else if (modifier === "AM" && hoursNum === 12) {
+            hoursNum = 0;
+          }
+
+          return `${hoursNum.toString().padStart(2, "0")}:00`;
+        }
+      } else {
+        // Assume it's already in 24-hour format
+        return cleanTime;
+      }
+    } catch (error) {
+      console.error("Error converting time:", error, "Input:", time12h);
+      return time12h;
+    }
+  };
 
   const fetchLawyerContactInfo = useCallback(async () => {
     if (!user?.id) return;
@@ -335,7 +448,7 @@ const LawyerProfilePage: React.FC = () => {
         location: contactInfo.location,
         bio: contactInfo.bio,
         specialization: contactInfo.specializations,
-        days: profileData.days, 
+        days: profileData.days,
         hours_available: profileData.hours_available,
       };
 
@@ -646,6 +759,65 @@ const LawyerProfilePage: React.FC = () => {
               </Text>
             </View>
           </View>
+        </View>
+
+        {/* Consultation Availability */}
+        <View style={tw`bg-white mt-3 p-4`}>
+          <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
+            Consultation Availability
+          </Text>
+
+          {selectedDays.length > 0 ? (
+            <View>
+              <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+                Available Days:
+              </Text>
+              <Text style={tw`text-sm text-gray-600 mb-4`}>
+                {selectedDays.join(", ")}
+              </Text>
+
+              <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+                Time Slots:
+              </Text>
+              {selectedDays.map((day) => (
+                <View key={day} style={tw`mb-3`}>
+                  <Text style={tw`text-sm font-medium text-gray-900 mb-1`}>
+                    {day}:
+                  </Text>
+                  <View style={tw`flex-row flex-wrap`}>
+                    {(dayTimeSlots[day] || []).map((time, index) => (
+                      <View
+                        key={`${day}-${time}-${index}`}
+                        style={tw`flex-row items-center mr-2 mb-1 px-3 py-2 bg-blue-50 rounded-lg`}
+                      >
+                        <Clock size={14} color={Colors.primary.blue} />
+                        <Text
+                          style={[
+                            tw`text-sm ml-2`,
+                            { color: Colors.primary.blue },
+                          ]}
+                        >
+                          {formatTimeLabel(time)}
+                        </Text>
+                      </View>
+                    ))}
+                    {(!dayTimeSlots[day] || dayTimeSlots[day].length === 0) && (
+                      <Text style={tw`text-xs text-gray-500 italic`}>
+                        No times set
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={tw`p-4 bg-gray-50 rounded-lg`}>
+              <Text style={tw`text-sm text-gray-600 text-center`}>
+                No availability set. Click Edit to configure your consultation
+                hours.
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Account Actions */}
