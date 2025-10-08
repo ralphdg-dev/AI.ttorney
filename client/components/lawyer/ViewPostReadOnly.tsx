@@ -7,7 +7,6 @@ import { ReportService } from '../../services/reportService';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 import Header from '../Header';
-import apiClient from '@/lib/api-client';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
 import SkeletonLoader from '../ui/SkeletonLoader';
@@ -64,19 +63,18 @@ const ViewPostReadOnly: React.FC = () => {
   const [post, setPost] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
   const [replies, setReplies] = useState<Reply[]>([]);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [, setCurrentTime] = useState(new Date());
   const [bookmarked, setBookmarked] = useState(false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Helper function to get auth headers using AuthContext
-  const getAuthHeaders = async (): Promise<HeadersInit> => {
+  // Optimized auth headers helper with minimal logging
+  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
     try {
       // First try to get token from AuthContext session
       if (session?.access_token) {
-        console.log(`[ViewPost] Using session token from AuthContext`);
         return {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
@@ -86,20 +84,19 @@ const ViewPostReadOnly: React.FC = () => {
       // Fallback to AsyncStorage
       const token = await AsyncStorage.getItem('access_token');
       if (token) {
-        console.log(`[ViewPost] Using token from AsyncStorage`);
         return {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         };
       }
       
-      console.log(`[ViewPost] No authentication token available`);
+      if (__DEV__) console.warn('ViewPost: No authentication token available');
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      if (__DEV__) console.error('ViewPost auth error:', error);
       return { 'Content-Type': 'application/json' };
     }
-  };
+  }, [session?.access_token]);
 
   // Reset states when postId changes
   useEffect(() => {
@@ -135,7 +132,7 @@ const ViewPostReadOnly: React.FC = () => {
     if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
     
     return new Date(normalized).toLocaleDateString();
-  }, [currentTime]); // Depend on currentTime to trigger re-renders
+  }, []); // Remove unnecessary currentTime dependency
 
   // Real-time timer effect - update more frequently for better responsiveness
   useEffect(() => {
@@ -164,32 +161,30 @@ const ViewPostReadOnly: React.FC = () => {
       }
     };
     checkBookmarkStatus();
-  }, [postId, currentUser?.id]);
+  }, [postId, currentUser?.id, session]);
 
-  const handleBookmarkPress = async () => {
+  const handleBookmarkPress = useCallback(async () => {
     if (!currentUser?.id || !postId) {
-      console.log('Missing user ID or post ID:', { userId: currentUser?.id, postId });
+      if (__DEV__) console.warn('ViewPost: Missing user ID or post ID');
       return;
     }
 
-    console.log('Attempting to toggle bookmark for:', { postId: String(postId), userId: currentUser.id });
     setIsBookmarkLoading(true);
     try {
       const result = await BookmarkService.toggleBookmark(String(postId), currentUser.id, session);
-      console.log('Bookmark toggle result:', result);
       if (result.success) {
         setBookmarked(result.isBookmarked);
         setMenuOpen(false);
-        console.log('Bookmark updated successfully:', result.isBookmarked);
+        if (__DEV__) console.log('Bookmark updated:', result.isBookmarked);
       } else {
-        console.error('Failed to toggle bookmark:', result.error);
+        if (__DEV__) console.error('Failed to toggle bookmark:', result.error);
       }
     } catch (error) {
-      console.error('Error toggling bookmark:', error);
+      if (__DEV__) console.error('Error toggling bookmark:', error);
     } finally {
       setIsBookmarkLoading(false);
     }
-  };
+  }, [currentUser?.id, postId, session]);
 
   const handleReportPress = () => {
     setMenuOpen(false);
@@ -228,19 +223,20 @@ const ViewPostReadOnly: React.FC = () => {
         throw new Error(result.error || 'Failed to submit report');
       }
 
-      console.log('Report submitted successfully');
+      if (__DEV__) console.log('Report submitted successfully');
     } finally {
       setIsReportLoading(false);
     }
   };
 
+  // Optimized post loading with minimal logging
   useEffect(() => {
     const load = async () => {
       if (!postId) return;
       
       // Check authentication first
       if (!isAuthenticated) {
-        console.error(`[ViewPost] User is not authenticated - cannot load post`);
+        if (__DEV__) console.warn('ViewPost: User not authenticated, cannot load post');
         setLoading(false);
         return;
       }
@@ -249,25 +245,35 @@ const ViewPostReadOnly: React.FC = () => {
       
       // Fallback: Hide loading after 5 seconds maximum
       const fallbackTimer = setTimeout(() => {
-        console.log('ViewPostReadOnly - Fallback timer triggered, hiding loading');
+        if (__DEV__) console.log('ViewPost: Fallback timer triggered');
         setLoading(false);
       }, 5000);
       
       try {
-        // Use direct API call with authentication
         const headers = await getAuthHeaders();
         const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
         
-        console.log(`[ViewPost] Loading post ${postId} from ${API_BASE_URL}/api/forum/posts/${postId}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        
         const response = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
           method: 'GET',
           headers,
+          signal: controller.signal,
         });
         
+        clearTimeout(timeoutId);
+        
         if (!response.ok) {
-          console.error(`[ViewPost] Failed to load post: ${response.status}`);
           const errorText = await response.text();
-          console.error(`[ViewPost] Error response:`, errorText);
+          if (response.status === 403) {
+            if (__DEV__) console.error('ViewPost: Authentication failed - 403 Forbidden');
+            setPost(null);
+            setLoading(false);
+            clearTimeout(fallbackTimer);
+            return;
+          }
+          if (__DEV__) console.error(`ViewPost: Failed to load post ${response.status}:`, errorText);
           setPost(null);
           setLoading(false);
           clearTimeout(fallbackTimer);
@@ -275,14 +281,13 @@ const ViewPostReadOnly: React.FC = () => {
         }
         
         const res = await response.json();
-        console.log('ViewPostReadOnly API response:', res); // Debug log
         
         // Handle both nested and direct data structures
         let row = null;
         if (res.success && res.data) {
-          row = (res.data as any)?.data || res.data; // Try nested first, then direct
+          row = (res.data as any)?.data || res.data;
         } else if (res.data) {
-          row = res.data; // Direct data structure
+          row = res.data;
         }
         
         if (row) {
@@ -302,7 +307,7 @@ const ViewPostReadOnly: React.FC = () => {
             user: isAnon ? undefined : {
               name: userData?.full_name || userData?.username || 'User',
               username: userData?.username || 'user',
-              avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
+              avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
               isLawyer: userData?.role === 'verified_lawyer',
               lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
             },
@@ -313,8 +318,12 @@ const ViewPostReadOnly: React.FC = () => {
         } else {
           setPost(null);
         }
-      } catch (error) {
-        console.error(`[ViewPost] Error loading post:`, error);
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          // Silent abort - expected behavior
+          return;
+        }
+        if (__DEV__) console.error('ViewPost: Error loading post:', error);
         setPost(null);
       } finally {
         setLoading(false);
@@ -322,7 +331,7 @@ const ViewPostReadOnly: React.FC = () => {
       }
     };
     load();
-  }, [postId, isAuthenticated]);
+  }, [postId, isAuthenticated, getAuthHeaders]);
 
   useEffect(() => {
     const loadReplies = async () => {
@@ -333,20 +342,24 @@ const ViewPostReadOnly: React.FC = () => {
         const headers = await getAuthHeaders();
         const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
         
-        console.log(`[ViewPost] Loading replies for post ${postId}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
         const response = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
           method: 'GET',
           headers,
+          signal: controller.signal,
         });
         
+        clearTimeout(timeoutId);
+        
         if (!response.ok) {
-          console.error(`[ViewPost] Failed to load replies: ${response.status}`);
+          if (__DEV__) console.error(`ViewPost: Failed to load replies: ${response.status}`);
           setReplies([]);
           return;
         }
         
         const rep = await response.json();
-        console.log('ViewPostReadOnly replies response:', rep); // Debug log
       
       // Handle both nested and direct data structures
       let rows = null;
@@ -380,13 +393,17 @@ const ViewPostReadOnly: React.FC = () => {
       } else {
         setReplies([]);
       }
-      } catch (error) {
-        console.error(`[ViewPost] Error loading replies:`, error);
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          if (__DEV__) console.log('ViewPost: Replies request aborted');
+          return;
+        }
+        if (__DEV__) console.error('ViewPost: Error loading replies:', error);
         setReplies([]);
       }
     };
     loadReplies();
-  }, [postId, isAuthenticated]);
+  }, [postId, isAuthenticated, getAuthHeaders]);
 
   const isAnonymous = post?.is_anonymous || false;
   const displayUser = isAnonymous 

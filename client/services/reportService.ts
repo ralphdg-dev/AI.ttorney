@@ -7,7 +7,6 @@ export class ReportService {
     try {
       // First try to get token from AuthContext session if provided
       if (session?.access_token) {
-        console.log(`[ReportService] Using session token from AuthContext`);
         return {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
@@ -17,34 +16,32 @@ export class ReportService {
       // Fallback to AsyncStorage
       const token = await AsyncStorage.getItem('access_token');
       if (token) {
-        console.log(`[ReportService] Using token from AsyncStorage`);
         return {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         };
       }
       
-      console.warn(`[ReportService] No authentication token found`);
+      if (__DEV__) console.warn('ReportService: No authentication token found');
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      if (__DEV__) console.error('ReportService auth error:', error);
       return { 'Content-Type': 'application/json' };
     }
   }
+
   /**
    * Submit a report for a forum post or comment
    */
   static async submitReport(
     targetId: string,
-    targetType: 'post' | 'comment',
+    targetType: 'post' | 'reply',
     reason: string,
     reporterId: string,
     reasonContext?: string,
     session?: any
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      console.log('Submitting report:', { targetId, targetType, reason, reporterId });
-      
       const headers = await this.getAuthHeaders(session);
       const response = await fetch(`${API_BASE_URL}/api/forum/reports`, {
         method: 'POST',
@@ -52,22 +49,22 @@ export class ReportService {
         body: JSON.stringify({
           target_id: targetId,
           target_type: targetType,
-          reason: reason,
+          reason,
           reason_context: reasonContext
         }),
       });
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Report submitted successfully:', result.data);
+        if (__DEV__) console.log('Report submitted:', targetId);
         return { success: true, data: result.data };
       } else {
         const result = await response.json();
-        console.error('API error submitting report:', result.detail);
+        if (__DEV__) console.error('Submit report error:', result.detail);
         return { success: false, error: result.detail || 'Failed to submit report' };
       }
     } catch (error) {
-      console.error('Exception submitting report:', error);
+      if (__DEV__) console.error('Submit report exception:', error);
       return { success: false, error: 'Failed to submit report' };
     }
   }
@@ -77,13 +74,11 @@ export class ReportService {
    */
   static async hasUserReported(
     targetId: string,
-    targetType: 'post' | 'comment',
+    targetType: 'post' | 'reply',
     reporterId: string,
     session?: any
   ): Promise<{ success: boolean; hasReported: boolean; error?: string }> {
     try {
-      console.log('Checking if user has reported:', { targetId, targetType, reporterId });
-      
       const headers = await this.getAuthHeaders(session);
       const response = await fetch(`${API_BASE_URL}/api/forum/reports/check/${targetId}/${targetType}`, {
         method: 'GET',
@@ -93,21 +88,19 @@ export class ReportService {
       if (response.ok) {
         const result = await response.json();
         const hasReported = !!result.data?.hasReported;
-        console.log('Report check result:', { hasReported, data: result.data });
         return { success: true, hasReported };
       } else {
         const result = await response.json();
-        console.error('API error checking existing report:', result.detail);
+        if (__DEV__) console.error('Check report error:', result.detail);
         return { success: false, hasReported: false, error: result.detail || 'Failed to check report status' };
       }
     } catch (error) {
-      console.error('Error checking existing report:', error);
+      if (__DEV__) console.error('Check report exception:', error);
       return { success: false, hasReported: false, error: 'Failed to check report status' };
     }
   }
 
   /**
-   * Get all reports for a specific target
    */
   static async getReportsForTarget(
     targetId: string,
@@ -125,11 +118,11 @@ export class ReportService {
         return { success: true, data: result.data || [] };
       } else {
         const result = await response.json();
-        console.error('API error getting reports for target:', result.detail);
+        if (__DEV__) console.error('Get reports error:', result.detail);
         return { success: false, error: result.detail || 'Failed to get reports' };
       }
     } catch (error) {
-      console.error('Error getting reports for target:', error);
+      if (__DEV__) console.error('Get reports exception:', error);
       return { success: false, error: 'Failed to get reports' };
     }
   }
@@ -152,11 +145,11 @@ export class ReportService {
         return { success: true, data: result.data || [] };
       } else {
         const result = await response.json();
-        console.error('API error getting reports by user:', result.detail);
+        if (__DEV__) console.error('Get user reports error:', result.detail);
         return { success: false, error: result.detail || 'Failed to get user reports' };
       }
     } catch (error) {
-      console.error('Error getting reports by user:', error);
+      if (__DEV__) console.error('Get user reports exception:', error);
       return { success: false, error: 'Failed to get user reports' };
     }
   }

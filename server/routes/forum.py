@@ -8,10 +8,126 @@ from services.report_service import ReportService
 import httpx
 import logging
 from middleware.auth import require_role
-
+import time
+from typing import Tuple
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/forum", tags=["forum"]) 
+router = APIRouter(prefix="/forum", tags=["forum"])
+
+# BEST APPROACH: Global caching with minimal complexity
+# Global cache for posts (shared across all users)
+_posts_cache = {}
+# User-specific caches with shorter duration to prevent stale user data
+_bookmarks_cache = {}  # user_id -> {post_ids_hash: (bookmarks, timestamp)}
+_replies_cache = {}    # post_ids_hash -> (reply_counts, timestamp)
+CACHE_DURATION = 20  # 20 seconds
+USER_CACHE_DURATION = 15  # 15 seconds for user-specific data cache - balance between freshness and performance
+
+def clear_posts_cache():
+    """Clear all cached posts when new content is added."""
+    _posts_cache.clear()
+    logger.debug("Posts cache cleared")
+
+def clear_user_bookmark_cache(user_id: str):
+    """Clear bookmark cache for a specific user."""
+    if user_id in _bookmarks_cache:
+        del _bookmarks_cache[user_id]
+        logger.debug(f"Bookmark cache cleared for user {user_id[:8]}...")
+
+def clear_reply_counts_cache():
+    """Clear reply counts cache when new replies are added."""
+    _replies_cache.clear()
+    logger.debug("Reply counts cache cleared")
+
+def _get_post_ids_hash(post_ids):
+    """Generate a hash for post IDs to use as cache key."""
+    return hash(tuple(sorted(post_ids)))
+
+async def _get_cached_bookmarks(user_id: str, post_ids: list) -> set:
+    """Get cached bookmarks or fetch from database."""
+    if not post_ids:
+        return set()
+    
+    post_ids_hash = _get_post_ids_hash(post_ids)
+    current_time = time.time()
+    
+    # Check user-specific bookmark cache
+    user_cache = _bookmarks_cache.get(user_id, {})
+    if post_ids_hash in user_cache:
+        bookmarks, timestamp = user_cache[post_ids_hash]
+        age = current_time - timestamp
+        if age < USER_CACHE_DURATION:
+            logger.info(f"📚 USING CACHED BOOKMARKS for user {user_id[:8]}... (age: {age:.1f}s)")
+            return bookmarks
+    
+    # Fetch from database
+    try:
+        supabase = SupabaseService()
+        ids_param = ",".join(post_ids)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{supabase.rest_url}/user_forum_bookmarks?select=post_id&post_id=in.({ids_param})&user_id=eq.{user_id}",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+        
+        if response.status_code == 200:
+            bookmarks_data = response.json() or []
+            user_bookmarks = {str(b.get("post_id")) for b in bookmarks_data}
+            
+            # Cache the result
+            if user_id not in _bookmarks_cache:
+                _bookmarks_cache[user_id] = {}
+            _bookmarks_cache[user_id][post_ids_hash] = (user_bookmarks, current_time)
+            logger.info(f"📚 CACHED BOOKMARKS for user {user_id[:8]}... ({len(user_bookmarks)} bookmarks)")
+            
+            return user_bookmarks
+    except Exception as e:
+        logger.warning(f"Bookmark check failed: {str(e)}")
+    
+    return set()
+
+async def _get_cached_reply_counts(post_ids: list) -> dict:
+    """Get cached reply counts or fetch from database."""
+    if not post_ids:
+        return {}
+    
+    post_ids_hash = _get_post_ids_hash(post_ids)
+    current_time = time.time()
+    
+    # Check reply counts cache
+    if post_ids_hash in _replies_cache:
+        reply_counts, timestamp = _replies_cache[post_ids_hash]
+        age = current_time - timestamp
+        if age < USER_CACHE_DURATION:
+            logger.info(f"💬 USING CACHED REPLY COUNTS (age: {age:.1f}s)")
+            return reply_counts
+    
+    # Fetch from database
+    try:
+        supabase = SupabaseService()
+        ids_param = ",".join(post_ids)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{supabase.rest_url}/forum_replies?select=post_id&post_id=in.({ids_param})",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+        
+        if response.status_code == 200:
+            replies = response.json() or []
+            reply_counts = {}
+            for reply in replies:
+                post_id = str(reply.get("post_id"))
+                reply_counts[post_id] = reply_counts.get(post_id, 0) + 1
+            
+            # Cache the result
+            _replies_cache[post_ids_hash] = (reply_counts, current_time)
+            logger.info(f"💬 CACHED REPLY COUNTS ({len(reply_counts)} posts with replies)")
+            
+            return reply_counts
+    except Exception as e:
+        logger.warning(f"Reply count check failed: {str(e)}")
+    
+    return {} 
 
 
 class CreatePostRequest(BaseModel):
@@ -81,6 +197,9 @@ async def create_post(
         if isinstance(created, list) and created:
             post_id = str(created[0].get("id"))
 
+        # Clear posts cache since we added a new post
+        clear_posts_cache()
+
         return CreatePostResponse(success=True, message="Post created", post_id=post_id)
 
     except HTTPException:
@@ -149,50 +268,67 @@ async def supabase_info():
 
 @router.get("/posts/recent", response_model=ListPostsResponse)
 async def list_recent_posts(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """List recent posts across all users with user information."""
+    """BEST APPROACH: Minimal queries with smart global caching."""
     try:
-        supabase = SupabaseService()
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&order=created_at.desc&limit=20",
-                headers=supabase._get_headers(use_service_key=True)
-            )
+        user_id = current_user["user"]["id"]
+        
+        # Global posts cache (shared across users for base posts)
+        cache_key = "global_posts"
+        current_time = time.time()
+        
+        # Check global posts cache first
+        base_posts = None
+        if cache_key in _posts_cache:
+            cached_posts, cache_time = _posts_cache[cache_key]
+            age = current_time - cache_time
+            logger.info(f"Cache found, age: {age:.1f}s, limit: {CACHE_DURATION}s")
+            if age < CACHE_DURATION:
+                base_posts = cached_posts
+                logger.info("✅ USING CACHED POSTS - No database query needed!")
+            else:
+                logger.info("Cache expired, fetching fresh data")
+        else:
+            logger.info("No cache found, fetching fresh data")
+        
+        # If no cached posts, fetch them
+        if base_posts is None:
+            supabase = SupabaseService()
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                response = await client.get(
+                    f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&order=created_at.desc&limit=20",
+                    headers=supabase._get_headers(use_service_key=True)
+                )
 
-        if response.status_code != 200:
-            details = {}
-            try:
-                details = response.json() if response.content else {}
-            except Exception:
-                details = {"raw": response.text}
-            logger.error(f"List recent posts failed: {response.status_code} - {details}")
-            raise HTTPException(status_code=400, detail="Failed to fetch posts")
+            if response.status_code != 200:
+                logger.error(f"Posts query failed: {response.status_code}")
+                return ListPostsResponse(success=True, data=[])
 
-        posts = response.json() if response.content else []
-
-        # Add reply counts for each post
-        reply_counts: Dict[str, int] = {}
-        try:
-            post_ids = [str(p.get("id")) for p in posts if p.get("id")]
+            base_posts = response.json() if response.content else []
+            
+            # Cache globally (shared across all users)
+            _posts_cache[cache_key] = (base_posts, current_time)
+            logger.info(f"📦 CACHED {len(base_posts)} posts for {CACHE_DURATION}s")
+        
+        # Get user-specific data using cached functions
+        user_bookmarks = set()
+        reply_counts = {}
+        if base_posts:
+            post_ids = [str(p.get("id")) for p in base_posts if p.get("id")]
             if post_ids:
-                ids_param = ",".join(post_ids)
-                async with httpx.AsyncClient() as client:
-                    rep_resp = await client.get(
-                        f"{supabase.rest_url}/forum_replies?select=post_id&post_id=in.({ids_param})",
-                        headers=supabase._get_headers(use_service_key=True)
-                    )
-                if rep_resp.status_code == 200:
-                    replies = rep_resp.json() or []
-                    for r in replies:
-                        pid = str(r.get("post_id"))
-                        reply_counts[pid] = reply_counts.get(pid, 0) + 1
-        except Exception as e:
-            logger.warning(f"Failed to compute reply counts: {str(e)}")
+                # Use cached functions to prevent duplicate API calls
+                user_bookmarks = await _get_cached_bookmarks(user_id, post_ids)
+                reply_counts = await _get_cached_reply_counts(post_ids)
 
-        for p in posts:
-            pid = str(p.get("id"))
-            p["reply_count"] = reply_counts.get(pid, 0)
-
-        return ListPostsResponse(success=True, data=posts)
+        # Combine base posts with user-specific data
+        final_posts = []
+        for post in base_posts:
+            post_copy = post.copy()  # Don't modify cached data
+            pid = str(post_copy.get("id"))
+            post_copy["reply_count"] = reply_counts.get(pid, 0)  # Real reply counts
+            post_copy["is_bookmarked"] = pid in user_bookmarks
+            final_posts.append(post_copy)
+        
+        return ListPostsResponse(success=True, data=final_posts)
     except HTTPException:
         raise
     except Exception as e:
@@ -329,6 +465,11 @@ async def create_reply(
         if isinstance(created, list) and created:
             reply_id = str(created[0].get("id"))
 
+        # Clear posts cache since we added a new reply
+        clear_posts_cache()
+        # Clear reply counts cache to ensure fresh reply counts
+        clear_reply_counts_cache()
+
         return CreateReplyResponse(success=True, message="Reply created", reply_id=reply_id)
     except HTTPException:
         raise
@@ -360,6 +501,8 @@ async def add_bookmark(
         result = await bookmark_service.add_bookmark(request.post_id, user_id)
         
         if result["success"]:
+            # Clear user's bookmark cache to ensure fresh data
+            clear_user_bookmark_cache(user_id)
             return BookmarkResponse(success=True, data=result.get("data"))
         else:
             raise HTTPException(status_code=400, detail=result.get("error", "Failed to add bookmark"))
@@ -383,6 +526,8 @@ async def remove_bookmark(
         result = await bookmark_service.remove_bookmark(post_id, user_id)
         
         if result["success"]:
+            # Clear user's bookmark cache to ensure fresh data
+            clear_user_bookmark_cache(user_id)
             return {"success": True}
         else:
             raise HTTPException(status_code=400, detail=result.get("error", "Failed to remove bookmark"))
@@ -451,6 +596,8 @@ async def toggle_bookmark(
         result = await bookmark_service.toggle_bookmark(request.post_id, user_id)
         
         if result["success"]:
+            # Clear user's bookmark cache to ensure fresh data
+            clear_user_bookmark_cache(user_id)
             return BookmarkResponse(success=True, data=result.get("data"))
         else:
             raise HTTPException(status_code=400, detail=result.get("error", "Failed to toggle bookmark"))

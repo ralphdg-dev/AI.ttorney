@@ -1,16 +1,15 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Animated, ListRenderItem } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Post from './Post';
-import Colors from '../../constants/Colors';
-import apiClient from '@/lib/api-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
 import { useList } from '@/hooks/useOptimizedList';
 import { SkeletonList } from '@/components/ui/SkeletonLoader';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
+import Colors from '../../constants/Colors';
 
 interface PostData {
   id: string;
@@ -23,8 +22,11 @@ interface PostData {
   category: string;
   content: string;
   comments: number;
+  // For optimistic posts
   isOptimistic?: boolean;
   animatedOpacity?: Animated.Value;
+  isLoading?: boolean;
+  isBookmarked?: boolean;
 }
 
 interface TimelineProps {
@@ -33,14 +35,20 @@ interface TimelineProps {
 
 const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
-  const { user, session, isAuthenticated } = useAuth();
+  const { session, isAuthenticated } = useAuth();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [optimisticPosts, setOptimisticPosts] = useState<PostData[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
+  
+  // Refs for optimization
+  const lastFetchTime = useRef<number>(0);
+  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isComponentMounted = useRef(true);
 
-  const formatTimeAgo = (isoDate?: string): string => {
+  const formatTimeAgo = useCallback((isoDate?: string): string => {
     if (!isoDate) return '';
     // Treat timestamps without timezone as UTC to avoid local offset issues
     const hasTz = /Z|[+-]\d{2}:?\d{2}$/.test(isoDate);
@@ -62,9 +70,9 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     if (diffMonth < 12) return `${diffMonth}mo`;
     const diffYear = Math.floor(diffDay / 365);
     return `${diffYear}y`;
-  };
+  }, []);
 
-  const mapApiToPost = (row: any): PostData => {
+  const mapApiToPost = useCallback((row: any): PostData => {
     const isAnon = !!row?.is_anonymous;
     const created = row?.created_at || '';
     const userData = row?.users || {};
@@ -82,15 +90,17 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       category: row?.category || 'Others',
       content: row?.body || '',
       comments: Number(row?.reply_count || 0),
+      isBookmarked: !!row?.is_bookmarked,
     };
-  };
+  }, [formatTimeAgo]);
 
-  // Helper function to get auth headers using AuthContext
-  const getAuthHeaders = async (): Promise<HeadersInit> => {
+  // Remove complex batching - bookmark status now comes from API
+
+  // Optimized auth headers helper with minimal logging
+  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
     try {
       // First try to get token from AuthContext session
       if (session?.access_token) {
-        console.log(`[Timeline] Using session token from AuthContext`);
         return {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
@@ -100,243 +110,247 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       // Fallback to AsyncStorage
       const token = await AsyncStorage.getItem('access_token');
       if (token) {
-        console.log(`[Timeline] Using token from AsyncStorage`);
         return {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         };
       }
       
-      console.log(`[Timeline] No authentication token available`);
+      if (__DEV__) console.warn('Timeline: No authentication token available');
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      if (__DEV__) console.error('Timeline auth error:', error);
       return { 'Content-Type': 'application/json' };
     }
-  };
+  }, [session?.access_token]);
 
-  const loadPosts = useCallback(async () => {
-    console.log(`[Timeline] Loading posts at ${new Date().toISOString()}`);
+  // Optimized loadPosts with smart caching and minimal logging
+  const loadPosts = useCallback(async (force = false) => {
+    // Prevent excessive API calls with smart caching
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime.current;
+    const CACHE_DURATION = 30000; // 30 seconds cache
+    
+    if (!force && timeSinceLastFetch < CACHE_DURATION && posts.length > 0) {
+      if (__DEV__) console.log('Timeline: Using cached posts, skipping fetch');
+      return;
+    }
     
     // Close any open dropdown menus when refreshing
     setOpenMenuPostId(null);
-    
-    // Debug authentication status
-    console.log(`[Timeline] Authentication status:`, {
-      isAuthenticated,
-      hasUser: !!user,
-      hasSession: !!session,
-      hasAccessToken: !!session?.access_token,
-      userId: user?.id,
-      userRole: user?.role
-    });
+    setError(null);
     
     if (!isAuthenticated) {
-      console.error(`[Timeline] User is not authenticated - cannot load posts`);
+      if (__DEV__) console.warn('Timeline: User not authenticated, clearing posts');
       setPosts([]);
       setRefreshing(false);
       return;
     }
     
+    // Prevent concurrent requests
+    if (refreshing && !force) {
+      return;
+    }
+    
     setRefreshing(true);
+    lastFetchTime.current = now;
+    
     try {
+      const headers = await getAuthHeaders();
       const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
       
-      // First, test if server is running at all
-      console.log(`[Timeline] Testing server connectivity to ${API_BASE_URL}...`);
-      try {
-        const healthCheck = await fetch(`${API_BASE_URL}/`, { method: 'GET' });
-        console.log(`[Timeline] Server root status: ${healthCheck.status}`);
-      } catch (e) {
-        console.error(`[Timeline] Server not reachable:`, e);
-        throw new Error('Server is not running or not reachable');
-      }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
       
-      // Debug: Check all available tokens in AsyncStorage
-      console.log(`[Timeline] Checking available authentication tokens...`);
-      try {
-        const allKeys = await AsyncStorage.getAllKeys();
-        console.log(`[Timeline] All AsyncStorage keys:`, allKeys);
-        
-        const accessToken = await AsyncStorage.getItem('access_token');
-        const supabaseToken = await AsyncStorage.getItem('supabase.auth.token');
-        const authKeys = allKeys.filter(key => key.includes('auth') || key.includes('token') || key.includes('session'));
-        
-        console.log(`[Timeline] Auth-related keys:`, authKeys);
-        console.log(`[Timeline] access_token:`, accessToken ? `exists (${accessToken.substring(0, 20)}...)` : 'null');
-        console.log(`[Timeline] supabase.auth.token:`, supabaseToken ? 'exists' : 'null');
-        
-        // Try to get tokens from all auth-related keys
-        for (const key of authKeys) {
-          const value = await AsyncStorage.getItem(key);
-          console.log(`[Timeline] ${key}:`, value ? `exists (${value.substring(0, 30)}...)` : 'null');
-        }
-      } catch (e) {
-        console.error(`[Timeline] Error checking AsyncStorage:`, e);
-      }
+      const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      });
       
-      // Try multiple different approaches to identify the issue
-      console.log(`[Timeline] Testing different request approaches...`);
-      
-      // Approach 1: Simple GET request
-      console.log(`[Timeline] Approach 1: Simple GET request`);
-      let response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`);
-      console.log(`[Timeline] Simple GET status: ${response.status}`);
-      
-      if (!response.ok) {
-        // Approach 2: With basic headers
-        console.log(`[Timeline] Approach 2: With Content-Type header`);
-        response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        console.log(`[Timeline] With headers status: ${response.status}`);
-      }
-      
-      if (!response.ok) {
-        // Approach 3: Test authentication with a simpler endpoint first
-        console.log(`[Timeline] Approach 3: Testing authentication`);
-        const headers = await getAuthHeaders();
-        console.log(`[Timeline] Auth headers:`, headers);
-        
-        // Test auth with user's own posts endpoint first (simpler)
-        console.log(`[Timeline] Testing auth with /api/forum/posts (user's posts)`);
-        const authTestResponse = await fetch(`${API_BASE_URL}/api/forum/posts`, {
-          method: 'GET',
-          headers,
-        });
-        console.log(`[Timeline] Auth test status: ${authTestResponse.status}`);
-        
-        if (authTestResponse.ok) {
-          console.log(`[Timeline] Authentication working! Now trying recent posts...`);
-          response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`, {
-            method: 'GET',
-            headers,
-          });
-          console.log(`[Timeline] Recent posts with auth status: ${response.status}`);
-        } else {
-          console.error(`[Timeline] Authentication failed - status ${authTestResponse.status}`);
-          const authErrorText = await authTestResponse.text();
-          console.error(`[Timeline] Auth error response:`, authErrorText);
-          response = authTestResponse; // Use the auth test response to show the error
-        }
-        
-        if (!response.ok) {
-          // Approach 4: Try different endpoint variations with auth
-          console.log(`[Timeline] Approach 4: Trying endpoint variations with auth`);
-          const endpoints = [
-            '/api/forum/posts',
-            '/api/forum/recent', 
-            '/forum/posts/recent',
-            '/posts/recent'
-          ];
-          
-          for (const endpoint of endpoints) {
-            console.log(`[Timeline] Trying with auth: ${API_BASE_URL}${endpoint}`);
-            const testResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
-              method: 'GET',
-              headers,
-            });
-            console.log(`[Timeline] ${endpoint} with auth status: ${testResponse.status}`);
-            if (testResponse.ok) {
-              response = testResponse;
-              break;
-            }
-          }
-        }
-      }
-      
-      // Log the full response details
-      console.log(`[Timeline] Final response status: ${response.status}`);
-      console.log(`[Timeline] Response headers:`, Object.fromEntries(response.headers.entries()));
-      
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[Timeline] Error response body:`, errorText);
+        if (response.status === 403) {
+          if (__DEV__) console.error('Timeline: Authentication failed - 403 Forbidden. Check if user is properly authenticated.');
+          // Clear posts and show authentication error
+          setPosts([]);
+          setError('Authentication required. Please log in again.');
+          return;
+        }
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
-      // Process successful response
       const data = await response.json();
+      let mapped: PostData[] = [];
+      
       if (Array.isArray(data?.data)) {
-        const rows = data.data as any[];
-        setPosts(rows.map(mapApiToPost));
-        console.log(`[Timeline] Successfully loaded ${rows.length} posts`);
+        mapped = data.data.map(mapApiToPost);
       } else if (Array.isArray(data)) {
-        setPosts((data as any[]).map(mapApiToPost));
-        console.log(`[Timeline] Successfully loaded ${data.length} posts`);
-      } else {
-        setPosts([]);
-        console.log(`[Timeline] No posts found in response`);
+        mapped = data.map(mapApiToPost);
       }
-    } catch (error) {
-      console.error(`[Timeline] Error loading posts:`, error);
-      setPosts([]);
+      
+      // Only update if component is still mounted
+      if (isComponentMounted.current) {
+        setPosts(mapped);
+        if (__DEV__ && mapped.length === 0) {
+          console.log('Timeline: No posts found');
+        }
+        
+        // Clear any error state on successful load
+        setError(null);
+        // Bookmark statuses now come directly from the API response
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        // Silent abort - don't log as it's expected behavior
+        return;
+      }
+      
+      const errorMessage = error.message || 'Failed to load posts';
+      if (__DEV__) console.error('Timeline load error:', errorMessage);
+      
+      if (isComponentMounted.current) {
+        setError(errorMessage);
+        // Don't clear posts on error to maintain user experience
+      }
     } finally {
-      setRefreshing(false);
+      if (isComponentMounted.current) {
+        setRefreshing(false);
+      }
     }
-  }, []);
+  }, [isAuthenticated, getAuthHeaders, posts.length, refreshing, mapApiToPost]);
 
+  // Initial load with proper cleanup - only when component mounts and user is authenticated
   useEffect(() => {
-    loadPosts().then(() => {
+    isComponentMounted.current = true;
+    
+    const initialLoad = async () => {
+      if (isAuthenticated) {
+        await loadPosts(true); // Force initial load only if authenticated
+      }
+      
       // Hide initial loading after first load
-      setTimeout(() => setInitialLoading(false), 300);
-    });
+      if (isComponentMounted.current) {
+        setTimeout(() => {
+          if (isComponentMounted.current) {
+            setInitialLoading(false);
+          }
+        }, 300);
+      }
+    };
+    
+    initialLoad();
     
     // Fallback: Hide loading after 3 seconds maximum
     const fallbackTimer = setTimeout(() => {
-      setInitialLoading(false);
+      if (isComponentMounted.current) {
+        setInitialLoading(false);
+      }
     }, 3000);
     
-    return () => clearTimeout(fallbackTimer);
-  }, []);
+    return () => {
+      isComponentMounted.current = false;
+      clearTimeout(fallbackTimer);
+    };
+  }, [isAuthenticated, loadPosts]);
 
-  // Refresh when screen gains focus
+  // Smart focus-based refresh (only if data is stale and on forum page)
   useFocusEffect(
     useCallback(() => {
-      loadPosts();
-    }, [])
+      // Only load posts when the home page is focused
+      const timeSinceLastFetch = Date.now() - lastFetchTime.current;
+      if (timeSinceLastFetch > 30000) { // Only refresh if data is older than 30s
+        loadPosts();
+      }
+    }, [loadPosts])
   );
 
-  // Reduced polling frequency to prevent 403 errors
+  // Optimized polling with smart intervals (only when component is active)
   useEffect(() => {
-    const id = setInterval(() => {
-      loadPosts();
-    }, 60000); // 60s - even less frequent to avoid rate limiting
-    return () => clearInterval(id);
+    // Clear any existing timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+    
+    const scheduleNextFetch = () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      
+      fetchTimeoutRef.current = setTimeout(() => {
+        if (isComponentMounted.current && isAuthenticated) {
+          // Only poll if the component is still mounted and user is on the page
+          loadPosts();
+          scheduleNextFetch(); // Schedule next fetch
+        }
+      }, 120000); // 2 minutes - much less aggressive
+    };
+    
+    if (isAuthenticated) {
+      scheduleNextFetch();
+    }
+    
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
+      }
+    };
+  }, [isAuthenticated, loadPosts]);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isComponentMounted.current = false;
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
   }, []);
 
-  const handleCommentPress = (postId: string) => {
-    console.log(`Comment pressed for post ${postId}`);
+  // Optimized event handlers with minimal logging
+  const handleCommentPress = useCallback((postId: string) => {
     const route = context === 'lawyer' ? `/lawyer/ViewPost?postId=${postId}` : `/home/ViewPost?postId=${postId}`;
     router.push(route as any);
-  };
+  }, [context, router]);
 
-  const handleBookmarkPress = (postId: string) => {
-    console.log(`Bookmark toggled for post ${postId}`);
+  const handleBookmarkPress = useCallback((postId: string) => {
     // The Post component handles the actual bookmark logic
-  };
+    if (__DEV__) console.log('Bookmark toggled:', postId);
+  }, []);
+  
+  const handleBookmarkStatusChange = useCallback((postId: string, isBookmarked: boolean) => {
+    // Update the post in the posts array directly
+    setPosts(prev => prev.map(post => 
+      post.id === postId ? { ...post, isBookmarked } : post
+    ));
+  }, []);
 
-  const handleReportPress = (postId: string) => {
-    console.log(`Report submitted for post ${postId}`);
+  const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic
-  };
+    if (__DEV__) console.log('Report submitted:', postId);
+  }, []);
 
   const handleMenuToggle = useCallback((postId: string) => {
     setOpenMenuPostId(prev => prev === postId ? null : postId);
   }, []);
 
-  const handlePostPress = (postId: string) => {
-    console.log(`Post pressed for post ${postId}`);
+  const handlePostPress = useCallback((postId: string) => {
     const route = context === 'lawyer' ? `/lawyer/ViewPost?postId=${postId}` : `/home/ViewPost?postId=${postId}`;
     router.push(route as any);
-  };
+  }, [context, router]);
+  
+  // Manual refresh handler
+  const handleRefresh = useCallback(() => {
+    loadPosts(true); // Force refresh
+  }, [loadPosts]);
 
-  const handleCreatePost = () => {
-    console.log('Create post pressed');
+  const handleCreatePost = useCallback(() => {
     const route = context === 'lawyer' ? '/lawyer/CreatePost' : '/home/CreatePost';
     router.push(route as any);
-  };
+  }, [context, router]);
 
   // Function to add optimistic post
   const addOptimisticPost = useCallback((postData: { body: string; category?: string; is_anonymous?: boolean }) => {
@@ -387,7 +401,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       }
       return prev;
     });
-  }, [loadPosts]);
+  }, []);
 
   // Function to remove failed optimistic post
   const removeOptimisticPost = useCallback((optimisticId: string) => {
@@ -428,6 +442,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const renderItem: ListRenderItem<PostData> = useCallback(({ item, index }) => {
     const postComponent = (
       <Post
+        key={item.id}
         id={item.id}
         user={item.user}
         timestamp={item.timestamp}
@@ -439,25 +454,26 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         onReportPress={() => handleReportPress(item.id)}
         onPostPress={() => handlePostPress(item.id)}
         index={index}
+        isLoading={item.isLoading}
         isOptimistic={item.isOptimistic}
         isMenuOpen={openMenuPostId === item.id}
         onMenuToggle={handleMenuToggle}
+        isBookmarked={item.isBookmarked || false}
+        onBookmarkStatusChange={handleBookmarkStatusChange}
       />
     );
 
     // Wrap optimistic posts with animated opacity
     if (item.isOptimistic && item.animatedOpacity) {
       return (
-        <Animated.View
-          style={{ opacity: item.animatedOpacity }}
-        >
+        <Animated.View style={{ opacity: item.animatedOpacity }}>
           {postComponent}
         </Animated.View>
       );
     }
 
     return postComponent;
-  }, [handleCommentPress, handleBookmarkPress, handleReportPress, handlePostPress, handleMenuToggle, openMenuPostId]);
+  }, [handleCommentPress, handleBookmarkPress, handleReportPress, handlePostPress, handleMenuToggle, openMenuPostId, handleBookmarkStatusChange]);
 
   // Combined posts data with duplicate detection for seamless transition
   const allPosts = useMemo(() => {
@@ -489,11 +505,11 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const refreshControl = useMemo(() => (
     <RefreshControl
       refreshing={refreshing}
-      onRefresh={loadPosts}
+      onRefresh={handleRefresh}
       colors={[Colors.primary.blue]}
       tintColor={Colors.primary.blue}
     />
-  ), [refreshing, loadPosts]);
+  ), [refreshing, handleRefresh]);
 
   return (
     <View style={styles.container}>

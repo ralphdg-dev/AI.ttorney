@@ -1,11 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl, Animated } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Post from '../home/Post';
 import Colors from '../../constants/Colors';
 import { Database } from '../../types/database.types';
-import apiClient from '@/lib/api-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
@@ -30,13 +29,18 @@ const LawyerTimeline: React.FC = React.memo(() => {
   const [optimisticPosts, setOptimisticPosts] = useState<ForumPostWithUser[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
+  
+  // Refs for optimization
+  const lastFetchTime = useRef<number>(0);
+  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isComponentMounted = useRef(true);
 
-  // Helper function to get auth headers using AuthContext
-  const getAuthHeaders = async (): Promise<HeadersInit> => {
+  // Optimized auth headers helper with minimal logging
+  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
     try {
       // First try to get token from AuthContext session
       if (session?.access_token) {
-        console.log(`[LawyerTimeline] Using session token from AuthContext`);
         return {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
@@ -46,201 +50,262 @@ const LawyerTimeline: React.FC = React.memo(() => {
       // Fallback to AsyncStorage
       const token = await AsyncStorage.getItem('access_token');
       if (token) {
-        console.log(`[LawyerTimeline] Using token from AsyncStorage`);
         return {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         };
       }
       
-      console.log(`[LawyerTimeline] No authentication token available`);
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      if (__DEV__) console.error('Auth token error:', error);
       return { 'Content-Type': 'application/json' };
     }
-  };
+  }, [session?.access_token]);
 
-  const loadPosts = useCallback(async () => {
-    console.log(`[LawyerTimeline] Loading posts at ${new Date().toISOString()}`);
+  // Optimized loadPosts with smart caching and minimal logging
+  const loadPosts = useCallback(async (force = false) => {
+    // Prevent excessive API calls with smart caching
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime.current;
+    const CACHE_DURATION = 30000; // 30 seconds cache
+    
+    if (!force && timeSinceLastFetch < CACHE_DURATION && posts.length > 0) {
+      if (__DEV__) console.log('Using cached posts, skipping fetch');
+      return;
+    }
     
     // Close any open dropdown menus when refreshing
     setOpenMenuPostId(null);
-    
-    // Debug authentication status
-    console.log(`[LawyerTimeline] Authentication status:`, {
-      isAuthenticated,
-      hasSession: !!session,
-      hasAccessToken: !!session?.access_token,
-    });
+    setError(null);
     
     if (!isAuthenticated) {
-      console.error(`[LawyerTimeline] User is not authenticated - cannot load posts`);
+      if (__DEV__) console.warn('User not authenticated, clearing posts');
       setPosts([]);
       setRefreshing(false);
       return;
     }
     
+    // Prevent concurrent requests
+    if (refreshing && !force) {
+      return;
+    }
+    
     setRefreshing(true);
+    lastFetchTime.current = now;
+    
     try {
-      // Try direct API call with authentication first
       const headers = await getAuthHeaders();
       const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
       
-      console.log(`[LawyerTimeline] Making authenticated request to ${API_BASE_URL}/api/forum/posts/recent`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      
       const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`, {
         method: 'GET',
         headers,
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[LawyerTimeline] Failed to load posts: ${response.status}`, errorText);
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const data = await response.json();
+      
+      // Helper function to map post data
+      const mapPostData = (r: any): ForumPostWithUser => {
+        const isAnon = !!r.is_anonymous;
+        const userData = r?.users || {};
+        
+        return {
+          id: String(r.id),
+          body: r.body,
+          category: r.category as any,
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+          user_id: r.user_id,
+          is_anonymous: r.is_anonymous,
+          is_flagged: r.is_flagged,
+          user: {
+            id: r.user_id,
+            email: '',
+            username: isAnon ? 'anonymous' : (userData?.username || 'user'),
+            full_name: isAnon ? 'Anonymous User' : (userData?.full_name || userData?.username || 'User'),
+            role: (userData?.role as any) || 'registered_user',
+            is_verified: false,
+            archived: null,
+            is_blocked_from_applying: null,
+            last_rejected_at: null,
+            pending_lawyer: null,
+            reject_count: null,
+            strike_count: null,
+            birthdate: null,
+            created_at: null,
+            updated_at: null,
+          },
+          reply_count: Number(r.reply_count || 0),
+        } as ForumPostWithUser;
+      };
+      
+      let mapped: ForumPostWithUser[] = [];
+      
       if (Array.isArray(data?.data)) {
-        const rows = data.data as any[];
-        const mapped: ForumPostWithUser[] = rows.map((r: any) => {
-          const isAnon = !!r.is_anonymous;
-          const userData = r?.users || {};
-          
-          return {
-            id: String(r.id),
-            body: r.body,
-            category: r.category as any,
-            created_at: r.created_at,
-            updated_at: r.updated_at,
-            user_id: r.user_id,
-            is_anonymous: r.is_anonymous,
-            is_flagged: r.is_flagged,
-            user: {
-              id: r.user_id,
-              email: '',
-              username: isAnon ? 'anonymous' : (userData?.username || 'user'),
-              full_name: isAnon ? 'Anonymous User' : (userData?.full_name || userData?.username || 'User'),
-              role: (userData?.role as any) || 'registered_user',
-              is_verified: false,
-              archived: null,
-              is_blocked_from_applying: null,
-              last_rejected_at: null,
-              pending_lawyer: null,
-              reject_count: null,
-              strike_count: null,
-              birthdate: null,
-              created_at: null,
-              updated_at: null,
-            },
-            reply_count: Number(r.reply_count || 0),
-          } as ForumPostWithUser;
-        });
-        setPosts(mapped);
-        console.log(`[LawyerTimeline] Successfully loaded ${mapped.length} posts`);
+        mapped = data.data.map(mapPostData);
       } else if (Array.isArray(data)) {
-        const mapped: ForumPostWithUser[] = (data as any[]).map((r: any) => {
-          const isAnon = !!r.is_anonymous;
-          const userData = r?.users || {};
-          
-          return {
-            id: String(r.id),
-            body: r.body,
-            category: r.category as any,
-            created_at: r.created_at,
-            updated_at: r.updated_at,
-            user_id: r.user_id,
-            is_anonymous: r.is_anonymous,
-            is_flagged: r.is_flagged,
-            user: {
-              id: r.user_id,
-              email: '',
-              username: isAnon ? 'anonymous' : (userData?.username || 'user'),
-              full_name: isAnon ? 'Anonymous User' : (userData?.full_name || userData?.username || 'User'),
-              role: (userData?.role as any) || 'registered_user',
-              is_verified: false,
-              archived: null,
-              is_blocked_from_applying: null,
-              last_rejected_at: null,
-              pending_lawyer: null,
-              reject_count: null,
-              strike_count: null,
-              birthdate: null,
-              created_at: null,
-              updated_at: null,
-            },
-            reply_count: Number(r.reply_count || 0),
-          } as ForumPostWithUser;
-        });
-        setPosts(mapped);
-        console.log(`[LawyerTimeline] Successfully loaded ${mapped.length} posts`);
-      } else {
-        setPosts([]);
-        console.log(`[LawyerTimeline] No posts found in response`);
+        mapped = data.map(mapPostData);
       }
-    } catch (error) {
-      console.error(`[LawyerTimeline] Error loading posts:`, error);
-      setPosts([]);
+      
+      // Only update if component is still mounted
+      if (isComponentMounted.current) {
+        setPosts(mapped);
+        if (__DEV__ && mapped.length === 0) {
+          console.log('No forum posts found');
+        }
+        
+        // Clear any error state on successful load
+        setError(null);
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        if (__DEV__) console.log('Request aborted');
+        return;
+      }
+      
+      const errorMessage = error.message || 'Failed to load posts';
+      if (__DEV__) console.error('Load posts error:', errorMessage);
+      
+      if (isComponentMounted.current) {
+        setError(errorMessage);
+        // Don't clear posts on error to maintain user experience
+      }
     } finally {
-      setRefreshing(false);
+      if (isComponentMounted.current) {
+        setRefreshing(false);
+      }
     }
-  }, [isAuthenticated, session]);
+  }, [isAuthenticated, getAuthHeaders, posts.length, refreshing]);
 
+  // Initial load with proper cleanup
   useEffect(() => {
-    loadPosts().then(() => {
+    isComponentMounted.current = true;
+    
+    const initialLoad = async () => {
+      await loadPosts(true); // Force initial load
+      
       // Hide initial loading after first load
-      setTimeout(() => setInitialLoading(false), 300);
-    });
+      if (isComponentMounted.current) {
+        setTimeout(() => {
+          if (isComponentMounted.current) {
+            setInitialLoading(false);
+          }
+        }, 300);
+      }
+    };
+    
+    initialLoad();
     
     // Fallback: Hide loading after 3 seconds maximum
     const fallbackTimer = setTimeout(() => {
-      setInitialLoading(false);
+      if (isComponentMounted.current) {
+        setInitialLoading(false);
+      }
     }, 3000);
     
-    return () => clearTimeout(fallbackTimer);
+    return () => {
+      isComponentMounted.current = false;
+      clearTimeout(fallbackTimer);
+    };
   }, [isAuthenticated, loadPosts]);
 
+  // Smart focus-based refresh (only if data is stale and on forum page)
   useFocusEffect(
     useCallback(() => {
-      loadPosts();
+      // Only load posts when the forum page is focused
+      const timeSinceLastFetch = Date.now() - lastFetchTime.current;
+      if (timeSinceLastFetch > 30000) { // Only refresh if data is older than 30s
+        loadPosts();
+      }
     }, [loadPosts])
   );
 
-  // Reduced polling frequency to prevent 403 errors
+  // Optimized polling with smart intervals (only when component is active)
   useEffect(() => {
-    const id = setInterval(() => {
-      loadPosts();
-    }, 60000); // 60s - even less frequent to avoid rate limiting
-    return () => clearInterval(id);
-  }, [loadPosts]);
+    // Clear any existing timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+    
+    const scheduleNextFetch = () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      
+      fetchTimeoutRef.current = setTimeout(() => {
+        if (isComponentMounted.current && isAuthenticated) {
+          // Only poll if the component is still mounted and user is on the page
+          loadPosts();
+          scheduleNextFetch(); // Schedule next fetch
+        }
+      }, 120000); // 2 minutes - much less aggressive
+    };
+    
+    if (isAuthenticated) {
+      scheduleNextFetch();
+    }
+    
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
+      }
+    };
+  }, [isAuthenticated, loadPosts]);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isComponentMounted.current = false;
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
+  }, []);
 
-  const handleCommentPress = (postId: string) => {
-    console.log(`Comment pressed for post ${postId}`);
+  // Optimized event handlers with minimal logging
+  const handleCommentPress = useCallback((postId: string) => {
     router.push(`/lawyer/ViewPost?postId=${postId}` as any);
-  };
+  }, [router]);
 
-  const handleBookmarkPress = (postId: string) => {
-    console.log(`Bookmark toggled for post ${postId}`);
+  const handleBookmarkPress = useCallback((postId: string) => {
     // The Post component handles the actual bookmark logic
-  };
+    if (__DEV__) console.log('Bookmark toggled:', postId);
+  }, []);
 
-  const handleReportPress = (postId: string) => {
-    console.log(`Report submitted for post ${postId}`);
+  const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic
-  };
+    if (__DEV__) console.log('Report submitted:', postId);
+  }, []);
 
   const handleMenuToggle = useCallback((postId: string) => {
     setOpenMenuPostId(prev => prev === postId ? null : postId);
   }, []);
 
-  const handlePostPress = (postId: string) => {
-    console.log(`Post pressed for post ${postId}`);
+  const handlePostPress = useCallback((postId: string) => {
     router.push(`/lawyer/ViewPost?postId=${postId}` as any);
-  };
+  }, [router]);
 
-  const handleCreatePost = () => {
-    console.log('Create post pressed');
+  const handleCreatePost = useCallback(() => {
     router.push('/lawyer/CreatePost' as any);
-  };
+  }, [router]);
+  
+  // Manual refresh handler
+  const handleRefresh = useCallback(() => {
+    loadPosts(true); // Force refresh
+  }, [loadPosts]);
 
   // Function to add optimistic post
   const addOptimisticPost = useCallback((postData: { body: string; category?: string }) => {
@@ -304,11 +369,16 @@ const LawyerTimeline: React.FC = React.memo(() => {
         // The post will automatically be filtered out when the real post appears
         // Only remove it after a reasonable time to ensure the real post has loaded
         setTimeout(() => {
-          setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+          if (isComponentMounted.current) {
+            setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+          }
         }, 3000); // Extended delay - duplicate detection prevents visual duplicates
       }
       return prev;
     });
+    
+    // Refresh posts to get the real post
+    loadPosts();
   }, [loadPosts]);
 
   // Function to remove failed optimistic post
@@ -352,7 +422,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
         contentContainerStyle={{ paddingVertical: 10 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={loadPosts} />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
         onScroll={() => setOpenMenuPostId(null)}
         scrollEventThrottle={16}

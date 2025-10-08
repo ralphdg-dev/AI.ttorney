@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
 import ReportModal from '../common/ReportModal';
@@ -6,9 +6,7 @@ import { ReportService } from '../../services/reportService';
 import Colors from '../../constants/Colors';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
-import Card from '../ui/Card';
 import FadeInView from '../ui/FadeInView';
-import LoadingSpinner from '../ui/LoadingSpinner';
 
 interface PostProps {
   id: string;
@@ -31,6 +29,9 @@ interface PostProps {
   // Dropdown state management
   isMenuOpen?: boolean;
   onMenuToggle?: (postId: string) => void;
+  // Bookmark status passed from parent to prevent individual API calls
+  isBookmarked?: boolean;
+  onBookmarkStatusChange?: (postId: string, isBookmarked: boolean) => void;
 }
 
 const Post: React.FC<PostProps> = React.memo(({
@@ -49,36 +50,22 @@ const Post: React.FC<PostProps> = React.memo(({
   isOptimistic = false,
   isMenuOpen = false,
   onMenuToggle,
+  isBookmarked: propIsBookmarked,
+  onBookmarkStatusChange,
 }) => {
   const { user: currentUser, session } = useAuth();
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(propIsBookmarked || false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+  
+  // Update local state when prop changes
+  useEffect(() => {
+    setIsBookmarked(propIsBookmarked || false);
+  }, [propIsBookmarked]);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [isReportLoading, setIsReportLoading] = useState(false);
 
-  // Memoized category styling
-  const categoryStyle = useMemo(() => {
-    const cleanCategory = category.replace(' Related Post', '').replace(' Law', '').toLowerCase();
-    return Colors.category[cleanCategory as keyof typeof Colors.category] || Colors.category.others;
-  }, [category]);
 
-  // Memoized clean category text
-  const cleanCategoryText = useMemo(() => {
-    return category.replace(' Related Post', '').replace(' Law', '').toUpperCase();
-  }, [category]);
-
-  // Check initial bookmark status
-  useEffect(() => {
-    const checkBookmarkStatus = async () => {
-      if (currentUser?.id && id) {
-        const result = await BookmarkService.isBookmarked(id, currentUser.id, session);
-        if (result.success) {
-          setIsBookmarked(result.isBookmarked);
-        }
-      }
-    };
-    checkBookmarkStatus();
-  }, [id, currentUser?.id, session]);
+  // Remove individual bookmark status checks - now handled by parent Timeline component
 
   const handleBookmarkPress = useCallback(async () => {
     if (!currentUser?.id) {
@@ -91,16 +78,17 @@ const Post: React.FC<PostProps> = React.memo(({
       const result = await BookmarkService.toggleBookmark(id, currentUser.id, session);
       if (result.success) {
         setIsBookmarked(result.isBookmarked);
+        onBookmarkStatusChange?.(id, result.isBookmarked);
         onBookmarkPress?.();
       } else {
-        console.error('Failed to toggle bookmark:', result.error);
+        if (__DEV__) console.error('Failed to toggle bookmark:', result.error);
       }
     } catch (error) {
-      console.error('Error toggling bookmark:', error);
+      if (__DEV__) console.error('Error toggling bookmark:', error);
     } finally {
       setIsBookmarkLoading(false);
     }
-  }, [currentUser?.id, id, onBookmarkPress, session]);
+  }, [currentUser?.id, id, onBookmarkPress, onBookmarkStatusChange, session]);
 
   const handleMorePress = useCallback(() => {
     onMenuToggle?.(id);

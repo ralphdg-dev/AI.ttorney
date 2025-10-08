@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, TextInput } from 'react-native';
 import { X, Heart } from 'lucide-react-native';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
@@ -8,109 +8,58 @@ interface ReportModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (reason: string, category: string, reasonContext?: string) => Promise<void>;
-  targetType: 'post' | 'comment';
+  targetType: 'post' | 'reply';
   isLoading?: boolean;
 }
 
 const REPORT_CATEGORIES = [
   { id: 'spam', label: 'Spam' },
-  { id: 'nudity', label: 'Nudity' },
-  { id: 'scam', label: 'Scam' },
-  { id: 'illegal', label: 'Illegal' },
-  { id: 'suicide', label: 'Suicide or self-injury' },
-  { id: 'violence', label: 'Violence' },
-  { id: 'hate_speech', label: 'Hate speech' },
-  { id: 'something_else', label: 'Something else' }
+  { id: 'harassment', label: 'Harassment' },
+  { id: 'hate_speech', label: 'Hate Speech' },
+  { id: 'misinformation', label: 'Misinformation' },
+  { id: 'inappropriate', label: 'Inappropriate Content' },
+  { id: 'other', label: 'Other' },
 ];
 
-export default function ReportModal({ visible, onClose, onSubmit, targetType, isLoading = false }: ReportModalProps) {
+const ReportModal: React.FC<ReportModalProps> = ({
+  visible,
+  onClose,
+  onSubmit,
+  targetType,
+  isLoading = false,
+}) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [customReason, setCustomReason] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [showAlreadyReported, setShowAlreadyReported] = useState(false);
-
-  const handleSubmit = async () => {
-    if (!selectedCategory) {
-      Alert.alert('Error', 'Please select a reason for reporting.');
-      return;
-    }
-
-    const reason = REPORT_CATEGORIES.find(cat => cat.id === selectedCategory)?.label || selectedCategory;
-    const reasonContext = customReason.trim() || undefined;
-
-    setIsSubmitting(true);
-    try {
-      await onSubmit(reason, selectedCategory, reasonContext);
-      setShowSuccess(true);
-    } catch (error) {
-      console.error('Error submitting report:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
-      if (errorMessage.toLowerCase().includes('already reported')) {
-        setShowAlreadyReported(true);
-      } else {
-        Alert.alert('Error', 'Failed to submit report. Please try again.');
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleClose = () => {
     setSelectedCategory('');
     setCustomReason('');
     setIsSubmitting(false);
     setShowSuccess(false);
-    setShowAlreadyReported(false);
     onClose();
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedCategory) return;
+
+    setIsSubmitting(true);
+    try {
+      const selectedCategoryData = REPORT_CATEGORIES.find(cat => cat.id === selectedCategory);
+      await onSubmit(selectedCategoryData?.label || selectedCategory, selectedCategory, customReason);
+      setShowSuccess(true);
+    } catch {
+      // Error handling is done in parent component
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSuccessClose = () => {
     setShowSuccess(false);
     handleClose();
   };
-
-  const handleAlreadyReportedClose = () => {
-    setShowAlreadyReported(false);
-    handleClose();
-  };
-
-  if (showAlreadyReported) {
-    return (
-      <Modal
-        visible={visible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={handleAlreadyReportedClose}
-      >
-        <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center px-4`}>
-          <View style={tw`bg-white rounded-lg w-full max-w-sm p-6 items-center`}>
-            <View style={tw`w-16 h-16 bg-orange-100 rounded-full items-center justify-center mb-4`}>
-              <Heart size={32} color="#EA580C" fill="#EA580C" />
-            </View>
-            <Text style={tw`text-lg font-semibold text-gray-900 mb-2 text-center`}>
-              You already have reported this post
-            </Text>
-            <Text style={tw`text-sm text-gray-600 text-center mb-6 leading-5`}>
-              You have already submitted a report for this content. We appreciate your vigilance in keeping our community safe.
-            </Text>
-            <TouchableOpacity
-              onPress={handleAlreadyReportedClose}
-              style={[
-                tw`w-full py-3 rounded-lg`,
-                { backgroundColor: Colors.primary.blue }
-              ]}
-            >
-              <Text style={tw`text-center font-medium text-white`}>
-                Close this window
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    );
-  }
 
   if (showSuccess) {
     return (
@@ -121,15 +70,17 @@ export default function ReportModal({ visible, onClose, onSubmit, targetType, is
         onRequestClose={handleSuccessClose}
       >
         <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center px-4`}>
-          <View style={tw`bg-white rounded-lg w-full max-w-sm p-6 items-center`}>
-            <View style={tw`w-16 h-16 bg-red-100 rounded-full items-center justify-center mb-4`}>
-              <Heart size={32} color="#B91C1C" fill="#B91C1C" />
+          <View style={tw`bg-white rounded-lg w-full max-w-md p-6`}>
+            <View style={tw`items-center mb-6`}>
+              <View style={tw`w-16 h-16 bg-green-100 rounded-full items-center justify-center mb-4`}>
+                <Heart size={32} color="#10B981" />
+              </View>
             </View>
             <Text style={tw`text-lg font-semibold text-gray-900 mb-2 text-center`}>
               Thank you for submitting a report
             </Text>
             <Text style={tw`text-sm text-gray-600 text-center mb-6 leading-5`}>
-              We take reports seriously and after a thorough review, our support team will get back to you.
+              We cannot reverse this action once it is submitted. After a thorough review, our support team will get back to you.
             </Text>
             <TouchableOpacity
               onPress={handleSuccessClose}
@@ -172,7 +123,7 @@ export default function ReportModal({ visible, onClose, onSubmit, targetType, is
               Why are you reporting this {targetType}?
             </Text>
             <Text style={tw`text-sm text-gray-600 leading-5`}>
-              Your report is anonymous, except if you're reporting an intellectual property infringement. If someone is in immediate danger, call the local emergency services.
+              Your report is anonymous, except if you are reporting an intellectual property infringement. If someone is in immediate danger, call the local emergency services.
             </Text>
           </View>
 
@@ -210,7 +161,7 @@ export default function ReportModal({ visible, onClose, onSubmit, targetType, is
               Help us understand the problem.
             </Text>
             <TextInput
-              style={tw`border border-gray-300 rounded-lg p-3 text-sm bg-gray-50 min-h-20`}
+              style={tw`border border-gray-300 rounded-lg p-3 text-sm bg-gray-50`}
               placeholder="Write a message"
               value={customReason}
               onChangeText={setCustomReason}
@@ -248,4 +199,6 @@ export default function ReportModal({ visible, onClose, onSubmit, targetType, is
       </View>
     </Modal>
   );
-}
+};
+
+export default ReportModal;
