@@ -1,4 +1,3 @@
-// components/LawyerCard.tsx
 import React, { useState, useEffect } from "react";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
@@ -16,7 +15,7 @@ interface Lawyer {
   specialization: string[];
   location: string;
   days: string;
-  available: boolean;
+  available: boolean; // This is now just for display, not for blocking bookings
   hours_available: string[];
 }
 
@@ -67,19 +66,26 @@ export default function LawyerCard({
     if (!hasActiveRequest) {
       onBookConsultation(lawyer);
     } else {
-      // You can show an alert or tooltip here
       alert(
         "You already have an active consultation request. Please wait for it to be completed or rejected before booking another one."
       );
     }
   };
 
-  const isBookable = lawyer.available && !hasActiveRequest && !checkingRequest;
+  const isBookable = !hasActiveRequest && !checkingRequest && lawyer.available;
+
   const buttonText = checkingRequest
     ? "Checking..."
     : hasActiveRequest
     ? "Already Booked"
+    : !lawyer.available
+    ? "Unavailable"
     : "Book Consultation";
+
+  // Helper function to check if lawyer has any available days
+  const hasAvailableDays = lawyer.days && lawyer.days.trim() !== "";
+  const hasAvailableHours =
+    lawyer.hours_available && lawyer.hours_available.length > 0;
 
   return (
     <Box className="mx-6 mb-4 bg-white rounded-lg border border-gray-200 p-4">
@@ -134,74 +140,46 @@ export default function LawyerCard({
           </Text>
         </VStack>
 
+        {/* Remove or modify the availability indicator since it's no longer blocking */}
         <HStack className="items-center">
           <Box
             className="w-2 h-2 rounded-full mr-2"
             style={{
-              backgroundColor: lawyer.available ? "#10B981" : "#9CA3AF",
+              backgroundColor: lawyer.available ? "#10B981" : "#EF4444",
             }}
           />
           <Text
             className="text-xs font-medium"
-            style={{ color: lawyer.available ? "#10B981" : "#9CA3AF" }}
+            style={{
+              color: lawyer.available ? "#10B981" : "#EF4444",
+            }}
           >
             {lawyer.available ? "Available" : "Unavailable"}
           </Text>
         </HStack>
       </HStack>
 
-      {/* Only show if days and hours_available are not empty */}
-      {lawyer.days &&
-        lawyer.days.trim() !== "" &&
-        lawyer.hours_available &&
-        lawyer.hours_available.length > 0 && (
-          <HStack className="items-center mb-4">
-            <HStack className="items-center">
-              <Ionicons
-                name="calendar-outline"
-                size={16}
-                color={Colors.text.sub}
-              />
-              <Text className="text-sm ml-1" style={{ color: Colors.text.sub }}>
-                {lawyer.days}
-              </Text>
-
-              {/* Display only today's available time */}
-              {(() => {
-                const today = new Date();
-                const dayNames = [
-                  "Sunday",
-                  "Monday",
-                  "Tuesday",
-                  "Wednesday",
-                  "Thursday",
-                  "Friday",
-                  "Saturday",
-                ];
-                const currentDay = dayNames[today.getDay()];
-
-                const todayHours = lawyer.hours_available.find((h) =>
-                  h.startsWith(`${currentDay}=`)
-                );
-
-                if (todayHours) {
-                  const time = todayHours.split("=")[1]?.trim();
-                  if (time && time !== "") {
-                    return (
-                      <Text
-                        className="text-sm ml-2"
-                        style={{ color: Colors.primary.blue }}
-                      >
-                        • {time}
-                      </Text>
-                    );
-                  }
-                }
-                return null;
-              })()}
-            </HStack>
+      {/* Show available days and hours information */}
+      {hasAvailableDays && hasAvailableHours ? (
+        <HStack className="items-center mb-4">
+          <HStack className="items-center">
+            <Ionicons
+              name="calendar-outline"
+              size={16}
+              color={Colors.text.sub}
+            />
+            <Text className="text-sm ml-1" style={{ color: Colors.text.sub }}>
+              {lawyer.days}
+            </Text>
           </HStack>
-        )}
+        </HStack>
+      ) : (
+        <HStack className="items-center mb-4">
+          <Text className="text-sm" style={{ color: Colors.text.sub }}>
+            Check booking for available schedule
+          </Text>
+        </HStack>
+      )}
 
       <Pressable
         className="py-3 rounded-lg items-center justify-center"

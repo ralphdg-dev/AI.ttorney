@@ -172,32 +172,9 @@ export default function DirectoryScreen() {
       .join("");
   }, []);
 
-  const isLawyerAvailableToday = useCallback((days: string): boolean => {
-    if (!days) return false;
-
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-
-    const dayNames = [
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-    ];
-
-    const currentDay = dayNames[dayOfWeek];
-    const availableDays = days.split(",").map((day) => day.trim());
-
-    return availableDays.includes(currentDay);
-  }, []);
-
   const lawyers = useMemo(() => {
     return lawyersData.map((lawyer) => ({
       ...lawyer,
-      available: isLawyerAvailableToday(lawyer.days),
       displayDays: getDayAbbreviations(lawyer.days),
       specialization: lawyer.specialization
         ? lawyer.specialization.split(",").map((s) => s.trim())
@@ -206,7 +183,7 @@ export default function DirectoryScreen() {
         ? lawyer.hours_available.split(";").map((h) => h.trim())
         : [],
     }));
-  }, [lawyersData, isLawyerAvailableToday, getDayAbbreviations]);
+  }, [lawyersData, getDayAbbreviations]);
 
   const filteredLawyers = useMemo(() => {
     let filtered = lawyers;
