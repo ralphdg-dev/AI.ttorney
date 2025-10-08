@@ -3,7 +3,11 @@ import {
   View,
   ScrollView,
   Alert,
+  Text,
   RefreshControl,
+  Modal,
+  Pressable,
+  Dimensions,
   Animated,
   Easing,
 } from "react-native";
@@ -11,6 +15,7 @@ import { LawyerListSkeleton } from "../components/LawyerListSkeleton";
 
 import FilterModal from "../components/FilterModal";
 import { useRouter } from "expo-router";
+import GoogleLawFirmsFinder from "../components/GoogleLawFirmsFinder";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Box } from "@/components/ui/box";
@@ -20,7 +25,6 @@ import tw from "tailwind-react-native-classnames";
 import Header from "../../../components/Header";
 import TabNavigation from "../components/TabNavigation";
 import LawyerCard from "../components/LawyerCard";
-import GoogleLawFirmsFinder from "../components/GoogleLawFirmsFinder";
 import Navbar from "../../Navbar";
 import { SidebarProvider, SidebarWrapper } from "../../AppSidebar";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,13 +35,13 @@ interface Lawyer {
   id: string;
   lawyer_id: string;
   name: string;
-  specialization: string | string[];
+  specialization: string;
   location: string;
   hours: string;
   bio: string;
   days: string;
   available: boolean;
-  hours_available: string | string[];
+  hours_available: string;
   created_at: string;
 }
 
@@ -48,7 +52,7 @@ const frontendCache = {
 };
 
 export default function DirectoryScreen() {
-  const [activeTab, setActiveTab] = useState<string>("lawyers");
+  const [activeTab, setActiveTab] = useState<string>("law-firms");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [lawyersData, setLawyersData] = useState<Lawyer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -61,6 +65,7 @@ export default function DirectoryScreen() {
     useState<string>("All");
   const { user, isAuthenticated } = useAuth();
 
+  const { height: screenHeight } = Dimensions.get("window");
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(300));
 
@@ -96,7 +101,7 @@ export default function DirectoryScreen() {
         }),
       ]).start();
     }
-  }, [filterVisible, fadeAnim, slideAnim]);
+  }, [filterVisible]);
 
   const fetchLawyers = useCallback(async (forceRefresh: boolean = false) => {
     try {
@@ -141,8 +146,11 @@ export default function DirectoryScreen() {
   }, []);
 
   useEffect(() => {
-    fetchLawyers();
-  }, [fetchLawyers]);
+    // Only fetch lawyers when lawyers tab is active
+    if (activeTab === "lawyers") {
+      fetchLawyers();
+    }
+  }, [activeTab, fetchLawyers]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -168,48 +176,24 @@ export default function DirectoryScreen() {
       .join("");
   }, []);
 
-  const isLawyerAvailableToday = useCallback((days: string): boolean => {
-    if (!days) return false;
-
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-
-    const dayNames = [
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-    ];
-
-    const currentDay = dayNames[dayOfWeek];
-    const availableDays = days.split(",").map((day) => day.trim());
-
-    return availableDays.includes(currentDay);
-  }, []);
-
   const lawyers = useMemo(() => {
     return lawyersData.map((lawyer) => ({
       ...lawyer,
-      available: isLawyerAvailableToday(lawyer.days),
       displayDays: getDayAbbreviations(lawyer.days),
-      specialization: Array.isArray(lawyer.specialization)
-        ? lawyer.specialization
-        : lawyer.specialization
-        ? lawyer.specialization.split(",").map((s: string) => s.trim())
+      specialization: lawyer.specialization
+        ? lawyer.specialization.split(",").map((s) => s.trim())
         : [],
-      hours_available: Array.isArray(lawyer.hours_available)
-        ? lawyer.hours_available
-        : lawyer.hours_available
-        ? lawyer.hours_available.split(";").map((h: string) => h.trim())
+      hours_available: lawyer.hours_available
+        ? lawyer.hours_available.split(";").map((h) => h.trim())
         : [],
     }));
-  }, [lawyersData, isLawyerAvailableToday, getDayAbbreviations]);
+  }, [lawyersData, getDayAbbreviations]);
 
   const filteredLawyers = useMemo(() => {
     let filtered = lawyers;
+
+    // Filter out unavailable lawyers
+    filtered = filtered.filter((lawyer) => lawyer.available);
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -232,9 +216,7 @@ export default function DirectoryScreen() {
 
     if (selectedSpecialization !== "All") {
       filtered = filtered.filter((lawyer) => {
-        const specs = Array.isArray(lawyer.specialization)
-          ? lawyer.specialization.map((s: string) => s.toLowerCase())
-          : [];
+        const specs = lawyer.specialization.map((s) => s.toLowerCase());
         const validSpecs = [
           "family law",
           "labor law",
@@ -244,7 +226,7 @@ export default function DirectoryScreen() {
         ];
 
         if (selectedSpecialization === "Others Law") {
-          return specs.some((s: string) => !validSpecs.includes(s));
+          return specs.some((s) => !validSpecs.includes(s));
         }
 
         return specs.includes(selectedSpecialization.toLowerCase());
@@ -290,94 +272,59 @@ export default function DirectoryScreen() {
 
         <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {/* Conditional Content Based on Active Tab */}
+        {/* Conditionally render based on active tab */}
         {activeTab === "law-firms" ? (
-          /* Law Firms Tab - Google Maps Integration with its own search */
-          <View style={tw`flex-1`}>
-            <GoogleLawFirmsFinder searchQuery={searchQuery} />
-          </View>
+          // Law Firms Tab - Google Law Firms Finder
+          <GoogleLawFirmsFinder searchQuery={searchQuery} />
         ) : (
-          /* Lawyers Tab - Search and Filter Section */
-          <VStack className="flex-1">
-            <VStack space="md" className="px-4 py-4 bg-white border-b border-gray-200" style={{ zIndex: 1000 }}>
-              <HStack className="items-center space-x-3">
-                {/* Search Bar - Takes most of the space */}
-                <Box className="flex-1">
-                  <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ 
-                    minHeight: 48,
-                    maxHeight: 48,
-                    height: 48
-                  }}>
-                    <HStack style={{ 
-                      height: 48, 
-                      alignItems: 'center', 
-                      paddingLeft: 20,
-                      paddingRight: 16
-                    }}>
-                      <Ionicons name="search" size={20} color="#9CA3AF" style={{ marginRight: 14 }} />
-                      
-                      <input
-                        placeholder="Search lawyers by name..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{
-                          flex: 1,
-                          height: 48,
-                          fontSize: 16,
-                          color: Colors.text.head,
-                          border: "none",
-                          outline: "none",
-                          backgroundColor: "transparent",
-                        }}
-                      />
-                      
-                      {/* Fixed-width container for right icons */}
-                      <Box style={{ 
-                        width: 24, 
-                        height: 48, 
-                        justifyContent: 'center', 
-                        alignItems: 'center', 
-                        flexShrink: 0 
-                      }}>
-                        {searchQuery.length > 0 && (
-                          <UIPressable
-                            onPress={() => setSearchQuery("")}
-                            style={{
-                              width: 24,
-                              height: 24,
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                              borderRadius: 12
-                            }}
-                          >
-                            <Ionicons name="close" size={18} color="#6B7280" />
-                          </UIPressable>
-                        )}
-                      </Box>
-                    </HStack>
-                  </Box>
-                </Box>
-
-                {/* Filter Button - Fixed width beside search */}
-                <UIPressable
-                  onPress={() => setFilterVisible(true)}
-                  className="bg-white border border-gray-200 p-3 rounded-lg relative"
-                  style={{ width: 48, height: 48 }}
-                >
-                  <Ionicons
-                    name="filter-outline"
-                    size={20}
-                    color={Colors.primary.blue}
-                  />
-                  {hasActiveFilters && (
-                    <Box
-                      className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
-                      style={{ backgroundColor: Colors.primary.blue }}
+          // Lawyers Tab - Original Content
+          <>
+            {/* Search and Filter Section */}
+            <HStack className="items-center px-6 mb-4">
+              <Box className="flex-1 mr-2">
+                <Box className="relative">
+                  <View
+                    style={[
+                      tw`flex-row items-center bg-white border border-gray-200 rounded-lg px-4 py-3`,
+                    ]}
+                  >
+                    <Ionicons name="search" size={20} color="#9CA3AF" />
+                    <input
+                      placeholder="Search lawyers..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      style={{
+                        flex: 1,
+                        marginLeft: 12,
+                        fontSize: 14,
+                        color: Colors.text.head,
+                        border: "none",
+                        outline: "none",
+                        backgroundColor: "transparent",
+                      }}
                     />
-                  )}
-                </UIPressable>
-              </HStack>
-            </VStack>
+                  </View>
+                </Box>
+              </Box>
+
+              {/* Filter Button */}
+              <UIPressable
+                onPress={() => setFilterVisible(true)}
+                className="bg-white border border-gray-200 p-3 rounded-lg relative"
+              >
+                <Ionicons
+                  name="filter-outline"
+                  size={20}
+                  color={Colors.primary.blue}
+                />
+                {hasActiveFilters && (
+                  <Box
+                    className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
+                    style={{ backgroundColor: Colors.primary.blue }}
+                  />
+                )}
+              </UIPressable>
+            </HStack>
 
             <FilterModal
               visible={filterVisible}
@@ -388,13 +335,10 @@ export default function DirectoryScreen() {
               setSelectedSpecialization={setSelectedSpecialization}
             />
 
-            {/* Lawyers Tab - Individual Lawyers List */}
-            <ScrollView 
-              className="flex-1" 
-              style={{ backgroundColor: '#f9fafb' }}
+            <ScrollView
+              style={tw`flex-1`}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 120 }}
-              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 60 }}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
@@ -432,7 +376,7 @@ export default function DirectoryScreen() {
                   </UIText>
                 </VStack>
               ) : (
-                <VStack space="xs" style={{ paddingTop: 12, paddingHorizontal: 8 }}>
+                <>
                   {filteredLawyers
                     .filter(
                       (lawyer) =>
@@ -448,15 +392,17 @@ export default function DirectoryScreen() {
                           ...lawyer,
                           days: lawyer.displayDays,
                         }}
-                        onBookConsultation={() => handleBookConsultation(lawyer)}
+                        onBookConsultation={() =>
+                          handleBookConsultation(lawyer)
+                        }
                       />
                     ))}
-                </VStack>
+                </>
               )}
 
               <View style={tw`h-4`} />
             </ScrollView>
-          </VStack>
+          </>
         )}
 
         <Navbar activeTab="find" />

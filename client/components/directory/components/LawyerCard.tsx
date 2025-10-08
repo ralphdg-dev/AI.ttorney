@@ -140,7 +140,6 @@ export default function LawyerCard({
           </Text>
         </VStack>
 
-        {/* Remove or modify the availability indicator since it's no longer blocking */}
         <HStack className="items-center">
           <Box
             className="w-2 h-2 rounded-full mr-2"
