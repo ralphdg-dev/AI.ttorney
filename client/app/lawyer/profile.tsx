@@ -17,6 +17,7 @@ import {
   Mail,
   Phone,
   MapPin,
+  Clock,
 } from "lucide-react-native";
 import LawyerNavbar from "../../components/lawyer/LawyerNavbar";
 import Header from "../../components/Header";
@@ -59,6 +60,29 @@ interface LawyerContactInfo {
   hours_available: string;
 }
 
+const DAYS_OF_WEEK = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
+const TIME_OPTIONS: { value: string; label: string }[] = [];
+
+for (let h = 0; h < 24; h++) {
+  for (let m of [0, 30]) {
+    if (h === 24 && m === 30) break;
+    const value = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    const hour12 = h % 12 === 0 ? 12 : h % 12;
+    const ampm = h < 12 ? "AM" : "PM";
+    const label = `${hour12}:${m === 0 ? "00" : "30"} ${ampm}`;
+    TIME_OPTIONS.push({ value, label });
+  }
+}
+
 const LawyerProfilePage: React.FC = () => {
   const { user, signOut, refreshUserData } = useAuth();
   const [profileData, setProfileData] = useState<ProfileData>({
@@ -81,7 +105,7 @@ const LawyerProfilePage: React.FC = () => {
       location: "",
       bio: "",
       specializations: "",
-      days: "", 
+      days: "",
       hours_available: "",
     }
   );
@@ -144,6 +168,141 @@ const LawyerProfilePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showAllSpecializations, setShowAllSpecializations] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isAcceptingConsultations, setIsAcceptingConsultations] =
+    useState(false);
+
+  const parseAvailabilityData = () => {
+    const selectedDays = lawyerContactInfo.days
+      ? lawyerContactInfo.days.split(", ").filter((day) => day.trim() !== "")
+      : [];
+
+    const dayTimeSlots: Record<string, string[]> = {};
+
+    if (lawyerContactInfo.hours_available) {
+      try {
+        const dayEntries = lawyerContactInfo.hours_available.split(";");
+
+        dayEntries.forEach((entry) => {
+          if (entry.trim()) {
+            const parts = entry.split("=");
+            if (parts.length >= 2) {
+              const dayName = parts[0].trim();
+              const timesString = parts.slice(1).join(":").trim();
+              if (DAYS_OF_WEEK.includes(dayName)) {
+                const timeStrings = timesString
+                  .split(",")
+                  .map((time) => time.trim());
+                dayTimeSlots[dayName] = timeStrings;
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.log("Error parsing availability data:", error);
+      }
+    }
+
+    return { selectedDays, dayTimeSlots };
+  };
+
+  const { selectedDays, dayTimeSlots } = parseAvailabilityData();
+
+
+  const toggleAcceptingConsultations = async () => {
+    if (!user?.id) {
+      Alert.alert("Error", "User not authenticated");
+      return;
+    }
+
+    const newStatus = !isAcceptingConsultations;
+    const previousStatus = isAcceptingConsultations;
+
+    try {
+      setIsAcceptingConsultations(newStatus);
+
+      const { data, error } = await supabase
+        .from("lawyer_info")
+        .update({ accepting_consultations: newStatus })
+        .eq("lawyer_id", user.id)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data && data.accepting_consultations === newStatus) {
+        Alert.alert(
+          "Success",
+          newStatus
+            ? "You are now accepting consultations."
+            : "You are no longer accepting consultations."
+        );
+      } else {
+        throw new Error("Status update verification failed");
+      }
+    } catch (error: any) {
+      console.error("Error updating consultation status:", error);
+
+      setIsAcceptingConsultations(previousStatus);
+
+      Alert.alert(
+        "Error",
+        error.message ||
+          "Failed to update consultation status. Please try again."
+      );
+    }
+  };
+
+  const formatTimeLabel = (time: string) => {
+    const timeOption = TIME_OPTIONS.find((option) => {
+      const time24 = convertTo24Hour(time);
+      return option.value === time24;
+    });
+    return timeOption ? timeOption.label : time;
+  };
+
+  const convertTo24Hour = (time12h: string): string => {
+    try {
+      let cleanTime = time12h.trim().toUpperCase();
+
+      if (cleanTime.includes("AM") || cleanTime.includes("PM")) {
+        const timePart = cleanTime.replace(/AM|PM/g, "").trim();
+        const modifier = cleanTime.includes("AM") ? "AM" : "PM";
+
+        if (timePart.includes(":")) {
+          let [hours, minutes] = timePart.split(":");
+          let hoursNum = parseInt(hours, 10);
+
+          if (modifier === "PM" && hoursNum !== 12) {
+            hoursNum += 12;
+          } else if (modifier === "AM" && hoursNum === 12) {
+            hoursNum = 0;
+          }
+
+          return `${hoursNum.toString().padStart(2, "0")}:${minutes.padStart(
+            2,
+            "0"
+          )}`;
+        } else {
+          let hoursNum = parseInt(timePart, 10);
+
+          if (modifier === "PM" && hoursNum !== 12) {
+            hoursNum += 12;
+          } else if (modifier === "AM" && hoursNum === 12) {
+            hoursNum = 0;
+          }
+
+          return `${hoursNum.toString().padStart(2, "0")}:00`;
+        }
+      } else {
+        return cleanTime;
+      }
+    } catch (error) {
+      console.error("Error converting time:", error, "Input:", time12h);
+      return time12h;
+    }
+  };
 
   const fetchLawyerContactInfo = useCallback(async () => {
     if (!user?.id) return;
@@ -153,7 +312,7 @@ const LawyerProfilePage: React.FC = () => {
       const { data, error } = await supabase
         .from("lawyer_info")
         .select(
-          "phone_number, location, bio, specialization, days, hours_available"
+          "phone_number, location, bio, specialization, days, hours_available, accepting_consultations"
         )
         .eq("lawyer_id", user.id)
         .single();
@@ -173,6 +332,7 @@ const LawyerProfilePage: React.FC = () => {
           console.error("Error fetching lawyer contact info:", error);
         }
       } else if (data) {
+        setIsAcceptingConsultations(!!data.accepting_consultations);
         setLawyerContactInfo({
           phone_number: data.phone_number || "",
           location: data.location || "",
@@ -335,7 +495,7 @@ const LawyerProfilePage: React.FC = () => {
         location: contactInfo.location,
         bio: contactInfo.bio,
         specialization: contactInfo.specializations,
-        days: profileData.days, 
+        days: profileData.days,
         hours_available: profileData.hours_available,
       };
 
@@ -460,7 +620,6 @@ const LawyerProfilePage: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={tw`pb-24`}
       >
-        {/* Profile Header */}
         <View style={tw`bg-white p-4 border-b border-gray-200`}>
           <View style={tw`flex-row items-center`}>
             <View style={tw`relative mr-4`}>
@@ -483,7 +642,6 @@ const LawyerProfilePage: React.FC = () => {
                 {profileData.name}
               </Text>
 
-              {/* Specializations with +more functionality */}
               <TouchableOpacity
                 onPress={() =>
                   setShowAllSpecializations(!showAllSpecializations)
@@ -513,7 +671,6 @@ const LawyerProfilePage: React.FC = () => {
                 </View>
               </TouchableOpacity>
 
-              {/* Show all specializations when expanded */}
               {showAllSpecializations && lawyerContactInfo.specializations && (
                 <View style={tw`mb-2 mr-2 p-2 bg-gray-100 rounded-lg`}>
                   <Text style={tw`text-xs font-semibold mb-1 text-gray-900`}>
@@ -553,7 +710,6 @@ const LawyerProfilePage: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Bio Section */}
           <View style={tw`mt-4 pt-4 border-t border-gray-100`}>
             <Text style={tw`text-sm text-gray-700 leading-5`}>
               {lawyerContactInfo.bio}
@@ -561,7 +717,6 @@ const LawyerProfilePage: React.FC = () => {
           </View>
         </View>
 
-        {/* Contact Information */}
         <View style={tw`bg-white mt-3 p-4`}>
           <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
             Contact Information
@@ -609,7 +764,6 @@ const LawyerProfilePage: React.FC = () => {
           </View>
         </View>
 
-        {/* Professional Information */}
         <View style={tw`bg-white mt-3 p-4`}>
           <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
             Professional Information
@@ -648,7 +802,98 @@ const LawyerProfilePage: React.FC = () => {
           </View>
         </View>
 
-        {/* Account Actions */}
+        <View
+          style={tw`bg-white mt-3 p-4 flex-row items-center justify-between rounded-xl`}
+        >
+          <View style={tw`flex-1 mr-4`}>
+            <Text style={tw`text-lg font-bold text-gray-900 mb-1`}>
+              Accepting Consultations
+            </Text>
+            <Text style={tw`text-sm text-gray-500`}>
+              {isAcceptingConsultations
+                ? "Clients can book consultations with you"
+                : "You are not accepting new consultations"}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={toggleAcceptingConsultations}
+            activeOpacity={0.9}
+            style={[
+              tw`w-16 h-9 rounded-full flex-row items-center px-1.5`,
+              {
+                backgroundColor: isAcceptingConsultations
+                  ? "#059669"
+                  : "#D1D5DB",
+                justifyContent: isAcceptingConsultations
+                  ? "flex-end"
+                  : "flex-start",
+                elevation: 2,
+              },
+            ]}
+          >
+            <View style={[tw`w-7 h-7 bg-white rounded-full`]} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={tw`bg-white mt-3 p-4`}>
+          <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
+            Consultation Availability
+          </Text>
+
+          {selectedDays.length > 0 ? (
+            <View>
+              <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+                Available Days:
+              </Text>
+              <Text style={tw`text-sm text-gray-600 mb-4`}>
+                {selectedDays.join(", ")}
+              </Text>
+
+              <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+                Time Slots:
+              </Text>
+              {selectedDays.map((day) => (
+                <View key={day} style={tw`mb-3`}>
+                  <Text style={tw`text-sm font-medium text-gray-900 mb-1`}>
+                    {day}:
+                  </Text>
+                  <View style={tw`flex-row flex-wrap`}>
+                    {(dayTimeSlots[day] || []).map((time, index) => (
+                      <View
+                        key={`${day}-${time}-${index}`}
+                        style={tw`flex-row items-center mr-2 mb-1 px-3 py-2 bg-blue-50 rounded-lg`}
+                      >
+                        <Clock size={14} color={Colors.primary.blue} />
+                        <Text
+                          style={[
+                            tw`text-sm ml-2`,
+                            { color: Colors.primary.blue },
+                          ]}
+                        >
+                          {formatTimeLabel(time)}
+                        </Text>
+                      </View>
+                    ))}
+                    {(!dayTimeSlots[day] || dayTimeSlots[day].length === 0) && (
+                      <Text style={tw`text-xs text-gray-500 italic`}>
+                        No times set
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={tw`p-4 bg-gray-50 rounded-lg`}>
+              <Text style={tw`text-sm text-gray-600 text-center`}>
+                No availability set. Click Edit to configure your consultation
+                hours.
+              </Text>
+            </View>
+          )}
+        </View>
+
         <View style={tw`bg-white mt-3 p-4`}>
           <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>Account</Text>
 
@@ -685,7 +930,6 @@ const LawyerProfilePage: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-      {/* Edit Profile Modal */}
       <EditProfileModal
         isVisible={isEditingProfile}
         onClose={() => setIsEditingProfile(false)}

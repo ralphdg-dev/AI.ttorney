@@ -19,6 +19,9 @@ class LawyerProfile(BaseModel):
     phone_number: Optional[str] = None
     bio: str
 
+class AcceptingConsultationsUpdate(BaseModel):
+    accepting_consultations: bool
+
 class AvailabilitySlot(BaseModel):
     id: str
     day: str
@@ -250,4 +253,98 @@ async def get_lawyer_profile(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
+        )
+
+@router.post("/api/lawyer/accepting-consultations")
+async def update_accepting_consultations(
+    payload: AcceptingConsultationsUpdate,
+    supabase: Client = Depends(get_supabase),
+    user=Depends(get_current_user)
+):
+    """
+    Update lawyer's accepting_consultations status
+    """
+    try:
+        logger.info(f"Updating accepting_consultations for lawyer {user.id} to {payload.accepting_consultations}")
+        
+        # Check if lawyer_info record exists
+        existing = supabase.table("lawyer_info")\
+            .select("lawyer_id")\
+            .eq("lawyer_id", user.id)\
+            .execute()
+        
+        if not existing.data:
+            # Create lawyer_info record if it doesn't exist
+            result = supabase.table("lawyer_info")\
+                .insert({
+                    "lawyer_id": user.id,
+                    "accepting_consultations": payload.accepting_consultations
+                })\
+                .execute()
+        else:
+            # Update existing record
+            result = supabase.table("lawyer_info")\
+                .update({"accepting_consultations": payload.accepting_consultations})\
+                .eq("lawyer_id", user.id)\
+                .execute()
+
+        if result.error:
+            logger.error(f"Database error: {result.error}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error: {result.error}"
+            )
+
+        logger.info(f"Successfully updated accepting_consultations for lawyer {user.id}")
+        
+        return {
+            "success": True,
+            "message": "Consultation status updated successfully",
+            "accepting_consultations": payload.accepting_consultations
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating accepting consultations: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update consultation status"
+        )
+
+
+@router.get("/api/lawyer/accepting-consultations")
+async def get_accepting_consultations(
+    supabase: Client = Depends(get_supabase),
+    user=Depends(get_current_user)
+):
+    """
+    Get lawyer's current accepting_consultations status
+    """
+    try:
+        result = supabase.table("lawyer_info")\
+            .select("accepting_consultations")\
+            .eq("lawyer_id", user.id)\
+            .execute()
+        
+        if result.error:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to fetch consultation status"
+            )
+        
+        accepting = False
+        if result.data and len(result.data) > 0:
+            accepting = result.data[0].get("accepting_consultations", False)
+        
+        return {
+            "success": True,
+            "accepting_consultations": accepting
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching accepting consultations: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch consultation status"
         )

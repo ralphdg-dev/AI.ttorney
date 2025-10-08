@@ -52,6 +52,7 @@ class ConsultationStats(BaseModel):
     accepted_requests: int
     completed_requests: int
     rejected_requests: int
+    cancelled_requests: int
     today_sessions: int
 
 class SuccessResponse(BaseModel):
@@ -241,6 +242,7 @@ async def get_consultation_stats(current_user: Dict[str, Any] = Depends(get_curr
         accepted_requests = len([c for c in consultations if c.get("status") == "accepted"])
         completed_requests = len([c for c in consultations if c.get("status") == "completed"])
         rejected_requests = len([c for c in consultations if c.get("status") == "rejected"])
+        cancelled_requests = len([c for c in consultations if c.get("status") == "cancelled"])  # Add this line
         
         # Calculate today's sessions (accepted consultations for today)
         today = date.today().isoformat()
@@ -255,6 +257,7 @@ async def get_consultation_stats(current_user: Dict[str, Any] = Depends(get_curr
             accepted_requests=accepted_requests,
             completed_requests=completed_requests,
             rejected_requests=rejected_requests,
+            cancelled_requests=cancelled_requests, 
             today_sessions=today_sessions
         )
         
@@ -340,4 +343,58 @@ async def update_consultation_status(
         raise
     except Exception as e:
         logger.error(f"Error updating consultation status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.post("/{consultation_id}/cancel", response_model=SuccessResponse)
+async def cancel_consultation(
+    consultation_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Cancel a consultation request (user-initiated)
+    """
+    try:
+        user_id = current_user["id"]
+        now = datetime.now().isoformat()
+        
+        # First verify the consultation belongs to this user
+        response = supabase.table("consultation_requests").select("*").eq("id", consultation_id).eq("user_id", user_id).execute()
+        
+        if hasattr(response, 'error') and response.error:
+            logger.error(f"Supabase error: {response.error}")
+            raise HTTPException(status_code=500, detail="Database error")
+        
+        consultations = response.data if hasattr(response, 'data') else []
+        
+        if not consultations:
+            raise HTTPException(status_code=404, detail="Consultation not found")
+        
+        current_status = consultations[0].get("status")
+        
+        # Only allow cancellation for pending and accepted consultations
+        if current_status not in ["pending", "accepted"]:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot cancel consultation with status: {current_status}"
+            )
+        
+        # Update the consultation status
+        update_data = {
+            "status": "cancelled",
+            "updated_at": now,
+            "responded_at": now
+        }
+        
+        update_response = supabase.table("consultation_requests").update(update_data).eq("id", consultation_id).execute()
+        
+        if hasattr(update_response, 'error') and update_response.error:
+            logger.error(f"Supabase update error: {update_response.error}")
+            raise HTTPException(status_code=500, detail="Database error")
+        
+        return SuccessResponse(success=True, message="Consultation cancelled successfully")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error cancelling consultation: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")

@@ -105,10 +105,23 @@ async def fetch_lawyers_from_db(supabase_service):
         if hasattr(response, 'data') and response.data:
             lawyers_data = response.data
             logger.info(f"Found {len(lawyers_data)} lawyers using Supabase client")
-            
+
+            # ✅ OPTIONAL: sync 'available' column with 'accepting_consultations' for consistency
+            for lawyer_data in lawyers_data:
+                accepting = bool(lawyer_data.get("accepting_consultations", False))
+                if lawyer_data.get("available") != accepting:
+                    try:
+                        supabase_service.supabase.table("lawyer_info") \
+                            .update({"available": accepting}) \
+                            .eq("id", lawyer_data.get("id")) \
+                            .execute()
+                    except Exception as sync_error:
+                        logger.warning(f"Could not sync availability for lawyer {lawyer_data.get('id')}: {sync_error}")
+
             lawyers = []
             for lawyer_data in lawyers_data:
                 try:
+                    accepting = bool(lawyer_data.get("accepting_consultations", False))
                     lawyer = Lawyer(
                         id=lawyer_data.get("id"),
                         lawyer_id=lawyer_data.get("lawyer_id"),
@@ -118,9 +131,9 @@ async def fetch_lawyers_from_db(supabase_service):
                         hours=lawyer_data.get("hours"),
                         days=lawyer_data.get("days"),
                         bio=lawyer_data.get("bio"),
-                        available=bool(lawyer_data.get("available", False)),
+                        available=accepting,  # ✅ This is now controlled by accepting_consultations
                         hours_available=lawyer_data.get("hours_available"),
-                        created_at=lawyer_data.get("created_at")
+                        created_at=lawyer_data.get("created_at"),
                     )
                     lawyers.append(lawyer)
                 except Exception as e:
@@ -133,7 +146,7 @@ async def fetch_lawyers_from_db(supabase_service):
             return lawyers
         else:
             raise Exception("No data returned from Supabase client")
-            
+
     except Exception as client_error:
         logger.warning(f"Supabase client failed, falling back to HTTP: {str(client_error)}")
         
@@ -156,6 +169,7 @@ async def fetch_lawyers_from_db(supabase_service):
                     lawyers = []
                     for lawyer_data in lawyers_data:
                         try:
+                            accepting = bool(lawyer_data.get("accepting_consultations", False))
                             lawyer = Lawyer(
                                 id=lawyer_data.get("id"),
                                 lawyer_id=lawyer_data.get("lawyer_id"),
@@ -165,7 +179,7 @@ async def fetch_lawyers_from_db(supabase_service):
                                 hours=lawyer_data.get("hours"),
                                 bio=lawyer_data.get("bio"),
                                 days=lawyer_data.get("days"),
-                                available=bool(lawyer_data.get("available", False)),
+                                available=accepting,  # ✅ same logic here
                                 hours_available=lawyer_data.get("hours_available"),
                                 created_at=lawyer_data.get("created_at")
                             )
@@ -183,6 +197,7 @@ async def fetch_lawyers_from_db(supabase_service):
         except Exception as http_error:
             logger.error(f"HTTP fallback also failed: {http_error}")
             raise client_error from http_error
+
 
 @router.get("/lawyers", response_model=LawyerResponse)
 async def get_lawyers(
@@ -240,7 +255,7 @@ async def get_lawyer(
                 hours=lawyer_data.get("hours"),
                 bio=lawyer_data.get("bio"),
                 days=lawyer_data.get("days"),
-                available=bool(lawyer_data.get("available", False)),
+                available=bool(lawyer_data.get("accepting_consultations", False)),
                 hours_available=lawyer_data.get("hours_available"),
                 created_at=lawyer_data.get("created_at")
             )

@@ -48,11 +48,12 @@ const frontendCache = {
 };
 
 export default function DirectoryScreen() {
-  const [activeTab, setActiveTab] = useState<string>("law-firms");
+  const [activeTab, setActiveTab] = useState<string>("lawyers");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [lawyersData, setLawyersData] = useState<Lawyer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [lastUpdated, setLastUpdated] = useState<number>(0);
   const router = useRouter();
   const [filterVisible, setFilterVisible] = useState(false);
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
@@ -108,6 +109,7 @@ export default function DirectoryScreen() {
         now - frontendCache.timestamp < frontendCache.ttl
       ) {
         setLawyersData(frontendCache.lawyers);
+        setLastUpdated(frontendCache.timestamp);
         setLoading(false);
         return;
       }
@@ -122,6 +124,7 @@ export default function DirectoryScreen() {
       if (result.success) {
         const lawyers = result.data || [];
         setLawyersData(lawyers);
+        setLastUpdated(now);
 
         frontendCache.lawyers = lawyers;
         frontendCache.timestamp = now;
@@ -297,62 +300,83 @@ export default function DirectoryScreen() {
           /* Lawyers Tab - Search and Filter Section */
           <VStack className="flex-1">
             <VStack space="md" className="px-4 py-4 bg-white border-b border-gray-200" style={{ zIndex: 1000 }}>
-              <Box className="relative" style={{ zIndex: 1000 }}>
-                <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ 
-                  minHeight: 48,
-                  maxHeight: 48,
-                  height: 48
-                }}>
-                  <HStack style={{ 
-                    height: 48, 
-                    alignItems: 'center', 
-                    paddingLeft: 20,
-                    paddingRight: 16
+              <HStack className="items-center space-x-3">
+                {/* Search Bar - Takes most of the space */}
+                <Box className="flex-1">
+                  <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ 
+                    minHeight: 48,
+                    maxHeight: 48,
+                    height: 48
                   }}>
-                    <Ionicons name="search" size={20} color="#9CA3AF" style={{ marginRight: 14 }} />
-                    
-                    <input
-                      placeholder="Search lawyers by name..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{
-                        flex: 1,
-                        height: 48,
-                        fontSize: 16,
-                        color: Colors.text.head,
-                        border: "none",
-                        outline: "none",
-                        backgroundColor: "transparent",
-                      }}
-                    />
-                    
-                    {/* Fixed-width container for right icons */}
-                    <Box style={{ 
-                      width: 24, 
+                    <HStack style={{ 
                       height: 48, 
-                      justifyContent: 'center', 
                       alignItems: 'center', 
-                      flexShrink: 0 
+                      paddingLeft: 20,
+                      paddingRight: 16
                     }}>
-                      {searchQuery.length > 0 && (
-                        <UIPressable
-                          onPress={() => setSearchQuery("")}
-                          style={{
-                            width: 24,
-                            height: 24,
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            borderRadius: 12
-                          }}
-                        >
-                          <Ionicons name="close" size={18} color="#6B7280" />
-                        </UIPressable>
-                      )}
-                    </Box>
-                  </HStack>
+                      <Ionicons name="search" size={20} color="#9CA3AF" style={{ marginRight: 14 }} />
+                      
+                      <input
+                        placeholder="Search lawyers by name..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={{
+                          flex: 1,
+                          height: 48,
+                          fontSize: 16,
+                          color: Colors.text.head,
+                          border: "none",
+                          outline: "none",
+                          backgroundColor: "transparent",
+                        }}
+                      />
+                      
+                      {/* Fixed-width container for right icons */}
+                      <Box style={{ 
+                        width: 24, 
+                        height: 48, 
+                        justifyContent: 'center', 
+                        alignItems: 'center', 
+                        flexShrink: 0 
+                      }}>
+                        {searchQuery.length > 0 && (
+                          <UIPressable
+                            onPress={() => setSearchQuery("")}
+                            style={{
+                              width: 24,
+                              height: 24,
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              borderRadius: 12
+                            }}
+                          >
+                            <Ionicons name="close" size={18} color="#6B7280" />
+                          </UIPressable>
+                        )}
+                      </Box>
+                    </HStack>
+                  </Box>
                 </Box>
-              </Box>
 
+                {/* Filter Button - Fixed width beside search */}
+                <UIPressable
+                  onPress={() => setFilterVisible(true)}
+                  className="bg-white border border-gray-200 p-3 rounded-lg relative"
+                  style={{ width: 48, height: 48 }}
+                >
+                  <Ionicons
+                    name="filter-outline"
+                    size={20}
+                    color={Colors.primary.blue}
+                  />
+                  {hasActiveFilters && (
+                    <Box
+                      className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
+                      style={{ backgroundColor: Colors.primary.blue }}
+                    />
+                  )}
+                </UIPressable>
+              </HStack>
             </VStack>
 
             <FilterModal

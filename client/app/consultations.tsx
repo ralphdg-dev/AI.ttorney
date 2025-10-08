@@ -1,5 +1,14 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { View, ScrollView, RefreshControl, Modal, TouchableOpacity, Animated, Dimensions } from "react-native";
+import {
+  View,
+  ScrollView,
+  RefreshControl,
+  Modal,
+  TouchableOpacity,
+  Animated,
+  Dimensions,
+  Alert,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
@@ -57,9 +66,15 @@ const STATUS_CONFIG = {
     icon: "checkmark-done-outline" as const,
     label: "Completed",
   },
+  cancelled: {
+    color: "#EF4444",
+    bgColor: "#FEE2E2",
+    icon: "close-circle-outline" as const,
+    label: "Cancelled",
+  },
 };
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 // Skeleton Loading Component
 const SkeletonCard = () => {
@@ -87,67 +102,67 @@ const SkeletonCard = () => {
       <HStack className="justify-between items-start mb-3">
         <VStack className="flex-1 mr-2" space="xs">
           {/* Lawyer name skeleton */}
-          <Animated.View 
+          <Animated.View
             style={[
               tw`rounded`,
-              { 
+              {
                 height: screenWidth < 768 ? 18 : 20,
-                width: '70%',
-                backgroundColor: '#E5E7EB',
-                opacity: pulseAnim
-              }
+                width: "70%",
+                backgroundColor: "#E5E7EB",
+                opacity: pulseAnim,
+              },
             ]}
           />
           {/* Specialization skeleton */}
-          <Animated.View 
+          <Animated.View
             style={[
               tw`rounded mt-1`,
-              { 
+              {
                 height: screenWidth < 768 ? 14 : 16,
-                width: '50%',
-                backgroundColor: '#E5E7EB',
-                opacity: pulseAnim
-              }
+                width: "50%",
+                backgroundColor: "#E5E7EB",
+                opacity: pulseAnim,
+              },
             ]}
           />
         </VStack>
 
         {/* Status badge skeleton */}
-        <Animated.View 
+        <Animated.View
           style={[
             tw`rounded-full`,
-            { 
+            {
               height: screenWidth < 768 ? 24 : 28,
               width: 80,
-              backgroundColor: '#E5E7EB',
-              opacity: pulseAnim
-            }
+              backgroundColor: "#E5E7EB",
+              opacity: pulseAnim,
+            },
           ]}
         />
       </HStack>
 
       {/* Message skeleton */}
       <VStack className="mb-3" space="xs">
-        <Animated.View 
+        <Animated.View
           style={[
             tw`rounded`,
-            { 
+            {
               height: screenWidth < 768 ? 14 : 16,
-              width: '90%',
-              backgroundColor: '#E5E7EB',
-              opacity: pulseAnim
-            }
+              width: "90%",
+              backgroundColor: "#E5E7EB",
+              opacity: pulseAnim,
+            },
           ]}
         />
-        <Animated.View 
+        <Animated.View
           style={[
             tw`rounded`,
-            { 
+            {
               height: screenWidth < 768 ? 14 : 16,
-              width: '60%',
-              backgroundColor: '#E5E7EB',
-              opacity: pulseAnim
-            }
+              width: "60%",
+              backgroundColor: "#E5E7EB",
+              opacity: pulseAnim,
+            },
           ]}
         />
       </VStack>
@@ -155,66 +170,66 @@ const SkeletonCard = () => {
       {/* Date and time skeleton */}
       <VStack className="mb-3" space="sm">
         <HStack className="items-center">
-          <Animated.View 
+          <Animated.View
             style={[
               tw`rounded`,
-              { 
+              {
                 height: screenWidth < 768 ? 16 : 18,
                 width: 16,
-                backgroundColor: '#E5E7EB',
-                opacity: pulseAnim
-              }
+                backgroundColor: "#E5E7EB",
+                opacity: pulseAnim,
+              },
             ]}
           />
-          <Animated.View 
+          <Animated.View
             style={[
               tw`rounded ml-2`,
-              { 
+              {
                 height: screenWidth < 768 ? 14 : 16,
                 width: 100,
-                backgroundColor: '#E5E7EB',
-                opacity: pulseAnim
-              }
+                backgroundColor: "#E5E7EB",
+                opacity: pulseAnim,
+              },
             ]}
           />
         </HStack>
 
         <HStack className="items-center">
-          <Animated.View 
+          <Animated.View
             style={[
               tw`rounded`,
-              { 
+              {
                 height: screenWidth < 768 ? 16 : 18,
                 width: 16,
-                backgroundColor: '#E5E7EB',
-                opacity: pulseAnim
-              }
+                backgroundColor: "#E5E7EB",
+                opacity: pulseAnim,
+              },
             ]}
           />
-          <Animated.View 
+          <Animated.View
             style={[
               tw`rounded ml-2`,
-              { 
+              {
                 height: screenWidth < 768 ? 14 : 16,
                 width: 80,
-                backgroundColor: '#E5E7EB',
-                opacity: pulseAnim
-              }
+                backgroundColor: "#E5E7EB",
+                opacity: pulseAnim,
+              },
             ]}
           />
         </HStack>
       </VStack>
 
       {/* Button skeleton */}
-      <Animated.View 
+      <Animated.View
         style={[
           tw`rounded-lg`,
-          { 
+          {
             height: screenWidth < 768 ? 36 : 42,
-            width: '100%',
-            backgroundColor: '#E5E7EB',
-            opacity: pulseAnim
-          }
+            width: "100%",
+            backgroundColor: "#E5E7EB",
+            opacity: pulseAnim,
+          },
         ]}
       />
     </Box>
@@ -227,55 +242,120 @@ export default function ConsultationsScreen() {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedConsultation, setSelectedConsultation] = useState<Consultation | null>(null);
+  const [selectedConsultation, setSelectedConsultation] =
+    useState<Consultation | null>(null);
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
   const scaleAnim = useState(new Animated.Value(0.8))[0];
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
+  const [cancelModalVisible, setCancelModalVisible] = useState<boolean>(false);
+  const [consultationToCancel, setConsultationToCancel] = useState<
+    string | null
+  >(null);
+
+  const openCancelModal = (consultationId: string) => {
+    setConsultationToCancel(consultationId);
+    setCancelModalVisible(true);
+  };
+
+  const closeCancelModal = () => {
+    setCancelModalVisible(false);
+    setConsultationToCancel(null);
+  };
+
+  const handleCancelConsultation = async () => {
+    if (!consultationToCancel) return;
+
+    try {
+      await cancelConsultation(consultationToCancel);
+      closeCancelModal();
+    } catch (error) {
+      console.error("Error in handleCancelConsultation:", error);
+    }
+  };
+
+  const cancelConsultation = async (consultationId: string) => {
+    try {
+      const { error } = await supabase
+        .from("consultation_requests")
+        .update({
+          status: "cancelled",
+          updated_at: new Date().toISOString(),
+          responded_at: new Date().toISOString(),
+        })
+        .eq("id", consultationId)
+        .eq("user_id", user?.id); // Ensure user can only cancel their own consultations
+
+      if (error) {
+        console.error("Error cancelling consultation:", error);
+        alert("Failed to cancel consultation. Please try again.");
+        return;
+      }
+
+      // Update local state
+      setConsultations((prev) =>
+        prev.map((consultation) =>
+          consultation.id === consultationId
+            ? { ...consultation, status: "cancelled" as const }
+            : consultation
+        )
+      );
+
+      // Close modal if open
+      if (selectedConsultation?.id === consultationId) {
+        closeDetailsModal();
+      }
+
+    } catch (error) {
+      console.error("Error in cancelConsultation:", error);
+    }
+  };
 
   const fetchConsultations = async () => {
     if (!user?.id) return;
 
     try {
       setLoading(true);
-      
+
       // Fetch consultation requests with lawyer info
       const { data, error } = await supabase
-        .from('consultation_requests')
-        .select(`
+        .from("consultation_requests")
+        .select(
+          `
           *,
           lawyer_info:lawyer_id (
             name,
             specialization
           )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        `
+        )
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
       if (error) {
-        console.error('Error fetching consultations:', error);
+        console.error("Error fetching consultations:", error);
         return;
       }
 
       // Transform the data to match our interface
-      const transformedData: Consultation[] = (data || []).map(item => ({
+      const transformedData: Consultation[] = (data || []).map((item) => ({
         id: item.id,
-        lawyer_name: item.lawyer_info?.name || 'Unknown Lawyer',
-        specialization: item.lawyer_info?.specialization || 'General Law',
-        consultation_date: item.consultation_date || '',
-        consultation_time: item.consultation_time || '',
-        status: item.status || 'pending',
+        lawyer_name: item.lawyer_info?.name || "Unknown Lawyer",
+        specialization: item.lawyer_info?.specialization || "General Law",
+        consultation_date: item.consultation_date || "",
+        consultation_time: item.consultation_time || "",
+        status: item.status || "pending",
         created_at: item.created_at,
         message: item.message,
         email: item.email,
         mobile_number: item.mobile_number,
-        responded_at: item.responded_at
+        responded_at: item.responded_at,
       }));
 
       setConsultations(transformedData);
     } catch (error) {
-      console.error('Error in fetchConsultations:', error);
+      console.error("Error in fetchConsultations:", error);
     } finally {
       setLoading(false);
     }
@@ -352,8 +432,8 @@ export default function ConsultationsScreen() {
   }, [activeFilter, searchQuery, consultations]);
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'Not scheduled';
-    
+    if (!dateString) return "Not scheduled";
+
     const date = new Date(dateString);
     const options: Intl.DateTimeFormatOptions = {
       month: "short",
@@ -364,8 +444,8 @@ export default function ConsultationsScreen() {
   };
 
   const formatDateTime = (dateString: string) => {
-    if (!dateString) return 'Not available';
-    
+    if (!dateString) return "Not available";
+
     const date = new Date(dateString);
     const options: Intl.DateTimeFormatOptions = {
       month: "short",
@@ -383,6 +463,7 @@ export default function ConsultationsScreen() {
     { id: "accepted", label: "Accepted" },
     { id: "completed", label: "Completed" },
     { id: "rejected", label: "Rejected" },
+    { id: "cancelled", label: "Cancelled" },
   ];
 
   return (
@@ -419,8 +500,8 @@ export default function ConsultationsScreen() {
         </HStack>
 
         {/* Filter Tabs - Horizontal Scroll for Mobile */}
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={tw`px-6`}
         >
@@ -482,18 +563,20 @@ export default function ConsultationsScreen() {
               />
               <UIText
                 className="text-center font-semibold mb-2"
-                style={{ 
+                style={{
                   fontSize: screenWidth < 768 ? 16 : 18,
-                  color: Colors.text.head 
+                  color: Colors.text.head,
                 }}
               >
-                {searchQuery ? "No consultations found" : "No consultations yet"}
+                {searchQuery
+                  ? "No consultations found"
+                  : "No consultations yet"}
               </UIText>
               <UIText
                 className="text-center"
-                style={{ 
+                style={{
                   fontSize: screenWidth < 768 ? 13 : 14,
-                  color: Colors.text.sub 
+                  color: Colors.text.sub,
                 }}
               >
                 {searchQuery
@@ -513,18 +596,18 @@ export default function ConsultationsScreen() {
                     <VStack className="flex-1 mr-2">
                       <UIText
                         className="font-bold"
-                        style={{ 
+                        style={{
                           fontSize: screenWidth < 768 ? 15 : 16,
-                          color: Colors.text.head 
+                          color: Colors.text.head,
                         }}
                       >
                         {consultation.lawyer_name}
                       </UIText>
                       <UIText
                         className="mt-1"
-                        style={{ 
+                        style={{
                           fontSize: screenWidth < 768 ? 12 : 14,
-                          color: Colors.text.sub 
+                          color: Colors.text.sub,
                         }}
                       >
                         {consultation.specialization}
@@ -542,9 +625,9 @@ export default function ConsultationsScreen() {
                       />
                       <UIText
                         className="font-semibold ml-1"
-                        style={{ 
+                        style={{
                           fontSize: screenWidth < 768 ? 10 : 12,
-                          color: statusConfig.color 
+                          color: statusConfig.color,
                         }}
                       >
                         {statusConfig.label}
@@ -555,9 +638,9 @@ export default function ConsultationsScreen() {
                   {consultation.message && (
                     <UIText
                       className="mb-3 italic"
-                      style={{ 
+                      style={{
                         fontSize: screenWidth < 768 ? 12 : 14,
-                        color: Colors.text.sub 
+                        color: Colors.text.sub,
                       }}
                       numberOfLines={2}
                     >
@@ -575,9 +658,9 @@ export default function ConsultationsScreen() {
                         />
                         <UIText
                           className="ml-2"
-                          style={{ 
+                          style={{
                             fontSize: screenWidth < 768 ? 12 : 14,
-                            color: Colors.text.sub 
+                            color: Colors.text.sub,
                           }}
                         >
                           {formatDate(consultation.consultation_date)}
@@ -594,9 +677,9 @@ export default function ConsultationsScreen() {
                         />
                         <UIText
                           className="ml-2"
-                          style={{ 
+                          style={{
                             fontSize: screenWidth < 768 ? 12 : 14,
-                            color: Colors.text.sub 
+                            color: Colors.text.sub,
                           }}
                         >
                           {consultation.consultation_time}
@@ -615,9 +698,9 @@ export default function ConsultationsScreen() {
                   >
                     <UIText
                       className="font-semibold"
-                      style={{ 
+                      style={{
                         fontSize: screenWidth < 768 ? 13 : 14,
-                        color: Colors.primary.blue 
+                        color: Colors.primary.blue,
                       }}
                     >
                       View Details
@@ -640,50 +723,54 @@ export default function ConsultationsScreen() {
         >
           <View style={tw`flex-1 justify-center items-center`}>
             {/* Backdrop */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={tw`absolute inset-0 bg-black bg-opacity-50`}
               activeOpacity={1}
               onPress={closeDetailsModal}
             />
-            
+
             {/* Modal Content */}
-            <Animated.View 
+            <Animated.View
               style={[
                 tw`bg-white rounded-lg mx-4 w-11/12 max-w-md`,
-                { 
+                {
                   opacity: fadeAnim,
                   transform: [{ scale: scaleAnim }],
                   maxHeight: screenHeight * 0.8,
-                }
+                },
               ]}
             >
               {selectedConsultation && (
                 <>
                   {/* Header */}
                   <HStack className="justify-between items-center p-4 md:p-6 border-b border-gray-200">
-                    <UIText 
-                      className="font-bold" 
-                      style={{ 
+                    <UIText
+                      className="font-bold"
+                      style={{
                         fontSize: screenWidth < 768 ? 18 : 20,
-                        color: Colors.text.head 
+                        color: Colors.text.head,
                       }}
                     >
                       Consultation Details
                     </UIText>
                     <TouchableOpacity onPress={closeDetailsModal}>
-                      <Ionicons name="close" size={24} color={Colors.text.sub} />
+                      <Ionicons
+                        name="close"
+                        size={24}
+                        color={Colors.text.sub}
+                      />
                     </TouchableOpacity>
                   </HStack>
 
                   {/* Content */}
-                  <ScrollView 
+                  <ScrollView
                     style={tw`max-h-96`}
                     showsVerticalScrollIndicator={true}
                   >
                     <VStack className="p-4 md:p-6" space="md">
                       {/* Lawyer Info */}
                       <VStack space="sm">
-                        <UIText 
+                        <UIText
                           className="font-semibold text-gray-500"
                           style={{ fontSize: screenWidth < 768 ? 12 : 14 }}
                         >
@@ -691,17 +778,17 @@ export default function ConsultationsScreen() {
                         </UIText>
                         <HStack className="justify-between items-start">
                           <VStack className="flex-1 mr-2">
-                            <UIText 
-                              className="font-bold" 
-                              style={{ 
+                            <UIText
+                              className="font-bold"
+                              style={{
                                 fontSize: screenWidth < 768 ? 16 : 18,
-                                color: Colors.text.head 
+                                color: Colors.text.head,
                               }}
                             >
                               {selectedConsultation.lawyer_name}
                             </UIText>
-                            <UIText 
-                              className="text-sm" 
+                            <UIText
+                              className="text-sm"
                               style={{ color: Colors.text.sub }}
                             >
                               {selectedConsultation.specialization}
@@ -709,15 +796,19 @@ export default function ConsultationsScreen() {
                           </VStack>
                           <Box
                             className="px-2 md:px-3 py-1 rounded-full"
-                            style={{ 
-                              backgroundColor: STATUS_CONFIG[selectedConsultation.status].bgColor 
+                            style={{
+                              backgroundColor:
+                                STATUS_CONFIG[selectedConsultation.status]
+                                  .bgColor,
                             }}
                           >
                             <UIText
                               className="font-semibold"
-                              style={{ 
+                              style={{
                                 fontSize: screenWidth < 768 ? 10 : 12,
-                                color: STATUS_CONFIG[selectedConsultation.status].color 
+                                color:
+                                  STATUS_CONFIG[selectedConsultation.status]
+                                    .color,
                               }}
                             >
                               {STATUS_CONFIG[selectedConsultation.status].label}
@@ -728,28 +819,28 @@ export default function ConsultationsScreen() {
 
                       {/* Consultation Details */}
                       <VStack space="sm">
-                        <UIText 
+                        <UIText
                           className="font-semibold text-gray-500"
                           style={{ fontSize: screenWidth < 768 ? 12 : 14 }}
                         >
                           CONSULTATION DETAILS
                         </UIText>
-                        
+
                         <HStack className="justify-between">
-                          <UIText 
-                            className="font-medium" 
-                            style={{ 
+                          <UIText
+                            className="font-medium"
+                            style={{
                               fontSize: screenWidth < 768 ? 13 : 14,
-                              color: Colors.text.head 
+                              color: Colors.text.head,
                             }}
                           >
                             Request Date:
                           </UIText>
-                          <UIText 
+                          <UIText
                             className="text-right flex-1 ml-2"
-                            style={{ 
+                            style={{
                               fontSize: screenWidth < 768 ? 13 : 14,
-                              color: Colors.text.sub 
+                              color: Colors.text.sub,
                             }}
                           >
                             {formatDateTime(selectedConsultation.created_at)}
@@ -758,43 +849,45 @@ export default function ConsultationsScreen() {
 
                         {selectedConsultation.consultation_date && (
                           <HStack className="justify-between">
-                            <UIText 
-                              className="font-medium" 
-                              style={{ 
+                            <UIText
+                              className="font-medium"
+                              style={{
                                 fontSize: screenWidth < 768 ? 13 : 14,
-                                color: Colors.text.head 
+                                color: Colors.text.head,
                               }}
                             >
                               Scheduled Date:
                             </UIText>
-                            <UIText 
+                            <UIText
                               className="text-right flex-1 ml-2"
-                              style={{ 
+                              style={{
                                 fontSize: screenWidth < 768 ? 13 : 14,
-                                color: Colors.text.sub 
+                                color: Colors.text.sub,
                               }}
                             >
-                              {formatDate(selectedConsultation.consultation_date)}
+                              {formatDate(
+                                selectedConsultation.consultation_date
+                              )}
                             </UIText>
                           </HStack>
                         )}
 
                         {selectedConsultation.consultation_time && (
                           <HStack className="justify-between">
-                            <UIText 
-                              className="font-medium" 
-                              style={{ 
+                            <UIText
+                              className="font-medium"
+                              style={{
                                 fontSize: screenWidth < 768 ? 13 : 14,
-                                color: Colors.text.head 
+                                color: Colors.text.head,
                               }}
                             >
                               Scheduled Time:
                             </UIText>
-                            <UIText 
+                            <UIText
                               className="text-right flex-1 ml-2"
-                              style={{ 
+                              style={{
                                 fontSize: screenWidth < 768 ? 13 : 14,
-                                color: Colors.text.sub 
+                                color: Colors.text.sub,
                               }}
                             >
                               {selectedConsultation.consultation_time}
@@ -804,46 +897,53 @@ export default function ConsultationsScreen() {
 
                         {selectedConsultation.responded_at && (
                           <HStack className="justify-between">
-                            <UIText 
-                              className="font-medium" 
-                              style={{ 
+                            <UIText
+                              className="font-medium"
+                              style={{
                                 fontSize: screenWidth < 768 ? 13 : 14,
-                                color: Colors.text.head 
+                                color: Colors.text.head,
                               }}
                             >
                               Responded At:
                             </UIText>
-                            <UIText 
+                            <UIText
                               className="text-right flex-1 ml-2"
-                              style={{ 
+                              style={{
                                 fontSize: screenWidth < 768 ? 13 : 14,
-                                color: Colors.text.sub 
+                                color: Colors.text.sub,
                               }}
                             >
-                              {formatDateTime(selectedConsultation.responded_at)}
+                              {formatDateTime(
+                                selectedConsultation.responded_at
+                              )}
                             </UIText>
                           </HStack>
                         )}
                       </VStack>
 
                       {/* Contact Information */}
-                      {(selectedConsultation.email || selectedConsultation.mobile_number) && (
+                      {(selectedConsultation.email ||
+                        selectedConsultation.mobile_number) && (
                         <VStack space="sm">
-                          <UIText 
+                          <UIText
                             className="font-semibold text-gray-500"
                             style={{ fontSize: screenWidth < 768 ? 12 : 14 }}
                           >
                             CONTACT INFORMATION
                           </UIText>
-                          
+
                           {selectedConsultation.email && (
                             <HStack className="items-center">
-                              <Ionicons name="mail-outline" size={16} color={Colors.text.sub} />
-                              <UIText 
+                              <Ionicons
+                                name="mail-outline"
+                                size={16}
+                                color={Colors.text.sub}
+                              />
+                              <UIText
                                 className="ml-2 flex-1"
-                                style={{ 
+                                style={{
                                   fontSize: screenWidth < 768 ? 13 : 14,
-                                  color: Colors.text.sub 
+                                  color: Colors.text.sub,
                                 }}
                               >
                                 {selectedConsultation.email}
@@ -853,12 +953,16 @@ export default function ConsultationsScreen() {
 
                           {selectedConsultation.mobile_number && (
                             <HStack className="items-center">
-                              <Ionicons name="call-outline" size={16} color={Colors.text.sub} />
-                              <UIText 
+                              <Ionicons
+                                name="call-outline"
+                                size={16}
+                                color={Colors.text.sub}
+                              />
+                              <UIText
                                 className="ml-2 flex-1"
-                                style={{ 
+                                style={{
                                   fontSize: screenWidth < 768 ? 13 : 14,
-                                  color: Colors.text.sub 
+                                  color: Colors.text.sub,
                                 }}
                               >
                                 {selectedConsultation.mobile_number}
@@ -871,18 +975,18 @@ export default function ConsultationsScreen() {
                       {/* Message */}
                       {selectedConsultation.message && (
                         <VStack space="sm">
-                          <UIText 
+                          <UIText
                             className="font-semibold text-gray-500"
                             style={{ fontSize: screenWidth < 768 ? 12 : 14 }}
                           >
                             YOUR MESSAGE
                           </UIText>
                           <Box className="bg-gray-50 rounded-lg p-3 md:p-4">
-                            <UIText 
+                            <UIText
                               className="italic"
-                              style={{ 
+                              style={{
                                 fontSize: screenWidth < 768 ? 13 : 14,
-                                color: Colors.text.sub 
+                                color: Colors.text.sub,
                               }}
                             >
                               "{selectedConsultation.message}"
@@ -893,17 +997,17 @@ export default function ConsultationsScreen() {
 
                       {/* Status Information */}
                       <VStack space="sm">
-                        <UIText 
+                        <UIText
                           className="font-semibold text-gray-500"
                           style={{ fontSize: screenWidth < 768 ? 12 : 14 }}
                         >
                           STATUS INFORMATION
                         </UIText>
-                        <UIText 
+                        <UIText
                           className="text-sm"
                           style={{ color: Colors.text.sub }}
                         >
-                          {selectedConsultation.status === 'completed' && 
+                          {selectedConsultation.status === "completed" &&
                             "This consultation has been completed. Thank you for using our service."}
                         </UIText>
                       </VStack>
@@ -911,20 +1015,137 @@ export default function ConsultationsScreen() {
                   </ScrollView>
 
                   {/* Footer */}
-                  <HStack className="p-4 md:p-6 border-t border-gray-200">
+                  <HStack
+                    className="p-4 md:p-6 border-t border-gray-200"
+                    space="sm"
+                  >
+                    {/* Show cancel button only for pending and accepted consultations */}
+                    {(selectedConsultation.status === "pending" ||
+                      selectedConsultation.status === "accepted") && (
+                      <UIPressable
+                        className="flex-1 py-3 rounded-lg items-center justify-center border"
+                        style={{
+                          borderColor: "#EF4444",
+                          backgroundColor: "white",
+                        }}
+                        onPress={() => openCancelModal(selectedConsultation.id)}
+                      >
+                        <UIText
+                          className="font-semibold"
+                          style={{ color: "#EF4444" }}
+                        >
+                          Cancel Consultation
+                        </UIText>
+                      </UIPressable>
+                    )}
+
                     <UIPressable
-                      className="flex-1 py-3 rounded-lg items-center justify-center"
-                      style={{ backgroundColor: Colors.primary.blue }}
+                      className={`py-3 rounded-lg items-center justify-center ${
+                        selectedConsultation.status === "pending" ||
+                        selectedConsultation.status === "accepted"
+                          ? "flex-1"
+                          : "flex-1"
+                      }`}
+                      style={{
+                        backgroundColor:
+                          selectedConsultation.status === "pending" ||
+                          selectedConsultation.status === "accepted"
+                            ? Colors.primary.blue
+                            : Colors.primary.blue,
+                      }}
                       onPress={closeDetailsModal}
                     >
                       <UIText className="font-semibold text-white">
-                        Close
+                        {selectedConsultation.status === "pending" ||
+                        selectedConsultation.status === "accepted"
+                          ? "Close"
+                          : "Close"}
                       </UIText>
                     </UIPressable>
                   </HStack>
                 </>
               )}
             </Animated.View>
+          </View>
+        </Modal>
+
+        {/* Cancel Confirmation Modal */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={cancelModalVisible}
+          onRequestClose={closeCancelModal}
+        >
+          <View style={tw`flex-1 justify-center items-center`}>
+            {/* Backdrop */}
+            <TouchableOpacity
+              style={tw`absolute inset-0 bg-black bg-opacity-50`}
+              activeOpacity={1}
+              onPress={closeCancelModal}
+            />
+
+            {/* Modal Content */}
+            <View style={tw`bg-white rounded-lg mx-4 w-9/10 max-w-md`}>
+              {/* Header */}
+              <HStack className="justify-between items-center p-6 border-b border-gray-200">
+                <UIText
+                  className="font-bold"
+                  style={{
+                    fontSize: screenWidth < 768 ? 18 : 20,
+                    color: Colors.text.head,
+                  }}
+                >
+                  Cancel Consultation
+                </UIText>
+                <TouchableOpacity onPress={closeCancelModal}>
+                  <Ionicons name="close" size={24} color={Colors.text.sub} />
+                </TouchableOpacity>
+              </HStack>
+
+              {/* Content */}
+              <VStack className="p-6" space="md">
+                <UIText
+                  style={{
+                    fontSize: screenWidth < 768 ? 14 : 16,
+                    color: Colors.text.head,
+                  }}
+                >
+                  Are you sure you want to cancel this consultation? This action
+                  cannot be undone.
+                </UIText>
+              </VStack>
+
+              {/* Footer */}
+              <HStack className="p-6 border-t border-gray-200" space="sm">
+                <UIPressable
+                  className="flex-1 py-3 rounded-lg items-center justify-center border"
+                  style={{
+                    borderColor: "#6B7280",
+                    backgroundColor: "white",
+                  }}
+                  onPress={closeCancelModal}
+                >
+                  <UIText
+                    className="font-semibold"
+                    style={{ color: "#6B7280" }}
+                  >
+                    Keep Consultation
+                  </UIText>
+                </UIPressable>
+
+                <UIPressable
+                  className="flex-1 py-3 rounded-lg items-center justify-center"
+                  style={{
+                    backgroundColor: "#EF4444",
+                  }}
+                  onPress={handleCancelConsultation}
+                >
+                  <UIText className="font-semibold text-white">
+                    Cancel Consultation
+                  </UIText>
+                </UIPressable>
+              </HStack>
+            </View>
           </View>
         </Modal>
 
