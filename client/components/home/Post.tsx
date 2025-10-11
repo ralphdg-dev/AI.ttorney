@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
 import ReportModal from '../common/ReportModal';
 import { ReportService } from '../../services/reportService';
-import Colors from '../../constants/Colors';
+import Colors from '@/constants/Colors';
+import { GlobalStyles } from '@/constants/GlobalStyles';
+import { createShadowStyle } from '@/utils/shadowUtils';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
 import FadeInView from '../ui/FadeInView';
@@ -291,7 +293,6 @@ const Post: React.FC<PostProps> = React.memo(({
     </FadeInView>
   );
 });
-
 const styles = StyleSheet.create({
   fadeContainer: {
     marginBottom: 12,
@@ -305,11 +306,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E1E8ED',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    ...createShadowStyle({
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
+    }),
   },
   loadingPost: {
     opacity: 0.7,
@@ -391,11 +394,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E1E8ED',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...createShadowStyle({
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    }),
     zIndex: 1000,
     minWidth: 160,
   },

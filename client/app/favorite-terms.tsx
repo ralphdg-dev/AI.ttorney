@@ -98,7 +98,7 @@ export default function FavoritesScreen() {
 
   useEffect(() => {
     loadFavoriteTerms();
-  }, [loadFavoriteTerms]);
+  }, []); // Remove loadFavoriteTerms dependency to prevent infinite loop
 
   // Filter terms based on search query and category
   useEffect(() => {

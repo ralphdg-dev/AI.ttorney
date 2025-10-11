@@ -16,7 +16,7 @@ const UnauthorizedPage: React.FC = () => {
 
   const handleGoHome = () => {
     if (user?.role === 'verified_lawyer') {
-      router.push('/lawyer');
+      router.push('/lawyer' as any);
     } else {
       router.push('/home');
     }

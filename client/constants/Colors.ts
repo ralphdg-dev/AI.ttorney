@@ -89,6 +89,9 @@ export default {
       text: '#6B7280',
     },
   },
+  // Import shadow utilities for cross-platform compatibility
+  // Use: import { shadowPresets, createShadowStyle } from '../utils/shadowUtils';
+  // Note: Import shadowPresets from shadowUtils instead of using these deprecated styles
   shadow: {
     light: {
       shadowColor: '#000',

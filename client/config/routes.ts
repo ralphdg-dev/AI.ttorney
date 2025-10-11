@@ -392,9 +392,6 @@ export const logRouteAccess = (
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown'
   };
 
-  // Log to console for development
-  console.log(`[ROUTE_ACCESS] ${result.toUpperCase()}: ${logData.user} -> ${path}${reason ? ` (${reason})` : ''}`);
-
   // Send to server for audit trail (in production)
   if (process.env.NODE_ENV === 'production') {
     fetch('/api/audit/route-access', {

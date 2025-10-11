@@ -42,7 +42,7 @@ export default function AcceptedStatus() {
     setIsProcessing(true);
     
     // Navigate immediately for better UX
-    router.push('/lawyer');
+    router.push('/lawyer' as any);
     
     try {
       // Clear the pending_lawyer flag in background

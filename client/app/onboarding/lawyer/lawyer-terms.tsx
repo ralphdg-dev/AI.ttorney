@@ -89,7 +89,7 @@ export default function LawyerTerms() {
           'lawyer_selfie_path'
         ]);
         
-        router.push('./documents-success');
+        router.push('/onboarding/lawyer/documents-success');
       } else {
         Alert.alert('Submission Failed', result.message || 'Failed to submit application');
       }

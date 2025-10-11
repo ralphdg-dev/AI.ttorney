@@ -50,27 +50,11 @@ export default function RootLayout() {
                       options={{ headerShown: false }}
                     />
                     <Stack.Screen
-                      name="onboarding"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
                       name="login"
                       options={{ headerShown: false }}
                     />
                     <Stack.Screen
                       name="role-selection"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="nonlaw-reg"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="verifyotp-reg"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="lawyer-starting-page"
                       options={{ headerShown: false }}
                     />
                     <Stack.Screen
@@ -88,13 +72,6 @@ export default function RootLayout() {
                     <Stack.Screen
                       name="lawyer/profile"
                       options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="lawyer"
-                      options={{
-                        headerShown: false,
-                        title: "Lawyer Dashboard",
-                      }}
                     />
                     <Stack.Screen
                       name="directory"
@@ -131,10 +108,6 @@ export default function RootLayout() {
                         headerShown: false,
                         title: "Term Details",
                       }}
-                    />
-                    <Stack.Screen
-                      name="documents-success"
-                      options={{ headerShown: false }}
                     />
                     <Stack.Screen
                       name="consultations"

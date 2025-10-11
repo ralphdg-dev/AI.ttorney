@@ -49,7 +49,7 @@ const LawyerNavbar: React.FC<LawyerNavbarProps> = ({
     // Default navigation behavior
     switch (tabId) {
       case 'home':
-        router.push('/lawyer');
+        router.push('/lawyer' as any);
         break;
       case 'forum':
         router.push('/lawyer/forum' as any);

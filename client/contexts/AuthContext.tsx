@@ -166,10 +166,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         if (initialSession) {
-          console.log('Initial session found:', initialSession.user?.email);
           await handleAuthStateChange(initialSession, false);
         } else {
-          console.log('No initial session found');
           setAuthState({ session: null, user: null, supabaseUser: null });
           setIsLoading(false);
         }
@@ -178,8 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Listen for auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          async (event, session) => {
-            console.log('Auth state change:', event, session?.user?.email || 'no session');
+          async (event: string, session: any) => {
             
             if (event === 'SIGNED_IN' && session) {
               await handleAuthStateChange(session, true);
@@ -208,7 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     initialize();
-  }, [handleAuthStateChange]);
+  }, []);
 
 
   const signIn = async (email: string, password: string) => {

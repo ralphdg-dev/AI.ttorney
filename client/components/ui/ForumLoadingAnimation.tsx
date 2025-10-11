@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, Dimensions, ScrollView } from 'react-native';
 import Colors from '@/constants/Colors';
+import { createShadowStyle } from '@/utils/shadowUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -149,7 +150,13 @@ const styles = {
     marginBottom: 12,
     backgroundColor: Colors.background.primary,
     borderRadius: 12,
-    ...Colors.shadow.light,
+    ...createShadowStyle({
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
+    }),
     overflow: 'hidden' as const,
     position: 'relative' as const,
   },

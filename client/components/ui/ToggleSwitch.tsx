@@ -1,13 +1,14 @@
-import React, { useEffect, useRef, useMemo } from 'react';
-import { Animated, ViewStyle, Platform, Pressable } from 'react-native';
+import React, { useRef, useEffect, useMemo } from 'react';
+import { View, Animated, TouchableOpacity, Dimensions, Platform, Pressable } from 'react-native';
 import Colors from '@/constants/Colors';
+import { createShadowStyle } from '@/utils/shadowUtils';
 
 export interface ToggleSwitchProps {
   value: boolean;
   onValueChange: (next: boolean) => void;
   disabled?: boolean;
-  style?: ViewStyle;
   testID?: string;
+  style?: any;
   // Optional overrides
   activeTrackColor?: string;
   inactiveTrackColor?: string;
@@ -90,11 +91,13 @@ export default function ToggleSwitch({
             borderRadius: THUMB_SIZE / 2,
             backgroundColor: thumbBg,
             transform: [{ translateX }],
-            shadowColor: '#000',
-            shadowOpacity: 0.15,
-            shadowRadius: 2,
-            shadowOffset: { width: 0, height: 1 },
-            elevation: 1,
+            ...createShadowStyle({
+              shadowColor: '#000',
+              shadowOpacity: 0.15,
+              shadowRadius: 2,
+              shadowOffset: { width: 0, height: 1 },
+              elevation: 1,
+            }),
           },
           thumbBorder,
         ]}

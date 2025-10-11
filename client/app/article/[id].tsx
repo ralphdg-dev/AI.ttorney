@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/Colors';
 import { Badge, BadgeText } from '@/components/ui/badge';
 import LegalDisclaimer from '@/components/guides/LegalDisclaimer';
-import { db } from '@/lib/supabase';
+import { supabase } from '@/config/supabase';
 
 // Database article shape (subset)
 interface DbArticleRow {
@@ -60,6 +60,7 @@ export default function ArticleViewScreen() {
   const router = useRouter();
   const [article, setArticle] = useState<DbArticleRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showFilipino, setShowFilipino] = useState(false);
   const noImageUri = 'https://placehold.co/1200x800/png?text=No+Image+Available';
 
@@ -72,21 +73,31 @@ export default function ArticleViewScreen() {
   const fetchArticle = async () => {
     try {
       setLoading(true);
+      setError(null);
+      setArticle(null);
+      
       const numericId = parseInt(id);
       if (Number.isNaN(numericId)) {
-        setArticle(null);
+        setError('Invalid article ID');
         return;
       }
-      const { data, error } = await db.legal.articles.get(numericId);
+      
+      const { data, error } = await supabase
+        .from('legal_articles')
+        .select('*')
+        .eq('id', numericId)
+        .single();
+        
       if (error) {
         console.error('Error fetching article:', error);
-        setArticle(null);
+        setError('Article not found');
         return;
       }
+      
       setArticle(data as unknown as DbArticleRow);
     } catch (error) {
       console.error('Error fetching article:', error);
-      setArticle(null);
+      setError('Failed to load article');
     } finally {
       setLoading(false);
     }
@@ -110,11 +121,11 @@ export default function ArticleViewScreen() {
     );
   }
 
-  if (!article) {
+  if (error || !article) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Article not found</Text>
+          <Text style={styles.errorText}>{error || 'Article not found'}</Text>
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>

@@ -68,7 +68,7 @@ export default function ConsultationsScreen() {
         return;
       }
 
-      const transformedData: Consultation[] = (data || []).map((item) => ({
+      const transformedData: Consultation[] = (data || []).map((item: any) => ({
         id: item.id,
         lawyer_name: (item.lawyer_info as any)?.name || "Unknown Lawyer",
         specialization: (item.lawyer_info as any)?.specialization || "General Law",

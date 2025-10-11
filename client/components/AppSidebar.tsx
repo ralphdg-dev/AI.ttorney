@@ -1,28 +1,10 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useRef,
-  ReactNode,
-} from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Dimensions,
-  ScrollView,
-  Platform,
-  StatusBar,
-} from "react-native";
+ import React, { createContext, useContext, useState, ReactNode, useRef, useEffect } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, Animated, ScrollView, StatusBar } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter, usePathname } from "expo-router";
+import { useFavorites } from "../contexts/FavoritesContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { useFavorites } from "@/contexts/FavoritesContext";
 import {
-  X,
-  User,
   Bookmark,
   Settings,
   HelpCircle,
@@ -32,11 +14,14 @@ import {
   MessageSquare,
   Star,
   Calendar,
+  User,
+  X
 } from "lucide-react-native";
 import Colors from "../constants/Colors";
 import { GlobalStyles } from "../constants/GlobalStyles";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../config/supabase";
+import { createShadowStyle } from "../utils/shadowUtils";
 
 const { width: screenWidth } = Dimensions.get("window");
 const SIDEBAR_WIDTH = screenWidth * 0.8;
@@ -340,11 +325,16 @@ const Sidebar: React.FC<SidebarProps> = ({
             opacity: overlayOpacity,
           },
         ]}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
       >
         <TouchableOpacity
           style={styles.overlayTouchable}
           onPress={onClose}
           activeOpacity={1}
+          accessible={true}
+          accessibilityLabel="Close sidebar"
+          accessibilityRole="button"
         />
       </Animated.View>
 
@@ -358,6 +348,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             paddingBottom: insets.bottom,
           },
         ]}
+        accessible={true}
+        accessibilityRole="menu"
+        accessibilityLabel="Main navigation sidebar"
       >
         {/* Header */}
         <View style={styles.header}>
@@ -497,14 +490,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: SIDEBAR_WIDTH,
     backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 2,
-      height: 0,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 16,
+    ...createShadowStyle({
+      shadowColor: "#000",
+      shadowOffset: { width: 2, height: 0 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      elevation: 16,
+    }),
   },
   header: {
     flexDirection: "row",

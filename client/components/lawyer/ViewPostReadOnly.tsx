@@ -62,6 +62,7 @@ const ViewPostReadOnly: React.FC = () => {
   const [showFullContent, setShowFullContent] = useState(false);
   const [post, setPost] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [, setCurrentTime] = useState(new Date());
   const [bookmarked, setBookmarked] = useState(false);
@@ -229,38 +230,62 @@ const ViewPostReadOnly: React.FC = () => {
     }
   };
 
-  // Optimized post loading with minimal logging
+  // Optimized post loading with parallel requests and caching
   useEffect(() => {
     const load = async () => {
-      if (!postId) return;
+      if (!postId) {
+        setError('No post ID provided');
+        setLoading(false);
+        return;
+      }
       
       // Check authentication first
       if (!isAuthenticated) {
         if (__DEV__) console.warn('ViewPost: User not authenticated, cannot load post');
+        setError('Authentication required');
         setLoading(false);
         return;
       }
       
       setLoading(true);
+      setError(null);
+      setPost(null);
       
-      // Fallback: Hide loading after 5 seconds maximum
+      // Fallback: Hide loading after 8 seconds maximum, but only if there's an error
       const fallbackTimer = setTimeout(() => {
-        if (__DEV__) console.log('ViewPost: Fallback timer triggered');
+        if (__DEV__) console.log('ViewPost: Fallback timer triggered - request taking too long');
+        setError('Request timed out. Please try again.');
         setLoading(false);
-      }, 5000);
+      }, 8000);
       
       try {
         const headers = await getAuthHeaders();
         const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout - faster response
         
-        const response = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
-          method: 'GET',
-          headers,
-          signal: controller.signal,
-        });
+        // Parallel fetch: Start both post and replies requests simultaneously
+        const [postResponse, repliesResponse] = await Promise.allSettled([
+          fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
+            method: 'GET',
+            headers,
+            signal: controller.signal,
+          }),
+          fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
+            method: 'GET',
+            headers,
+            signal: controller.signal,
+          })
+        ]);
+        
+        const response = postResponse.status === 'fulfilled' ? postResponse.value : null;
+        if (!response) {
+          setError('Failed to load post');
+          setLoading(false);
+          clearTimeout(fallbackTimer);
+          return;
+        }
         
         clearTimeout(timeoutId);
         
@@ -268,16 +293,26 @@ const ViewPostReadOnly: React.FC = () => {
           const errorText = await response.text();
           if (response.status === 403) {
             if (__DEV__) console.error('ViewPost: Authentication failed - 403 Forbidden');
+            setError('Authentication failed');
+            setPost(null);
+            setLoading(false);
+            clearTimeout(fallbackTimer);
+            return;
+          } else if (response.status === 404) {
+            if (__DEV__) console.error('ViewPost: Post not found - 404');
+            setError('Post not found');
+            setPost(null);
+            setLoading(false);
+            clearTimeout(fallbackTimer);
+            return;
+          } else {
+            if (__DEV__) console.error(`ViewPost: Failed to load post ${response.status}:`, errorText);
+            setError(`Failed to load post: ${response.status}`);
             setPost(null);
             setLoading(false);
             clearTimeout(fallbackTimer);
             return;
           }
-          if (__DEV__) console.error(`ViewPost: Failed to load post ${response.status}:`, errorText);
-          setPost(null);
-          setLoading(false);
-          clearTimeout(fallbackTimer);
-          return;
         }
         
         const res = await response.json();
@@ -315,6 +350,49 @@ const ViewPostReadOnly: React.FC = () => {
             replies: [],
           };
           setPost(mapped);
+          
+          // Process replies if available
+          if (repliesResponse.status === 'fulfilled' && repliesResponse.value.ok) {
+            try {
+              const repliesData = await repliesResponse.value.json();
+              let rows = null;
+              if (repliesData.success && repliesData.data) {
+                rows = (repliesData.data as any)?.data || repliesData.data;
+              }
+              
+              if (Array.isArray(rows)) {
+                const mappedReplies: Reply[] = rows.map((r: any) => {
+                  const isReplyAnon = !!r.is_anonymous;
+                  const replyUserData = r?.users || {};
+                  
+                  return {
+                    id: String(r.id),
+                    body: r.reply_body ?? r.body,
+                    created_at: r.created_at || null,
+                    updated_at: r.updated_at || null,
+                    user_id: r.user_id || null,
+                    is_anonymous: isReplyAnon,
+                    is_flagged: !!r.is_flagged,
+                    user: isReplyAnon ? undefined : {
+                      name: replyUserData?.full_name || replyUserData?.username || 'User',
+                      username: replyUserData?.username || 'user',
+                      avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+                      isLawyer: replyUserData?.role === 'verified_lawyer',
+                      lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+                    },
+                  };
+                });
+                setReplies(mappedReplies);
+              } else {
+                setReplies([]);
+              }
+            } catch (repliesError) {
+              if (__DEV__) console.warn('ViewPost: Failed to process replies:', repliesError);
+              setReplies([]);
+            }
+          } else {
+            setReplies([]);
+          }
         } else {
           setPost(null);
         }
@@ -333,77 +411,7 @@ const ViewPostReadOnly: React.FC = () => {
     load();
   }, [postId, isAuthenticated, getAuthHeaders]);
 
-  useEffect(() => {
-    const loadReplies = async () => {
-      if (!postId || !isAuthenticated) return;
-      
-      try {
-        // Use direct API call with authentication
-        const headers = await getAuthHeaders();
-        const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
-        
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-        
-        const response = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
-          method: 'GET',
-          headers,
-          signal: controller.signal,
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          if (__DEV__) console.error(`ViewPost: Failed to load replies: ${response.status}`);
-          setReplies([]);
-          return;
-        }
-        
-        const rep = await response.json();
-      
-      // Handle both nested and direct data structures
-      let rows = null;
-      if (rep.success && rep.data) {
-        rows = (rep.data as any)?.data || rep.data;
-      }
-      
-      if (Array.isArray(rows)) {
-        const mapped: Reply[] = rows.map((r: any) => {
-          const isReplyAnon = !!r.is_anonymous;
-          const replyUserData = r?.users || {};
-          
-          return {
-            id: String(r.id),
-            body: r.reply_body ?? r.body,
-            created_at: r.created_at || null,
-            updated_at: r.updated_at || null,
-            user_id: r.user_id || null,
-            is_anonymous: isReplyAnon,
-            is_flagged: !!r.is_flagged,
-            user: isReplyAnon ? undefined : {
-              name: replyUserData?.full_name || replyUserData?.username || 'User',
-              username: replyUserData?.username || 'user',
-              avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
-              isLawyer: replyUserData?.role === 'verified_lawyer',
-              lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
-            },
-          };
-        });
-        setReplies(mapped);
-      } else {
-        setReplies([]);
-      }
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          if (__DEV__) console.log('ViewPost: Replies request aborted');
-          return;
-        }
-        if (__DEV__) console.error('ViewPost: Error loading replies:', error);
-        setReplies([]);
-      }
-    };
-    loadReplies();
-  }, [postId, isAuthenticated, getAuthHeaders]);
+  // Removed separate replies loading effect - now handled in parallel with post loading
 
   const isAnonymous = post?.is_anonymous || false;
   const displayUser = isAnonymous 
@@ -570,9 +578,20 @@ const ViewPostReadOnly: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         
-        {!post && !loading && (
-          <View style={tw`px-5 py-6`}>
-            <Text style={tw`text-gray-500`}>Post not found.</Text>
+        {!post && !loading && error && (
+          <View style={tw`px-5 py-6 items-center`}>
+            <Text style={tw`text-gray-500 text-center mb-4`}>{error}</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setError(null);
+                setLoading(true);
+                // Trigger reload by updating a dependency
+                setPost(null);
+              }}
+              style={tw`bg-blue-500 px-4 py-2 rounded-lg`}
+            >
+              <Text style={tw`text-white font-medium`}>Try Again</Text>
+            </TouchableOpacity>
           </View>
         )}
         {post && (
