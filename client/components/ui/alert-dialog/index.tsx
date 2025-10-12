@@ -91,15 +91,13 @@ const alertDialogBackdropStyle = tva({
   base: 'absolute left-0 top-0 right-0 bottom-0 bg-background-dark web:cursor-default',
 });
 
-type IAlertDialogProps = React.ComponentPropsWithoutRef<
-  typeof UIAccessibleAlertDialog
-> &
-  VariantProps<typeof alertDialogStyle>;
+type IAlertDialogProps = React.ComponentProps<typeof UIAccessibleAlertDialog> &
+  VariantProps<typeof alertDialogStyle> & { className?: string; style?: any };
 
 type IAlertDialogContentProps = React.ComponentPropsWithoutRef<
   typeof UIAccessibleAlertDialog.Content
 > &
-  VariantProps<typeof alertDialogContentStyle> & { className?: string };
+  VariantProps<typeof alertDialogContentStyle> & { className?: string; style?: any };
 
 type IAlertDialogCloseButtonProps = React.ComponentPropsWithoutRef<
   typeof UIAccessibleAlertDialog.CloseButton
@@ -136,7 +134,7 @@ const AlertDialog = React.forwardRef<
       {...props}
       className={alertDialogStyle({ class: className })}
       context={{ size }}
-      pointerEvents="box-none"
+      style={{ pointerEvents: 'box-none', ...(props.style || {}) }}
     />
   );
 });
@@ -149,7 +147,7 @@ const AlertDialogContent = React.forwardRef<
 
   return (
     <UIAccessibleAlertDialog.Content
-      pointerEvents="auto"
+      style={{ pointerEvents: 'auto', ...(props.style || {}) }}
       ref={ref}
       initial={{
         scale: 0.9,

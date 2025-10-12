@@ -4,7 +4,7 @@ import tw from "tailwind-react-native-classnames";
 import Colors from "@/constants/Colors";
 import { ChevronRight, Star } from "lucide-react-native";
 import { Badge, BadgeText } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import Card from "@/components/ui/Card";
 import { useFavorites } from "@/contexts/FavoritesContext";
 
 export interface TermItem {
@@ -78,16 +78,20 @@ export default function TermListItem({ item, onPress, containerStyle }: TermList
             >
               {item.title}
             </Text>
-            {item.category ? (
-              <Badge
-                variant="outline"
-                className={`rounded-md ${getCategoryBadgeClasses(item.category).container}`}
-              >
-                <BadgeText size="sm" className={getCategoryBadgeClasses(item.category).text}>
-                  {item.category}
-                </BadgeText>
-              </Badge>
-            ) : null}
+            <View style={tw`flex-row items-center`}>
+              {item.category ? (
+                <Badge
+                  variant="outline"
+                  className={`rounded-md ${getCategoryBadgeClasses(item.category).container}`}
+                  style={{ marginRight: 8 }}
+                >
+                  <BadgeText size="sm" className={getCategoryBadgeClasses(item.category).text}>
+                    {item.category}
+                  </BadgeText>
+                </Badge>
+              ) : null}
+              <ChevronRight size={18} color="#9ca3af" />
+            </View>
           </View>
           {item.filipinoTerm ? (
             <Text style={[tw`text-sm mb-3 font-medium`, { color: Colors.primary.blue }]}>
@@ -111,7 +115,6 @@ export default function TermListItem({ item, onPress, containerStyle }: TermList
             </Text>
           ) : null}
         </View>
-        <ChevronRight size={18} color="#9ca3af" />
       </Card>
     </TouchableOpacity>
   );

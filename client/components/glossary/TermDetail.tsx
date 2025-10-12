@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, useWindowDimensions, Alert, ActivityIndicator, TouchableOpacity } from "react-native";
 import Colors from "@/constants/Colors";
-import { Card } from "@/components/ui/card";
+import Card from "@/components/ui/Card";
 import { Heading } from "@/components/ui/heading";
 import { Text as GSText } from "@/components/ui/text";
 import { HStack } from "@/components/ui/hstack";

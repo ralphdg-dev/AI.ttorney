@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, Text } from 'react-native';
-import { router, usePathname } from 'expo-router';
+import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { lawyerApplicationService } from '../services/lawyerApplicationService';
 import { useStatusPolling } from '../hooks/useStatusPolling';
@@ -12,7 +12,6 @@ interface LawyerStatusGuardProps {
 
 export default function LawyerStatusGuard({ children, requiredStatus }: LawyerStatusGuardProps) {
   const { user } = useAuth();
-  const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
 
@@ -37,6 +36,7 @@ export default function LawyerStatusGuard({ children, requiredStatus }: LawyerSt
 
   useEffect(() => {
     checkStatusAccess();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, requiredStatus]);
 
   const redirectToCorrectStatusPage = (actualStatus: string, statusData: any) => {
@@ -93,10 +93,6 @@ export default function LawyerStatusGuard({ children, requiredStatus }: LawyerSt
       if (actualStatus === requiredStatus) {
         setHasAccess(true);
       } else {
-        // Special case: If current status is 'pending' but version > 1, it's a resubmission pending review
-        const isResubmissionPending = actualStatus === 'pending' && 
-                                     statusData.application.version && 
-                                     statusData.application.version > 1;
         
         // Redirect to the correct status page based on their actual status
         switch (actualStatus) {

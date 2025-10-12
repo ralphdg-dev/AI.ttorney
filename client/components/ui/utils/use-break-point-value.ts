@@ -2,7 +2,8 @@ import { Dimensions, useWindowDimensions } from 'react-native';
 import { useEffect, useState } from 'react';
 
 import resolveConfig from 'tailwindcss/resolveConfig';
-import * as tailwindConfig from '@/tailwind.config';
+// @ts-ignore
+import tailwindConfig from '@/tailwind.config';
 
 const TailwindTheme = resolveConfig(tailwindConfig as any);
 const screenSize = TailwindTheme.theme.screens;
@@ -35,7 +36,7 @@ export const getBreakPointValue = (
   if (typeof values !== 'object') return values;
 
   let finalBreakPointResolvedValue: unknown;
-  const mediaQueriesBreakpoints: Array<MediaQueriesBreakpoints> = [
+  const mediaQueriesBreakpoints: MediaQueriesBreakpoints[] = [
     {
       key: 'default',
       breakpoint: 0,
@@ -59,10 +60,10 @@ export const getBreakPointValue = (
 
   mediaQueriesBreakpoints.forEach(
     (breakpoint: MediaQueriesBreakpoints, index: number) => {
-      breakpoint.value = values.hasOwnProperty(breakpoint.key)
+      (breakpoint as any).value = values.hasOwnProperty(breakpoint.key)
         ? values[breakpoint.key]
-        : mediaQueriesBreakpoints[index - 1]?.value ||
-          mediaQueriesBreakpoints[0]?.value;
+        : (mediaQueriesBreakpoints[index - 1] as any)?.value ||
+          (mediaQueriesBreakpoints[0] as any)?.value;
     }
   );
 
@@ -71,7 +72,7 @@ export const getBreakPointValue = (
   if (!lastValidObject) {
     finalBreakPointResolvedValue = values;
   } else {
-    finalBreakPointResolvedValue = lastValidObject.value;
+    finalBreakPointResolvedValue = (lastValidObject as any).value;
   }
   return finalBreakPointResolvedValue;
 };
@@ -104,17 +105,17 @@ export function isValidBreakpoint(
   return windowWidth >= breakPointWidth;
 }
 
-function getLastValidObject(
-  mediaQueries: Array<{
+function getLastValidObject<T>(
+  mediaQueries: {
     key: breakpoints;
     breakpoint: number;
     isValid: boolean;
     value?: unknown;
-  }>
-) {
+  }[]
+): T | null {
   for (let i = mediaQueries.length - 1; i >= 0; i--) {
     if (mediaQueries[i].isValid) {
-      return mediaQueries[i];
+      return mediaQueries[i] as T;
     }
   }
   return null; // No valid object found

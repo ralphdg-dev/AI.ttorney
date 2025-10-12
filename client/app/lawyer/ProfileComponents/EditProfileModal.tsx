@@ -140,8 +140,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [isEditingAvailability, setIsEditingAvailability] =
     React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [localAvailabilitySlots, setLocalAvailabilitySlots] =
-    React.useState<TimeSlot[]>(availabilitySlots);
+  const [, setLocalAvailabilitySlots] = React.useState<TimeSlot[]>(availabilitySlots);
 
   const [selectedDays, setSelectedDays] = React.useState<string[]>([]);
   const [dayTimeSlots, setDayTimeSlots] = React.useState<
@@ -493,7 +492,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       try {
         const hoursData = JSON.parse(profileData.hours_available);
         setDayTimeSlots(hoursData);
-      } catch (error) {
+      } catch {
         setDayTimeSlots({});
       }
     } else {

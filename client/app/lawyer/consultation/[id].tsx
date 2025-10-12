@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, Image, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ScrollView, View, Text, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Mail, Phone, Calendar, Clock, MessageSquare, Settings, AlertTriangle } from 'lucide-react-native';
-import { Button, ButtonText } from '../../../components/ui/button';
+import { Button, ButtonText } from '../../../components/ui/button/';
 import { HStack } from '../../../components/ui/hstack';
 import { useAuth } from '../../../contexts/AuthContext';
 import Colors from '../../../constants/Colors';
@@ -35,14 +35,14 @@ interface ConsultationRequest {
 const ConsultationDetailPage: React.FC = () => {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { user, session } = useAuth();
+  const { session } = useAuth();
   const [consultation, setConsultation] = useState<ConsultationRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [actionType, setActionType] = useState<'accept' | 'reject' | 'complete' | null>(null);
 
   // Fetch consultation details
-  const fetchConsultationDetails = async () => {
+  const fetchConsultationDetails = useCallback(async () => {
     if (!id || !session?.access_token) return;
 
     try {
@@ -71,13 +71,13 @@ const ConsultationDetailPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, session?.access_token, router]);
 
   useEffect(() => {
     if (id && session?.access_token) {
       fetchConsultationDetails();
     }
-  }, [id, session?.access_token]);
+  }, [id, session?.access_token, fetchConsultationDetails]);
 
   const formatTimeAgo = (timestamp: string) => {
     const now = new Date();

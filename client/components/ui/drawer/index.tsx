@@ -157,13 +157,13 @@ const drawerFooterStyle = tva({
 });
 
 type IDrawerProps = React.ComponentProps<typeof UIDrawer> &
-  VariantProps<typeof drawerStyle> & { className?: string };
+  VariantProps<typeof drawerStyle> & { className?: string; style?: any };
 
 type IDrawerBackdropProps = React.ComponentProps<typeof UIDrawer.Backdrop> &
   VariantProps<typeof drawerBackdropStyle> & { className?: string };
 
 type IDrawerContentProps = React.ComponentProps<typeof UIDrawer.Content> &
-  VariantProps<typeof drawerContentStyle> & { className?: string };
+  VariantProps<typeof drawerContentStyle> & { className?: string; style?: any };
 
 type IDrawerHeaderProps = React.ComponentProps<typeof UIDrawer.Header> &
   VariantProps<typeof drawerHeaderStyle> & { className?: string };
@@ -187,7 +187,7 @@ const Drawer = React.forwardRef<
     <UIDrawer
       ref={ref}
       {...props}
-      pointerEvents="box-none"
+      style={{ pointerEvents: 'box-none', ...(props.style || {}) }}
       className={drawerStyle({ size, anchor, class: className })}
       context={{ size, anchor }}
     />
@@ -270,7 +270,7 @@ const DrawerContent = React.forwardRef<
         },
         class: `${className} ${customClass}`,
       })}
-      pointerEvents="auto"
+      style={{ pointerEvents: 'auto', ...(props.style || {}) }}
     />
   );
 });

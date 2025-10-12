@@ -1,8 +1,8 @@
  import React, { createContext, useContext, useState, ReactNode, useRef, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, Animated, ScrollView, StatusBar } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter, usePathname } from "expo-router";
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated, ScrollView, StatusBar } from "react-native";
+import { useRouter } from "expo-router";
 import { useFavorites } from "../contexts/FavoritesContext";
+import { shouldUseNativeDriver } from '@/utils/animations';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Bookmark,
@@ -143,12 +143,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         Animated.timing(slideAnim, {
           toValue: 0,
           duration: 280,
-          useNativeDriver: Platform.OS !== 'web',
+          useNativeDriver: shouldUseNativeDriver('transform'),
         }),
         Animated.timing(overlayOpacity, {
           toValue: 0.5,
           duration: 280,
-          useNativeDriver: Platform.OS !== 'web',
+          useNativeDriver: shouldUseNativeDriver('transform'),
         }),
       ]).start();
     } else if (shouldRender) {
@@ -156,12 +156,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         Animated.timing(slideAnim, {
           toValue: -SIDEBAR_WIDTH,
           duration: 280,
-          useNativeDriver: Platform.OS !== 'web',
+          useNativeDriver: shouldUseNativeDriver('transform'),
         }),
         Animated.timing(overlayOpacity, {
           toValue: 0,
           duration: 280,
-          useNativeDriver: Platform.OS !== 'web',
+          useNativeDriver: shouldUseNativeDriver('transform'),
         }),
       ]).start(() => {
         setShouldRender(false);

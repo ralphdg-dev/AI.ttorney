@@ -7,6 +7,7 @@ import { ReportService } from '../../services/reportService';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 import Header from '../Header';
+// eslint-disable-next-line import/no-named-as-default
 import apiClient from '@/lib/api-client';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -68,7 +69,6 @@ const LawyerViewPost: React.FC = () => {
   const [isReplying, setIsReplying] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [showFullContent, setShowFullContent] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [bookmarked, setBookmarked] = useState(false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
@@ -201,20 +201,13 @@ const LawyerViewPost: React.FC = () => {
     if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
     
     return new Date(normalized).toLocaleDateString();
-  }, [currentTime]); // Depend on currentTime to trigger re-renders
+   
+  }, []); // currentTime dependency removed to avoid unnecessary re-renders
 
   const [post, setPost] = useState<PostData | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [optimisticReplies, setOptimisticReplies] = useState<Reply[]>([]);
 
-  // Real-time timer effect - update more frequently for better responsiveness
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 10000); // Update every 10 seconds for real-time feel
-
-    return () => clearInterval(timer);
-  }, []);
 
   // Check initial bookmark status
   useEffect(() => {
@@ -234,6 +227,7 @@ const LawyerViewPost: React.FC = () => {
       }
     };
     checkBookmarkStatus();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId, currentUser?.id]);
 
   const handleBookmarkPress = async () => {
@@ -368,6 +362,7 @@ const LawyerViewPost: React.FC = () => {
       setLoading(false);
     };
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId]);
 
   // Derived data
@@ -486,36 +481,6 @@ const LawyerViewPost: React.FC = () => {
     setOptimisticReplies(prev => prev.filter(r => r.id !== optimisticId));
   }, []);
 
-  // Function to reload replies
-  const loadReplies = useCallback(async () => {
-    if (!postId) return;
-    const rep = await apiClient.getForumReplies(String(postId));
-    if (rep.success && Array.isArray((rep.data as any)?.data)) {
-      const rows = (rep.data as any).data as any[];
-      const mappedReplies: Reply[] = rows.map((r: any) => {
-        const isReplyAnon = !!r.is_anonymous;
-        const replyUserData = r?.users || {};
-        
-        return {
-          id: String(r.id),
-          body: r.reply_body ?? r.body,
-          created_at: r.created_at || null,
-          updated_at: r.updated_at || null,
-          user_id: r.user_id || null,
-          is_anonymous: isReplyAnon,
-          is_flagged: !!r.is_flagged,
-          user: isReplyAnon ? undefined : {
-            name: replyUserData?.full_name || replyUserData?.username || 'User',
-            username: replyUserData?.username || 'user',
-            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
-            isLawyer: replyUserData?.role === 'verified_lawyer',
-            lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
-          },
-        };
-      });
-      setReplies(mappedReplies);
-    }
-  }, [postId]);
 
   const handleSendReply = async () => {
     const text = replyText.trim();

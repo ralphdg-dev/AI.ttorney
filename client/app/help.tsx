@@ -9,7 +9,7 @@ import { VStack } from "@/components/ui/vstack";
 import { Text as GSText } from "@/components/ui/text";
 import Colors from "@/constants/Colors";
 import Navbar from "@/components/Navbar";
-import { Search, Bell, HelpCircle, BookOpen, CreditCard, Plus, Minus } from "lucide-react-native";
+import { Search, HelpCircle, BookOpen, CreditCard, Minus, Plus } from "lucide-react-native";
 import { Input, InputField } from "@/components/ui/input";
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {

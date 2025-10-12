@@ -3,7 +3,7 @@ import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody, ModalFooter
 import { VStack } from '../ui/vstack';
 import { Text } from '../ui/text';
 import { Heading } from '../ui/heading';
-import { Button, ButtonText } from '../ui/button';
+import { Button, ButtonText } from '../ui/button/';
 import { Icon } from '../ui/icon';
 import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react-native';
 import { Box } from '../ui/box';

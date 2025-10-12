@@ -4,7 +4,6 @@ import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } fro
 import ReportModal from '../common/ReportModal';
 import { ReportService } from '../../services/reportService';
 import Colors from '@/constants/Colors';
-import { GlobalStyles } from '@/constants/GlobalStyles';
 import { createShadowStyle } from '@/utils/shadowUtils';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';

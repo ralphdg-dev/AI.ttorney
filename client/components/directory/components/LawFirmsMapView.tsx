@@ -5,7 +5,7 @@ import { NetworkConfig } from '../../../utils/networkConfig';
 import { VStack } from '@/components/ui/vstack';
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
-import { Button, ButtonText } from '@/components/ui/button';
+import { Button, ButtonText } from '@/components/ui/button/';
 import { Box } from '@/components/ui/box';
 import { Pressable } from '@/components/ui/pressable';
 import { Spinner } from '@/components/ui/spinner';
@@ -23,6 +23,7 @@ import {
   X
 } from 'lucide-react-native';
 import Colors from '../../../constants/Colors';
+import { shadowPresets, createShadowStyle } from '../../../utils/shadowUtils';
 
 // Constants
 const CONSTANTS = {
@@ -1161,11 +1162,13 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
                 borderRadius: 8,
                 borderWidth: 1,
                 borderColor: '#E5E7EB',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.15,
-                shadowRadius: 8,
-                elevation: 10,
+                ...createShadowStyle({
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 8,
+                  elevation: 10,
+                }),
                 maxHeight: screenSize.isSmall ? 200 : 250,
               }}
             >
@@ -1293,11 +1296,13 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
               borderWidth: 1,
               borderColor: '#E5E7EB',
               borderRadius: 12,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.15,
-              shadowRadius: 12,
-              elevation: 12,
+              ...createShadowStyle({
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 12,
+                elevation: 12,
+              }),
               zIndex: 9999,
               minWidth: 140,
             }}
@@ -1386,11 +1391,7 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
         backgroundColor: 'white',
         marginBottom: 12,
         borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 2,
+        ...shadowPresets.light,
         borderWidth: 1,
         borderColor: '#f1f5f9'
       }}
@@ -1648,11 +1649,7 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
                   backgroundColor: Colors.primary.blue,
                   borderRadius: 50,
                   padding: 16,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 4,
-                  elevation: 3
+                  ...shadowPresets.medium
                 }}
               >
                 <MapPin 
@@ -1700,11 +1697,13 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
                     minHeight: 48,
                     paddingHorizontal: 16,
                     borderRadius: 12,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.15,
-                    shadowRadius: 4,
-                    elevation: 4
+                    ...createShadowStyle({
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 4,
+                      elevation: 4
+                    })
                   }}
                   onPress={() => setShowMapView(true)}
                 >

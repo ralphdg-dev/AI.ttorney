@@ -1,8 +1,22 @@
-import { Animated, Easing } from 'react-native';
+import { Animated, Easing, Platform } from 'react-native';
 
 /**
  * Standardized animation utilities for consistent transitions across the app
  */
+
+/**
+ * Determines whether to use native driver based on platform and animation type
+ * Native driver is not supported on web platform
+ */
+export const shouldUseNativeDriver = (animationType: 'opacity' | 'transform' | 'all' = 'all'): boolean => {
+  // Native driver is not supported on web
+  if (Platform.OS === 'web') {
+    return false;
+  }
+  
+  // For mobile platforms, native driver is supported for opacity and transform animations
+  return true;
+};
 
 export const AnimationDurations = {
   fast: 150,
@@ -31,7 +45,7 @@ export const fadeIn = (
     toValue: 1,
     duration,
     easing,
-    useNativeDriver: true,
+    useNativeDriver: shouldUseNativeDriver('opacity'),
   });
 };
 
@@ -44,7 +58,7 @@ export const fadeOut = (
     toValue: 0,
     duration,
     easing,
-    useNativeDriver: true,
+    useNativeDriver: shouldUseNativeDriver('opacity'),
   });
 };
 
@@ -60,7 +74,7 @@ export const scaleIn = (
     toValue: 1,
     duration,
     easing,
-    useNativeDriver: true,
+    useNativeDriver: shouldUseNativeDriver('transform'),
   });
 };
 
@@ -73,7 +87,7 @@ export const scaleOut = (
     toValue: 0,
     duration,
     easing,
-    useNativeDriver: true,
+    useNativeDriver: shouldUseNativeDriver('transform'),
   });
 };
 
@@ -90,7 +104,7 @@ export const slideInFromRight = (
     toValue: 0,
     duration,
     easing,
-    useNativeDriver: true,
+    useNativeDriver: shouldUseNativeDriver('transform'),
   });
 };
 
@@ -104,7 +118,7 @@ export const slideInFromLeft = (
     toValue: 0,
     duration,
     easing,
-    useNativeDriver: true,
+    useNativeDriver: shouldUseNativeDriver('transform'),
   });
 };
 
@@ -121,7 +135,7 @@ export const springAnimation = (
     toValue,
     tension,
     friction,
-    useNativeDriver: true,
+    useNativeDriver: shouldUseNativeDriver('transform'),
   });
 };
 
@@ -140,13 +154,13 @@ export const createPulseAnimation = (
         toValue: maxOpacity,
         duration: duration / 2,
         easing: AnimationEasings.easeInOut,
-        useNativeDriver: true,
+        useNativeDriver: shouldUseNativeDriver('opacity'),
       }),
       Animated.timing(animatedValue, {
         toValue: minOpacity,
         duration: duration / 2,
         easing: AnimationEasings.easeInOut,
-        useNativeDriver: true,
+        useNativeDriver: shouldUseNativeDriver('opacity'),
       }),
     ])
   );
@@ -178,27 +192,27 @@ export const createShakeAnimation = (
     Animated.timing(animatedValue, {
       toValue: intensity,
       duration: duration / 8,
-      useNativeDriver: true,
+      useNativeDriver: shouldUseNativeDriver('transform'),
     }),
     Animated.timing(animatedValue, {
       toValue: -intensity,
       duration: duration / 8,
-      useNativeDriver: true,
+      useNativeDriver: shouldUseNativeDriver('transform'),
     }),
     Animated.timing(animatedValue, {
       toValue: intensity,
       duration: duration / 8,
-      useNativeDriver: true,
+      useNativeDriver: shouldUseNativeDriver('transform'),
     }),
     Animated.timing(animatedValue, {
       toValue: -intensity,
       duration: duration / 8,
-      useNativeDriver: true,
+      useNativeDriver: shouldUseNativeDriver('transform'),
     }),
     Animated.timing(animatedValue, {
       toValue: 0,
       duration: duration / 2,
-      useNativeDriver: true,
+      useNativeDriver: shouldUseNativeDriver('transform'),
     }),
   ]);
 };
@@ -215,7 +229,7 @@ export const createRotationAnimation = (
       toValue: 1,
       duration,
       easing: Easing.linear,
-      useNativeDriver: true,
+      useNativeDriver: shouldUseNativeDriver('transform'),
     })
   );
 };

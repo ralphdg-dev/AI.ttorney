@@ -16,6 +16,7 @@ import { Pressable as UIPressable } from "@/components/ui/pressable";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../../../constants/Colors";
 import tw from "tailwind-react-native-classnames";
+import { createShadowStyle } from "../../../utils/shadowUtils";
 
 interface FilterModalProps {
   visible: boolean;
@@ -87,6 +88,7 @@ export default function FilterModal({
         }),
       ]).start();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   if (!visible) return null;
@@ -111,11 +113,13 @@ export default function FilterModal({
               {
                 marginTop: "auto",
                 transform: [{ translateY: slideAnim }],
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: -4 },
-                shadowOpacity: 0.1,
-                shadowRadius: 12,
-                elevation: 20,
+                ...createShadowStyle({
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: -4 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 12,
+                  elevation: 20,
+                }),
               },
             ]}
           >

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { View, Text, ScrollView, RefreshControl, Animated } from "react-native";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { View, RefreshControl, ScrollView, Animated } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import tw from "tailwind-react-native-classnames";
 import Header from "../components/Header";
@@ -11,6 +11,7 @@ import {
 import Colors from "../constants/Colors";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../config/supabase";
+import { shouldUseNativeDriver } from "@/utils/animations";
 
 // Import consultation components
 import ConsultationCard, { type Consultation } from "@/components/sidebar/consultations/ConsultationCard";
@@ -33,7 +34,7 @@ export default function ConsultationsScreen() {
   const scaleAnim = useState(new Animated.Value(0.8))[0];
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const fetchConsultations = async () => {
+  const fetchConsultations = useCallback(async () => {
     if (!user?.id) {
       return;
     }
@@ -88,7 +89,7 @@ export default function ConsultationsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -109,7 +110,7 @@ export default function ConsultationsScreen() {
     } else {
       setLoading(false); // Stop loading if not authenticated
     }
-  }, [authLoading, isAuthenticated, user?.id]);
+  }, [authLoading, isAuthenticated, user?.id, fetchConsultations]);
 
   // Also fetch when screen comes into focus (for navigation)
   useFocusEffect(
@@ -117,7 +118,7 @@ export default function ConsultationsScreen() {
       if (!authLoading && isAuthenticated && user?.id) {
         fetchConsultations();
       }
-    }, [authLoading, isAuthenticated, user?.id])
+    }, [authLoading, isAuthenticated, user?.id, fetchConsultations])
   );
 
   const openDetailsModal = (consultation: Consultation) => {
@@ -127,12 +128,12 @@ export default function ConsultationsScreen() {
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: shouldUseNativeDriver('opacity'),
       }),
       Animated.timing(scaleAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: shouldUseNativeDriver('transform'),
       }),
     ]).start();
   };
@@ -142,12 +143,12 @@ export default function ConsultationsScreen() {
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver: shouldUseNativeDriver('opacity'),
       }),
       Animated.timing(scaleAnim, {
         toValue: 0.8,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver: shouldUseNativeDriver('transform'),
       }),
     ]).start(() => {
       setModalVisible(false);

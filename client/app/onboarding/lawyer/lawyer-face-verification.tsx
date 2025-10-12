@@ -59,7 +59,7 @@ export default function LawyerFaceVerification() {
           // Keep the preview but show warning - don't remove the image
           Alert.alert('Upload Warning', 'Selfie captured but upload failed. You can continue and try again later.');
         }
-      } catch (error) {
+      } catch {
         // Keep the preview but show warning - don't remove the image
         Alert.alert('Upload Warning', 'Selfie captured but upload failed. You can continue and try again later.');
       } finally {

@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useMemo } from 'react';
-import { View, Animated, TouchableOpacity, Dimensions, Platform, Pressable } from 'react-native';
+import { Animated, Pressable } from 'react-native';
+import { shouldUseNativeDriver } from '@/utils/animations';
 import Colors from '@/constants/Colors';
 import { createShadowStyle } from '@/utils/shadowUtils';
 
@@ -40,7 +41,7 @@ export default function ToggleSwitch({
     Animated.timing(animated, {
       toValue: value ? 1 : 0,
       duration: 160,
-      useNativeDriver: Platform.OS !== 'web',
+      useNativeDriver: shouldUseNativeDriver('transform'),
     }).start();
   }, [value, animated]);
 

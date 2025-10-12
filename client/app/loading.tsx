@@ -50,7 +50,7 @@ export default function LoadingPage() {
                 // If still loading, default to pending status
                 router.replace('/onboarding/lawyer/lawyer-status/pending' as any);
               }
-            } catch (timeoutError) {
+            } catch {
               // If timeout or API error, default to pending status
               console.warn('Status check timeout, defaulting to pending');
               router.replace('/onboarding/lawyer/lawyer-status/pending' as any);

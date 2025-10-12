@@ -165,7 +165,7 @@ const LawyerProfilePage: React.FC = () => {
   ]);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
   const [showAllSpecializations, setShowAllSpecializations] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isAcceptingConsultations, setIsAcceptingConsultations] =
@@ -455,7 +455,8 @@ const LawyerProfilePage: React.FC = () => {
     if (isInitialLoad && user) {
       initializeProfileData();
     }
-  }, [user, isInitialLoad, fetchLawyerContactInfo, fetchProfessionalInfo]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isInitialLoad]);
 
   const refreshProfileData = useCallback(async () => {
     if (!user) return;

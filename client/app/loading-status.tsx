@@ -13,6 +13,7 @@ export default function LoadingStatus() {
     if (user) {
       loadStatusAndRedirect();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
 
@@ -44,7 +45,7 @@ export default function LoadingStatus() {
       let statusData;
       try {
         statusData = await Promise.race([statusPromise, timeoutPromise]);
-      } catch (timeoutError) {
+      } catch {
         // If timeout or error, default to pending status
         router.replace('/onboarding/lawyer/lawyer-status/pending');
         return;

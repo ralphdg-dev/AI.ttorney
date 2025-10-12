@@ -1,10 +1,10 @@
 import { useRef, useState, useEffect } from 'react';
-import { Animated, Platform } from 'react-native';
+import { Animated } from 'react-native';
+import { shouldUseNativeDriver } from '@/utils/animations';
 import { State } from 'react-native-gesture-handler';
 
 export function useOnboardingAnimation(totalSlides: number) {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const progressAnims = useRef([
     new Animated.Value(0), // Slide 0
@@ -16,21 +16,21 @@ export function useOnboardingAnimation(totalSlides: number) {
   // Initialize first progress dot as active
   useEffect(() => {
     progressAnims[0].setValue(1);
-  }, []);
+  }, [progressAnims]);
 
   const animateProgress = (newSlide: number) => {
     // Animate out current slide progress
     Animated.timing(progressAnims[currentSlide], {
       toValue: 0,
       duration: 150,
-      useNativeDriver: Platform.OS !== 'web',
+      useNativeDriver: shouldUseNativeDriver('opacity'),
     }).start();
 
     // Animate in new slide progress
     Animated.timing(progressAnims[newSlide], {
       toValue: 1,
       duration: 150,
-      useNativeDriver: Platform.OS !== 'web',
+      useNativeDriver: shouldUseNativeDriver('opacity'),
     }).start();
   };
 
@@ -40,7 +40,7 @@ export function useOnboardingAnimation(totalSlides: number) {
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 150,
-        useNativeDriver: Platform.OS !== 'web',
+        useNativeDriver: shouldUseNativeDriver('opacity'),
       }).start(() => {
         const newSlide = currentSlide + 1;
         setCurrentSlide(newSlide);
@@ -49,7 +49,7 @@ export function useOnboardingAnimation(totalSlides: number) {
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 150,
-          useNativeDriver: Platform.OS !== 'web',
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }).start();
       });
     } else {
@@ -63,7 +63,7 @@ export function useOnboardingAnimation(totalSlides: number) {
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 150,
-        useNativeDriver: Platform.OS !== 'web',
+        useNativeDriver: shouldUseNativeDriver('opacity'),
       }).start(() => {
         const newSlide = currentSlide - 1;
         setCurrentSlide(newSlide);
@@ -72,7 +72,7 @@ export function useOnboardingAnimation(totalSlides: number) {
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 150,
-          useNativeDriver: Platform.OS !== 'web',
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }).start();
       });
     }

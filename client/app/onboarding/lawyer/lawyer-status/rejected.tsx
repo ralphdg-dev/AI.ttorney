@@ -33,7 +33,6 @@ export default function RejectedStatus() {
     }
   };
 
-  const application = applicationData?.application;
   const canReapply = applicationData?.can_apply && !applicationData?.is_blocked;
 
   let description = "After review, we can't approve your lawyer application at this time. You can continue using AI.ttorney as a regular user";

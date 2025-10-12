@@ -7,7 +7,7 @@ import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
 import { useStatusPolling } from '../../../../hooks/useStatusPolling';
 
 export default function AcceptedStatus() {
-  const [applicationData, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
+  const [, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { refreshUserData } = useAuth();
 

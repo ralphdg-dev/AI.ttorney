@@ -1,12 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, ListRenderItem } from 'react-native';
+import { View, Text, TextInput, FlatList, ListRenderItem } from 'react-native';
 import { Send, User, Shield } from 'lucide-react-native';
 import Colors from '../../constants/Colors';
 import { useAuth } from '../../contexts/AuthContext';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import FadeInView from '../ui/FadeInView';
-import LoadingSpinner from '../ui/LoadingSpinner';
 import { SkeletonCard } from '../ui/SkeletonLoader';
 import { useOptimizedList } from '../../hooks/useOptimizedList';
 

@@ -1,7 +1,6 @@
 'use client';
 import { createLink } from '@gluestack-ui/link';
-import { Pressable } from 'react-native';
-import { Text } from 'react-native';
+import { Pressable , Text } from 'react-native';
 
 import { tva } from '@gluestack-ui/nativewind-utils/tva';
 import { withStyleContext } from '@gluestack-ui/nativewind-utils/withStyleContext';

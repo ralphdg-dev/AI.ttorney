@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Alert, StatusBar, Animated, Pressable, RefreshControl, Platform } from "react-native";
+import { View, Alert, StatusBar, Animated, RefreshControl } from "react-native";
+import { shouldUseNativeDriver } from '@/utils/animations';
 import { useRouter } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { HStack } from "@/components/ui/hstack";
-import { VStack } from "@/components/ui/vstack";
 import { Text as GSText } from "@/components/ui/text";
-import { Button, ButtonText } from "@/components/ui/button";
+import { Button, ButtonText } from "@/components/ui/button/";
 import { Input, InputField, InputSlot } from "@/components/ui/input";
 import { Box } from "@/components/ui/box";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,7 +16,7 @@ import {
   SidebarWrapper,
 } from "@/components/AppSidebar";
 import Colors from "@/constants/Colors";
-import { Star, Search, Heart, BookOpen, Filter, SortAsc } from "lucide-react-native";
+import { Star, Filter, SortAsc } from "lucide-react-native";
 import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import { useFavorites } from "@/contexts/FavoritesContext";
@@ -26,7 +26,7 @@ const sampleFavoriteTerms: TermItem[] = [
   {
     id: "1",
     title: "Annulment",
-    summary: "A court declaration that a marriage is invalid from the start, as if it never existed. Unlike divorce, which ends a valid marriage, annulment treats the marriage as if it was never legally valid.",
+    definition: "A court declaration that a marriage is invalid from the start, as if it never existed. Unlike divorce, which ends a valid marriage, annulment treats the marriage as if it was never legally valid.",
     isFavorite: true,
     filipinoTerm: "Pagpapawalang-bisa",
     category: "Family"
@@ -34,7 +34,7 @@ const sampleFavoriteTerms: TermItem[] = [
   {
     id: "2",
     title: "Employment Contract",
-    summary: "A legally binding agreement between employer and employee that sets out the terms and conditions of employment, including duties, compensation, benefits, and termination procedures.",
+    definition: "A legal agreement between a landlord and tenant that outlines the terms and conditions for renting a property.",
     isFavorite: true,
     filipinoTerm: "Kontrata sa Trabaho",
     category: "Work"
@@ -42,7 +42,7 @@ const sampleFavoriteTerms: TermItem[] = [
   {
     id: "3",
     title: "Habeas Corpus",
-    summary: "A legal principle that protects against unlawful detention, requiring authorities to bring a detained person before a court to determine if their imprisonment is lawful.",
+    definition: "A legal writ requiring law enforcement to bring a prisoner before the court to determine if the person's imprisonment or detention is lawful.",
     isFavorite: true,
     filipinoTerm: "Habeas Corpus",
     category: "Criminal"
@@ -50,7 +50,7 @@ const sampleFavoriteTerms: TermItem[] = [
   {
     id: "4",
     title: "Power of Attorney",
-    summary: "A legal document that gives one person the authority to act on behalf of another person in legal or financial matters.",
+    definition: "A legal document that allows someone to make decisions on behalf of another person when they become unable to make decisions for themselves.",
     isFavorite: true,
     filipinoTerm: "Kapangyarihan ng Abogado",
     category: "Civil"
@@ -58,7 +58,7 @@ const sampleFavoriteTerms: TermItem[] = [
   {
     id: "5",
     title: "Consumer Protection",
-    summary: "Laws and regulations designed to protect buyers of goods and services from unfair business practices and defective products.",
+    definition: "Laws and regulations designed to protect buyers of goods and services from unfair business practices and defective products.",
     isFavorite: true,
     filipinoTerm: "Proteksyon sa Mamimili",
     category: "Consumer"
@@ -67,7 +67,7 @@ const sampleFavoriteTerms: TermItem[] = [
 
 export default function FavoritesScreen() {
   const router = useRouter();
-  const { favoriteTermIds, toggleFavorite, getFavoriteCount, loadFavorites } = useFavorites();
+  const { favoriteTermIds, loadFavorites } = useFavorites();
   const [filteredTerms, setFilteredTerms] = useState<TermItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -98,7 +98,7 @@ export default function FavoritesScreen() {
 
   useEffect(() => {
     loadFavoriteTerms();
-  }, []); // Remove loadFavoriteTerms dependency to prevent infinite loop
+  }, [loadFavoriteTerms]); // Remove loadFavoriteTerms dependency to prevent infinite loop
 
   // Filter terms based on search query and category
   useEffect(() => {
@@ -116,7 +116,7 @@ export default function FavoritesScreen() {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(term =>
         term.title.toLowerCase().includes(query) ||
-        term.summary.toLowerCase().includes(query) ||
+        term.definition.toLowerCase().includes(query) ||
         term.filipinoTerm?.toLowerCase().includes(query)
       );
     }
@@ -124,45 +124,12 @@ export default function FavoritesScreen() {
     setFilteredTerms(filtered);
   }, [favoriteTerms, searchQuery, activeCategory]);
 
-  const handleBack = () => {
-    router.back();
-  };
 
   const handleTermPress = (term: TermItem) => {
     router.push(`/glossary/${term.id}`);
   };
 
-  const handleRemoveFromFavorites = async (termId: string) => {
-    const term = favoriteTerms.find(t => t.id === termId);
-    if (term) {
-      await toggleFavorite(termId, term.title);
-    }
-  };
 
-  const handleClearAllFavorites = () => {
-    Alert.alert(
-      "Clear All Favorites",
-      "Are you sure you want to remove all terms from your favorites? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Clear All",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // Remove all favorites one by one
-              for (const term of favoriteTerms) {
-                await toggleFavorite(term.id);
-              }
-              Alert.alert("Cleared", "All favorite terms have been removed");
-            } catch (error) {
-              Alert.alert("Error", "Failed to clear favorites");
-            }
-          }
-        }
-      ]
-    );
-  };
 
   if (loading) {
     return (
@@ -243,7 +210,7 @@ export default function FavoritesScreen() {
           }
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: Platform.OS !== 'web' }
+            { useNativeDriver: shouldUseNativeDriver('transform') }
           )}
         >
           {/* Category Filter (match Bookmarked Guides header) */}

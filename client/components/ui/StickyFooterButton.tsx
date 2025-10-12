@@ -16,7 +16,7 @@ export default function StickyFooterButton({
   bottomOffset = 0,
 }: StickyFooterButtonProps) {
   return (
-    <View pointerEvents="box-none" style={[styles.container, { bottom: bottomOffset }] }>
+    <View style={[styles.container, { bottom: bottomOffset, pointerEvents: 'box-none' }]}>
       <View style={styles.divider} />
       <View style={styles.innerPad}>
         <PrimaryButton title={title} onPress={onPress} disabled={disabled} />

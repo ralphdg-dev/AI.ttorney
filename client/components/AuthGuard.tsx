@@ -14,7 +14,7 @@ interface AuthGuardProps {
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
-  const { user, session, isLoading, isAuthenticated, hasRedirectedToStatus } = useAuth();
+  const { user, session, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 

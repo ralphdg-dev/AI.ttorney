@@ -1,4 +1,5 @@
-import { Text, Image, Animated, Platform } from "react-native";
+import { Text, Image, Animated } from 'react-native';
+import { shouldUseNativeDriver } from '@/utils/animations';
 import { Redirect } from "expo-router";
 import { useEffect, useState, useRef } from "react";
 import tw from "tailwind-react-native-classnames";
@@ -40,7 +41,7 @@ export default function SplashScreen() {
           Animated.timing(fadeAnim, {
             toValue: 0,
             duration: 500, // Faster fade
-            useNativeDriver: Platform.OS !== 'web',
+            useNativeDriver: shouldUseNativeDriver('opacity'),
           }).start(() => {
             setRedirectPath(targetPath);
             setShouldRedirect(true);

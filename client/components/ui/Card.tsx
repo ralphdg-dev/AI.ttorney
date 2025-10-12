@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, ViewStyle, TouchableOpacity, GestureResponderEvent } from 'react-native';
 import Colors from '@/constants/Colors';
+import { shadowPresets } from '@/utils/shadowUtils';
 
 interface CardProps {
   children: React.ReactNode;
@@ -9,6 +10,7 @@ interface CardProps {
   onPress?: (event: GestureResponderEvent) => void;
   style?: ViewStyle;
   testID?: string;
+  className?: string;
 }
 
 const Card: React.FC<CardProps> = ({
@@ -18,13 +20,14 @@ const Card: React.FC<CardProps> = ({
   onPress,
   style,
   testID,
+  className,
 }) => {
   const getVariantStyles = (): ViewStyle => {
     switch (variant) {
       case 'elevated':
         return {
           backgroundColor: Colors.background.primary,
-          ...Colors.shadow.medium,
+          ...shadowPresets.medium,
           borderRadius: 12,
         };
       case 'outlined':
@@ -42,7 +45,7 @@ const Card: React.FC<CardProps> = ({
       default:
         return {
           backgroundColor: Colors.background.primary,
-          ...Colors.shadow.light,
+          ...shadowPresets.light,
           borderRadius: 12,
         };
     }
@@ -76,6 +79,7 @@ const Card: React.FC<CardProps> = ({
         onPress={onPress}
         testID={testID}
         activeOpacity={0.95}
+        className={className}
       >
         {children}
       </TouchableOpacity>
@@ -83,7 +87,7 @@ const Card: React.FC<CardProps> = ({
   }
 
   return (
-    <View style={cardStyles} testID={testID}>
+    <View style={cardStyles} testID={testID} className={className}>
       {children}
     </View>
   );

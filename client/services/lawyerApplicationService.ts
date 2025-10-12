@@ -39,7 +39,7 @@ interface LawyerApplicationStatus {
 }
 
 interface LawyerApplicationHistory {
-  applications: Array<{
+  applications: {
     id: string;
     user_id: string;
     full_name?: string;
@@ -58,7 +58,7 @@ interface LawyerApplicationHistory {
     version?: number;
     parent_application_id?: string;
     is_latest?: boolean;
-  }>;
+  }[];
   total_applications: number;
 }
 
@@ -182,7 +182,7 @@ class LawyerApplicationService {
       
       try {
         data = await response.json();
-      } catch (jsonError) {
+      } catch {
         throw new Error(`Invalid response format: ${response.status} ${response.statusText}`);
       }
       
@@ -274,7 +274,7 @@ class LawyerApplicationService {
       
       try {
         data = await response.json();
-      } catch (jsonError) {
+      } catch {
         throw new Error(`Invalid response format: ${response.status} ${response.statusText}`);
       }
       
@@ -332,7 +332,7 @@ class LawyerApplicationService {
       let data;
       try {
         data = await response.json();
-      } catch (jsonError) {
+      } catch {
         throw new Error(`Server error ${response.status}: ${response.statusText}`);
       }
       
@@ -444,7 +444,7 @@ class LawyerApplicationService {
   async prefetchApplicationStatus(): Promise<void> {
     try {
       await this.getApplicationStatus();
-    } catch (error) {
+    } catch {
       // Silent fail for background prefetch
     }
   }
@@ -506,7 +506,7 @@ class LawyerApplicationService {
       let data;
       try {
         data = await response.json();
-      } catch (jsonError) {
+      } catch {
         throw new Error(`Server error ${response.status}: ${response.statusText}`);
       }
       

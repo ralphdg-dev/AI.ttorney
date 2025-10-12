@@ -3,9 +3,6 @@ import { View, ScrollView, TouchableOpacity } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
-import { useAuth } from "../../contexts/AuthContext";
-import { GlobalStyles } from "../../constants/GlobalStyles";
-import { router } from "expo-router";
 import { createShadowStyle } from "../../utils/shadowUtils";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
@@ -19,7 +16,7 @@ import {
   User, 
   Lock, 
   Bell, 
-  Info, 
+ 
   Shield, 
   ChevronRight,
   Plus,

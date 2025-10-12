@@ -1,5 +1,6 @@
 import React from 'react';
 import { StatusBar, SafeAreaView } from 'react-native';
+import { useRouter } from 'expo-router';
 import BackButton from './BackButton';
 import StickyFooterButton from './StickyFooterButton';
 import { Box } from './box';
@@ -18,12 +19,13 @@ export type StatusScreenProps = {
 };
 
 export default function StatusScreen({ image, title, description, buttonLabel, onPress, onBack, showBackButton = true, imageAlt }: StatusScreenProps) {
+  const router = useRouter();
+  
   const handleBack = () => {
     if (onBack) {
       onBack();
     } else {
       // Default back behavior - use router
-      const { router } = require('expo-router');
       if (router.canGoBack()) {
         router.back();
       } else {

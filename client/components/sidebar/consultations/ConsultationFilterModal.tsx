@@ -47,6 +47,7 @@ export default function ConsultationFilterModal({
         useNativeDriver: true,
       }).start();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const handleStatusSelect = (statusId: string) => {
