@@ -22,7 +22,7 @@ type ForumPostWithUser = ForumPost & {
 
 const LawyerTimeline: React.FC = React.memo(() => {
   const router = useRouter();
-  const { session, isAuthenticated } = useAuth();
+  const { session, isAuthenticated, user: currentUser } = useAuth();
 
   const [posts, setPosts] = useState<ForumPostWithUser[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -310,22 +310,29 @@ const LawyerTimeline: React.FC = React.memo(() => {
   // Function to add optimistic post
   const addOptimisticPost = useCallback((postData: { body: string; category?: string }) => {
     const animatedOpacity = new Animated.Value(0); // Start completely transparent
+    
+    // Get current user info for optimistic post
+    const userName = currentUser?.full_name || currentUser?.username || currentUser?.email || 'You';
+    const userUsername = currentUser?.username || currentUser?.email?.split('@')[0] || 'you';
+    const userId = currentUser?.id || 'current-user';
+    const userRole = currentUser?.role || 'registered_user';
+    
     const optimisticPost: ForumPostWithUser = {
       id: `optimistic-${Date.now()}`,
       body: postData.body,
       category: (postData.category as any) || 'others',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      user_id: 'current-user',
+      user_id: userId,
       is_anonymous: false,
       is_flagged: false,
       user: {
-        id: 'current-user',
-        email: '',
-        username: 'You',
-        full_name: 'You',
-        role: 'registered_user',
-        is_verified: false,
+        id: userId,
+        email: currentUser?.email || '',
+        username: userUsername,
+        full_name: userName,
+        role: userRole as any,
+        is_verified: currentUser?.is_verified || false,
         archived: null,
         is_blocked_from_applying: null,
         last_rejected_at: null,
@@ -351,7 +358,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
     }).start();
     
     return optimisticPost.id;
-  }, []);
+  }, [currentUser]);
 
   // Function to confirm optimistic post (make it fully opaque and keep it seamless)
   const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: ForumPostWithUser) => {

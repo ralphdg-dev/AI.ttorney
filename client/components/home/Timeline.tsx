@@ -45,7 +45,7 @@ interface TimelineProps {
 
 const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
-  const { session, isAuthenticated } = useAuth();
+  const { session, isAuthenticated, user: currentUser } = useAuth();
   const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, getLastFetchTime, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -407,11 +407,23 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   // Function to add optimistic post
   const addOptimisticPost = useCallback((postData: { body: string; category?: string; is_anonymous?: boolean }) => {
     const animatedOpacity = new Animated.Value(0); // Start completely transparent
+    
+    // Get current user info for optimistic post
+    const userName = currentUser?.full_name || currentUser?.username || currentUser?.email || 'You';
+    const userUsername = currentUser?.username || currentUser?.email?.split('@')[0] || 'you';
+    const isLawyer = currentUser?.role === 'verified_lawyer';
+    
     const optimisticPost: PostData = {
       id: `optimistic-${Date.now()}`,
       user: postData.is_anonymous 
         ? { name: 'Anonymous User', username: 'anonymous', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png' } // Detective icon for anonymous posts
-        : { name: 'You', username: 'you', avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png' }, // Gray default person icon
+        : { 
+            name: userName,
+            username: userUsername,
+            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+            isLawyer: isLawyer,
+            lawyerBadge: isLawyer ? 'Verified' : undefined
+          },
       timestamp: 'now',
       category: postData.category || 'Others',
       content: postData.body,
@@ -430,7 +442,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     }).start();
     
     return optimisticPost.id;
-  }, []);
+  }, [currentUser]);
 
   // Function to confirm optimistic post (make it fully opaque and keep it seamless)
   const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: PostData) => {
