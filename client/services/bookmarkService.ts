@@ -155,11 +155,19 @@ export class BookmarkService {
   static async toggleBookmark(postId: string, userId: string, session?: any): Promise<{ success: boolean; isBookmarked: boolean; error?: string }> {
     try {
       const headers = await this.getAuthHeaders(session);
+      
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
       const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks/toggle`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ post_id: postId }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
       
       if (response.ok) {
         const result = await response.json();
@@ -169,16 +177,20 @@ export class BookmarkService {
         const cacheKey = `${userId}-${postId}`;
         this.bookmarkCache.set(cacheKey, { isBookmarked, timestamp: Date.now() });
         
-        if (__DEV__) console.log('Bookmark toggled:', { postId, isBookmarked });
+        if (__DEV__) console.log('✅ Bookmark toggled:', { postId, isBookmarked });
         return { success: true, isBookmarked };
       } else {
-        const result = await response.json();
-        if (__DEV__) console.error('Toggle bookmark error:', result.detail);
+        const result = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        if (__DEV__) console.error('❌ Toggle bookmark error:', result.detail);
         return { success: false, isBookmarked: false, error: result.detail || 'Failed to toggle bookmark' };
       }
-    } catch (error) {
-      if (__DEV__) console.error('Toggle bookmark exception:', error);
-      return { success: false, isBookmarked: false, error: 'Failed to toggle bookmark' };
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        if (__DEV__) console.error('⏰ Bookmark request timed out');
+        return { success: false, isBookmarked: false, error: 'Request timed out' };
+      }
+      if (__DEV__) console.error('❌ Toggle bookmark exception:', error);
+      return { success: false, isBookmarked: false, error: 'Network error' };
     }
   }
   

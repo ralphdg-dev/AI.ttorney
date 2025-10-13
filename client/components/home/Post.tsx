@@ -74,22 +74,45 @@ const Post: React.FC<PostProps> = React.memo(({
       return;
     }
 
+    // Optimistic update - update UI immediately
+    const previousBookmarkState = isBookmarked;
+    const newBookmarkState = !isBookmarked;
+    
+    setIsBookmarked(newBookmarkState);
+    onBookmarkStatusChange?.(id, newBookmarkState);
+    onBookmarkPress?.();
+    
+    // Show brief loading state (shorter duration)
     setIsBookmarkLoading(true);
+    
+    // Hide loading state quickly for better UX
+    setTimeout(() => setIsBookmarkLoading(false), 300);
+    
     try {
+      // Make API call in background
       const result = await BookmarkService.toggleBookmark(id, currentUser.id, session);
+      
       if (result.success) {
-        setIsBookmarked(result.isBookmarked);
-        onBookmarkStatusChange?.(id, result.isBookmarked);
-        onBookmarkPress?.();
+        // Confirm the optimistic update was correct
+        if (result.isBookmarked !== newBookmarkState) {
+          // If server state differs, correct it
+          setIsBookmarked(result.isBookmarked);
+          onBookmarkStatusChange?.(id, result.isBookmarked);
+        }
+        if (__DEV__) console.log(`✅ Bookmark ${result.isBookmarked ? 'added' : 'removed'} successfully`);
       } else {
+        // Revert optimistic update on failure
         if (__DEV__) console.error('Failed to toggle bookmark:', result.error);
+        setIsBookmarked(previousBookmarkState);
+        onBookmarkStatusChange?.(id, previousBookmarkState);
       }
     } catch (error) {
+      // Revert optimistic update on error
       if (__DEV__) console.error('Error toggling bookmark:', error);
-    } finally {
-      setIsBookmarkLoading(false);
+      setIsBookmarked(previousBookmarkState);
+      onBookmarkStatusChange?.(id, previousBookmarkState);
     }
-  }, [currentUser?.id, id, onBookmarkPress, onBookmarkStatusChange, session]);
+  }, [currentUser?.id, id, onBookmarkPress, onBookmarkStatusChange, session, isBookmarked]);
 
   const handleMorePress = useCallback(() => {
     onMenuToggle?.(id);
