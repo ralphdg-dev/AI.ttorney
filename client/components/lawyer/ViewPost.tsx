@@ -100,10 +100,16 @@ const LawyerViewPost: React.FC = () => {
         const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
         
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
+          
           const response = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json', ...headers } as HeadersInit,
+            signal: controller.signal,
           });
+          
+          clearTimeout(timeoutId);
           
           if (response.ok) {
             const data = await response.json();
@@ -112,7 +118,11 @@ const LawyerViewPost: React.FC = () => {
             console.error(`Failed to get post: ${response.status}`);
             return { success: false, error: `HTTP ${response.status}` };
           }
-        } catch (error) {
+        } catch (error: any) {
+          if (error.name === 'AbortError') {
+            console.error('Post request timed out');
+            return { success: false, error: 'Request timed out' };
+          }
           console.error('Error getting post:', error);
           return { success: false, error: String(error) };
         }
@@ -123,10 +133,16 @@ const LawyerViewPost: React.FC = () => {
         const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
         
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout for replies
+          
           const response = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json', ...headers } as HeadersInit,
+            signal: controller.signal,
           });
+          
+          clearTimeout(timeoutId);
           
           if (response.ok) {
             const data = await response.json();
@@ -135,7 +151,11 @@ const LawyerViewPost: React.FC = () => {
             console.error(`Failed to get replies: ${response.status}`);
             return { success: false, error: `HTTP ${response.status}` };
           }
-        } catch (error) {
+        } catch (error: any) {
+          if (error.name === 'AbortError') {
+            console.error('Replies request timed out');
+            return { success: false, error: 'Request timed out' };
+          }
           console.error('Error getting replies:', error);
           return { success: false, error: String(error) };
         }
@@ -300,66 +320,89 @@ const LawyerViewPost: React.FC = () => {
 
   useEffect(() => {
     const load = async () => {
-      if (!postId) return;
-      const res = await authenticatedApiClient.getForumPostById(String(postId));
-      if (res.success && (res.data as any)?.data) {
-        const row = (res.data as any).data;
-        const isAnon = !!row.is_anonymous;
-        const userData = row?.users || {};
-        
-        const mapped: PostData = {
-          id: String(row.id),
-          title: undefined,
-          body: row.body,
-          domain: (row.category as any) || 'others',
-          created_at: row.created_at || null,
-          updated_at: row.updated_at || null,
-          user_id: row.user_id || null,
-          is_anonymous: isAnon,
-          is_flagged: !!row.is_flagged,
-          user: isAnon ? undefined : {
-            name: userData?.full_name || userData?.username || 'User',
-            username: userData?.username || 'user',
-            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
-            isLawyer: userData?.role === 'verified_lawyer',
-            lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
-          },
-          comments: 0,
-          replies: [],
-        };
-        setPost(mapped);
-      } else {
-        setPost(null);
+      if (!postId) {
+        setLoading(false);
+        return;
       }
-      const rep = await authenticatedApiClient.getForumReplies(String(postId));
-      if (rep.success && Array.isArray((rep.data as any)?.data)) {
-        const rows = (rep.data as any).data as any[];
-        const mappedReplies: Reply[] = rows.map((r: any) => {
-          const isReplyAnon = !!r.is_anonymous;
-          const replyUserData = r?.users || {};
+      
+      setLoading(true);
+      
+      try {
+        // Load post first
+        const res = await authenticatedApiClient.getForumPostById(String(postId));
+        if (res.success && (res.data as any)?.data) {
+          const row = (res.data as any).data;
+          const isAnon = !!row.is_anonymous;
+          const userData = row?.users || {};
           
-          return {
-            id: String(r.id),
-            body: r.reply_body ?? r.body,
-            created_at: r.created_at || null,
-            updated_at: r.updated_at || null,
-            user_id: r.user_id || null,
-            is_anonymous: isReplyAnon,
-            is_flagged: !!r.is_flagged,
-            user: isReplyAnon ? undefined : {
-              name: replyUserData?.full_name || replyUserData?.username || 'User',
-              username: replyUserData?.username || 'user',
+          const mapped: PostData = {
+            id: String(row.id),
+            title: undefined,
+            body: row.body,
+            domain: (row.category as any) || 'others',
+            created_at: row.created_at || null,
+            updated_at: row.updated_at || null,
+            user_id: row.user_id || null,
+            is_anonymous: isAnon,
+            is_flagged: !!row.is_flagged,
+            user: isAnon ? undefined : {
+              name: userData?.full_name || userData?.username || 'User',
+              username: userData?.username || 'user',
               avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
-              isLawyer: replyUserData?.role === 'verified_lawyer',
-              lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+              isLawyer: userData?.role === 'verified_lawyer',
+              lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
             },
+            comments: 0,
+            replies: [],
           };
-        });
-        setReplies(mappedReplies);
-      } else {
+          setPost(mapped);
+          
+          // Load replies separately - don't fail if replies fail
+          try {
+            const rep = await authenticatedApiClient.getForumReplies(String(postId));
+            if (rep.success && Array.isArray((rep.data as any)?.data)) {
+              const rows = (rep.data as any).data as any[];
+              const mappedReplies: Reply[] = rows.map((r: any) => {
+                const isReplyAnon = !!r.is_anonymous;
+                const replyUserData = r?.users || {};
+                
+                return {
+                  id: String(r.id),
+                  body: r.reply_body ?? r.body,
+                  created_at: r.created_at || null,
+                  updated_at: r.updated_at || null,
+                  user_id: r.user_id || null,
+                  is_anonymous: isReplyAnon,
+                  is_flagged: !!r.is_flagged,
+                  user: isReplyAnon ? undefined : {
+                    name: replyUserData?.full_name || replyUserData?.username || 'User',
+                    username: replyUserData?.username || 'user',
+                    avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
+                    isLawyer: replyUserData?.role === 'verified_lawyer',
+                    lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+                  },
+                };
+              });
+              setReplies(mappedReplies);
+            } else {
+              console.warn('Failed to load replies, but post loaded successfully');
+              setReplies([]);
+            }
+          } catch (repliesError) {
+            console.warn('Error loading replies:', repliesError);
+            setReplies([]);
+          }
+        } else {
+          console.error('Failed to load post:', res.error);
+          setPost(null);
+        }
+      } catch (error) {
+        console.error('Error in post loading:', error);
+        setPost(null);
         setReplies([]);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -12,6 +12,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { AuthProvider } from "../contexts/AuthContext";
 import { FavoritesProvider } from "../contexts/FavoritesContext";
+import { ForumCacheProvider } from "../contexts/ForumCacheContext";
 import { SidebarProvider } from "../components/AppSidebar";
 import { AuthGuard } from "../components/AuthGuard";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
@@ -41,9 +42,10 @@ export default function RootLayout() {
     <GluestackUIProvider mode="light">
       <AuthProvider>
           <FavoritesProvider>
-            <AuthGuard>
-              <RouteErrorBoundary>
-                <SidebarProvider>
+            <ForumCacheProvider>
+              <AuthGuard>
+                <RouteErrorBoundary>
+                  <SidebarProvider>
                   <Stack screenOptions={{ headerShown: false }}>
                     <Stack.Screen
                       name="index"
@@ -145,9 +147,10 @@ export default function RootLayout() {
                       }}
                     />
                   </Stack>
-                </SidebarProvider>
-              </RouteErrorBoundary>
-            </AuthGuard>
+                  </SidebarProvider>
+                </RouteErrorBoundary>
+              </AuthGuard>
+            </ForumCacheProvider>
           </FavoritesProvider>
       </AuthProvider>
     </GluestackUIProvider>

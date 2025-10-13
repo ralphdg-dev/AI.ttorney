@@ -230,7 +230,7 @@ const ViewPostReadOnly: React.FC = () => {
     }
   };
 
-  // Optimized post loading with parallel requests and caching
+  // Optimized post loading with better timeout handling
   useEffect(() => {
     const load = async () => {
       if (!postId) {
@@ -239,83 +239,51 @@ const ViewPostReadOnly: React.FC = () => {
         return;
       }
       
-      // Check authentication first
-      if (!isAuthenticated) {
-        if (__DEV__) console.warn('ViewPost: User not authenticated, cannot load post');
-        setError('Authentication required');
-        setLoading(false);
-        return;
-      }
-      
       setLoading(true);
       setError(null);
       setPost(null);
       
-      // Fallback: Hide loading after 8 seconds maximum, but only if there's an error
+      // Longer fallback timer - only as last resort
       const fallbackTimer = setTimeout(() => {
         if (__DEV__) console.log('ViewPost: Fallback timer triggered - request taking too long');
         setError('Request timed out. Please try again.');
         setLoading(false);
-      }, 8000);
+      }, 30000); // Increased to 30 seconds
       
       try {
         const headers = await getAuthHeaders();
         const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout - faster response
+        const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout - more reasonable
         
-        // Parallel fetch: Start both post and replies requests simultaneously
-        const [postResponse, repliesResponse] = await Promise.allSettled([
-          fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
-            method: 'GET',
-            headers,
-            signal: controller.signal,
-          }),
-          fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
-            method: 'GET',
-            headers,
-            signal: controller.signal,
-          })
-        ]);
+        // Sequential fetch: Load post first, then replies for better reliability
+        const postResponse = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
+          method: 'GET',
+          headers,
+          signal: controller.signal,
+        });
         
-        const response = postResponse.status === 'fulfilled' ? postResponse.value : null;
-        if (!response) {
-          setError('Failed to load post');
+        clearTimeout(timeoutId);
+        clearTimeout(fallbackTimer);
+        
+        if (!postResponse.ok) {
+          const errorText = await postResponse.text().catch(() => 'Unknown error');
+          if (postResponse.status === 403) {
+            if (__DEV__) console.error('ViewPost: Authentication failed - 403 Forbidden');
+            setError('Authentication failed. Please log in again.');
+          } else if (postResponse.status === 404) {
+            if (__DEV__) console.error('ViewPost: Post not found - 404');
+            setError('Post not found');
+          } else {
+            if (__DEV__) console.error(`ViewPost: Failed to load post ${postResponse.status}:`, errorText);
+            setError(`Failed to load post (${postResponse.status})`);
+          }
           setLoading(false);
-          clearTimeout(fallbackTimer);
           return;
         }
         
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          if (response.status === 403) {
-            if (__DEV__) console.error('ViewPost: Authentication failed - 403 Forbidden');
-            setError('Authentication failed');
-            setPost(null);
-            setLoading(false);
-            clearTimeout(fallbackTimer);
-            return;
-          } else if (response.status === 404) {
-            if (__DEV__) console.error('ViewPost: Post not found - 404');
-            setError('Post not found');
-            setPost(null);
-            setLoading(false);
-            clearTimeout(fallbackTimer);
-            return;
-          } else {
-            if (__DEV__) console.error(`ViewPost: Failed to load post ${response.status}:`, errorText);
-            setError(`Failed to load post: ${response.status}`);
-            setPost(null);
-            setLoading(false);
-            clearTimeout(fallbackTimer);
-            return;
-          }
-        }
-        
-        const res = await response.json();
+        const res = await postResponse.json();
         
         // Handle both nested and direct data structures
         let row = null;
@@ -351,10 +319,21 @@ const ViewPostReadOnly: React.FC = () => {
           };
           setPost(mapped);
           
-          // Process replies if available
-          if (repliesResponse.status === 'fulfilled' && repliesResponse.value.ok) {
-            try {
-              const repliesData = await repliesResponse.value.json();
+          // Load replies separately with better error handling
+          try {
+            const repliesController = new AbortController();
+            const repliesTimeoutId = setTimeout(() => repliesController.abort(), 15000); // 15s for replies
+            
+            const repliesResponse = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
+              method: 'GET',
+              headers,
+              signal: repliesController.signal,
+            });
+            
+            clearTimeout(repliesTimeoutId);
+            
+            if (repliesResponse.ok) {
+              const repliesData = await repliesResponse.json();
               let rows = null;
               if (repliesData.success && repliesData.data) {
                 rows = (repliesData.data as any)?.data || repliesData.data;
@@ -386,30 +365,36 @@ const ViewPostReadOnly: React.FC = () => {
               } else {
                 setReplies([]);
               }
-            } catch (repliesError) {
-              if (__DEV__) console.warn('ViewPost: Failed to process replies:', repliesError);
+            } else {
+              if (__DEV__) console.warn('ViewPost: Failed to load replies:', repliesResponse.status);
               setReplies([]);
             }
-          } else {
+          } catch (repliesError: any) {
+            if (repliesError.name !== 'AbortError') {
+              if (__DEV__) console.warn('ViewPost: Error loading replies:', repliesError);
+            }
             setReplies([]);
           }
         } else {
+          setError('Post data not found');
           setPost(null);
         }
       } catch (error: any) {
+        clearTimeout(fallbackTimer);
         if (error.name === 'AbortError') {
-          // Silent abort - expected behavior
-          return;
+          if (__DEV__) console.log('ViewPost: Request aborted (timeout)');
+          setError('Request timed out. Please check your connection and try again.');
+        } else {
+          if (__DEV__) console.error('ViewPost: Error loading post:', error);
+          setError('Failed to load post. Please try again.');
         }
-        if (__DEV__) console.error('ViewPost: Error loading post:', error);
         setPost(null);
       } finally {
         setLoading(false);
-        clearTimeout(fallbackTimer);
       }
     };
     load();
-  }, [postId, isAuthenticated, getAuthHeaders]);
+  }, [postId, getAuthHeaders]); // Removed isAuthenticated dependency to prevent blocking
 
   // Removed separate replies loading effect - now handled in parallel with post loading
 

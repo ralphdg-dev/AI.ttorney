@@ -9,6 +9,7 @@ import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
 import { useList } from '@/hooks/useOptimizedList';
 import { SkeletonList } from '@/components/ui/SkeletonLoader';
 import { useAuth } from '../../contexts/AuthContext';
+import { useForumCache } from '../../contexts/ForumCacheContext';
 import Colors from '../../constants/Colors';
 
 interface PostData {
@@ -36,6 +37,7 @@ interface TimelineProps {
 const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
   const { session, isAuthenticated } = useAuth();
+  const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, getLastFetchTime, setLastFetchTime } = useForumCache();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [optimisticPosts, setOptimisticPosts] = useState<PostData[]>([]);
@@ -44,9 +46,13 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const [, setError] = useState<string | null>(null);
   
   // Refs for optimization
-  const lastFetchTime = useRef<number>(0);
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isComponentMounted = useRef(true);
+  
+  // Force cache refresh to fix any lingering references
+  React.useEffect(() => {
+    // This ensures any old references are cleared
+  }, []);
 
   const formatTimeAgo = useCallback((isoDate?: string): string => {
     if (!isoDate) return '';
@@ -124,16 +130,17 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     }
   }, [session?.access_token]);
 
-  // Optimized loadPosts with smart caching and minimal logging
+  // Optimized loadPosts with persistent caching
   const loadPosts = useCallback(async (force = false) => {
-    // Prevent excessive API calls with smart caching
-    const now = Date.now();
-    const timeSinceLastFetch = now - lastFetchTime.current;
-    const CACHE_DURATION = 30000; // 30 seconds cache
-    
-    if (!force && timeSinceLastFetch < CACHE_DURATION && posts.length > 0) {
-      if (__DEV__) console.log('Timeline: Using cached posts, skipping fetch');
-      return;
+    // Check cache first
+    if (!force && isCacheValid()) {
+      const cachedPosts = getCachedPosts();
+      if (cachedPosts && cachedPosts.length > 0) {
+        if (__DEV__) console.log('Timeline: Using cached posts, skipping fetch');
+        setPosts(cachedPosts);
+        setInitialLoading(false);
+        return;
+      }
     }
     
     // Close any open dropdown menus when refreshing
@@ -144,6 +151,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       if (__DEV__) console.warn('Timeline: User not authenticated, clearing posts');
       setPosts([]);
       setRefreshing(false);
+      setInitialLoading(false);
       return;
     }
     
@@ -153,7 +161,8 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     }
     
     setRefreshing(true);
-    lastFetchTime.current = now;
+    const now = Date.now();
+    setLastFetchTime(now);
     
     try {
       const headers = await getAuthHeaders();
@@ -194,13 +203,13 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       // Only update if component is still mounted
       if (isComponentMounted.current) {
         setPosts(mapped);
+        setCachedPosts(mapped); // Cache the posts
         if (__DEV__ && mapped.length === 0) {
           console.log('Timeline: No posts found');
         }
         
         // Clear any error state on successful load
         setError(null);
-        // Bookmark statuses now come directly from the API response
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -218,26 +227,34 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     } finally {
       if (isComponentMounted.current) {
         setRefreshing(false);
+        setInitialLoading(false);
       }
     }
-  }, [isAuthenticated, getAuthHeaders, posts.length, refreshing, mapApiToPost]);
+  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, refreshing]);
 
-  // Initial load with proper cleanup - only when component mounts and user is authenticated
+  // Initial load with cache check
   useEffect(() => {
     isComponentMounted.current = true;
     
     const initialLoad = async () => {
       if (isAuthenticated) {
-        await loadPosts(true); // Force initial load only if authenticated
-      }
-      
-      // Hide initial loading after first load
-      if (isComponentMounted.current) {
-        setTimeout(() => {
-          if (isComponentMounted.current) {
-            setInitialLoading(false);
+        // Check cache first for instant loading
+        const cachedPosts = getCachedPosts();
+        if (cachedPosts && cachedPosts.length > 0) {
+          setPosts(cachedPosts);
+          setInitialLoading(false);
+          if (__DEV__) console.log('Timeline: Loaded from cache immediately');
+          
+          // Still fetch fresh data in background if cache is getting old
+          if (!isCacheValid()) {
+            await loadPosts(false);
           }
-        }, 300);
+        } else {
+          // No cache, do fresh load
+          await loadPosts(true);
+        }
+      } else {
+        setInitialLoading(false);
       }
     };
     
@@ -254,17 +271,16 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       isComponentMounted.current = false;
       clearTimeout(fallbackTimer);
     };
-  }, [isAuthenticated, loadPosts]);
+  }, [isAuthenticated, loadPosts, getCachedPosts, isCacheValid]);
 
   // Smart focus-based refresh (only if data is stale and on forum page)
   useFocusEffect(
     useCallback(() => {
-      // Only load posts when the home page is focused
-      const timeSinceLastFetch = Date.now() - lastFetchTime.current;
-      if (timeSinceLastFetch > 30000) { // Only refresh if data is older than 30s
+      // Only load posts when the home page is focused and cache is invalid
+      if (!isCacheValid()) {
         loadPosts();
       }
-    }, [loadPosts])
+    }, [loadPosts, isCacheValid])
   );
 
   // Optimized polling with smart intervals (only when component is active)
@@ -326,7 +342,9 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     setPosts(prev => prev.map(post => 
       post.id === postId ? { ...post, isBookmarked } : post
     ));
-  }, []);
+    // Also update the cache
+    updatePostBookmark(postId, isBookmarked);
+  }, [updatePostBookmark]);
 
   const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic

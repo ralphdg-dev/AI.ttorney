@@ -346,7 +346,8 @@ async def get_post(post_id: str, current_user: Dict[str, Any] = Depends(get_curr
     """Fetch a single forum post by ID with user information."""
     try:
         supabase = SupabaseService()
-        async with httpx.AsyncClient() as client:
+        # Increased timeout for better reliability
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
                 f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&id=eq.{post_id}",
                 headers=supabase._get_headers(use_service_key=True)
@@ -359,7 +360,14 @@ async def get_post(post_id: str, current_user: Dict[str, Any] = Depends(get_curr
             except Exception:
                 details = {"raw": response.text}
             logger.error(f"Get post failed: {response.status_code} - {details}")
-            raise HTTPException(status_code=400, detail="Failed to fetch post")
+            
+            # Return more specific error codes
+            if response.status_code == 404:
+                raise HTTPException(status_code=404, detail="Post not found")
+            elif response.status_code == 403:
+                raise HTTPException(status_code=403, detail="Access denied")
+            else:
+                raise HTTPException(status_code=400, detail="Failed to fetch post")
 
         rows = response.json() if response.content else []
         if not rows:
@@ -383,11 +391,13 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
     """List replies for a forum post with user information."""
     try:
         supabase = SupabaseService()
-        async with httpx.AsyncClient() as client:
+        # Increased timeout for better reliability
+        async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.get(
                 f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=eq.{post_id}&order=created_at.desc",
                 headers=supabase._get_headers(use_service_key=True)
             )
+        
         if response.status_code != 200:
             details = {}
             try:
@@ -395,14 +405,23 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
             except Exception:
                 details = {"raw": response.text}
             logger.error(f"List replies failed: {response.status_code} - {details}")
-            raise HTTPException(status_code=400, detail="Failed to fetch replies")
+            
+            # More graceful error handling - return empty array instead of failing
+            if response.status_code == 404:
+                logger.info(f"No replies found for post {post_id}")
+                return ListRepliesResponse(success=True, data=[])
+            else:
+                raise HTTPException(status_code=400, detail="Failed to fetch replies")
+        
         data = response.json() if response.content else []
         return ListRepliesResponse(success=True, data=data)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"List replies error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        # Return empty array on error instead of failing completely
+        logger.info("Returning empty replies array due to error")
+        return ListRepliesResponse(success=True, data=[])
 
 
 class CreateReplyRequest(BaseModel):
