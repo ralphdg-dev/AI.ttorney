@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
+import { useForumCache } from '@/contexts/ForumCacheContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Shared categories reference
@@ -15,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const CreatePost: React.FC = () => {
   const router = useRouter();
   const { session, isAuthenticated } = useAuth();
+  const { clearCache } = useForumCache();
   const [content, setContent] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
   const [isAnonymous, setIsAnonymous] = useState<boolean>(false);
@@ -121,6 +123,10 @@ const CreatePost: React.FC = () => {
         return;
       }
       
+      // Clear the forum cache so new post appears when user navigates back
+      clearCache();
+      console.log(`[CreatePost] Cleared forum cache to show new post`);
+      
       // Wait a bit for smooth transition, then confirm the optimistic post
       setTimeout(() => {
         if (optimisticId) {
@@ -134,6 +140,8 @@ const CreatePost: React.FC = () => {
       if (optimisticId) {
         (global as any).userForumActions?.removeOptimisticPost(optimisticId);
       }
+      // Also clear cache on error to ensure fresh data on next load
+      clearCache();
       Alert.alert(
         'Error',
         'Something went wrong. Please try again.',

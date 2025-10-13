@@ -6,18 +6,58 @@ interface PostData {
     name: string;
     username: string;
     avatar: string;
+    isLawyer?: boolean;
+    lawyerBadge?: string;
   };
   timestamp: string;
   category: string;
   content: string;
   comments: number;
   isBookmarked?: boolean;
+  // Full post data for individual post view
+  body?: string;
+  domain?: string;
+  created_at?: string;
+  user_id?: string;
+  is_anonymous?: boolean;
+  is_flagged?: boolean;
+  users?: any;
+}
+
+interface Reply {
+  id: string;
+  body: string;
+  created_at: string | null;
+  updated_at?: string | null;
+  user_id?: string | null;
+  is_anonymous?: boolean | null;
+  is_flagged?: boolean | null;
+  user?: {
+    name: string;
+    username: string;
+    avatar: string;
+    isLawyer?: boolean;
+    lawyerBadge?: string;
+  };
+  timestamp?: string;
+  content?: string;
+}
+
+interface PostWithComments extends PostData {
+  replies: Reply[];
+  commentsLoaded: boolean;
+  commentsTimestamp?: number;
 }
 
 interface CacheData {
   posts: PostData[];
   timestamp: number;
   lastFetchTime: number;
+}
+
+interface PostCacheData {
+  post: PostWithComments;
+  timestamp: number;
 }
 
 interface ForumCacheContextType {
@@ -28,14 +68,24 @@ interface ForumCacheContextType {
   updatePostBookmark: (postId: string, isBookmarked: boolean) => void;
   getLastFetchTime: () => number;
   setLastFetchTime: (time: number) => void;
+  // Individual post caching
+  getCachedPost: (postId: string) => PostWithComments | null;
+  setCachedPost: (postId: string, post: PostWithComments) => void;
+  getCachedPostFromForum: (postId: string) => PostData | null;
+  updatePostComments: (postId: string, replies: Reply[]) => void;
+  isPostCacheValid: (postId: string) => boolean;
+  prefetchPost: (postId: string) => Promise<void>;
 }
 
 const ForumCacheContext = createContext<ForumCacheContextType | undefined>(undefined);
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache duration
+const POST_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes for individual posts
+const COMMENTS_CACHE_DURATION = 3 * 60 * 1000; // 3 minutes for comments
 
 export const ForumCacheProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cacheData, setCacheData] = useState<CacheData | null>(null);
+  const [postCache, setPostCache] = useState<Map<string, PostCacheData>>(new Map());
   const lastFetchTimeRef = useRef<number>(0);
 
   const getCachedPosts = useCallback((): PostData[] | null => {
@@ -98,6 +148,113 @@ export const ForumCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     lastFetchTimeRef.current = time;
   }, []);
 
+  // Individual post caching functions
+  const getCachedPost = useCallback((postId: string): PostWithComments | null => {
+    const cached = postCache.get(postId);
+    if (!cached) return null;
+    
+    const now = Date.now();
+    const age = now - cached.timestamp;
+    
+    if (age > POST_CACHE_DURATION) {
+      // Remove expired cache
+      setPostCache(prev => {
+        const newCache = new Map(prev);
+        newCache.delete(postId);
+        return newCache;
+      });
+      return null;
+    }
+    
+    return cached.post;
+  }, [postCache]);
+
+  const setCachedPost = useCallback((postId: string, post: PostWithComments) => {
+    const now = Date.now();
+    setPostCache(prev => {
+      const newCache = new Map(prev);
+      newCache.set(postId, {
+        post: { ...post, commentsTimestamp: now },
+        timestamp: now
+      });
+      return newCache;
+    });
+  }, []);
+
+  const getCachedPostFromForum = useCallback((postId: string): PostData | null => {
+    if (!cacheData) return null;
+    
+    return cacheData.posts.find(post => post.id === postId) || null;
+  }, [cacheData]);
+
+  const updatePostComments = useCallback((postId: string, replies: Reply[]) => {
+    setPostCache(prev => {
+      const newCache = new Map(prev);
+      const existing = newCache.get(postId);
+      
+      if (existing) {
+        const updatedPost = {
+          ...existing.post,
+          replies,
+          commentsLoaded: true,
+          commentsTimestamp: Date.now()
+        };
+        
+        newCache.set(postId, {
+          ...existing,
+          post: updatedPost
+        });
+      }
+      
+      return newCache;
+    });
+  }, []);
+
+  const isPostCacheValid = useCallback((postId: string): boolean => {
+    const cached = postCache.get(postId);
+    if (!cached) return false;
+    
+    const now = Date.now();
+    const age = now - cached.timestamp;
+    
+    return age < POST_CACHE_DURATION;
+  }, [postCache]);
+
+  const prefetchPost = useCallback(async (postId: string): Promise<void> => {
+    // Check if already cached and valid
+    if (isPostCacheValid(postId)) {
+      return;
+    }
+
+    // Check if we have basic post data from forum cache
+    const forumPost = getCachedPostFromForum(postId);
+    if (!forumPost) {
+      return; // Can't prefetch without basic post data
+    }
+
+    try {
+      // Create post with comments structure from forum data
+      const postWithComments: PostWithComments = {
+        ...forumPost,
+        replies: [],
+        commentsLoaded: false,
+        body: forumPost.content,
+        domain: forumPost.category as any
+      };
+
+      // Cache the basic post structure
+      setCachedPost(postId, postWithComments);
+      
+      if (__DEV__) {
+        console.log(`📦 Prefetched post ${postId} from forum cache`);
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.warn(`Failed to prefetch post ${postId}:`, error);
+      }
+    }
+  }, [isPostCacheValid, getCachedPostFromForum, setCachedPost]);
+
   const value: ForumCacheContextType = {
     getCachedPosts,
     setCachedPosts,
@@ -106,6 +263,12 @@ export const ForumCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     updatePostBookmark,
     getLastFetchTime,
     setLastFetchTime,
+    getCachedPost,
+    setCachedPost,
+    getCachedPostFromForum,
+    updatePostComments,
+    isPostCacheValid,
+    prefetchPost,
   };
 
   return (

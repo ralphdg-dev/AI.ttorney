@@ -8,14 +8,17 @@ import CategoryScroller from '@/components/glossary/CategoryScroller';
 import Colors from '../../constants/Colors';
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 import { useAuth } from '@/contexts/AuthContext';
+import { useForumCache } from '@/contexts/ForumCacheContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const LawyerCreatePost: React.FC = () => {
   const router = useRouter();
   const { session, isAuthenticated } = useAuth();
+  const { clearCache } = useForumCache();
   const [content, setContent] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
+  const [isAnonymous, setIsAnonymous] = useState<boolean>(false);
   const [isPosting, setIsPosting] = useState(false);
   const MAX_LEN = 500;
 
@@ -118,6 +121,10 @@ const LawyerCreatePost: React.FC = () => {
         return;
       }
       
+      // Clear the forum cache so new post appears when user navigates back
+      clearCache();
+      console.log(`[LawyerCreatePost] Cleared forum cache to show new post`);
+      
       // Wait a bit for smooth transition, then confirm the optimistic post
       setTimeout(() => {
         if (optimisticId) {
@@ -131,6 +138,8 @@ const LawyerCreatePost: React.FC = () => {
       if (optimisticId) {
         (global as any).forumActions?.removeOptimisticPost(optimisticId);
       }
+      // Also clear cache on error to ensure fresh data on next load
+      clearCache();
       Alert.alert(
         'Error',
         'Something went wrong. Please try again.',

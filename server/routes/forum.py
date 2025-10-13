@@ -290,42 +290,89 @@ async def list_recent_posts(current_user: Dict[str, Any] = Depends(get_current_u
         else:
             logger.info("No cache found, fetching fresh data")
         
-        # If no cached posts, fetch them
+        # If no cached posts, fetch them WITH replies for instant ViewPost loading
         if base_posts is None:
             supabase = SupabaseService()
             async with httpx.AsyncClient(timeout=20.0) as client:
-                response = await client.get(
+                # First fetch posts
+                posts_response = await client.get(
                     f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&order=created_at.desc&limit=20",
                     headers=supabase._get_headers(use_service_key=True)
                 )
 
-            if response.status_code != 200:
-                logger.error(f"Posts query failed: {response.status_code}")
+            if posts_response.status_code != 200:
+                logger.error(f"Posts query failed: {posts_response.status_code}")
                 return ListPostsResponse(success=True, data=[])
 
-            base_posts = response.json() if response.content else []
+            base_posts = posts_response.json() if posts_response.content else []
+            
+            # If we have posts, fetch their replies
+            if base_posts:
+                post_ids = [str(p.get("id")) for p in base_posts if p.get("id")]
+                if post_ids:
+                    try:
+                        # Fetch all replies for these posts
+                        ids_param = ",".join(post_ids)
+                        async with httpx.AsyncClient(timeout=15.0) as client:
+                            replies_response = await client.get(
+                                f"{supabase.rest_url}/forum_replies?select=id,reply_body,created_at,user_id,is_anonymous,post_id,users(id,username,full_name,role)&post_id=in.({ids_param})&order=created_at.asc",
+                                headers=supabase._get_headers(use_service_key=True)
+                            )
+                        
+                        if replies_response.status_code == 200:
+                            all_replies = replies_response.json() if replies_response.content else []
+                            
+                            # Group replies by post_id
+                            replies_by_post = {}
+                            for reply in all_replies:
+                                post_id = str(reply.get("post_id"))
+                                if post_id not in replies_by_post:
+                                    replies_by_post[post_id] = []
+                                replies_by_post[post_id].append(reply)
+                            
+                            # Add replies to each post
+                            for post in base_posts:
+                                post_id = str(post.get("id"))
+                                post["forum_replies"] = replies_by_post.get(post_id, [])
+                                
+                            logger.info(f"📦 Fetched {len(base_posts)} posts with replies from {len(all_replies)} total replies")
+                        else:
+                            logger.warning(f"Failed to fetch replies: {replies_response.status_code}")
+                            # Add empty replies to posts
+                            for post in base_posts:
+                                post["forum_replies"] = []
+                    except Exception as e:
+                        logger.warning(f"Error fetching replies: {str(e)}")
+                        # Add empty replies to posts
+                        for post in base_posts:
+                            post["forum_replies"] = []
             
             # Cache globally (shared across all users)
             _posts_cache[cache_key] = (base_posts, current_time)
-            logger.info(f"📦 CACHED {len(base_posts)} posts for {CACHE_DURATION}s")
+            logger.info(f"📦 CACHED {len(base_posts)} posts with replies for {CACHE_DURATION}s")
         
         # Get user-specific data using cached functions
         user_bookmarks = set()
-        reply_counts = {}
         if base_posts:
             post_ids = [str(p.get("id")) for p in base_posts if p.get("id")]
             if post_ids:
-                # Use cached functions to prevent duplicate API calls
+                # Only need bookmarks now since replies are included in the main query
                 user_bookmarks = await _get_cached_bookmarks(user_id, post_ids)
-                reply_counts = await _get_cached_reply_counts(post_ids)
 
         # Combine base posts with user-specific data
         final_posts = []
         for post in base_posts:
             post_copy = post.copy()  # Don't modify cached data
             pid = str(post_copy.get("id"))
-            post_copy["reply_count"] = reply_counts.get(pid, 0)  # Real reply counts
+            
+            # Calculate reply count from the included replies
+            replies = post_copy.get("forum_replies", [])
+            post_copy["reply_count"] = len(replies) if replies else 0
             post_copy["is_bookmarked"] = pid in user_bookmarks
+            
+            # Keep the replies data for frontend caching
+            post_copy["replies"] = replies
+            
             final_posts.append(post_copy)
         
         return ListPostsResponse(success=True, data=final_posts)

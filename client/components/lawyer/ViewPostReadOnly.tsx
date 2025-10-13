@@ -11,6 +11,7 @@ import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
 import SkeletonLoader from '../ui/SkeletonLoader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useForumCache } from '../../contexts/ForumCacheContext';
 
 interface Reply {
   id: string;
@@ -53,17 +54,23 @@ interface PostData {
   timestamp?: string;
   category?: string;
   content?: string;
+  isBookmarked?: boolean;
+  users?: any;
 }
 
 const ViewPostReadOnly: React.FC = () => {
   const router = useRouter();
   const { postId } = useLocalSearchParams();
   const { user: currentUser, session, isAuthenticated } = useAuth();
+  const { getCachedPost, getCachedPostFromForum, setCachedPost, updatePostComments, prefetchPost } = useForumCache();
   const [showFullContent, setShowFullContent] = useState(false);
   const [post, setPost] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingComments, setLoadingComments] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
+  const [postReady, setPostReady] = useState(false);
+  const [commentsReady, setCommentsReady] = useState(false);
   const [, setCurrentTime] = useState(new Date());
   const [bookmarked, setBookmarked] = useState(false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
@@ -230,9 +237,9 @@ const ViewPostReadOnly: React.FC = () => {
     }
   };
 
-  // Optimized post loading with better timeout handling
+  // Optimized post loading with cache-first approach
   useEffect(() => {
-    const load = async () => {
+    const loadPost = async () => {
       if (!postId) {
         setError('No post ID provided');
         setLoading(false);
@@ -241,160 +248,289 @@ const ViewPostReadOnly: React.FC = () => {
       
       setLoading(true);
       setError(null);
-      setPost(null);
-      
-      // Longer fallback timer - only as last resort
-      const fallbackTimer = setTimeout(() => {
-        if (__DEV__) console.log('ViewPost: Fallback timer triggered - request taking too long');
-        setError('Request timed out. Please try again.');
-        setLoading(false);
-      }, 30000); // Increased to 30 seconds
       
       try {
-        const headers = await getAuthHeaders();
-        const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+        // Step 1: Check if we have cached post with comments
+        const cachedPostWithComments = getCachedPost(String(postId));
         
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout - more reasonable
-        
-        // Sequential fetch: Load post first, then replies for better reliability
-        const postResponse = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
-          method: 'GET',
-          headers,
-          signal: controller.signal,
-        });
-        
-        clearTimeout(timeoutId);
-        clearTimeout(fallbackTimer);
-        
-        if (!postResponse.ok) {
-          const errorText = await postResponse.text().catch(() => 'Unknown error');
-          if (postResponse.status === 403) {
-            if (__DEV__) console.error('ViewPost: Authentication failed - 403 Forbidden');
-            setError('Authentication failed. Please log in again.');
-          } else if (postResponse.status === 404) {
-            if (__DEV__) console.error('ViewPost: Post not found - 404');
-            setError('Post not found');
-          } else {
-            if (__DEV__) console.error(`ViewPost: Failed to load post ${postResponse.status}:`, errorText);
-            setError(`Failed to load post (${postResponse.status})`);
-          }
+        if (cachedPostWithComments && cachedPostWithComments.commentsLoaded) {
+          if (__DEV__) console.log('✅ Using cached post with comments - instant load!');
+          
+          // Map cached data to component state
+          const mappedPost: PostData = {
+            id: cachedPostWithComments.id,
+            user: cachedPostWithComments.user,
+            timestamp: cachedPostWithComments.timestamp || '',
+            category: cachedPostWithComments.category || 'others',
+            content: cachedPostWithComments.content || cachedPostWithComments.body || '',
+            comments: cachedPostWithComments.replies.length,
+            isBookmarked: cachedPostWithComments.isBookmarked,
+            body: cachedPostWithComments.body || '',
+            domain: (cachedPostWithComments.domain as any) || 'others',
+            created_at: cachedPostWithComments.created_at || null,
+            user_id: cachedPostWithComments.user_id || null,
+            is_anonymous: cachedPostWithComments.is_anonymous || false,
+            is_flagged: cachedPostWithComments.is_flagged || false,
+            users: cachedPostWithComments.users,
+            replies: cachedPostWithComments.replies
+          };
+          
+          // Show everything at once since we have complete data
+          setPost(mappedPost);
+          setReplies(cachedPostWithComments.replies);
+          setPostReady(true);
+          setCommentsReady(true);
           setLoading(false);
           return;
         }
         
-        const res = await postResponse.json();
+        // Step 2: Check if we have basic post data from forum cache
+        const forumPost = getCachedPostFromForum(String(postId));
         
-        // Handle both nested and direct data structures
-        let row = null;
-        if (res.success && res.data) {
-          row = (res.data as any)?.data || res.data;
-        } else if (res.data) {
-          row = res.data;
-        }
-        
-        if (row) {
-          const isAnon = !!row.is_anonymous;
-          const userData = row?.users || {};
+        if (forumPost) {
+          if (__DEV__) console.log(`📦 Using forum cache for post (shows ${forumPost.comments} comments), loading comments separately`);
           
-          const mapped: PostData = {
-            id: String(row.id),
-            title: undefined,
-            body: row.body,
-            domain: (row.category as any) || 'others',
-            created_at: row.created_at || null,
-            updated_at: row.updated_at || null,
-            user_id: row.user_id || null,
-            is_anonymous: isAnon,
-            is_flagged: !!row.is_flagged,
-            user: isAnon ? undefined : {
-              name: userData?.full_name || userData?.username || 'User',
-              username: userData?.username || 'user',
-              avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
-              isLawyer: userData?.role === 'verified_lawyer',
-              lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
-            },
-            comments: 0,
-            replies: [],
+          // Create full post data from forum cache
+          const mappedPost: PostData = {
+            id: forumPost.id,
+            user: forumPost.user,
+            timestamp: forumPost.timestamp || '',
+            category: forumPost.category || 'others',
+            content: forumPost.content || '',
+            comments: forumPost.comments || 0,
+            isBookmarked: forumPost.isBookmarked || false,
+            body: forumPost.content || '',
+            domain: (forumPost.category as any) || 'others',
+            created_at: forumPost.created_at || null,
+            user_id: forumPost.user_id || null,
+            is_anonymous: forumPost.is_anonymous || false,
+            is_flagged: forumPost.is_flagged || false,
+            users: forumPost.users,
+            replies: []
           };
-          setPost(mapped);
           
-          // Load replies separately with better error handling
-          try {
-            const repliesController = new AbortController();
-            const repliesTimeoutId = setTimeout(() => repliesController.abort(), 15000); // 15s for replies
-            
-            const repliesResponse = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
-              method: 'GET',
-              headers,
-              signal: repliesController.signal,
-            });
-            
-            clearTimeout(repliesTimeoutId);
-            
-            if (repliesResponse.ok) {
-              const repliesData = await repliesResponse.json();
-              let rows = null;
-              if (repliesData.success && repliesData.data) {
-                rows = (repliesData.data as any)?.data || repliesData.data;
-              }
-              
-              if (Array.isArray(rows)) {
-                const mappedReplies: Reply[] = rows.map((r: any) => {
-                  const isReplyAnon = !!r.is_anonymous;
-                  const replyUserData = r?.users || {};
-                  
-                  return {
-                    id: String(r.id),
-                    body: r.reply_body ?? r.body,
-                    created_at: r.created_at || null,
-                    updated_at: r.updated_at || null,
-                    user_id: r.user_id || null,
-                    is_anonymous: isReplyAnon,
-                    is_flagged: !!r.is_flagged,
-                    user: isReplyAnon ? undefined : {
-                      name: replyUserData?.full_name || replyUserData?.username || 'User',
-                      username: replyUserData?.username || 'user',
-                      avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
-                      isLawyer: replyUserData?.role === 'verified_lawyer',
-                      lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
-                    },
-                  };
-                });
-                setReplies(mappedReplies);
-              } else {
-                setReplies([]);
-              }
-            } else {
-              if (__DEV__) console.warn('ViewPost: Failed to load replies:', repliesResponse.status);
-              setReplies([]);
-            }
-          } catch (repliesError: any) {
-            if (repliesError.name !== 'AbortError') {
-              if (__DEV__) console.warn('ViewPost: Error loading replies:', repliesError);
-            }
-            setReplies([]);
-          }
-        } else {
-          setError('Post data not found');
-          setPost(null);
+          // Don't show the post yet - wait for comments to load
+          setPost(mappedPost);
+          setPostReady(true);
+          
+          // Load comments and show everything together when ready
+          if (__DEV__) console.log(`🔄 About to load comments for cached post (expecting ${forumPost.comments} comments)`);
+          loadComments(String(postId), mappedPost);
+          return;
         }
+        
+        // Step 3: No cache available, fetch from API
+        if (__DEV__) console.log('🌐 No cache available, fetching from API');
+        await loadFromAPI(String(postId));
+        
       } catch (error: any) {
-        clearTimeout(fallbackTimer);
-        if (error.name === 'AbortError') {
-          if (__DEV__) console.log('ViewPost: Request aborted (timeout)');
-          setError('Request timed out. Please check your connection and try again.');
-        } else {
-          if (__DEV__) console.error('ViewPost: Error loading post:', error);
-          setError('Failed to load post. Please try again.');
-        }
-        setPost(null);
-      } finally {
+        if (__DEV__) console.error('ViewPost: Error in loadPost:', error);
+        setError('Failed to load post. Please try again.');
         setLoading(false);
       }
     };
-    load();
-  }, [postId, getAuthHeaders]); // Removed isAuthenticated dependency to prevent blocking
+    
+    loadPost();
+  }, [postId, getCachedPost, getCachedPostFromForum]);
+  
+  // Load comments only (when we have post from forum cache)
+  const loadComments = async (postId: string, postData: PostData) => {
+    if (__DEV__) console.log(`🔄 Starting to load comments for post ${postId}`);
+    setLoadingComments(true);
+    
+    try {
+      const headers = await getAuthHeaders();
+      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      
+      if (__DEV__) console.log(`📡 Fetching comments from: ${API_BASE_URL}/api/forum/posts/${postId}/replies`);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s for comments only
+      
+      const repliesResponse = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (__DEV__) console.log(`📡 Comments response status: ${repliesResponse.status}`);
+      
+      if (repliesResponse.ok) {
+        const repliesData = await repliesResponse.json();
+        if (__DEV__) console.log('📡 Comments response data:', JSON.stringify(repliesData, null, 2));
+        
+        let rows = null;
+        if (repliesData.success && repliesData.data) {
+          rows = (repliesData.data as any)?.data || repliesData.data;
+        } else if (Array.isArray(repliesData)) {
+          rows = repliesData;
+        } else {
+          // Try to extract data from different response formats
+          rows = repliesData.data || repliesData;
+        }
+        
+        if (__DEV__) console.log('📡 Processed comments rows:', rows);
+        if (__DEV__) console.log('📡 Is rows an array?', Array.isArray(rows));
+        if (__DEV__) console.log('📡 Rows length:', rows?.length);
+        
+        if (Array.isArray(rows)) {
+          const mappedReplies: Reply[] = rows.map((r: any) => {
+            const isReplyAnon = !!r.is_anonymous;
+            const replyUserData = r?.users || {};
+            
+            return {
+              id: String(r.id),
+              body: r.reply_body ?? r.body,
+              created_at: r.created_at || null,
+              updated_at: r.updated_at || null,
+              user_id: r.user_id || null,
+              is_anonymous: isReplyAnon,
+              is_flagged: !!r.is_flagged,
+              user: isReplyAnon ? undefined : {
+                name: replyUserData?.full_name || replyUserData?.username || 'User',
+                username: replyUserData?.username || 'user',
+                avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+                isLawyer: replyUserData?.role === 'verified_lawyer',
+                lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+              },
+            };
+          });
+          
+          if (__DEV__) console.log(`💬 Mapped ${mappedReplies.length} comments successfully`);
+          setReplies(mappedReplies);
+          setCommentsReady(true);
+          
+          // Cache the complete post with comments
+          const postWithComments = {
+            ...postData,
+            replies: mappedReplies,
+            commentsLoaded: true,
+            commentsTimestamp: Date.now()
+          };
+          
+          setCachedPost(postId, postWithComments as any);
+          updatePostComments(postId, mappedReplies);
+          
+          if (__DEV__) console.log(`💬 Loaded ${mappedReplies.length} comments and cached complete post`);
+        } else {
+          if (__DEV__) console.log('📡 No comments found or invalid format');
+          setReplies([]);
+          setCommentsReady(true); // Still mark as ready even if no comments
+        }
+      } else {
+        const errorText = await repliesResponse.text().catch(() => 'Unknown error');
+        if (__DEV__) console.error(`❌ ViewPost: Failed to load replies: ${repliesResponse.status} - ${errorText}`);
+        if (__DEV__) console.error('❌ Response headers:', Object.fromEntries(repliesResponse.headers.entries()));
+        setReplies([]);
+        setCommentsReady(true); // Mark as ready even on error
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        if (__DEV__) console.error('ViewPost: Error loading comments:', error);
+      }
+      setReplies([]);
+      setCommentsReady(true); // Mark as ready even on error
+    } finally {
+      if (__DEV__) console.log('🔄 Finished loading comments');
+      setLoadingComments(false);
+    }
+  };
+  
+  // Fallback to API when no cache available
+  const loadFromAPI = async (postId: string) => {
+    const fallbackTimer = setTimeout(() => {
+      if (__DEV__) console.log('ViewPost: Fallback timer triggered - request taking too long');
+      setError('Request timed out. Please try again.');
+      setLoading(false);
+    }, 30000);
+    
+    try {
+      const headers = await getAuthHeaders();
+      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      
+      const postResponse = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      clearTimeout(fallbackTimer);
+      
+      if (!postResponse.ok) {
+        const errorText = await postResponse.text().catch(() => 'Unknown error');
+        if (postResponse.status === 403) {
+          setError('Authentication failed. Please log in again.');
+        } else if (postResponse.status === 404) {
+          setError('Post not found');
+        } else {
+          setError(`Failed to load post (${postResponse.status})`);
+        }
+        setLoading(false);
+        return;
+      }
+      
+      const res = await postResponse.json();
+      let row = null;
+      if (res.success && res.data) {
+        row = (res.data as any)?.data || res.data;
+      } else if (res.data) {
+        row = res.data;
+      }
+      
+      if (row) {
+        const isAnon = !!row.is_anonymous;
+        const userData = row?.users || {};
+        
+        const mapped: PostData = {
+          id: String(row.id),
+          title: undefined,
+          body: row.body,
+          domain: (row.category as any) || 'others',
+          created_at: row.created_at || null,
+          updated_at: row.updated_at || null,
+          user_id: row.user_id || null,
+          is_anonymous: isAnon,
+          is_flagged: !!row.is_flagged,
+          user: isAnon ? undefined : {
+            name: userData?.full_name || userData?.username || 'User',
+            username: userData?.username || 'user',
+            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+            isLawyer: userData?.role === 'verified_lawyer',
+            lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+          },
+          comments: 0,
+          replies: [],
+        };
+        
+        // Don't show the post yet - wait for comments to load
+        setPost(mapped);
+        setPostReady(true);
+        
+        // Load comments and show everything together when ready
+        if (__DEV__) console.log('🔄 Loading comments for API-fetched post');
+        loadComments(postId, mapped);
+      } else {
+        setError('Post data not found');
+        setPostReady(true);
+        setCommentsReady(true);
+      }
+    } catch (error: any) {
+      clearTimeout(fallbackTimer);
+      if (error.name === 'AbortError') {
+        setError('Request timed out. Please check your connection and try again.');
+      } else {
+        setError('Failed to load post. Please try again.');
+      }
+      setPostReady(true);
+      setCommentsReady(true);
+    }
+  };
 
   // Removed separate replies loading effect - now handled in parallel with post loading
 
@@ -405,6 +541,22 @@ const ViewPostReadOnly: React.FC = () => {
   const displayTimestamp = formatTimestamp(post?.created_at || null);
   const displayContent = post?.body || '';
   const repliesToShow = replies;
+  
+  // Wait for both post and comments to be ready before showing content
+  React.useEffect(() => {
+    if (postReady && commentsReady) {
+      if (__DEV__) console.log('✅ Both post and comments ready - showing content');
+      setLoading(false);
+    }
+  }, [postReady, commentsReady]);
+  
+  // Auto-prefetch when component mounts (for future visits)
+  React.useEffect(() => {
+    if (postId && !loading) {
+      // Prefetch this post for future visits
+      prefetchPost(String(postId));
+    }
+  }, [postId, loading, prefetchPost]);
 
   const categoryColors = {
     family: { bg: '#FEF2F2', text: '#BE123C', border: '#FECACA' },
@@ -421,7 +573,7 @@ const ViewPostReadOnly: React.FC = () => {
   return (
     <SafeAreaView style={[tw`flex-1 bg-white`, { position: 'relative', zIndex: 1 }]}>
       {/* Loading Overlay - Covers any parent loading indicators */}
-      {loading && (
+      {(loading || !postReady || !commentsReady) && (
         <View style={{
           position: 'absolute',
           top: 0,
@@ -563,7 +715,7 @@ const ViewPostReadOnly: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         
-        {!post && !loading && error && (
+        {!post && !loading && !postReady && !commentsReady && error && (
           <View style={tw`px-5 py-6 items-center`}>
             <Text style={tw`text-gray-500 text-center mb-4`}>{error}</Text>
             <TouchableOpacity
@@ -644,7 +796,7 @@ const ViewPostReadOnly: React.FC = () => {
             <View style={tw`flex-row items-center mb-4`}>
               <MessageCircle size={20} color="#6B7280" />
               <Text style={tw`text-gray-700 font-semibold ml-2`}>
-              {repliesToShow.length} {repliesToShow.length === 1 ? 'Reply' : 'Replies'}
+                {repliesToShow.length} {repliesToShow.length === 1 ? 'Reply' : 'Replies'}
               </Text>
             </View>
           {repliesToShow.map((reply) => (
