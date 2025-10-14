@@ -36135,3 +36135,5 @@ legal-app/node_modules/yocto-queue/index.js
 legal-app/node_modules/yocto-queue/license
 legal-app/node_modules/yocto-queue/package.json
 legal-app/node_modules/yocto-queue/readme.md
+client/.env
+server/.env
