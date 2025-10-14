@@ -152,16 +152,12 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     // Use setCachedPost to cache the complete post
     setCachedPost(postData.id, postWithComments as any);
     
-    if (__DEV__) {
-      console.log(`Cached post ${postData.id} with ${mappedReplies.length} comments from Timeline`);
-    }
-    
     return postData;
   }, [formatTimeAgo, setCachedPost]);
 
   // Remove complex batching - bookmark status now comes from API
 
-  // Optimized auth headers helper with minimal logging
+  // Optimized auth headers helper with improved logging
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
     try {
       // First try to get token from AuthContext session
@@ -181,10 +177,8 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         };
       }
       
-      if (__DEV__) console.warn('Timeline: No authentication token available');
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      if (__DEV__) console.error('Timeline auth error:', error);
       return { 'Content-Type': 'application/json' };
     }
   }, [session?.access_token]);
@@ -195,7 +189,6 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     if (!force && isCacheValid()) {
       const cachedPosts = getCachedPosts();
       if (cachedPosts && cachedPosts.length > 0) {
-        if (__DEV__) console.log('Timeline: Using cached posts, skipping fetch');
         setPosts(cachedPosts);
         setInitialLoading(false);
         return;
@@ -207,10 +200,13 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     setError(null);
     
     if (!isAuthenticated) {
-      if (__DEV__) console.warn('Timeline: User not authenticated, clearing posts');
       setPosts([]);
       setRefreshing(false);
       setInitialLoading(false);
+      
+      // Prompt user to login instead of making API call
+      const { checkAuthentication } = require('../../utils/authUtils');
+      checkAuthentication();
       return;
     }
     
@@ -238,10 +234,18 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       
       clearTimeout(timeoutId);
 
+      // Handle session timeout
+      const { handleSessionTimeout } = require('../../utils/authUtils');
+      const isSessionTimeout = await handleSessionTimeout(response);
+      if (isSessionTimeout) {
+        setRefreshing(false);
+        setInitialLoading(false);
+        return;
+      }
+      
       if (!response.ok) {
         const errorText = await response.text();
         if (response.status === 403) {
-          if (__DEV__) console.error('Timeline: Authentication failed - 403 Forbidden. Check if user is properly authenticated.');
           // Clear posts and show authentication error
           setPosts([]);
           setError('Authentication required. Please log in again.');
@@ -263,9 +267,6 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       if (isComponentMounted.current) {
         setPosts(mapped);
         setCachedPosts(mapped); // Cache the posts
-        if (__DEV__ && mapped.length === 0) {
-          console.log('Timeline: No posts found');
-        }
         
         // Clear any error state on successful load
         setError(null);
@@ -277,7 +278,6 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       }
       
       const errorMessage = error.message || 'Failed to load posts';
-      if (__DEV__) console.error('Timeline load error:', errorMessage);
       
       if (isComponentMounted.current) {
         setError(errorMessage);
@@ -303,10 +303,8 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     useCallback(() => {
       // Check if cache is invalid or if we should refresh
       if (!isCacheValid()) {
-        if (__DEV__) console.log('📱 Timeline: Screen focused, cache invalid - refreshing');
         loadPosts(true); // Force refresh
       } else {
-        if (__DEV__) console.log('📱 Timeline: Screen focused, cache valid - using cache');
         loadPosts(); // Use cache if valid
       }
     }, [loadPosts, isCacheValid])
@@ -365,7 +363,6 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
 
   const handleBookmarkPress = useCallback((postId: string) => {
     // The Post component handles the actual bookmark logic
-    if (__DEV__) console.log('Bookmark toggled:', postId);
   }, []);
   
   const handleBookmarkStatusChange = useCallback((postId: string, isBookmarked: boolean) => {
@@ -379,7 +376,6 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
 
   const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic
-    if (__DEV__) console.log('Report submitted:', postId);
   }, []);
 
   const handleMenuToggle = useCallback((postId: string) => {
@@ -642,4 +638,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Timeline; 
+export default Timeline;

@@ -89,7 +89,6 @@ const LawyerViewPost: React.FC = () => {
         }
         return {};
       } catch (error) {
-        console.error('Error getting auth token:', error);
         return {};
       }
     };
@@ -115,15 +114,12 @@ const LawyerViewPost: React.FC = () => {
             const data = await response.json();
             return { success: true, data };
           } else {
-            console.error(`Failed to get post: ${response.status}`);
             return { success: false, error: `HTTP ${response.status}` };
           }
         } catch (error: any) {
           if (error.name === 'AbortError') {
-            console.error('Post request timed out');
             return { success: false, error: 'Request timed out' };
           }
-          console.error('Error getting post:', error);
           return { success: false, error: String(error) };
         }
       },
@@ -154,10 +150,8 @@ const LawyerViewPost: React.FC = () => {
           }
         } catch (error: any) {
           if (error.name === 'AbortError') {
-            console.error('Replies request timed out');
             return { success: false, error: 'Request timed out' };
           }
-          console.error('Error getting replies:', error);
           return { success: false, error: String(error) };
         }
       },
@@ -177,11 +171,9 @@ const LawyerViewPost: React.FC = () => {
             const data = await response.json();
             return { success: true, data };
           } else {
-            console.error(`Failed to create reply: ${response.status}`);
             return { success: false, error: `HTTP ${response.status}` };
           }
         } catch (error) {
-          console.error('Error creating reply:', error);
           return { success: false, error: String(error) };
         }
       }
@@ -253,24 +245,18 @@ const LawyerViewPost: React.FC = () => {
 
   const handleBookmarkPress = async () => {
     if (!currentUser?.id || !postId) {
-      console.log('Missing user ID or post ID:', { userId: currentUser?.id, postId });
       return;
     }
 
-    console.log('Attempting to toggle bookmark for:', { postId: String(postId), userId: currentUser.id });
     setIsBookmarkLoading(true);
     try {
       const result = await BookmarkService.toggleBookmark(String(postId), currentUser.id, session);
-      console.log('Bookmark toggle result:', result);
       if (result.success) {
         setBookmarked(result.isBookmarked);
         setMenuOpen(false);
-        console.log('Bookmark updated successfully:', result.isBookmarked);
-      } else {
-        console.error('Failed to toggle bookmark:', result.error);
       }
     } catch (error) {
-      console.error('Error toggling bookmark:', error);
+      // Error handled silently
     } finally {
       setIsBookmarkLoading(false);
     }
@@ -312,8 +298,6 @@ const LawyerViewPost: React.FC = () => {
       if (!result.success) {
         throw new Error(result.error || 'Failed to submit report');
       }
-
-      console.log('Report submitted successfully');
     } finally {
       setIsReportLoading(false);
     }
@@ -393,15 +377,12 @@ const LawyerViewPost: React.FC = () => {
               setReplies([]);
             }
           } catch (repliesError) {
-            console.warn('Error loading replies:', repliesError);
             setReplies([]);
           }
         } else {
-          console.error('Failed to load post:', res.error);
           setPost(null);
         }
       } catch (error) {
-        console.error('Error in post loading:', error);
         setPost(null);
         setReplies([]);
       } finally {
@@ -552,7 +533,6 @@ const LawyerViewPost: React.FC = () => {
         setReplyText(text);
       }
     } catch (error) {
-      console.error('Error sending reply:', error);
       // Remove the optimistic reply on error
       removeOptimisticReply(optimisticId);
       // Restore the text on error

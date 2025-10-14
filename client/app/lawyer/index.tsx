@@ -16,6 +16,10 @@ import ConsultationCalendar from '../../components/lawyer/ConsultationCalendar';
 
 const LawyerDashboard: React.FC = () => {
   const router = useRouter();
+
+  const handleNotificationPress = () => {
+    router.push('/notifications');
+  };
   
   // Get current date and time in Philippine timezone
   const getCurrentDateTime = () => {
@@ -113,6 +117,7 @@ const LawyerDashboard: React.FC = () => {
         variant="home"
         showMenu={true}
         showNotifications={true}
+        onNotificationPress={handleNotificationPress}
       />
       
       <ScrollView style={tw`flex-1 pb-24`} showsVerticalScrollIndicator={false}>

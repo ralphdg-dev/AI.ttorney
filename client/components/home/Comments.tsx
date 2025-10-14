@@ -53,7 +53,7 @@ const Comments: React.FC<CommentsProps> = React.memo(({
       await onAddComment(newComment.trim());
       setNewComment('');
     } catch (error) {
-      console.error('Error submitting comment:', error);
+      // Error handled by parent component
     } finally {
       setIsSubmitting(false);
     }

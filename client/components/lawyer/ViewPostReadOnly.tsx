@@ -37,6 +37,7 @@ interface PostData {
   content?: string;
   isBookmarked?: boolean;
   users?: any;
+  forum_replies?: any[];
 }
 
 interface Reply {
@@ -97,10 +98,8 @@ const ViewPostReadOnly: React.FC = () => {
         };
       }
       
-      if (__DEV__) console.warn('ViewPost: No authentication token available');
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      if (__DEV__) console.error('ViewPost auth error:', error);
       return { 'Content-Type': 'application/json' };
     }
   }, [session?.access_token]);
@@ -133,16 +132,19 @@ const ViewPostReadOnly: React.FC = () => {
       // If the timestamp is in the future or very recent (within 1 second)
       if (diffInSeconds <= 0) return 'Just now';
       
-      if (diffInSeconds < 60) return `${diffInSeconds}s`;
+      if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
       
       const diffInMinutes = Math.floor(diffInSeconds / 60);
-      if (diffInMinutes < 60) return `${diffInMinutes}m`;
+      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
       
       const diffInHours = Math.floor(diffInMinutes / 60);
-      if (diffInHours < 24) return `${diffInHours}h`;
+      if (diffInHours < 24) return `${diffInHours}h ago`;
       
       const diffInDays = Math.floor(diffInHours / 24);
-      if (diffInDays < 7) return `${diffInDays}d`;
+      if (diffInDays < 7) return `${diffInDays}d ago`;
+      
+      // For posts older than a week but less than a month, show weeks
+      if (diffInDays < 30) return `${Math.floor(diffInDays / 7)}w ago`;
       
       // For posts older than 7 days, display the date in MM/DD/YYYY format
       return `${postDate.getMonth() + 1}/${postDate.getDate()}/${postDate.getFullYear()}`;
@@ -183,7 +185,6 @@ const ViewPostReadOnly: React.FC = () => {
 
   const handleBookmarkPress = useCallback(async () => {
     if (!currentUser?.id || !postId) {
-      if (__DEV__) console.warn('ViewPost: Missing user ID or post ID');
       return;
     }
 
@@ -193,12 +194,9 @@ const ViewPostReadOnly: React.FC = () => {
       if (result.success) {
         setBookmarked(result.isBookmarked);
         setMenuOpen(false);
-        if (__DEV__) console.log('Bookmark updated:', result.isBookmarked);
-      } else {
-        if (__DEV__) console.error('Failed to toggle bookmark:', result.error);
       }
     } catch (error) {
-      if (__DEV__) console.error('Error toggling bookmark:', error);
+      // Error handled silently
     } finally {
       setIsBookmarkLoading(false);
     }
@@ -240,8 +238,6 @@ const ViewPostReadOnly: React.FC = () => {
       if (!result.success) {
         throw new Error(result.error || 'Failed to submit report');
       }
-
-      if (__DEV__) console.log('Report submitted successfully');
     } finally {
       setIsReportLoading(false);
     }
@@ -264,8 +260,6 @@ const ViewPostReadOnly: React.FC = () => {
         const cachedPostWithComments = getCachedPost(String(postId));
         
         if (cachedPostWithComments) {
-          if (__DEV__) console.log('✅ Using cached post with comments - instant load!');
-          
           // Map cached data to component state
           const mappedPost: PostData = {
             id: cachedPostWithComments.id,
@@ -290,8 +284,8 @@ const ViewPostReadOnly: React.FC = () => {
           setLoading(false);
           
           // Set replies from cache
-          if (cachedPostWithComments.replies) {
-            setReplies(cachedPostWithComments.replies);
+          if (cachedPostWithComments.replies && Array.isArray(cachedPostWithComments.replies)) {
+            setReplies(cachedPostWithComments.replies as Reply[]);
             setRepliesLoading(false);
           }
           return;
@@ -301,8 +295,6 @@ const ViewPostReadOnly: React.FC = () => {
         const forumPost = getCachedPostFromForum(String(postId));
         
         if (forumPost) {
-          if (__DEV__) console.log(`📦 Using forum cache for post with forum_replies`);
-          
           // Create full post data from forum cache
           const mappedPost: PostData = {
             id: forumPost.id,
@@ -321,14 +313,14 @@ const ViewPostReadOnly: React.FC = () => {
             users: forumPost.users
           };
           
-          // Show the post immediately
+          // Show the post immediately and update UI state
           setPost(mappedPost);
           setPostReady(true);
           setLoading(false);
           
           // If forum_replies exist in the forum cache, use them
-          if (forumPost.forum_replies) {
-            const mappedReplies = forumPost.forum_replies.map((r: any) => {
+          if ((forumPost as any).forum_replies && Array.isArray((forumPost as any).forum_replies)) {
+            const mappedReplies = ((forumPost as any).forum_replies as any[]).map((r: any) => {
               const isReplyAnon = !!r.is_anonymous;
               const replyUserData = r?.users || {};
               
@@ -366,11 +358,9 @@ const ViewPostReadOnly: React.FC = () => {
         }
         
         // Step 3: No cache available, fetch from API
-        if (__DEV__) console.log('🌐 No cache available, fetching from API');
         await loadFromAPI(String(postId));
         
       } catch (error: any) {
-        if (__DEV__) console.error('ViewPost: Error in loadPost:', error);
         setError('Failed to load post. Please try again.');
         setLoading(false);
       }
@@ -383,7 +373,6 @@ const ViewPostReadOnly: React.FC = () => {
   // Fallback to API when no cache available
   const loadFromAPI = async (postId: string) => {
     const fallbackTimer = setTimeout(() => {
-      if (__DEV__) console.log('ViewPost: Fallback timer triggered - request taking too long');
       setError('Request timed out. Please try again.');
       setLoading(false);
     }, 30000);
@@ -463,6 +452,7 @@ const ViewPostReadOnly: React.FC = () => {
           });
           
           if (repliesResponse.ok) {
+            // Process replies data from API response
             const repliesData = await repliesResponse.json();
             if (repliesData.success && Array.isArray((repliesData as any)?.data)) {
               const rows = (repliesData as any).data as any[];
@@ -488,14 +478,18 @@ const ViewPostReadOnly: React.FC = () => {
                 };
               });
               
-              // Update UI with replies
-              setReplies(mappedReplies);
+              // Update UI with replies - sort by newest first
+              setReplies(mappedReplies.sort((a, b) => 
+                new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+              ));
               setRepliesLoading(false);
               
               // Cache the complete post with replies
               const postWithComments = {
                 ...mapped,
-                replies: mappedReplies,
+                replies: mappedReplies.sort((a, b) => 
+                  new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+                ),
                 commentsLoaded: true,
                 commentsTimestamp: Date.now()
               };
@@ -503,7 +497,6 @@ const ViewPostReadOnly: React.FC = () => {
             }
           }
         } catch (error) {
-          if (__DEV__) console.warn('Error fetching replies:', error);
           // Don't set error state here as we already have the post content
         }
       } else {
@@ -536,7 +529,6 @@ const ViewPostReadOnly: React.FC = () => {
   // Wait for post to be ready before showing content
   React.useEffect(() => {
     if (postReady) {
-      if (__DEV__) console.log('✅ Post ready - showing content');
       setLoading(false);
     }
   }, [postReady]);
@@ -717,6 +709,7 @@ const ViewPostReadOnly: React.FC = () => {
                 setPost(null);
               }}
               style={tw`bg-blue-500 px-4 py-2 rounded-lg`}
+              accessibilityLabel="Try loading the post again"
             >
               <Text style={tw`text-white font-medium`}>Try Again</Text>
             </TouchableOpacity>
@@ -736,40 +729,53 @@ const ViewPostReadOnly: React.FC = () => {
                   />
                 )}
               <View style={tw`flex-1`}>
-                <View style={tw`flex-row items-center justify-between mb-1`}>
+                <View style={tw`flex-row items-start justify-between mb-1`}>
                   <View style={tw`flex-1 mr-3`}>
-                    <View style={tw`flex-row items-center mb-1 flex-wrap`}>
-                      <Text style={tw`text-sm font-bold text-gray-900 mr-1`}>
+                    {/* [Full Name] [lawyer badge] */}
+                    <View style={{flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap'}}>
+                      <Text style={tw`text-base font-semibold text-gray-900 mr-2`}>
                         {displayUser.name}
                       </Text>
                       {displayUser.isLawyer && (
-                        <View style={tw`bg-blue-100 px-2 py-0.5 rounded-full mr-2 inline-flex`}>
-                          <Text style={tw`text-xs font-semibold text-blue-700`}>
-                            Verified Lawyer
+                        <View style={tw`px-2 py-0.5 bg-green-50 rounded-full border border-green-100`}>
+                          <View style={tw`flex-row items-center`}>
+                            <Image 
+                              source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3472/3472620.png' }}
+                              style={tw`w-3 h-3 mr-1 tint-green-700`}
+                            />
+                            <Text style={tw`text-xs font-medium text-green-700`}>Verified Lawyer</Text>
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                    
+                    {/* [username] [law category] - side by side */}
+                    <View style={tw`flex-row items-center mt-1`}>
+                      <Text style={tw`text-sm text-gray-500 mr-2`}>
+                        @{!isAnonymous ? displayUser.name?.toLowerCase().replace(/\s+/g, '') : 'anonymous'}
+                      </Text>
+                      
+                      {post.domain && (
+                        <View style={[
+                          tw`px-3 py-1 rounded-full border`,
+                          { 
+                            backgroundColor: post.domain && categoryColors[post.domain] ? categoryColors[post.domain].bg : categoryColors.others.bg,
+                            borderColor: post.domain && categoryColors[post.domain] ? categoryColors[post.domain].border : categoryColors.others.border 
+                          }
+                        ]}>
+                          <Text style={[
+                            tw`text-xs font-semibold`, 
+                            { color: post.domain && categoryColors[post.domain] ? categoryColors[post.domain].text : categoryColors.others.text }
+                          ]}> 
+                            {post.domain ? post.domain.charAt(0).toUpperCase() + post.domain.slice(1) : 'Others'}
                           </Text>
                         </View>
                       )}
-                      <Text style={tw`text-sm text-gray-500`}>
-                        @{!isAnonymous ? displayUser.name?.toLowerCase().replace(/\s+/g, '') : 'anonymous'}
-                      </Text>
                     </View>
                   </View>
-                  
-                  {post.domain && (
-                    <View style={[
-                      tw`px-3 py-1 rounded-full border`,
-                      { backgroundColor: categoryColors[post.domain]?.bg || categoryColors.others.bg,
-                        borderColor: categoryColors[post.domain]?.border || categoryColors.others.border }
-                    ]}>
-                      <Text style={[tw`text-xs font-semibold`, { color: categoryColors[post.domain]?.text || categoryColors.others.text }]}> 
-                        {post.domain?.charAt(0).toUpperCase() + post.domain?.slice(1)}
-                      </Text>
-                    </View>
-                  )}
                 </View>
-                <Text style={tw`text-sm text-gray-500 mt-1`}>
-                  {displayTimestamp}
-                </Text>
+                
+                {/* [timestamp] - moved to bottom */}
               </View>
             </View>
 
@@ -783,6 +789,11 @@ const ViewPostReadOnly: React.FC = () => {
                 </Text>
               </TouchableOpacity>
             )}
+            
+            {/* [timestamp] - at the bottom of post content */}
+            <Text style={tw`text-xs text-gray-500 mb-2`}>
+              {displayTimestamp}
+            </Text>
 
             {/* Replies Section */}
             <View style={tw`mt-6 pt-6 border-t border-gray-100 bg-white`}>
@@ -819,34 +830,43 @@ const ViewPostReadOnly: React.FC = () => {
                           </View>
                         ) : (
                           <Image 
-                            source={{ uri: replyUser.avatar }} 
+                            source={{ uri: replyUser.avatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png' }} 
                             style={tw`w-10 h-10 rounded-full mr-3`}
                           />
                         )}
                         <View style={tw`flex-1`}>
+                          {/* [Full Name] [lawyer badge] */}
                           <View style={tw`mb-2`}>
-                          <Text style={tw`text-base font-bold text-gray-900 mb-1`}>
-                            {replyUser.name}
-                          </Text>
-                          {replyUser.isLawyer && (
-                            <View style={tw`flex-row items-center mb-1`}>
-                              <View style={tw`flex-row items-center px-2 py-0.5 bg-green-50 rounded-full border border-green-100`}>
-                                <Image 
-                                  source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3472/3472620.png' }}
-                                  style={tw`w-3 h-3 mr-1 tint-green-700`}
-                                />
-                                <Text style={tw`text-xs font-medium text-green-700`}>Verified Lawyer</Text>
-                              </View>
+                            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                              <Text style={tw`text-base font-semibold text-gray-900 mr-2`}>
+                                {replyUser.name}
+                              </Text>
+                              {replyUser.isLawyer && (
+                                <View style={tw`px-2 py-0.5 bg-green-50 rounded-full border border-green-100`}>
+                                  <View style={tw`flex-row items-center`}>
+                                    <Image 
+                                      source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3472/3472620.png' }}
+                                      style={tw`w-3 h-3 mr-1 tint-green-700`}
+                                    />
+                                    <Text style={tw`text-xs font-medium text-green-700`}>Verified Lawyer</Text>
+                                  </View>
+                                </View>
+                              )}
                             </View>
-                          )}
-                          <Text style={tw`text-sm text-gray-500`}>
-                            @{!isReplyAnonymous ? replyUser.username : 'anonymous'}
+                            
+                            {/* [username] - law category not available in comments */}
+                            <Text style={tw`text-sm text-gray-500 mt-1`}>
+                              @{!isReplyAnonymous && 'username' in replyUser ? replyUser.username : 'anonymous'}
+                            </Text>
+                          </View>
+                          
+                          {/* [post content] */}
+                          <Text style={tw`text-gray-900 mb-2`}>{reply.body}</Text>
+                          
+                          {/* [timestamp] */}
+                          <Text style={tw`text-xs text-gray-500`}>
+                            {replyTimestamp}
                           </Text>
-                        </View>
-                        <Text style={tw`text-gray-900 mb-2`}>{reply.body}</Text>
-                        <Text style={tw`text-xs text-gray-500`}>
-                          {replyTimestamp}
-                        </Text>
                         </View>
                       </View>
                     </View>

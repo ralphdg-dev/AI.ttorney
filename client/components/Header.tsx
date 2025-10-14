@@ -62,7 +62,7 @@ const Header: React.FC<HeaderProps> = ({
     if (onNotificationPress) {
       onNotificationPress();
     } else {
-      console.log('Notifications pressed');
+      router.push('/notifications');
     }
   };
 

@@ -22,10 +22,8 @@ export class BookmarkService {
         };
       }
       
-      if (__DEV__) console.warn('BookmarkService: No authentication token found');
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      if (__DEV__) console.error('BookmarkService auth error:', error);
       return { 'Content-Type': 'application/json' };
     }
   }
@@ -44,14 +42,11 @@ export class BookmarkService {
       const result = await response.json();
       
       if (response.ok && result.success) {
-        if (__DEV__) console.log('Bookmark added:', postId);
         return { success: true, data: result.data };
       } else {
-        if (__DEV__) console.error('Add bookmark error:', result.error || result.detail);
         return { success: false, error: result.error || result.detail || 'Failed to add bookmark' };
       }
     } catch (error) {
-      if (__DEV__) console.error('Add bookmark exception:', error);
       return { success: false, error: 'Failed to add bookmark' };
     }
   }
@@ -68,15 +63,12 @@ export class BookmarkService {
       });
       
       if (response.ok) {
-        if (__DEV__) console.log('Bookmark removed:', postId);
         return { success: true };
       } else {
         const result = await response.json();
-        if (__DEV__) console.error('Remove bookmark error:', result.detail);
         return { success: false, error: result.detail || 'Failed to remove bookmark' };
       }
     } catch (error) {
-      if (__DEV__) console.error('Remove bookmark exception:', error);
       return { success: false, error: 'Failed to remove bookmark' };
     }
   }
@@ -115,11 +107,9 @@ export class BookmarkService {
         return { success: true, isBookmarked };
       } else {
         const result = await response.json();
-        if (__DEV__) console.error('Bookmark check error:', result.detail);
         return { success: false, isBookmarked: false, error: result.detail || 'Failed to check bookmark' };
       }
     } catch (error) {
-      if (__DEV__) console.error('Bookmark check exception:', error);
       return { success: false, isBookmarked: false, error: 'Failed to check bookmark status' };
     }
   }
@@ -140,11 +130,9 @@ export class BookmarkService {
         return { success: true, data: result.data || [] };
       } else {
         const result = await response.json();
-        console.error('API error getting user bookmarks:', result.detail);
         return { success: false, error: result.detail || 'Failed to get bookmarks' };
       }
     } catch (error) {
-      console.error('Error getting user bookmarks:', error);
       return { success: false, error: 'Failed to get bookmarks' };
     }
   }
@@ -177,19 +165,15 @@ export class BookmarkService {
         const cacheKey = `${userId}-${postId}`;
         this.bookmarkCache.set(cacheKey, { isBookmarked, timestamp: Date.now() });
         
-        if (__DEV__) console.log('✅ Bookmark toggled:', { postId, isBookmarked });
         return { success: true, isBookmarked };
       } else {
         const result = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        if (__DEV__) console.error('❌ Toggle bookmark error:', result.detail);
         return { success: false, isBookmarked: false, error: result.detail || 'Failed to toggle bookmark' };
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        if (__DEV__) console.error('⏰ Bookmark request timed out');
         return { success: false, isBookmarked: false, error: 'Request timed out' };
       }
-      if (__DEV__) console.error('❌ Toggle bookmark exception:', error);
       return { success: false, isBookmarked: false, error: 'Network error' };
     }
   }

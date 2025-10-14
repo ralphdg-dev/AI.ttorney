@@ -103,16 +103,29 @@ class SupabaseService:
                 headers = self._get_headers()
                 headers["Authorization"] = f"Bearer {access_token}"
                 
+                logger.info(f"Authenticating with Supabase using token: {access_token[:10]}...")
+                
                 response = await client.get(
                     f"{self.auth_url}/user",
-                    headers=headers
+                    headers=headers,
+                    timeout=10.0  # Add timeout to prevent hanging requests
                 )
                 
                 if response.status_code == 200:
                     data = response.json()
+                    logger.info(f"Successfully authenticated user: {data.get('id', 'unknown')[:8]}...")
                     return {"success": True, "data": data}
                 else:
-                    return {"success": False, "error": "Invalid token"}
+                    error_data = response.text if response.content else ""
+                    logger.error(f"Authentication failed with status {response.status_code}: {error_data}")
+                    
+                    # For development/debugging - provide more detailed error info
+                    if response.status_code == 401:
+                        logger.error("Token is invalid or expired. User needs to sign in again.")
+                    elif response.status_code == 403:
+                        logger.error("Token doesn't have permission to access this resource.")
+                    
+                    return {"success": False, "error": f"Invalid token (HTTP {response.status_code})"}
                     
         except Exception as e:
             logger.error(f"Get user error: {str(e)}")

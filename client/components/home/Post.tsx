@@ -99,16 +99,13 @@ const Post: React.FC<PostProps> = React.memo(({
           setIsBookmarked(result.isBookmarked);
           onBookmarkStatusChange?.(id, result.isBookmarked);
         }
-        if (__DEV__) console.log(`✅ Bookmark ${result.isBookmarked ? 'added' : 'removed'} successfully`);
       } else {
         // Revert optimistic update on failure
-        if (__DEV__) console.error('Failed to toggle bookmark:', result.error);
         setIsBookmarked(previousBookmarkState);
         onBookmarkStatusChange?.(id, previousBookmarkState);
       }
     } catch (error) {
       // Revert optimistic update on error
-      if (__DEV__) console.error('Error toggling bookmark:', error);
       setIsBookmarked(previousBookmarkState);
       onBookmarkStatusChange?.(id, previousBookmarkState);
     }
@@ -162,11 +159,9 @@ const Post: React.FC<PostProps> = React.memo(({
         // Don't close modal immediately - let ReportModal handle success state and auto-close
         onReportPress?.();
       } else {
-        console.error('Failed to submit report:', result.error);
         throw new Error(result.error || 'Failed to submit report');
       }
     } catch (error) {
-      console.error('Error submitting report:', error);
       throw error; // Re-throw to let ReportModal handle the error display
     } finally {
       setIsReportLoading(false);

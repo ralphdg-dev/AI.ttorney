@@ -58,7 +58,6 @@ const LawyerTimeline: React.FC = React.memo(() => {
       
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      if (__DEV__) console.error('Auth token error:', error);
       return { 'Content-Type': 'application/json' };
     }
   }, [session?.access_token]);
@@ -71,7 +70,6 @@ const LawyerTimeline: React.FC = React.memo(() => {
     const CACHE_DURATION = 30000; // 30 seconds cache
     
     if (!force && timeSinceLastFetch < CACHE_DURATION && posts.length > 0) {
-      if (__DEV__) console.log('Using cached posts, skipping fetch');
       return;
     }
     
@@ -80,9 +78,12 @@ const LawyerTimeline: React.FC = React.memo(() => {
     setError(null);
     
     if (!isAuthenticated) {
-      if (__DEV__) console.warn('User not authenticated, clearing posts');
       setPosts([]);
       setRefreshing(false);
+      
+      // Prompt user to login instead of making API call
+      const { checkAuthentication } = require('../../utils/authUtils');
+      checkAuthentication();
       return;
     }
     
@@ -108,6 +109,14 @@ const LawyerTimeline: React.FC = React.memo(() => {
       });
       
       clearTimeout(timeoutId);
+
+      // Handle session timeout
+      const { handleSessionTimeout } = require('../../utils/authUtils');
+      const isSessionTimeout = await handleSessionTimeout(response);
+      if (isSessionTimeout) {
+        setRefreshing(false);
+        return;
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -164,21 +173,16 @@ const LawyerTimeline: React.FC = React.memo(() => {
       // Only update if component is still mounted
       if (isComponentMounted.current) {
         setPosts(mapped);
-        if (__DEV__ && mapped.length === 0) {
-          console.log('No forum posts found');
-        }
         
         // Clear any error state on successful load
         setError(null);
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        if (__DEV__) console.log('Request aborted');
         return;
       }
       
       const errorMessage = error.message || 'Failed to load posts';
-      if (__DEV__) console.error('Load posts error:', errorMessage);
       
       if (isComponentMounted.current) {
         setError(errorMessage);
@@ -284,12 +288,10 @@ const LawyerTimeline: React.FC = React.memo(() => {
 
   const handleBookmarkPress = useCallback((postId: string) => {
     // The Post component handles the actual bookmark logic
-    if (__DEV__) console.log('Bookmark toggled:', postId);
   }, []);
 
   const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic
-    if (__DEV__) console.log('Report submitted:', postId);
   }, []);
 
   const handleMenuToggle = useCallback((postId: string) => {

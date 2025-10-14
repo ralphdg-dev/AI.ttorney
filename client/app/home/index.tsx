@@ -1,19 +1,21 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import Navbar from '../../components/Navbar';
 import Timeline from '../../components/home/Timeline';
 import Header from '../../components/Header';
 import { SidebarProvider, SidebarWrapper } from '../../components/AppSidebar';
 
 const HomePage: React.FC = () => {
+  const router = useRouter();
 
   const handleSearchPress = () => {
     console.log('Search functionality to be implemented');
   };
 
   const handleNotificationPress = () => {
-    console.log('Notification functionality to be implemented');
+    router.push('/notifications');
   };
 
   return (
