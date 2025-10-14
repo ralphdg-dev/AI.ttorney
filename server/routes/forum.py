@@ -799,7 +799,7 @@ async def check_bookmark(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/bookmarks/user", response_model=BookmarkResponse)
+@router.get("/bookmarks/user", response_model=ListPostsResponse)
 async def get_user_bookmarks(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
@@ -810,7 +810,7 @@ async def get_user_bookmarks(
         result = await bookmark_service.get_user_bookmarks(user_id)
         
         if result["success"]:
-            return BookmarkResponse(success=True, data=result.get("data"))
+            return ListPostsResponse(success=True, data=result.get("data", []))
         else:
             raise HTTPException(status_code=400, detail=result.get("error", "Failed to get bookmarks"))
             

@@ -190,6 +190,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       badge: badgeCounts.favoriteTerms || undefined,
     },
     {
+      id: "bookmarked-posts",
+      label: "Bookmarked Posts",
+      icon: MessageSquare,
+      route: "bookmarked-posts",
+    },
+    {
       id: "bookmarked-guides",
       label: "Bookmarked Guides",
       icon: Bookmark,
@@ -419,6 +425,9 @@ export const SidebarWrapper: React.FC<{
     switch (route) {
       case "favorite-terms":
         router.push("/favorite-terms");
+        break;
+      case "bookmarked-posts":
+        router.push("/bookmarked-posts");
         break;
       case "consultations":
         router.push("/consultations");

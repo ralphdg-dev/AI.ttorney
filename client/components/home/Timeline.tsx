@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   bottomSpacer: {
-    height: 80, // Add a spacer at the bottom to prevent content from being hidden
+    height: 20, // Add a spacer at the bottom to prevent content from being hidden
   },
   createPostButton: {
     position: 'absolute',
