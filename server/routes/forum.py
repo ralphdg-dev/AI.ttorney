@@ -408,8 +408,8 @@ async def list_recent_posts(current_user: Dict[str, Any] = Depends(get_current_u
                     try:
                         # Fetch all replies for these posts
                         ids_param = ",".join(post_ids)
-                        # Try simpler query first - the issue might be with the users join
-                        replies_url = f"{supabase.rest_url}/forum_replies?select=*&post_id=in.({ids_param})&order=created_at.asc"
+                        # Include user data with proper join syntax
+                        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=in.({ids_param})&order=created_at.asc"
                         
                         logger.info(f"🔍 Fetching replies with URL: {replies_url}")
                         
@@ -568,8 +568,8 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
     try:
         supabase = SupabaseService()
         # Increased timeout for better reliability
-        # Try simpler query first - the issue might be with the users join
-        replies_url = f"{supabase.rest_url}/forum_replies?select=*&post_id=eq.{post_id}&order=created_at.desc"
+        # Include user data with proper join syntax
+        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=eq.{post_id}&order=created_at.desc"
         logger.info(f"🔍 Individual replies URL: {replies_url}")
         
         async with httpx.AsyncClient(timeout=20.0) as client:

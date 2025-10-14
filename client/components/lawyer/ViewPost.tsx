@@ -741,9 +741,9 @@ const LawyerViewPost: React.FC = () => {
                   </Text>
                   {displayUser.isLawyer && (
                     <View style={tw`flex-row items-center bg-emerald-50 px-2 py-1 rounded border border-emerald-200`}>
-                      <Shield size={10} color="#059669" fill="#059669" />
+                      <Shield size={10} color="#059669" fill="#059669" stroke="none" strokeWidth={0} />
                       <Text style={tw`text-xs font-semibold text-emerald-700 ml-1`}>
-                        Verified
+                        Verified Lawyer
                       </Text>
                     </View>
                   )}
@@ -809,9 +809,9 @@ const LawyerViewPost: React.FC = () => {
                       </Text>
                       {reply.user?.isLawyer && (
                         <View style={tw`flex-row items-center bg-emerald-50 px-2 py-1 rounded border border-emerald-200`}>
-                          <Shield size={8} color="#059669" fill="#059669" />
+                          <Shield size={8} color="#059669" fill="#059669" stroke="none" strokeWidth={0} />
                           <Text style={tw`text-xs font-semibold text-emerald-700 ml-1`}>
-                            Verified
+                            Verified Lawyer
                           </Text>
                         </View>
                       )}

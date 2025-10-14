@@ -71,10 +71,16 @@ const Comments: React.FC<CommentsProps> = React.memo(({
               <Text style={styles.commentUserName}>
                 {item.is_anonymous ? 'Anonymous' : (item.user?.name || 'Anonymous')}
               </Text>
-              {item.user?.isLawyer && (
-                <Shield size={12} color={Colors.primary.blue} />
-              )}
+              <Text style={styles.commentUserHandle}>
+                @{item.is_anonymous ? 'anonymous' : (item.user?.username || 'anonymous')}
+              </Text>
             </View>
+            {item.user?.isLawyer && (
+              <View style={styles.verifiedBadge}>
+                <Shield size={12} color="#10B981" fill="#10B981" stroke="none" strokeWidth={0} />
+                <Text style={styles.verifiedText}>Verified Lawyer</Text>
+              </View>
+            )}
             <Text style={styles.commentTimestamp}>
               {new Date(item.created_at).toLocaleDateString()}
             </Text>
@@ -236,6 +242,22 @@ const styles = {
     fontWeight: '600' as const,
     color: Colors.text.primary,
     marginRight: 8,
+  },
+  commentUserHandle: {
+    fontSize: 12,
+    color: Colors.text.secondary,
+  },
+  verifiedBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  verifiedText: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: '#10B981',
+    marginLeft: 4,
   },
   commentTimestamp: {
     fontSize: 12,

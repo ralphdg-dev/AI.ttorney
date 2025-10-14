@@ -634,7 +634,7 @@ const LawyerProfilePage: React.FC = () => {
                   { backgroundColor: "#ECFDF5" },
                 ]}
               >
-                <Shield size={14} color="#059669" fill="#059669" />
+                <Shield size={14} color="#059669" fill="#059669" stroke="none" strokeWidth={0} />
               </View>
             </View>
 
