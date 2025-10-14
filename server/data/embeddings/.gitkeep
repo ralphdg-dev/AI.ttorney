@@ -1,0 +1,2 @@
+# This file ensures the embeddings directory is tracked by git
+# Place your vector embeddings and similarity models here

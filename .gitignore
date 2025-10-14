@@ -4,6 +4,28 @@
 .env.production
 .env.staging
 
+# Chatbot Training Data (exclude large datasets from git)
+server/data/raw/*.csv
+server/data/processed/*.csv
+server/data/embeddings/*.pkl
+server/data/embeddings/*.npy
+server/data/models/*.pkl
+server/data/models/*.h5
+server/data/models/*.pt
+server/data/models/*.pth
+
+# IDE and Editor Files
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# Backup Files
+*.backup
+*.bak
+*~
+
 # Python
 __pycache__/
 *.py[cod]
@@ -36135,5 +36157,7 @@ legal-app/node_modules/yocto-queue/index.js
 legal-app/node_modules/yocto-queue/license
 legal-app/node_modules/yocto-queue/package.json
 legal-app/node_modules/yocto-queue/readme.md
+client/.env
+server/.env
 client/.env
 server/.env
