@@ -227,6 +227,47 @@ class OTPService:
             logger.error(f"Send password reset OTP error: {str(e)}")
             return {"success": False, "error": str(e)}
     
+    async def send_email_change_otp(self, email: str, user_name: str = "User") -> Dict[str, Any]:
+        """Send OTP for email change verification"""
+        try:
+            # Generate OTP
+            otp_code = self.generate_otp()
+            ttl_seconds = 300  # 5 minutes for email change
+            
+            # Hash the OTP
+            otp_hash = self.hash_otp(otp_code)
+            
+            # Create OTP data
+            otp_key = self.get_otp_key(email, "email_change")
+            otp_data = OTPData(
+                hash=otp_hash,
+                email=email,
+                otp_type="email_change",
+                expires_at=time.time() + ttl_seconds,
+                attempts=0,
+                locked_until=None
+            )
+            
+            # Store in memory
+            self.otp_store.store_otp(otp_key, otp_data)
+            logger.info(f"Email change OTP stored in memory with key: {otp_key}, expires in: {ttl_seconds}s")
+            
+            # Send email
+            email_response = await self.send_otp_email(email, otp_code, user_name, "email_change")
+            
+            if email_response["success"]:
+                return {
+                    "success": True,
+                    "message": "Email change verification OTP sent successfully",
+                    "expires_in_minutes": 5
+                }
+            else:
+                return {"success": False, "error": email_response["error"]}
+                
+        except Exception as e:
+            logger.error(f"Send email change OTP error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
     async def verify_otp(self, email: str, otp_code: str, otp_type: str) -> Dict[str, Any]:
         """Verify OTP code with attempt tracking and lockout"""
         try:
@@ -306,6 +347,9 @@ class OTPService:
             elif otp_type == "password_reset":
                 subject = "Reset Your AI.ttorney Password"
                 html_content = self.get_password_reset_email_template(otp_code, user_name)
+            elif otp_type == "email_change":
+                subject = "Verify Your New Email Address"
+                html_content = self.get_email_change_template(otp_code, user_name)
             else:
                 return {"success": False, "error": "Invalid OTP type"}
             
@@ -392,6 +436,38 @@ class OTPService:
                 
                 <p>This code will expire in <strong>2 minutes</strong>.</p>
                 <p>If you didn't request a password reset, please ignore this email and your password will remain unchanged.</p>
+                
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
+                <p style="font-size: 14px; color: #6b7280;">
+                    Best regards,<br>
+                    The AI.ttorney Team
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+    
+    def get_email_change_template(self, otp_code: str, user_name: str) -> str:
+        """HTML template for email change verification"""
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Verify Your New Email Address</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #2563eb;">Email Address Change</h2>
+                <p>Hi {user_name},</p>
+                <p>We received a request to change your email address for your AI.ttorney account. To verify this new email address, please use the following OTP code:</p>
+                
+                <div style="background-color: #eff6ff; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; border: 1px solid #bfdbfe;">
+                    <h1 style="color: #2563eb; font-size: 32px; margin: 0; letter-spacing: 8px;">{otp_code}</h1>
+                </div>
+                
+                <p>This code will expire in <strong>5 minutes</strong>.</p>
+                <p>If you didn't request this email change, please ignore this email and contact our support team immediately.</p>
                 
                 <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
                 <p style="font-size: 14px; color: #6b7280;">

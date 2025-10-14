@@ -65,8 +65,7 @@ const Navbar: React.FC<NavbarProps> = ({
         router.push('/directory');
         break;
       case 'profile':
-        // router.push('/profile'); // Uncomment when profile page is ready
-        console.log('Profile page not implemented yet');
+        router.push('/profile');
         break;
       default:
         console.log(`Unknown tab: ${tabId}`);

@@ -146,6 +146,13 @@ export default function RootLayout() {
                         title: "Help",
                       }}
                     />
+                    <Stack.Screen
+                      name="profile"
+                      options={{
+                        headerShown: false,
+                        title: "Profile",
+                      }}
+                    />
                   </Stack>
                   </SidebarProvider>
                 </RouteErrorBoundary>

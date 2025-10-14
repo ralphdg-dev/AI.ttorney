@@ -139,6 +139,13 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     serverValidation: true,
     errorBoundary: true
   },
+  '/profile': { 
+    path: '/profile', 
+    requiredRole: 'registered_user',
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
 
   // Lawyer onboarding routes (for authenticated users during verification process)
   '/onboarding/lawyer': {
