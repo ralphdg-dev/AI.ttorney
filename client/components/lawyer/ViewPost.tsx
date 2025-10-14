@@ -144,12 +144,13 @@ const LawyerViewPost: React.FC = () => {
           
           clearTimeout(timeoutId);
           
+          
           if (response.ok) {
             const data = await response.json();
             return { success: true, data };
           } else {
-            console.error(`Failed to get replies: ${response.status}`);
-            return { success: false, error: `HTTP ${response.status}` };
+            const errorText = await response.text();
+            return { success: false, error: `HTTP ${response.status}: ${errorText}` };
           }
         } catch (error: any) {
           if (error.name === 'AbortError') {
@@ -360,6 +361,8 @@ const LawyerViewPost: React.FC = () => {
           // Load replies separately - don't fail if replies fail
           try {
             const rep = await authenticatedApiClient.getForumReplies(String(postId));
+            
+            
             if (rep.success && Array.isArray((rep.data as any)?.data)) {
               const rows = (rep.data as any).data as any[];
               const mappedReplies: Reply[] = rows.map((r: any) => {
@@ -383,9 +386,10 @@ const LawyerViewPost: React.FC = () => {
                   },
                 };
               });
+              
+              
               setReplies(mappedReplies);
             } else {
-              console.warn('Failed to load replies, but post loaded successfully');
               setReplies([]);
             }
           } catch (repliesError) {
@@ -785,7 +789,7 @@ const LawyerViewPost: React.FC = () => {
           <View style={tw`flex-row items-center mb-4`}>
             <MessageCircle size={20} color="#6B7280" />
             <Text style={tw`text-gray-700 font-semibold ml-2`}>
-              {replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}
+              {[...replies, ...optimisticReplies].length} {[...replies, ...optimisticReplies].length === 1 ? 'Reply' : 'Replies'}
             </Text>
           </View>
 

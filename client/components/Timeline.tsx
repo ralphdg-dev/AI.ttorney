@@ -59,6 +59,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     const created = row?.created_at || '';
     const userData = row?.users || {};
     
+    
     return {
       id: String(row?.id ?? ''),
       user: isAnon
@@ -71,7 +72,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       timestamp: formatTimeAgo(created),
       category: row?.category || 'Others',
       content: row?.body || '',
-      comments: Number(row?.reply_count || 0),
+      comments: Number(row?.reply_count || row?.replies?.length || row?.forum_replies?.length || 0),
     };
   };
 
@@ -79,6 +80,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     setRefreshing(true);
     try {
       const res = await apiClient.getRecentForumPosts();
+      
       if (res.success && Array.isArray((res.data as any)?.data)) {
         const rows = (res.data as any).data as any[];
         setPosts(rows.map(mapApiToPost));
@@ -87,7 +89,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       } else {
         setPosts([]);
       }
-    } catch {
+    } catch (error) {
       setPosts([]);
     } finally {
       setRefreshing(false);

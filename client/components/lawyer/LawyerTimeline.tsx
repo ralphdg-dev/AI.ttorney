@@ -116,10 +116,12 @@ const LawyerTimeline: React.FC = React.memo(() => {
 
       const data = await response.json();
       
+      
       // Helper function to map post data
       const mapPostData = (r: any): ForumPostWithUser => {
         const isAnon = !!r.is_anonymous;
         const userData = r?.users || {};
+        
         
         return {
           id: String(r.id),
@@ -147,7 +149,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
             created_at: null,
             updated_at: null,
           },
-          reply_count: Number(r.reply_count || 0),
+          reply_count: Number(r.reply_count || r.replies?.length || r.forum_replies?.length || 0),
         } as ForumPostWithUser;
       };
       
