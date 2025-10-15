@@ -6,18 +6,17 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/Colors';
 import { Badge, BadgeText } from '@/components/ui/badge';
 import LegalDisclaimer from '@/components/guides/LegalDisclaimer';
-import { db } from '@/lib/supabase';
+import { articleCache } from '@/services/articleCache';
 
 // Database article shape (subset)
 interface DbArticleRow {
-  id: number;
+  id: string;
   title_en: string;
   title_fil: string | null;
   description_en: string;
   description_fil: string | null;
   content_en: string;
   content_fil: string | null;
-  domain: string | null;
   category?: string | null;
   image_article?: string | null;
   is_verified: boolean | null;
@@ -60,6 +59,7 @@ export default function ArticleViewScreen() {
   const router = useRouter();
   const [article, setArticle] = useState<DbArticleRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showFilipino, setShowFilipino] = useState(false);
   const noImageUri = 'https://placehold.co/1200x800/png?text=No+Image+Available';
 
@@ -67,26 +67,93 @@ export default function ArticleViewScreen() {
     if (id) {
       fetchArticle();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchArticle = async () => {
+    const SERVER_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+    
     try {
       setLoading(true);
-      const numericId = parseInt(id);
-      if (Number.isNaN(numericId)) {
-        setArticle(null);
+      setError(null);
+      
+      // Validate ID
+      if (!id || typeof id !== 'string' || id.trim() === '') {
+        setError('Invalid article ID');
         return;
       }
-      const { data, error } = await db.legal.articles.get(numericId);
-      if (error) {
-        console.error('Error fetching article:', error);
-        setArticle(null);
+      
+      const articleId = id.trim();
+      
+      // Check cache first
+      const cachedArticle = articleCache.get(articleId);
+      if (cachedArticle) {
+        if (__DEV__) {
+          console.log('📦 Article loaded from cache:', cachedArticle.title_en);
+        }
+        setArticle(cachedArticle);
+        setLoading(false);
         return;
       }
-      setArticle(data as unknown as DbArticleRow);
+      
+      if (__DEV__) {
+        console.log(`🌐 Fetching article from API: ${articleId}`);
+      }
+      
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      try {
+        // Use server API (faster and more reliable)
+        const response = await fetch(`${SERVER_API_URL}/api/legal/articles/${articleId}`, {
+          signal: controller.signal,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError('Article not found');
+            return;
+          }
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success || !result.data) {
+          setError('Article not found');
+          return;
+        }
+        
+        if (__DEV__) {
+          console.log('✅ Article loaded from API:', result.data.title_en);
+        }
+        
+        // Cache the article
+        articleCache.set(articleId, result.data);
+        setArticle(result.data as DbArticleRow);
+        
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          setError('Request timed out. Please check your connection and try again.');
+          return;
+        }
+        
+        console.error('API fetch failed:', fetchError);
+        setError('Failed to load article. Please try again.');
+      }
+      
     } catch (error) {
-      console.error('Error fetching article:', error);
-      setArticle(null);
+      console.error('Unexpected error:', error);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -110,14 +177,19 @@ export default function ArticleViewScreen() {
     );
   }
 
-  if (!article) {
+  if (error || !article) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Article not found</Text>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>Go Back</Text>
-          </TouchableOpacity>
+          <Text style={styles.errorText}>{error || 'Article not found'}</Text>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity onPress={fetchArticle} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+              <Text style={styles.backButtonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -178,14 +250,14 @@ export default function ArticleViewScreen() {
             {/* Category Badge */}
 
 
-            {((article as any).category || article.domain) && (
+            {article.category && (
             <View style={styles.categoryContainer}>
               <Badge
                 variant="outline"
-                className={`rounded-md ${getCategoryBadgeClasses(((article as any).category || article.domain || '') as string).container}`}
+                className={`rounded-md ${getCategoryBadgeClasses(article.category).container}`}
               >
-                <BadgeText size="sm" className={getCategoryBadgeClasses(((article as any).category || article.domain || '') as string).text}>
-                  {(article as any).category || article.domain}
+                <BadgeText size="sm" className={getCategoryBadgeClasses(article.category).text}>
+                  {article.category}
                 </BadgeText>
               </Badge>
             </View>
@@ -302,16 +374,36 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  backButton: {
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  retryButton: {
     backgroundColor: Colors.primary.blue,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
+    flex: 1,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  backButton: {
+    backgroundColor: '#6B7280',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    flex: 1,
   },
   backButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
   articleImage: {
     width: '100%',

@@ -7,7 +7,7 @@ import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
 import { useStatusPolling } from '../../../../hooks/useStatusPolling';
 
 export default function AcceptedStatus() {
-  const [applicationData, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
+  const [, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { refreshUserData } = useAuth();
 
@@ -42,7 +42,7 @@ export default function AcceptedStatus() {
     setIsProcessing(true);
     
     // Navigate immediately for better UX
-    router.push('/lawyer');
+    router.push('/lawyer' as any);
     
     try {
       // Clear the pending_lawyer flag in background

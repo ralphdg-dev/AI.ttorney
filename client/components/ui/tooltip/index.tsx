@@ -80,7 +80,7 @@ const tooltipTextStyle = tva({
 type ITooltipProps = React.ComponentProps<typeof UITooltip> &
   VariantProps<typeof tooltipStyle> & { className?: string };
 type ITooltipContentProps = React.ComponentProps<typeof UITooltip.Content> &
-  VariantProps<typeof tooltipContentStyle> & { className?: string };
+  VariantProps<typeof tooltipContentStyle> & { style?: any } & { className?: string };
 type ITooltipTextProps = React.ComponentProps<typeof UITooltip.Text> &
   VariantProps<typeof tooltipTextStyle> & { className?: string };
 
@@ -108,7 +108,7 @@ const TooltipContent = React.forwardRef<
       className={tooltipContentStyle({
         class: className,
       })}
-      pointerEvents="auto"
+      style={{ pointerEvents: 'auto', ...(props.style || {}) }}
     />
   );
 });

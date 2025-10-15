@@ -3,12 +3,15 @@ from services.supabase_service import SupabaseService
 from models.legal_article import LegalArticle, SearchParams
 import logging
 import httpx
+import time
 
 logger = logging.getLogger(__name__)
 
 class LegalArticleService:
     def __init__(self):
         self.supabase_service = SupabaseService()
+        self._article_cache = {}
+        self._cache_duration = 300  # 5 minutes
     
     async def get_articles(self, params: SearchParams) -> tuple[List[LegalArticle], int]:
         """
@@ -104,11 +107,18 @@ class LegalArticleService:
         )
         return await self.get_articles(params)
     
-    async def get_article_by_id(self, article_id: int) -> Optional[LegalArticle]:
+    async def get_article_by_id(self, article_id: str) -> Optional[LegalArticle]:
         """
-        Get a specific article by ID using HTTP requests
+        Get a specific article by ID using HTTP requests with caching
         """
         try:
+            # Check cache first
+            cache_key = f"article_{article_id}"
+            cached_data = self._get_cached_data(cache_key)
+            if cached_data:
+                logger.info(f"📦 USING CACHED ARTICLE: {article_id}")
+                return LegalArticle(**cached_data)
+            
             select_fields = (
                 "id,title_en,title_fil,description_en,description_fil,"
                 "content_en,content_fil,category,image_article,is_verified,created_at,updated_at"
@@ -130,7 +140,13 @@ class LegalArticleService:
                 if not articles_data:
                     return None
                 
-                return LegalArticle(**articles_data[0])
+                article_data = articles_data[0]
+                
+                # Cache the result
+                self._set_cache(cache_key, article_data)
+                logger.info(f"✅ CACHED ARTICLE: {article_id} - {article_data.get('title_en', 'Unknown')}")
+                
+                return LegalArticle(**article_data)
             
         except Exception as e:
             logger.error(f"Error fetching article {article_id}: {str(e)}")
@@ -182,3 +198,26 @@ class LegalArticleService:
             offset=offset
         )
         return await self.get_articles(params)
+    
+    def _get_cached_data(self, cache_key: str):
+        """Get data from cache if not expired"""
+        if cache_key in self._article_cache:
+            cached_item = self._article_cache[cache_key]
+            if time.time() - cached_item['timestamp'] < self._cache_duration:
+                return cached_item['data']
+            else:
+                # Remove expired cache
+                del self._article_cache[cache_key]
+        return None
+    
+    def _set_cache(self, cache_key: str, data):
+        """Set data in cache with timestamp"""
+        self._article_cache[cache_key] = {
+            'data': data,
+            'timestamp': time.time()
+        }
+    
+    def clear_cache(self):
+        """Clear all cached data"""
+        self._article_cache.clear()
+        logger.info("🗑️ Article cache cleared")

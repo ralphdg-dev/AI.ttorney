@@ -128,25 +128,87 @@ class BookmarkService:
             return {"success": False, "error": "Internal server error"}
     
     async def get_user_bookmarks(self, user_id: str) -> Dict[str, Any]:
-        """Get all bookmarks for a user"""
+        """Get all bookmarks for a user with full post and user data"""
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{self.supabase.rest_url}/user_forum_bookmarks?select=*,forum_posts(*)&user_id=eq.{user_id}&order=bookmarked_at.desc",
+            # First, get the bookmarked post IDs
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                bookmarks_response = await client.get(
+                    f"{self.supabase.rest_url}/user_forum_bookmarks?select=post_id,bookmarked_at&user_id=eq.{user_id}&order=bookmarked_at.desc",
                     headers=self.supabase._get_headers(use_service_key=True)
                 )
             
-            if response.status_code != 200:
+            if bookmarks_response.status_code != 200:
                 details = {}
                 try:
-                    details = response.json() if response.content else {}
+                    details = bookmarks_response.json() if bookmarks_response.content else {}
                 except Exception:
-                    details = {"raw": response.text}
-                logger.error(f"Get user bookmarks failed: {response.status_code} - {details}")
+                    details = {"raw": bookmarks_response.text}
+                logger.error(f"Get user bookmarks failed: {bookmarks_response.status_code} - {details}")
                 return {"success": False, "error": details.get("message", "Failed to get bookmarks")}
             
-            bookmarks = response.json() if response.content else []
-            return {"success": True, "data": bookmarks}
+            bookmarks = bookmarks_response.json() if bookmarks_response.content else []
+            
+            if not bookmarks:
+                return {"success": True, "data": []}
+            
+            # Get the post IDs
+            post_ids = [str(b.get("post_id")) for b in bookmarks if b.get("post_id")]
+            
+            if not post_ids:
+                return {"success": True, "data": []}
+            
+            # Fetch the full post data with user information and replies
+            ids_param = ",".join(post_ids)
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                posts_response = await client.get(
+                    f"{self.supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&id=in.({ids_param})",
+                    headers=self.supabase._get_headers(use_service_key=True)
+                )
+            
+            if posts_response.status_code != 200:
+                logger.error(f"Get posts for bookmarks failed: {posts_response.status_code}")
+                return {"success": False, "error": "Failed to fetch post details"}
+            
+            posts = posts_response.json() if posts_response.content else []
+            
+            # Fetch replies for these posts
+            if posts:
+                try:
+                    async with httpx.AsyncClient(timeout=15.0) as client:
+                        replies_response = await client.get(
+                            f"{self.supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=in.({ids_param})&order=created_at.asc",
+                            headers=self.supabase._get_headers(use_service_key=True)
+                        )
+                    
+                    if replies_response.status_code == 200:
+                        all_replies = replies_response.json() if replies_response.content else []
+                        
+                        # Group replies by post_id
+                        replies_by_post = {}
+                        for reply in all_replies:
+                            post_id = str(reply.get("post_id"))
+                            if post_id not in replies_by_post:
+                                replies_by_post[post_id] = []
+                            replies_by_post[post_id].append(reply)
+                        
+                        # Add replies to each post
+                        for post in posts:
+                            post_id = str(post.get("id"))
+                            post["replies"] = replies_by_post.get(post_id, [])
+                    else:
+                        # Add empty replies if fetch fails
+                        for post in posts:
+                            post["replies"] = []
+                except Exception as e:
+                    logger.warning(f"Error fetching replies for bookmarks: {str(e)}")
+                    for post in posts:
+                        post["replies"] = []
+            
+            # Sort posts by bookmark date (maintain bookmark order)
+            post_order = {str(b.get("post_id")): i for i, b in enumerate(bookmarks)}
+            posts.sort(key=lambda p: post_order.get(str(p.get("id")), 999))
+            
+            return {"success": True, "data": posts}
             
         except Exception as e:
             logger.error(f"Get user bookmarks error: {str(e)}")

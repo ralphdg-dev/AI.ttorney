@@ -80,16 +80,6 @@ app.add_middleware(
 from routes import auth
 from routes.forum import router as forum_router
 
-# Include routers
-app.include_router(auth.router)
-app.include_router(legalTerms.router)
-app.include_router(legal_consultations_router)
-app.include_router(consultation_router)
-app.include_router(lawyer_info_router)
-app.include_router(consult_action)
-
-
-
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -99,9 +89,14 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal server error"}
     )
 
-# Include routers
+# Include routers (consolidated)
 app.include_router(auth_router)
 app.include_router(legal_router)
+app.include_router(legalTerms.router)
+app.include_router(legal_consultations_router)
+app.include_router(consultation_router)
+app.include_router(lawyer_info_router)
+app.include_router(consult_action)
 app.include_router(route_validation_router, prefix="/api")
 
 # Import and include lawyer application router
@@ -112,6 +107,10 @@ app.include_router(forum_router, prefix="/api")
 # Import and include places proxy router
 from routes.places_proxy import router as places_proxy_router
 app.include_router(places_proxy_router)
+
+# Import and include user profile router
+from routes.user_profile import router as user_profile_router
+app.include_router(user_profile_router)
 
 
 @app.get("/")

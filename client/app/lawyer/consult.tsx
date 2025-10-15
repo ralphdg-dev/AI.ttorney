@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Image,
   Alert,
   Animated,
   Easing,
@@ -24,7 +23,6 @@ import LawyerNavbar from "../../components/lawyer/LawyerNavbar";
 import Header from "../../components/Header";
 import ConfirmationModal from "../../components/lawyer/ConfirmationModal";
 import { useAuth } from "../../contexts/AuthContext";
-import { supabase } from "../../config/supabase";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../../constants/Colors";
 
@@ -87,6 +85,7 @@ const LawyerConsultPage: React.FC = () => {
           }),
         ])
       ).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const opacity = animatedValue.interpolate({
@@ -227,6 +226,7 @@ const LawyerConsultPage: React.FC = () => {
       fetchConsultationRequests();
       fetchStats(); // Still call API as fallback
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, session?.access_token, filter]);
 
   const getModeIcon = (mode: string | null) => {

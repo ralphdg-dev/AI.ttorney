@@ -1,28 +1,10 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useRef,
-  ReactNode,
-} from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Dimensions,
-  ScrollView,
-  Platform,
-  StatusBar,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+ import React, { createContext, useContext, useState, ReactNode, useRef, useEffect } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated, ScrollView, StatusBar } from "react-native";
 import { useRouter } from "expo-router";
-import { useFavorites } from "@/contexts/FavoritesContext";
+import { useFavorites } from "../contexts/FavoritesContext";
+import { shouldUseNativeDriver } from '@/utils/animations';
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  X,
-  User,
   Bookmark,
   Settings,
   HelpCircle,
@@ -32,11 +14,14 @@ import {
   MessageSquare,
   Star,
   Calendar,
+  User,
+  X
 } from "lucide-react-native";
 import Colors from "../constants/Colors";
 import { GlobalStyles } from "../constants/GlobalStyles";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../config/supabase";
+import { createShadowStyle } from "../utils/shadowUtils";
 
 const { width: screenWidth } = Dimensions.get("window");
 const SIDEBAR_WIDTH = screenWidth * 0.8;
@@ -158,12 +143,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         Animated.timing(slideAnim, {
           toValue: 0,
           duration: 280,
-          useNativeDriver: Platform.OS !== 'web',
+          useNativeDriver: shouldUseNativeDriver('transform'),
         }),
         Animated.timing(overlayOpacity, {
           toValue: 0.5,
           duration: 280,
-          useNativeDriver: Platform.OS !== 'web',
+          useNativeDriver: shouldUseNativeDriver('transform'),
         }),
       ]).start();
     } else if (shouldRender) {
@@ -171,12 +156,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         Animated.timing(slideAnim, {
           toValue: -SIDEBAR_WIDTH,
           duration: 280,
-          useNativeDriver: Platform.OS !== 'web',
+          useNativeDriver: shouldUseNativeDriver('transform'),
         }),
         Animated.timing(overlayOpacity, {
           toValue: 0,
           duration: 280,
-          useNativeDriver: Platform.OS !== 'web',
+          useNativeDriver: shouldUseNativeDriver('transform'),
         }),
       ]).start(() => {
         setShouldRender(false);
@@ -203,6 +188,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: Star,
       route: "favorite-terms",
       badge: badgeCounts.favoriteTerms || undefined,
+    },
+    {
+      id: "bookmarked-posts",
+      label: "Bookmarked Posts",
+      icon: MessageSquare,
+      route: "bookmarked-posts",
     },
     {
       id: "bookmarked-guides",
@@ -340,11 +331,16 @@ const Sidebar: React.FC<SidebarProps> = ({
             opacity: overlayOpacity,
           },
         ]}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
       >
         <TouchableOpacity
           style={styles.overlayTouchable}
           onPress={onClose}
           activeOpacity={1}
+          accessible={true}
+          accessibilityLabel="Close sidebar"
+          accessibilityRole="button"
         />
       </Animated.View>
 
@@ -358,6 +354,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             paddingBottom: insets.bottom,
           },
         ]}
+        accessible={true}
+        accessibilityRole="menu"
+        accessibilityLabel="Main navigation sidebar"
       >
         {/* Header */}
         <View style={styles.header}>
@@ -426,6 +425,9 @@ export const SidebarWrapper: React.FC<{
     switch (route) {
       case "favorite-terms":
         router.push("/favorite-terms");
+        break;
+      case "bookmarked-posts":
+        router.push("/bookmarked-posts");
         break;
       case "consultations":
         router.push("/consultations");
@@ -497,14 +499,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: SIDEBAR_WIDTH,
     backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 2,
-      height: 0,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 16,
+    ...createShadowStyle({
+      shadowColor: "#000",
+      shadowOffset: { width: 2, height: 0 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      elevation: 16,
+    }),
   },
   header: {
     flexDirection: "row",

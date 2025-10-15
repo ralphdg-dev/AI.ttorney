@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "../../../constants/Colors";
 import { useAuth } from "../../../contexts/AuthContext";
 import { hasActiveConsultationRequest } from "../../utils/consultationUtils";
+import { shadowPresets } from "../../../utils/shadowUtils";
 
 interface Lawyer {
   id: string;
@@ -118,13 +119,7 @@ export default function LawyerCard({
   return (
     <Box
       className="mx-2 mb-3 bg-white rounded-lg border border-gray-200 overflow-hidden"
-      style={{ 
-        elevation: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-      }}
+      style={shadowPresets.light}
     >
       {/* Header Section */}
       <Box className="p-4 pb-3">

@@ -9,7 +9,7 @@ import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Box } from "@/components/ui/box";
 import { Text } from "@/components/ui/text";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button/";
 import { ScrollView } from "@/components/ui/scroll-view";
 import { Input, InputField } from "@/components/ui/input";
 import { Pressable } from "@/components/ui/pressable";
@@ -249,7 +249,8 @@ export default function LawyerBookingView() {
     if (params.lawyerId && params.lawyerName) {
       initializeLawyerData();
     }
-  }, [params]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const generateCalendarDays = (month: number, year: number) => {
     const days: CalendarDay[] = [];
@@ -314,7 +315,8 @@ export default function LawyerBookingView() {
 
   useEffect(() => {
     setCalendarDays(generateCalendarDays(selectedMonth, selectedYear));
-  }, [selectedMonth, selectedYear, selectedDay]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMonth, selectedYear]);
 
   const navigateToPreviousMonth = () => {
     if (selectedMonth === 0) {
@@ -800,7 +802,7 @@ export default function LawyerBookingView() {
                     );
 
                     if (match) {
-                      let [_, hour, minute, period] = match;
+                      let [, hour, minute, period] = match;
                       let h = parseInt(hour);
                       const m = minute ? parseInt(minute) : 0;
                       if (period.toUpperCase() === "PM" && h < 12) h += 12;

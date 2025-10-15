@@ -22,7 +22,7 @@ type ForumPostWithUser = ForumPost & {
 
 const LawyerTimeline: React.FC = React.memo(() => {
   const router = useRouter();
-  const { session, isAuthenticated } = useAuth();
+  const { session, isAuthenticated, user: currentUser } = useAuth();
 
   const [posts, setPosts] = useState<ForumPostWithUser[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,7 +58,6 @@ const LawyerTimeline: React.FC = React.memo(() => {
       
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      if (__DEV__) console.error('Auth token error:', error);
       return { 'Content-Type': 'application/json' };
     }
   }, [session?.access_token]);
@@ -71,7 +70,6 @@ const LawyerTimeline: React.FC = React.memo(() => {
     const CACHE_DURATION = 30000; // 30 seconds cache
     
     if (!force && timeSinceLastFetch < CACHE_DURATION && posts.length > 0) {
-      if (__DEV__) console.log('Using cached posts, skipping fetch');
       return;
     }
     
@@ -80,9 +78,12 @@ const LawyerTimeline: React.FC = React.memo(() => {
     setError(null);
     
     if (!isAuthenticated) {
-      if (__DEV__) console.warn('User not authenticated, clearing posts');
       setPosts([]);
       setRefreshing(false);
+      
+      // Prompt user to login instead of making API call
+      const { checkAuthentication } = require('../../utils/authUtils');
+      checkAuthentication();
       return;
     }
     
@@ -109,6 +110,14 @@ const LawyerTimeline: React.FC = React.memo(() => {
       
       clearTimeout(timeoutId);
 
+      // Handle session timeout
+      const { handleSessionTimeout } = require('../../utils/authUtils');
+      const isSessionTimeout = await handleSessionTimeout(response);
+      if (isSessionTimeout) {
+        setRefreshing(false);
+        return;
+      }
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`HTTP ${response.status}: ${errorText}`);
@@ -116,10 +125,12 @@ const LawyerTimeline: React.FC = React.memo(() => {
 
       const data = await response.json();
       
+      
       // Helper function to map post data
       const mapPostData = (r: any): ForumPostWithUser => {
         const isAnon = !!r.is_anonymous;
         const userData = r?.users || {};
+        
         
         return {
           id: String(r.id),
@@ -147,7 +158,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
             created_at: null,
             updated_at: null,
           },
-          reply_count: Number(r.reply_count || 0),
+          reply_count: Number(r.reply_count || r.replies?.length || r.forum_replies?.length || 0),
         } as ForumPostWithUser;
       };
       
@@ -162,21 +173,16 @@ const LawyerTimeline: React.FC = React.memo(() => {
       // Only update if component is still mounted
       if (isComponentMounted.current) {
         setPosts(mapped);
-        if (__DEV__ && mapped.length === 0) {
-          console.log('No forum posts found');
-        }
         
         // Clear any error state on successful load
         setError(null);
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        if (__DEV__) console.log('Request aborted');
         return;
       }
       
       const errorMessage = error.message || 'Failed to load posts';
-      if (__DEV__) console.error('Load posts error:', errorMessage);
       
       if (isComponentMounted.current) {
         setError(errorMessage);
@@ -282,12 +288,10 @@ const LawyerTimeline: React.FC = React.memo(() => {
 
   const handleBookmarkPress = useCallback((postId: string) => {
     // The Post component handles the actual bookmark logic
-    if (__DEV__) console.log('Bookmark toggled:', postId);
   }, []);
 
   const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic
-    if (__DEV__) console.log('Report submitted:', postId);
   }, []);
 
   const handleMenuToggle = useCallback((postId: string) => {
@@ -310,22 +314,29 @@ const LawyerTimeline: React.FC = React.memo(() => {
   // Function to add optimistic post
   const addOptimisticPost = useCallback((postData: { body: string; category?: string }) => {
     const animatedOpacity = new Animated.Value(0); // Start completely transparent
+    
+    // Get current user info for optimistic post
+    const userName = currentUser?.full_name || currentUser?.username || currentUser?.email || 'You';
+    const userUsername = currentUser?.username || currentUser?.email?.split('@')[0] || 'you';
+    const userId = currentUser?.id || 'current-user';
+    const userRole = currentUser?.role || 'registered_user';
+    
     const optimisticPost: ForumPostWithUser = {
       id: `optimistic-${Date.now()}`,
       body: postData.body,
       category: (postData.category as any) || 'others',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      user_id: 'current-user',
+      user_id: userId,
       is_anonymous: false,
       is_flagged: false,
       user: {
-        id: 'current-user',
-        email: '',
-        username: 'You',
-        full_name: 'You',
-        role: 'registered_user',
-        is_verified: false,
+        id: userId,
+        email: currentUser?.email || '',
+        username: userUsername,
+        full_name: userName,
+        role: userRole as any,
+        is_verified: currentUser?.is_verified || false,
         archived: null,
         is_blocked_from_applying: null,
         last_rejected_at: null,
@@ -351,7 +362,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
     }).start();
     
     return optimisticPost.id;
-  }, []);
+  }, [currentUser]);
 
   // Function to confirm optimistic post (make it fully opaque and keep it seamless)
   const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: ForumPostWithUser) => {

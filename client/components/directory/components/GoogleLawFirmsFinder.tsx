@@ -27,6 +27,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../../constants/Colors';
 import { NetworkConfig } from '../../../utils/networkConfig';
+import { shadowPresets, createShadowStyle } from '../../../utils/shadowUtils';
 
 interface LawFirm {
   id: string;
@@ -1240,11 +1241,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
               borderRadius: 8,
               borderWidth: 1,
               borderColor: '#E5E7EB',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-              elevation: 5,
+              ...shadowPresets.medium,
               zIndex: 9999,
               maxHeight: 250,
               overflow: 'hidden',
@@ -1355,11 +1352,13 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
             borderWidth: 1,
             borderColor: '#E5E7EB',
             borderRadius: 8,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.15,
-            shadowRadius: 8,
-            elevation: 10,
+            ...createShadowStyle({
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              elevation: 10,
+            }),
             zIndex: 9999,
             minWidth: 120,
           }}
@@ -1514,11 +1513,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
             paddingHorizontal: 10,
             paddingVertical: 5,
             borderRadius: 12,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.1,
-            shadowRadius: 3,
-            elevation: 3,
+            ...shadowPresets.light,
             borderWidth: 1,
             borderColor: 'rgba(0, 0, 0, 0.1)'
           }}>

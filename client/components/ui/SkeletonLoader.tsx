@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Animated, ViewStyle } from 'react-native';
 import Colors from '@/constants/Colors';
 import { createPulseAnimation } from '@/utils/animations';
+import { shadowPresets } from '@/utils/shadowUtils';
 
 interface SkeletonLoaderProps {
   width?: number | string;
@@ -91,7 +92,7 @@ export const SkeletonCard: React.FC<{
           padding: 16,
           backgroundColor: Colors.background.primary,
           borderRadius: 12,
-          ...Colors.shadow.light,
+          ...shadowPresets.light,
         },
         style,
       ]}

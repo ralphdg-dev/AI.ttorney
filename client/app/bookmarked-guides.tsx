@@ -16,6 +16,7 @@ import {
   SidebarWrapper,
 } from "@/components/AppSidebar";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
+import { useLegalArticles } from "@/hooks/useLegalArticles";
 import Button from "@/components/ui/Button";
 import { Filter, SortAsc } from "lucide-react-native";
 
@@ -30,77 +31,18 @@ export default function BookmarkedGuidesScreen() {
   const minCardWidth = 320;
   const numColumns = Math.max(1, Math.min(3, Math.floor((width - horizontalPadding * 2) / minCardWidth)));
 
-  // Reuse placeholder articles from Guides, mirroring the look and feel
-  const placeholderArticles: ArticleItem[] = useMemo(
-    () => [
-      {
-        id: "1",
-        title: "How Annulment Works in the Philippines",
-        filipinoTitle: "Paano Gumagana ang Annulment sa Pilipinas",
-        summary:
-          "Understand the legal grounds, procedure, timeline, and costs involved in filing for annulment in the Philippines.",
-        filipinoSummary:
-          "Alamin ang mga batayan, proseso, tagal, at gastos sa paghahain ng annulment sa Pilipinas.",
-        imageUrl: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&q=80&auto=format&fit=crop",
-        category: "Family",
-      },
-      {
-        id: "2",
-        title: "Employee Rights During Probationary Period",
-        filipinoTitle: "Mga Karapatan ng Empleyado sa Panahon ng Probation",
-        summary:
-          "A quick guide to rights, obligations, and due process for probationary employees and employers.",
-        filipinoSummary:
-          "Mabilisang gabay sa mga karapatan, obligasyon, at due process para sa probationary na empleyado at employer.",
-        imageUrl: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&q=80&auto=format&fit=crop",
-        category: "Work",
-      },
-      {
-        id: "a3",
-        title: "Small Claims: When and How to File",
-        filipinoTitle: "Small Claims: Kailan at Paano Maghain",
-        summary:
-          "Learn eligibility, filing steps, fees, and what to expect in small claims court.",
-        filipinoSummary:
-          "Alamin ang kwalipikasyon, mga hakbang sa paghahain, bayarin, at inaasahan sa small claims court.",
-        image: require("@/assets/images/guides-placeholder/small-claims.png"),
-        category: "Civil",
-      },
-      {
-        id: "a4",
-        title: "What To Do If You're Arrested",
-        filipinoTitle: "Ano ang Gagawin Kung Maaresto",
-        summary:
-          "Immediate steps to protect your rights, from invoking counsel to handling searches and seizures.",
-        filipinoSummary:
-          "Agarang mga hakbang para protektahan ang iyong karapatan, mula sa paghingi ng abogado hanggang sa pagharap sa paghahalughog at pagsamsam.",
-        image: require("@/assets/images/guides-placeholder/arrest.jpg"),
-        category: "Criminal",
-      },
-      {
-        id: "a5",
-        title: "Consumer Warranty Basics",
-        filipinoTitle: "Mga Batayan ng Consumer Warranty",
-        summary:
-          "Know the difference between express and implied warranties and how to file a claim.",
-        filipinoSummary:
-          "Alamin ang pagkakaiba ng express at implied warranty at kung paano maghain ng reklamo.",
-        imageUrl: "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=1200&q=80&auto=format&fit=crop",
-        category: "Consumer",
-      },
-    ],
-    []
-  );
-
+  // Use real articles from the hook instead of placeholders
+  const { articles: realArticles } = useLegalArticles();
+  
   // For now, simulate a set of bookmarked IDs. Later, wire this to persisted user data.
-  const bookmarkedIds = useMemo(() => new Set(["1", "a4"]), []);
+  const bookmarkedIds = useMemo(() => new Set<string>([]), []); // Empty for now - no placeholders
 
   // All bookmarked guides regardless of category/search
   const allBookmarkedArticles: ArticleItem[] = useMemo(() => {
-    return placeholderArticles
-      .filter((a) => bookmarkedIds.has(a.id))
-      .map((a) => ({ ...a, isBookmarked: true }));
-  }, [placeholderArticles, bookmarkedIds]);
+    return realArticles
+      .filter((a: ArticleItem) => bookmarkedIds.has(a.id))
+      .map((a: ArticleItem) => ({ ...a, isBookmarked: true }));
+  }, [realArticles, bookmarkedIds]);
 
   // Narrow to current category from already-bookmarked
   const filteredByCategory = useMemo(() => {

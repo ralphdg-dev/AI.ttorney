@@ -13,7 +13,7 @@ class LegalArticleBase(BaseModel):
     image_article: Optional[str] = Field(None, description="Article image path")
 
 class LegalArticle(LegalArticleBase):
-    id: int
+    id: str = Field(..., description="Article UUID")
     is_verified: Optional[bool] = Field(True, description="Verification status")
     created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Update timestamp")

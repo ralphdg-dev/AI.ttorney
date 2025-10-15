@@ -16,7 +16,7 @@ const UnauthorizedPage: React.FC = () => {
 
   const handleGoHome = () => {
     if (user?.role === 'verified_lawyer') {
-      router.push('/lawyer');
+      router.push('/lawyer' as any);
     } else {
       router.push('/home');
     }
@@ -35,7 +35,7 @@ const UnauthorizedPage: React.FC = () => {
         
         <Text style={styles.title}>Access Denied</Text>
         <Text style={styles.message}>
-          You don't have permission to access this page. This area is restricted to verified lawyers only.
+          You don&apos;t have permission to access this page. This area is restricted to verified lawyers only.
         </Text>
         
         {user && (

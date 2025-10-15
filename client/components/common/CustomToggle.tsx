@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { TouchableOpacity, Animated, Platform } from 'react-native';
+import { TouchableOpacity, Animated } from 'react-native';
+import { shouldUseNativeDriver } from '@/utils/animations';
 
 interface CustomToggleProps {
   value: boolean;
@@ -20,7 +21,7 @@ const CustomToggle: React.FC<CustomToggleProps> = ({
     Animated.timing(animatedValue, {
       toValue: value ? 1 : 0,
       duration: 200,
-      useNativeDriver: Platform.OS !== 'web',
+      useNativeDriver: shouldUseNativeDriver('opacity'),
     }).start();
   }, [value, animatedValue]);
 

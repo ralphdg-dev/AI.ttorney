@@ -103,7 +103,7 @@ async def get_legal_article_categories():
 
 
 @router.get("/articles/{article_id}", response_model=LegalArticleSingleResponse)
-async def get_legal_article(article_id: int):
+async def get_legal_article(article_id: str):
     """
     Get a specific legal article by ID
     """

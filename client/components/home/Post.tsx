@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
 import ReportModal from '../common/ReportModal';
 import { ReportService } from '../../services/reportService';
-import Colors from '../../constants/Colors';
+import Colors from '@/constants/Colors';
+import { createShadowStyle } from '@/utils/shadowUtils';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
 import FadeInView from '../ui/FadeInView';
@@ -73,22 +74,42 @@ const Post: React.FC<PostProps> = React.memo(({
       return;
     }
 
+    // Optimistic update - update UI immediately
+    const previousBookmarkState = isBookmarked;
+    const newBookmarkState = !isBookmarked;
+    
+    setIsBookmarked(newBookmarkState);
+    onBookmarkStatusChange?.(id, newBookmarkState);
+    onBookmarkPress?.();
+    
+    // Show brief loading state (shorter duration)
     setIsBookmarkLoading(true);
+    
+    // Hide loading state quickly for better UX
+    setTimeout(() => setIsBookmarkLoading(false), 300);
+    
     try {
+      // Make API call in background
       const result = await BookmarkService.toggleBookmark(id, currentUser.id, session);
+      
       if (result.success) {
-        setIsBookmarked(result.isBookmarked);
-        onBookmarkStatusChange?.(id, result.isBookmarked);
-        onBookmarkPress?.();
+        // Confirm the optimistic update was correct
+        if (result.isBookmarked !== newBookmarkState) {
+          // If server state differs, correct it
+          setIsBookmarked(result.isBookmarked);
+          onBookmarkStatusChange?.(id, result.isBookmarked);
+        }
       } else {
-        if (__DEV__) console.error('Failed to toggle bookmark:', result.error);
+        // Revert optimistic update on failure
+        setIsBookmarked(previousBookmarkState);
+        onBookmarkStatusChange?.(id, previousBookmarkState);
       }
     } catch (error) {
-      if (__DEV__) console.error('Error toggling bookmark:', error);
-    } finally {
-      setIsBookmarkLoading(false);
+      // Revert optimistic update on error
+      setIsBookmarked(previousBookmarkState);
+      onBookmarkStatusChange?.(id, previousBookmarkState);
     }
-  }, [currentUser?.id, id, onBookmarkPress, onBookmarkStatusChange, session]);
+  }, [currentUser?.id, id, onBookmarkPress, onBookmarkStatusChange, session, isBookmarked]);
 
   const handleMorePress = useCallback(() => {
     onMenuToggle?.(id);
@@ -138,11 +159,9 @@ const Post: React.FC<PostProps> = React.memo(({
         // Don't close modal immediately - let ReportModal handle success state and auto-close
         onReportPress?.();
       } else {
-        console.error('Failed to submit report:', result.error);
         throw new Error(result.error || 'Failed to submit report');
       }
     } catch (error) {
-      console.error('Error submitting report:', error);
       throw error; // Re-throw to let ReportModal handle the error display
     } finally {
       setIsReportLoading(false);
@@ -291,7 +310,6 @@ const Post: React.FC<PostProps> = React.memo(({
     </FadeInView>
   );
 });
-
 const styles = StyleSheet.create({
   fadeContainer: {
     marginBottom: 12,
@@ -305,11 +323,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E1E8ED',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    ...createShadowStyle({
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
+    }),
   },
   loadingPost: {
     opacity: 0.7,
@@ -391,11 +411,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E1E8ED',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...createShadowStyle({
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    }),
     zIndex: 1000,
     minWidth: 160,
   },

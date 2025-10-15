@@ -1,23 +1,24 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Shield, ArrowLeft } from 'lucide-react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LEGAL_CATEGORIES } from '@/constants/categories';
 import CategoryScroller from '@/components/glossary/CategoryScroller';
 import Colors from '../../constants/Colors';
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
-import apiClient from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useForumCache } from '@/contexts/ForumCacheContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const LawyerCreatePost: React.FC = () => {
   const router = useRouter();
   const { session, isAuthenticated } = useAuth();
+  const { clearCache } = useForumCache();
   const [content, setContent] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
+  const [isAnonymous, setIsAnonymous] = useState<boolean>(false);
   const [isPosting, setIsPosting] = useState(false);
   const MAX_LEN = 500;
 
@@ -120,6 +121,10 @@ const LawyerCreatePost: React.FC = () => {
         return;
       }
       
+      // Clear the forum cache so new post appears when user navigates back
+      clearCache();
+      console.log(`[LawyerCreatePost] Cleared forum cache to show new post`);
+      
       // Wait a bit for smooth transition, then confirm the optimistic post
       setTimeout(() => {
         if (optimisticId) {
@@ -133,6 +138,8 @@ const LawyerCreatePost: React.FC = () => {
       if (optimisticId) {
         (global as any).forumActions?.removeOptimisticPost(optimisticId);
       }
+      // Also clear cache on error to ensure fresh data on next load
+      clearCache();
       Alert.alert(
         'Error',
         'Something went wrong. Please try again.',

@@ -22,10 +22,8 @@ export class ReportService {
         };
       }
       
-      if (__DEV__) console.warn('ReportService: No authentication token found');
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      if (__DEV__) console.error('ReportService auth error:', error);
       return { 'Content-Type': 'application/json' };
     }
   }
@@ -56,15 +54,12 @@ export class ReportService {
 
       if (response.ok) {
         const result = await response.json();
-        if (__DEV__) console.log('Report submitted:', targetId);
         return { success: true, data: result.data };
       } else {
         const result = await response.json();
-        if (__DEV__) console.error('Submit report error:', result.detail);
         return { success: false, error: result.detail || 'Failed to submit report' };
       }
     } catch (error) {
-      if (__DEV__) console.error('Submit report exception:', error);
       return { success: false, error: 'Failed to submit report' };
     }
   }
@@ -91,11 +86,9 @@ export class ReportService {
         return { success: true, hasReported };
       } else {
         const result = await response.json();
-        if (__DEV__) console.error('Check report error:', result.detail);
         return { success: false, hasReported: false, error: result.detail || 'Failed to check report status' };
       }
     } catch (error) {
-      if (__DEV__) console.error('Check report exception:', error);
       return { success: false, hasReported: false, error: 'Failed to check report status' };
     }
   }
@@ -118,11 +111,9 @@ export class ReportService {
         return { success: true, data: result.data || [] };
       } else {
         const result = await response.json();
-        if (__DEV__) console.error('Get reports error:', result.detail);
         return { success: false, error: result.detail || 'Failed to get reports' };
       }
     } catch (error) {
-      if (__DEV__) console.error('Get reports exception:', error);
       return { success: false, error: 'Failed to get reports' };
     }
   }
@@ -145,11 +136,9 @@ export class ReportService {
         return { success: true, data: result.data || [] };
       } else {
         const result = await response.json();
-        if (__DEV__) console.error('Get user reports error:', result.detail);
         return { success: false, error: result.detail || 'Failed to get user reports' };
       }
     } catch (error) {
-      if (__DEV__) console.error('Get user reports exception:', error);
       return { success: false, error: 'Failed to get user reports' };
     }
   }

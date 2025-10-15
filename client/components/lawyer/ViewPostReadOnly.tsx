@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Image, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { User, Shield, MessageCircle, Bookmark, MoreHorizontal, Flag } from 'lucide-react-native';
+import { User, Bookmark, MoreHorizontal, Flag } from 'lucide-react-native';
 import ReportModal from '../common/ReportModal';
 import { ReportService } from '../../services/reportService';
 import tw from 'tailwind-react-native-classnames';
@@ -11,25 +11,8 @@ import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
 import SkeletonLoader from '../ui/SkeletonLoader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useForumCache } from '../../contexts/ForumCacheContext';
 
-interface Reply {
-  id: string;
-  body: string;
-  created_at: string | null;
-  updated_at?: string | null;
-  user_id?: string | null;
-  is_anonymous?: boolean | null;
-  is_flagged?: boolean | null;
-  user?: {
-    name: string;
-    username: string;
-    avatar: string;
-    isLawyer?: boolean;
-    lawyerBadge?: string;
-  };
-  timestamp?: string;
-  content?: string;
-}
 
 interface PostData {
   id: string;
@@ -49,26 +32,51 @@ interface PostData {
     lawyerBadge?: string;
   };
   comments?: number;
-  replies: Reply[];
   timestamp?: string;
   category?: string;
   content?: string;
+  isBookmarked?: boolean;
+  users?: any;
+  forum_replies?: any[];
 }
+
+interface Reply {
+  id: string;
+  body: string;
+  created_at: string | null;
+  updated_at?: string | null;
+  user_id?: string | null;
+  is_anonymous?: boolean;
+  is_flagged?: boolean;
+  user?: {
+    name: string;
+    username: string;
+    avatar: string;
+    isLawyer?: boolean;
+    lawyerBadge?: string;
+  };
+}
+
+
 
 const ViewPostReadOnly: React.FC = () => {
   const router = useRouter();
   const { postId } = useLocalSearchParams();
   const { user: currentUser, session, isAuthenticated } = useAuth();
+  const { getCachedPost, getCachedPostFromForum, setCachedPost, updatePostComments, prefetchPost } = useForumCache();
   const [showFullContent, setShowFullContent] = useState(false);
   const [post, setPost] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [replies, setReplies] = useState<Reply[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [postReady, setPostReady] = useState(false);
   const [, setCurrentTime] = useState(new Date());
   const [bookmarked, setBookmarked] = useState(false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [replies, setReplies] = useState<Reply[]>([]);
+  const [repliesLoading, setRepliesLoading] = useState(false);
 
   // Optimized auth headers helper with minimal logging
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
@@ -90,10 +98,8 @@ const ViewPostReadOnly: React.FC = () => {
         };
       }
       
-      if (__DEV__) console.warn('ViewPost: No authentication token available');
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      if (__DEV__) console.error('ViewPost auth error:', error);
       return { 'Content-Type': 'application/json' };
     }
   }, [session?.access_token]);
@@ -111,28 +117,42 @@ const ViewPostReadOnly: React.FC = () => {
   const formatTimestamp = useCallback((timestamp: string | null): string => {
     if (!timestamp) return 'Unknown time';
     
-    // Handle timezone properly - treat timestamps without timezone as UTC
-    const hasTz = /Z|[+-]\d{2}:?\d{2}$/.test(timestamp);
-    const normalized = hasTz ? timestamp : `${timestamp}Z`;
-    
-    const now = new Date().getTime();
-    const postTime = new Date(normalized).getTime();
-    
-    if (isNaN(postTime)) return 'Invalid time';
-    
-    const diffInMinutes = Math.floor((now - postTime) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
-    
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
-    
-    return new Date(normalized).toLocaleDateString();
-  }, []); // Remove unnecessary currentTime dependency
+    try {
+      // Parse the timestamp
+      const postDate = new Date(timestamp);
+      const now = new Date();
+      
+      // Check if the date is valid
+      if (isNaN(postDate.getTime())) return 'Invalid time';
+      
+      // For recent posts (less than 7 days old), show relative time
+      const diffInMs = now.getTime() - postDate.getTime();
+      const diffInSeconds = Math.floor(diffInMs / 1000);
+      
+      // If the timestamp is in the future or very recent (within 1 second)
+      if (diffInSeconds <= 0) return 'Just now';
+      
+      if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
+      
+      const diffInMinutes = Math.floor(diffInSeconds / 60);
+      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+      
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      if (diffInHours < 24) return `${diffInHours}h ago`;
+      
+      const diffInDays = Math.floor(diffInHours / 24);
+      if (diffInDays < 7) return `${diffInDays}d ago`;
+      
+      // For posts older than a week but less than a month, show weeks
+      if (diffInDays < 30) return `${Math.floor(diffInDays / 7)}w ago`;
+      
+      // For posts older than 7 days, display the date in MM/DD/YYYY format
+      return `${postDate.getMonth() + 1}/${postDate.getDate()}/${postDate.getFullYear()}`;
+    } catch (error) {
+      // Fallback for any parsing errors
+      return 'Unknown time';
+    }
+  }, []);
 
   // Real-time timer effect - update more frequently for better responsiveness
   useEffect(() => {
@@ -165,7 +185,6 @@ const ViewPostReadOnly: React.FC = () => {
 
   const handleBookmarkPress = useCallback(async () => {
     if (!currentUser?.id || !postId) {
-      if (__DEV__) console.warn('ViewPost: Missing user ID or post ID');
       return;
     }
 
@@ -175,12 +194,9 @@ const ViewPostReadOnly: React.FC = () => {
       if (result.success) {
         setBookmarked(result.isBookmarked);
         setMenuOpen(false);
-        if (__DEV__) console.log('Bookmark updated:', result.isBookmarked);
-      } else {
-        if (__DEV__) console.error('Failed to toggle bookmark:', result.error);
       }
     } catch (error) {
-      if (__DEV__) console.error('Error toggling bookmark:', error);
+      // Error handled silently
     } finally {
       setIsBookmarkLoading(false);
     }
@@ -222,188 +238,286 @@ const ViewPostReadOnly: React.FC = () => {
       if (!result.success) {
         throw new Error(result.error || 'Failed to submit report');
       }
-
-      if (__DEV__) console.log('Report submitted successfully');
     } finally {
       setIsReportLoading(false);
     }
   };
 
-  // Optimized post loading with minimal logging
+  // Optimized post loading with cache-first approach
   useEffect(() => {
-    const load = async () => {
-      if (!postId) return;
-      
-      // Check authentication first
-      if (!isAuthenticated) {
-        if (__DEV__) console.warn('ViewPost: User not authenticated, cannot load post');
+    const loadPost = async () => {
+      if (!postId) {
+        setError('No post ID provided');
         setLoading(false);
         return;
       }
       
       setLoading(true);
-      
-      // Fallback: Hide loading after 5 seconds maximum
-      const fallbackTimer = setTimeout(() => {
-        if (__DEV__) console.log('ViewPost: Fallback timer triggered');
-        setLoading(false);
-      }, 5000);
+      setError(null);
       
       try {
-        const headers = await getAuthHeaders();
-        const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+        // Step 1: Check if we have cached post with comments
+        const cachedPostWithComments = getCachedPost(String(postId));
         
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
-        
-        const response = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
-          method: 'GET',
-          headers,
-          signal: controller.signal,
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          if (response.status === 403) {
-            if (__DEV__) console.error('ViewPost: Authentication failed - 403 Forbidden');
-            setPost(null);
-            setLoading(false);
-            clearTimeout(fallbackTimer);
-            return;
-          }
-          if (__DEV__) console.error(`ViewPost: Failed to load post ${response.status}:`, errorText);
-          setPost(null);
+        if (cachedPostWithComments) {
+          // Map cached data to component state
+          const mappedPost: PostData = {
+            id: cachedPostWithComments.id,
+            user: cachedPostWithComments.user,
+            timestamp: cachedPostWithComments.timestamp || '',
+            category: cachedPostWithComments.category || 'others',
+            content: cachedPostWithComments.content || cachedPostWithComments.body || '',
+            comments: cachedPostWithComments.replies?.length || 0,
+            isBookmarked: cachedPostWithComments.isBookmarked,
+            body: cachedPostWithComments.body || '',
+            domain: (cachedPostWithComments.domain as any) || 'others',
+            created_at: cachedPostWithComments.created_at || null,
+            user_id: cachedPostWithComments.user_id || null,
+            is_anonymous: cachedPostWithComments.is_anonymous || false,
+            is_flagged: cachedPostWithComments.is_flagged || false,
+            users: cachedPostWithComments.users
+          };
+          
+          // Show everything at once since we have complete data
+          setPost(mappedPost);
+          setPostReady(true);
           setLoading(false);
-          clearTimeout(fallbackTimer);
-          return;
-        }
-        
-        const res = await response.json();
-        
-        // Handle both nested and direct data structures
-        let row = null;
-        if (res.success && res.data) {
-          row = (res.data as any)?.data || res.data;
-        } else if (res.data) {
-          row = res.data;
-        }
-        
-        if (row) {
-          const isAnon = !!row.is_anonymous;
-          const userData = row?.users || {};
           
-          const mapped: PostData = {
-            id: String(row.id),
-            title: undefined,
-            body: row.body,
-            domain: (row.category as any) || 'others',
-            created_at: row.created_at || null,
-            updated_at: row.updated_at || null,
-            user_id: row.user_id || null,
-            is_anonymous: isAnon,
-            is_flagged: !!row.is_flagged,
-            user: isAnon ? undefined : {
-              name: userData?.full_name || userData?.username || 'User',
-              username: userData?.username || 'user',
-              avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
-              isLawyer: userData?.role === 'verified_lawyer',
-              lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
-            },
-            comments: 0,
-            replies: [],
-          };
-          setPost(mapped);
-        } else {
-          setPost(null);
-        }
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          // Silent abort - expected behavior
+          // Set replies from cache
+          if (cachedPostWithComments.replies && Array.isArray(cachedPostWithComments.replies)) {
+            setReplies(cachedPostWithComments.replies as Reply[]);
+            setRepliesLoading(false);
+          }
           return;
         }
-        if (__DEV__) console.error('ViewPost: Error loading post:', error);
-        setPost(null);
-      } finally {
+        
+        // Step 2: Check if we have basic post data from forum cache
+        const forumPost = getCachedPostFromForum(String(postId));
+        
+        if (forumPost) {
+          // Create full post data from forum cache
+          const mappedPost: PostData = {
+            id: forumPost.id,
+            user: forumPost.user,
+            timestamp: forumPost.timestamp || '',
+            category: forumPost.category || 'others',
+            content: forumPost.content || '',
+            comments: forumPost.comments || 0,
+            isBookmarked: forumPost.isBookmarked || false,
+            body: forumPost.content || '',
+            domain: (forumPost.category as any) || 'others',
+            created_at: forumPost.created_at || null,
+            user_id: forumPost.user_id || null,
+            is_anonymous: forumPost.is_anonymous || false,
+            is_flagged: forumPost.is_flagged || false,
+            users: forumPost.users
+          };
+          
+          // Show the post immediately and update UI state
+          setPost(mappedPost);
+          setPostReady(true);
+          setLoading(false);
+          
+          // If forum_replies exist in the forum cache, use them
+          if ((forumPost as any).forum_replies && Array.isArray((forumPost as any).forum_replies)) {
+            const mappedReplies = ((forumPost as any).forum_replies as any[]).map((r: any) => {
+              const isReplyAnon = !!r.is_anonymous;
+              const replyUserData = r?.users || {};
+              
+              return {
+                id: String(r.id),
+                body: r.reply_body ?? r.body,
+                created_at: r.created_at || null,
+                updated_at: r.updated_at || null,
+                user_id: r.user_id || null,
+                is_anonymous: isReplyAnon,
+                is_flagged: !!r.is_flagged,
+                user: isReplyAnon ? undefined : {
+                  name: replyUserData?.full_name || replyUserData?.username || 'User',
+                  username: replyUserData?.username || 'user',
+                  avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+                  isLawyer: replyUserData?.role === 'verified_lawyer',
+                  lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+                }
+              };
+            });
+            
+            setReplies(mappedReplies);
+            setRepliesLoading(false);
+            
+            // Cache the post with replies
+            const postWithComments = {
+              ...mappedPost,
+              replies: mappedReplies,
+              commentsLoaded: true,
+              commentsTimestamp: Date.now()
+            };
+            setCachedPost(String(postId), postWithComments as any);
+          }
+          return;
+        }
+        
+        // Step 3: No cache available, fetch from API
+        await loadFromAPI(String(postId));
+        
+      } catch (error: any) {
+        setError('Failed to load post. Please try again.');
         setLoading(false);
-        clearTimeout(fallbackTimer);
       }
     };
-    load();
-  }, [postId, isAuthenticated, getAuthHeaders]);
-
-  useEffect(() => {
-    const loadReplies = async () => {
-      if (!postId || !isAuthenticated) return;
+    
+    loadPost();
+  }, [postId, getCachedPost, getCachedPostFromForum]);
+  
+  
+  // Fallback to API when no cache available
+  const loadFromAPI = async (postId: string) => {
+    const fallbackTimer = setTimeout(() => {
+      setError('Request timed out. Please try again.');
+      setLoading(false);
+    }, 30000);
+    
+    try {
+      const headers = await getAuthHeaders();
+      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
       
-      try {
-        // Use direct API call with authentication
-        const headers = await getAuthHeaders();
-        const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
-        
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-        
-        const response = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
-          method: 'GET',
-          headers,
-          signal: controller.signal,
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          if (__DEV__) console.error(`ViewPost: Failed to load replies: ${response.status}`);
-          setReplies([]);
-          return;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      
+      const postResponse = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      clearTimeout(fallbackTimer);
+      
+      if (!postResponse.ok) {
+        const errorText = await postResponse.text().catch(() => 'Unknown error');
+        if (postResponse.status === 403) {
+          setError('Authentication failed. Please log in again.');
+        } else if (postResponse.status === 404) {
+          setError('Post not found');
+        } else {
+          setError(`Failed to load post (${postResponse.status})`);
         }
-        
-        const rep = await response.json();
-      
-      // Handle both nested and direct data structures
-      let rows = null;
-      if (rep.success && rep.data) {
-        rows = (rep.data as any)?.data || rep.data;
+        setLoading(false);
+        return;
       }
       
-      if (Array.isArray(rows)) {
-        const mapped: Reply[] = rows.map((r: any) => {
-          const isReplyAnon = !!r.is_anonymous;
-          const replyUserData = r?.users || {};
+      const res = await postResponse.json();
+      let row = null;
+      if (res.success && res.data) {
+        row = (res.data as any)?.data || res.data;
+      } else if (res.data) {
+        row = res.data;
+      }
+      
+      if (row) {
+        const isAnon = !!row.is_anonymous;
+        const userData = row?.users || {};
+        
+        const mapped: PostData = {
+          id: String(row.id),
+          title: undefined,
+          body: row.body,
+          domain: (row.category as any) || 'others',
+          created_at: row.created_at || null,
+          updated_at: row.updated_at || null,
+          user_id: row.user_id || null,
+          is_anonymous: isAnon,
+          is_flagged: !!row.is_flagged,
+          user: isAnon ? undefined : {
+            name: userData?.full_name || userData?.username || 'User',
+            username: userData?.username || 'user',
+            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+            isLawyer: userData?.role === 'verified_lawyer',
+            lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+          },
+          comments: 0,
+        };
+        
+        // Show the post immediately
+        setPost(mapped);
+        setPostReady(true);
+        setLoading(false);
+        
+        // Fetch replies immediately after post
+        try {
+          const repliesResponse = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json', ...headers } as HeadersInit,
+            signal: controller.signal,
+          });
           
-          return {
-            id: String(r.id),
-            body: r.reply_body ?? r.body,
-            created_at: r.created_at || null,
-            updated_at: r.updated_at || null,
-            user_id: r.user_id || null,
-            is_anonymous: isReplyAnon,
-            is_flagged: !!r.is_flagged,
-            user: isReplyAnon ? undefined : {
-              name: replyUserData?.full_name || replyUserData?.username || 'User',
-              username: replyUserData?.username || 'user',
-              avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
-              isLawyer: replyUserData?.role === 'verified_lawyer',
-              lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
-            },
-          };
-        });
-        setReplies(mapped);
-      } else {
-        setReplies([]);
-      }
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          if (__DEV__) console.log('ViewPost: Replies request aborted');
-          return;
+          if (repliesResponse.ok) {
+            // Process replies data from API response
+            const repliesData = await repliesResponse.json();
+            if (repliesData.success && Array.isArray((repliesData as any)?.data)) {
+              const rows = (repliesData as any).data as any[];
+              const mappedReplies: Reply[] = rows.map((r: any) => {
+                const isReplyAnon = !!r.is_anonymous;
+                const replyUserData = r?.users || {};
+                
+                return {
+                  id: String(r.id),
+                  body: r.reply_body ?? r.body,
+                  created_at: r.created_at || null,
+                  updated_at: r.updated_at || null,
+                  user_id: r.user_id || null,
+                  is_anonymous: isReplyAnon,
+                  is_flagged: !!r.is_flagged,
+                  user: isReplyAnon ? undefined : {
+                    name: replyUserData?.full_name || replyUserData?.username || 'User',
+                    username: replyUserData?.username || 'user',
+                    avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+                    isLawyer: replyUserData?.role === 'verified_lawyer',
+                    lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+                  }
+                };
+              });
+              
+              // Update UI with replies - sort by newest first
+              setReplies(mappedReplies.sort((a, b) => 
+                new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+              ));
+              setRepliesLoading(false);
+              
+              // Cache the complete post with replies
+              const postWithComments = {
+                ...mapped,
+                replies: mappedReplies.sort((a, b) => 
+                  new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+                ),
+                commentsLoaded: true,
+                commentsTimestamp: Date.now()
+              };
+              setCachedPost(String(postId), postWithComments as any);
+            }
+          }
+        } catch (error) {
+          // Don't set error state here as we already have the post content
         }
-        if (__DEV__) console.error('ViewPost: Error loading replies:', error);
-        setReplies([]);
+      } else {
+        setError('Post data not found');
+        setPostReady(true);
+        setLoading(false);
       }
-    };
-    loadReplies();
-  }, [postId, isAuthenticated, getAuthHeaders]);
+    } catch (error: any) {
+      clearTimeout(fallbackTimer);
+      if (error.name === 'AbortError') {
+        setError('Request timed out. Please check your connection and try again.');
+      } else {
+        setError('Failed to load post. Please try again.');
+      }
+      setPostReady(true);
+      setLoading(false);
+    }
+  };
+
+  // Replies are now loaded with the post in loadPost and loadFromAPI
+  // No separate loadReplies function needed
 
   const isAnonymous = post?.is_anonymous || false;
   const displayUser = isAnonymous 
@@ -411,7 +525,21 @@ const ViewPostReadOnly: React.FC = () => {
     : (post?.user || { name: 'User', avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', isLawyer: false }); // Gray default for regular users
   const displayTimestamp = formatTimestamp(post?.created_at || null);
   const displayContent = post?.body || '';
-  const repliesToShow = replies;
+  
+  // Wait for post to be ready before showing content
+  React.useEffect(() => {
+    if (postReady) {
+      setLoading(false);
+    }
+  }, [postReady]);
+  
+  // Auto-prefetch when component mounts (for future visits)
+  React.useEffect(() => {
+    if (postId && !loading) {
+      // Prefetch this post for future visits
+      prefetchPost(String(postId));
+    }
+  }, [postId, loading, prefetchPost]);
 
   const categoryColors = {
     family: { bg: '#FEF2F2', text: '#BE123C', border: '#FECACA' },
@@ -426,23 +554,23 @@ const ViewPostReadOnly: React.FC = () => {
   const shouldShowReadMore = displayContent.length > 280;
 
   return (
-    <SafeAreaView style={[tw`flex-1 bg-white`, { position: 'relative', zIndex: 1 }]}>
+    <SafeAreaView style={[tw`flex-1`, { position: 'relative', zIndex: 1, backgroundColor: 'transparent' }]}>
       {/* Loading Overlay - Covers any parent loading indicators */}
-      {loading && (
+      {(loading || !postReady) && (
         <View style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'white',
+          backgroundColor: 'transparent',
           zIndex: 9999,
         }}>
           {/* Header Space */}
           <View style={{ height: 60 }} />
           
           {/* Skeleton Content */}
-          <View style={tw`bg-white px-5 py-6 border-b border-gray-100`}>
+          <View style={tw`px-5 py-6 border-b border-gray-100`}>
             {/* User Info Skeleton */}
             <View style={tw`flex-row items-start mb-4`}>
               <SkeletonLoader width={56} height={56} borderRadius={28} style={tw`mr-4`} />
@@ -491,7 +619,7 @@ const ViewPostReadOnly: React.FC = () => {
       <Header 
         title="Post"
         showBackButton={true}
-        onBackPress={() => router.back()}
+        onBackPress={() => router.push('/home' as any)}
         rightComponent={
           !loading ? (
             <TouchableOpacity
@@ -565,60 +693,89 @@ const ViewPostReadOnly: React.FC = () => {
       )}
 
       <ScrollView 
-        style={tw`flex-1`}
-        contentContainerStyle={{ paddingBottom: 80 }}
+        style={tw`flex-1 bg-white`}
+        contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
       >
         
-        {!post && !loading && (
-          <View style={tw`px-5 py-6`}>
-            <Text style={tw`text-gray-500`}>Post not found.</Text>
+        {!post && !loading && !postReady && error && (
+          <View style={tw`px-5 py-6 items-center`}>
+            <Text style={tw`text-gray-500 text-center mb-4`}>{error}</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setError(null);
+                setLoading(true);
+                // Trigger reload by updating a dependency
+                setPost(null);
+              }}
+              style={tw`bg-blue-500 px-4 py-2 rounded-lg`}
+              accessibilityLabel="Try loading the post again"
+            >
+              <Text style={tw`text-white font-medium`}>Try Again</Text>
+            </TouchableOpacity>
           </View>
         )}
         {post && (
-          <View style={tw`bg-white px-5 py-6 border-b border-gray-100`}>
+          <View style={tw`px-5 py-6`}>
             <View style={tw`flex-row items-start mb-4`}>
-              {isAnonymous ? (
-                <View style={tw`w-14 h-14 rounded-full bg-gray-100 border border-gray-200 items-center justify-center mr-4`}>
-                  <User size={24} color="#6B7280" />
-                </View>
-              ) : (
-                <Image 
-                  source={{ uri: displayUser.avatar }} 
-                  style={tw`w-14 h-14 rounded-full mr-4`}
-                />
-              )}
-              <View style={tw`flex-1`}>
-                <View style={tw`flex-row items-center justify-between mb-1`}>
-                  <View style={tw`flex-row items-center flex-1 mr-3`}>
-                    <Text style={tw`text-base font-bold text-gray-900 mr-2 flex-shrink`}>
-                      {displayUser.name}
-                    </Text>
-                    {displayUser.isLawyer && (
-                      <View style={tw`flex-row items-center bg-emerald-50 px-2 py-1 rounded border border-emerald-200`}>
-                        <Shield size={10} color="#059669" fill="#059669" />
-                        <Text style={tw`text-xs font-semibold text-emerald-700 ml-1`}>
-                          Verified
-                        </Text>
-                      </View>
-                    )}
+                {isAnonymous ? (
+                  <View style={tw`w-12 h-12 rounded-full border border-gray-200 items-center justify-center mr-3`}>
+                    <User size={20} color="#6B7280" />
                   </View>
-                  
-                  {post.domain && (
-                    <View style={[
-                      tw`px-3 py-1 rounded-full border`,
-                      { backgroundColor: categoryColors[post.domain]?.bg || categoryColors.others.bg,
-                        borderColor: categoryColors[post.domain]?.border || categoryColors.others.border }
-                    ]}>
-                      <Text style={[tw`text-xs font-semibold`, { color: categoryColors[post.domain]?.text || categoryColors.others.text }]}> 
-                        {post.domain?.charAt(0).toUpperCase() + post.domain?.slice(1)}
+                ) : (
+                  <Image 
+                    source={{ uri: displayUser.avatar }} 
+                    style={tw`w-12 h-12 rounded-full mr-3`}
+                  />
+                )}
+              <View style={tw`flex-1`}>
+                <View style={tw`flex-row items-start justify-between mb-1`}>
+                  <View style={tw`flex-1 mr-3`}>
+                    {/* [Full Name] [lawyer badge] */}
+                    <View style={{flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap'}}>
+                      <Text style={tw`text-base font-semibold text-gray-900 mr-2`}>
+                        {displayUser.name}
                       </Text>
+                      {displayUser.isLawyer && (
+                        <View style={tw`px-2 py-0.5 bg-green-50 rounded-full border border-green-100`}>
+                          <View style={tw`flex-row items-center`}>
+                            <Image 
+                              source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3472/3472620.png' }}
+                              style={tw`w-3 h-3 mr-1 tint-green-700`}
+                            />
+                            <Text style={tw`text-xs font-medium text-green-700`}>Verified Lawyer</Text>
+                          </View>
+                        </View>
+                      )}
                     </View>
-                  )}
+                    
+                    {/* [username] [law category] - side by side */}
+                    <View style={tw`flex-row items-center mt-1`}>
+                      <Text style={tw`text-sm text-gray-500 mr-2`}>
+                        @{!isAnonymous ? displayUser.name?.toLowerCase().replace(/\s+/g, '') : 'anonymous'}
+                      </Text>
+                      
+                      {post.domain && (
+                        <View style={[
+                          tw`px-3 py-1 rounded-full border`,
+                          { 
+                            backgroundColor: post.domain && categoryColors[post.domain] ? categoryColors[post.domain].bg : categoryColors.others.bg,
+                            borderColor: post.domain && categoryColors[post.domain] ? categoryColors[post.domain].border : categoryColors.others.border 
+                          }
+                        ]}>
+                          <Text style={[
+                            tw`text-xs font-semibold`, 
+                            { color: post.domain && categoryColors[post.domain] ? categoryColors[post.domain].text : categoryColors.others.text }
+                          ]}> 
+                            {post.domain ? post.domain.charAt(0).toUpperCase() + post.domain.slice(1) : 'Others'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
                 </View>
-                <Text style={tw`text-sm text-gray-500`}>
-                  {!isAnonymous ? `@${displayUser.name?.toLowerCase().replace(/\s+/g, '')}` : 'Anonymous'} • {displayTimestamp}
-                </Text>
+                
+                {/* [timestamp] - moved to bottom */}
               </View>
             </View>
 
@@ -627,53 +784,101 @@ const ViewPostReadOnly: React.FC = () => {
             </Text>
             {shouldShowReadMore && (
               <TouchableOpacity onPress={() => setShowFullContent(!showFullContent)}>
-                <Text style={[tw`font-medium mb-4`, { color: Colors.primary.blue }]}>
+                <Text style={[tw`font-medium mb-2`, { color: Colors.primary.blue }]}>
                   {showFullContent ? 'Show less' : 'Read more'}
                 </Text>
               </TouchableOpacity>
             )}
-          </View>
-        )}
+            
+            {/* [timestamp] - at the bottom of post content */}
+            <Text style={tw`text-xs text-gray-500 mb-2`}>
+              {displayTimestamp}
+            </Text>
 
-        {post && (
-          <View style={tw`bg-white px-5 py-4`}>
-            <View style={tw`flex-row items-center mb-4`}>
-              <MessageCircle size={20} color="#6B7280" />
-              <Text style={tw`text-gray-700 font-semibold ml-2`}>
-              {repliesToShow.length} {repliesToShow.length === 1 ? 'Reply' : 'Replies'}
+            {/* Replies Section */}
+            <View style={tw`mt-6 pt-6 border-t border-gray-100 bg-white`}>
+              <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
+                Replies ({replies.length})
               </Text>
-            </View>
-          {repliesToShow.map((reply) => (
-              <View key={reply.id} style={tw`mb-4 pb-4 border-b border-gray-100`}>
-                <View style={tw`flex-row items-start`}>
-                  <Image 
-                    source={{ uri: reply.user?.avatar || (reply.is_anonymous ? 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png' : 'https://cdn-icons-png.flaticon.com/512/847/847969.png') }} 
-                    style={tw`w-10 h-10 rounded-full mr-3`}
-                  />
-                  <View style={tw`flex-1`}>
-                    <View style={tw`flex-row items-center mb-1`}>
-                      <Text style={tw`font-semibold text-gray-900 mr-2`}>
-                        {reply.user?.name || 'Anonymous'}
-                      </Text>
-                      {reply.user?.isLawyer && (
-                        <View style={tw`flex-row items-center bg-emerald-50 px-2 py-1 rounded border border-emerald-200`}>
-                          <Shield size={8} color="#059669" fill="#059669" />
-                          <Text style={tw`text-xs font-semibold text-emerald-700 ml-1`}>
-                            Verified
+              
+              {repliesLoading ? (
+                // Skeleton loaders for replies
+                [1, 2, 3].map((index) => (
+                  <View key={index} style={tw`flex-row items-start mb-4 pl-4`}>
+                    <View style={tw`w-10 h-10 rounded-full border border-gray-200 mr-3`} />
+                    <View style={tw`flex-1`}>
+                        <View style={tw`h-4 border border-gray-200 rounded w-3/4 mb-2`} />
+                        <View style={tw`h-4 border border-gray-200 rounded w-1/2`} />
+                      </View>
+                  </View>
+                ))
+              ) : replies.length > 0 ? (
+                // Display actual replies
+                replies.map((reply) => {
+                  const isReplyAnonymous = reply.is_anonymous || false;
+                  const replyUser = isReplyAnonymous 
+                    ? { name: 'Anonymous User', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png', isLawyer: false }
+                    : (reply.user || { name: 'User', avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', isLawyer: false });
+                  const replyTimestamp = formatTimestamp(reply.created_at);
+                  
+                  return (
+                    <View key={reply.id} style={tw`mb-6 pl-4 bg-white`}>
+                      <View style={tw`flex-row items-start mb-2`}>
+                        {isReplyAnonymous ? (
+                          <View style={tw`w-10 h-10 rounded-full bg-gray-100 border border-gray-200 items-center justify-center mr-3`}>
+                            <User size={16} color="#6B7280" />
+                          </View>
+                        ) : (
+                          <Image 
+                            source={{ uri: replyUser.avatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png' }} 
+                            style={tw`w-10 h-10 rounded-full mr-3`}
+                          />
+                        )}
+                        <View style={tw`flex-1`}>
+                          {/* [Full Name] [lawyer badge] */}
+                          <View style={tw`mb-2`}>
+                            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                              <Text style={tw`text-base font-semibold text-gray-900 mr-2`}>
+                                {replyUser.name}
+                              </Text>
+                              {replyUser.isLawyer && (
+                                <View style={tw`px-2 py-0.5 bg-green-50 rounded-full border border-green-100`}>
+                                  <View style={tw`flex-row items-center`}>
+                                    <Image 
+                                      source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3472/3472620.png' }}
+                                      style={tw`w-3 h-3 mr-1 tint-green-700`}
+                                    />
+                                    <Text style={tw`text-xs font-medium text-green-700`}>Verified Lawyer</Text>
+                                  </View>
+                                </View>
+                              )}
+                            </View>
+                            
+                            {/* [username] - law category not available in comments */}
+                            <Text style={tw`text-sm text-gray-500 mt-1`}>
+                              @{!isReplyAnonymous && 'username' in replyUser ? replyUser.username : 'anonymous'}
+                            </Text>
+                          </View>
+                          
+                          {/* [post content] */}
+                          <Text style={tw`text-gray-900 mb-2`}>{reply.body}</Text>
+                          
+                          {/* [timestamp] */}
+                          <Text style={tw`text-xs text-gray-500`}>
+                            {replyTimestamp}
                           </Text>
                         </View>
-                      )}
-                      <Text style={tw`text-sm text-gray-500 ml-2`}>
-                        {formatTimestamp(reply.created_at)}
-                      </Text>
+                      </View>
                     </View>
-                    <Text style={tw`text-gray-800 leading-5`}>
-                      {reply.body}
-                    </Text>
-                  </View>
+                  );
+                })
+              ) : (
+                // No replies message
+                <View style={tw`py-4 items-center bg-white`}>
+                  <Text style={tw`text-gray-500 text-center italic`}>No replies yet</Text>
                 </View>
-              </View>
-            ))}
+              )}
+            </View>
           </View>
         )}
       </ScrollView>

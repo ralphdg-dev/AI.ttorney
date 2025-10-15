@@ -2,13 +2,6 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { View, Text } from 'react-native';
 import Colors from '../../constants/Colors';
 
-interface PerformanceMetrics {
-  componentName: string;
-  renderTime: number;
-  renderCount: number;
-  averageRenderTime: number;
-  timestamp: number;
-}
 
 interface PerformanceTrackerProps {
   componentName: string;

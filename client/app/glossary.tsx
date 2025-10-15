@@ -4,11 +4,11 @@ import {
   TouchableOpacity,
   FlatList,
   Animated,
-  Platform,
   ActivityIndicator,
   Alert,
   useWindowDimensions,
 } from 'react-native';
+import { fadeIn, fadeOut } from '@/utils/animations';
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
 import { Box } from "@/components/ui/box";
@@ -276,21 +276,13 @@ export default function GlossaryScreen() {
     if (id === activeTab) return;
     
     // Smooth transition animation
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: Platform.OS !== 'web',
-    }).start(() => {
+    fadeOut(fadeAnim, 150).start(() => {
       setActiveTab(id);
       setCurrentPage(1);
       setSearchQuery("");
       setActiveCategory("all");
       
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: Platform.OS !== 'web',
-      }).start();
+      fadeIn(fadeAnim, 150).start();
     });
   }, [activeTab, fadeAnim]);
 

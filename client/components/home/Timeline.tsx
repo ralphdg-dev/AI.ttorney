@@ -1,15 +1,15 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { View, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Animated, ListRenderItem } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { View, Text, FlatList, RefreshControl, Animated, TouchableOpacity, StyleSheet, ListRenderItem } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Plus } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
 import Post from './Post';
+import { useAuth } from '../../contexts/AuthContext';
+import { useForumCache } from '../../contexts/ForumCacheContext';
+import Colors from '../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
 import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
 import { useList } from '@/hooks/useOptimizedList';
 import { SkeletonList } from '@/components/ui/SkeletonLoader';
-import { useAuth } from '../../contexts/AuthContext';
-import Colors from '../../constants/Colors';
 
 interface PostData {
   id: string;
@@ -17,6 +17,8 @@ interface PostData {
     name: string;
     username: string;
     avatar: string;
+    isLawyer?: boolean;
+    lawyerBadge?: string;
   };
   timestamp: string;
   category: string;
@@ -27,6 +29,14 @@ interface PostData {
   animatedOpacity?: Animated.Value;
   isLoading?: boolean;
   isBookmarked?: boolean;
+  // Additional data for ViewPost caching
+  body?: string;
+  domain?: string;
+  created_at?: string;
+  user_id?: string;
+  is_anonymous?: boolean;
+  is_flagged?: boolean;
+  users?: any;
 }
 
 interface TimelineProps {
@@ -35,7 +45,8 @@ interface TimelineProps {
 
 const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
-  const { session, isAuthenticated } = useAuth();
+  const { session, isAuthenticated, user: currentUser } = useAuth();
+  const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, getLastFetchTime, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [optimisticPosts, setOptimisticPosts] = useState<PostData[]>([]);
@@ -44,9 +55,13 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const [, setError] = useState<string | null>(null);
   
   // Refs for optimization
-  const lastFetchTime = useRef<number>(0);
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isComponentMounted = useRef(true);
+  
+  // Force cache refresh to fix any lingering references
+  React.useEffect(() => {
+    // This ensures any old references are cleared
+  }, []);
 
   const formatTimeAgo = useCallback((isoDate?: string): string => {
     if (!isoDate) return '';
@@ -77,26 +92,72 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     const created = row?.created_at || '';
     const userData = row?.users || {};
     
-    return {
+    // Map replies data if available
+    const replies = row?.replies || row?.forum_replies || [];
+    const mappedReplies = replies.map((reply: any) => {
+      const isReplyAnon = !!reply?.is_anonymous;
+      const replyUserData = reply?.users || {};
+      
+      return {
+        id: String(reply?.id || ''),
+        body: reply?.reply_body || reply?.body || '',
+        created_at: reply?.created_at || null,
+        user_id: reply?.user_id || null,
+        is_anonymous: isReplyAnon,
+        is_flagged: !!reply?.is_flagged,
+        user: isReplyAnon ? undefined : {
+          name: replyUserData?.full_name || replyUserData?.username || 'User',
+          username: replyUserData?.username || 'user',
+          avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+          isLawyer: replyUserData?.role === 'verified_lawyer',
+          lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+        },
+      };
+    });
+    
+    const postData: PostData = {
       id: String(row?.id ?? ''),
       user: isAnon
         ? { name: 'Anonymous User', username: 'anonymous', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png' } // Detective icon for anonymous users
         : { 
             name: userData?.full_name || userData?.username || 'User', 
             username: userData?.username || 'user', 
-            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png' // Gray default person icon
+            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
+            isLawyer: userData?.role === 'verified_lawyer',
+            lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
           },
       timestamp: formatTimeAgo(created),
       category: row?.category || 'Others',
       content: row?.body || '',
-      comments: Number(row?.reply_count || 0),
+      comments: mappedReplies.length,
       isBookmarked: !!row?.is_bookmarked,
+      // Additional data for ViewPost caching
+      body: row?.body || '',
+      domain: row?.category || 'others',
+      created_at: row?.created_at || null,
+      user_id: row?.user_id || null,
+      is_anonymous: isAnon,
+      is_flagged: !!row?.is_flagged,
+      users: userData,
     };
-  }, [formatTimeAgo]);
+    
+    // Cache the complete post (with or without comments) for instant ViewPost loading
+    const postWithComments = {
+      ...postData,
+      replies: mappedReplies,
+      commentsLoaded: true,
+      commentsTimestamp: Date.now()
+    };
+    
+    // Use setCachedPost to cache the complete post
+    setCachedPost(postData.id, postWithComments as any);
+    
+    return postData;
+  }, [formatTimeAgo, setCachedPost]);
 
   // Remove complex batching - bookmark status now comes from API
 
-  // Optimized auth headers helper with minimal logging
+  // Optimized auth headers helper with improved logging
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
     try {
       // First try to get token from AuthContext session
@@ -116,24 +177,22 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         };
       }
       
-      if (__DEV__) console.warn('Timeline: No authentication token available');
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      if (__DEV__) console.error('Timeline auth error:', error);
       return { 'Content-Type': 'application/json' };
     }
   }, [session?.access_token]);
 
-  // Optimized loadPosts with smart caching and minimal logging
+  // Optimized loadPosts with persistent caching
   const loadPosts = useCallback(async (force = false) => {
-    // Prevent excessive API calls with smart caching
-    const now = Date.now();
-    const timeSinceLastFetch = now - lastFetchTime.current;
-    const CACHE_DURATION = 30000; // 30 seconds cache
-    
-    if (!force && timeSinceLastFetch < CACHE_DURATION && posts.length > 0) {
-      if (__DEV__) console.log('Timeline: Using cached posts, skipping fetch');
-      return;
+    // Check cache first
+    if (!force && isCacheValid()) {
+      const cachedPosts = getCachedPosts();
+      if (cachedPosts && cachedPosts.length > 0) {
+        setPosts(cachedPosts);
+        setInitialLoading(false);
+        return;
+      }
     }
     
     // Close any open dropdown menus when refreshing
@@ -141,9 +200,13 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     setError(null);
     
     if (!isAuthenticated) {
-      if (__DEV__) console.warn('Timeline: User not authenticated, clearing posts');
       setPosts([]);
       setRefreshing(false);
+      setInitialLoading(false);
+      
+      // Prompt user to login instead of making API call
+      const { checkAuthentication } = require('../../utils/authUtils');
+      checkAuthentication();
       return;
     }
     
@@ -153,7 +216,8 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     }
     
     setRefreshing(true);
-    lastFetchTime.current = now;
+    const now = Date.now();
+    setLastFetchTime(now);
     
     try {
       const headers = await getAuthHeaders();
@@ -170,10 +234,18 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       
       clearTimeout(timeoutId);
 
+      // Handle session timeout
+      const { handleSessionTimeout } = require('../../utils/authUtils');
+      const isSessionTimeout = await handleSessionTimeout(response);
+      if (isSessionTimeout) {
+        setRefreshing(false);
+        setInitialLoading(false);
+        return;
+      }
+      
       if (!response.ok) {
         const errorText = await response.text();
         if (response.status === 403) {
-          if (__DEV__) console.error('Timeline: Authentication failed - 403 Forbidden. Check if user is properly authenticated.');
           // Clear posts and show authentication error
           setPosts([]);
           setError('Authentication required. Please log in again.');
@@ -194,13 +266,10 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       // Only update if component is still mounted
       if (isComponentMounted.current) {
         setPosts(mapped);
-        if (__DEV__ && mapped.length === 0) {
-          console.log('Timeline: No posts found');
-        }
+        setCachedPosts(mapped); // Cache the posts
         
         // Clear any error state on successful load
         setError(null);
-        // Bookmark statuses now come directly from the API response
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -209,7 +278,6 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       }
       
       const errorMessage = error.message || 'Failed to load posts';
-      if (__DEV__) console.error('Timeline load error:', errorMessage);
       
       if (isComponentMounted.current) {
         setError(errorMessage);
@@ -218,54 +286,31 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     } finally {
       if (isComponentMounted.current) {
         setRefreshing(false);
-      }
-    }
-  }, [isAuthenticated, getAuthHeaders, posts.length, refreshing, mapApiToPost]);
-
-  // Initial load with proper cleanup - only when component mounts and user is authenticated
-  useEffect(() => {
-    isComponentMounted.current = true;
-    
-    const initialLoad = async () => {
-      if (isAuthenticated) {
-        await loadPosts(true); // Force initial load only if authenticated
-      }
-      
-      // Hide initial loading after first load
-      if (isComponentMounted.current) {
-        setTimeout(() => {
-          if (isComponentMounted.current) {
-            setInitialLoading(false);
-          }
-        }, 300);
-      }
-    };
-    
-    initialLoad();
-    
-    // Fallback: Hide loading after 3 seconds maximum
-    const fallbackTimer = setTimeout(() => {
-      if (isComponentMounted.current) {
         setInitialLoading(false);
       }
-    }, 3000);
-    
-    return () => {
-      isComponentMounted.current = false;
-      clearTimeout(fallbackTimer);
-    };
-  }, [isAuthenticated, loadPosts]);
+    }
+  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, refreshing]);
 
-  // Smart focus-based refresh (only if data is stale and on forum page)
+  // Initial load with cache check
+  useEffect(() => {
+    if (isComponentMounted.current) {
+      loadPosts();
+    }
+  }, [loadPosts]);
+  
+  // Refresh posts when screen comes into focus (e.g., returning from CreatePost)
   useFocusEffect(
     useCallback(() => {
-      // Only load posts when the home page is focused
-      const timeSinceLastFetch = Date.now() - lastFetchTime.current;
-      if (timeSinceLastFetch > 30000) { // Only refresh if data is older than 30s
-        loadPosts();
+      // Check if cache is invalid or if we should refresh
+      if (!isCacheValid()) {
+        loadPosts(true); // Force refresh
+      } else {
+        loadPosts(); // Use cache if valid
       }
-    }, [loadPosts])
+    }, [loadPosts, isCacheValid])
   );
+
+  // Remove duplicate useFocusEffect - already handled above
 
   // Optimized polling with smart intervals (only when component is active)
   useEffect(() => {
@@ -318,7 +363,6 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
 
   const handleBookmarkPress = useCallback((postId: string) => {
     // The Post component handles the actual bookmark logic
-    if (__DEV__) console.log('Bookmark toggled:', postId);
   }, []);
   
   const handleBookmarkStatusChange = useCallback((postId: string, isBookmarked: boolean) => {
@@ -326,11 +370,12 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     setPosts(prev => prev.map(post => 
       post.id === postId ? { ...post, isBookmarked } : post
     ));
-  }, []);
+    // Also update the cache
+    updatePostBookmark(postId, isBookmarked);
+  }, [updatePostBookmark]);
 
   const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic
-    if (__DEV__) console.log('Report submitted:', postId);
   }, []);
 
   const handleMenuToggle = useCallback((postId: string) => {
@@ -338,9 +383,12 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   }, []);
 
   const handlePostPress = useCallback((postId: string) => {
+    // Prefetch the post before navigation for instant loading
+    prefetchPost(postId);
+    
     const route = context === 'lawyer' ? `/lawyer/ViewPost?postId=${postId}` : `/home/ViewPost?postId=${postId}`;
     router.push(route as any);
-  }, [context, router]);
+  }, [context, router, prefetchPost]);
   
   // Manual refresh handler
   const handleRefresh = useCallback(() => {
@@ -355,11 +403,23 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   // Function to add optimistic post
   const addOptimisticPost = useCallback((postData: { body: string; category?: string; is_anonymous?: boolean }) => {
     const animatedOpacity = new Animated.Value(0); // Start completely transparent
+    
+    // Get current user info for optimistic post
+    const userName = currentUser?.full_name || currentUser?.username || currentUser?.email || 'You';
+    const userUsername = currentUser?.username || currentUser?.email?.split('@')[0] || 'you';
+    const isLawyer = currentUser?.role === 'verified_lawyer';
+    
     const optimisticPost: PostData = {
       id: `optimistic-${Date.now()}`,
       user: postData.is_anonymous 
         ? { name: 'Anonymous User', username: 'anonymous', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png' } // Detective icon for anonymous posts
-        : { name: 'You', username: 'you', avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png' }, // Gray default person icon
+        : { 
+            name: userName,
+            username: userUsername,
+            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+            isLawyer: isLawyer,
+            lawyerBadge: isLawyer ? 'Verified' : undefined
+          },
       timestamp: 'now',
       category: postData.category || 'Others',
       content: postData.body,
@@ -378,7 +438,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     }).start();
     
     return optimisticPost.id;
-  }, []);
+  }, [currentUser]);
 
   // Function to confirm optimistic post (make it fully opaque and keep it seamless)
   const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: PostData) => {
@@ -439,7 +499,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const keyExtractor = useCallback((item: PostData) => item.id, []);
 
   // Memoized render item
-  const renderItem: ListRenderItem<PostData> = useCallback(({ item, index }) => {
+  const renderItem: ListRenderItem<PostData> = useCallback(({ item, index }: { item: PostData; index: number }) => {
     const postComponent = (
       <Post
         key={item.id}
@@ -561,7 +621,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   bottomSpacer: {
-    height: 80, // Add a spacer at the bottom to prevent content from being hidden
+    height: 20, // Add a spacer at the bottom to prevent content from being hidden
   },
   createPostButton: {
     position: 'absolute',
@@ -578,4 +638,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Timeline; 
+export default Timeline;

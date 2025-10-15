@@ -6,7 +6,7 @@ import Header from "@/components/Header";
 import { Box } from "@/components/ui/box";
 import { VStack } from "@/components/ui/vstack";
 import { Text as GSText } from "@/components/ui/text";
-import { Button, ButtonText } from "@/components/ui/button";
+import { Button, ButtonText } from "@/components/ui/button/";
 import { Input, InputField } from "@/components/ui/input";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
@@ -57,7 +57,7 @@ export default function ChangePasswordScreen() {
       setOldPassword("");
       setPassword("");
       setConfirmPassword("");
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to reset password. Please try again.");
     } finally {
       setLoading(false);

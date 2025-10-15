@@ -11,7 +11,8 @@ import { Box } from '@/components/ui/box';
 import { Spinner } from '@/components/ui/spinner';
 import { MapPin } from 'lucide-react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Colors from '../../../constants/Colors';
+import Colors from "../../../constants/Colors";
+import { shadowPresets } from "../../../utils/shadowUtils";
 
 interface AutocompletePrediction {
   place_id: string;
@@ -155,11 +156,7 @@ export default function SearchHeader({
               borderRadius: 8,
               borderWidth: 1,
               borderColor: '#E5E7EB',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-              elevation: 5,
+              ...shadowPresets.medium,
               zIndex: 9999,
               maxHeight: 250,
               overflow: 'hidden',

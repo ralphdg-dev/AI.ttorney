@@ -124,13 +124,13 @@ const popoverFooterStyle = tva({
 });
 
 type IPopoverProps = React.ComponentProps<typeof UIPopover> &
-  VariantProps<typeof popoverStyle> & { className?: string };
+  VariantProps<typeof popoverStyle> & { className?: string; style?: any };
 
 type IPopoverArrowProps = React.ComponentProps<typeof UIPopover.Arrow> &
   VariantProps<typeof popoverArrowStyle> & { className?: string };
 
 type IPopoverContentProps = React.ComponentProps<typeof UIPopover.Content> &
-  VariantProps<typeof popoverContentStyle> & { className?: string };
+  VariantProps<typeof popoverContentStyle> & { className?: string; style?: any };
 
 type IPopoverHeaderProps = React.ComponentProps<typeof UIPopover.Header> &
   VariantProps<typeof popoverHeaderStyle> & { className?: string };
@@ -163,7 +163,7 @@ const Popover = React.forwardRef<
       {...props}
       className={popoverStyle({ size, class: className })}
       context={{ size, placement }}
-      pointerEvents="box-none"
+      style={{ pointerEvents: 'box-none', ...(props.style || {}) }}
     />
   );
 });
@@ -196,7 +196,7 @@ const PopoverContent = React.forwardRef<
         size,
         class: className,
       })}
-      pointerEvents="auto"
+      style={{ pointerEvents: 'auto', ...(props.style || {}) }}
     />
   );
 });

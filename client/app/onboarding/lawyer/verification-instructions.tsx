@@ -33,7 +33,7 @@ export default function LawyerStartingPage() {
         <View style={tw`px-6`}>
           {/* Heading */}
           <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#0f172a' }}>
-            Let's get started
+            Let&apos;s get started
           </Text>
 
           {/* Subtitle */}
@@ -133,7 +133,7 @@ export default function LawyerStartingPage() {
                     Acknowledgment of Lawyer Terms and Conditions
                   </Text>
                   <Text style={{ fontSize: 12, color: '#6b7280', lineHeight: 18, marginTop: 4 }}>
-                    Carefully review and agree to the Terms and Conditions for legal practitioners.
+                    We&apos;ll review your documents to the Terms and Conditions for legal practitioners.
                   </Text>
                 </View>
               </View>

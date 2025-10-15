@@ -266,6 +266,101 @@ async def supabase_info():
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@router.get("/debug/replies_count")
+async def debug_replies_count():
+    """Debug endpoint to check total replies in database."""
+    try:
+        supabase = SupabaseService()
+        
+        # Get total count of replies
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            count_response = await client.get(
+                f"{supabase.rest_url}/forum_replies?select=count",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+        
+        # Get sample replies
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            sample_response = await client.get(
+                f"{supabase.rest_url}/forum_replies?select=*&limit=5",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+        
+        count_data = count_response.json() if count_response.content else []
+        sample_data = sample_response.json() if sample_response.content else []
+        
+        return {
+            "success": True,
+            "total_replies": count_data[0].get("count", 0) if count_data else 0,
+            "count_response_status": count_response.status_code,
+            "sample_response_status": sample_response.status_code,
+            "sample_replies": sample_data[:3] if isinstance(sample_data, list) else sample_data,
+            "sample_count": len(sample_data) if isinstance(sample_data, list) else "not a list"
+        }
+    except Exception as e:
+        logger.error(f"Debug replies count error: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@router.post("/debug/create_test_reply")
+async def create_test_reply(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Debug endpoint to create a test reply."""
+    try:
+        supabase = SupabaseService()
+        user_id = current_user["user"]["id"]
+        
+        # Get the first available post to reply to
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            posts_response = await client.get(
+                f"{supabase.rest_url}/forum_posts?select=id&limit=1",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+        
+        posts_data = posts_response.json() if posts_response.content else []
+        if not posts_data:
+            return {"success": False, "error": "No posts found to reply to"}
+        
+        post_id = posts_data[0]["id"]
+        
+        # Create a test reply
+        test_reply = {
+            "post_id": post_id,
+            "user_id": user_id,
+            "reply_body": "This is a test reply created for debugging purposes.",
+            "is_flagged": False
+        }
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            reply_response = await client.post(
+                f"{supabase.rest_url}/forum_replies",
+                json=test_reply,
+                headers={**supabase._get_headers(use_service_key=True), "Prefer": "return=representation"}
+            )
+        
+        reply_data = reply_response.json() if reply_response.content else []
+        
+        # Clear caches
+        clear_posts_cache()
+        clear_reply_counts_cache()
+        
+        return {
+            "success": reply_response.status_code in [200, 201],
+            "status_code": reply_response.status_code,
+            "post_id": post_id,
+            "reply_data": reply_data,
+            "message": "Test reply created successfully" if reply_response.status_code in [200, 201] else "Failed to create test reply"
+        }
+    except Exception as e:
+        logger.error(f"Create test reply error: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
 @router.get("/posts/recent", response_model=ListPostsResponse)
 async def list_recent_posts(current_user: Dict[str, Any] = Depends(get_current_user)):
     """BEST APPROACH: Minimal queries with smart global caching."""
@@ -290,42 +385,123 @@ async def list_recent_posts(current_user: Dict[str, Any] = Depends(get_current_u
         else:
             logger.info("No cache found, fetching fresh data")
         
-        # If no cached posts, fetch them
+        # If no cached posts, fetch them WITH replies for instant ViewPost loading
         if base_posts is None:
             supabase = SupabaseService()
             async with httpx.AsyncClient(timeout=20.0) as client:
-                response = await client.get(
+                # First fetch posts
+                posts_response = await client.get(
                     f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&order=created_at.desc&limit=20",
                     headers=supabase._get_headers(use_service_key=True)
                 )
 
-            if response.status_code != 200:
-                logger.error(f"Posts query failed: {response.status_code}")
+            if posts_response.status_code != 200:
+                logger.error(f"Posts query failed: {posts_response.status_code}")
                 return ListPostsResponse(success=True, data=[])
 
-            base_posts = response.json() if response.content else []
+            base_posts = posts_response.json() if posts_response.content else []
+            
+            # If we have posts, fetch their replies
+            if base_posts:
+                post_ids = [str(p.get("id")) for p in base_posts if p.get("id")]
+                if post_ids:
+                    try:
+                        # Fetch all replies for these posts
+                        ids_param = ",".join(post_ids)
+                        # Include user data with proper join syntax
+                        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=in.({ids_param})&order=created_at.asc"
+                        
+                        logger.info(f"🔍 Fetching replies with URL: {replies_url}")
+                        
+                        async with httpx.AsyncClient(timeout=15.0) as client:
+                            replies_response = await client.get(
+                                replies_url,
+                                headers=supabase._get_headers(use_service_key=True)
+                            )
+                        
+                        logger.info(f"📡 Replies response: {replies_response.status_code}")
+                        if replies_response.status_code != 200:
+                            error_text = replies_response.text if replies_response.content else "No error text"
+                            logger.error(f"❌ Replies query failed: {replies_response.status_code} - {error_text}")
+                            
+                            # Try fallback query without users join
+                            logger.info("🔄 Trying fallback query without users join...")
+                            fallback_url = f"{supabase.rest_url}/forum_replies?select=id,reply_body,created_at,user_id,is_anonymous,post_id&post_id=in.({ids_param})&order=created_at.asc"
+                            logger.info(f"🔍 Fallback URL: {fallback_url}")
+                            
+                            async with httpx.AsyncClient(timeout=15.0) as client:
+                                fallback_response = await client.get(
+                                    fallback_url,
+                                    headers=supabase._get_headers(use_service_key=True)
+                                )
+                            
+                            logger.info(f"📡 Fallback response: {fallback_response.status_code}")
+                            if fallback_response.status_code == 200:
+                                replies_response = fallback_response
+                                logger.info("✅ Fallback query succeeded!")
+                            else:
+                                fallback_error = fallback_response.text if fallback_response.content else "No error text"
+                                logger.error(f"❌ Fallback query also failed: {fallback_response.status_code} - {fallback_error}")
+                        
+                        if replies_response.status_code == 200:
+                            all_replies = replies_response.json() if replies_response.content else []
+                            logger.info(f"📊 Recent posts replies data: {len(all_replies) if isinstance(all_replies, list) else 'not a list'} total replies")
+                            if isinstance(all_replies, list) and len(all_replies) > 0:
+                                logger.info(f"📝 First reply sample from recent posts: {all_replies[0]}")
+                            elif isinstance(all_replies, dict):
+                                logger.info(f"📝 Recent posts replies structure: {list(all_replies.keys())}")
+                            
+                            # Group replies by post_id
+                            replies_by_post = {}
+                            for reply in all_replies:
+                                post_id = str(reply.get("post_id"))
+                                if post_id not in replies_by_post:
+                                    replies_by_post[post_id] = []
+                                replies_by_post[post_id].append(reply)
+                            
+                            # Add replies to each post
+                            for post in base_posts:
+                                post_id = str(post.get("id"))
+                                post["forum_replies"] = replies_by_post.get(post_id, [])
+                                
+                            logger.info(f"📦 Fetched {len(base_posts)} posts with replies from {len(all_replies)} total replies")
+                        else:
+                            logger.warning(f"Failed to fetch replies: {replies_response.status_code}")
+                            # Add empty replies to posts
+                            for post in base_posts:
+                                post["forum_replies"] = []
+                    except Exception as e:
+                        logger.warning(f"Error fetching replies: {str(e)}")
+                        # Add empty replies to posts
+                        for post in base_posts:
+                            post["forum_replies"] = []
             
             # Cache globally (shared across all users)
             _posts_cache[cache_key] = (base_posts, current_time)
-            logger.info(f"📦 CACHED {len(base_posts)} posts for {CACHE_DURATION}s")
+            logger.info(f"📦 CACHED {len(base_posts)} posts with replies for {CACHE_DURATION}s")
         
         # Get user-specific data using cached functions
         user_bookmarks = set()
-        reply_counts = {}
         if base_posts:
             post_ids = [str(p.get("id")) for p in base_posts if p.get("id")]
             if post_ids:
-                # Use cached functions to prevent duplicate API calls
+                # Only need bookmarks now since replies are included in the main query
                 user_bookmarks = await _get_cached_bookmarks(user_id, post_ids)
-                reply_counts = await _get_cached_reply_counts(post_ids)
 
         # Combine base posts with user-specific data
         final_posts = []
         for post in base_posts:
             post_copy = post.copy()  # Don't modify cached data
             pid = str(post_copy.get("id"))
-            post_copy["reply_count"] = reply_counts.get(pid, 0)  # Real reply counts
+            
+            # Calculate reply count from the included replies
+            replies = post_copy.get("forum_replies", [])
+            post_copy["reply_count"] = len(replies) if replies else 0
             post_copy["is_bookmarked"] = pid in user_bookmarks
+            
+            # Keep the replies data for frontend caching
+            post_copy["replies"] = replies
+            
             final_posts.append(post_copy)
         
         return ListPostsResponse(success=True, data=final_posts)
@@ -346,7 +522,8 @@ async def get_post(post_id: str, current_user: Dict[str, Any] = Depends(get_curr
     """Fetch a single forum post by ID with user information."""
     try:
         supabase = SupabaseService()
-        async with httpx.AsyncClient() as client:
+        # Increased timeout for better reliability
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
                 f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&id=eq.{post_id}",
                 headers=supabase._get_headers(use_service_key=True)
@@ -359,7 +536,14 @@ async def get_post(post_id: str, current_user: Dict[str, Any] = Depends(get_curr
             except Exception:
                 details = {"raw": response.text}
             logger.error(f"Get post failed: {response.status_code} - {details}")
-            raise HTTPException(status_code=400, detail="Failed to fetch post")
+            
+            # Return more specific error codes
+            if response.status_code == 404:
+                raise HTTPException(status_code=404, detail="Post not found")
+            elif response.status_code == 403:
+                raise HTTPException(status_code=403, detail="Access denied")
+            else:
+                raise HTTPException(status_code=400, detail="Failed to fetch post")
 
         rows = response.json() if response.content else []
         if not rows:
@@ -383,11 +567,55 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
     """List replies for a forum post with user information."""
     try:
         supabase = SupabaseService()
-        async with httpx.AsyncClient() as client:
+        # Increased timeout for better reliability
+        # Include user data with proper join syntax
+        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=eq.{post_id}&order=created_at.desc"
+        logger.info(f"🔍 Individual replies URL: {replies_url}")
+        
+        async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.get(
-                f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=eq.{post_id}&order=created_at.desc",
+                replies_url,
                 headers=supabase._get_headers(use_service_key=True)
             )
+        
+        logger.info(f"📡 Individual replies response: {response.status_code}")
+        
+        # Always log the response content for debugging
+        if response.content:
+            try:
+                response_data = response.json()
+                logger.info(f"📊 Individual replies data: {len(response_data) if isinstance(response_data, list) else 'not a list'} items")
+                if isinstance(response_data, list) and len(response_data) > 0:
+                    logger.info(f"📝 First reply sample: {response_data[0]}")
+                elif isinstance(response_data, dict):
+                    logger.info(f"📝 Response structure: {list(response_data.keys())}")
+            except Exception as e:
+                logger.error(f"❌ Could not parse response JSON: {e}")
+                logger.info(f"📝 Raw response: {response.text[:500]}...")
+        
+        if response.status_code != 200:
+            error_text = response.text if response.content else "No error text"
+            logger.error(f"❌ Individual replies query failed: {response.status_code} - {error_text}")
+            
+            # Try fallback query without users join
+            logger.info("🔄 Trying fallback individual replies query without users join...")
+            fallback_url = f"{supabase.rest_url}/forum_replies?select=*&post_id=eq.{post_id}&order=created_at.desc"
+            logger.info(f"🔍 Fallback individual replies URL: {fallback_url}")
+            
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                fallback_response = await client.get(
+                    fallback_url,
+                    headers=supabase._get_headers(use_service_key=True)
+                )
+            
+            logger.info(f"📡 Fallback individual replies response: {fallback_response.status_code}")
+            if fallback_response.status_code == 200:
+                response = fallback_response
+                logger.info("✅ Fallback individual replies query succeeded!")
+            else:
+                fallback_error = fallback_response.text if fallback_response.content else "No error text"
+                logger.error(f"❌ Fallback individual replies query also failed: {fallback_response.status_code} - {fallback_error}")
+        
         if response.status_code != 200:
             details = {}
             try:
@@ -395,14 +623,23 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
             except Exception:
                 details = {"raw": response.text}
             logger.error(f"List replies failed: {response.status_code} - {details}")
-            raise HTTPException(status_code=400, detail="Failed to fetch replies")
+            
+            # More graceful error handling - return empty array instead of failing
+            if response.status_code == 404:
+                logger.info(f"No replies found for post {post_id}")
+                return ListRepliesResponse(success=True, data=[])
+            else:
+                raise HTTPException(status_code=400, detail="Failed to fetch replies")
+        
         data = response.json() if response.content else []
         return ListRepliesResponse(success=True, data=data)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"List replies error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        # Return empty array on error instead of failing completely
+        logger.info("Returning empty replies array due to error")
+        return ListRepliesResponse(success=True, data=[])
 
 
 class CreateReplyRequest(BaseModel):
@@ -562,7 +799,7 @@ async def check_bookmark(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/bookmarks/user", response_model=BookmarkResponse)
+@router.get("/bookmarks/user", response_model=ListPostsResponse)
 async def get_user_bookmarks(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
@@ -573,7 +810,7 @@ async def get_user_bookmarks(
         result = await bookmark_service.get_user_bookmarks(user_id)
         
         if result["success"]:
-            return BookmarkResponse(success=True, data=result.get("data"))
+            return ListPostsResponse(success=True, data=result.get("data", []))
         else:
             raise HTTPException(status_code=400, detail=result.get("error", "Failed to get bookmarks"))
             

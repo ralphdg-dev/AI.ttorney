@@ -9,6 +9,7 @@ import {
   GestureResponderEvent,
 } from 'react-native';
 import Colors from '@/constants/Colors';
+import { shadowPresets } from '@/utils/shadowUtils';
 import LoadingSpinner from './LoadingSpinner';
 import { scaleIn, scaleOut } from '@/utils/animations';
 
@@ -194,7 +195,7 @@ const Button: React.FC<ButtonProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             opacity: isDisabled ? 0.6 : 1,
-            ...Colors.shadow.light,
+            ...shadowPresets.light,
           },
           variantStyles.container,
           sizeStyles.container,

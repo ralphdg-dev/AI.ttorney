@@ -139,7 +139,7 @@ export default function ConsultationCard({ consultation, index, onViewDetails }:
           }}
           numberOfLines={2}
         >
-          "{consultation.message}"
+          &ldquo;{consultation.message}&rdquo;
         </UIText>
       )}
 

@@ -139,6 +139,13 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     serverValidation: true,
     errorBoundary: true
   },
+  '/profile': { 
+    path: '/profile', 
+    requiredRole: 'registered_user',
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
 
   // Lawyer onboarding routes (for authenticated users during verification process)
   '/onboarding/lawyer': {
@@ -391,9 +398,6 @@ export const logRouteAccess = (
     reason,
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown'
   };
-
-  // Log to console for development
-  console.log(`[ROUTE_ACCESS] ${result.toUpperCase()}: ${logData.user} -> ${path}${reason ? ` (${reason})` : ''}`);
 
   // Send to server for audit trail (in production)
   if (process.env.NODE_ENV === 'production') {

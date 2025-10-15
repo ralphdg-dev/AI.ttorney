@@ -14,7 +14,7 @@ interface AuthGuardProps {
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
-  const { user, session, isLoading, isAuthenticated, hasRedirectedToStatus } = useAuth();
+  const { user, session, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
@@ -24,7 +24,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     const currentPath = `/${segments.join('/')}`;
     const routeConfig = getRouteConfig(currentPath);
     
-    console.log(`AuthGuard: currentPath=${currentPath}, isAuthenticated=${isAuthenticated}, user=${user?.role}, pending_lawyer=${user?.pending_lawyer}, hasRedirectedToStatus=${hasRedirectedToStatus}, session=${!!session}`);
 
     if (!routeConfig) return;
 
@@ -37,7 +36,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       if (isLoginPage || isRegistrationPage) {
         // Redirect authenticated users away from login/registration
         const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
-        console.log(`Authenticated user accessing ${currentPath}, redirecting to ${redirectPath}`);
         logRouteAccess(currentPath, user, 'denied', 'Already authenticated');
         router.replace(redirectPath as any);
         return;
@@ -47,13 +45,11 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       if (!hasRoutePermission(routeConfig, user.role)) {
         // Allow users with pending_lawyer to access most routes
         if (user.pending_lawyer) {
-          console.log(`Pending lawyer user accessing ${currentPath}, allowing access`);
           logRouteAccess(currentPath, user, 'granted', 'Pending lawyer access');
           return;
         }
         
         const redirectPath = routeConfig.fallbackRoute || getRoleBasedRedirect(user.role, user.is_verified, false);
-        console.log(`User lacks permission for ${currentPath}, redirecting to ${redirectPath}`);
         logRouteAccess(currentPath, user, 'denied', 'Insufficient permissions');
         router.replace(redirectPath as any);
         return;
@@ -65,7 +61,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       // Handle unauthenticated users - check if route is public
       if (!routeConfig.isPublic) {
         const redirectPath = '/login';
-        console.log(`Unauthenticated user accessing protected route ${currentPath}, redirecting to ${redirectPath}`);
         logRouteAccess(currentPath, null, 'denied', 'Authentication required');
         router.replace(redirectPath as any); // Use replace instead of push for faster redirect
         return;

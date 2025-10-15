@@ -12,7 +12,6 @@ import {
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { useState } from "react";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from "../constants/Colors";
 import BackButton from "../components/ui/BackButton";
 import PrimaryButton from "../components/ui/PrimaryButton";
@@ -112,7 +111,7 @@ export default function RoleSelection() {
       
       // Navigate back
       router.back();
-    } catch (error) {
+    } catch {
       // Still navigate back even if API call fails
       router.back();
     }
@@ -164,7 +163,7 @@ export default function RoleSelection() {
       } else {
         Alert.alert('Error', response.error || 'Failed to update role');
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to update role. Please try again.');
     } finally {
       setIsLoading(false);

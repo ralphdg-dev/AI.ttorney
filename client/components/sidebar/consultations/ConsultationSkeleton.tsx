@@ -29,6 +29,7 @@ export default function ConsultationSkeleton({ isFirst = false }: ConsultationSk
         }),
       ])
     ).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

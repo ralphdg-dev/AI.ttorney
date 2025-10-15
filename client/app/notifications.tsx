@@ -1,11 +1,11 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { View, FlatList, Pressable } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import Header from "@/components/Header";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
-import { Button, ButtonText } from "@/components/ui/button";
+import { Button, ButtonText } from "@/components/ui/button/";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
 import { Bell, MessageSquare, Calendar, CheckCircle, ChevronRight, ChevronDown } from "lucide-react-native";

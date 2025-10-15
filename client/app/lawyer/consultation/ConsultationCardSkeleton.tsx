@@ -22,6 +22,7 @@ const SkeletonBox = ({ width, height, style }: any) => {
         }),
       ])
     ).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const opacity = animatedValue.interpolate({

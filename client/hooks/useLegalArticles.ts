@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../config/supabase';
 import { ArticleItem } from '@/components/guides/ArticleCard';
+import { supabase } from '../config/supabase';
 
 export interface LegalArticle {
-  id: number;
+  id: string;
   title_en: string;
   title_fil: string | null;
   description_en: string | null;
@@ -18,8 +18,8 @@ export interface LegalArticle {
 }
 
 // Configuration to choose between direct Supabase or server API
-const USE_SERVER_API = process.env.EXPO_PUBLIC_USE_SERVER_API === 'true';
-const SERVER_API_URL = process.env.EXPO_PUBLIC_SERVER_API_URL || 'http://localhost:8000';
+const USE_SERVER_API = true; // Always use server API instead of direct Supabase calls
+const SERVER_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Helper function to get full Supabase Storage URL
 const getStorageUrl = (path: string | null | undefined): string | undefined => {
@@ -54,18 +54,25 @@ export const useLegalArticles = () => {
         ? `${SERVER_API_URL}/api/legal/articles?search=${encodeURIComponent(searchQuery)}`
         : `${SERVER_API_URL}/api/legal/articles`;
       
+      console.log('Fetching from URL:', url);
       const response = await fetch(url);
+      console.log('Response status:', response.status, response.statusText);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Server API error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
       
       const result = await response.json();
+      console.log('Server API response:', result);
       
       if (!result.success) {
+        console.error('API request failed:', result);
         throw new Error('API request failed');
       }
       
+      console.log('Articles fetched from server:', result.data?.length || 0);
       return result.data || [];
     } catch (err) {
       console.error('Error fetching from server API:', err);
@@ -98,72 +105,85 @@ export const useLegalArticles = () => {
     }
   };
 
-  const fetchArticles = useCallback(async () => {
+  const fetchArticles = useCallback(async (retryCount = 0) => {
+    const maxRetries = 3;
+    
     try {
       setLoading(true);
       setError(null);
       
       let data: LegalArticle[] = [];
       
-      console.log('Fetching articles...');
+      console.log(`Fetching articles... (attempt ${retryCount + 1})`);
       console.log('USE_SERVER_API:', USE_SERVER_API);
       
-      if (USE_SERVER_API) {
-        console.log('Using server API to fetch articles');
-        // Use server API
+      console.log('Using server API to fetch articles');
+      try {
+        // Try server API first
         data = await fetchArticlesFromServer();
-      } else {
-        console.log('Using direct Supabase to fetch articles');
-        // Log Supabase client to check if it's properly initialized
-        console.log('Supabase client:', {
-          supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
-          supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
-        });
+      } catch (serverError) {
+        console.warn('Server API failed, falling back to direct Supabase:', serverError);
         
-        // Use direct Supabase - only fetch verified articles with new description fields
+        // Fallback to direct Supabase
         const { data: supabaseData, error: fetchError } = await supabase
           .from('legal_articles')
           .select('id, title_en, title_fil, description_en, description_fil, content_en, content_fil, category, image_article, is_verified, created_at, updated_at')
-          .eq('is_verified', true);
-        
-        console.log('Supabase response:', { data: supabaseData, error: fetchError });
+          .eq('is_verified', true)
+          .order('created_at', { ascending: false });
         
         if (fetchError) {
-          console.error('Supabase fetch error:', fetchError);
+          console.error('Supabase fallback also failed:', fetchError);
           throw fetchError;
         }
         
         data = supabaseData as unknown as LegalArticle[] || [];
-        console.log('Fetched articles:', data.length);
+        console.log('Fallback: Fetched articles from Supabase:', data.length);
       }
 
       // Transform the database data to match ArticleItem interface
-      const transformedArticles: ArticleItem[] = data.map((article: LegalArticle) => {
-        const rawCategory = (article as any).category;
-        const normalized = normalizeCategory(rawCategory || undefined);
-        return ({
-          id: article.id.toString(),
-          title: article.title_en,
-          filipinoTitle: article.title_fil || undefined,
-          summary: article.description_en || 
-            (article.content_en.length > 150 
-              ? article.content_en.substring(0, 150) + '...' 
-              : article.content_en),
-          filipinoSummary: article.description_fil || 
-            (article.content_fil 
-              ? (article.content_fil.length > 150 
-                  ? article.content_fil.substring(0, 150) + '...' 
-                  : article.content_fil)
-              : undefined),
-          category: normalized,
-          imageUrl: getStorageUrl((article as any).image_article),
+      const transformedArticles: ArticleItem[] = data
+        .filter((article: LegalArticle) => {
+          // Filter out invalid articles
+          return article && 
+                 article.id && 
+                 typeof article.id === 'string' && 
+                 article.title_en && 
+                 article.title_en.trim() !== '';
+        })
+        .map((article: LegalArticle) => {
+          const rawCategory = (article as any).category;
+          const normalized = normalizeCategory(rawCategory || undefined);
+          return ({
+            id: article.id, // Already a string (UUID)
+            title: article.title_en.trim(),
+            filipinoTitle: article.title_fil?.trim() || undefined,
+            summary: (article.description_en?.trim() || 
+              (article.content_en && article.content_en.length > 150 
+                ? article.content_en.substring(0, 150) + '...' 
+                : article.content_en)) || 'No description available',
+            filipinoSummary: article.description_fil?.trim() || 
+              (article.content_fil 
+                ? (article.content_fil.length > 150 
+                    ? article.content_fil.substring(0, 150) + '...' 
+                    : article.content_fil)
+                : undefined),
+            category: normalized,
+            imageUrl: getStorageUrl((article as any).image_article),
+          });
         });
-      });
 
       setArticles(transformedArticles);
     } catch (err) {
       console.error('Error fetching legal articles:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch articles');
+      
+      // Retry on unexpected errors
+      if (retryCount < maxRetries) {
+        console.log(`Retrying articles fetch due to unexpected error (${retryCount + 1}/${maxRetries})...`);
+        setTimeout(() => fetchArticles(retryCount + 1), 1000 * (retryCount + 1));
+        return;
+      }
+      
+      setError(err instanceof Error ? err.message : 'Failed to fetch articles. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -177,39 +197,23 @@ export const useLegalArticles = () => {
     try {
       let data: LegalArticle | null = null;
       
-      if (USE_SERVER_API) {
-        // Use server API
-        const response = await fetch(`${SERVER_API_URL}/api/legal/articles/${id}`);
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            return null;
-          }
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        
-        if (!result.success) {
+      // Use server API
+      const response = await fetch(`${SERVER_API_URL}/api/legal/articles/${id}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
           return null;
         }
-        
-        data = result.data;
-      } else {
-        // Use direct Supabase - only fetch verified articles with new description fields
-        const { data: supabaseData, error: fetchError } = await supabase
-          .from('legal_articles')
-          .select('id, title_en, title_fil, description_en, description_fil, content_en, content_fil, category, image_article, is_verified, created_at, updated_at')
-          .eq('id', parseInt(id))
-          .eq('is_verified', true)
-          .single();
-        
-        if (fetchError || !supabaseData) {
-          return null;
-        }
-        
-        data = supabaseData as unknown as LegalArticle;
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        return null;
+      }
+      
+      data = result.data;
 
       if (!data) {
         return null;
@@ -218,7 +222,7 @@ export const useLegalArticles = () => {
       const rawCategory = (data as any).category;
       const normalized = normalizeCategory(rawCategory || undefined);
       return {
-        id: data.id.toString(),
+        id: data.id, // Already a string (UUID)
         title: data.title_en,
         filipinoTitle: data.title_fil || undefined,
         summary: data.description_en || 
@@ -244,42 +248,27 @@ export const useLegalArticles = () => {
     try {
       let data: LegalArticle[] = [];
       
-      if (USE_SERVER_API) {
-        // Use server API (send category; server supports it)
-        const dbCategory = category === 'work' ? 'labor' : category;
-        const response = await fetch(`${SERVER_API_URL}/api/legal/articles?category=${encodeURIComponent(dbCategory)}`);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        
-        if (!result.success) {
-          return [];
-        }
-        
-        data = result.data || [];
-      } else {
-        // Use direct Supabase filtering by category column - only verified articles with new description fields
-        const dbCategory = category === 'work' ? 'labor' : category;
-        const { data: supabaseData, error: fetchError } = await supabase
-          .from('legal_articles')
-          .select('id, title_en, title_fil, description_en, description_fil, content_en, content_fil, category, image_article, is_verified, created_at, updated_at')
-          .eq('category', dbCategory)
-          .eq('is_verified', true);
-
-        if (fetchError || !supabaseData) {
-          return [];
-        }
-        data = supabaseData as unknown as LegalArticle[];
+      // Use server API (send category; server supports it)
+      const dbCategory = category === 'work' ? 'labor' : category;
+      const response = await fetch(`${SERVER_API_URL}/api/legal/articles?category=${encodeURIComponent(dbCategory)}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        return [];
+      }
+      
+      data = result.data || [];
 
       return data.map((article: LegalArticle) => {
         const rawCategory = (article as any).category;
         const normalized = normalizeCategory(rawCategory || undefined);
         return ({
-          id: article.id?.toString(),
+          id: article.id, // Already a string (UUID)
           title: article.title_en,
           filipinoTitle: article.title_fil || undefined,
           summary: article.description_en || 
@@ -308,41 +297,14 @@ export const useLegalArticles = () => {
     try {
       let data: LegalArticle[] = [];
       
-      if (USE_SERVER_API) {
-        // Use server API search endpoint
-        data = await searchArticlesFromServer(query, category);
-      } else {
-        // Use direct Supabase search with ilike for case-insensitive search
-        let supabaseQuery = supabase
-          .from('legal_articles')
-          .select('id, title_en, title_fil, description_en, description_fil, content_en, content_fil, category, image_article, is_verified, created_at, updated_at')
-          .eq('is_verified', true);
-        
-        if (category) {
-          const dbCategory = category === 'work' ? 'labor' : category;
-          supabaseQuery = supabaseQuery.eq('category', dbCategory);
-        }
-        
-        // Use .or() for multiple field search with ilike - fix the syntax
-        supabaseQuery = supabaseQuery.or(
-          `title_en.ilike.%${query}%,title_fil.ilike.%${query}%,description_en.ilike.%${query}%,description_fil.ilike.%${query}%,content_en.ilike.%${query}%,content_fil.ilike.%${query}%`
-        );
-        
-        const { data: supabaseData, error: fetchError } = await supabaseQuery;
-        
-        if (fetchError || !supabaseData) {
-          console.error('Direct Supabase search error:', fetchError);
-          return [];
-        }
-        
-        data = supabaseData as unknown as LegalArticle[];
-      }
+      // Use server API search endpoint
+      data = await searchArticlesFromServer(query, category);
 
       return data.map((article: LegalArticle) => {
         const rawCategory = (article as any).category;
         const normalized = normalizeCategory(rawCategory || undefined);
         return ({
-          id: article.id?.toString(),
+          id: article.id, // Already a string (UUID)
           title: article.title_en,
           filipinoTitle: article.title_fil || undefined,
           summary: article.description_en || 

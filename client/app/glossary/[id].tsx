@@ -7,13 +7,13 @@ import {
   Pressable,
   ActivityIndicator,
   useWindowDimensions,
-  Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
-import { Button, ButtonText } from "@/components/ui/button";
+import { Button, ButtonText } from "@/components/ui/button/";
 import { Badge, BadgeText } from "@/components/ui/badge";
+import { shouldUseNativeDriver } from '@/utils/animations';
 import BackButton from "@/components/ui/BackButton";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
@@ -223,7 +223,7 @@ export default function TermDetailScreen() {
         scrollEventThrottle={16}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: Platform.OS !== 'web' }
+            { useNativeDriver: shouldUseNativeDriver('transform') }
         )}
       >
         {/* Main Content Card - Responsive width */}

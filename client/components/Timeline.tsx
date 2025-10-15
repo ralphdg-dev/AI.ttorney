@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, Text, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Post from './home/Post';
 import Colors from '../constants/Colors';
+// eslint-disable-next-line import/no-named-as-default
 import apiClient from '@/lib/api-client';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -58,6 +59,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     const created = row?.created_at || '';
     const userData = row?.users || {};
     
+    
     return {
       id: String(row?.id ?? ''),
       user: isAnon
@@ -70,7 +72,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       timestamp: formatTimeAgo(created),
       category: row?.category || 'Others',
       content: row?.body || '',
-      comments: Number(row?.reply_count || 0),
+      comments: Number(row?.reply_count || row?.replies?.length || row?.forum_replies?.length || 0),
     };
   };
 
@@ -78,6 +80,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     setRefreshing(true);
     try {
       const res = await apiClient.getRecentForumPosts();
+      
       if (res.success && Array.isArray((res.data as any)?.data)) {
         const rows = (res.data as any).data as any[];
         setPosts(rows.map(mapApiToPost));
@@ -86,11 +89,12 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       } else {
         setPosts([]);
       }
-    } catch {
+    } catch (error) {
       setPosts([]);
     } finally {
       setRefreshing(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

@@ -12,6 +12,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { AuthProvider } from "../contexts/AuthContext";
 import { FavoritesProvider } from "../contexts/FavoritesContext";
+import { ForumCacheProvider } from "../contexts/ForumCacheContext";
 import { SidebarProvider } from "../components/AppSidebar";
 import { AuthGuard } from "../components/AuthGuard";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
@@ -41,16 +42,13 @@ export default function RootLayout() {
     <GluestackUIProvider mode="light">
       <AuthProvider>
           <FavoritesProvider>
-            <AuthGuard>
-              <RouteErrorBoundary>
-                <SidebarProvider>
+            <ForumCacheProvider>
+              <AuthGuard>
+                <RouteErrorBoundary>
+                  <SidebarProvider>
                   <Stack screenOptions={{ headerShown: false }}>
                     <Stack.Screen
                       name="index"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="onboarding"
                       options={{ headerShown: false }}
                     />
                     <Stack.Screen
@@ -59,18 +57,6 @@ export default function RootLayout() {
                     />
                     <Stack.Screen
                       name="role-selection"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="nonlaw-reg"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="verifyotp-reg"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="lawyer-starting-page"
                       options={{ headerShown: false }}
                     />
                     <Stack.Screen
@@ -88,13 +74,6 @@ export default function RootLayout() {
                     <Stack.Screen
                       name="lawyer/profile"
                       options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="lawyer"
-                      options={{
-                        headerShown: false,
-                        title: "Lawyer Dashboard",
-                      }}
                     />
                     <Stack.Screen
                       name="directory"
@@ -133,10 +112,6 @@ export default function RootLayout() {
                       }}
                     />
                     <Stack.Screen
-                      name="documents-success"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
                       name="consultations"
                       options={{
                         headerShown: false,
@@ -171,10 +146,18 @@ export default function RootLayout() {
                         title: "Help",
                       }}
                     />
+                    <Stack.Screen
+                      name="profile"
+                      options={{
+                        headerShown: false,
+                        title: "Profile",
+                      }}
+                    />
                   </Stack>
-                </SidebarProvider>
-              </RouteErrorBoundary>
-            </AuthGuard>
+                  </SidebarProvider>
+                </RouteErrorBoundary>
+              </AuthGuard>
+            </ForumCacheProvider>
           </FavoritesProvider>
       </AuthProvider>
     </GluestackUIProvider>

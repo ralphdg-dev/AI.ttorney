@@ -3,11 +3,12 @@ import { View, ScrollView, TouchableOpacity } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
-import { Box } from "@/components/ui/box";
-import { HStack } from "@/components/ui/hstack";
+import { createShadowStyle } from "../../utils/shadowUtils";
 import { VStack } from "@/components/ui/vstack";
+import { HStack } from "@/components/ui/hstack";
+import { Box } from "@/components/ui/box";
 import { Text as GSText } from "@/components/ui/text";
-import { Button, ButtonText } from "@/components/ui/button";
+import Button from "@/components/ui/Button";
 import CustomToggle from "@/components/common/CustomToggle";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
@@ -15,7 +16,7 @@ import {
   User, 
   Lock, 
   Bell, 
-  Info, 
+ 
   Shield, 
   ChevronRight,
   Plus,
@@ -142,13 +143,13 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Section */}
-        <Box className="bg-white rounded-2xl mb-6 p-6" style={{
+        <Box className="bg-white rounded-2xl mb-6 p-6" style={createShadowStyle({
           shadowColor: "#000",
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.1,
           shadowRadius: 12,
           elevation: 4,
-        }}>
+        })}>
           <HStack className="items-center">
             <View style={{
               width: 56,
@@ -169,14 +170,9 @@ export default function SettingsScreen() {
                 john.doe@example.com
               </GSText>
             </VStack>
-            <Button
-              variant="link"
-              size="sm"
-              onPress={() => console.log("Edit profile")}
-              style={{ padding: 8 }}
-            >
+            <TouchableOpacity onPress={() => console.log("Edit profile")} style={{ padding: 8 }}>
               <ChevronRight size={20} color={Colors.text.sub} />
-            </Button>
+            </TouchableOpacity>
           </HStack>
         </Box>
 
@@ -185,13 +181,13 @@ export default function SettingsScreen() {
           <GSText size="lg" bold className="mb-5 px-1" style={{ color: Colors.text.head }}>
             Account Settings
           </GSText>
-          <VStack className="bg-white rounded-2xl" style={{
+          <VStack className="bg-white rounded-2xl" style={createShadowStyle({
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.06,
             shadowRadius: 8,
             elevation: 2,
-          }}>
+          })}>
             {accountSettings.map((item, index) => (
               <View key={item.id}>
                 {renderSettingItemInGroup(item)}
@@ -208,13 +204,13 @@ export default function SettingsScreen() {
           <GSText size="lg" bold className="mb-5 px-1" style={{ color: Colors.text.head }}>
             More
           </GSText>
-          <VStack className="bg-white rounded-2xl" style={{
+          <VStack className="bg-white rounded-2xl" style={createShadowStyle({
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.06,
             shadowRadius: 8,
             elevation: 2,
-          }}>
+          })}>
             {moreSettings.map((item, index) => (
               <View key={item.id}>
                 {renderSettingItemInGroup(item)}
@@ -229,19 +225,14 @@ export default function SettingsScreen() {
         {/* Sign Out Button */}
         <View style={{ marginTop: -8 }}>
           <Button
+            title="Sign Out"
             onPress={() => {
               // Handle sign out
               console.log("Sign out");
             }}
-            className="rounded-lg py-4"
-            style={{ 
-              backgroundColor: "#FEF2F2", 
-              borderWidth: 1, 
-              borderColor: "#FECACA" 
-            }}
-          >
-            <ButtonText style={{ color: "#DC2626", fontSize: 16, fontWeight: '600' }}>Sign Out</ButtonText>
-          </Button>
+            variant="danger"
+            size="large"
+          />
         </View>
       </ScrollView>
 
