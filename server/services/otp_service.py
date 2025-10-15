@@ -120,6 +120,16 @@ class InMemoryOTPStore:
         if self._cleanup_thread and self._cleanup_thread.is_alive():
             self._cleanup_thread.join(timeout=5)
 
+# Global OTP store singleton
+_global_otp_store = None
+
+def get_otp_store():
+    """Get the global OTP store singleton"""
+    global _global_otp_store
+    if _global_otp_store is None:
+        _global_otp_store = InMemoryOTPStore()
+    return _global_otp_store
+
 class OTPService:
     def __init__(self):
         # SMTP Configuration
@@ -130,8 +140,8 @@ class OTPService:
         self.from_email = os.getenv("FROM_EMAIL", "noreply@ai.ttorney.com")
         self.from_name = os.getenv("FROM_NAME", "AI.ttorney")
         
-        # Initialize in-memory OTP store
-        self.otp_store = InMemoryOTPStore()
+        # Use global OTP store singleton
+        self.otp_store = get_otp_store()
         
     def generate_otp(self, length: int = 6) -> str:
         """Generate a random OTP code"""
@@ -142,143 +152,103 @@ class OTPService:
         return hashlib.sha256(otp_code.encode()).hexdigest()
     
     def get_otp_key(self, email: str, otp_type: str) -> str:
-        """Generate key for OTP storage"""
-        return f"otp:{otp_type}:{email}"
+        """Generate key for OTP storage with normalized email"""
+        # Normalize email to lowercase to ensure consistency
+        normalized_email = email.lower().strip()
+        return f"otp:{otp_type}:{normalized_email}"
+    
+    # OTP Configuration Constants
+    OTP_TTL_SECONDS = 120  # 2 minutes for all OTP types
+    OTP_TTL_MINUTES = 2
+    
+    # OTP Type Configuration
+    OTP_TYPES = {
+        "email_verification": {
+            "email_template": "verification",
+            "success_message": "Verification OTP sent successfully",
+            "log_prefix": "Email verification"
+        },
+        "password_reset": {
+            "email_template": "password_reset", 
+            "success_message": "Password reset OTP sent successfully",
+            "log_prefix": "Password reset"
+        },
+        "email_change": {
+            "email_template": "email_change",
+            "success_message": "Email change verification OTP sent successfully", 
+            "log_prefix": "Email change"
+        }
+    }
+    
+    async def _send_otp_core(self, email: str, otp_type: str, user_name: str = "User") -> Dict[str, Any]:
+        """Core OTP sending logic - DRY implementation"""
+        try:
+            # Validate OTP type
+            if otp_type not in self.OTP_TYPES:
+                raise ValueError(f"Invalid OTP type: {otp_type}")
+            
+            config = self.OTP_TYPES[otp_type]
+            
+            # Generate OTP
+            otp_code = self.generate_otp()
+            otp_hash = self.hash_otp(otp_code)
+            
+            # Create OTP data
+            otp_key = self.get_otp_key(email, otp_type)
+            otp_data = OTPData(
+                hash=otp_hash,
+                email=email,
+                otp_type=otp_type,
+                expires_at=time.time() + self.OTP_TTL_SECONDS,
+                attempts=0,
+                locked_until=None
+            )
+            
+            # Store in memory
+            self.otp_store.store_otp(otp_key, otp_data)
+            logger.info(f"{config['log_prefix']} OTP stored with key: {otp_key}, expires in: {self.OTP_TTL_SECONDS}s")
+            
+            # Send email
+            email_response = await self.send_otp_email(email, otp_code, user_name, config["email_template"])
+            
+            if email_response["success"]:
+                return {
+                    "success": True,
+                    "message": config["success_message"],
+                    "expires_in_minutes": self.OTP_TTL_MINUTES
+                }
+            else:
+                return {"success": False, "error": email_response["error"]}
+                
+        except Exception as e:
+            logger.error(f"Send {otp_type} OTP error: {str(e)}")
+            return {"success": False, "error": str(e)}
     
     async def send_verification_otp(self, email: str, user_name: str = "User") -> Dict[str, Any]:
         """Send OTP for email verification"""
-        try:
-            # Generate OTP
-            otp_code = self.generate_otp()
-            ttl_seconds = 120  # 2 minutes
-            
-            # Hash the OTP
-            otp_hash = self.hash_otp(otp_code)
-            
-            # Create OTP data
-            otp_key = self.get_otp_key(email, "email_verification")
-            otp_data = OTPData(
-                hash=otp_hash,
-                email=email,
-                otp_type="email_verification",
-                expires_at=time.time() + ttl_seconds,
-                attempts=0,
-                locked_until=None
-            )
-            
-            # Store in memory
-            self.otp_store.store_otp(otp_key, otp_data)
-            logger.info(f"OTP stored in memory with key: {otp_key}, expires in: {ttl_seconds}s")
-            
-            # Send email
-            email_response = await self.send_otp_email(email, otp_code, user_name, "verification")
-            
-            if email_response["success"]:
-                return {
-                    "success": True,
-                    "message": "Verification OTP sent successfully",
-                    "expires_in_minutes": 2
-                }
-            else:
-                return {"success": False, "error": email_response["error"]}
-                
-        except Exception as e:
-            logger.error(f"Send verification OTP error: {str(e)}")
-            return {"success": False, "error": str(e)}
+        return await self._send_otp_core(email, "email_verification", user_name)
     
     async def send_password_reset_otp(self, email: str, user_name: str = "User") -> Dict[str, Any]:
         """Send OTP for password reset"""
-        try:
-            # Generate OTP
-            otp_code = self.generate_otp()
-            ttl_seconds = 120  # 2 minutes
-            
-            # Hash the OTP
-            otp_hash = self.hash_otp(otp_code)
-            
-            # Create OTP data
-            otp_key = self.get_otp_key(email, "password_reset")
-            otp_data = OTPData(
-                hash=otp_hash,
-                email=email,
-                otp_type="password_reset",
-                expires_at=time.time() + ttl_seconds,
-                attempts=0,
-                locked_until=None
-            )
-            
-            # Store in memory
-            self.otp_store.store_otp(otp_key, otp_data)
-            logger.info(f"OTP stored in memory with key: {otp_key}, expires in: {ttl_seconds}s")
-            
-            # Send email
-            email_response = await self.send_otp_email(email, otp_code, user_name, "password_reset")
-            
-            if email_response["success"]:
-                return {
-                    "success": True,
-                    "message": "Password reset OTP sent successfully",
-                    "expires_in_minutes": 2
-                }
-            else:
-                return {"success": False, "error": email_response["error"]}
-                
-        except Exception as e:
-            logger.error(f"Send password reset OTP error: {str(e)}")
-            return {"success": False, "error": str(e)}
+        return await self._send_otp_core(email, "password_reset", user_name)
     
     async def send_email_change_otp(self, email: str, user_name: str = "User") -> Dict[str, Any]:
         """Send OTP for email change verification"""
-        try:
-            # Generate OTP
-            otp_code = self.generate_otp()
-            ttl_seconds = 300  # 5 minutes for email change
-            
-            # Hash the OTP
-            otp_hash = self.hash_otp(otp_code)
-            
-            # Create OTP data
-            otp_key = self.get_otp_key(email, "email_change")
-            otp_data = OTPData(
-                hash=otp_hash,
-                email=email,
-                otp_type="email_change",
-                expires_at=time.time() + ttl_seconds,
-                attempts=0,
-                locked_until=None
-            )
-            
-            # Store in memory
-            self.otp_store.store_otp(otp_key, otp_data)
-            logger.info(f"Email change OTP stored in memory with key: {otp_key}, expires in: {ttl_seconds}s")
-            
-            # Send email
-            email_response = await self.send_otp_email(email, otp_code, user_name, "email_change")
-            
-            if email_response["success"]:
-                return {
-                    "success": True,
-                    "message": "Email change verification OTP sent successfully",
-                    "expires_in_minutes": 5
-                }
-            else:
-                return {"success": False, "error": email_response["error"]}
-                
-        except Exception as e:
-            logger.error(f"Send email change OTP error: {str(e)}")
-            return {"success": False, "error": str(e)}
+        return await self._send_otp_core(email, "email_change", user_name)
     
     async def verify_otp(self, email: str, otp_code: str, otp_type: str) -> Dict[str, Any]:
         """Verify OTP code with attempt tracking and lockout"""
         try:
             # Get OTP key
             otp_key = self.get_otp_key(email, otp_type)
+            logger.info(f"Verifying OTP with key: {otp_key}, email: {email}, otp_type: {otp_type}")
             
             # Check if user is locked out
             is_locked, remaining_lockout = self.otp_store.is_locked(otp_key)
             if is_locked:
                 minutes = int(remaining_lockout // 60)
                 seconds = int(remaining_lockout % 60)
+                logger.warning(f"OTP verification blocked - user locked out: {otp_key}")
                 return {
                     "success": False, 
                     "error": f"Too many failed attempts. Please try again in {minutes} minutes and {seconds} seconds.",
@@ -290,6 +260,11 @@ class OTPService:
             otp_data = self.otp_store.get_otp(otp_key)
             
             if not otp_data:
+                logger.error(f"OTP not found in store for key: {otp_key}")
+                # Debug: List all keys in store
+                with self.otp_store._lock:
+                    all_keys = list(self.otp_store._store.keys())
+                    logger.error(f"Available OTP keys in store: {all_keys}")
                 return {"success": False, "error": "OTP not found or expired"}
             
             # Hash the provided OTP
@@ -466,7 +441,7 @@ class OTPService:
                     <h1 style="color: #2563eb; font-size: 32px; margin: 0; letter-spacing: 8px;">{otp_code}</h1>
                 </div>
                 
-                <p>This code will expire in <strong>5 minutes</strong>.</p>
+                <p>This code will expire in <strong>2 minutes</strong>.</p>
                 <p>If you didn't request this email change, please ignore this email and contact our support team immediately.</p>
                 
                 <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">

@@ -125,10 +125,17 @@ class LegalArticleService:
             )
             
             async with httpx.AsyncClient() as client:
-                url = f"{self.supabase_service.rest_url}/legal_articles?select={select_fields}&id=eq.{article_id}&is_verified=eq.true"
+                # Sanitize article_id to prevent SQL injection
+                import urllib.parse
+                sanitized_article_id = urllib.parse.quote(str(article_id), safe='')
                 
                 response = await client.get(
-                    url,
+                    f"{self.supabase_service.rest_url}/legal_articles",
+                    params={
+                        "select": select_fields,
+                        "id": f"eq.{sanitized_article_id}",
+                        "is_verified": "eq.true"
+                    },
                     headers=self.supabase_service._get_headers()
                 )
                 

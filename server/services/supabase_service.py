@@ -200,9 +200,13 @@ class SupabaseService:
     async def get_user_profile(self, user_id: str) -> Dict[str, Any]:
         """Get user profile from users table"""
         try:
+            # Sanitize user_id to prevent SQL injection
+            sanitized_user_id = self._sanitize_value(user_id)
+            
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.rest_url}/users?id=eq.{user_id}&select=*",
+                    f"{self.rest_url}/users",
+                    params={"id": f"eq.{sanitized_user_id}", "select": "*"},
                     headers=self._get_headers()
                 )
                 
@@ -222,9 +226,13 @@ class SupabaseService:
     async def get_user_profile_by_email(self, email: str) -> Dict[str, Any]:
         """Get user profile from users table by email"""
         try:
+            # Sanitize email to prevent SQL injection
+            sanitized_email = self._sanitize_value(email)
+            
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.rest_url}/users?email=eq.{email}&select=*",
+                    f"{self.rest_url}/users",
+                    params={"email": f"eq.{sanitized_email}", "select": "*"},
                     headers=self._get_headers()
                 )
                 
@@ -245,14 +253,19 @@ class SupabaseService:
         """Update user profile in users table"""
         try:
             async with httpx.AsyncClient() as client:
-                # Build query parameters for WHERE clause
-                query_params = []
+                # Build sanitized query parameters for WHERE clause
+                query_params = {}
                 for key, value in where_clause.items():
-                    query_params.append(f"{key}=eq.{value}")
-                query_string = "&".join(query_params)
+                    # Validate field name to prevent SQL injection
+                    if not self._validate_field_name(key):
+                        return {"success": False, "error": f"Invalid field name: {key}"}
+                    # Sanitize value to prevent SQL injection
+                    sanitized_value = self._sanitize_value(str(value))
+                    query_params[key] = f"eq.{sanitized_value}"
                 
                 response = await client.patch(
-                    f"{self.rest_url}/users?{query_string}",
+                    f"{self.rest_url}/users",
+                    params=query_params,
                     json=update_data,
                     headers=self._get_headers(use_service_key=True)
                 )
@@ -267,17 +280,36 @@ class SupabaseService:
             logger.error(f"Update user profile error: {str(e)}")
             return {"success": False, "error": str(e)}
     
+    def _validate_field_name(self, field: str) -> bool:
+        """Validate field name to prevent SQL injection"""
+        allowed_fields = {"email", "username", "id"}
+        return field in allowed_fields
+    
+    def _sanitize_value(self, value: str) -> str:
+        """Sanitize value to prevent SQL injection"""
+        import urllib.parse
+        # URL encode the value to prevent injection
+        return urllib.parse.quote(str(value), safe='')
+    
     async def check_user_exists(self, field: str, value: str) -> Dict[str, Any]:
         """Check if a user exists by field (email or username) in both auth.users and public.users tables"""
         try:
+            # Validate field name to prevent SQL injection
+            if not self._validate_field_name(field):
+                return {"success": False, "error": f"Invalid field name: {field}"}
+            
+            # Sanitize value to prevent SQL injection
+            sanitized_value = self._sanitize_value(value)
+            
             async with httpx.AsyncClient() as client:
                 # Initialize data variables
                 public_data = []
                 auth_data = {"users": []}
                 
-                # Check public.users table
+                # Check public.users table with sanitized parameters
                 public_response = await client.get(
-                    f"{self.rest_url}/users?select=id&{field}=eq.{value}",
+                    f"{self.rest_url}/users",
+                    params={"select": "id", field: f"eq.{sanitized_value}"},
                     headers=self._get_headers(use_service_key=True)
                 )
                 
@@ -326,6 +358,76 @@ class SupabaseService:
                         "public": public_data,
                         "auth": auth_data.get("users", [])
                     }
+                }
+                
+        except Exception as e:
+            logger.error(f"Check user exists error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    async def check_user_exists_excluding_current(self, field: str, value: str, current_user_id: str) -> Dict[str, Any]:
+        """Check if a user exists by field, excluding the current user"""
+        try:
+            # Validate field name to prevent SQL injection
+            if not self._validate_field_name(field):
+                return {"success": False, "error": f"Invalid field name: {field}"}
+            
+            # Sanitize values to prevent SQL injection
+            sanitized_value = self._sanitize_value(value)
+            sanitized_user_id = self._sanitize_value(current_user_id)
+            
+            async with httpx.AsyncClient() as client:
+                # Check public.users table (exclude current user) with sanitized parameters
+                public_response = await client.get(
+                    f"{self.rest_url}/users",
+                    params={
+                        "select": "id", 
+                        field: f"eq.{sanitized_value}",
+                        "id": f"neq.{sanitized_user_id}"
+                    },
+                    headers=self._get_headers(use_service_key=True)
+                )
+                
+                public_exists = False
+                if public_response.status_code == 200:
+                    public_data = public_response.json()
+                    public_exists = len(public_data) > 0
+                    logger.info(f"Public users check (excluding current): found {len(public_data)} records for {field}={value}")
+                else:
+                    logger.error(f"Check public.users error: {public_response.status_code} - {public_response.text}")
+                    return {"success": False, "error": f"Database query failed: {public_response.status_code}"}
+                
+                # Check auth.users table (only for email field, exclude current user)
+                auth_exists = False
+                if field == "email":
+                    auth_response = await client.get(
+                        f"{self.auth_url}/admin/users",
+                        headers=self._get_headers(use_service_key=True)
+                    )
+                    
+                    if auth_response.status_code == 200:
+                        auth_data = auth_response.json()
+                        all_users = auth_data.get("users", [])
+                        # Filter by email and exclude current user
+                        matching_users = [
+                            user for user in all_users 
+                            if user.get("email") == value and user.get("id") != current_user_id
+                        ]
+                        auth_exists = len(matching_users) > 0
+                        logger.info(f"Auth users check (excluding current): found {len(matching_users)} records for email={value}")
+                    else:
+                        logger.error(f"Check auth.users error: {auth_response.status_code} - {auth_response.text}")
+                        return {"success": False, "error": f"Auth query failed: {auth_response.status_code}"}
+                
+                # User exists if found in either table (excluding current user)
+                exists = public_exists or auth_exists
+                
+                logger.info(f"Final result (excluding current user): exists={exists}, public_exists={public_exists}, auth_exists={auth_exists}")
+                
+                return {
+                    "success": True,
+                    "exists": exists,
+                    "found_in_public": public_exists,
+                    "found_in_auth": auth_exists
                 }
                     
         except Exception as e:

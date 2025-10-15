@@ -130,18 +130,18 @@ async def update_user_profile(
         user_id = user_data["id"]
         supabase_service = SupabaseService()
         
-        # Check if email is being changed and if it already exists
+        # Check if email is being changed and if it already exists (excluding current user)
         if profile_data.email != profile["email"]:
-            email_check = await supabase_service.check_user_exists("email", profile_data.email)
+            email_check = await supabase_service.check_user_exists_excluding_current("email", profile_data.email, user_id)
             if email_check["success"] and email_check.get("exists"):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Email address is already in use"
                 )
         
-        # Check if username is being changed and if it already exists
+        # Check if username is being changed and if it already exists (excluding current user)
         if profile_data.username != profile["username"]:
-            username_check = await supabase_service.check_user_exists("username", profile_data.username)
+            username_check = await supabase_service.check_user_exists_excluding_current("username", profile_data.username, user_id)
             if username_check["success"] and username_check.get("exists"):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -477,7 +477,7 @@ async def send_email_change_otp(
         return {
             "success": True,
             "message": result["message"],
-            "expires_in_minutes": result.get("expires_in_minutes", 5)
+            "expires_in_minutes": result.get("expires_in_minutes", 2)
         }
         
     except HTTPException:

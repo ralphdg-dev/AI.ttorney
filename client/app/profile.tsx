@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -29,6 +29,7 @@ import Colors from "../constants/Colors";
 import { useAuth } from "../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
 import { supabase } from "../config/supabase";
+import { useToast, Toast, ToastTitle, ToastDescription } from "../components/ui/toast";
 
 interface UserProfileData {
   full_name: string;
@@ -44,14 +45,185 @@ interface EditFormData extends UserProfileData {
   confirmPassword: string;
 }
 
+interface ValidationState {
+  isValid: boolean;
+  isChecking: boolean;
+  message: string;
+}
+
+interface ApiRequestOptions {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  endpoint: string;
+  body?: any;
+}
+
+// Constants
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+const DEFAULT_PROFILE_PHOTO = "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face";
+const VALIDATION_DEBOUNCE_MS = 300; // Reduced from 500ms for faster response
+const REQUEST_TIMEOUT_MS = 5000; // Reduced from 10s for faster timeout
+const CACHE_DURATION_MS = 30000; // 30 seconds cache for validation results
+
+const INITIAL_VALIDATION_STATE: ValidationState = {
+  isValid: true,
+  isChecking: false,
+  message: ""
+};
+
+// Validation cache to avoid repeated API calls
+interface ValidationCache {
+  [key: string]: {
+    result: ValidationState;
+    timestamp: number;
+  };
+}
+
+const validationCache: ValidationCache = {};
+
+// Optimized session cache
+let sessionCache: { session: any; timestamp: number } | null = null;
+const SESSION_CACHE_DURATION = 60000; // 1 minute
+
+// Optimized session getter with caching
+const getCachedSession = async () => {
+  const now = Date.now();
+  
+  // Return cached session if still valid
+  if (sessionCache && (now - sessionCache.timestamp) < SESSION_CACHE_DURATION) {
+    return sessionCache.session;
+  }
+  
+  // Fetch new session and cache it
+  const { data: { session } } = await supabase.auth.getSession();
+  sessionCache = { session, timestamp: now };
+  return session;
+};
+
+// Utility Functions
+const makeApiRequest = async (options: ApiRequestOptions): Promise<Response> => {
+  const session = await getCachedSession();
+  if (!session?.access_token) {
+    throw new Error("Authentication required");
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${options.endpoint}`, {
+      method: options.method,
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+};
+
+const showSuccessToast = (toast: any, title: string, description: string) => {
+  toast.show({
+    placement: "top",
+    render: ({ id }: { id: string }) => (
+      <Toast nativeID={id} action="success" variant="solid" className="mt-12">
+        <ToastTitle>{title}</ToastTitle>
+        <ToastDescription>{description}</ToastDescription>
+      </Toast>
+    ),
+  });
+};
+
+const createDebouncedValidator = (
+  validationFn: (value: string) => Promise<void>,
+  timeoutSetter: (timeout: number | null) => void,
+  currentTimeout: number | null
+) => {
+  return (value: string) => {
+    if (currentTimeout) {
+      clearTimeout(currentTimeout);
+    }
+    const newTimeout = setTimeout(() => validationFn(value), VALIDATION_DEBOUNCE_MS);
+    timeoutSetter(newTimeout);
+  };
+};
+
+// Cache cleanup utility
+const cleanupValidationCache = () => {
+  const now = Date.now();
+  Object.keys(validationCache).forEach(key => {
+    if (now - validationCache[key].timestamp > CACHE_DURATION_MS) {
+      delete validationCache[key];
+    }
+  });
+};
+
+const createFallbackProfile = (user: any): UserProfileData => ({
+  full_name: user.full_name || "",
+  email: user.email || "",
+  username: (user as any).username || "",
+  birthdate: (user as any).birthdate || "",
+  profile_photo: DEFAULT_PROFILE_PHOTO,
+});
+
+// Reusable Password Input Component
+interface PasswordInputProps {
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder: string;
+  showPassword: boolean;
+  onTogglePassword: () => void;
+}
+
+const PasswordInput: React.FC<PasswordInputProps> = ({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  showPassword,
+  onTogglePassword,
+}) => (
+  <View style={tw`mb-5`}>
+    <Text style={tw`text-sm font-semibold text-gray-700 mb-2`}>{label}</Text>
+    <View style={tw`relative`}>
+      <TextInput
+        style={tw`border border-gray-300 rounded-xl px-4 py-4 pr-12 text-base bg-gray-50 h-14`}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        secureTextEntry={!showPassword}
+        placeholderTextColor="#9CA3AF"
+      />
+      <TouchableOpacity
+        style={tw`absolute right-4 top-4`}
+        onPress={onTogglePassword}
+      >
+        {showPassword ? (
+          <EyeOff size={20} color="#9CA3AF" />
+        ) : (
+          <Eye size={20} color="#9CA3AF" />
+        )}
+      </TouchableOpacity>
+    </View>
+  </View>
+);
+
 const UserProfilePage: React.FC = () => {
   const { user, signOut, refreshUserData } = useAuth();
+  const toast = useToast();
   const [profileData, setProfileData] = useState<UserProfileData>({
     full_name: "",
     email: "",
     username: "",
     birthdate: "",
-    profile_photo: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
+    profile_photo: DEFAULT_PROFILE_PHOTO,
   });
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -76,14 +248,12 @@ const UserProfilePage: React.FC = () => {
   const [newEmail, setNewEmail] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
-  const [emailValidation, setEmailValidation] = useState<{
-    isValid: boolean;
-    isChecking: boolean;
-    message: string;
-  }>({ isValid: true, isChecking: false, message: "" });
+  const [emailValidation, setEmailValidation] = useState<ValidationState>(INITIAL_VALIDATION_STATE);
   const [canSendOTP, setCanSendOTP] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [emailValidationTimeout, setEmailValidationTimeout] = useState<number | null>(null);
+  const [usernameValidation, setUsernameValidation] = useState<ValidationState>(INITIAL_VALIDATION_STATE);
+  const [usernameValidationTimeout, setUsernameValidationTimeout] = useState<number | null>(null);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -97,48 +267,25 @@ const UserProfilePage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       
-      // Get the session token with timeout
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        // Fallback to user data from context
-        const fallbackProfile: UserProfileData = {
-          full_name: user.full_name || "",
-          email: user.email || "",
-          username: (user as any).username || "",
-          birthdate: (user as any).birthdate || "",
-          profile_photo: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
-        };
-        setProfileData(fallbackProfile);
-        setIsLoading(false);
-        return;
+      // Try to make API request, fallback to user data if no session
+      let response: Response;
+      try {
+        response = await makeApiRequest({
+          method: 'GET',
+          endpoint: '/api/user/profile'
+        });
+      } catch (error: any) {
+        if (error.message === "Authentication required") {
+          setProfileData(createFallbackProfile(user));
+          return;
+        }
+        throw error;
       }
-
-      // Call backend API with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/user/profile`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         if (response.status === 404) {
           // User not found in backend, use auth data
-          const fallbackProfile: UserProfileData = {
-            full_name: user.full_name || "",
-            email: user.email || "",
-            username: (user as any).username || "",
-            birthdate: (user as any).birthdate || "",
-            profile_photo: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
-          };
-          setProfileData(fallbackProfile);
+          setProfileData(createFallbackProfile(user));
           return;
         }
         throw new Error(`Failed to load profile: ${response.status}`);
@@ -150,29 +297,22 @@ const UserProfilePage: React.FC = () => {
         full_name: data.full_name || user.full_name || "",
         email: data.email || user.email || "",
         username: data.username || (user as any).username || "",
-        birthdate: data.birthdate || "",
-        profile_photo: data.profile_photo || "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
+        birthdate: data.birthdate || (user as any).birthdate || "",
+        profile_photo: data.profile_photo || DEFAULT_PROFILE_PHOTO,
       };
       setProfileData(userProfile);
       
     } catch (error: any) {
       console.error("Error in fetchUserProfile:", error);
-      if (error.name === 'AbortError') {
-        setError('Request timed out. Please try again.');
-      } else {
-        setError('Failed to load profile. Please try again.');
+      
+      // Always provide fallback data to prevent blank screen
+      if (user) {
+        setProfileData(createFallbackProfile(user));
       }
       
-      // Fallback to user data from context
-      if (user) {
-        const fallbackProfile: UserProfileData = {
-          full_name: user.full_name || "",
-          email: user.email || "",
-          username: (user as any).username || "",
-          birthdate: (user as any).birthdate || "",
-          profile_photo: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
-        };
-        setProfileData(fallbackProfile);
+      // Only show error for non-timeout errors
+      if (error.name !== 'AbortError') {
+        setError('Using cached data. Some features may be limited.');
       }
     } finally {
       setIsLoading(false);
@@ -187,6 +327,25 @@ const UserProfilePage: React.FC = () => {
     }
   }, [user, fetchUserProfile]);
 
+  // Cleanup timeouts and cache on component unmount
+  useEffect(() => {
+    // Cleanup cache periodically
+    const cacheCleanupInterval = setInterval(cleanupValidationCache, CACHE_DURATION_MS);
+    
+    return () => {
+      if (emailValidationTimeout) {
+        clearTimeout(emailValidationTimeout);
+      }
+      if (usernameValidationTimeout) {
+        clearTimeout(usernameValidationTimeout);
+      }
+      clearInterval(cacheCleanupInterval);
+      // Clear session cache on unmount
+      sessionCache = null;
+    };
+  }, [emailValidationTimeout, usernameValidationTimeout]);
+
+
   const handleEditProfile = () => {
     setEditFormData({
       ...profileData,
@@ -197,19 +356,7 @@ const UserProfilePage: React.FC = () => {
     setIsEditingProfile(true);
   };
 
-  const handleCancelEdit = () => {
-    setIsEditingProfile(false);
-    setShowConfirmModal(false);
-    setEditFormData({
-      full_name: "",
-      email: "",
-      username: "",
-      birthdate: "",
-      profile_photo: "",
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
+  const resetFormState = () => {
     setShowCurrentPassword(false);
     setShowNewPassword(false);
     setShowConfirmPassword(false);
@@ -217,14 +364,26 @@ const UserProfilePage: React.FC = () => {
     setOtpCode("");
     setNewEmail("");
     setOtpError(null);
-    setEmailValidation({ isValid: true, isChecking: false, message: "" });
+    setEmailValidation(INITIAL_VALIDATION_STATE);
     setCanSendOTP(false);
     setOtpSent(false);
+    setUsernameValidation(INITIAL_VALIDATION_STATE);
   };
 
-  const validateEmail = async (email: string) => {
+  const handleCancelEdit = () => {
+    setEditFormData({
+      ...profileData,
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+    setIsEditingProfile(false);
+    resetFormState();
+  };
+
+  const validateEmail = useCallback(async (email: string) => {
     if (!email || email === profileData.email) {
-      setEmailValidation({ isValid: true, isChecking: false, message: "" });
+      setEmailValidation(INITIAL_VALIDATION_STATE);
       setCanSendOTP(false);
       return;
     }
@@ -241,26 +400,23 @@ const UserProfilePage: React.FC = () => {
       return;
     }
 
-    try {
-      setEmailValidation({ isValid: true, isChecking: true, message: "Checking email availability..." });
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        setEmailValidation({ 
-          isValid: false, 
-          isChecking: false, 
-          message: "Authentication required" 
-        });
-        setCanSendOTP(false);
-        return;
-      }
+    // Check cache first
+    const cacheKey = `email:${email}`;
+    const now = Date.now();
+    const cached = validationCache[cacheKey];
+    
+    if (cached && (now - cached.timestamp) < CACHE_DURATION_MS) {
+      setEmailValidation(cached.result);
+      setCanSendOTP(cached.result.isValid);
+      return;
+    }
 
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/user/check-email/${encodeURIComponent(email)}`, {
+    try {
+      setEmailValidation({ isValid: true, isChecking: true, message: "Checking..." });
+      
+      const response = await makeApiRequest({
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
+        endpoint: `/api/user/check-email/${encodeURIComponent(email)}`
       });
 
       if (!response.ok) {
@@ -269,31 +425,119 @@ const UserProfilePage: React.FC = () => {
 
       const data = await response.json();
       
-      if (data.exists) {
-        setEmailValidation({ 
-          isValid: false, 
-          isChecking: false, 
-          message: "This email address is already in use" 
-        });
-        setCanSendOTP(false);
-      } else {
-        setEmailValidation({ 
-          isValid: true, 
-          isChecking: false, 
-          message: "Email is available" 
-        });
-        setCanSendOTP(true);
-      }
+      const result: ValidationState = !data.available ? {
+        isValid: false, 
+        isChecking: false, 
+        message: "This email address is already in use" 
+      } : {
+        isValid: true, 
+        isChecking: false, 
+        message: "Email is available" 
+      };
+
+      // Cache the result
+      validationCache[cacheKey] = { result, timestamp: now };
+      
+      setEmailValidation(result);
+      setCanSendOTP(result.isValid);
     } catch (error) {
       console.error('Email validation error:', error);
-      setEmailValidation({ 
+      const errorResult: ValidationState = { 
         isValid: false, 
         isChecking: false, 
         message: "Unable to verify email. Please try again." 
-      });
+      };
+      setEmailValidation(errorResult);
       setCanSendOTP(false);
     }
-  };
+  }, [profileData.email]);
+
+  const validateUsername = useCallback(async (username: string) => {
+    if (!username || username === profileData.username) {
+      setUsernameValidation(INITIAL_VALIDATION_STATE);
+      return;
+    }
+
+    // Basic username validation
+    if (username.length < 3) {
+      setUsernameValidation({ 
+        isValid: false, 
+        isChecking: false, 
+        message: "Username must be at least 3 characters long" 
+      });
+      return;
+    }
+
+    // Username format validation (alphanumeric and underscores only)
+    const usernameRegex = /^[a-zA-Z0-9_]+$/;
+    if (!usernameRegex.test(username)) {
+      setUsernameValidation({ 
+        isValid: false, 
+        isChecking: false, 
+        message: "Username can only contain letters, numbers, and underscores" 
+      });
+      return;
+    }
+
+    // Check cache first
+    const cacheKey = `username:${username}`;
+    const now = Date.now();
+    const cached = validationCache[cacheKey];
+    
+    if (cached && (now - cached.timestamp) < CACHE_DURATION_MS) {
+      setUsernameValidation(cached.result);
+      return;
+    }
+
+    try {
+      setUsernameValidation({ isValid: true, isChecking: true, message: "Checking..." });
+      
+      const response = await makeApiRequest({
+        method: 'GET',
+        endpoint: `/api/user/check-username/${encodeURIComponent(username)}`
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to check username availability');
+      }
+
+      const data = await response.json();
+      
+      const result: ValidationState = !data.available ? {
+        isValid: false, 
+        isChecking: false, 
+        message: "This username is already taken" 
+      } : {
+        isValid: true, 
+        isChecking: false, 
+        message: "Username is available" 
+      };
+
+      // Cache the result
+      validationCache[cacheKey] = { result, timestamp: now };
+      
+      setUsernameValidation(result);
+    } catch (error) {
+      console.error('Username validation error:', error);
+      const errorResult: ValidationState = { 
+        isValid: false, 
+        isChecking: false, 
+        message: "Unable to verify username. Please try again." 
+      };
+      setUsernameValidation(errorResult);
+    }
+  }, [profileData.username]);
+
+  // Memoized validation functions to prevent recreation on every render
+  const debouncedEmailValidation = useMemo(
+    () => createDebouncedValidator(validateEmail, setEmailValidationTimeout, emailValidationTimeout),
+    [validateEmail, emailValidationTimeout]
+  );
+
+  const debouncedUsernameValidation = useMemo(
+    () => createDebouncedValidator(validateUsername, setUsernameValidationTimeout, usernameValidationTimeout),
+    [validateUsername, usernameValidationTimeout]
+  );
 
   const handleSendOTP = async () => {
     if (!canSendOTP || !editFormData.email) return;
@@ -302,21 +546,12 @@ const UserProfilePage: React.FC = () => {
       setOtpLoading(true);
       setOtpError(null);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        setOtpError("Authentication required");
-        return;
-      }
-
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/user/send-email-change-otp`, {
+      const response = await makeApiRequest({
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        endpoint: '/api/user/send-email-change-otp',
+        body: {
           new_email: editFormData.email,
-        }),
+        },
       });
 
       if (!response.ok) {
@@ -346,24 +581,14 @@ const UserProfilePage: React.FC = () => {
       setOtpLoading(true);
       setOtpError(null);
 
-      // Get the session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        setOtpError("No access token available");
-        return;
-      }
-
       // Verify OTP and update email
-      const verifyResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/user/verify-email-change`, {
+      const verifyResponse = await makeApiRequest({
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        endpoint: '/api/user/verify-email-change',
+        body: {
           new_email: newEmail,
           otp_code: otpCode,
-        }),
+        },
       });
 
       if (!verifyResponse.ok) {
@@ -374,37 +599,47 @@ const UserProfilePage: React.FC = () => {
       // Now update the rest of the profile
       const profileUpdateData = {
         full_name: editFormData.full_name,
+        email: newEmail, // Include the updated email
         username: editFormData.username,
         birthdate: editFormData.birthdate || null,
         profile_photo: editFormData.profile_photo || null,
       };
 
-      const profileResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/user/profile`, {
+      const profileResponse = await makeApiRequest({
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(profileUpdateData),
+        endpoint: '/api/user/profile',
+        body: profileUpdateData,
       });
 
       if (!profileResponse.ok) {
         const errorData = await profileResponse.json();
-        throw new Error(errorData.detail || 'Failed to update profile');
+        console.error('Profile update error:', errorData);
+        
+        // Handle validation errors (422)
+        if (profileResponse.status === 422 && errorData.detail) {
+          if (Array.isArray(errorData.detail)) {
+            // Pydantic validation errors
+            const validationErrors = errorData.detail.map((err: any) => 
+              `${err.loc?.join('.')}: ${err.msg}`
+            ).join(', ');
+            throw new Error(`Validation error: ${validationErrors}`);
+          } else {
+            throw new Error(errorData.detail);
+          }
+        }
+        
+        throw new Error(errorData.detail || errorData.message || 'Failed to update profile');
       }
 
       // Update password if provided
       if (editFormData.newPassword) {
-        const passwordResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/user/change-password`, {
+        const passwordResponse = await makeApiRequest({
           method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+          endpoint: '/api/user/change-password',
+          body: {
             current_password: editFormData.currentPassword,
             new_password: editFormData.newPassword,
-          }),
+          },
         });
 
         if (!passwordResponse.ok) {
@@ -422,7 +657,9 @@ const UserProfilePage: React.FC = () => {
         profile_photo: editFormData.profile_photo || profileData.profile_photo,
       });
 
-      Alert.alert("Success", "Profile and email updated successfully!");
+      // Show success toast
+      showSuccessToast(toast, "Profile Updated!", "Your profile and email have been updated successfully.");
+      
       setIsEditingProfile(false);
       setShowOTPModal(false);
       
@@ -456,6 +693,18 @@ const UserProfilePage: React.FC = () => {
     if (!editFormData.username.trim()) {
       Alert.alert("Error", "Username is required");
       return false;
+    }
+
+    // Check username validation state
+    if (editFormData.username !== profileData.username) {
+      if (usernameValidation.isChecking) {
+        Alert.alert("Error", "Please wait while we check username availability");
+        return false;
+      }
+      if (!usernameValidation.isValid) {
+        Alert.alert("Error", usernameValidation.message || "Please choose a different username");
+        return false;
+      }
     }
 
     // If user wants to change password, validate password fields
@@ -494,13 +743,6 @@ const UserProfilePage: React.FC = () => {
       setIsSaving(true);
       setShowConfirmModal(false);
 
-      // Get the session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        Alert.alert("Error", "No access token available");
-        return;
-      }
-
       // Check if email is being changed
       const emailChanged = editFormData.email !== profileData.email;
       
@@ -530,13 +772,10 @@ const UserProfilePage: React.FC = () => {
         profile_photo: editFormData.profile_photo || null,
       };
 
-      const profileResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/user/profile`, {
+      const profileResponse = await makeApiRequest({
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(profileUpdateData),
+        endpoint: '/api/user/profile',
+        body: profileUpdateData,
       });
 
       if (!profileResponse.ok) {
@@ -546,16 +785,13 @@ const UserProfilePage: React.FC = () => {
 
       // Update password if provided
       if (editFormData.newPassword) {
-        const passwordResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/user/change-password`, {
+        const passwordResponse = await makeApiRequest({
           method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+          endpoint: '/api/user/change-password',
+          body: {
             current_password: editFormData.currentPassword,
             new_password: editFormData.newPassword,
-          }),
+          },
         });
 
         if (!passwordResponse.ok) {
@@ -573,7 +809,9 @@ const UserProfilePage: React.FC = () => {
         profile_photo: editFormData.profile_photo || profileData.profile_photo,
       });
 
-      Alert.alert("Success", "Profile updated successfully!");
+      // Show success toast
+      showSuccessToast(toast, "Profile Updated!", "Your profile has been updated successfully.");
+      
       setIsEditingProfile(false);
       
       // Refresh user data in background
@@ -892,14 +1130,8 @@ const UserProfilePage: React.FC = () => {
                     onChangeText={(text: string) => {
                       setEditFormData(prev => ({ ...prev, email: text }));
                       
-                      // Clear previous timeout
-                      if (emailValidationTimeout) {
-                        clearTimeout(emailValidationTimeout);
-                      }
-                      
-                      // Set new timeout for debounced validation
-                      const newTimeout = setTimeout(() => validateEmail(text), 500);
-                      setEmailValidationTimeout(newTimeout);
+                      // Debounced validation
+                      debouncedEmailValidation(text);
                     }}
                     placeholder="Enter your email address"
                     keyboardType="email-address"
@@ -953,11 +1185,34 @@ const UserProfilePage: React.FC = () => {
               <TextInput
                 style={tw`border border-gray-300 rounded-xl px-4 py-4 text-base bg-gray-50 h-14`}
                 value={editFormData.username}
-                onChangeText={(text: string) => setEditFormData(prev => ({ ...prev, username: text }))}
+                onChangeText={(text: string) => {
+                  setEditFormData(prev => ({ ...prev, username: text }));
+                  
+                  // Debounced validation
+                  debouncedUsernameValidation(text);
+                }}
                 placeholder="Enter your username"
                 autoCapitalize="none"
                 placeholderTextColor="#9CA3AF"
               />
+              
+              {/* Username validation feedback */}
+              {usernameValidation.message ? (
+                <View style={tw`mt-2 flex-row items-center`}>
+                  <View style={[
+                    tw`w-2 h-2 rounded-full mr-2 flex-shrink-0`,
+                    usernameValidation.isChecking ? tw`bg-blue-500` : 
+                    usernameValidation.isValid ? tw`bg-green-500` : tw`bg-red-500`
+                  ]} />
+                  <Text style={[
+                    tw`text-sm flex-1`,
+                    usernameValidation.isChecking ? tw`text-blue-600` :
+                    usernameValidation.isValid ? tw`text-green-600` : tw`text-red-600`
+                  ]}>
+                    {usernameValidation.message}
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             <View style={tw`mb-2`}>
@@ -980,76 +1235,33 @@ const UserProfilePage: React.FC = () => {
               Leave password fields blank if you don&apos;t want to change your password
             </Text>
 
-            <View style={tw`mb-5`}>
-              <Text style={tw`text-sm font-semibold text-gray-700 mb-2`}>Current Password</Text>
-              <View style={tw`relative`}>
-                <TextInput
-                  style={tw`border border-gray-300 rounded-xl px-4 py-4 pr-12 text-base bg-gray-50 h-14`}
-                  value={editFormData.currentPassword}
-                  onChangeText={(text: string) => setEditFormData(prev => ({ ...prev, currentPassword: text }))}
-                  placeholder="Enter current password"
-                  secureTextEntry={!showCurrentPassword}
-                  placeholderTextColor="#9CA3AF"
-                />
-                <TouchableOpacity
-                  style={tw`absolute right-4 top-0 bottom-0 flex items-center justify-center`}
-                  onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-                >
-                  {showCurrentPassword ? (
-                    <EyeOff size={20} color="#6B7280" />
-                  ) : (
-                    <Eye size={20} color="#6B7280" />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
+            <PasswordInput
+              label="Current Password"
+              value={editFormData.currentPassword}
+              onChangeText={(text: string) => setEditFormData(prev => ({ ...prev, currentPassword: text }))}
+              placeholder="Enter current password"
+              showPassword={showCurrentPassword}
+              onTogglePassword={() => setShowCurrentPassword(!showCurrentPassword)}
+            />
 
-            <View style={tw`mb-5`}>
-              <Text style={tw`text-sm font-semibold text-gray-700 mb-2`}>New Password</Text>
-              <View style={tw`relative`}>
-                <TextInput
-                  style={tw`border border-gray-300 rounded-xl px-4 py-4 pr-12 text-base bg-gray-50 h-14`}
-                  value={editFormData.newPassword}
-                  onChangeText={(text: string) => setEditFormData(prev => ({ ...prev, newPassword: text }))}
-                  placeholder="Enter new password (min. 6 characters)"
-                  secureTextEntry={!showNewPassword}
-                  placeholderTextColor="#9CA3AF"
-                />
-                <TouchableOpacity
-                  style={tw`absolute right-4 top-0 bottom-0 flex items-center justify-center`}
-                  onPress={() => setShowNewPassword(!showNewPassword)}
-                >
-                  {showNewPassword ? (
-                    <EyeOff size={20} color="#6B7280" />
-                  ) : (
-                    <Eye size={20} color="#6B7280" />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
+            <PasswordInput
+              label="New Password"
+              value={editFormData.newPassword}
+              onChangeText={(text: string) => setEditFormData(prev => ({ ...prev, newPassword: text }))}
+              placeholder="Enter new password (min. 6 characters)"
+              showPassword={showNewPassword}
+              onTogglePassword={() => setShowNewPassword(!showNewPassword)}
+            />
 
             <View style={tw`mb-2`}>
-              <Text style={tw`text-sm font-semibold text-gray-700 mb-2`}>Confirm New Password</Text>
-              <View style={tw`relative`}>
-                <TextInput
-                  style={tw`border border-gray-300 rounded-xl px-4 py-4 pr-12 text-base bg-gray-50 h-14`}
-                  value={editFormData.confirmPassword}
-                  onChangeText={(text: string) => setEditFormData(prev => ({ ...prev, confirmPassword: text }))}
-                  placeholder="Confirm your new password"
-                  secureTextEntry={!showConfirmPassword}
-                  placeholderTextColor="#9CA3AF"
-                />
-                <TouchableOpacity
-                  style={tw`absolute right-4 top-0 bottom-0 flex items-center justify-center`}
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                >
-                  {showConfirmPassword ? (
-                    <EyeOff size={20} color="#6B7280" />
-                  ) : (
-                    <Eye size={20} color="#6B7280" />
-                  )}
-                </TouchableOpacity>
-              </View>
+              <PasswordInput
+                label="Confirm New Password"
+                value={editFormData.confirmPassword}
+                onChangeText={(text: string) => setEditFormData(prev => ({ ...prev, confirmPassword: text }))}
+                placeholder="Confirm your new password"
+                showPassword={showConfirmPassword}
+                onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
+              />
             </View>
           </View>
         </ScrollView>
