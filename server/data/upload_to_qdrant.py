@@ -32,17 +32,25 @@ QDRANT_URL = os.getenv("QDRANT_URL")  # e.g., "https://your-cluster.qdrant.io"
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 VECTOR_SIZE = 1536  # text-embedding-3-small dimension
 
-def load_embeddings() -> tuple[List[str], List[List[float]], List[Dict[str, Any]]]:
+def load_embeddings() -> tuple[List[str], List[List[float]], List[str], List[Dict[str, Any]]]:
     """Load embeddings from pickle file"""
     print(f"📥 Loading embeddings from {EMBEDDINGS_FILE}")
     
     with open(EMBEDDINGS_FILE, 'rb') as f:
         data = pickle.load(f)
     
-    ids = data['ids']
-    embeddings = data['embeddings']
-    texts = data['texts']
-    metadatas = data['metadatas']
+    # Extract data from the structure
+    documents = data['documents']  # List of dicts with 'id', 'text', 'metadata'
+    embeddings = data['embeddings']  # numpy array
+    
+    # Parse documents
+    ids = [doc['id'] for doc in documents]
+    texts = [doc['text'] for doc in documents]
+    metadatas = [doc['metadata'] for doc in documents]
+    
+    # Convert numpy array to list if needed
+    if hasattr(embeddings, 'tolist'):
+        embeddings = embeddings.tolist()
     
     print(f"✅ Loaded {len(ids)} embeddings")
     return ids, embeddings, texts, metadatas
@@ -83,10 +91,15 @@ def create_qdrant_collection():
 def upload_to_qdrant(client: QdrantClient, ids: List[str], embeddings: List[List[float]], 
                      texts: List[str], metadatas: List[Dict[str, Any]]):
     """Upload embeddings to Qdrant Cloud in batches"""
-    print(f"\n📤 Uploading {len(ids)} embeddings to Qdrant Cloud...")
+    import time
     
-    # Qdrant recommends batch size of 100-500
-    BATCH_SIZE = 100
+    print(f"\n📤 Uploading {len(ids)} embeddings to Qdrant Cloud...")
+    print(f"⚠️  Using small batches for reliability. This will take a few minutes...")
+    
+    # Use very small batch size for free tier reliability
+    BATCH_SIZE = 25  # Reduced to 25 for better reliability
+    MAX_RETRIES = 3
+    DELAY_BETWEEN_BATCHES = 0.5  # Half second delay between batches
     total_batches = (len(ids) + BATCH_SIZE - 1) // BATCH_SIZE
     
     for i in tqdm(range(0, len(ids), BATCH_SIZE), total=total_batches, desc="Uploading batches"):
@@ -107,55 +120,76 @@ def upload_to_qdrant(client: QdrantClient, ids: List[str], embeddings: List[List
                 )
             )
         
-        # Upload batch
-        client.upsert(
-            collection_name=COLLECTION_NAME,
-            points=points
-        )
+        # Upload batch with retry logic
+        for retry in range(MAX_RETRIES):
+            try:
+                client.upsert(
+                    collection_name=COLLECTION_NAME,
+                    points=points,
+                    wait=False  # Don't wait for indexing to complete
+                )
+                break  # Success, exit retry loop
+            except Exception as e:
+                if retry < MAX_RETRIES - 1:
+                    print(f"\n⚠️  Batch {i//BATCH_SIZE + 1} failed, retrying ({retry + 1}/{MAX_RETRIES})...")
+                    time.sleep(3)  # Wait longer before retry
+                else:
+                    print(f"\n❌ Batch {i//BATCH_SIZE + 1} failed after {MAX_RETRIES} retries: {str(e)}")
+                    raise
+        
+        # Small delay between batches to avoid rate limits
+        time.sleep(DELAY_BETWEEN_BATCHES)
     
     print(f"✅ Successfully uploaded all embeddings!")
+    print(f"⏳ Waiting for Qdrant to finish indexing...")
+    time.sleep(5)  # Give Qdrant time to index
 
 
-def verify_upload(collection):
+def verify_upload(client: QdrantClient, sample_embedding: List[float]):
     """Verify the upload was successful"""
     print(f"\n🔍 Verifying upload...")
     
-    count = collection.count()
+    # Get collection info
+    collection_info = client.get_collection(collection_name=COLLECTION_NAME)
+    count = collection_info.points_count
     print(f"✅ Collection contains {count} documents")
     
-    # Test query
-    results = collection.query(
-        query_texts=["What is theft?"],
-        n_results=3
+    # Test query with sample embedding
+    results = client.search(
+        collection_name=COLLECTION_NAME,
+        query_vector=sample_embedding,
+        limit=3
     )
     
     print(f"\n📋 Sample query results:")
-    for i, (doc, metadata) in enumerate(zip(results['documents'][0], results['metadatas'][0]), 1):
-        print(f"\n{i}. Source: {metadata.get('source', 'Unknown')}")
-        print(f"   Article: {metadata.get('article_number', 'N/A')}")
-        print(f"   Preview: {doc[:100]}...")
+    for i, result in enumerate(results, 1):
+        payload = result.payload
+        print(f"\n{i}. Source: {payload.get('source', 'Unknown')}")
+        print(f"   Article: {payload.get('article_number', 'N/A')}")
+        print(f"   Score: {result.score:.4f}")
+        print(f"   Preview: {payload.get('text', '')[:100]}...")
 
 
 def main():
     """Main execution function"""
-    print("🚀 Starting ChromaDB Upload Process")
+    print("🚀 Starting Qdrant Cloud Upload Process")
     print("=" * 60)
     
     # Load embeddings
     ids, embeddings, texts, metadatas = load_embeddings()
     
-    # Create ChromaDB collection
-    collection = create_chromadb_collection()
+    # Create Qdrant collection
+    client = create_qdrant_collection()
     
-    # Upload to ChromaDB
-    upload_to_chromadb(collection, ids, embeddings, texts, metadatas)
+    # Upload to Qdrant
+    upload_to_qdrant(client, ids, embeddings, texts, metadatas)
     
-    # Verify upload
-    verify_upload(collection)
+    # Verify upload (use first embedding as sample)
+    verify_upload(client, embeddings[0])
     
     print("\n" + "=" * 60)
-    print("✅ ChromaDB upload complete!")
-    print(f"📁 Database location: {CHROMA_DB_PATH}")
+    print("✅ Qdrant Cloud upload complete!")
+    print(f"🌐 Qdrant URL: {QDRANT_URL}")
     print(f"📊 Collection name: {COLLECTION_NAME}")
     print(f"📈 Total documents: {len(ids)}")
 

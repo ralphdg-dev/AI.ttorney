@@ -1,13 +1,12 @@
 """
-Test Script for Legal Chatbot
+Test Script for Legal Chatbot with Qdrant Cloud
 
 This script allows you to test the chatbot locally before integrating with the API.
 """
 
-import chromadb
+from qdrant_client import QdrantClient
 from openai import OpenAI
 import os
-from pathlib import Path
 from dotenv import load_dotenv
 from typing import List, Dict
 
@@ -15,16 +14,19 @@ from typing import List, Dict
 load_dotenv()
 
 # Configuration
-CHROMA_DB_PATH = Path(__file__).parent / "chroma_db"
 COLLECTION_NAME = "legal_knowledge"
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4o-mini"
 TOP_K_RESULTS = 5
 
 # Initialize clients
-chroma_client = chromadb.PersistentClient(path=str(CHROMA_DB_PATH))
-collection = chroma_client.get_collection(name=COLLECTION_NAME)
+qdrant_client = QdrantClient(
+    url=QDRANT_URL,
+    api_key=QDRANT_API_KEY,
+)
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 
@@ -38,36 +40,35 @@ def get_embedding(text: str) -> List[float]:
 
 
 def search_legal_knowledge(question: str, top_k: int = TOP_K_RESULTS):
-    """Search ChromaDB for relevant legal context"""
+    """Search Qdrant Cloud for relevant legal context"""
     print(f"\n🔍 Searching for: '{question}'")
     print("=" * 80)
     
     # Get embedding
     question_embedding = get_embedding(question)
     
-    # Query ChromaDB
-    results = collection.query(
-        query_embeddings=[question_embedding],
-        n_results=top_k
+    # Query Qdrant
+    results = qdrant_client.search(
+        collection_name=COLLECTION_NAME,
+        query_vector=question_embedding,
+        limit=top_k
     )
     
     # Display results
-    documents = results['documents'][0]
-    metadatas = results['metadatas'][0]
-    distances = results['distances'][0]
-    
     context_parts = []
     
-    for i, (doc, metadata, distance) in enumerate(zip(documents, metadatas, distances), 1):
-        similarity = 1 - distance
-        print(f"\n📄 Result {i} (Relevance: {similarity:.2%})")
-        print(f"   Source: {metadata.get('source', 'Unknown')}")
-        print(f"   Law: {metadata.get('law', 'Unknown')}")
-        print(f"   Article: {metadata.get('article_number', 'N/A')}")
+    for i, result in enumerate(results, 1):
+        payload = result.payload
+        doc = payload.get('text', '')
+        
+        print(f"\n📄 Result {i} (Relevance: {result.score:.2%})")
+        print(f"   Source: {payload.get('source', 'Unknown')}")
+        print(f"   Law: {payload.get('law', 'Unknown')}")
+        print(f"   Article: {payload.get('article_number', 'N/A')}")
         print(f"   Preview: {doc[:150]}...")
         
         # Build context for GPT
-        source_info = f"[Source {i}: {metadata.get('law', 'Unknown')} - Article {metadata.get('article_number', 'N/A')}]"
+        source_info = f"[Source {i}: {payload.get('law', 'Unknown')} - Article {payload.get('article_number', 'N/A')}]"
         context_parts.append(f"{source_info}\n{doc}")
     
     return "\n\n".join(context_parts)
@@ -176,16 +177,21 @@ def run_sample_queries():
 
 def main():
     """Main function"""
-    print("\n🚀 Legal Chatbot Test Script")
+    print("\n🚀 Legal Chatbot Test Script (Qdrant Cloud)")
     print("=" * 80)
     
-    # Check database
+    # Check database connection
     try:
-        count = collection.count()
-        print(f"✅ Connected to ChromaDB")
+        collection_info = qdrant_client.get_collection(collection_name=COLLECTION_NAME)
+        count = collection_info.points_count
+        print(f"✅ Connected to Qdrant Cloud")
         print(f"📊 Database contains {count} documents")
     except Exception as e:
-        print(f"❌ Error connecting to database: {str(e)}")
+        print(f"❌ Error connecting to Qdrant: {str(e)}")
+        print("\nMake sure you have:")
+        print("1. Created a Qdrant Cloud account")
+        print("2. Set QDRANT_URL and QDRANT_API_KEY in .env file")
+        print("3. Run upload_to_qdrant.py to upload embeddings")
         return
     
     # Menu
