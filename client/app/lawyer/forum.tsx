@@ -2,7 +2,7 @@ import React from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import LawyerTimeline from '../../components/lawyer/LawyerTimeline';
+import Timeline from '../../components/home/Timeline';
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 import Header from '../../components/Header';
 
@@ -22,7 +22,7 @@ const LawyerForum = () => {
         onNotificationPress={handleNotificationPress}
       />
       <View style={{ flex: 1 }}>
-        <LawyerTimeline />
+        <Timeline context="lawyer" />
       </View>
       <LawyerNavbar activeTab="forum" />
     </SafeAreaView>
