@@ -1,21 +1,41 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image } from "react-native";
+import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image, ActivityIndicator, ScrollView } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../constants/Colors";
 import Header from "../components/Header";
 import { SidebarProvider, SidebarWrapper } from "../components/AppSidebar";
 import Navbar from "../components/Navbar";
-// Replace with your bird logo after upload
+import axios from "axios";
+
 const birdLogo = require("../assets/images/logo.png");
+const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
+
+interface Message {
+  id: string;
+  text: string;
+  fromUser: boolean;
+  sources?: Array<{
+    law: string;
+    article: string;
+    title: string;
+    relevance: number;
+  }>;
+}
 
 export default function ChatbotScreen() {
   const [showIntro, setShowIntro] = useState(true);
-  const [messages, setMessages] = useState([
-    { id: "1", text: "Hello, how can I help you today?", fromUser: false },
+  const [messages, setMessages] = useState<Message[]>([
+    { 
+      id: "1", 
+      text: "Kumusta! I'm Ai.ttorney, your legal assistant. Ask me anything about Philippine law in English or Filipino. 🇵🇭", 
+      fromUser: false 
+    },
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<Array<{role: string, content: string}>>([]);
   const flatRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -24,30 +44,73 @@ export default function ChatbotScreen() {
     }
   }, [messages]);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!input.trim()) return;
-    const newMsg = {
+    
+    const userMessage = input.trim();
+    const newMsg: Message = {
       id: Date.now().toString(),
-      text: input.trim(),
+      text: userMessage,
       fromUser: true,
     };
+    
     setMessages((prev) => [...prev, newMsg]);
     setInput("");
     setIsTyping(true);
+    setError(null);
 
-    // Simulated bot reply, replace with API call
-    setTimeout(() => {
-      const reply = {
+    try {
+      // Call chatbot API
+      const response = await axios.post(`${API_URL}/api/chatbot/chat`, {
+        message: userMessage,
+        conversation_history: conversationHistory
+      });
+
+      const { response: botResponse, sources, language } = response.data;
+
+      // Update conversation history
+      setConversationHistory(prev => [
+        ...prev,
+        { role: "user", content: userMessage },
+        { role: "assistant", content: botResponse }
+      ]);
+
+      // Add bot reply with sources
+      const reply: Message = {
         id: (Date.now() + 1).toString(),
-        text: "Got it. I will fetch that for you.",
+        text: botResponse,
+        fromUser: false,
+        sources: sources
+      };
+      
+      setMessages((prev) => [...prev, reply]);
+      
+    } catch (err: any) {
+      console.error("Chat error:", err);
+      
+      let errorMessage = "Sorry, I encountered an error. Please try again.";
+      
+      if (err.response?.status === 503) {
+        errorMessage = "The legal knowledge base is not yet initialized. Please contact support.";
+      } else if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      }
+      
+      setError(errorMessage);
+      
+      const errorReply: Message = {
+        id: (Date.now() + 1).toString(),
+        text: errorMessage,
         fromUser: false,
       };
-      setMessages((prev) => [...prev, reply]);
+      
+      setMessages((prev) => [...prev, errorReply]);
+    } finally {
       setIsTyping(false);
-    }, 900);
+    }
   };
 
-  const renderItem = ({ item }: { item: { id: string; text: string; fromUser: boolean } }) => {
+  const renderItem = ({ item }: { item: Message }) => {
     const isUser = item.fromUser;
     return (
       <View style={tw`px-4 py-2`}>
@@ -68,6 +131,18 @@ export default function ChatbotScreen() {
             >
               {item.text}
             </Text>
+            
+            {/* Show sources for bot messages */}
+            {!isUser && item.sources && item.sources.length > 0 && (
+              <View style={tw`mt-2 pt-2 border-t border-gray-300`}>
+                <Text style={tw`text-xs text-gray-600 font-semibold mb-1`}>Sources:</Text>
+                {item.sources.map((source, idx) => (
+                  <Text key={idx} style={tw`text-xs text-gray-600`}>
+                    • {source.law} - Article {source.article}
+                  </Text>
+                ))}
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -96,7 +171,7 @@ export default function ChatbotScreen() {
                 { color: Colors.text.head },
               ]}
             >
-              May tanong sa batas? &apos;Wag mag-alala, AI got you!
+              May tanong sa batas? &apos;Wag mag-alala, AI got you!{"\n"}Ask in English or Filipino - I understand both!
             </Text>
 
             <TouchableOpacity
@@ -147,9 +222,19 @@ export default function ChatbotScreen() {
         {isTyping && (
           <View style={tw`px-4 pb-2`}>
             <View style={tw`items-start`}>
-              <View style={tw`p-3 rounded-2xl bg-gray-100`}>
-                <Text style={tw`text-sm text-gray-600`}>Typing...</Text>
+              <View style={tw`p-3 rounded-2xl bg-gray-100 flex-row items-center`}>
+                <ActivityIndicator size="small" color={Colors.primary.blue} style={tw`mr-2`} />
+                <Text style={tw`text-sm text-gray-600`}>Thinking...</Text>
               </View>
+            </View>
+          </View>
+        )}
+
+        {/* Error message */}
+        {error && (
+          <View style={tw`px-4 pb-2`}>
+            <View style={[tw`p-3 rounded-lg`, { backgroundColor: "#FEE2E2" }]}>
+              <Text style={tw`text-sm text-red-600`}>{error}</Text>
             </View>
           </View>
         )}
@@ -182,7 +267,11 @@ export default function ChatbotScreen() {
 
             <TouchableOpacity
               onPress={sendMessage}
-              style={tw`p-2 bg-blue-900 rounded-full`}
+              disabled={isTyping || !input.trim()}
+              style={[
+                tw`p-2 rounded-full`,
+                { backgroundColor: (isTyping || !input.trim()) ? "#9CA3AF" : Colors.primary.blue }
+              ]}
             >
               <Ionicons name="send" size={20} color="#fff" />
             </TouchableOpacity>

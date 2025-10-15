@@ -112,6 +112,9 @@ app.include_router(places_proxy_router)
 from routes.user_profile import router as user_profile_router
 app.include_router(user_profile_router)
 
+# Import and include chatbot router
+from routes.chatbot import router as chatbot_router
+app.include_router(chatbot_router)
 
 @app.get("/")
 async def root():
