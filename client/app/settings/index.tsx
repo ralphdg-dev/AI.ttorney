@@ -1,22 +1,20 @@
 import React, { useState } from "react";
-import { View, ScrollView, TouchableOpacity } from "react-native";
+import { View, ScrollView } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
-import Header from "@/components/Header";
-import { createShadowStyle } from "../../utils/shadowUtils";
+import { useAuth } from "@/contexts/AuthContext";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Box } from "@/components/ui/box";
 import { Text as GSText } from "@/components/ui/text";
-import Button from "@/components/ui/Button";
-import CustomToggle from "@/components/common/CustomToggle";
+import { Switch } from "@/components/ui/switch";
+import { Pressable } from "@/components/ui/pressable";
+import { Avatar, AvatarImage, AvatarFallbackText } from "@/components/ui/avatar";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
 import { 
-  User, 
   Lock, 
   Bell, 
- 
   Shield, 
   ChevronRight,
   Plus,
@@ -33,21 +31,21 @@ type SettingItem = {
   onToggle?: (value: boolean) => void;
 };
 
+// Common styling utilities
+const cardShadowStyle = {
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 8,
+  elevation: 3
+};
+
 export default function SettingsScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [pushNotifications, setPushNotifications] = useState(true);
 
   const accountSettings: SettingItem[] = [
-    {
-      id: "edit-profile",
-      title: "Edit profile",
-      icon: <User size={20} color={Colors.text.body} />,
-      type: "navigation",
-      onPress: () => {
-        // Navigate to edit profile
-        console.log("Navigate to edit profile");
-      },
-    },
     {
       id: "change-password",
       title: "Change password",
@@ -91,16 +89,19 @@ export default function SettingsScreen() {
   const renderSettingItemInGroup = (item: SettingItem) => {
     if (item.type === "toggle") {
       return (
-        <HStack className="items-center justify-between px-5 py-4">
-          <HStack className="items-center flex-1">
-            <View style={[tw`mr-4 p-2 rounded-lg`, { backgroundColor: '#F8FAFC' }]}>
+        <HStack className="items-center justify-between px-5 py-4" space="md">
+          <HStack className="items-center flex-1" space="md">
+            <Box 
+              className="p-2 rounded-lg" 
+              style={{ backgroundColor: Colors.background.tertiary }}
+            >
               {item.icon}
-            </View>
-            <GSText size="md" style={{ color: Colors.text.head, flex: 1 }}>
+            </Box>
+            <GSText size="md" style={{ color: Colors.text.primary, flex: 1 }}>
               {item.title}
             </GSText>
           </HStack>
-          <CustomToggle
+          <Switch
             value={item.value || false}
             onValueChange={item.onToggle || (() => {})}
             size="md"
@@ -110,32 +111,48 @@ export default function SettingsScreen() {
     }
 
     return (
-      <TouchableOpacity onPress={item.onPress} activeOpacity={0.6}>
-        <HStack className="items-center justify-between px-5 py-4">
-          <HStack className="items-center flex-1">
-            <View style={[tw`mr-4 p-2 rounded-lg`, { backgroundColor: '#F8FAFC' }]}>
+      <Pressable onPress={item.onPress}>
+        <HStack className="items-center justify-between px-5 py-4" space="md">
+          <HStack className="items-center flex-1" space="md">
+            <Box 
+              className="p-2 rounded-lg" 
+              style={{ backgroundColor: Colors.background.tertiary }}
+            >
               {item.icon}
-            </View>
-            <GSText size="md" style={{ color: Colors.text.head, flex: 1 }}>
+            </Box>
+            <GSText size="md" style={{ color: Colors.text.primary, flex: 1 }}>
               {item.title}
             </GSText>
           </HStack>
 
           {item.type === "navigation" && (
-            <ChevronRight size={18} color={Colors.text.sub} />
+            <ChevronRight size={18} color={Colors.text.secondary} />
           )}
 
           {item.type === "add" && (
             <Plus size={18} color={Colors.primary.blue} strokeWidth={2} />
           )}
         </HStack>
-      </TouchableOpacity>
+      </Pressable>
     );
   };
 
   return (
     <View style={tw`flex-1 bg-gray-50`}>
-      <Header title="Settings" showMenu={true} />
+      {/* Back Button Header */}
+      <View style={[tw`bg-white p-4 flex-row items-center`, { borderBottomColor: Colors.border.light, borderBottomWidth: 1 }]}>
+        <Pressable 
+          onPress={() => router.back()}
+          style={[tw`p-2 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}
+        >
+          <View style={{ transform: [{ rotate: '180deg' }] }}>
+            <ChevronRight 
+              size={24} 
+              color={Colors.text.secondary}
+            />
+          </View>
+        </Pressable>
+      </View>
 
       <ScrollView
         style={tw`flex-1`}
@@ -143,56 +160,59 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Section */}
-        <Box className="bg-white rounded-2xl mb-6 p-6" style={createShadowStyle({
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 12,
-          elevation: 4,
-        })}>
-          <HStack className="items-center">
-            <View style={{
-              width: 56,
-              height: 56,
-              borderRadius: 28,
-              backgroundColor: '#F0F9FF',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 16,
-            }}>
-              <User size={28} color={Colors.primary.blue} strokeWidth={1.5} />
-            </View>
-            <VStack className="flex-1">
-              <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                John Doe
-              </GSText>
-              <GSText size="sm" style={{ color: Colors.text.sub, marginTop: 2 }}>
-                john.doe@example.com
-              </GSText>
-            </VStack>
-            <TouchableOpacity onPress={() => console.log("Edit profile")} style={{ padding: 8 }}>
-              <ChevronRight size={20} color={Colors.text.sub} />
-            </TouchableOpacity>
-          </HStack>
-        </Box>
+        <Pressable onPress={() => router.push('/profile')}>
+          <Box 
+            className="bg-white rounded-2xl mb-6 p-6" 
+            style={cardShadowStyle}
+          >
+            <HStack className="items-center" space="md">
+              <Avatar 
+                size="lg"
+                style={{ backgroundColor: Colors.background.tertiary }}
+              >
+                <AvatarFallbackText style={{ color: Colors.text.primary }}>
+                  {user?.full_name || "User"}
+                </AvatarFallbackText>
+                <AvatarImage 
+                  source={{ uri: (user as any)?.profile_photo || undefined }} 
+                  alt="Profile"
+                />
+              </Avatar>
+              <VStack className="flex-1" space="xs">
+                <GSText size="lg" bold style={{ color: Colors.text.primary }}>
+                  {user?.full_name || "User"}
+                </GSText>
+                <GSText size="sm" style={{ color: Colors.text.secondary }}>
+                  {user?.email || "user@example.com"}
+                </GSText>
+              </VStack>
+              <Box style={{ padding: 8 }}>
+                <ChevronRight size={20} color={Colors.text.secondary} />
+              </Box>
+            </HStack>
+          </Box>
+        </Pressable>
 
         {/* Account Settings Section */}
-        <VStack className="mb-8">
-          <GSText size="lg" bold className="mb-5 px-1" style={{ color: Colors.text.head }}>
+        <VStack className="mb-8" space="md">
+          <GSText size="lg" bold className="px-1" style={{ color: Colors.text.primary }}>
             Account Settings
           </GSText>
-          <VStack className="bg-white rounded-2xl" style={createShadowStyle({
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.06,
-            shadowRadius: 8,
-            elevation: 2,
-          })}>
+          <VStack 
+            className="bg-white rounded-2xl" 
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.06,
+              shadowRadius: 8,
+              elevation: 2,
+            }}
+          >
             {accountSettings.map((item, index) => (
               <View key={item.id}>
                 {renderSettingItemInGroup(item)}
                 {index < accountSettings.length - 1 && (
-                  <View style={{ height: 1, backgroundColor: '#F1F5F9' }} />
+                  <Box style={{ height: 1, backgroundColor: Colors.border.light }} />
                 )}
               </View>
             ))}
@@ -200,40 +220,31 @@ export default function SettingsScreen() {
         </VStack>
 
         {/* More Section */}
-        <VStack className="mb-8">
-          <GSText size="lg" bold className="mb-5 px-1" style={{ color: Colors.text.head }}>
+        <VStack className="mb-8" space="md">
+          <GSText size="lg" bold className="px-1" style={{ color: Colors.text.primary }}>
             More
           </GSText>
-          <VStack className="bg-white rounded-2xl" style={createShadowStyle({
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.06,
-            shadowRadius: 8,
-            elevation: 2,
-          })}>
+          <VStack 
+            className="bg-white rounded-2xl" 
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.06,
+              shadowRadius: 8,
+              elevation: 2,
+            }}
+          >
             {moreSettings.map((item, index) => (
               <View key={item.id}>
                 {renderSettingItemInGroup(item)}
                 {index < moreSettings.length - 1 && (
-                  <View style={{ height: 1, backgroundColor: '#F1F5F9' }} />
+                  <Box style={{ height: 1, backgroundColor: Colors.border.light }} />
                 )}
               </View>
             ))}
           </VStack>
         </VStack>
 
-        {/* Sign Out Button */}
-        <View style={{ marginTop: -8 }}>
-          <Button
-            title="Sign Out"
-            onPress={() => {
-              // Handle sign out
-              console.log("Sign out");
-            }}
-            variant="danger"
-            size="large"
-          />
-        </View>
       </ScrollView>
 
       <Navbar activeTab="learn" />

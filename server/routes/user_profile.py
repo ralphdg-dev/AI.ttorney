@@ -369,7 +369,7 @@ async def delete_user_account(
             detail="Failed to delete account"
         )
 
-@router.get("/check-username/{username}")
+@router.get("/check-username")
 async def check_username_availability(username: str):
     """Check if username is available"""
     try:
@@ -389,6 +389,7 @@ async def check_username_availability(username: str):
             )
         
         return {
+            "exists": result.get("exists", False),
             "available": not result.get("exists", False),
             "username": username.strip()
         }
@@ -402,10 +403,19 @@ async def check_username_availability(username: str):
             detail="Failed to check username availability"
         )
 
-@router.get("/check-email/{email}")
+@router.get("/check-email")
 async def check_email_availability(email: str):
     """Check if email is available"""
     try:
+        # Validate email format
+        import re
+        email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+        if not re.match(email_regex, email.strip()):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid email format"
+            )
+        
         supabase_service = SupabaseService()
         result = await supabase_service.check_user_exists("email", email.strip())
         
@@ -416,6 +426,7 @@ async def check_email_availability(email: str):
             )
         
         return {
+            "exists": result.get("exists", False),
             "available": not result.get("exists", False),
             "email": email.strip()
         }
