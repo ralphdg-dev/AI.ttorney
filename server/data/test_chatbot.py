@@ -60,15 +60,20 @@ def search_legal_knowledge(question: str, top_k: int = TOP_K_RESULTS):
     for i, result in enumerate(results, 1):
         payload = result.payload
         doc = payload.get('text', '')
+        source_url = payload.get('source_url', '')
         
         print(f"\n📄 Result {i} (Relevance: {result.score:.2%})")
         print(f"   Source: {payload.get('source', 'Unknown')}")
         print(f"   Law: {payload.get('law', 'Unknown')}")
         print(f"   Article: {payload.get('article_number', 'N/A')}")
+        if source_url:
+            print(f"   🔗 URL: {source_url}")
         print(f"   Preview: {doc[:150]}...")
         
-        # Build context for GPT
+        # Build context for GPT (include URL in context)
         source_info = f"[Source {i}: {payload.get('law', 'Unknown')} - Article {payload.get('article_number', 'N/A')}]"
+        if source_url:
+            source_info += f"\n[URL: {source_url}]"
         context_parts.append(f"{source_info}\n{doc}")
     
     return "\n\n".join(context_parts)
@@ -89,10 +94,11 @@ Provide accurate legal information based on Philippine laws.
 
 Guidelines:
 1. Answer using ONLY the provided legal context
-2. Cite specific articles and laws
+2. Cite specific articles and laws with their source URLs
 3. Use clear, professional language
 4. Always remind users to consult a licensed lawyer
-5. Be concise but thorough"""
+5. Be concise but thorough
+6. Include source URLs at the end of your response for verification"""
 
     user_message = f"""Legal Context:
 {context}
