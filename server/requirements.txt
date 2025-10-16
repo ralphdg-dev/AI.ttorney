@@ -14,3 +14,4 @@ numpy==1.26.4
 beautifulsoup4==4.12.3
 requests==2.31.0
 tqdm==4.66.1
+qdrant-client==1.15.1
