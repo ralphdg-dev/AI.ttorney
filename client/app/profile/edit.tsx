@@ -23,6 +23,7 @@ import { useRouter } from "expo-router";
 import { useToast, Toast, ToastTitle, ToastDescription } from "../../components/ui/toast";
 import { Avatar, AvatarImage, AvatarFallbackText } from "../../components/ui/avatar";
 import { VStack } from "../../components/ui/vstack";
+import { createShadowStyle } from "../../utils/shadowUtils";
 
 interface UserProfileData {
   full_name: string;
@@ -52,13 +53,13 @@ const DEFAULT_TIMEOUT_MS = 10000; // 10 seconds default
 const EMAIL_TIMEOUT_MS = 20000; // 20 seconds for email operations
 
 // Common styling utilities
-const cardStyle = {
+const cardStyle = createShadowStyle({
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 1 },
   shadowOpacity: 0.05,
   shadowRadius: 4,
   elevation: 2
-};
+});
 
 const sectionHeaderStyle = {
   backgroundColor: Colors.background.tertiary

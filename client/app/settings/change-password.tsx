@@ -12,6 +12,7 @@ import { useToast, Toast, ToastTitle, ToastDescription } from "@/components/ui/t
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
 import { supabase } from "@/config/supabase";
+import { createShadowStyle } from "@/utils/shadowUtils";
 
 // API Base URL
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
@@ -167,13 +168,13 @@ export default function ChangePasswordScreen() {
       >
         {/* Header Card */}
         <View 
-          style={[tw`bg-white rounded-2xl p-6 mb-6`, {
+          style={[tw`bg-white rounded-2xl p-6 mb-6`, createShadowStyle({
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.1,
             shadowRadius: 8,
             elevation: 3
-          }]}
+          })]}
         >
           <HStack className="items-center mb-4">
             <View 
@@ -194,13 +195,13 @@ export default function ChangePasswordScreen() {
         
         {/* Form Card */}
         <View 
-          style={[tw`bg-white rounded-2xl p-6 mb-6`, {
+          style={[tw`bg-white rounded-2xl p-6 mb-6`, createShadowStyle({
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.1,
             shadowRadius: 8,
             elevation: 3
-          }]}
+          })]}
         >
           {/* Old Password Field */}
           <VStack style={{ marginBottom: 24 }}>

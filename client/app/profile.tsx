@@ -22,6 +22,7 @@ import { useRouter } from "expo-router";
 import { Avatar, AvatarImage, AvatarFallbackText } from "../components/ui/avatar";
 import { supabase } from "../config/supabase";
 import { SidebarWrapper } from "../components/AppSidebar";
+import { createShadowStyle } from "../utils/shadowUtils";
 
 interface UserProfileData {
   full_name: string;
@@ -37,13 +38,13 @@ const DEFAULT_PROFILE_PHOTO = "";
 const REQUEST_TIMEOUT_MS = 5000;
 
 // Common styling utilities
-const cardStyle = {
+const cardStyle = createShadowStyle({
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 1 },
   shadowOpacity: 0.05,
   shadowRadius: 4,
   elevation: 2
-};
+});
 
 const sectionHeaderStyle = {
   backgroundColor: Colors.background.tertiary

@@ -4,6 +4,7 @@ import tw from "tailwind-react-native-classnames";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Box } from "@/components/ui/box";
+import { shouldUseNativeDriver } from "../../../utils/animations";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -20,12 +21,12 @@ export default function ConsultationSkeleton({ isFirst = false }: ConsultationSk
         Animated.timing(pulseAnim, {
           toValue: 1,
           duration: 600,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }),
         Animated.timing(pulseAnim, {
           toValue: 0.4,
           duration: 600,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }),
       ])
     ).start();

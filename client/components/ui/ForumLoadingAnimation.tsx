@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Animated, Dimensions, ScrollView } from 'react-native';
 import Colors from '@/constants/Colors';
 import { createShadowStyle } from '@/utils/shadowUtils';
+import { shouldUseNativeDriver } from '@/utils/animations';
 
 const { width } = Dimensions.get('window');
 
@@ -19,7 +20,7 @@ const ForumLoadingAnimation: React.FC<ForumLoadingAnimationProps> = ({ visible }
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver: shouldUseNativeDriver('opacity'),
       }).start();
 
       // Shimmer animation
@@ -27,7 +28,7 @@ const ForumLoadingAnimation: React.FC<ForumLoadingAnimationProps> = ({ visible }
         Animated.timing(shimmerAnim, {
           toValue: 1,
           duration: 1500,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('transform'),
         })
       );
 
@@ -41,7 +42,7 @@ const ForumLoadingAnimation: React.FC<ForumLoadingAnimationProps> = ({ visible }
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: shouldUseNativeDriver('opacity'),
       }).start();
     }
   }, [visible, fadeAnim, shimmerAnim]);

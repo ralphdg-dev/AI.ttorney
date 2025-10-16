@@ -25,6 +25,7 @@ import ConfirmationModal from "../../components/lawyer/ConfirmationModal";
 import { useAuth } from "../../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../../constants/Colors";
+import { shouldUseNativeDriver } from "../../utils/animations";
 
 interface ConsultationRequest {
   id: string;
@@ -75,13 +76,13 @@ const LawyerConsultPage: React.FC = () => {
             toValue: 1,
             duration: 1000,
             easing: Easing.ease,
-            useNativeDriver: true,
+            useNativeDriver: shouldUseNativeDriver('opacity'),
           }),
           Animated.timing(animatedValue, {
             toValue: 0,
             duration: 1000,
             easing: Easing.ease,
-            useNativeDriver: true,
+            useNativeDriver: shouldUseNativeDriver('opacity'),
           }),
         ])
       ).start();

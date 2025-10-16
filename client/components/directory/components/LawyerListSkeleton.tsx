@@ -3,6 +3,7 @@ import { Animated, Easing } from "react-native";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Box } from "@/components/ui/box";
+import { shouldUseNativeDriver } from "../../../utils/animations";
 
 const SkeletonBox = ({ width, height, style }: any) => {
   const animatedValue = useRef(new Animated.Value(0)).current;
@@ -14,13 +15,13 @@ const SkeletonBox = ({ width, height, style }: any) => {
           toValue: 1,
           duration: 1000,
           easing: Easing.ease,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }),
         Animated.timing(animatedValue, {
           toValue: 0,
           duration: 1000,
           easing: Easing.ease,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }),
       ])
     ).start();

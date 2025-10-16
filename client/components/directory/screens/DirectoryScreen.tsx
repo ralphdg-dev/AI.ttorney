@@ -17,6 +17,7 @@ import { Text as UIText } from "@/components/ui/text";
 import tw from "tailwind-react-native-classnames";
 import Header from "../../../components/Header";
 import TabNavigation from "../components/TabNavigation";
+import { shouldUseNativeDriver } from "../../../utils/animations";
 import LawyerCard from "../components/LawyerCard";
 import Navbar from "../../Navbar";
 import { SidebarWrapper } from "../../AppSidebar";
@@ -68,13 +69,13 @@ export default function DirectoryScreen() {
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 250,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }),
         Animated.timing(slideAnim, {
           toValue: 0,
           duration: 300,
           easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('transform'),
         }),
       ]).start();
     } else {
@@ -83,13 +84,13 @@ export default function DirectoryScreen() {
         Animated.timing(fadeAnim, {
           toValue: 0,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }),
         Animated.timing(slideAnim, {
           toValue: 300,
           duration: 200,
           easing: Easing.in(Easing.ease),
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('transform'),
         }),
       ]).start();
     }

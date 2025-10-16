@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { View, Animated, Easing } from "react-native";
 import tw from "tailwind-react-native-classnames";
+import { shouldUseNativeDriver } from "../../../utils/animations";
 
 const SkeletonBox = ({ width, height, style }: any) => {
   const animatedValue = useRef(new Animated.Value(0)).current;
@@ -12,13 +13,13 @@ const SkeletonBox = ({ width, height, style }: any) => {
           toValue: 1,
           duration: 1000,
           easing: Easing.ease,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }),
         Animated.timing(animatedValue, {
           toValue: 0,
           duration: 1000,
           easing: Easing.ease,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }),
       ])
     ).start();

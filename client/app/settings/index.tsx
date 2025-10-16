@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarImage, AvatarFallbackText } from "@/components/ui/avatar";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
+import { createShadowStyle } from '@/utils/shadowUtils';
 import { 
   Lock, 
   Bell, 
@@ -31,13 +32,13 @@ type SettingItem = {
 };
 
 // Common styling utilities
-const cardShadowStyle = {
+const cardShadowStyle = createShadowStyle({
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 2 },
   shadowOpacity: 0.1,
   shadowRadius: 8,
   elevation: 3
-};
+});
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -200,13 +201,13 @@ export default function SettingsScreen() {
           </GSText>
           <VStack 
             className="bg-white rounded-2xl" 
-            style={{
+            style={createShadowStyle({
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.06,
               shadowRadius: 8,
               elevation: 2,
-            }}
+            })}
           >
             {accountSettings.map((item, index) => (
               <View key={item.id}>
@@ -226,13 +227,13 @@ export default function SettingsScreen() {
           </GSText>
           <VStack 
             className="bg-white rounded-2xl" 
-            style={{
+            style={createShadowStyle({
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.06,
               shadowRadius: 8,
               elevation: 2,
-            }}
+            })}
           >
             {moreSettings.map((item, index) => (
               <View key={item.id}>

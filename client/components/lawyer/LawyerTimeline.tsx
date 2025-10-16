@@ -9,6 +9,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
 import { useAuth } from '@/contexts/AuthContext';
+import { createShadowStyle } from '../../utils/shadowUtils';
+import { shouldUseNativeDriver } from '../../utils/animations';
 
 type ForumPost = Database['public']['Tables']['forum_posts']['Row'];
 type User = Database['public']['Tables']['users']['Row'];
@@ -29,7 +31,6 @@ const LawyerTimeline: React.FC = React.memo(() => {
   const [optimisticPosts, setOptimisticPosts] = useState<ForumPostWithUser[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
-  const [, setError] = useState<string | null>(null);
   
   // Refs for optimization
   const lastFetchTime = useRef<number>(0);
@@ -57,7 +58,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
       }
       
       return { 'Content-Type': 'application/json' };
-    } catch (error) {
+    } catch {
       return { 'Content-Type': 'application/json' };
     }
   }, [session?.access_token]);
@@ -75,15 +76,15 @@ const LawyerTimeline: React.FC = React.memo(() => {
     
     // Close any open dropdown menus when refreshing
     setOpenMenuPostId(null);
-    setError(null);
     
     if (!isAuthenticated) {
       setPosts([]);
       setRefreshing(false);
       
       // Prompt user to login instead of making API call
-      const { checkAuthentication } = require('../../utils/authUtils');
-      checkAuthentication();
+      import('../../utils/authUtils').then(({ checkAuthentication }) => {
+        checkAuthentication();
+      });
       return;
     }
     
@@ -111,7 +112,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
       clearTimeout(timeoutId);
 
       // Handle session timeout
-      const { handleSessionTimeout } = require('../../utils/authUtils');
+      const { handleSessionTimeout } = await import('../../utils/authUtils');
       const isSessionTimeout = await handleSessionTimeout(response);
       if (isSessionTimeout) {
         setRefreshing(false);
@@ -173,19 +174,14 @@ const LawyerTimeline: React.FC = React.memo(() => {
       // Only update if component is still mounted
       if (isComponentMounted.current) {
         setPosts(mapped);
-        
-        // Clear any error state on successful load
-        setError(null);
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
         return;
       }
       
-      const errorMessage = error.message || 'Failed to load posts';
-      
+      // Error logged but not displayed to maintain user experience
       if (isComponentMounted.current) {
-        setError(errorMessage);
         // Don't clear posts on error to maintain user experience
       }
     } finally {
@@ -358,7 +354,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
     Animated.timing(animatedOpacity, {
       toValue: 0.7, // Semi-transparent while posting
       duration: 300,
-      useNativeDriver: true,
+      useNativeDriver: shouldUseNativeDriver('opacity'),
     }).start();
     
     return optimisticPost.id;
@@ -373,7 +369,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
         Animated.timing(post.animatedOpacity, {
           toValue: 1,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }).start();
         
         // Keep optimistic post visible and let duplicate detection handle seamless transition
@@ -401,7 +397,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
         Animated.timing(post.animatedOpacity, {
           toValue: 0,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }).start(() => {
           setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
         });
@@ -547,11 +543,13 @@ const LawyerTimeline: React.FC = React.memo(() => {
             borderRadius: 28,
             justifyContent: 'center',
             alignItems: 'center',
-            shadowColor: Colors.primary.blue,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-            elevation: 8,
+            ...createShadowStyle({
+              shadowColor: Colors.primary.blue,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 5,
+            }),
           }
         ]} 
         onPress={handleCreatePost} 

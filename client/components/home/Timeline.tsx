@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl, Animated, TouchableOpacity, StyleSheet, ListRenderItem } from 'react-native';
+import { View, FlatList, RefreshControl, Animated, TouchableOpacity, StyleSheet, ListRenderItem } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import Post from './Post';
@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
 import { useList } from '@/hooks/useOptimizedList';
 import { SkeletonList } from '@/components/ui/SkeletonLoader';
+import { shouldUseNativeDriver } from '../../utils/animations';
 
 interface PostData {
   id: string;
@@ -46,7 +47,7 @@ interface TimelineProps {
 const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
-  const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, getLastFetchTime, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
+  const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [optimisticPosts, setOptimisticPosts] = useState<PostData[]>([]);
@@ -178,7 +179,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       }
       
       return { 'Content-Type': 'application/json' };
-    } catch (error) {
+    } catch {
       return { 'Content-Type': 'application/json' };
     }
   }, [session?.access_token]);
@@ -205,8 +206,9 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       setInitialLoading(false);
       
       // Prompt user to login instead of making API call
-      const { checkAuthentication } = require('../../utils/authUtils');
-      checkAuthentication();
+      import('../../utils/authUtils').then(({ checkAuthentication }) => {
+        checkAuthentication();
+      });
       return;
     }
     
@@ -235,7 +237,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       clearTimeout(timeoutId);
 
       // Handle session timeout
-      const { handleSessionTimeout } = require('../../utils/authUtils');
+      const { handleSessionTimeout } = await import('../../utils/authUtils');
       const isSessionTimeout = await handleSessionTimeout(response);
       if (isSessionTimeout) {
         setRefreshing(false);
@@ -434,7 +436,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     Animated.timing(animatedOpacity, {
       toValue: 0.7, // Semi-transparent while posting
       duration: 300,
-      useNativeDriver: true,
+      useNativeDriver: shouldUseNativeDriver('opacity'),
     }).start();
     
     return optimisticPost.id;
@@ -449,7 +451,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         Animated.timing(post.animatedOpacity, {
           toValue: 1,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }).start();
         
         // Keep optimistic post visible and let duplicate detection handle seamless transition
@@ -472,7 +474,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         Animated.timing(post.animatedOpacity, {
           toValue: 0,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }).start(() => {
           setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
         });

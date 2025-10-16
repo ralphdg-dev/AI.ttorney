@@ -13,6 +13,8 @@ import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
 import SkeletonLoader from '../ui/SkeletonLoader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createShadowStyle } from '../../utils/shadowUtils';
+import { shouldUseNativeDriver } from '../../utils/animations';
 
 interface Reply {
   id: string;
@@ -88,7 +90,7 @@ const LawyerViewPost: React.FC = () => {
           return { 'Authorization': `Bearer ${token}` };
         }
         return {};
-      } catch (error) {
+      } catch {
         return {};
       }
     };
@@ -255,7 +257,7 @@ const LawyerViewPost: React.FC = () => {
         setBookmarked(result.isBookmarked);
         setMenuOpen(false);
       }
-    } catch (error) {
+    } catch {
       // Error handled silently
     } finally {
       setIsBookmarkLoading(false);
@@ -376,13 +378,13 @@ const LawyerViewPost: React.FC = () => {
             } else {
               setReplies([]);
             }
-          } catch (repliesError) {
+          } catch {
             setReplies([]);
           }
         } else {
           setPost(null);
         }
-      } catch (error) {
+      } catch {
         setPost(null);
         setReplies([]);
       } finally {
@@ -443,7 +445,7 @@ const LawyerViewPost: React.FC = () => {
     Animated.timing(animatedOpacity, {
       toValue: 0.8, // Semi-transparent while posting
       duration: 250,
-      useNativeDriver: true,
+      useNativeDriver: shouldUseNativeDriver('opacity'),
     }).start();
     
     return optimisticReply.id;
@@ -458,7 +460,7 @@ const LawyerViewPost: React.FC = () => {
         Animated.timing(reply.animatedOpacity, {
           toValue: 1,
           duration: 150,
-          useNativeDriver: true,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
         }).start();
         
         // Keep the optimistic reply visible for longer, then remove it gradually
@@ -532,7 +534,7 @@ const LawyerViewPost: React.FC = () => {
         // Restore the text on failure
         setReplyText(text);
       }
-    } catch (error) {
+    } catch {
       // Remove the optimistic reply on error
       removeOptimisticReply(optimisticId);
       // Restore the text on error
@@ -657,11 +659,13 @@ const LawyerViewPost: React.FC = () => {
             borderWidth: 1,
             borderColor: '#E5E7EB',
             borderRadius: 8,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 6,
-            elevation: 20,
+            ...createShadowStyle({
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 6,
+              elevation: 3,
+            }),
             zIndex: 1000,
             width: 192
           }}>

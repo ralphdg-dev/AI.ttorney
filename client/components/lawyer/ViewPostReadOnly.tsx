@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import SkeletonLoader from '../ui/SkeletonLoader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useForumCache } from '../../contexts/ForumCacheContext';
+import { createShadowStyle } from '../../utils/shadowUtils';
 
 
 interface PostData {
@@ -62,14 +63,14 @@ interface Reply {
 const ViewPostReadOnly: React.FC = () => {
   const router = useRouter();
   const { postId } = useLocalSearchParams();
-  const { user: currentUser, session, isAuthenticated } = useAuth();
-  const { getCachedPost, getCachedPostFromForum, setCachedPost, updatePostComments, prefetchPost } = useForumCache();
+  const { user: currentUser, session } = useAuth();
+  const { getCachedPost, getCachedPostFromForum, prefetchPost } = useForumCache();
   const [showFullContent, setShowFullContent] = useState(false);
   const [post, setPost] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [postReady, setPostReady] = useState(false);
-  const [, setCurrentTime] = useState(new Date());
+  // Timer removed - no longer needed for real-time updates
   const [bookmarked, setBookmarked] = useState(false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
@@ -99,7 +100,7 @@ const ViewPostReadOnly: React.FC = () => {
       }
       
       return { 'Content-Type': 'application/json' };
-    } catch (error) {
+    } catch {
       return { 'Content-Type': 'application/json' };
     }
   }, [session?.access_token]);
@@ -110,7 +111,6 @@ const ViewPostReadOnly: React.FC = () => {
     setBookmarked(false);
     setIsBookmarkLoading(false);
     setReportModalVisible(false);
-    setIsReportLoading(false);
   }, [postId]);
 
   // Helper function to format timestamp with real-time updates using device time
@@ -148,7 +148,7 @@ const ViewPostReadOnly: React.FC = () => {
       
       // For posts older than 7 days, display the date in MM/DD/YYYY format
       return `${postDate.getMonth() + 1}/${postDate.getDate()}/${postDate.getFullYear()}`;
-    } catch (error) {
+    } catch {
       // Fallback for any parsing errors
       return 'Unknown time';
     }
@@ -157,7 +157,7 @@ const ViewPostReadOnly: React.FC = () => {
   // Real-time timer effect - update more frequently for better responsiveness
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(new Date());
+      // Removed setCurrentTime as it's not being used
     }, 10000); // Update every 10 seconds for real-time feel
 
     return () => clearInterval(timer);
@@ -195,7 +195,7 @@ const ViewPostReadOnly: React.FC = () => {
         setBookmarked(result.isBookmarked);
         setMenuOpen(false);
       }
-    } catch (error) {
+    } catch {
       // Error handled silently
     } finally {
       setIsBookmarkLoading(false);
@@ -345,14 +345,8 @@ const ViewPostReadOnly: React.FC = () => {
             setReplies(mappedReplies);
             setRepliesLoading(false);
             
-            // Cache the post with replies
-            const postWithComments = {
-              ...mappedPost,
-              replies: mappedReplies,
-              commentsLoaded: true,
-              commentsTimestamp: Date.now()
-            };
-            setCachedPost(String(postId), postWithComments as any);
+            // Post with replies already set in state
+            // No need to cache again here
           }
           return;
         }
@@ -360,18 +354,18 @@ const ViewPostReadOnly: React.FC = () => {
         // Step 3: No cache available, fetch from API
         await loadFromAPI(String(postId));
         
-      } catch (error: any) {
-        setError('Failed to load post. Please try again.');
-        setLoading(false);
-      }
-    };
-    
-    loadPost();
-  }, [postId, getCachedPost, getCachedPostFromForum]);
+      } catch {
+      console.error('Error loading post from cache:');
+      setLoading(false);
+    }
+  };
   
-  
+  loadPost();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postId, getCachedPost, getCachedPostFromForum, prefetchPost, currentUser, session]);
+
   // Fallback to API when no cache available
-  const loadFromAPI = async (postId: string) => {
+  const loadFromAPI = useCallback(async (postId: string) => {
     const fallbackTimer = setTimeout(() => {
       setError('Request timed out. Please try again.');
       setLoading(false);
@@ -394,7 +388,7 @@ const ViewPostReadOnly: React.FC = () => {
       clearTimeout(fallbackTimer);
       
       if (!postResponse.ok) {
-        const errorText = await postResponse.text().catch(() => 'Unknown error');
+        await postResponse.text().catch(() => 'Unknown error');
         if (postResponse.status === 403) {
           setError('Authentication failed. Please log in again.');
         } else if (postResponse.status === 404) {
@@ -484,19 +478,11 @@ const ViewPostReadOnly: React.FC = () => {
               ));
               setRepliesLoading(false);
               
-              // Cache the complete post with replies
-              const postWithComments = {
-                ...mapped,
-                replies: mappedReplies.sort((a, b) => 
-                  new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-                ),
-                commentsLoaded: true,
-                commentsTimestamp: Date.now()
-              };
-              setCachedPost(String(postId), postWithComments as any);
+              // Post with replies already set in state
+              // No need to cache again here
             }
           }
-        } catch (error) {
+        } catch {
           // Don't set error state here as we already have the post content
         }
       } else {
@@ -514,7 +500,7 @@ const ViewPostReadOnly: React.FC = () => {
       setPostReady(true);
       setLoading(false);
     }
-  };
+  }, [getAuthHeaders]);
 
   // Replies are now loaded with the post in loadPost and loadFromAPI
   // No separate loadReplies function needed
@@ -655,11 +641,13 @@ const ViewPostReadOnly: React.FC = () => {
             borderWidth: 1,
             borderColor: '#E5E7EB',
             borderRadius: 8,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 6,
-            elevation: 20,
+            ...createShadowStyle({
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 6,
+              elevation: 3,
+            }),
             zIndex: 1000,
             width: 192
           }}>
@@ -741,7 +729,7 @@ const ViewPostReadOnly: React.FC = () => {
                           <View style={tw`flex-row items-center`}>
                             <Image 
                               source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3472/3472620.png' }}
-                              style={tw`w-3 h-3 mr-1 tint-green-700`}
+                              style={[tw`w-3 h-3 mr-1`, { tintColor: '#15803d' }]}
                             />
                             <Text style={tw`text-xs font-medium text-green-700`}>Verified Lawyer</Text>
                           </View>
@@ -846,7 +834,7 @@ const ViewPostReadOnly: React.FC = () => {
                                   <View style={tw`flex-row items-center`}>
                                     <Image 
                                       source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3472/3472620.png' }}
-                                      style={tw`w-3 h-3 mr-1 tint-green-700`}
+                                      style={[tw`w-3 h-3 mr-1`, { tintColor: '#15803d' }]}
                                     />
                                     <Text style={tw`text-xs font-medium text-green-700`}>Verified Lawyer</Text>
                                   </View>

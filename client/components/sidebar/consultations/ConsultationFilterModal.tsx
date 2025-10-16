@@ -7,6 +7,7 @@ import { Pressable as UIPressable } from "@/components/ui/pressable";
 import { Ionicons } from "@expo/vector-icons";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../../../constants/Colors";
+import { shouldUseNativeDriver } from "../../../utils/animations";
 
 const { height: screenHeight } = Dimensions.get("window");
 
@@ -38,13 +39,13 @@ export default function ConsultationFilterModal({
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: shouldUseNativeDriver('transform'),
       }).start();
     } else {
       Animated.timing(slideAnim, {
         toValue: screenHeight,
         duration: 250,
-        useNativeDriver: true,
+        useNativeDriver: shouldUseNativeDriver('transform'),
       }).start();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
