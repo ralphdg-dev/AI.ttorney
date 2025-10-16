@@ -1,35 +1,53 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image, ActivityIndicator } from "react-native";
+import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image, ActivityIndicator, Linking, ScrollView } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../constants/Colors";
 import Header from "../components/Header";
 import { SidebarWrapper } from "../components/AppSidebar";
 import Navbar from "../components/Navbar";
+import { useAuth } from "../contexts/AuthContext";
 import axios from "axios";
 
 const birdLogo = require("../assets/images/logo.png");
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
+
+interface SourceCitation {
+  source: string;
+  law: string;
+  article_number: string;
+  article_title?: string;
+  text_preview: string;
+  source_url?: string;
+  relevance_score: number;
+}
+
+interface FallbackSuggestion {
+  action: string;
+  description: string;
+  reason: string;
+}
 
 interface Message {
   id: string;
   text: string;
   fromUser: boolean;
   isTyping?: boolean;
-  sources?: {
-    law: string;
-    article: string;
-    title: string;
-    relevance: number;
-  }[];
+  sources?: SourceCitation[];
+  confidence?: string;
+  language?: string;
+  legal_disclaimer?: string;
+  fallback_suggestions?: FallbackSuggestion[];
+  normalized_query?: string;
+  is_complex_query?: boolean;
 }
 
 export default function ChatbotScreen() {
-  const [showIntro, setShowIntro] = useState(true);
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     { 
       id: "1", 
-      text: "Kumusta! I'm Ai.ttorney, your legal assistant. Ask me anything about Philippine law in English or Filipino. 🇵🇭", 
+      text: "May tanong tungkol sa batas? AI got you!", 
       fromUser: false 
     },
   ]);
@@ -61,27 +79,63 @@ export default function ChatbotScreen() {
     setError(null);
 
     try {
-      // Call chatbot API
-      const response = await axios.post(`${API_URL}/api/chatbot/chat`, {
-        message: userMessage,
-        conversation_history: conversationHistory
+      // Determine endpoint based on user role
+      const userRole = user?.role || 'guest';
+      let endpoint = '';
+      
+      if (userRole === 'verified_lawyer') {
+        // Lawyer endpoint (to be implemented)
+        endpoint = `${API_URL}/api/chatbot/lawyer/ask`;
+      } else {
+        // General public endpoint (registered_user, guest, etc.)
+        endpoint = `${API_URL}/api/chatbot/user/ask`;
+      }
+
+      // Prepare conversation history in the format expected by backend
+      const formattedHistory = conversationHistory.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+      // Call enhanced chatbot API
+      const response = await axios.post(endpoint, {
+        question: userMessage,
+        conversation_history: formattedHistory,
+        max_tokens: 1200,
+        user_id: user?.id || null
       });
 
-      const { response: botResponse, sources } = response.data;
+      const { 
+        answer, 
+        sources, 
+        confidence, 
+        language, 
+        simplified_summary,
+        legal_disclaimer,
+        fallback_suggestions,
+        normalized_query,
+        is_complex_query
+      } = response.data;
 
       // Update conversation history
       setConversationHistory(prev => [
         ...prev,
         { role: "user", content: userMessage },
-        { role: "assistant", content: botResponse }
+        { role: "assistant", content: answer }
       ]);
 
-      // Add bot reply with sources
+      // Add bot reply with all enhanced data
       const reply: Message = {
         id: (Date.now() + 1).toString(),
-        text: botResponse,
+        text: answer,
         fromUser: false,
-        sources: sources
+        sources: sources || [],
+        confidence: confidence,
+        language: language,
+        legal_disclaimer: legal_disclaimer,
+        fallback_suggestions: fallback_suggestions,
+        normalized_query: normalized_query,
+        is_complex_query: is_complex_query
       };
       
       setMessages((prev) => [...prev, reply]);
@@ -91,7 +145,10 @@ export default function ChatbotScreen() {
       
       let errorMessage = "Sorry, I encountered an error. Please try again.";
       
-      if (err.response?.status === 503) {
+      if (err.response?.status === 400) {
+        // Handle prohibited input or validation errors
+        errorMessage = err.response.data.detail || "Invalid question. Please rephrase your query.";
+      } else if (err.response?.status === 503) {
         errorMessage = "The legal knowledge base is not yet initialized. Please contact support.";
       } else if (err.response?.data?.detail) {
         errorMessage = err.response.data.detail;
@@ -124,6 +181,16 @@ export default function ChatbotScreen() {
                 : { backgroundColor: "#F3F4F6" },
             ]}
           >
+            {/* Normalized query indicator */}
+            {!isUser && item.normalized_query && (
+              <View style={tw`mb-2 p-2 bg-blue-50 rounded-lg`}>
+                <Text style={tw`text-xs text-blue-600`}>
+                  📝 Understood as: {item.normalized_query}
+                </Text>
+              </View>
+            )}
+
+            {/* Main answer */}
             <Text
               style={[
                 tw`text-base`,
@@ -132,16 +199,82 @@ export default function ChatbotScreen() {
             >
               {item.text}
             </Text>
+            {!isUser && item.confidence && (
+              <View style={tw`mt-2`}>
+                <Text style={tw`text-xs text-gray-500`}>
+                  {item.confidence === 'high' && '✅ High confidence'}
+                  {item.confidence === 'medium' && '⚠️ Medium confidence'}
+                  {item.confidence === 'low' && '❓ Low confidence - consider consulting a lawyer'}
+                </Text>
+              </View>
+            )}
             
-            {/* Show sources for bot messages */}
+            {/* Show sources with URLs */}
             {!isUser && item.sources && item.sources.length > 0 && (
-              <View style={tw`mt-2 pt-2 border-t border-gray-300`}>
-                <Text style={tw`text-xs text-gray-600 font-semibold mb-1`}>Sources:</Text>
+              <View style={tw`mt-3 pt-2 border-t border-gray-300`}>
+                <Text style={tw`text-xs text-gray-700 font-semibold mb-2`}>📚 Sources:</Text>
                 {item.sources.map((source, idx) => (
-                  <Text key={idx} style={tw`text-xs text-gray-600`}>
-                    • {source.law} - Article {source.article}
-                  </Text>
+                  <View key={idx} style={tw`mb-2`}>
+                    <Text style={tw`text-xs text-gray-700 font-medium`}>
+                      • {source.law} - Art. {source.article_number}
+                    </Text>
+                    {source.article_title && (
+                      <Text style={tw`text-xs text-gray-600 ml-3`}>
+                        {source.article_title}
+                      </Text>
+                    )}
+                    {source.source_url && (
+                      <TouchableOpacity 
+                        onPress={() => Linking.openURL(source.source_url!)}
+                        style={tw`ml-3 mt-1`}
+                      >
+                        <Text style={tw`text-xs text-blue-600 underline`}>
+                          🔗 View source
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    <Text style={tw`text-xs text-gray-500 ml-3`}>
+                      Relevance: {(source.relevance_score * 100).toFixed(0)}%
+                    </Text>
+                  </View>
                 ))}
+              </View>
+            )}
+
+            {/* Legal disclaimer */}
+            {!isUser && item.legal_disclaimer && (
+              <View style={tw`mt-3 pt-2 border-t border-gray-300`}>
+                <Text style={tw`text-xs text-gray-600 italic`}>
+                  {item.legal_disclaimer}
+                </Text>
+              </View>
+            )}
+
+            {/* Fallback suggestions for complex queries */}
+            {!isUser && item.fallback_suggestions && item.fallback_suggestions.length > 0 && (
+              <View style={tw`mt-3 pt-2 border-t border-yellow-300 bg-yellow-50 p-2 rounded-lg`}>
+                <Text style={tw`text-xs text-yellow-800 font-semibold mb-2`}>
+                  💡 Recommended Next Steps:
+                </Text>
+                {item.fallback_suggestions.map((suggestion, idx) => (
+                  <View key={idx} style={tw`mb-2`}>
+                    <Text style={tw`text-xs text-yellow-800 font-medium`}>
+                      {suggestion.description}
+                    </Text>
+                    <Text style={tw`text-xs text-yellow-700 ml-2`}>
+                      {suggestion.reason}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Language indicator */}
+            {!isUser && item.language && (
+              <View style={tw`mt-2`}>
+                <Text style={tw`text-xs text-gray-400`}>
+                  Language: {item.language}
+                </Text>
               </View>
             )}
           </View>
@@ -150,53 +283,6 @@ export default function ChatbotScreen() {
     );
   };
 
-
-  if (showIntro) {
-    return (
-        <View style={tw`flex-1 bg-white`}>
-          <Header
-            title="AI.ttorney"
-            showMenu={true}
-          />
-
-          <View style={tw`flex-1 justify-center items-center px-6`}>
-            <Image
-              source={birdLogo}
-              style={tw`w-32 h-32 mb-3`}
-              resizeMode="contain"
-            />
-            <Text
-              style={[
-                tw`text-center text-lg font-bold mb-6`,
-                { color: Colors.text.head },
-              ]}
-            >
-              May tanong sa batas? &apos;Wag mag-alala, AI got you!{"\n"}Ask in English or Filipino - I understand both!
-            </Text>
-
-            <TouchableOpacity
-              style={[
-                tw`flex-row items-center px-6 py-3 rounded-full`,
-                { backgroundColor: Colors.primary.blue },
-              ]}
-              onPress={() => setShowIntro(false)}
-            >
-              <Ionicons
-                name="chatbubble-ellipses-outline"
-                size={20}
-                color="white"
-                style={tw`mr-2`}
-              />
-              <Text style={tw`text-white font-semibold text-base`}>
-                Chat with Ai.ttorney
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <Navbar activeTab="ask" />
-          <SidebarWrapper />
-        </View>
-    );
-  }
 
   return (
       <View style={tw`flex-1 bg-white`}>
