@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '../constants/StorageKeys';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://vmlbrckrlgwlobhnpstx.supabase.co';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtbGJyY2tybGd3bG9iaG5wc3R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4MDI5MDksImV4cCI6MjA2OTM3ODkwOX0.ucK9BXmRg7wYaamFBkTKWTkOavlp7SzNrZwDvNmKsK8';
@@ -20,7 +21,7 @@ const createSupabaseClient = () => {
       detectSessionInUrl: false,
       storage: Platform.OS === 'web' ? undefined : AsyncStorage,
       // Add storage key to prevent conflicts between multiple instances
-      storageKey: 'ai-ttorney-auth',
+      storageKey: STORAGE_KEYS.AUTH,
     },
   });
 
@@ -34,9 +35,16 @@ export const supabase = createSupabaseClient();
 export const clearAuthStorage = async () => {
   try {
     if (Platform.OS !== 'web') {
-      await AsyncStorage.removeItem('supabase.auth.token');
+      await AsyncStorage.removeItem(STORAGE_KEYS.SUPABASE_TOKEN);
+      await AsyncStorage.removeItem(STORAGE_KEYS.AUTH);
+      await AsyncStorage.removeItem(STORAGE_KEYS.USER_SESSION);
+      await AsyncStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
+    } else {
+      // Clear web storage
+      localStorage.removeItem(STORAGE_KEYS.AUTH);
+      localStorage.removeItem(STORAGE_KEYS.USER_SESSION);
+      localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
     }
-    await supabase.auth.signOut({ scope: 'global' });
   } catch (error) {
     console.error('Error clearing auth storage:', error);
   }

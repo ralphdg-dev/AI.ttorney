@@ -3,12 +3,10 @@ import { View, ScrollView, Alert, TouchableOpacity, ActivityIndicator } from "re
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
-import { Box } from "@/components/ui/box";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
 import { Input, InputField } from "@/components/ui/input";
-import { Pressable } from "@/components/ui/pressable";
 import { AlertCircle, CheckCircle, Eye, EyeOff, Lock, ChevronRight } from "lucide-react-native";
 import { useToast, Toast, ToastTitle, ToastDescription } from "@/components/ui/toast";
 import Navbar from "@/components/Navbar";
@@ -148,18 +146,19 @@ export default function ChangePasswordScreen() {
   };
 
   return (
-    <Box className="flex-1" style={{ backgroundColor: Colors.background.secondary }}>
+    <View style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]}>
       {/* Back Button Header */}
-      <Box style={[tw`bg-white p-4 flex-row items-center`, { borderBottomColor: Colors.border.light, borderBottomWidth: 1 }]}>
-        <Pressable 
+      <View style={[tw`bg-white p-4 flex-row items-center`, { borderBottomColor: Colors.border.light, borderBottomWidth: 1 }]}>
+        <TouchableOpacity 
           onPress={() => router.back()}
           style={[tw`p-2 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}
+          activeOpacity={0.7}
         >
           <View style={{ transform: [{ rotate: '180deg' }] }}>
             <ChevronRight size={24} color={Colors.text.secondary} />
           </View>
-        </Pressable>
-      </Box>
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
         style={tw`flex-1`}
@@ -167,23 +166,21 @@ export default function ChangePasswordScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header Card */}
-        <Box 
-          className="bg-white rounded-2xl p-6 mb-6" 
-          style={{
+        <View 
+          style={[tw`bg-white rounded-2xl p-6 mb-6`, {
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.1,
             shadowRadius: 8,
             elevation: 3
-          }}
+          }]}
         >
           <HStack className="items-center mb-4">
-            <Box 
-              className="w-12 h-12 rounded-xl items-center justify-center mr-4"
-              style={{ backgroundColor: Colors.primary.blue + '20' }}
+            <View 
+              style={[tw`w-12 h-12 rounded-xl items-center justify-center mr-4`, { backgroundColor: Colors.primary.blue + '20' }]}
             >
               <Lock size={24} color={Colors.primary.blue} />
-            </Box>
+            </View>
             <VStack className="flex-1">
               <GSText size="lg" bold style={{ color: Colors.text.primary }}>
                 Change Password
@@ -193,18 +190,17 @@ export default function ChangePasswordScreen() {
               </GSText>
             </VStack>
           </HStack>
-        </Box>
+        </View>
         
         {/* Form Card */}
-        <Box 
-          className="bg-white rounded-2xl p-6 mb-6" 
-          style={{
+        <View 
+          style={[tw`bg-white rounded-2xl p-6 mb-6`, {
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.1,
             shadowRadius: 8,
             elevation: 3
-          }}
+          }]}
         >
           {/* Old Password Field */}
           <VStack style={{ marginBottom: 24 }}>
@@ -382,7 +378,7 @@ export default function ChangePasswordScreen() {
               </GSText>
             )}
           </VStack>
-        </Box>
+        </View>
 
         {/* Action Buttons */}
         <HStack space="sm" className="mt-6">
@@ -434,6 +430,6 @@ export default function ChangePasswordScreen() {
       </ScrollView>
       
       <Navbar />
-    </Box>
+    </View>
   );
 }

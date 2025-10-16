@@ -242,12 +242,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsSigningOut(true);
     
     try {
-      await clearAuthStorage();
+      // Clear auth state immediately to prevent further API calls
+      setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
+      
+      // Clear local storage first
+      await clearAuthStorage();
+      
+      // Then sign out from Supabase Auth
+      await supabase.auth.signOut({ scope: 'local' });
+      
+      // Navigate to login
+      router.replace('/login');
     } catch (error) {
       console.error('Sign out error:', error);
       // Force clear state on error
       setAuthState({ session: null, user: null, supabaseUser: null });
+      router.replace('/login');
     } finally {
       setIsSigningOut(false);
     }

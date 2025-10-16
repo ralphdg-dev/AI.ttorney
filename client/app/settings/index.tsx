@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, ScrollView } from "react-native";
+import { View, ScrollView, TouchableOpacity } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,7 +8,6 @@ import { HStack } from "@/components/ui/hstack";
 import { Box } from "@/components/ui/box";
 import { Text as GSText } from "@/components/ui/text";
 import { Switch } from "@/components/ui/switch";
-import { Pressable } from "@/components/ui/pressable";
 import { Avatar, AvatarImage, AvatarFallbackText } from "@/components/ui/avatar";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
@@ -111,7 +110,7 @@ export default function SettingsScreen() {
     }
 
     return (
-      <Pressable onPress={item.onPress}>
+      <TouchableOpacity onPress={item.onPress} activeOpacity={0.7}>
         <HStack className="items-center justify-between px-5 py-4" space="md">
           <HStack className="items-center flex-1" space="md">
             <Box 
@@ -133,7 +132,7 @@ export default function SettingsScreen() {
             <Plus size={18} color={Colors.primary.blue} strokeWidth={2} />
           )}
         </HStack>
-      </Pressable>
+      </TouchableOpacity>
     );
   };
 
@@ -141,9 +140,10 @@ export default function SettingsScreen() {
     <View style={tw`flex-1 bg-gray-50`}>
       {/* Back Button Header */}
       <View style={[tw`bg-white p-4 flex-row items-center`, { borderBottomColor: Colors.border.light, borderBottomWidth: 1 }]}>
-        <Pressable 
+        <TouchableOpacity 
           onPress={() => router.back()}
           style={[tw`p-2 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}
+          activeOpacity={0.7}
         >
           <View style={{ transform: [{ rotate: '180deg' }] }}>
             <ChevronRight 
@@ -151,7 +151,7 @@ export default function SettingsScreen() {
               color={Colors.text.secondary}
             />
           </View>
-        </Pressable>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -160,7 +160,7 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Section */}
-        <Pressable onPress={() => router.push('/profile')}>
+        <TouchableOpacity onPress={() => router.push('/profile')} activeOpacity={0.7}>
           <Box 
             className="bg-white rounded-2xl mb-6 p-6" 
             style={cardShadowStyle}
@@ -191,7 +191,7 @@ export default function SettingsScreen() {
               </Box>
             </HStack>
           </Box>
-        </Pressable>
+        </TouchableOpacity>
 
         {/* Account Settings Section */}
         <VStack className="mb-8" space="md">
@@ -247,7 +247,7 @@ export default function SettingsScreen() {
 
       </ScrollView>
 
-      <Navbar activeTab="learn" />
+      <Navbar />
     </View>
   );
 }

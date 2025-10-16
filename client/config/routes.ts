@@ -146,6 +146,50 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     serverValidation: true,
     errorBoundary: true
   },
+  '/profile/edit': { 
+    path: '/profile/edit', 
+    requiredRole: 'registered_user',
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
+
+  // Settings routes
+  '/settings': { 
+    path: '/settings', 
+    requiredRole: 'registered_user',
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
+  '/settings/change-password': { 
+    path: '/settings/change-password', 
+    requiredRole: 'registered_user',
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
+  '/settings/privacy-policy': { 
+    path: '/settings/privacy-policy', 
+    requiredRole: 'registered_user',
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
+  '/settings/terms': { 
+    path: '/settings/terms', 
+    requiredRole: 'registered_user',
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
+  '/settings/about-us': { 
+    path: '/settings/about-us', 
+    requiredRole: 'registered_user',
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
 
   // Lawyer onboarding routes (for authenticated users during verification process)
   '/onboarding/lawyer': {

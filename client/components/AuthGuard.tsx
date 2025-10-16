@@ -24,7 +24,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     const currentPath = `/${segments.join('/')}`;
     const routeConfig = getRouteConfig(currentPath);
     
-
     if (!routeConfig) return;
 
     // Handle authenticated users - check both session and user exist

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request
 from auth.models import UserSignUp, UserSignIn, OTPRequest, VerifyOTPRequest, OTPResponse, PasswordReset, SendOTPRequest
 from auth.service import AuthService
 from services.otp_service import OTPService
@@ -68,12 +68,19 @@ async def sign_in(credentials: UserSignIn):
     }
 
 @router.post("/signout")
-async def sign_out():
+async def sign_out(request: Request):
     """Sign out user"""
+    from auth.service import clear_auth_cache
+    from utils.auth_utils import extract_bearer_token
+    
     # Extract token from request header
-    from fastapi import Request
-    token = None  # TODO: Extract from Authorization header
-    result = await auth_service.sign_out(token or "")
+    token = extract_bearer_token(request)
+    
+    # Clear auth cache for this token
+    if token:
+        clear_auth_cache(token)
+    
+    result = await auth_service.sign_out(token)
     
     if not result["success"]:
         raise HTTPException(
