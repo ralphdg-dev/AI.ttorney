@@ -11,10 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import Navbar from "@/components/Navbar";
-import {
-  SidebarProvider,
-  SidebarWrapper,
-} from "@/components/AppSidebar";
+import { SidebarWrapper } from "@/components/AppSidebar";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import { useLegalArticles } from "@/hooks/useLegalArticles";
 import Button from "@/components/ui/Button";
@@ -119,9 +116,8 @@ export default function BookmarkedGuidesScreen() {
   );
 
   return (
-    <SidebarProvider>
-      <View style={tw`flex-1 bg-gray-50`}>
-        <Header title="Bookmarked Guides" showMenu={true} />
+    <View style={tw`flex-1 bg-gray-50`}>
+      <Header title="Bookmarked Guides" showMenu={true} />
 
       <Box className="px-6 pt-6 mb-4">
         <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
@@ -181,6 +177,5 @@ export default function BookmarkedGuidesScreen() {
       <Navbar />
       <SidebarWrapper />
     </View>
-    </SidebarProvider>
   );
 }

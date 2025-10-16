@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image, ActivityIndicator, ScrollView } from "react-native";
+import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image, ActivityIndicator } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../constants/Colors";
 import Header from "../components/Header";
-import { SidebarProvider, SidebarWrapper } from "../components/AppSidebar";
+import { SidebarWrapper } from "../components/AppSidebar";
 import Navbar from "../components/Navbar";
 import axios from "axios";
 
@@ -15,12 +15,13 @@ interface Message {
   id: string;
   text: string;
   fromUser: boolean;
-  sources?: Array<{
+  isTyping?: boolean;
+  sources?: {
     law: string;
     article: string;
     title: string;
     relevance: number;
-  }>;
+  }[];
 }
 
 export default function ChatbotScreen() {
@@ -35,7 +36,7 @@ export default function ChatbotScreen() {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [conversationHistory, setConversationHistory] = useState<Array<{role: string, content: string}>>([]);
+  const [conversationHistory, setConversationHistory] = useState<{role: string, content: string}[]>([]);
   const flatRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -66,7 +67,7 @@ export default function ChatbotScreen() {
         conversation_history: conversationHistory
       });
 
-      const { response: botResponse, sources, language } = response.data;
+      const { response: botResponse, sources } = response.data;
 
       // Update conversation history
       setConversationHistory(prev => [
@@ -152,7 +153,6 @@ export default function ChatbotScreen() {
 
   if (showIntro) {
     return (
-      <SidebarProvider>
         <View style={tw`flex-1 bg-white`}>
           <Header
             title="AI.ttorney"
@@ -195,12 +195,10 @@ export default function ChatbotScreen() {
           <Navbar activeTab="ask" />
           <SidebarWrapper />
         </View>
-      </SidebarProvider>
     );
   }
 
   return (
-    <SidebarProvider>
       <View style={tw`flex-1 bg-white`}>
         {/* ✅ Header on Chat screen */}
         <Header
@@ -280,7 +278,5 @@ export default function ChatbotScreen() {
         <Navbar activeTab="ask" />
         <SidebarWrapper />
       </View>
-    </SidebarProvider>
   );
 }
-

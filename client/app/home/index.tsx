@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import Navbar from '../../components/Navbar';
 import Timeline from '../../components/home/Timeline';
 import Header from '../../components/Header';
-import { SidebarProvider, SidebarWrapper } from '../../components/AppSidebar';
+import { SidebarWrapper } from '../../components/AppSidebar';
 
 const HomePage: React.FC = () => {
   const router = useRouter();
@@ -19,7 +19,6 @@ const HomePage: React.FC = () => {
   };
 
   return (
-    <SidebarProvider>
       <SafeAreaView style={styles.container}>
         <Header 
           variant="home"
@@ -34,9 +33,8 @@ const HomePage: React.FC = () => {
         </View>
         
         <Navbar activeTab="home" />
-        <SidebarWrapper />
-      </SafeAreaView>
-    </SidebarProvider>
+      <SidebarWrapper />
+    </SafeAreaView>
   );
 };
 

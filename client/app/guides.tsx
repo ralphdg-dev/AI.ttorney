@@ -12,7 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import Navbar from "@/components/Navbar";
-import { SidebarProvider, SidebarWrapper } from "@/components/AppSidebar";
+import { SidebarWrapper } from "@/components/AppSidebar";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import { useLegalArticles } from "@/hooks/useLegalArticles";
 
@@ -282,8 +282,7 @@ const renderPagination = () => {
   
 
   return (
-    <SidebarProvider>
-      <View style={tw`flex-1 bg-gray-50`}>
+    <View style={tw`flex-1 bg-gray-50`}>
         <Header title="Know Your Batas" showMenu={true} />
 
         <ToggleGroup options={tabOptions} activeOption={activeTab} onOptionChange={onToggleChange} />
@@ -370,6 +369,5 @@ const renderPagination = () => {
         <Navbar activeTab="learn" />
         <SidebarWrapper />
       </View>
-    </SidebarProvider>
   );
 }

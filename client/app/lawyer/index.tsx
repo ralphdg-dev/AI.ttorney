@@ -13,6 +13,7 @@ import {
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 import Header from '../../components/Header';
 import ConsultationCalendar from '../../components/lawyer/ConsultationCalendar';
+import { SidebarWrapper } from '../../components/AppSidebar';
 
 const LawyerDashboard: React.FC = () => {
   const router = useRouter();
@@ -112,13 +113,13 @@ const LawyerDashboard: React.FC = () => {
 
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-white`}>
-      <Header 
-        variant="home"
-        showMenu={true}
-        showNotifications={true}
-        onNotificationPress={handleNotificationPress}
-      />
+      <SafeAreaView style={tw`flex-1 bg-white`}>
+        <Header 
+          variant="home"
+          showMenu={true}
+          showNotifications={true}
+          onNotificationPress={handleNotificationPress}
+        />
       
       <ScrollView style={tw`flex-1 pb-24`} showsVerticalScrollIndicator={false}>
         {/* Welcome Section */}
@@ -301,6 +302,7 @@ const LawyerDashboard: React.FC = () => {
       </ScrollView>
 
       <LawyerNavbar activeTab="home" />
+      <SidebarWrapper />
     </SafeAreaView>
   );
 };

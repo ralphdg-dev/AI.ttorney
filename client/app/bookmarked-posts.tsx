@@ -5,7 +5,7 @@ import { Bookmark, Filter, SortAsc, Search, X } from 'lucide-react-native';
 import Post from '../components/home/Post';
 import Header from '../components/Header';
 import Navbar from '../components/Navbar';
-import { SidebarProvider, SidebarWrapper } from '../components/AppSidebar';
+import { SidebarWrapper } from '../components/AppSidebar';
 import { useAuth } from '../contexts/AuthContext';
 import { BookmarkService } from '../services/bookmarkService';
 import Colors from '../constants/Colors';
@@ -131,7 +131,8 @@ export default function BookmarkedPostsScreen() {
 
   useEffect(() => {
     loadBookmarkedPosts();
-  }, [loadBookmarkedPosts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, currentUser?.id]); // Only re-run when auth state changes
 
   const handleRefresh = useCallback(() => {
     loadBookmarkedPosts(true);
@@ -258,7 +259,6 @@ export default function BookmarkedPostsScreen() {
   ), [handleCommentPress, handleBookmarkPress, handleReportPress, handlePostPress, handleMenuToggle, openMenuPostId, handleBookmarkStatusChange]);
 
   return (
-    <SidebarProvider>
       <View style={styles.container}>
         <Header title="Bookmarked Posts" showMenu={true} />
 
@@ -276,7 +276,7 @@ export default function BookmarkedPostsScreen() {
                 <Filter size={48} color={Colors.text.sub} strokeWidth={1.5} />
                 <Text style={styles.emptyTitle}>No Posts Found</Text>
                 <Text style={styles.emptySubtitle}>
-                  No bookmarked posts match your search "{searchQuery}"
+                  No bookmarked posts match your search &quot;{searchQuery}&quot;
                 </Text>
                 <TouchableOpacity 
                   style={styles.browseButton}
@@ -312,7 +312,6 @@ export default function BookmarkedPostsScreen() {
         <Navbar />
         <SidebarWrapper />
       </View>
-    </SidebarProvider>
   );
 }
 

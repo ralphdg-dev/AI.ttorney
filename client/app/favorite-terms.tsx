@@ -12,7 +12,6 @@ import { Ionicons } from "@expo/vector-icons";
 import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import {
-  SidebarProvider,
   SidebarWrapper,
 } from "@/components/AppSidebar";
 import Colors from "@/constants/Colors";
@@ -75,8 +74,11 @@ export default function FavoritesScreen() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [scrollY] = useState(new Animated.Value(0));
 
-  // Get favorite terms from sample data based on favoriteTermIds
-  const favoriteTerms = sampleFavoriteTerms.filter(term => favoriteTermIds.has(term.id));
+  // Get favorite terms from sample data based on favoriteTermIds - MEMOIZED to prevent infinite loop
+  const favoriteTerms = React.useMemo(() => 
+    sampleFavoriteTerms.filter(term => favoriteTermIds.has(term.id)),
+    [favoriteTermIds]
+  );
 
   const loadFavoriteTerms = useCallback(async () => {
     try {
@@ -88,7 +90,8 @@ export default function FavoritesScreen() {
     } finally {
       setLoading(false);
     }
-  }, [loadFavorites]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // loadFavorites is stable, no need in deps
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -98,7 +101,8 @@ export default function FavoritesScreen() {
 
   useEffect(() => {
     loadFavoriteTerms();
-  }, [loadFavoriteTerms]); // Remove loadFavoriteTerms dependency to prevent infinite loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   // Filter terms based on search query and category
   useEffect(() => {
@@ -146,7 +150,6 @@ export default function FavoritesScreen() {
   }
 
   return (
-    <SidebarProvider>
       <View style={tw`flex-1 bg-gray-100`}>
       <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
       
@@ -284,6 +287,5 @@ export default function FavoritesScreen() {
       <Navbar />
       <SidebarWrapper />
     </View>
-    </SidebarProvider>
   );
 }

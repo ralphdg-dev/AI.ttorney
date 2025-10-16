@@ -4,6 +4,8 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../../constants/Colors";
 import Navbar from "@/components/Navbar";
+import Header from "@/components/Header";
+import { SidebarWrapper } from "@/components/AppSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
@@ -480,20 +482,8 @@ export default function LawyerBookingView() {
     lawyerData.bio && lawyerData.bio.length > bioMaxLength;
 
   return (
-    <Box className="flex-1 bg-gray-50">
-      {/* Header */}
-      <HStack className="items-center justify-between px-4 pt-10 pb-3 bg-white">
-        <Pressable onPress={handleBackPress} className="p-2">
-          <Ionicons name="arrow-back" size={24} color={Colors.primary.blue} />
-        </Pressable>
-        <Text
-          className={`${isSmallScreen ? "text-base" : "text-lg"} font-bold`}
-          style={{ color: Colors.primary.blue }}
-        >
-          Talk to a Lawyer
-        </Text>
-        <Box className="w-8" />
-      </HStack>
+      <Box className="flex-1 bg-gray-50">
+        <Header title="Talk to a Lawyer" showMenu={true} showBackButton={true} onBackPress={handleBackPress} />
 
       <ScrollView
         className="flex-1"
@@ -1083,6 +1073,7 @@ export default function LawyerBookingView() {
       </Modal>
 
       <Navbar activeTab="find" onTabPress={handleBottomNavChange} />
+      <SidebarWrapper />
     </Box>
   );
 }

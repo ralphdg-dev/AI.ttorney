@@ -320,7 +320,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
 
-  const value: AuthContextType = {
+  const value: AuthContextType = React.useMemo(() => ({
     user: authState.user,
     session: authState.session,
     isLoading,
@@ -337,7 +337,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setHasRedirectedToStatus,
     initialAuthCheck,
     isSigningOut,
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [authState.user, authState.session, isLoading, hasRedirectedToStatus, isSigningOut]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

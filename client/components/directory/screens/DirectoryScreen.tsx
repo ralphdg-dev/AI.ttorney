@@ -19,7 +19,7 @@ import Header from "../../../components/Header";
 import TabNavigation from "../components/TabNavigation";
 import LawyerCard from "../components/LawyerCard";
 import Navbar from "../../Navbar";
-import { SidebarProvider, SidebarWrapper } from "../../AppSidebar";
+import { SidebarWrapper } from "../../AppSidebar";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../../../constants/Colors";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -260,7 +260,6 @@ export default function DirectoryScreen() {
     selectedDays.length > 0 || selectedSpecialization !== "All";
 
   return (
-    <SidebarProvider>
       <View style={tw`flex-1 bg-gray-50`}>
         <Header title="Find Legal Help" showMenu={true} />
 
@@ -366,6 +365,5 @@ export default function DirectoryScreen() {
         <Navbar activeTab="find" />
         <SidebarWrapper />
       </View>
-    </SidebarProvider>
   );
 }

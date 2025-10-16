@@ -81,13 +81,13 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
     loadFavorites();
   }, [loadFavorites]);
 
-  const value: FavoritesContextType = {
+  const value: FavoritesContextType = React.useMemo(() => ({
     favoriteTermIds,
     toggleFavorite,
     isFavorite,
     getFavoriteCount,
     loadFavorites,
-  };
+  }), [favoriteTermIds, toggleFavorite, isFavorite, getFavoriteCount, loadFavorites]);
 
   return (
     <FavoritesContext.Provider value={value}>

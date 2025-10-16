@@ -255,7 +255,7 @@ export const ForumCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [isPostCacheValid, getCachedPostFromForum, setCachedPost]);
 
-  const value: ForumCacheContextType = {
+  const value: ForumCacheContextType = React.useMemo(() => ({
     getCachedPosts,
     setCachedPosts,
     isCacheValid,
@@ -269,7 +269,7 @@ export const ForumCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     updatePostComments,
     isPostCacheValid,
     prefetchPost,
-  };
+  }), [getCachedPosts, setCachedPosts, isCacheValid, clearCache, updatePostBookmark, getLastFetchTime, setLastFetchTime, getCachedPost, setCachedPost, getCachedPostFromForum, updatePostComments, isPostCacheValid, prefetchPost]);
 
   return (
     <ForumCacheContext.Provider value={value}>

@@ -1,4 +1,4 @@
- import React, { createContext, useContext, useState, ReactNode, useRef, useEffect } from "react";
+ import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated, ScrollView, StatusBar } from "react-native";
 import { useRouter } from "expo-router";
 import { useFavorites } from "../contexts/FavoritesContext";
@@ -25,6 +25,7 @@ import { createShadowStyle } from "../utils/shadowUtils";
 
 const { width: screenWidth } = Dimensions.get("window");
 const SIDEBAR_WIDTH = screenWidth * 0.8;
+const ANIMATION_DURATION = 280;
 
 // Types
 interface SidebarContextType {
@@ -68,16 +69,16 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
 }) => {
   const [isVisible, setIsVisible] = useState(false);
 
-  const openSidebar = () => setIsVisible(true);
-  const closeSidebar = () => setIsVisible(false);
-  const toggleSidebar = () => setIsVisible((prev) => !prev);
+  const openSidebar = useCallback(() => setIsVisible(true), []);
+  const closeSidebar = useCallback(() => setIsVisible(false), []);
+  const toggleSidebar = useCallback(() => setIsVisible((prev) => !prev), []);
 
-  const value: SidebarContextType = {
+  const value: SidebarContextType = React.useMemo(() => ({
     isVisible,
     openSidebar,
     closeSidebar,
     toggleSidebar,
-  };
+  }), [isVisible, openSidebar, closeSidebar, toggleSidebar]);
 
   return (
     <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>
@@ -100,15 +101,16 @@ const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   userInfo = { name: "User", email: "user@example.com" },
 }) => {
-  const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
-  const overlayOpacity = useRef(new Animated.Value(0)).current;
-  const [shouldRender, setShouldRender] = useState(false);
-  const [acceptedConsultationsCount, setAcceptedConsultationsCount] =
-    useState(0);
+  // INDUSTRY STANDARD: Lazy initialization with useState
+  const [slideAnim] = useState(() => new Animated.Value(-SIDEBAR_WIDTH));
+  const [overlayOpacity] = useState(() => new Animated.Value(0));
+  const [acceptedConsultationsCount, setAcceptedConsultationsCount] = useState(0);
   const insets = useSafeAreaInsets();
   const { signOut, user } = useAuth();
+  const { favoriteTermIds } = useFavorites();
+  const hasFetchedConsultations = useRef(false);
 
-  // Fetch accepted consultations count
+  // Fetch accepted consultations count ONCE when sidebar becomes visible
   useEffect(() => {
     const fetchAcceptedConsultations = async () => {
       if (!user?.id) return;
@@ -131,57 +133,72 @@ const Sidebar: React.FC<SidebarProps> = ({
       }
     };
 
-    if (isVisible && user?.id) {
+    // Only fetch if the sidebar is visible AND we haven't fetched before
+    if (isVisible && user?.id && !hasFetchedConsultations.current) {
       fetchAcceptedConsultations();
+      hasFetchedConsultations.current = true; // Mark as fetched
+    }
+
+    // Reset fetch status when sidebar closes
+    if (!isVisible) {
+      hasFetchedConsultations.current = false;
     }
   }, [isVisible, user?.id]);
 
+  // Animation effect - SIMPLE and CLEAN
   useEffect(() => {
+    const animationConfig = {
+      duration: ANIMATION_DURATION,
+      useNativeDriver: shouldUseNativeDriver('transform'),
+    };
+
     if (isVisible) {
-      setShouldRender(true);
+      // Animate in
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: 0,
-          duration: 280,
-          useNativeDriver: shouldUseNativeDriver('transform'),
+          ...animationConfig,
         }),
         Animated.timing(overlayOpacity, {
           toValue: 0.5,
-          duration: 280,
-          useNativeDriver: shouldUseNativeDriver('transform'),
+          ...animationConfig,
         }),
       ]).start();
-    } else if (shouldRender) {
+    } else {
+      // Animate out
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: -SIDEBAR_WIDTH,
-          duration: 280,
-          useNativeDriver: shouldUseNativeDriver('transform'),
+          ...animationConfig,
         }),
         Animated.timing(overlayOpacity, {
           toValue: 0,
-          duration: 280,
-          useNativeDriver: shouldUseNativeDriver('transform'),
+          ...animationConfig,
         }),
-      ]).start(() => {
-        setShouldRender(false);
-      });
+      ]).start();
     }
-  }, [isVisible, slideAnim, overlayOpacity, shouldRender]);
 
-  // Get actual favorite count from context
-  const { getFavoriteCount } = useFavorites();
-
-  const getBadgeCounts = () => ({
-    favoriteTerms: getFavoriteCount(),
+    // Cleanup
+    return () => {
+      slideAnim.stopAnimation();
+      overlayOpacity.stopAnimation();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible]);
+  
+  // Get favorite count directly from Set size
+  const favoriteCount = favoriteTermIds.size;
+  
+  // Memoize badge counts to prevent recreating on every render
+  const badgeCounts = React.useMemo(() => ({
+    favoriteTerms: favoriteCount,
     bookmarkedGuides: 0,
     acceptedConsultations: acceptedConsultationsCount,
     unreadNotifications: 0,
-  });
+  }), [favoriteCount, acceptedConsultationsCount]);
 
-  const badgeCounts = getBadgeCounts();
-
-  const menuItems: MenuItem[] = [
+  // Memoize menu items to prevent recreating on every render
+  const menuItems: MenuItem[] = React.useMemo(() => [
     {
       id: "bookmarks",
       label: "Favorite Terms",
@@ -270,7 +287,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         }
       },
     },
-  ];
+  ], [badgeCounts, signOut]);
 
   const handleMenuItemPress = (item: MenuItem) => {
     if (item.action) {
@@ -317,7 +334,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  if (!shouldRender) return null;
+  // Don't render if not visible
+  if (!isVisible) return null;
 
   return (
     <View style={styles.container}>
@@ -419,7 +437,8 @@ export const SidebarWrapper: React.FC<{
   const router = useRouter();
   const { user } = useAuth();
 
-  const handleNavigate = (route: string) => {
+  // Memoize navigation handler to prevent recreation on every render
+  const handleNavigate = useCallback((route: string) => {
     console.log(`Navigate to ${route}`);
 
     switch (route) {
@@ -453,14 +472,14 @@ export const SidebarWrapper: React.FC<{
       default:
         console.log(`Route ${route} not implemented yet`);
     }
-  };
+  }, [router]);
 
-  // Use actual user data from auth context
-  const actualUserInfo = {
+  // Memoize user info to prevent object recreation on every render
+  const actualUserInfo = React.useMemo(() => ({
     name: user?.full_name || "User",
     email: user?.email || "user@example.com",
     avatar: userInfo?.avatar,
-  };
+  }), [user?.full_name, user?.email, userInfo?.avatar]);
 
   return (
     <Sidebar

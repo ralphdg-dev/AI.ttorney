@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import Timeline from '../../components/home/Timeline';
 import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
 import Header from '../../components/Header';
+import { SidebarWrapper } from '../../components/AppSidebar';
 
 const LawyerForum = () => {
   const router = useRouter();
@@ -14,17 +15,18 @@ const LawyerForum = () => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <Header 
-        variant="home"
-        showMenu={true}
-        showNotifications={true}
-        onNotificationPress={handleNotificationPress}
-      />
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+        <Header 
+          variant="home"
+          showMenu={true}
+          showNotifications={true}
+          onNotificationPress={handleNotificationPress}
+        />
       <View style={{ flex: 1 }}>
         <Timeline context="lawyer" />
       </View>
       <LawyerNavbar activeTab="forum" />
+      <SidebarWrapper />
     </SafeAreaView>
   );
 };

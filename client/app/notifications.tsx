@@ -7,6 +7,7 @@ import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
 import { Button, ButtonText } from "@/components/ui/button/";
 import Navbar from "@/components/Navbar";
+import { SidebarWrapper } from "@/components/AppSidebar";
 import Colors from "@/constants/Colors";
 import { Bell, MessageSquare, Calendar, CheckCircle, ChevronRight, ChevronDown } from "lucide-react-native";
 import DropdownMenu from "@/components/common/DropdownMenu";
@@ -127,8 +128,8 @@ export default function NotificationsScreen() {
   );
 
   return (
-    <View style={[tw`flex-1 bg-gray-50`, { position: "relative" }]}>
-      <Header title="Notifications" showMenu={true} />
+      <View style={[tw`flex-1 bg-gray-50`, { position: "relative" }]}>
+        <Header title="Notifications" showMenu={true} />
 
       {/* Inbox filter row */}
       <Box className="px-6 pt-4 pb-2" style={{ zIndex: menuOpen ? 100 : 1, position: "relative", elevation: menuOpen ? 12 : 0, overflow: 'visible' }}>
@@ -191,7 +192,8 @@ export default function NotificationsScreen() {
         />
       )}
 
-      <Navbar activeTab="learn" />
+      <Navbar />
+      <SidebarWrapper />
     </View>
   );
 }

@@ -29,17 +29,24 @@ const Navbar: React.FC<NavbarProps> = ({
   const getActiveTab = () => {
     if (activeTab) return activeTab;
     
-    // Check consultations and settings first to prevent other routes from matching
-    if (pathname.includes('/consultations')) return null; // Don't highlight any tab for consultations
-    if (pathname.includes('/settings')) return null; // Don't highlight any tab for settings
+    // Check sidebar routes first - these should NOT highlight any navbar tab
+    if (pathname.includes('/consultations')) return null;
+    if (pathname.includes('/settings')) return null;
+    if (pathname.includes('/help')) return null;
+    if (pathname.includes('/favorite-terms')) return null;
+    if (pathname.includes('/notifications')) return null;
+    if (pathname.includes('/article')) return null;
+    if (pathname.includes('/bookmarked')) return null;
     
-    if (pathname.includes('/home') || pathname === '/') return 'home';
+    // Check main navbar routes
+    if (pathname === '/' || pathname === '/home') return 'home';
     if (pathname.includes('/glossary') || pathname.includes('/guides')) return 'learn';
     if (pathname.includes('/chatbot')) return 'ask';
     if (pathname.includes('/directory')) return 'find';
     if (pathname.includes('/profile')) return 'profile';
     
-    return 'home'; // default
+    // Don't highlight anything for unknown routes
+    return null;
   };
 
   const currentActiveTab = getActiveTab();

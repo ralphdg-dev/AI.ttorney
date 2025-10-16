@@ -21,6 +21,7 @@ import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import { Avatar, AvatarImage, AvatarFallbackText } from "../components/ui/avatar";
 import { supabase } from "../config/supabase";
+import { SidebarWrapper } from "../components/AppSidebar";
 
 interface UserProfileData {
   full_name: string;
@@ -215,42 +216,46 @@ export default function UserProfilePage() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[tw`flex-1 justify-center items-center`, { backgroundColor: Colors.background.secondary }]}>
-        <View style={tw`items-center`}>
-          <ActivityIndicator size="large" color={Colors.primary.blue} />
-          <Text style={[tw`mt-4 text-base`, { color: Colors.text.secondary }]}>Loading profile...</Text>
-        </View>
-        <Navbar activeTab="profile" />
-      </SafeAreaView>
+        <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]}>
+          <View style={tw`flex-1 justify-center items-center px-4`}>
+            <View style={tw`items-center`}>
+              <ActivityIndicator size="large" color={Colors.primary.blue} />
+              <Text style={[tw`mt-4 text-base`, { color: Colors.text.secondary }]}>Loading profile...</Text>
+            </View>
+          </View>
+          <Navbar activeTab="profile" />
+          <SidebarWrapper />
+        </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]}>
-        <View style={tw`flex-1 justify-center items-center px-4`}>
-          <View style={tw`items-center`}>
-            <Text style={tw`text-red-600 text-center text-lg font-bold mb-2`}>Error Loading Profile</Text>
-            <Text style={tw`text-red-600 text-center text-sm`}>{error}</Text>
-            <TouchableOpacity 
-              style={tw`mt-4 px-6 py-3 bg-red-600 rounded-lg`}
-              onPress={() => {
-                setError(null);
-                fetchUserProfile();
-              }}
-            >
-              <Text style={tw`text-white text-center font-medium`}>Retry</Text>
-            </TouchableOpacity>
+        <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]}>
+          <View style={tw`flex-1 justify-center items-center px-4`}>
+            <View style={tw`items-center`}>
+              <Text style={tw`text-red-600 text-center text-lg font-bold mb-2`}>Error Loading Profile</Text>
+              <Text style={tw`text-red-600 text-center text-sm`}>{error}</Text>
+              <TouchableOpacity 
+                style={tw`mt-4 px-6 py-3 bg-red-600 rounded-lg`}
+                onPress={() => {
+                  setError(null);
+                  fetchUserProfile();
+                }}
+              >
+                <Text style={tw`text-white text-center font-medium`}>Retry</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-        <Navbar activeTab="profile" />
-      </SafeAreaView>
+          <Navbar activeTab="profile" />
+          <SidebarWrapper />
+        </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]}>
-      <Header variant="default" title="Profile" showSettings={false} />
+      <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]}>
+        <Header variant="default" title="Profile" showSettings={false} showMenu={true} />
       
       <ScrollView 
         style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]} 
@@ -368,6 +373,7 @@ export default function UserProfilePage() {
       </ScrollView>
 
       <Navbar activeTab="profile" />
+      <SidebarWrapper />
     </SafeAreaView>
   );
 }

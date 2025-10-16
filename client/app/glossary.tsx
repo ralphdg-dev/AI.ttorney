@@ -22,7 +22,7 @@ import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
-import { SidebarProvider, SidebarWrapper } from "@/components/AppSidebar";
+import { SidebarWrapper } from "@/components/AppSidebar";
 import { useLegalArticles } from "@/hooks/useLegalArticles";
 import {
   CacheService,
@@ -546,7 +546,6 @@ export default function GlossaryScreen() {
   }, [activeTab, handleItemPress, handleToggleBookmark, numColumns, screenWidth, horizontalPadding]);
 
   return (
-    <SidebarProvider>
       <View className="flex-1 bg-gray-50">
         <Header title="Know Your Batas" showMenu={true} />
 
@@ -613,6 +612,5 @@ export default function GlossaryScreen() {
         <Navbar activeTab="learn" />
         <SidebarWrapper />
       </View>
-    </SidebarProvider>
   );
 }

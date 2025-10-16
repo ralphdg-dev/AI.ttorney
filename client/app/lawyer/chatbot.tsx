@@ -5,6 +5,7 @@ import Colors from '../../constants/Colors';
 import { Ionicons } from "@expo/vector-icons";
 import Header from "../../components/Header";
 import LawyerNavbar from "../../components/lawyer/LawyerNavbar";
+import { SidebarWrapper } from "../../components/AppSidebar";
 
 // Replace with your lawyer-specific logo if needed
 const lawyerLogo = require("../../assets/images/logo.png");
@@ -149,6 +150,7 @@ export default function LawyerChatbotScreen() {
             </TouchableOpacity>
           </View>
           <LawyerNavbar activeTab="chatbot" />
+          <SidebarWrapper />
         </View>
     );
   }
@@ -216,6 +218,7 @@ export default function LawyerChatbotScreen() {
           </View>
         </KeyboardAvoidingView>
         <LawyerNavbar activeTab="chatbot" />
+        <SidebarWrapper />
       </View>
   );
 }

@@ -4,10 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import tw from "tailwind-react-native-classnames";
 import Header from "../components/Header";
 import Navbar from "../../client/components/Navbar";
-import {
-  SidebarProvider,
-  SidebarWrapper,
-} from "../../client/components/AppSidebar";
+import { SidebarWrapper } from "../components/AppSidebar";
 import Colors from "../constants/Colors";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../config/supabase";
@@ -110,7 +107,8 @@ export default function ConsultationsScreen() {
     } else {
       setLoading(false); // Stop loading if not authenticated
     }
-  }, [authLoading, isAuthenticated, user?.id, fetchConsultations]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, user?.id]); // fetchConsultations is stable
 
   // Also fetch when screen comes into focus (for navigation)
   useFocusEffect(
@@ -118,7 +116,8 @@ export default function ConsultationsScreen() {
       if (!authLoading && isAuthenticated && user?.id) {
         fetchConsultations();
       }
-    }, [authLoading, isAuthenticated, user?.id, fetchConsultations])
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authLoading, isAuthenticated, user?.id]) // fetchConsultations is stable
   );
 
   const openDetailsModal = (consultation: Consultation) => {
@@ -175,7 +174,6 @@ export default function ConsultationsScreen() {
     return filtered;
   }, [activeFilter, searchQuery, consultations]);
   return (
-    <SidebarProvider>
       <View style={tw`flex-1 bg-gray-50`}>
         <Header title="My Consultations" showMenu={true} />
         
@@ -244,6 +242,5 @@ export default function ConsultationsScreen() {
         <Navbar />
         <SidebarWrapper />
       </View>
-    </SidebarProvider>
   );
 }
