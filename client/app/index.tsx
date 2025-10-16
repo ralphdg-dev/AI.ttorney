@@ -21,7 +21,7 @@ export default function SplashScreen() {
       
       // Wait for auth to be determined
       if (!isLoading && initialAuthCheck) {
-        let targetPath = "/onboarding/onboarding"; // Default for unauthenticated users
+        let targetPath = "/login"; // Default to login page for unauthenticated users
         
         if (isAuthenticated && user) {
           // User is authenticated, redirect to appropriate dashboard

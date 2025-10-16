@@ -1,13 +1,12 @@
+import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
-import { useState } from "react";
 import Colors from "../constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import logo from "../assets/images/logo.png";
 import { useToast, Toast, ToastTitle, ToastDescription } from "../components/ui/toast";
 import { useAuth } from "../contexts/AuthContext";
- 
 
 export default function Login() {
   const toast = useToast();
@@ -23,87 +22,75 @@ export default function Login() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
+
   // Validation functions
-  const validateEmail = (emailValue: string) => {
-    setEmailError("");
-    
+  const validateEmail = (emailValue: string, showError: boolean = true) => {
     if (!emailValue) {
-      setEmailError("Email is required");
+      if (showError) setEmailError("Email is required");
       return false;
     }
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailValue)) {
-      setEmailError("Please enter a valid email address");
+      if (showError) setEmailError("Invalid email format");
       return false;
     }
     
+    setEmailError("");
     return true;
   };
   
-  const validatePassword = (passwordValue: string) => {
-    setPasswordError("");
-    
+  const validatePassword = (passwordValue: string, showError: boolean = true) => {
     if (!passwordValue) {
-      setPasswordError("Password is required");
+      if (showError) setPasswordError("Password is required");
       return false;
     }
     
     if (passwordValue.length < 6) {
-      setPasswordError("Password must be at least 6 characters");
+      if (showError) setPasswordError("Must be at least 6 characters");
       return false;
     }
     
+    setPasswordError("");
     return true;
   };
   
   const handleLogin = async () => {
     // Validate inputs
-    const isEmailValid = validateEmail(email);
-    const isPasswordValid = validatePassword(password);
+    const isEmailValid = validateEmail(email, true);
+    const isPasswordValid = validatePassword(password, true);
     
     if (!isEmailValid || !isPasswordValid) {
-      toast.show({
-        placement: "top",
-        render: ({ id }) => (
-          <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-            <ToastTitle size="md">Validation Error</ToastTitle>
-            <ToastDescription size="sm">Please fix the errors in the form</ToastDescription>
-          </Toast>
-        ),
-      });
       return;
     }
 
     setIsLoading(true);
     
     try {
-      // Use AuthContext signIn method with Supabase Auth
       const result = await signIn(email.toLowerCase().trim(), password);
 
       if (result.success) {
-        // Show success toast
         toast.show({
           placement: "top",
           render: ({ id }) => (
             <Toast nativeID={id} action="success" variant="solid" className="mt-12">
-              <ToastTitle size="md">Login Successful</ToastTitle>
-              <ToastDescription size="sm">Welcome back! Redirecting...</ToastDescription>
+              <ToastTitle size="md">Welcome back!</ToastTitle>
+              <ToastDescription size="sm">Redirecting...</ToastDescription>
             </Toast>
           ),
         });
-        // Navigation is handled by AuthContext
       } else {
-        // Handle login errors
+        // Stay on login page and show error
         toast.show({
           placement: "top",
           render: ({ id }) => (
             <Toast nativeID={id} action="error" variant="solid" className="mt-12">
               <ToastTitle size="md">Login Failed</ToastTitle>
-              <ToastDescription size="sm">{result.error || "Invalid credentials"}</ToastDescription>
+              <ToastDescription size="sm">{result.error || "Invalid email or password"}</ToastDescription>
             </Toast>
           ),
         });
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -111,12 +98,11 @@ export default function Login() {
         placement: "top",
         render: ({ id }) => (
           <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-            <ToastTitle size="md">Network Error</ToastTitle>
-            <ToastDescription size="sm">Please check your connection and try again</ToastDescription>
+            <ToastTitle size="md">Connection Error</ToastTitle>
+            <ToastDescription size="sm">Please check your internet connection</ToastDescription>
           </Toast>
         ),
       });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -171,15 +157,17 @@ export default function Login() {
                   borderWidth: emailError ? 2 : 1,
                 },
               ]}
-              placeholder="Your email"
+              placeholder="your.email@example.com"
               placeholderTextColor="#9CA3AF"
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
-                if (emailError) setEmailError(""); // Clear error on input
+                if (emailError) setEmailError("");
               }}
+              onBlur={() => email && validateEmail(email, true)}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
             />
             {emailError ? (
               <Text style={[tw`text-sm mt-1`, { color: '#ef4444' }]}>
@@ -203,15 +191,17 @@ export default function Login() {
                     borderWidth: passwordError ? 2 : 1,
                   },
                 ]}
-                placeholder="Your password"
+                placeholder="Enter your password"
                 placeholderTextColor="#9CA3AF"
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
-                  if (passwordError) setPasswordError(""); // Clear error on input
+                  if (passwordError) setPasswordError("");
                 }}
+                onBlur={() => password && validatePassword(password, true)}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
+                autoCorrect={false}
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}

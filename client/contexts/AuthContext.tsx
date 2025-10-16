@@ -177,7 +177,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Listen for auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event: string, session: any) => {
-            
             if (event === 'SIGNED_IN' && session) {
               await handleAuthStateChange(session, true);
             } else if (event === 'TOKEN_REFRESHED' && session) {
@@ -221,18 +220,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Sign in error:', error.message);
-        return { success: false, error: error.message };
+        
+        // Map Supabase errors to user-friendly messages
+        let errorMessage = 'Invalid email or password';
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Invalid email or password';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Please verify your email address';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error. Please check your connection';
+        }
+        
+        // Don't call handleAuthStateChange on error - let the listener handle it
+        return { success: false, error: errorMessage };
       }
 
       if (data.session) {
+        // The onAuthStateChange listener will handle navigation
+        // We just need to wait for it to complete
         await handleAuthStateChange(data.session, true);
         return { success: true };
       }
 
-      return { success: false, error: 'No session created' };
+      return { success: false, error: 'Login failed. Please try again' };
     } catch (error: any) {
       console.error('Sign in catch:', error);
-      return { success: false, error: error.message || 'Network error' };
+      return { success: false, error: 'Network error. Please check your connection' };
     } finally {
       setIsLoading(false);
     }

@@ -33,6 +33,11 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       const isRegistrationPage = currentPath === '/onboarding/registration';
       
       if (isLoginPage || isRegistrationPage) {
+        // Only redirect if user has a valid role (not guest without verification)
+        if (user.role === 'guest' && !user.is_verified) {
+          return;
+        }
+        
         // Redirect authenticated users away from login/registration
         const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
         logRouteAccess(currentPath, user, 'denied', 'Already authenticated');

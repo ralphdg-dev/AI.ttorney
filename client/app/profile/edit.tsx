@@ -42,12 +42,14 @@ interface ApiRequestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   endpoint: string;
   body?: any;
+  timeout?: number;
 }
 
 // Constants
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 const DEFAULT_PROFILE_PHOTO = "";
-const REQUEST_TIMEOUT_MS = 5000;
+const DEFAULT_TIMEOUT_MS = 10000; // 10 seconds default
+const EMAIL_TIMEOUT_MS = 20000; // 20 seconds for email operations
 
 // Common styling utilities
 const cardStyle = {
@@ -63,7 +65,7 @@ const sectionHeaderStyle = {
 };
 
 // Helper function to make API requests with timeout
-const makeApiRequest = async ({ method, endpoint, body }: ApiRequestOptions): Promise<Response> => {
+const makeApiRequest = async ({ method, endpoint, body, timeout = DEFAULT_TIMEOUT_MS }: ApiRequestOptions): Promise<Response> => {
   const { data: { session } } = await supabase.auth.getSession();
   
   if (!session?.access_token) {
@@ -71,7 +73,7 @@ const makeApiRequest = async ({ method, endpoint, body }: ApiRequestOptions): Pr
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -127,6 +129,7 @@ export default function EditProfilePage() {
   const [newEmail, setNewEmail] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [usernameChecking, setUsernameChecking] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [usernameError, setUsernameError] = useState<string>("");
@@ -142,6 +145,18 @@ export default function EditProfilePage() {
       editFormData.username !== profileData.username ||
       editFormData.birthdate !== profileData.birthdate
     );
+  };
+
+  // Check if save button should be enabled
+  const canSave = () => {
+    if (!hasChanges()) return false;
+    
+    // If email changed, must be verified
+    if (editFormData.email !== profileData.email && !emailVerified) {
+      return false;
+    }
+    
+    return true;
   };
 
   // Load profile data on mount
@@ -166,10 +181,41 @@ export default function EditProfilePage() {
   }, [user]);
 
   const handleCancel = () => {
-    if (router.canGoBack()) {
-      router.back();
+    // Check if there are unsaved changes
+    if (hasChanges() || emailVerified) {
+      Alert.alert(
+        "Discard Changes?",
+        "You have unsaved changes. Are you sure you want to discard them?",
+        [
+          {
+            text: "Keep Editing",
+            style: "cancel"
+          },
+          {
+            text: "Discard",
+            style: "destructive",
+            onPress: () => {
+              // Reset verification state
+              setEmailVerified(false);
+              setNewEmail("");
+              
+              // Navigate back
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.push('/profile');
+              }
+            }
+          }
+        ]
+      );
     } else {
-      router.push('/profile');
+      // No changes, just go back
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.push('/profile');
+      }
     }
   };
 
@@ -290,20 +336,20 @@ export default function EditProfilePage() {
       const response = await makeApiRequest({
         method: 'POST',
         endpoint: '/api/user/send-email-change-otp',
-        body: { new_email: editFormData.email }
+        body: { new_email: editFormData.email },
+        timeout: EMAIL_TIMEOUT_MS
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ detail: 'Server error' }));
         throw new Error(errorData.detail || 'Failed to send OTP');
       }
 
       setNewEmail(editFormData.email);
       setShowOTPModal(true);
-      console.log("OTP Modal should be visible now. showOTPModal:", true, "newEmail:", editFormData.email);
       
       toast.show({
-        placement: "bottom",
+        placement: "top",
         duration: 3000,
         render: ({ id }) => (
           <Toast nativeID={`toast-${id}`} action="success" variant="solid">
@@ -316,7 +362,8 @@ export default function EditProfilePage() {
       });
     } catch (error: any) {
       console.error("Send OTP error:", error);
-      Alert.alert("Error", error.message || "Failed to send OTP");
+      const errorMessage = error.message || "Failed to send OTP. Please check your connection and try again.";
+      Alert.alert("Error", errorMessage);
     } finally {
       setOtpLoading(false);
     }
@@ -338,7 +385,8 @@ export default function EditProfilePage() {
         body: { 
           new_email: newEmail,
           otp_code: otpCode 
-        }
+        },
+        timeout: EMAIL_TIMEOUT_MS
       });
 
       if (!response.ok) {
@@ -346,12 +394,23 @@ export default function EditProfilePage() {
         throw new Error(errorData.detail || 'Invalid OTP code');
       }
 
-      // OTP verified, now update profile with new email
-      await confirmSave();
-      
+      // Mark email as verified
+      setEmailVerified(true);
       setShowOTPModal(false);
       setOtpCode("");
-      setNewEmail("");
+      
+      toast.show({
+        placement: "top",
+        duration: 2000,
+        render: ({ id }) => (
+          <Toast nativeID={`toast-${id}`} action="success" variant="solid">
+            <VStack space="xs">
+              <ToastTitle>Email Verified!</ToastTitle>
+              <ToastDescription>You can now save your changes.</ToastDescription>
+            </VStack>
+          </Toast>
+        ),
+      });
     } catch (error: any) {
       console.error("Verify OTP error:", error);
       setOtpError(error.message || "Invalid OTP code");
@@ -383,6 +442,15 @@ export default function EditProfilePage() {
   const handleSave = async () => {
     if (!validateForm()) return;
     
+    // Check if email changed but not verified
+    if (editFormData.email !== profileData.email && !emailVerified) {
+      Alert.alert(
+        "Email Verification Required", 
+        "Please verify your new email address by clicking 'Send OTP' and entering the verification code."
+      );
+      return;
+    }
+    
     // Check username validation if changed
     if (editFormData.username !== profileData.username) {
       if (usernameChecking) {
@@ -409,7 +477,7 @@ export default function EditProfilePage() {
         body: {
           full_name: editFormData.full_name,
           username: editFormData.username,
-          email: newEmail || editFormData.email, // Use verified email if OTP was completed
+          email: emailVerified ? newEmail : profileData.email, // Only update if verified
           birthdate: editFormData.birthdate,
         }
       });
@@ -421,7 +489,7 @@ export default function EditProfilePage() {
 
       // Show success toast
       toast.show({
-        placement: "bottom",
+        placement: "top",
         duration: 3000,
         render: ({ id }) => (
           <Toast nativeID={`toast-${id}`} action="success" variant="solid">
@@ -436,9 +504,13 @@ export default function EditProfilePage() {
       // Update local state
       setProfileData({
         ...editFormData,
-        email: newEmail || editFormData.email,
+        email: emailVerified ? newEmail : profileData.email,
         profile_photo: editFormData.profile_photo || DEFAULT_PROFILE_PHOTO,
       });
+
+      // Reset email verification state
+      setEmailVerified(false);
+      setNewEmail("");
 
       // Refresh user data in context
       await refreshUserData();
@@ -484,19 +556,19 @@ export default function EditProfilePage() {
           style={[
             tw`px-6 py-3 rounded-lg flex-row items-center`,
             { 
-              backgroundColor: hasChanges() && !isSaving ? Colors.primary.blue : '#D1D5DB',
-              opacity: hasChanges() && !isSaving ? 1 : 0.6
+              backgroundColor: canSave() && !isSaving ? Colors.primary.blue : '#D1D5DB',
+              opacity: canSave() && !isSaving ? 1 : 0.6
             },
           ]}
           onPress={handleSave}
-          disabled={isSaving || !hasChanges()}
+          disabled={isSaving || !canSave()}
         >
           {isSaving ? (
             <ActivityIndicator size="small" color="white" />
           ) : (
             <>
-              <Save size={16} color={hasChanges() ? "white" : "#6B7280"} />
-              <Text style={[tw`font-semibold text-sm ml-2`, { color: hasChanges() ? Colors.text.white : '#6B7280' }]}>Save</Text>
+              <Save size={16} color={canSave() ? "white" : "#6B7280"} />
+              <Text style={[tw`font-semibold text-sm ml-2`, { color: canSave() ? Colors.text.white : '#6B7280' }]}>Save</Text>
             </>
           )}
         </TouchableOpacity>
@@ -619,6 +691,9 @@ export default function EditProfilePage() {
                 value={editFormData.email}
                 onChangeText={(text: string) => {
                   setEditFormData(prev => ({ ...prev, email: text }));
+                  // Reset verification when email changes
+                  setEmailVerified(false);
+                  setNewEmail("");
                   // Debounce email check
                   if (text && text !== profileData.email) {
                     setTimeout(() => checkEmailAvailability(text), 500);
@@ -668,7 +743,13 @@ export default function EditProfilePage() {
                 <Text style={tw`text-blue-600 text-sm`}>Checking availability...</Text>
               </View>
             )}
-            {!emailChecking && emailAvailable === true && (
+            {emailVerified && (
+              <View style={tw`flex-row items-center mt-2`}>
+                <View style={tw`w-2 h-2 rounded-full bg-green-500 mr-2`} />
+                <Text style={tw`text-green-600 text-sm font-medium`}>✓ Email verified - ready to save</Text>
+              </View>
+            )}
+            {!emailVerified && !emailChecking && emailAvailable === true && (
               <View style={tw`flex-row items-center mt-2`}>
                 <View style={tw`w-2 h-2 rounded-full bg-green-500 mr-2`} />
                 <Text style={tw`text-green-600 text-sm font-medium`}>{emailError || "Email is available"}</Text>
