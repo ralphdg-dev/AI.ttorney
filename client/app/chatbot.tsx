@@ -63,6 +63,55 @@ export default function ChatbotScreen() {
     }
   }, [messages]);
 
+  // Helper function to render legal disclaimer with clickable links
+  const renderLegalDisclaimer = (disclaimer: string) => {
+    // Parse markdown links [text](/path) and make them clickable
+    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    const parts: Array<{ text: string; isLink: boolean; path?: string }> = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = linkRegex.exec(disclaimer)) !== null) {
+      // Add text before the link
+      if (match.index > lastIndex) {
+        parts.push({ text: disclaimer.substring(lastIndex, match.index), isLink: false });
+      }
+      // Add the link
+      parts.push({ text: match[1], isLink: true, path: match[2] });
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < disclaimer.length) {
+      parts.push({ text: disclaimer.substring(lastIndex), isLink: false });
+    }
+
+    return (
+      <Text style={tw`text-xs text-gray-600 italic`}>
+        {parts.map((part, index) => 
+          part.isLink ? (
+            <Text
+              key={index}
+              style={tw`text-blue-600 underline`}
+              onPress={() => {
+                // Navigate to in-app route
+                if (part.path) {
+                  // Use router navigation for in-app links
+                  const router = require('expo-router').router;
+                  router.push(part.path);
+                }
+              }}
+            >
+              {part.text}
+            </Text>
+          ) : (
+            <Text key={index}>{part.text}</Text>
+          )
+        )}
+      </Text>
+    );
+  };
+
   const sendMessage = async () => {
     if (!input.trim()) return;
     
@@ -194,10 +243,11 @@ export default function ChatbotScreen() {
             <Text
               style={[
                 tw`text-base`,
-                isUser ? tw`text-white` : tw`text-gray-800`,
               ]}
             >
-              {item.text}
+              <Text style={[tw`text-sm leading-relaxed`, isUser ? tw`text-white` : tw`text-gray-800`]}>
+                {item.text}
+              </Text>
             </Text>
             {!isUser && item.confidence && (
               <View style={tw`mt-2`}>
@@ -244,9 +294,7 @@ export default function ChatbotScreen() {
             {/* Legal disclaimer */}
             {!isUser && item.legal_disclaimer && (
               <View style={tw`mt-3 pt-2 border-t border-gray-300`}>
-                <Text style={tw`text-xs text-gray-600 italic`}>
-                  {item.legal_disclaimer}
-                </Text>
+                {renderLegalDisclaimer(item.legal_disclaimer)}
               </View>
             )}
 

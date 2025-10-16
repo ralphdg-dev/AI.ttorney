@@ -454,6 +454,13 @@ If a question is about ANY other topic (politics, religion, personal life, finan
 - Always add a gentle reminder to talk to a real lawyer for personal situations
 - Keep responses conversational and helpful
 
+📝 FORMATTING FOR READABILITY:
+- Break long answers into SHORT paragraphs (2-3 sentences max per paragraph)
+- Use line breaks between paragraphs for better readability
+- Start with a simple explanation, then add examples
+- Don't write huge blocks of text - keep it scannable
+- Make it easy to read on mobile devices
+
 🚫 WHAT TO AVOID:
 - Don't use robotic or formal language
 - Don't mention "confidence levels" or "AI model"
@@ -525,6 +532,13 @@ Kung ang tanong ay tungkol sa IBANG paksa (pulitika, relihiyon, personal na buha
 - Banggitin ang mga partikular na batas at artikulo kasama ang kanilang website links nang natural kung relevant
 - Palaging magdagdag ng banayad na paalala na kausapin ang tunay na abogado para sa personal na sitwasyon
 - Panatilihing conversational at matulungin ang mga sagot
+
+📝 FORMATTING PARA SA READABILITY:
+- Hatiin ang mahabang sagot sa MAIKLING paragraphs (2-3 sentences max per paragraph)
+- Gumamit ng line breaks sa pagitan ng paragraphs para mas madaling basahin
+- Magsimula sa simple explanation, tapos magdagdag ng examples
+- Huwag magsulat ng malalaking blocks ng text - gawing scannable
+- Gawing madaling basahin sa mobile devices
 
 🚫 ANO ANG IIWASAN:
 - Huwag gumamit ng robotic o formal na lengguwahe
@@ -729,14 +743,96 @@ Gawing varied at natural, hindi robotic. Ipakita na attentive ka sa kanilang sty
         return "Hey there! I'm Ai.ttorney, your legal assistant for Philippine law. Got any questions?"
 
 
+def generate_out_of_scope_response(question: str, topic_type: str, language: str) -> str:
+    """
+    Generate natural, varied responses for out-of-scope topics using AI
+    """
+    try:
+        # Create a smart prompt for AI to generate contextual decline responses
+        decline_prompt = f"""You are Ai.ttorney, a friendly Philippine legal assistant. The user just asked: "{question}"
+
+This question is about {topic_type} topics, which is OUTSIDE your scope. You can ONLY help with:
+- Civil Law
+- Criminal Law
+- Consumer Law
+- Family Law
+- Labor Law
+
+Respond in a natural, friendly way that:
+1. Politely declines to answer the question
+2. Explains you can only help with the five legal domains
+3. Matches their language style ({language})
+4. Shows empathy and understanding
+5. Invites them to ask legal questions instead
+6. Feels conversational, NOT robotic
+
+Keep it brief but warm - like a friend explaining their limitations.
+
+Examples of good responses:
+- For "sino dapat iboto ko": "Ay sorry tropa, hindi ako makakatulong sa political questions eh. Ang expertise ko lang talaga ay sa legal matters - Civil, Criminal, Consumer, Family, at Labor Law. May legal topics ka bang gustong malaman?"
+- For "who should I vote for": "Hey, I'd love to help but political advice isn't my thing! I'm all about Philippine law - Civil, Criminal, Consumer, Family, and Labor. Got any legal questions instead?"
+- For financial questions: "Pasensya na, hindi ako financial advisor. Ang specialty ko ay legal matters lang - batas tungkol sa Civil, Criminal, Consumer, Family, at Labor. May legal tanong ka ba?"
+
+Make it varied and natural, not robotic. Show personality!"""
+
+        if language == "tagalog":
+            decline_prompt = f"""Ikaw si Ai.ttorney, isang friendly na Philippine legal assistant. Ang user ay nagtanong: "{question}"
+
+Ang tanong na ito ay tungkol sa {topic_type} topics, na WALA sa iyong scope. Makakatulong ka LAMANG sa:
+- Civil Law
+- Criminal Law
+- Consumer Law
+- Family Law
+- Labor Law
+
+Sumagot nang natural at friendly na:
+1. Magalang na tumanggi sa tanong
+2. Ipaliwanag na makakatulong ka lang sa limang legal domains
+3. I-match ang kanilang language style ({language})
+4. Magpakita ng empathy at pag-unawa
+5. Imbitahan silang magtanong ng legal questions
+6. Parang kausap ang kaibigan, HINDI robot
+
+Panatilihing maikli pero mainit - parang kaibigang nagpapaliwanag ng kanilang limitations.
+
+Mga halimbawa ng magandang responses:
+- Para sa "sino dapat iboto ko": "Ay sorry tropa, hindi ako makakatulong sa political questions eh. Ang expertise ko lang talaga ay sa legal matters - Civil, Criminal, Consumer, Family, at Labor Law. May legal topics ka bang gustong malaman?"
+- Para sa financial questions: "Pasensya na, hindi ako financial advisor. Ang specialty ko ay legal matters lang - batas tungkol sa Civil, Criminal, Consumer, Family, at Labor. May legal tanong ka ba?"
+
+Gawing varied at natural, hindi robotic. Magpakita ng personality!"""
+
+        messages = [
+            {"role": "system", "content": decline_prompt},
+            {"role": "user", "content": "Generate a natural decline response."}
+        ]
+
+        response = openai_client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=messages,
+            max_tokens=150,
+            temperature=0.8,  # Higher temperature for more varied responses
+        )
+
+        result = response.choices[0].message.content
+        return result.strip() if result else "Sorry, I can only help with Civil, Criminal, Consumer, Family, and Labor Law."
+
+    except Exception as e:
+        print(f"Error generating out-of-scope response: {e}")
+        # Fallback to simple response if AI fails
+        if language == "tagalog":
+            return "Pasensya na, ang maitutulong ko lang ay tungkol sa Civil, Criminal, Consumer, Family, at Labor Law."
+        else:
+            return "Sorry, I can only help with Civil, Criminal, Consumer, Family, and Labor Law."
+
+
 def get_legal_disclaimer(language: str) -> str:
     """
-    Get legal disclaimer in appropriate language with legal directory link
+    Get legal disclaimer in appropriate language with in-app legal help link
     """
     disclaimers = {
-        "english": "⚖️ Important: This is general legal information only, not legal advice. For your specific situation, you can consult with a licensed Philippine lawyer through our Legal Directory: https://ai-ttorney.com/legal-directory",
-        "tagalog": "⚖️ Mahalaga: Ito ay pangkalahatang impormasyon lamang, hindi legal advice. Para sa iyong partikular na sitwasyon, maaari kang kumonsulta sa lisensyadong abogado sa aming Legal Directory: https://ai-ttorney.com/legal-directory",
-        "taglish": "⚖️ Important: Ito ay general legal information lang, hindi legal advice. Para sa iyong specific situation, you can consult with a licensed Philippine lawyer sa aming Legal Directory: https://ai-ttorney.com/legal-directory"
+        "english": "⚖️ Important: This is general legal information only, not legal advice. For your specific situation, you can consult with a licensed Philippine lawyer through our [Legal Help](/legal-help) section.",
+        "tagalog": "⚖️ Mahalaga: Ito ay pangkalahatang impormasyon lamang, hindi legal advice. Para sa iyong partikular na sitwasyon, maaari kang kumonsulta sa lisensyadong abogado sa aming [Legal Help](/legal-help) section.",
+        "taglish": "⚖️ Important: Ito ay general legal information lang, hindi legal advice. Para sa iyong specific situation, you can consult with a licensed Philippine lawyer sa aming [Legal Help](/legal-help) section."
     }
     return disclaimers.get(language, disclaimers["english"])
 
@@ -850,11 +946,12 @@ async def ask_legal_question(request: ChatRequest):
         # Check if question is about out-of-scope topics (politics, finance, medicine, etc.)
         is_out_of_scope, topic_type = is_out_of_scope_topic(request.question)
         if is_out_of_scope:
-            language = detect_language(request.question)
-            if language == "tagalog":
-                out_of_scope_response = "Pasensya na, ang maitutulong ko lang ay tungkol sa Civil, Criminal, Consumer, Family, at Labor Law. Para sa ibang paksa, hindi ako makakapagbigay ng impormasyon."
-            else:
-                out_of_scope_response = "Sorry, I can only provide information about Civil, Criminal, Consumer, Family, and Labor Law. I can't help with other topics."
+            # Generate natural, varied decline response using AI
+            out_of_scope_response = generate_out_of_scope_response(
+                request.question, 
+                topic_type, 
+                detect_language(request.question)
+            )
             
             return ChatResponse(
                 answer=out_of_scope_response,
