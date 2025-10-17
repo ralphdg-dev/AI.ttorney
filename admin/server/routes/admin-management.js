@@ -247,8 +247,8 @@ router.post('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
       user_metadata: {
         full_name: full_name.trim(),
         role: role,
-        created_by: req.admin.email, // Track who created this admin
-        created_at: new Date().toISOString()
+        created_by: req.admin.email // Track who created this admin
+        // created_at handled by database with Asia/Manila timezone
       }
     });
 
@@ -269,8 +269,8 @@ router.post('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
           email: email.toLowerCase(),
           full_name: full_name.trim(),
           role: role,
-          is_verified: true, // Admins are automatically verified
-          created_at: new Date().toISOString()
+          is_verified: true // Admins are automatically verified
+          // created_at handled by database with Asia/Manila timezone
         });
       userError = error;
     } catch (err) {
@@ -301,8 +301,8 @@ router.post('/', authenticateAdmin, requireSuperAdmin, async (req, res) => {
         email: email.toLowerCase(),
         full_name: full_name.trim(),
         role: role,
-        status: status,
-        created_at: new Date().toISOString()
+        status: status
+        // created_at handled by database with Asia/Manila timezone
       })
       .select()
       .single();
@@ -392,12 +392,12 @@ router.patch('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
       });
     }
 
-    // Update admin with new status and updated_at timestamp
+    // Update admin with new status (updated_at handled by database)
     const { data: updatedAdmin, error: updateError } = await supabaseAdmin
       .from('admin')
       .update({
-        status: status,
-        updated_at: new Date().toISOString()
+        status: status
+        // updated_at handled by database with Asia/Manila timezone
       })
       .eq('id', id)
       .select()

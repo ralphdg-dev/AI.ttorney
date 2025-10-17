@@ -67,6 +67,7 @@ const StatusBadge = ({ status, isArchived = false }) => {
 
   return (
     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
+      {displayStatus}
     </span>
   );
 };
@@ -565,11 +566,12 @@ const ManageAdmins = () => {
       ),
       render: (row) => {
         const date = new Date(row.created_at);
-        return date.toLocaleDateString('en-US', {
+        return new Intl.DateTimeFormat('en-US', {
           month: 'short',
           day: 'numeric', 
-          year: 'numeric'
-        });
+          year: 'numeric',
+          timeZone: 'Asia/Manila'
+        }).format(date);
       }
     },
     { 
@@ -594,11 +596,12 @@ const ManageAdmins = () => {
       render: (row) => {
         if (!row.updated_at) return 'Never';
         const date = new Date(row.updated_at);
-        return date.toLocaleDateString('en-US', {
+        return new Intl.DateTimeFormat('en-US', {
           month: 'short',
           day: 'numeric', 
-          year: 'numeric'
-        });
+          year: 'numeric',
+          timeZone: 'Asia/Manila'
+        }).format(date);
       }
     },
     { 
@@ -644,16 +647,16 @@ const ManageAdmins = () => {
         } else if (diffInDays < 7) {
           return `${diffInDays}d ago`;
         } else {
-          return date.toLocaleDateString('en-US', {
+          return new Intl.DateTimeFormat('en-US', {
             month: 'short',
             day: 'numeric', 
             year: 'numeric',
-            timeZone: 'UTC'
-          });
+            timeZone: 'Asia/Manila'
+          }).format(date);
         }
       }
     },
-    {
+    { 
       key: 'status',
       header: 'Status',
       render: (row) => <StatusBadge status={row.status} isArchived={row.status === 'archived'} />,

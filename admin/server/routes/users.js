@@ -235,8 +235,8 @@ router.patch('/legal-seekers/:id/status', authenticateAdmin, async (req, res) =>
     const { data, error } = await supabaseAdmin
       .from('users')
       .update({ 
-        is_verified,
-        updated_at: new Date().toISOString()
+        is_verified
+        // updated_at handled by database with Asia/Manila timezone
       })
       .eq('id', id)
       .not('role', 'in', '("verified_lawyer","admin","superadmin")') // Only allow updates to legal seekers
@@ -296,8 +296,8 @@ router.delete('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
       .from('users')
       .update({ 
         role: 'guest',
-        is_verified: false,
-        updated_at: new Date().toISOString()
+        is_verified: false
+        // updated_at handled by database with Asia/Manila timezone
       })
       .eq('id', id)
       .select()
@@ -505,8 +505,8 @@ router.patch('/lawyers/:id/status', authenticateAdmin, async (req, res) => {
     const { data, error } = await supabaseAdmin
       .from('users')
       .update({ 
-        is_verified,
-        updated_at: new Date().toISOString()
+        is_verified
+        // updated_at handled by database with Asia/Manila timezone
       })
       .eq('id', id)
       .eq('role', 'verified_lawyer')
@@ -552,7 +552,10 @@ router.patch('/legal-seekers/:id/archive', authenticateAdmin, async (req, res) =
     // Update the user's archived status (only for legal seekers)
     const { data, error } = await supabaseAdmin
       .from('users')
-      .update({ archived, updated_at: new Date().toISOString() })
+      .update({ 
+        archived
+        // updated_at handled by database with Asia/Manila timezone
+      })
       .eq('id', id)
       .not('role', 'in', '("verified_lawyer","admin","superadmin")') // Only allow archiving legal seekers
       .select()
@@ -820,8 +823,8 @@ router.patch('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
     const { data: updatedUser, error: updateError } = await supabaseAdmin
       .from('users')
       .update({
-        is_verified: is_verified,
-        updated_at: new Date().toISOString()
+        is_verified: is_verified
+        // updated_at handled by database with Asia/Manila timezone
       })
       .eq('id', id)
       .select()

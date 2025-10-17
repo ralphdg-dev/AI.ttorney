@@ -1,11 +1,12 @@
 import React from 'react';
-import { Book, Eye, Pencil, Archive } from 'lucide-react';
+import { Book, Eye, Pencil, Archive, Upload } from 'lucide-react';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import ViewTermModal from '../../components/glossary/ViewTermModal';
 import AddTermModal from '../../components/glossary/AddTermModal';
 import EditTermModal from '../../components/glossary/EditTermModal';
+import BulkUploadModal from '../../components/glossary/BulkUploadModal';
 import Pagination from '../../components/ui/Pagination';
 import { useToast } from '../../components/ui/Toast';
 import glossaryTermsService from '../../services/glossaryTermsService';
@@ -20,6 +21,7 @@ const ManageGlossaryTerms = () => {
   const [viewModalOpen, setViewModalOpen] = React.useState(false);
   const [addModalOpen, setAddModalOpen] = React.useState(false);
   const [editModalOpen, setEditModalOpen] = React.useState(false);
+  const [bulkUploadModalOpen, setBulkUploadModalOpen] = React.useState(false);
   const [selectedTerm, setSelectedTerm] = React.useState(null);
   const [terms, setTerms] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -181,6 +183,34 @@ const ManageGlossaryTerms = () => {
   // Handle add new term
   const handleAddNew = () => {
     setAddModalOpen(true);
+  };
+
+  // Handle bulk upload
+  const handleBulkUpload = () => {
+    setBulkUploadModalOpen(true);
+  };
+
+  // Handle bulk upload save
+  const handleBulkUploadSave = async (termsArray) => {
+    try {
+      showWarning(`Uploading ${termsArray.length} terms... This may take a moment.`);
+      
+      const response = await glossaryTermsService.bulkCreateGlossaryTerms(termsArray);
+      
+      if (response.success) {
+        showSuccess(`Successfully uploaded ${response.created} term(s)!`);
+        if (response.failed > 0) {
+          showWarning(`${response.failed} term(s) failed to upload. Check console for details.`);
+        }
+        await loadData();
+        setBulkUploadModalOpen(false);
+      } else {
+        throw new Error(response.error || 'Failed to upload terms');
+      }
+    } catch (err) {
+      console.error('Failed to bulk upload terms:', err);
+      showError('Failed to upload terms: ' + err.message);
+    }
   };
 
   // Handle save new term
@@ -355,33 +385,39 @@ const ManageGlossaryTerms = () => {
   // Helper function to format date
   const formatDate = (dateString) => {
     if (!dateString) return '-';
+    
+    // Parse the UTC date string and convert to Manila time
     const date = new Date(dateString);
-    return date.toLocaleString('en-US', { 
-      year: 'numeric', 
-      month: '2-digit', 
+    
+    // Format with Manila timezone
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
-    });
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Manila'
+    }).format(date);
   };
 
-  // Helper function to get category colors (matching client-side forum post colors)
-  const getCategoryColors = (category) => {
+  // Helper function to get category Tailwind classes
+  const getCategoryClasses = (category) => {
     switch ((category || '').toLowerCase()) {
       case 'family':
-        return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', textColor: '#BE123C' };
+        return 'bg-red-50 border-red-200 text-rose-700';
       case 'civil':
-        return { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE', textColor: '#7C3AED' };
+        return 'bg-violet-50 border-violet-200 text-violet-700';
       case 'criminal':
-        return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', textColor: '#DC2626' };
+        return 'bg-red-50 border-red-200 text-red-600';
       case 'labor':
-        return { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', textColor: '#1D4ED8' };
+        return 'bg-blue-50 border-blue-200 text-blue-700';
       case 'consumer':
-        return { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', textColor: '#047857' };
+        return 'bg-emerald-50 border-emerald-200 text-emerald-700';
       case 'others':
-        return { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', textColor: '#374151' };
+        return 'bg-gray-50 border-gray-200 text-gray-700';
       default:
-        return { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', textColor: '#374151' };
+        return 'bg-gray-50 border-gray-200 text-gray-700';
     }
   };
 
@@ -389,18 +425,11 @@ const ManageGlossaryTerms = () => {
   const renderCategoryBadge = (category) => {
     if (!category) return '-';
     
-    const colors = getCategoryColors(category);
+    const classes = getCategoryClasses(category);
     const displayText = category.charAt(0).toUpperCase() + category.slice(1);
     
     return (
-      <span 
-        className="inline-flex items-center px-2 py-1 rounded text-[10px] font-semibold border"
-        style={{
-          backgroundColor: colors.backgroundColor,
-          borderColor: colors.borderColor,
-          color: colors.textColor
-        }}
-      >
+      <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-semibold border ${classes}`}>
         {displayText}
       </span>
     );
@@ -544,13 +573,29 @@ const ManageGlossaryTerms = () => {
 
       {/* Toolbar */}
       <div className="w-full mb-3">
-        <ListToolbar
-          query={query}
-          onQueryChange={setQuery}
-          filter={{ value: category, onChange: setCategory, options: categories, label: 'Category' }}
-          sort={{ value: sortBy, onChange: setSortBy, options: ['Newest', 'Oldest', 'A-Z (English)', 'Z-A (English)', 'Most Viewed', 'Least Viewed'], label: 'Sort by' }}
-          primaryButton={{ label: 'Add New', onClick: handleAddNew, className: 'inline-flex items-center gap-1 bg-[#023D7B] text-white text-[11px] px-3 py-1.5 rounded-md hover:bg-[#013462]' }}
-        />
+        <div className="flex items-center gap-2">
+          <div className="flex-1">
+            <ListToolbar
+              query={query}
+              onQueryChange={setQuery}
+              filter={{ value: category, onChange: setCategory, options: categories, label: 'Category' }}
+              sort={{ value: sortBy, onChange: setSortBy, options: ['Newest', 'Oldest', 'A-Z (English)', 'Z-A (English)', 'Most Viewed', 'Least Viewed'], label: 'Sort by' }}
+            />
+          </div>
+          <button
+            onClick={handleBulkUpload}
+            className="inline-flex items-center gap-1.5 bg-white text-[#023D7B] border border-[#023D7B] text-[11px] px-3 py-1.5 rounded-md hover:bg-blue-50 whitespace-nowrap"
+          >
+            <Upload size={14} />
+            Bulk Upload CSV
+          </button>
+          <button
+            onClick={handleAddNew}
+            className="inline-flex items-center gap-1.5 bg-[#023D7B] text-white text-[11px] px-3 py-1.5 rounded-md hover:bg-[#013462] whitespace-nowrap"
+          >
+            Add New
+          </button>
+        </div>
       </div>
 
       {/* DataTable matching other admin pages */}
@@ -660,6 +705,13 @@ const ManageGlossaryTerms = () => {
         onClose={() => setEditModalOpen(false)}
         onSave={handleEditTermSave}
         term={selectedTerm}
+      />
+
+      {/* Bulk Upload Modal */}
+      <BulkUploadModal
+        open={bulkUploadModalOpen}
+        onClose={() => setBulkUploadModalOpen(false)}
+        onUpload={handleBulkUploadSave}
       />
 
       {/* Confirmation Modal */}

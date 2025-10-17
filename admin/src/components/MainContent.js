@@ -6,8 +6,8 @@ import ManageLegalSeekers from '../pages/users/ManageLegalSeekers';
 import ManageLawyers from '../pages/users/ManageLawyers';
 import ManageLawyerApplications from '../pages/users/ManageLawyerApplications';
 import ManageAdmins from '../pages/users/ManageAdmins';
-import ManageGlossaryTerms from '../pages/content/ManageGlossaryTerms';
-import ManageLegalArticles from '../pages/content/ManageLegalArticles';
+import ManageGlossaryTerms from '../pages/legal-resources/ManageGlossaryTerms';
+import ManageLegalArticles from '../pages/legal-resources/ManageLegalArticles';
 import Login from '../pages/auth/Login';
 import { getBreadcrumbForItem } from '../components/menuConfig';
 

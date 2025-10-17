@@ -544,11 +544,12 @@ const ManageLegalSeekers = () => {
       render: (row) => {
         if (!row.birthdate) return 'N/A';
         const date = new Date(row.birthdate);
-        return date.toLocaleDateString('en-US', {
+        return new Intl.DateTimeFormat('en-US', {
           month: 'short',
           day: 'numeric', 
-          year: 'numeric'
-        });
+          year: 'numeric',
+          timeZone: 'Asia/Manila'
+        }).format(date);
       }
     },
     { 
@@ -572,11 +573,12 @@ const ManageLegalSeekers = () => {
       ),
       render: (row) => {
         const date = new Date(row.registration_date);
-        return date.toLocaleDateString('en-US', {
+        return new Intl.DateTimeFormat('en-US', {
           month: 'short',
           day: 'numeric', 
-          year: 'numeric'
-        });
+          year: 'numeric',
+          timeZone: 'Asia/Manila'
+        }).format(date);
       }
     },
     {

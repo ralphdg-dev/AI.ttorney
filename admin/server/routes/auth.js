@@ -51,13 +51,12 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Update last updated timestamp
-    await supabaseAdmin
-      .from('admin')
-      .update({ 
-        updated_at: new Date().toISOString() 
-      })
-      .eq('id', admin.id);
+    // Update last updated timestamp (handled by database with Asia/Manila timezone)
+    // Note: This update is optional - remove if not needed
+    // await supabaseAdmin
+    //   .from('admin')
+    //   .update({})
+    //   .eq('id', admin.id);
 
     // Generate JWT token
     const token = jwt.sign(
