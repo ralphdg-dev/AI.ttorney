@@ -1,9 +1,11 @@
 import React from 'react';
-import { Users, Eye, Pencil, Archive, ArchiveRestore } from 'lucide-react';
+import { Users, Eye, Pencil, Archive, ArchiveRestore, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Loader2, XCircle, RefreshCw } from 'lucide-react';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import ViewLegalSeekerModal from '../../components/users/ViewLegalSeekerModal';
+import EditLegalSeekerModal from '../../components/users/EditLegalSeekerModal';
+import DataTable from '../../components/ui/DataTable';
 import Pagination from '../../components/ui/Pagination';
 import { useToast } from '../../components/ui/Toast';
 import usersService from '../../services/usersService';
@@ -37,9 +39,26 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+const LawyerApplicationBadge = ({ hasApplication }) => {
+  if (hasApplication === 'Yes') {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+        Yes
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-700 border border-gray-200">
+      No
+    </span>
+  );
+};
+
 const ManageLegalSeekers = () => {
   const { showSuccess, showError, showWarning, ToastContainer } = useToast();
   const [query, setQuery] = React.useState('');
+  const [debouncedQuery, setDebouncedQuery] = React.useState('');
+  const [combinedFilter, setCombinedFilter] = React.useState('Active');
   const [status, setStatus] = React.useState('All');
   const [sortBy, setSortBy] = React.useState('Newest');
   const [data, setData] = React.useState([]);
