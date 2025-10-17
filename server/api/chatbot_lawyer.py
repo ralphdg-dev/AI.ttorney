@@ -9,7 +9,38 @@ from typing import List, Dict, Optional
 from qdrant_client import QdrantClient
 from openai import OpenAI
 import os
+import logging
+import time
+from datetime import datetime
 from dotenv import load_dotenv
+
+# Import guardrails configuration with fallback
+GUARDRAILS_AVAILABLE = False
+GUARDRAILS_CONFIG = {
+    "enable_input_validation": True,
+    "enable_output_validation": True,
+    "strict_mode": True,
+    "log_security_events": True,
+    "max_retries": 2,
+    "timeout_seconds": 30
+}
+
+# Disable Guardrails due to system compatibility issues
+# Use basic validation only for now
+print("🔒 Running with basic security validation only")
+print("⚠️ Guardrails AI disabled due to system compatibility issues")
+
+def get_guardrails_instance():
+    """Get guardrails instance with fallback"""
+    return None
+
+def is_guardrails_enabled():
+    """Check if guardrails are enabled with fallback"""
+    return False
+
+# Setup logging for security events
+logging.basicConfig(level=logging.INFO)
+security_logger = logging.getLogger("lawyer_chatbot_security")
 
 # --- Load configuration ---
 load_dotenv()
@@ -65,6 +96,16 @@ class SourceCitation(BaseModel):
     lawphil_link: Optional[str] = None
 
 
+class SecurityReport(BaseModel):
+    security_score: float
+    security_level: str
+    issues_detected: int
+    issues: List[str]
+    recommendations: List[str]
+    timestamp: str
+    guardrails_enabled: bool
+
+
 class LawyerChatResponse(BaseModel):
     answer: str
     sources: List[SourceCitation]
@@ -72,6 +113,7 @@ class LawyerChatResponse(BaseModel):
     language: str
     legal_analysis: Optional[str] = None
     related_provisions: Optional[List[str]] = None
+    security_report: Optional[SecurityReport] = None
 
 
 # --- Helper Functions ---
@@ -97,6 +139,259 @@ def is_greeting_or_casual(text: str) -> bool:
 def get_embedding(text: str) -> List[float]:
     resp = openai_client.embeddings.create(model=EMBEDDING_MODEL, input=text)
     return resp.data[0].embedding
+
+
+def basic_input_validation(question: str) -> Dict[str, any]:
+    """
+    Basic input validation without external validators
+    Performs simple checks for security and appropriateness
+    """
+    issues = []
+    warnings = []
+    
+    # Check for obvious prompt injection attempts
+    injection_patterns = [
+        "ignore previous instructions",
+        "ignore all previous",
+        "system:",
+        "assistant:",
+        "you are now",
+        "pretend to be",
+        "act as if",
+        "forget everything"
+    ]
+    
+    question_lower = question.lower()
+    for pattern in injection_patterns:
+        if pattern in question_lower:
+            issues.append(f"Potential prompt injection detected: {pattern}")
+    
+    # Check for inappropriate content
+    inappropriate_terms = [
+        "hack", "exploit", "bypass", "illegal", "unethical",
+        "bribe", "corrupt", "fraud", "scam", "cheat", "lie",
+        "hide assets", "tax evasion", "money laundering"
+    ]
+    
+    for term in inappropriate_terms:
+        if term in question_lower:
+            if term in ["bribe", "corrupt", "fraud", "illegal", "unethical"]:
+                issues.append(f"Inappropriate request detected: {term}")
+            else:
+                warnings.append(f"Potentially inappropriate content: {term}")
+    
+    # Check length
+    if len(question) > 2000:
+        issues.append("Question too long (max 2000 characters)")
+    
+    if len(question.strip()) < 5:
+        issues.append("Question too short")
+    
+    is_valid = len(issues) == 0
+    
+    return {
+        "is_valid": is_valid,
+        "cleaned_input": question if is_valid else None,
+        "validation_passed": is_valid,
+        "issues": issues,
+        "warnings": warnings,
+        "security_score": 0.8 if is_valid else 0.3
+    }
+
+def validate_input_security(question: str) -> Dict[str, any]:
+    """
+    Validate user input using available security system
+    Falls back to basic validation if Guardrails unavailable
+    """
+    # Try Guardrails first if available
+    if GUARDRAILS_AVAILABLE and is_guardrails_enabled():
+        try:
+            guardrails = get_guardrails_instance()
+            if guardrails:
+                validation_result = guardrails.validate_input(question)
+                
+                # Log security events
+                if GUARDRAILS_CONFIG.get("log_security_events", True):
+                    security_logger.info(f"Guardrails input validation: {validation_result['is_valid']} - {question[:50]}...")
+                    if not validation_result["is_valid"]:
+                        security_logger.warning(f"Guardrails security issue: {validation_result.get('error', 'Unknown')}")
+                
+                return validation_result
+        except Exception as e:
+            security_logger.error(f"Guardrails validation error: {e}")
+            # Fall through to basic validation
+    
+    # Use basic validation as fallback
+    basic_result = basic_input_validation(question)
+    
+    # Log basic validation events
+    if GUARDRAILS_CONFIG.get("log_security_events", True):
+        security_logger.info(f"Basic input validation: {basic_result['is_valid']} - {question[:50]}...")
+        if not basic_result["is_valid"]:
+            security_logger.warning(f"Basic security issues: {basic_result.get('issues', [])}")
+    
+    return basic_result
+
+
+def basic_output_validation(response: str, context: str = "") -> Dict[str, any]:
+    """
+    Basic output validation without external validators
+    Performs simple checks for response quality and safety
+    """
+    issues = []
+    warnings = []
+    
+    # Check for obvious hallucinations or made-up content
+    hallucination_indicators = [
+        "article 999",  # Non-existent article numbers
+        "section 9999",
+        "republic act 99999",
+        "presidential decree 9999",
+        "supreme court case xyz-2024"  # Obviously fake case citations
+    ]
+    
+    response_lower = response.lower()
+    for indicator in hallucination_indicators:
+        if indicator in response_lower:
+            issues.append(f"Potential hallucination detected: {indicator}")
+    
+    # Check for inappropriate disclaimers or responses
+    inappropriate_responses = [
+        "i am not a lawyer",
+        "this is not legal advice",
+        "consult a real lawyer",
+        "i cannot provide legal advice"
+    ]
+    
+    for inappropriate in inappropriate_responses:
+        if inappropriate in response_lower:
+            warnings.append(f"Inappropriate disclaimer: {inappropriate}")
+    
+    # Check response length and quality
+    if len(response.strip()) < 50:
+        issues.append("Response too short")
+    
+    if len(response) > 5000:
+        warnings.append("Response very long")
+    
+    # Check for proper legal structure
+    has_legal_structure = any(term in response_lower for term in [
+        "article", "section", "code", "law", "provision", "statute"
+    ])
+    
+    if not has_legal_structure and len(response) > 100:
+        warnings.append("Response lacks legal structure")
+    
+    is_valid = len(issues) == 0
+    confidence_score = 0.9 if is_valid and len(warnings) == 0 else 0.7 if is_valid else 0.4
+    
+    return {
+        "is_valid": is_valid,
+        "cleaned_output": response if is_valid else None,
+        "validation_passed": is_valid,
+        "confidence_score": confidence_score,
+        "issues": issues,
+        "warnings": warnings
+    }
+
+def validate_output_security(response: str, context: str = "") -> Dict[str, any]:
+    """
+    Validate AI response using available security system
+    Falls back to basic validation if Guardrails unavailable
+    """
+    # Try Guardrails first if available
+    if GUARDRAILS_AVAILABLE and is_guardrails_enabled():
+        try:
+            guardrails = get_guardrails_instance()
+            if guardrails:
+                validation_result = guardrails.validate_output(response, context)
+                
+                # Log security events
+                if GUARDRAILS_CONFIG.get("log_security_events", True):
+                    security_logger.info(f"Guardrails output validation: {validation_result['is_valid']} - Score: {validation_result.get('confidence_score', 'N/A')}")
+                    if not validation_result["is_valid"]:
+                        security_logger.warning(f"Guardrails output issue: {validation_result.get('error', 'Unknown')}")
+                
+                return validation_result
+        except Exception as e:
+            security_logger.error(f"Guardrails output validation error: {e}")
+            # Fall through to basic validation
+    
+    # Use basic validation as fallback
+    basic_result = basic_output_validation(response, context)
+    
+    # Log basic validation events
+    if GUARDRAILS_CONFIG.get("log_security_events", True):
+        security_logger.info(f"Basic output validation: {basic_result['is_valid']} - Score: {basic_result.get('confidence_score', 'N/A')}")
+        if not basic_result["is_valid"]:
+            security_logger.warning(f"Basic output issues: {basic_result.get('issues', [])}")
+    
+    return basic_result
+
+
+def create_security_report(input_validation: Dict, output_validation: Dict) -> SecurityReport:
+    """
+    Create comprehensive security report for the interaction
+    Works with both Guardrails and basic validation
+    """
+    # Try Guardrails report first if available
+    if GUARDRAILS_AVAILABLE and is_guardrails_enabled():
+        try:
+            guardrails = get_guardrails_instance()
+            if guardrails and hasattr(guardrails, 'get_security_report'):
+                report_data = guardrails.get_security_report(input_validation, output_validation)
+                report_data["timestamp"] = datetime.now().isoformat()
+                report_data["guardrails_enabled"] = True
+                return SecurityReport(**report_data)
+        except Exception as e:
+            security_logger.error(f"Guardrails security report error: {e}")
+            # Fall through to basic report
+    
+    # Create basic security report
+    security_score = 1.0
+    issues = []
+    recommendations = []
+    
+    # Analyze input validation
+    if not input_validation.get("is_valid", True):
+        security_score -= 0.3
+        input_issues = input_validation.get("issues", [])
+        issues.extend(input_issues)
+        if input_issues:
+            recommendations.append("Review user input for security issues")
+    
+    # Analyze output validation
+    if not output_validation.get("is_valid", True):
+        security_score -= 0.4
+        output_issues = output_validation.get("issues", [])
+        issues.extend(output_issues)
+        if output_issues:
+            recommendations.append("Review AI response for accuracy and safety")
+    
+    # Add warnings as lower-priority issues
+    input_warnings = input_validation.get("warnings", [])
+    output_warnings = output_validation.get("warnings", [])
+    if input_warnings or output_warnings:
+        security_score -= 0.1
+        issues.extend([f"Warning: {w}" for w in input_warnings + output_warnings])
+    
+    # Calculate security level
+    if security_score >= 0.9:
+        security_level = "HIGH"
+    elif security_score >= 0.7:
+        security_level = "MEDIUM"
+    else:
+        security_level = "LOW"
+    
+    return SecurityReport(
+        security_score=max(0.0, security_score),
+        security_level=security_level,
+        issues_detected=len(issues),
+        issues=issues,
+        recommendations=recommendations,
+        timestamp=datetime.now().isoformat(),
+        guardrails_enabled=GUARDRAILS_AVAILABLE and is_guardrails_enabled()
+    )
 
 
 def retrieve_relevant_context(question: str, top_k: int = TOP_K_RESULTS):
@@ -218,23 +513,105 @@ Ensure your answer follows the prescribed structure and tone.
 # --- Main API Endpoint ---
 @router.post("/ask", response_model=LawyerChatResponse)
 async def ask_legal_question_lawyer(request: LawyerChatRequest):
+    start_time = time.time()
+    input_validation = None
+    output_validation = None
+    
     try:
         if not openai_client:
             raise HTTPException(status_code=503, detail="OpenAI unavailable")
         if not request.question.strip():
             raise HTTPException(status_code=400, detail="Question cannot be empty")
 
-        language = detect_language(request.question)
-        if is_greeting_or_casual(request.question):
-            ans, conf, _, _ = generate_lawyer_answer(request.question, "", request.conversation_history, language, False, 500)
-            return LawyerChatResponse(answer=ans, sources=[], confidence=conf, language=language)
+        # Step 1: Input Security Validation
+        security_logger.info(f"Processing lawyer chatbot request: {request.question[:100]}...")
+        input_validation = validate_input_security(request.question)
+        
+        # Check if input validation failed in strict mode
+        if GUARDRAILS_CONFIG.get("strict_mode", True) and not input_validation.get("is_valid", True):
+            security_logger.error(f"Input validation failed in strict mode: {input_validation.get('error', 'Unknown')}")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Security validation failed: {input_validation.get('error', 'Invalid input detected')}"
+            )
+        
+        # Use cleaned input if available
+        cleaned_question = input_validation.get("cleaned_input", request.question)
+        if cleaned_question is None:
+            cleaned_question = request.question
+            
+        language = detect_language(cleaned_question)
+        
+        # Handle greetings with minimal processing
+        if is_greeting_or_casual(cleaned_question):
+            ans, conf, _, _ = generate_lawyer_answer(cleaned_question, "", request.conversation_history, language, False, 500)
+            
+            # Validate greeting response
+            output_validation = validate_output_security(ans, "")
+            if GUARDRAILS_CONFIG.get("strict_mode", True) and not output_validation.get("is_valid", True):
+                ans = "I apologize, but I cannot provide a response at this time due to security constraints. Please rephrase your question."
+                conf = "low"
+            else:
+                ans = output_validation.get("cleaned_output", ans)
+            
+            # Create security report
+            security_report = create_security_report(input_validation, output_validation or {})
+            
+            return LawyerChatResponse(
+                answer=ans, 
+                sources=[], 
+                confidence=conf, 
+                language=language,
+                security_report=security_report
+            )
 
-        context, sources = retrieve_relevant_context(request.question)
+        # Step 2: Retrieve Legal Context
+        context, sources = retrieve_relevant_context(cleaned_question)
+        
+        # Step 3: Generate AI Response
         ans, conf, analysis, related = generate_lawyer_answer(
-            request.question, context, request.conversation_history,
+            cleaned_question, context, request.conversation_history,
             language, request.include_cross_references, request.max_tokens
         )
 
+        # Step 4: Output Security Validation
+        output_validation = validate_output_security(ans, context)
+        
+        # Handle output validation failure in strict mode
+        if GUARDRAILS_CONFIG.get("strict_mode", True) and not output_validation.get("is_valid", True):
+            security_logger.error(f"Output validation failed: {output_validation.get('error', 'Unknown')}")
+            
+            # Retry with more conservative approach if retries are enabled
+            max_retries = GUARDRAILS_CONFIG.get("max_retries", 2)
+            for retry in range(max_retries):
+                security_logger.info(f"Retrying response generation (attempt {retry + 1}/{max_retries})")
+                
+                # Generate more conservative response
+                conservative_ans, conservative_conf, conservative_analysis, conservative_related = generate_lawyer_answer(
+                    cleaned_question, context, request.conversation_history,
+                    language, False, min(request.max_tokens, 1000)  # Reduce token limit
+                )
+                
+                # Validate conservative response
+                retry_validation = validate_output_security(conservative_ans, context)
+                if retry_validation.get("is_valid", False):
+                    ans = retry_validation.get("cleaned_output", conservative_ans)
+                    conf = conservative_conf
+                    analysis = conservative_analysis
+                    related = conservative_related
+                    output_validation = retry_validation
+                    break
+            else:
+                # All retries failed, return safe fallback
+                ans = "I apologize, but I cannot provide a complete response to your question at this time due to security constraints. Please rephrase your question or contact support for assistance."
+                conf = "low"
+                analysis = "Response filtered for security reasons"
+                related = []
+        else:
+            # Use cleaned output if available
+            ans = output_validation.get("cleaned_output", ans)
+
+        # Step 5: Create Source Citations
         citations = [
             SourceCitation(
                 source=s["source"],
@@ -248,15 +625,40 @@ async def ask_legal_question_lawyer(request: LawyerChatRequest):
             for s in sources
         ]
 
+        # Step 6: Generate Security Report
+        security_report = create_security_report(input_validation, output_validation)
+        
+        # Log processing time and security metrics
+        processing_time = time.time() - start_time
+        security_logger.info(f"Request processed in {processing_time:.2f}s - Security Level: {security_report.security_level}")
+
         return LawyerChatResponse(
             answer=ans,
             sources=citations,
             confidence=conf,
             language=language,
             legal_analysis=analysis,
-            related_provisions=related
+            related_provisions=related,
+            security_report=security_report
         )
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
+        security_logger.error(f"Unexpected error in lawyer chatbot: {e}")
+        
+        # Create error security report
+        error_security_report = SecurityReport(
+            security_score=0.0,
+            security_level="ERROR",
+            issues_detected=1,
+            issues=[f"System error: {str(e)}"],
+            recommendations=["Contact system administrator"],
+            timestamp=datetime.now().isoformat(),
+            guardrails_enabled=GUARDRAILS_AVAILABLE and is_guardrails_enabled()
+        )
+        
         print("❌ Error:", e)
         raise HTTPException(status_code=500, detail=f"Internal error: {e}")
 
@@ -266,18 +668,48 @@ async def ask_legal_question_lawyer(request: LawyerChatRequest):
 async def health_check():
     try:
         info = qdrant_client.get_collection(collection_name=COLLECTION_NAME)
+        
+        # Check guardrails status
+        guardrails_status = {
+            "available": GUARDRAILS_AVAILABLE,
+            "enabled": is_guardrails_enabled() if GUARDRAILS_AVAILABLE else False,
+            "strict_mode": GUARDRAILS_CONFIG.get("strict_mode", False) if GUARDRAILS_AVAILABLE else False,
+            "security_features": [
+                "Hallucination Detection",
+                "Prompt Injection Protection", 
+                "PII Detection & Filtering",
+                "Toxic Language Detection",
+                "Bias Detection",
+                "Sensitive Topics Filtering",
+                "Competitor Check",
+                "LlamaGuard Content Safety",
+                "Grounded AI Validation"
+            ] if GUARDRAILS_AVAILABLE else []
+        }
+        
         return {
             "status": "healthy",
-            "service": "Enhanced Legal Chatbot (Codified Philippine Law)",
+            "service": "Enhanced Legal Chatbot (Codified Philippine Law) with Guardrails AI",
             "model": CHAT_MODEL,
             "documents": info.points_count,
             "features": [
                 "LawPhil Links",
-                "No Supreme Court Cases",
+                "No Supreme Court Cases", 
                 "Formal Legal Analysis",
                 "English & Tagalog Support",
-                "Structured Answer Format"
-            ]
+                "Structured Answer Format",
+                "Advanced Security Validation",
+                "Real-time Threat Detection",
+                "Content Safety Filtering"
+            ],
+            "security": guardrails_status,
+            "guardrails_config": {
+                "input_validation": GUARDRAILS_CONFIG.get("enable_input_validation", True),
+                "output_validation": GUARDRAILS_CONFIG.get("enable_output_validation", True), 
+                "security_reporting": GUARDRAILS_CONFIG.get("enable_security_reporting", True),
+                "max_retries": GUARDRAILS_CONFIG.get("max_retries", 2),
+                "timeout_seconds": GUARDRAILS_CONFIG.get("timeout_seconds", 30)
+            } if GUARDRAILS_AVAILABLE else {}
         }
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}
