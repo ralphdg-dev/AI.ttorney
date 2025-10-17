@@ -1,8 +1,13 @@
+# AI.ttorney Server Dependencies
+# Python Version: 3.11-3.12 recommended for full Guardrails AI compatibility
+# Python 3.13: Basic security validation only (Guardrails AI compatibility issues)
+
+# Core Dependencies
 supabase==2.21.1
 python-dotenv==1.1.1
 fastapi==0.118.0
-uvicorn==0.37.0
-pydantic==2.11.10
+uvicorn==0.32.1
+pydantic==2.10.3
 httpx==0.28.1
 email-validator==2.3.0
 PyJWT==2.10.1
@@ -10,8 +15,19 @@ python-multipart==0.0.20
 googlemaps==4.10.0
 cachetools==6.2.0
 openai==1.54.0
-numpy==1.26.4
+numpy>=2.1.0
 beautifulsoup4==4.12.3
 requests==2.31.0
 tqdm==4.66.1
-qdrant-client==1.15.1
+qdrant-client>=1.15.1
+
+# Guardrails AI Security (requires Python 3.11-3.12)
+# Uncomment these dependencies when using Python 3.11/3.12 for full Guardrails AI support
+# guardrails-ai>=0.4.0
+# torch>=2.0.0
+# transformers>=4.30.0
+# peft>=0.4.0
+# jinja2>=3.1.0
+
+# Note: For Python 3.13, Guardrails AI has compatibility issues with lxml compilation
+# Use Python 3.11 or 3.12 for full security validation features

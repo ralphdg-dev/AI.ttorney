@@ -26,6 +26,17 @@ from openai import OpenAI
 import os
 import re
 from dotenv import load_dotenv
+import sys
+
+# Add parent directory to path for config imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from config.guardrails_config import get_guardrails_instance, is_guardrails_enabled
+    GUARDRAILS_AVAILABLE = True
+except ImportError:
+    print("⚠️  Guardrails AI not available - running without security validation")
+    GUARDRAILS_AVAILABLE = False
 
 # Load environment variables
 load_dotenv()
@@ -36,7 +47,7 @@ QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 EMBEDDING_MODEL = "text-embedding-3-small"
-CHAT_MODEL = "gpt-4o-mini"  # Cost-effective and capable
+CHAT_MODEL = "gpt-5-mini"  # Latest GPT-5 mini - faster and cost-efficient
 TOP_K_RESULTS = 5  # Number of relevant chunks to retrieve
 MIN_CONFIDENCE_SCORE = 0.3  # Lower threshold to allow more results for simple queries
 
@@ -75,6 +86,18 @@ qdrant_client = QdrantClient(
 # Initialize OpenAI client
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
+# Initialize Guardrails (if available)
+if GUARDRAILS_AVAILABLE and is_guardrails_enabled():
+    try:
+        guardrails_instance = get_guardrails_instance()
+        print("✅ Guardrails AI enabled for user chatbot")
+    except Exception as e:
+        print(f"⚠️  Failed to initialize Guardrails: {e}")
+        guardrails_instance = None
+else:
+    guardrails_instance = None
+    print("ℹ️  Guardrails AI disabled for user chatbot")
+
 # Create router
 router = APIRouter(prefix="/api/chatbot/user", tags=["Legal Chatbot - User"])
 
@@ -109,6 +132,7 @@ class ChatResponse(BaseModel):
     simplified_summary: Optional[str] = None
     legal_disclaimer: str
     fallback_suggestions: Optional[List[FallbackSuggestion]] = None
+    security_report: Optional[Dict] = Field(default=None, description="Guardrails AI security validation report")
 
 
 def detect_toxic_content(text: str) -> tuple[bool, Optional[str]]:
@@ -1025,6 +1049,44 @@ async def ask_legal_question(request: ChatRequest):
     }
     """
     try:
+        # Initialize security tracking
+        input_validation_result = None
+        output_validation_result = None
+        
+        # === GUARDRAILS INPUT VALIDATION ===
+        if guardrails_instance:
+            try:
+                print(f"\n🔒 Validating user input with Guardrails AI...")
+                input_validation_result = guardrails_instance.validate_input(request.question)
+                
+                if not input_validation_result.get('is_valid', True):
+                    # Input failed validation - return error
+                    error_message = input_validation_result.get('error', 'Input validation failed')
+                    print(f"❌ Input validation failed: {error_message}")
+                    
+                    return ChatResponse(
+                        answer=error_message,
+                        sources=[],
+                        simplified_summary="Input blocked by security validation",
+                        legal_disclaimer="",
+                        fallback_suggestions=None,
+                        security_report={
+                            "security_score": 0.0,
+                            "security_level": "BLOCKED",
+                            "issues_detected": 1,
+                            "issues": [error_message],
+                            "guardrails_enabled": True
+                        }
+                    )
+                else:
+                    print(f"✅ Input validation passed")
+                    # Use cleaned input if available
+                    if 'cleaned_input' in input_validation_result:
+                        request.question = input_validation_result['cleaned_input']
+            except Exception as e:
+                print(f"⚠️  Guardrails input validation error: {e}")
+                # Continue without Guardrails if it fails
+        
         # Check if query is a simple greeting BEFORE validation
         if request.question and is_simple_greeting(request.question):
             print(f"✅ Detected as greeting: {request.question}")
@@ -1221,6 +1283,54 @@ async def ask_legal_question(request: ChatRequest):
             for src in sources
         ]
         
+        # === GUARDRAILS OUTPUT VALIDATION ===
+        if guardrails_instance:
+            try:
+                print(f"\n🔒 Validating AI output with Guardrails AI...")
+                output_validation_result = guardrails_instance.validate_output(
+                    response=answer,
+                    context=context
+                )
+                
+                if not output_validation_result.get('is_valid', True):
+                    # Output failed validation - return error
+                    error_message = output_validation_result.get('error', 'Output validation failed')
+                    print(f"❌ Output validation failed: {error_message}")
+                    
+                    return ChatResponse(
+                        answer="I apologize, but I cannot provide a response that meets our safety standards. Please rephrase your question or consult with a licensed lawyer.",
+                        sources=[],
+                        simplified_summary="Output blocked by security validation",
+                        legal_disclaimer=get_legal_disclaimer(language),
+                        fallback_suggestions=get_fallback_suggestions(language, is_complex=True),
+                        security_report={
+                            "security_score": 0.0,
+                            "security_level": "BLOCKED",
+                            "issues_detected": 1,
+                            "issues": [error_message],
+                            "guardrails_enabled": True
+                        }
+                    )
+                else:
+                    print(f"✅ Output validation passed")
+                    # Use cleaned output if available
+                    if 'cleaned_output' in output_validation_result:
+                        answer = output_validation_result['cleaned_output']
+            except Exception as e:
+                print(f"⚠️  Guardrails output validation error: {e}")
+                # Continue without Guardrails if it fails
+        
+        # Generate security report
+        security_report = None
+        if guardrails_instance and (input_validation_result or output_validation_result):
+            try:
+                security_report = guardrails_instance.get_security_report(
+                    input_validation_result or {},
+                    output_validation_result or {}
+                )
+            except Exception as e:
+                print(f"⚠️  Failed to generate security report: {e}")
+        
         # Get legal disclaimer (simplified)
         legal_disclaimer = get_legal_disclaimer(language)
         
@@ -1232,7 +1342,8 @@ async def ask_legal_question(request: ChatRequest):
             sources=source_citations,
             simplified_summary=simplified_summary,
             legal_disclaimer=legal_disclaimer,
-            fallback_suggestions=fallback_suggestions
+            fallback_suggestions=fallback_suggestions,
+            security_report=security_report
         )
         
     except HTTPException:
@@ -1247,10 +1358,29 @@ async def health_check():
     try:
         collection_info = qdrant_client.get_collection(collection_name=COLLECTION_NAME)
         count = collection_info.points_count
+        
+        # Check Guardrails status
+        guardrails_status = {
+            "enabled": guardrails_instance is not None,
+            "available": GUARDRAILS_AVAILABLE
+        }
+        
+        if guardrails_instance:
+            try:
+                # Get list of active validators
+                validators = []
+                if hasattr(guardrails_instance, 'input_validators'):
+                    validators.extend([v.__class__.__name__ for v in guardrails_instance.input_validators])
+                if hasattr(guardrails_instance, 'output_validators'):
+                    validators.extend([v.__class__.__name__ for v in guardrails_instance.output_validators])
+                guardrails_status["validators"] = list(set(validators))
+            except:
+                guardrails_status["validators"] = []
+        
         return {
             "status": "healthy",
             "service": "Ai.ttorney Legal Chatbot - General Public",
-            "description": "Bilingual chatbot for Philippine legal seekers",
+            "description": "Bilingual chatbot for Philippine legal seekers with AI security",
             "database": "Qdrant Cloud",
             "documents": count,
             "model": CHAT_MODEL,
@@ -1262,8 +1392,10 @@ async def health_check():
                 "Source citations with URLs",
                 "Legal disclaimers",
                 "Greeting detection and responses",
-                "Handles all user scenarios (emotional, rude, confused, etc.)"
+                "Handles all user scenarios (emotional, rude, confused, etc.)",
+                "Guardrails AI security validation" if guardrails_instance else "Basic security validation"
             ],
+            "security": guardrails_status,
             "target_audience": "Non-lawyer users in the Philippines"
         }
     except Exception as e:
