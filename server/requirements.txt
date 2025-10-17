@@ -20,14 +20,15 @@ beautifulsoup4==4.12.3
 requests==2.31.0
 tqdm==4.66.1
 qdrant-client>=1.15.1
+urllib3<2.0  # Pin to 1.x for macOS LibreSSL compatibility
 
 # Guardrails AI Security (requires Python 3.11-3.12)
 # Uncomment these dependencies when using Python 3.11/3.12 for full Guardrails AI support
-# guardrails-ai>=0.4.0
-# torch>=2.0.0
-# transformers>=4.30.0
-# peft>=0.4.0
-# jinja2>=3.1.0
+guardrails-ai>=0.4.0
+torch>=2.0.0
+transformers>=4.30.0
+peft>=0.4.0
+jinja2>=3.1.0
 
 # Note: For Python 3.13, Guardrails AI has compatibility issues with lxml compilation
 # Use Python 3.11 or 3.12 for full security validation features

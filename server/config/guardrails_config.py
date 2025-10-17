@@ -10,52 +10,35 @@ from dotenv import load_dotenv
 
 # Import available validators with fallback handling
 available_validators = {}
+SILENT_MODE = os.getenv("GUARDRAILS_SILENT_MODE", "true").lower() == "true"
 
-try:
-    from guardrails.hub import ToxicLanguage
-    available_validators['ToxicLanguage'] = ToxicLanguage
-except ImportError:
-    print("⚠️ ToxicLanguage validator not available")
+def try_import_validator(name: str, import_func):
+    """Silently try to import a validator"""
+    try:
+        validator = import_func()
+        available_validators[name] = validator
+        if not SILENT_MODE:
+            print(f"✅ {name} validator loaded")
+    except ImportError:
+        if not SILENT_MODE:
+            print(f"⚠️ {name} validator not available")
+    except Exception as e:
+        if not SILENT_MODE:
+            print(f"⚠️ {name} validator error: {e}")
 
-try:
-    from guardrails.hub import BiasCheck
-    available_validators['BiasCheck'] = BiasCheck
-except ImportError:
-    print("⚠️ BiasCheck validator not available")
-
-try:
-    from guardrails.hub import LlamaGuard7B
-    available_validators['LlamaGuard7B'] = LlamaGuard7B
-except ImportError:
-    print("⚠️ LlamaGuard7B validator not available")
-
-try:
-    from guardrails.hub import GroundedAIHallucination
-    available_validators['GroundedAIHallucination'] = GroundedAIHallucination
-except ImportError:
-    print("⚠️ GroundedAIHallucination validator not available")
-
-try:
-    from guardrails.hub import SensitiveTopic
-    available_validators['SensitiveTopic'] = SensitiveTopic
-except ImportError:
-    print("⚠️ SensitiveTopic validator not available")
-
-try:
-    from guardrails.hub import RestrictToTopic
-    available_validators['RestrictToTopic'] = RestrictToTopic
-except ImportError:
-    print("⚠️ RestrictToTopic validator not available")
-
-try:
-    from guardrails.hub import RegexMatch
-    available_validators['RegexMatch'] = RegexMatch
-except ImportError:
-    print("⚠️ RegexMatch validator not available")
+# Try importing validators silently
+try_import_validator('ToxicLanguage', lambda: __import__('guardrails.hub', fromlist=['ToxicLanguage']).ToxicLanguage)
+try_import_validator('BiasCheck', lambda: __import__('guardrails.hub', fromlist=['BiasCheck']).BiasCheck)
+try_import_validator('LlamaGuard7B', lambda: __import__('guardrails.hub', fromlist=['LlamaGuard7B']).LlamaGuard7B)
+try_import_validator('GroundedAIHallucination', lambda: __import__('guardrails.hub', fromlist=['GroundedAIHallucination']).GroundedAIHallucination)
+try_import_validator('SensitiveTopic', lambda: __import__('guardrails.hub', fromlist=['SensitiveTopic']).SensitiveTopic)
+try_import_validator('RestrictToTopic', lambda: __import__('guardrails.hub', fromlist=['RestrictToTopic']).RestrictToTopic)
+try_import_validator('RegexMatch', lambda: __import__('guardrails.hub', fromlist=['RegexMatch']).RegexMatch)
 
 load_dotenv()
 
-print(f"✅ Loaded {len(available_validators)} Guardrails validators: {list(available_validators.keys())}")
+if not SILENT_MODE or len(available_validators) > 0:
+    print(f"✅ Guardrails: {len(available_validators)} validators available{' (silent mode)' if SILENT_MODE else ''}")
 
 class LawyerChatbotGuardrails:
     """
@@ -84,9 +67,11 @@ class LawyerChatbotGuardrails:
                         on_fail="exception"
                     )
                 )
-                print("✅ ToxicLanguage validator added to input guard")
+                if not SILENT_MODE:
+                    print("✅ ToxicLanguage validator added to input guard")
             except Exception as e:
-                print(f"⚠️ Failed to initialize ToxicLanguage validator: {e}")
+                if not SILENT_MODE:
+                    print(f"⚠️ Failed to initialize ToxicLanguage validator: {e}")
         
         # Bias detection - Ensure fair legal advice
         if 'BiasCheck' in available_validators:
@@ -98,9 +83,11 @@ class LawyerChatbotGuardrails:
                         on_fail="filter"
                     )
                 )
-                print("✅ BiasCheck validator added to input guard")
+                if not SILENT_MODE:
+                    print("✅ BiasCheck validator added to input guard")
             except Exception as e:
-                print(f"⚠️ Failed to initialize BiasCheck validator: {e}")
+                if not SILENT_MODE:
+                    print(f"⚠️ Failed to initialize BiasCheck validator: {e}")
         
         # Sensitive topics filter - Legal ethics compliance
         if 'SensitiveTopic' in available_validators:
@@ -118,14 +105,17 @@ class LawyerChatbotGuardrails:
                         on_fail="exception"
                     )
                 )
-                print("✅ SensitiveTopic validator added to input guard")
+                if not SILENT_MODE:
+                    print("✅ SensitiveTopic validator added to input guard")
             except Exception as e:
-                print(f"⚠️ Failed to initialize SensitiveTopic validator: {e}")
+                if not SILENT_MODE:
+                    print(f"⚠️ Failed to initialize SensitiveTopic validator: {e}")
         
         if validators:
             return gd.Guard().use_many(*validators)
         else:
-            print("⚠️ No input validators available - creating empty guard")
+            if not SILENT_MODE:
+                print("⚠️ No input validators available - creating empty guard")
             return gd.Guard()
     
     def _create_output_guard(self) -> gd.Guard:
@@ -145,9 +135,11 @@ class LawyerChatbotGuardrails:
                         on_fail="reask"
                     )
                 )
-                print("✅ GroundedAIHallucination validator added to output guard")
+                if not SILENT_MODE:
+                    print("✅ GroundedAIHallucination validator added to output guard")
             except Exception as e:
-                print(f"⚠️ Failed to initialize GroundedAIHallucination validator: {e}")
+                if not SILENT_MODE:
+                    print(f"⚠️ Failed to initialize GroundedAIHallucination validator: {e}")
         
         # Skip LlamaGuard7B for now due to initialization issues
         # if 'LlamaGuard7B' in available_validators:
@@ -172,9 +164,11 @@ class LawyerChatbotGuardrails:
                         on_fail="reask"
                     )
                 )
-                print("✅ BiasCheck validator added to output guard")
+                if not SILENT_MODE:
+                    print("✅ BiasCheck validator added to output guard")
             except Exception as e:
-                print(f"⚠️ Failed to initialize BiasCheck validator: {e}")
+                if not SILENT_MODE:
+                    print(f"⚠️ Failed to initialize BiasCheck validator: {e}")
         
         # Toxic language in responses
         if 'ToxicLanguage' in available_validators:
@@ -186,14 +180,17 @@ class LawyerChatbotGuardrails:
                         on_fail="reask"
                     )
                 )
-                print("✅ ToxicLanguage validator added to output guard")
+                if not SILENT_MODE:
+                    print("✅ ToxicLanguage validator added to output guard")
             except Exception as e:
-                print(f"⚠️ Failed to initialize ToxicLanguage validator: {e}")
+                if not SILENT_MODE:
+                    print(f"⚠️ Failed to initialize ToxicLanguage validator: {e}")
         
         if validators:
             return gd.Guard().use_many(*validators)
         else:
-            print("⚠️ No output validators available - creating empty guard")
+            if not SILENT_MODE:
+                print("⚠️ No output validators available - creating empty guard")
             return gd.Guard()
     
     def validate_input(self, question: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -306,7 +303,7 @@ class LawyerChatbotGuardrails:
             "issues": issues,
             "recommendations": recommendations,
             "timestamp": None,  # Will be set by the API
-            "guardrails_version": gd.__version__
+            "guardrails_version": getattr(gd, '__version__', 'unknown')
         }
 
 # Global instance for the lawyer chatbot

@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
-import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image, ActivityIndicator, Linking, ScrollView } from "react-native";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Linking } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../constants/Colors";
@@ -8,8 +8,9 @@ import { SidebarWrapper } from "../components/AppSidebar";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../contexts/AuthContext";
 import axios from "axios";
-
-const birdLogo = require("../assets/images/logo.png");
+import ChatHistorySidebar from "../components/chatbot/ChatHistorySidebar";
+import { ChatHistoryService } from "../services/chatHistoryService";
+import { Sparkles, Send } from "lucide-react-native";
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
 interface SourceCitation {
@@ -43,12 +44,13 @@ interface Message {
 }
 
 export default function ChatbotScreen() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conversationHistory, setConversationHistory] = useState<{role: string, content: string}[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string>("");
   const flatRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -57,11 +59,94 @@ export default function ChatbotScreen() {
     }
   }, [messages]);
 
+  useEffect(() => {
+    initializeConversation();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const initializeConversation = useCallback(async () => {
+    const convId = await ChatHistoryService.getCurrentConversationId(user?.id);
+    if (convId) {
+      setCurrentConversationId(convId);
+      await loadConversation(convId);
+    } else {
+      // No current conversation - start fresh (will create session on first message)
+      setCurrentConversationId('');
+      setMessages([]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  const loadConversation = async (conversationId: string) => {
+    if (!conversationId) {
+      console.warn('⚠️  No conversation ID provided');
+      return;
+    }
+    
+    console.log('📥 Loading conversation:', conversationId);
+    console.log('   User ID:', user?.id);
+    
+    try {
+      const loadedMessages = await ChatHistoryService.loadConversation(conversationId, user?.id);
+      console.log('✅ Loaded messages:', loadedMessages.length);
+      
+      if (loadedMessages.length === 0) {
+        console.warn('⚠️  No messages found for this conversation');
+      } else {
+        console.log('   First message:', loadedMessages[0].text.substring(0, 50));
+      }
+      
+      // ALWAYS set messages, even if empty
+      setMessages(loadedMessages as Message[]);
+      
+      // Rebuild conversation history for context
+      const history = loadedMessages.map(msg => ({
+        role: msg.fromUser ? 'user' : 'assistant',
+        content: msg.text
+      }));
+      setConversationHistory(history);
+      
+    } catch (error) {
+      console.error('❌ Error loading conversation:', error);
+      throw error;
+    }
+  };
+
+  const handleNewChat = async () => {
+    const newConvId = await ChatHistoryService.startNewConversation(user?.id);
+    setCurrentConversationId(newConvId);
+    setMessages([]);
+    setConversationHistory([]);
+    setError(null);
+  };
+
+  const handleConversationSelect = async (conversationId: string) => {
+    console.log('🔄 Switching to conversation:', conversationId);
+    
+    // Update current conversation ID first
+    setCurrentConversationId(conversationId);
+    
+    // Clear existing state
+    setMessages([]);
+    setConversationHistory([]);
+    setError(null);
+    
+    // Load the conversation
+    try {
+      await loadConversation(conversationId);
+      console.log('✅ Conversation loaded successfully');
+    } catch (error) {
+      console.error('❌ Failed to load conversation:', error);
+      setError('Failed to load conversation. Please try again.');
+    }
+  };
+
   // Helper function to render legal disclaimer with clickable links
   const renderLegalDisclaimer = (disclaimer: string) => {
+    /* eslint-disable @typescript-eslint/no-require-imports */
     // Parse markdown links [text](/path) and make them clickable
     const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-    const parts: Array<{ text: string; isLink: boolean; path?: string }> = [];
+    const parts: { text: string; isLink: boolean; path?: string }[] = [];
     let lastIndex = 0;
     let match;
 
@@ -121,6 +206,10 @@ export default function ChatbotScreen() {
     setIsTyping(true);
     setError(null);
 
+    // Don't create session here - let backend create it on first message
+    // This is the industry-standard approach (ChatGPT/Claude)
+    let sessionId = currentConversationId;
+
     try {
       // Determine endpoint based on user role
       const userRole = user?.role || 'guest';
@@ -140,25 +229,58 @@ export default function ChatbotScreen() {
         content: msg.content
       }));
 
-      // Call enhanced chatbot API
+      // Prepare headers with authentication token if available
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      // Call enhanced chatbot API with authentication
       const response = await axios.post(endpoint, {
         question: userMessage,
         conversation_history: formattedHistory,
         max_tokens: 1200,
-        user_id: user?.id || null
-      });
+        user_id: user?.id || null,
+        session_id: sessionId || null
+      }, { headers });
 
       const { 
         answer, 
         sources, 
         confidence, 
-        language, 
-        simplified_summary,
+        language,
         legal_disclaimer,
         fallback_suggestions,
         normalized_query,
-        is_complex_query
+        is_complex_query,
+        session_id: returnedSessionId,
+        message_id: assistantMessageId,
+        user_message_id: userMessageId
       } = response.data;
+      
+      console.log('📨 Backend response:', {
+        sessionId: returnedSessionId,
+        userMessageId,
+        assistantMessageId,
+        messagesSaved: !!(userMessageId && assistantMessageId)
+      });
+      
+      // Update session ID if backend created a new one
+      if (returnedSessionId) {
+        if (!sessionId || sessionId !== returnedSessionId) {
+          console.log('🆕 New session created:', returnedSessionId);
+          setCurrentConversationId(returnedSessionId);
+          sessionId = returnedSessionId;
+          
+          // Store in AsyncStorage for persistence
+          if (user?.id) {
+            await ChatHistoryService.setCurrentConversationId(returnedSessionId, user.id);
+          }
+        }
+      }
 
       // Update conversation history
       setConversationHistory(prev => [
@@ -167,9 +289,16 @@ export default function ChatbotScreen() {
         { role: "assistant", content: answer }
       ]);
 
-      // Add bot reply with all enhanced data
+      // Update the user message with the real ID from backend
+      if (userMessageId) {
+        setMessages((prev) => prev.map(msg => 
+          msg.id === newMsg.id ? { ...msg, id: userMessageId } : msg
+        ));
+      }
+      
+      // Add bot reply with all enhanced data and real ID from backend
       const reply: Message = {
-        id: (Date.now() + 1).toString(),
+        id: assistantMessageId || (Date.now() + 1).toString(),
         text: answer,
         fromUser: false,
         sources: sources || [],
@@ -182,6 +311,12 @@ export default function ChatbotScreen() {
       };
       
       setMessages((prev) => [...prev, reply]);
+      
+      console.log('✅ Messages saved to database:', {
+        session: sessionId,
+        userMsg: userMessageId,
+        assistantMsg: assistantMessageId
+      });
       
     } catch (err: any) {
       console.error("Chat error:", err);
@@ -215,20 +350,57 @@ export default function ChatbotScreen() {
     const isUser = item.fromUser;
     return (
       <View style={tw`px-4 py-2`}>
-        <View style={isUser ? tw`items-end` : tw`items-start`}>
+        <View style={isUser ? tw`items-end` : tw`items-start flex-row`}>
+          {!isUser && (
+            <View
+              style={[
+                tw`w-8 h-8 rounded-full items-center justify-center mr-3 mt-1`,
+                { backgroundColor: Colors.primary.blue },
+              ]}
+            >
+              <Sparkles size={16} color="#fff" />
+            </View>
+          )}
           <View
             style={[
-              tw`max-w-4/5 p-3 rounded-2xl`,
+              tw`flex-1 rounded-2xl`,
               isUser
-                ? { backgroundColor: Colors.primary.blue }
-                : { backgroundColor: "#F3F4F6" },
+                ? { 
+                    backgroundColor: Colors.primary.blue,
+                    maxWidth: '85%',
+                    alignSelf: 'flex-end',
+                    padding: 16,
+                    ...(Platform.OS === 'web'
+                      ? { boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }
+                      : {
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.08,
+                          shadowRadius: 8,
+                          elevation: 2,
+                        }),
+                  }
+                : { 
+                    backgroundColor: Colors.background.secondary,
+                    maxWidth: '100%',
+                    padding: 16,
+                    ...(Platform.OS === 'web'
+                      ? { boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' }
+                      : {
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.05,
+                          shadowRadius: 3,
+                          elevation: 1,
+                        }),
+                  },
             ]}
           >
             {/* Normalized query indicator */}
             {!isUser && item.normalized_query && (
-              <View style={tw`mb-2 p-2 bg-blue-50 rounded-lg`}>
-                <Text style={tw`text-xs text-blue-600`}>
-                  📝 Understood as: {item.normalized_query}
+              <View style={[tw`mb-3 p-3 rounded-lg`, { backgroundColor: Colors.status.info + '15' }]}>
+                <Text style={[tw`text-xs font-medium`, { color: Colors.status.info }]}>
+                  Understood as: {item.normalized_query}
                 </Text>
               </View>
             )}
@@ -237,49 +409,53 @@ export default function ChatbotScreen() {
             <Text
               style={[
                 tw`text-base`,
+                { lineHeight: 26 },
+                isUser ? tw`text-white` : { color: Colors.text.primary },
               ]}
             >
-              <Text style={[tw`text-sm leading-relaxed`, isUser ? tw`text-white` : tw`text-gray-800`]}>
-                {item.text}
-              </Text>
+              {item.text || ''}
             </Text>
             {!isUser && item.confidence && (
-              <View style={tw`mt-2`}>
-                <Text style={tw`text-xs text-gray-500`}>
-                  {item.confidence === 'high' && '✅ High confidence'}
-                  {item.confidence === 'medium' && '⚠️ Medium confidence'}
-                  {item.confidence === 'low' && '❓ Low confidence - consider consulting a lawyer'}
+              <View style={[tw`mt-4 p-3 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}>
+                <Text style={[tw`text-xs font-semibold`, { color: Colors.text.secondary }]}>
+                  Confidence: {item.confidence === 'high' && 'High'}
+                  {item.confidence === 'medium' && 'Medium'}
+                  {item.confidence === 'low' && 'Low - consider consulting a lawyer'}
                 </Text>
               </View>
             )}
             
             {/* Show sources with URLs */}
             {!isUser && item.sources && item.sources.length > 0 && (
-              <View style={tw`mt-3 pt-2 border-t border-gray-300`}>
-                <Text style={tw`text-xs text-gray-700 font-semibold mb-2`}>📚 Sources:</Text>
+              <View style={[tw`mt-4 pt-3 border-t`, { borderTopColor: Colors.border.light }]}>
+                <Text style={[tw`text-sm font-bold mb-3`, { color: Colors.text.primary }]}>Legal Sources</Text>
                 {item.sources.map((source, idx) => (
-                  <View key={idx} style={tw`mb-2`}>
-                    <Text style={tw`text-xs text-gray-700 font-medium`}>
-                      • {source.law} - Art. {source.article_number}
+                  <View key={idx} style={[tw`mb-3 p-4 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}>
+                    <Text style={[tw`text-sm font-bold mb-1`, { color: Colors.text.primary }]}>
+                      {source.law.toUpperCase()}
+                    </Text>
+                    <Text style={[tw`text-xs mb-2`, { color: Colors.text.secondary }]}>
+                      Article {source.article_number}
                     </Text>
                     {source.article_title && (
-                      <Text style={tw`text-xs text-gray-600 ml-3`}>
+                      <Text style={[tw`text-xs mb-3`, { color: Colors.text.secondary }]}>
                         {source.article_title}
                       </Text>
                     )}
-                    {source.source_url && (
-                      <TouchableOpacity 
-                        onPress={() => Linking.openURL(source.source_url!)}
-                        style={tw`ml-3 mt-1`}
-                      >
-                        <Text style={tw`text-xs text-blue-600 underline`}>
-                          🔗 View source
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                    <Text style={tw`text-xs text-gray-500 ml-3`}>
-                      Relevance: {(source.relevance_score * 100).toFixed(0)}%
-                    </Text>
+                    <View style={tw`flex-row items-center justify-between mt-2`}>
+                      {source.source_url && (
+                        <TouchableOpacity 
+                          onPress={() => Linking.openURL(source.source_url!)}
+                        >
+                          <Text style={[tw`text-xs font-semibold`, { color: Colors.primary.blue }]}>
+                            View full source
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      <Text style={[tw`text-xs`, { color: Colors.text.tertiary }]}>
+                        Relevance: {(source.relevance_score * 100).toFixed(0)}%
+                      </Text>
+                    </View>
                   </View>
                 ))}
               </View>
@@ -287,23 +463,25 @@ export default function ChatbotScreen() {
 
             {/* Legal disclaimer */}
             {!isUser && item.legal_disclaimer && (
-              <View style={tw`mt-3 pt-2 border-t border-gray-300`}>
-                {renderLegalDisclaimer(item.legal_disclaimer)}
+              <View style={[tw`mt-4 pt-3 border-t`, { borderTopColor: Colors.border.light }]}>
+                <View style={[tw`p-3 rounded-lg`, { backgroundColor: Colors.status.warning + '15' }]}>
+                  {renderLegalDisclaimer(item.legal_disclaimer)}
+                </View>
               </View>
             )}
 
             {/* Fallback suggestions for complex queries */}
             {!isUser && item.fallback_suggestions && item.fallback_suggestions.length > 0 && (
-              <View style={tw`mt-3 pt-2 border-t border-yellow-300 bg-yellow-50 p-2 rounded-lg`}>
-                <Text style={tw`text-xs text-yellow-800 font-semibold mb-2`}>
-                  💡 Recommended Next Steps:
+              <View style={[tw`mt-4 p-4 rounded-lg`, { backgroundColor: Colors.status.info + '15' }]}>
+                <Text style={[tw`text-sm font-bold mb-3`, { color: Colors.status.info }]}>
+                  Recommended Next Steps
                 </Text>
                 {item.fallback_suggestions.map((suggestion, idx) => (
                   <View key={idx} style={tw`mb-2`}>
-                    <Text style={tw`text-xs text-yellow-800 font-medium`}>
-                      {suggestion.description}
+                    <Text style={[tw`text-xs font-semibold mb-1`, { color: Colors.text.primary }]}>
+                      • {suggestion.description}
                     </Text>
-                    <Text style={tw`text-xs text-yellow-700 ml-2`}>
+                    <Text style={[tw`text-xs ml-3`, { color: Colors.text.secondary }]}>
                       {suggestion.reason}
                     </Text>
                   </View>
@@ -311,14 +489,6 @@ export default function ChatbotScreen() {
               </View>
             )}
 
-            {/* Language indicator */}
-            {!isUser && item.language && (
-              <View style={tw`mt-2`}>
-                <Text style={tw`text-xs text-gray-400`}>
-                  Language: {item.language}
-                </Text>
-              </View>
-            )}
           </View>
         </View>
       </View>
@@ -327,19 +497,62 @@ export default function ChatbotScreen() {
 
 
   return (
-      <View style={tw`flex-1 bg-white`}>
-        {/* ✅ Header on Chat screen */}
+      <View style={[tw`flex-1`, { backgroundColor: Colors.background.primary, overflow: 'hidden' }]}>
+        {/* Chat History Sidebar */}
+        <ChatHistorySidebar
+          userId={user?.id}
+          currentConversationId={currentConversationId}
+          onConversationSelect={handleConversationSelect}
+          onNewChat={handleNewChat}
+        />
+
+        {/* Header */}
         <Header
-          title="Chat"
+          title="AI Legal Assistant"
           showMenu={true}
         />
 
         {/* Messages list or centered placeholder */}
+        <View style={tw`flex-1`}>
         {messages.length === 0 ? (
           <View style={tw`flex-1 items-center justify-center px-8`}>
-            <Text style={[tw`text-2xl text-center`, { color: Colors.text.head }]}>
-              May tanong tungkol sa batas? AI got you!
+            <View
+              style={[
+                tw`w-20 h-20 rounded-full items-center justify-center mb-6`,
+                { backgroundColor: Colors.primary.blue + '15' },
+              ]}
+            >
+              <Sparkles size={40} color={Colors.primary.blue} />
+            </View>
+            <Text style={[tw`text-2xl font-bold text-center mb-3`, { color: Colors.text.primary }]}>
+              May tanong tungkol sa batas?
             </Text>
+            <Text style={[tw`text-base text-center`, { color: Colors.text.secondary }]}>
+              I specialize in Civil, Criminal, Consumer, Family, and Labor Law. Ask away!
+            </Text>
+            <View style={tw`mt-8 w-full px-4`}>
+              <Text style={[tw`text-sm font-semibold mb-3`, { color: Colors.text.primary }]}>
+                Try asking:
+              </Text>
+              {[
+                'What are my rights as a tenant?',
+                'How do I file a small claims case?',
+                'What is the legal age of consent?',
+              ].map((suggestion, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => setInput(suggestion)}
+                  style={[
+                    tw`p-4 mb-2 rounded-xl`,
+                    { backgroundColor: Colors.background.secondary },
+                  ]}
+                >
+                  <Text style={[tw`text-sm`, { color: Colors.text.primary }]}>
+                    {suggestion}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         ) : (
           <FlatList
@@ -347,18 +560,28 @@ export default function ChatbotScreen() {
             data={messages}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={tw`pb-4`}
+            contentContainerStyle={tw`px-4 pb-4 pt-2`}
             showsVerticalScrollIndicator={false}
+            style={tw`flex-1`}
           />
         )}
+        </View>
 
         {/* Typing indicator */}
         {isTyping && (
-          <View style={tw`px-4 pb-2`}>
-            <View style={tw`items-start`}>
-              <View style={tw`p-3 rounded-2xl bg-gray-100 flex-row items-center`}>
-                <ActivityIndicator size="small" color={Colors.primary.blue} style={tw`mr-2`} />
-                <Text style={tw`text-sm text-gray-600`}>Thinking...</Text>
+          <View style={tw`px-6 pb-3`}>
+            <View style={tw`flex-row items-start`}>
+              <View
+                style={[
+                  tw`w-8 h-8 rounded-full items-center justify-center mr-3`,
+                  { backgroundColor: Colors.primary.blue },
+                ]}
+              >
+                <Sparkles size={16} color="#fff" />
+              </View>
+              <View style={[tw`p-4 rounded-2xl flex-row items-center`, { backgroundColor: Colors.background.secondary }]}>
+                <ActivityIndicator size="small" color={Colors.primary.blue} style={tw`mr-3`} />
+                <Text style={[tw`text-sm font-medium`, { color: Colors.text.secondary }]}>Analyzing your question...</Text>
               </View>
             </View>
           </View>
@@ -366,9 +589,10 @@ export default function ChatbotScreen() {
 
         {/* Error message */}
         {error && (
-          <View style={tw`px-4 pb-2`}>
-            <View style={[tw`p-3 rounded-lg`, { backgroundColor: "#FEE2E2" }]}>
-              <Text style={tw`text-sm text-red-600`}>{error}</Text>
+          <View style={tw`px-6 pb-3`}>
+            <View style={[tw`p-4 rounded-xl flex-row items-start`, { backgroundColor: Colors.status.error + '15' }]}>
+              <Ionicons name="alert-circle" size={20} color={Colors.status.error} style={tw`mr-2`} />
+              <Text style={[tw`text-sm flex-1`, { color: Colors.status.error }]}>{error}</Text>
             </View>
           </View>
         )}
@@ -376,36 +600,85 @@ export default function ChatbotScreen() {
         {/* Composer */}
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ marginBottom: 80 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
         >
           <View
-            style={tw`flex-row items-center px-4 pt-4 pb-2 border-t border-gray-200 bg-white`}
+            style={[
+              tw`px-4 pt-3 pb-2 border-t`,
+              { 
+                borderTopColor: Colors.border.light,
+                backgroundColor: Colors.background.primary,
+                marginBottom: 80,
+              },
+            ]}
           >
-            <View style={tw`flex-1 mr-2`}>
-              <TextInput
-                value={input}
-                onChangeText={setInput}
-                placeholder="Ask anything"
-                placeholderTextColor="#9CA3AF"
-                style={[
-                  tw`border border-gray-300 rounded-full px-4`,
-                  { color: Colors.text.head, backgroundColor: '#F9FAFB', height: 36, paddingTop: 8, paddingBottom: 8 },
-                ]}
-                multiline
-                onSubmitEditing={sendMessage}
-              />
-            </View>
+            <View style={tw`flex-row items-end`}>
+              <View style={tw`flex-1 mr-3`}>
+                <View
+                  style={[
+                    tw`rounded-3xl px-5 py-3`,
+                    {
+                      backgroundColor: Colors.background.secondary,
+                      borderWidth: 1.5,
+                      borderColor: Colors.border.light,
+                      minHeight: 50,
+                      maxHeight: 120,
+                      ...(Platform.OS === 'web'
+                        ? { boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' }
+                        : {
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 3,
+                            elevation: 1,
+                          }),
+                    },
+                  ]}
+                >
+                  <TextInput
+                    value={input}
+                    onChangeText={setInput}
+                    placeholder="Ask about Civil, Criminal, Consumer, Family, or Labor Law..."
+                    placeholderTextColor={Colors.text.tertiary}
+                    style={[
+                      tw`text-base`,
+                      { 
+                        color: Colors.text.primary,
+                        paddingTop: Platform.OS === 'ios' ? 2 : 0,
+                        outlineStyle: 'none',
+                      },
+                    ]}
+                    multiline
+                    maxLength={1000}
+                    onSubmitEditing={sendMessage}
+                  />
+                </View>
+              </View>
 
-            <TouchableOpacity
-              onPress={sendMessage}
-              disabled={isTyping || !input.trim()}
-              style={[
-                tw`p-2 rounded-full`,
-                { backgroundColor: (isTyping || !input.trim()) ? "#D1D5DB" : Colors.primary.blue }
-              ]}
-            >
-              <Ionicons name="arrow-up" size={20} color="#fff" />
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={sendMessage}
+                disabled={isTyping || !input.trim()}
+                style={[
+                  tw`w-12 h-12 rounded-full items-center justify-center`,
+                  { 
+                    backgroundColor: (isTyping || !input.trim()) 
+                      ? Colors.border.medium 
+                      : Colors.primary.blue,
+                    ...(Platform.OS === 'web'
+                      ? { boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }
+                      : {
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.1,
+                          shadowRadius: 4,
+                          elevation: 3,
+                        }),
+                  }
+                ]}
+              >
+                <Send size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
           </View>
         </KeyboardAvoidingView>
         <Navbar activeTab="ask" />

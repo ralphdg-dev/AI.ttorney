@@ -26,6 +26,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Set httpx to WARNING level to reduce noise
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 # Lifespan event handler
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -80,6 +83,15 @@ app.add_middleware(
 from routes import auth
 from routes.forum import router as forum_router
 
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"🌐 {request.method} {request.url.path}")
+    logger.info(f"🔑 Headers: {dict(request.headers)}")
+    response = await call_next(request)
+    logger.info(f"📤 Response status: {response.status_code}")
+    return response
+
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -117,6 +129,10 @@ from api.chatbot_user import router as user_chatbot_router
 from api.chatbot_lawyer import router as lawyer_chatbot_router
 app.include_router(user_chatbot_router)
 app.include_router(lawyer_chatbot_router)
+
+# Import and include chat history routes
+from routes.chat_history import router as chat_history_router
+app.include_router(chat_history_router)
 
 @app.get("/")
 async def root():

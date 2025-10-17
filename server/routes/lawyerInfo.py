@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import logging
 from supabase import Client
-from dependencies import get_current_user, get_supabase
+from config.dependencies import get_current_user, get_supabase
 
 logger = logging.getLogger(__name__)
 
