@@ -44,13 +44,7 @@ interface Message {
 
 export default function ChatbotScreen() {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([
-    { 
-      id: "1", 
-      text: "May tanong tungkol sa batas? AI got you!", 
-      fromUser: false 
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -340,15 +334,23 @@ export default function ChatbotScreen() {
           showMenu={true}
         />
 
-        {/* Messages list */}
-        <FlatList
-          ref={flatRef}
-          data={messages}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={tw`pb-4`}
-          showsVerticalScrollIndicator={false}
-        />
+        {/* Messages list or centered placeholder */}
+        {messages.length === 0 ? (
+          <View style={tw`flex-1 items-center justify-center px-8`}>
+            <Text style={[tw`text-2xl text-center`, { color: Colors.text.head }]}>
+              May tanong tungkol sa batas? AI got you!
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatRef}
+            data={messages}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={tw`pb-4`}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
 
         {/* Typing indicator */}
         {isTyping && (
@@ -377,23 +379,20 @@ export default function ChatbotScreen() {
           style={{ marginBottom: 80 }}
         >
           <View
-            style={tw`flex-row items-center px-4 pt-4 border-t border-gray-200 bg-white`}
+            style={tw`flex-row items-center px-4 pt-4 pb-2 border-t border-gray-200 bg-white`}
           >
-            <TouchableOpacity style={tw`p-2`}>
-              <Ionicons name="add" size={22} color={Colors.primary.blue} />
-            </TouchableOpacity>
-
-            <View style={tw`flex-1 ml-2 mr-2`}>
+            <View style={tw`flex-1 mr-2`}>
               <TextInput
                 value={input}
                 onChangeText={setInput}
-                placeholder="Type a message"
+                placeholder="Ask anything"
                 placeholderTextColor="#9CA3AF"
                 style={[
-                  tw`border border-gray-200 rounded-full px-4 pt-4`,
-                  { color: Colors.text.head },
+                  tw`border border-gray-300 rounded-full px-4`,
+                  { color: Colors.text.head, backgroundColor: '#F9FAFB', height: 36, paddingTop: 8, paddingBottom: 8 },
                 ]}
                 multiline
+                onSubmitEditing={sendMessage}
               />
             </View>
 
@@ -402,10 +401,10 @@ export default function ChatbotScreen() {
               disabled={isTyping || !input.trim()}
               style={[
                 tw`p-2 rounded-full`,
-                { backgroundColor: (isTyping || !input.trim()) ? "#9CA3AF" : Colors.primary.blue }
+                { backgroundColor: (isTyping || !input.trim()) ? "#D1D5DB" : Colors.primary.blue }
               ]}
             >
-              <Ionicons name="send" size={20} color="#fff" />
+              <Ionicons name="arrow-up" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
