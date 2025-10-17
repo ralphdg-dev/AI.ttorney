@@ -1,9 +1,10 @@
 import React from 'react';
-import { Users, Eye, Pencil, UserX } from 'lucide-react';
+import { Users, Eye, Pencil, UserX, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import ViewLegalSeekerModal from '../../components/users/ViewLegalSeekerModal';
+import DataTable from '../../components/ui/DataTable';
 import Pagination from '../../components/ui/Pagination';
 import { useToast } from '../../components/ui/Toast';
 import usersService from '../../services/usersService';
