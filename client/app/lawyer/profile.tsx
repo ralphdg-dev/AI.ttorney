@@ -27,6 +27,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
 import { useLawyerProfile, TimeSlot } from "../../services/lawyerProfileServices";
 import { supabase } from "../../config/supabase";
+import { useRouter } from "expo-router";
 
 interface ProfileData {
   name: string;
@@ -76,7 +77,19 @@ for (let h = 0; h < 24; h++) {
 }
 
 const LawyerProfilePage: React.FC = () => {
+  const router = useRouter();
   const { user, signOut, refreshUserData } = useAuth();
+  
+  // Helper function to get initials from name
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+  
   const [profileData, setProfileData] = useState<ProfileData>({
     name: "",
     email: "",
@@ -593,7 +606,7 @@ const LawyerProfilePage: React.FC = () => {
   };
 
   const handleSettings = () => {
-    console.log("Settings");
+    router.push('/settings');
   };
 
   const handleLogout = async () => {
@@ -619,10 +632,18 @@ const LawyerProfilePage: React.FC = () => {
         <View style={tw`bg-white p-4 border-b border-gray-200`}>
           <View style={tw`flex-row items-center`}>
             <View style={tw`relative mr-4`}>
-              <Image
-                source={{ uri: profileData.avatar }}
-                style={tw`w-20 h-20 rounded-full`}
-              />
+              {profileData.avatar && !profileData.avatar.includes('unsplash') ? (
+                <Image
+                  source={{ uri: profileData.avatar }}
+                  style={tw`w-20 h-20 rounded-full`}
+                />
+              ) : (
+                <View style={[tw`w-20 h-20 rounded-full items-center justify-center`, { backgroundColor: Colors.primary.blue }]}>
+                  <Text style={tw`text-white font-bold text-2xl`}>
+                    {getInitials(profileData.name || 'User')}
+                  </Text>
+                </View>
+              )}
               <View
                 style={[
                   tw`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center`,

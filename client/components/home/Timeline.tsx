@@ -65,6 +65,16 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     // This ensures any old references are cleared
   }, []);
 
+  // Helper function to get initials from name
+  const getInitials = useCallback((name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  }, []);
+
   const formatTimeAgo = useCallback((isoDate?: string): string => {
     if (!isoDate) return '';
     // Treat timestamps without timezone as UTC to avoid local offset issues
@@ -110,7 +120,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         user: isReplyAnon ? undefined : {
           name: replyUserData?.full_name || replyUserData?.username || 'User',
           username: replyUserData?.username || 'user',
-          avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+          avatar: replyUserData?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
           isLawyer: replyUserData?.role === 'verified_lawyer',
           lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
         },
@@ -124,7 +134,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         : { 
             name: userData?.full_name || userData?.username || 'User', 
             username: userData?.username || 'user', 
-            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
+            avatar: userData?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Use profile photo or fallback
             isLawyer: userData?.role === 'verified_lawyer',
             lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
           },
@@ -419,7 +429,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         : { 
             name: userName,
             username: userUsername,
-            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+            avatar: (currentUser as any)?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
             isLawyer: isLawyer,
             lawyerBadge: isLawyer ? 'Verified' : undefined
           },

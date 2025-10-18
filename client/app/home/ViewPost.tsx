@@ -1,8 +1,8 @@
 import React from 'react';
-import ViewPostReadOnly from '../../components/lawyer/forum/ViewPostReadOnly';
+import ViewPost from '../../components/lawyer/forum/ViewPost';
 
 const PostView: React.FC = () => {
-  return <ViewPostReadOnly />;
+  return <ViewPost />;
 };
 
 export default PostView;

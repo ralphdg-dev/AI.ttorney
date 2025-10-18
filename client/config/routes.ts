@@ -157,35 +157,35 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   // Settings routes
   '/settings': { 
     path: '/settings', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'verified_lawyer'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
   },
   '/settings/change-password': { 
     path: '/settings/change-password', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'verified_lawyer'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
   },
   '/settings/privacy-policy': { 
     path: '/settings/privacy-policy', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'verified_lawyer'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
   },
   '/settings/terms': { 
     path: '/settings/terms', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'verified_lawyer'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true
   },
   '/settings/about-us': { 
     path: '/settings/about-us', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'verified_lawyer'],
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true

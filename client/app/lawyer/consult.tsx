@@ -451,7 +451,7 @@ const LawyerConsultPage: React.FC = () => {
 
   if (loading && consultationRequests.length === 0) {
     return (
-      <SafeAreaView style={tw`flex-1 bg-gray-50`} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
         <Header
           title="Consultations"
           showSearch={false}
@@ -511,7 +511,7 @@ const LawyerConsultPage: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-50`} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
       <Header
         title="Consultations"
         showSearch={false}

@@ -57,6 +57,16 @@ const Post: React.FC<PostProps> = React.memo(({
   const { user: currentUser, session } = useAuth();
   const [isBookmarked, setIsBookmarked] = useState(propIsBookmarked || false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+
+  // Helper function to get initials from name
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
   
   // Update local state when prop changes
   useEffect(() => {
@@ -104,7 +114,7 @@ const Post: React.FC<PostProps> = React.memo(({
         setIsBookmarked(previousBookmarkState);
         onBookmarkStatusChange?.(id, previousBookmarkState);
       }
-    } catch (error) {
+    } catch {
       // Revert optimistic update on error
       setIsBookmarked(previousBookmarkState);
       onBookmarkStatusChange?.(id, previousBookmarkState);
@@ -219,11 +229,17 @@ const Post: React.FC<PostProps> = React.memo(({
             <View style={[styles.avatar, styles.anonymousAvatar]}>
               <User size={20} color="#6B7280" />
             </View>
-          ) : (
+          ) : user.avatar && !user.avatar.includes('flaticon') ? (
             <Image 
               source={{ uri: user.avatar }} 
               style={styles.avatar}
             />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: Colors.primary.blue, justifyContent: 'center', alignItems: 'center' }]}>
+              <Text style={{ color: 'white', fontWeight: '600', fontSize: 14 }}>
+                {getInitials(user.name)}
+              </Text>
+            </View>
           )}
           <View style={styles.userInfo}>
             <View style={styles.userNameRow}>
