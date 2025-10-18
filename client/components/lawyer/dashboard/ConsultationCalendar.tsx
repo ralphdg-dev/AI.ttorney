@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { ChevronLeft, ChevronRight, Calendar, Clock, Video, MapPin, X } from 'lucide-react-native';
-import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalCloseButton, ModalBody } from '../ui/modal';
-import Colors from '../../constants/Colors';
+import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalCloseButton, ModalBody } from '../../ui/modal';
+import Colors from '../../../constants/Colors';
 import tw from 'tailwind-react-native-classnames';
 
 interface ConsultationCalendarProps {

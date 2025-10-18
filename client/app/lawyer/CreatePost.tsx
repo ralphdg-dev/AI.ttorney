@@ -6,7 +6,7 @@ import { Shield, ArrowLeft } from 'lucide-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CategoryScroller from '@/components/glossary/CategoryScroller';
 import Colors from '../../constants/Colors';
-import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
+import { LawyerNavbar } from '../../components/lawyer/shared';
 import { useAuth } from '@/contexts/AuthContext';
 import { useForumCache } from '@/contexts/ForumCacheContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,7 +18,6 @@ const LawyerCreatePost: React.FC = () => {
   const { clearCache } = useForumCache();
   const [content, setContent] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
-  const [isAnonymous, setIsAnonymous] = useState<boolean>(false);
   const [isPosting, setIsPosting] = useState(false);
   const MAX_LEN = 500;
 

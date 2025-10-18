@@ -2,17 +2,17 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Image, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { User, Bookmark, MoreHorizontal, Flag } from 'lucide-react-native';
-import ReportModal from '../common/ReportModal';
-import { ReportService } from '../../services/reportService';
+import ReportModal from '../../common/ReportModal';
+import { ReportService } from '../../../services/reportService';
 import tw from 'tailwind-react-native-classnames';
-import Colors from '../../constants/Colors';
-import Header from '../Header';
-import { BookmarkService } from '../../services/bookmarkService';
-import { useAuth } from '../../contexts/AuthContext';
-import SkeletonLoader from '../ui/SkeletonLoader';
+import Colors from '../../../constants/Colors';
+import Header from '../../Header';
+import { BookmarkService } from '../../../services/bookmarkService';
+import { useAuth } from '../../../contexts/AuthContext';
+import SkeletonLoader from '../../ui/SkeletonLoader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useForumCache } from '../../contexts/ForumCacheContext';
-import { createShadowStyle } from '../../utils/shadowUtils';
+import { useForumCache } from '../../../contexts/ForumCacheContext';
+import { createShadowStyle } from '../../../utils/shadowUtils';
 
 
 interface PostData {

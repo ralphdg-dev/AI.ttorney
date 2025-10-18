@@ -2,19 +2,19 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, SafeAreaView, Animated } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { User, Shield, MessageCircle, Bookmark, MoreHorizontal, Flag, Send } from 'lucide-react-native';
-import ReportModal from '../common/ReportModal';
-import { ReportService } from '../../services/reportService';
+import ReportModal from '../../common/ReportModal';
+import { ReportService } from '../../../services/reportService';
 import tw from 'tailwind-react-native-classnames';
-import Colors from '../../constants/Colors';
-import Header from '../Header';
+import Colors from '../../../constants/Colors';
+import Header from '../../Header';
 // eslint-disable-next-line import/no-named-as-default
 import apiClient from '@/lib/api-client';
-import { BookmarkService } from '../../services/bookmarkService';
-import { useAuth } from '../../contexts/AuthContext';
-import SkeletonLoader from '../ui/SkeletonLoader';
+import { BookmarkService } from '../../../services/bookmarkService';
+import { useAuth } from '../../../contexts/AuthContext';
+import SkeletonLoader from '../../ui/SkeletonLoader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createShadowStyle } from '../../utils/shadowUtils';
-import { shouldUseNativeDriver } from '../../utils/animations';
+import { createShadowStyle } from '../../../utils/shadowUtils';
+import { shouldUseNativeDriver } from '../../../utils/animations';
 
 interface Reply {
   id: string;

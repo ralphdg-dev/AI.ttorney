@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Timeline from '../../components/home/Timeline';
-import LawyerNavbar from '../../components/lawyer/LawyerNavbar';
+import { LawyerNavbar } from '../../components/lawyer/shared';
 import Header from '../../components/Header';
 import { SidebarWrapper } from '../../components/AppSidebar';
 

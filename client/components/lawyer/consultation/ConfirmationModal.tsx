@@ -1,13 +1,13 @@
 import React from 'react';
-import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody, ModalFooter } from '../ui/modal';
-import { VStack } from '../ui/vstack';
-import { Text } from '../ui/text';
-import { Heading } from '../ui/heading';
-import { Button, ButtonText } from '../ui/button/';
-import { Icon } from '../ui/icon';
-import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react-native';
-import { Box } from '../ui/box';
-import Colors from '../../constants/Colors';
+import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody, ModalFooter } from '../../ui/modal';
+import { VStack } from '../../ui/vstack';
+import { Text } from '../../ui/text';
+import { Heading } from '../../ui/heading';
+import { Button, ButtonText } from '../../ui/button/';
+import { Icon } from '../../ui/icon';
+import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react-native';
+import { Box } from '../../ui/box';
+import Colors from '../../../constants/Colors';
 
 interface ConfirmationModalProps {
   isOpen: boolean;

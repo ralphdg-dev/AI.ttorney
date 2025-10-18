@@ -9,8 +9,8 @@ import { useAuth } from '../../../contexts/AuthContext';
 import Colors from '../../../constants/Colors';
 import tw from 'tailwind-react-native-classnames';
 import Header from '../../../components/Header';
-import LawyerNavbar from '../../../components/lawyer/LawyerNavbar';
-import ConfirmationModal from '../../../components/lawyer/ConfirmationModal';
+import { LawyerNavbar } from '../../../components/lawyer/shared';
+import { ConfirmationModal } from '../../../components/lawyer/consultation';
 
 interface ConsultationRequest {
   id: string;

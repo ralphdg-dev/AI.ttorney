@@ -19,9 +19,9 @@ import {
   MapPin,
 } from "lucide-react-native";
 import { ConsultationListSkeleton } from "./consultation/ConsultationCardSkeleton";
-import LawyerNavbar from "../../components/lawyer/LawyerNavbar";
+import { LawyerNavbar } from "../../components/lawyer/shared";
 import Header from "../../components/Header";
-import ConfirmationModal from "../../components/lawyer/ConfirmationModal";
+import { ConfirmationModal } from "../../components/lawyer/consultation";
 import { useAuth } from "../../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../../constants/Colors";

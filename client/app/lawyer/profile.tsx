@@ -19,22 +19,14 @@ import {
   MapPin,
   Clock,
 } from "lucide-react-native";
-import LawyerNavbar from "../../components/lawyer/LawyerNavbar";
+import { LawyerNavbar } from "../../components/lawyer/shared";
 import Header from "../../components/Header";
-import EditProfileModal from "./ProfileComponents/EditProfileModal";
+import { EditProfileModal } from "../../components/lawyer/profile";
 import Colors from "../../constants/Colors";
 import { useAuth } from "../../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
-import { useLawyerProfile } from "../../services/lawyerProfileServices";
+import { useLawyerProfile, TimeSlot } from "../../services/lawyerProfileServices";
 import { supabase } from "../../config/supabase";
-
-interface TimeSlot {
-  id: string;
-  day: string;
-  startTime: string;
-  endTime: string;
-  isActive: boolean;
-}
 
 interface ProfileData {
   name: string;
@@ -492,10 +484,13 @@ const LawyerProfilePage: React.FC = () => {
       const combinedData = {
         name: profileData.name,
         email: profileData.email,
+        avatar: profileData.avatar || '',
         phone: contactInfo.phone_number,
         location: contactInfo.location,
         bio: contactInfo.bio,
-        specialization: contactInfo.specializations,
+        specialization: Array.isArray(contactInfo.specializations) 
+          ? contactInfo.specializations 
+          : [contactInfo.specializations],
         days: profileData.days,
         hours_available: profileData.hours_available,
       };
@@ -954,7 +949,7 @@ const LawyerProfilePage: React.FC = () => {
           hours_available: lawyerContactInfo.hours_available,
         }}
         availabilitySlots={availabilitySlots}
-        onAvailabilityChange={setAvailabilitySlots}
+        onAvailabilityChange={(slots) => setAvailabilitySlots(slots)}
       />
       <LawyerNavbar activeTab="profile" />
     </SafeAreaView>

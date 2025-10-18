@@ -2,15 +2,15 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl, Animated } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import Post from '../home/Post';
-import Colors from '../../constants/Colors';
-import { Database } from '../../types/database.types';
+import Post from '../../home/Post';
+import Colors from '../../../constants/Colors';
+import { Database } from '../../../types/database.types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
+import ForumLoadingAnimation from '../../ui/ForumLoadingAnimation';
 import { useAuth } from '@/contexts/AuthContext';
-import { createShadowStyle } from '../../utils/shadowUtils';
-import { shouldUseNativeDriver } from '../../utils/animations';
+import { createShadowStyle } from '../../../utils/shadowUtils';
+import { shouldUseNativeDriver } from '../../../utils/animations';
 
 type ForumPost = Database['public']['Tables']['forum_posts']['Row'];
 type User = Database['public']['Tables']['users']['Row'];
@@ -82,7 +82,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
       setRefreshing(false);
       
       // Prompt user to login instead of making API call
-      import('../../utils/authUtils').then(({ checkAuthentication }) => {
+      import('../../../utils/authUtils').then(({ checkAuthentication }) => {
         checkAuthentication();
       });
       return;
@@ -112,7 +112,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
       clearTimeout(timeoutId);
 
       // Handle session timeout
-      const { handleSessionTimeout } = await import('../../utils/authUtils');
+      const { handleSessionTimeout } = await import('../../../utils/authUtils');
       const isSessionTimeout = await handleSessionTimeout(response);
       if (isSessionTimeout) {
         setRefreshing(false);

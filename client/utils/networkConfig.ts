@@ -33,8 +33,14 @@ export class NetworkConfig {
     }
 
     try {
-      // Method 1: Use Expo's debugger host (most reliable)
-      const debuggerHost = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost;
+      // Web platform always uses localhost (no IP detection needed)
+      if (Platform.OS === 'web') {
+        this.cachedIP = 'localhost';
+        return 'localhost';
+      }
+
+      // Method 1: Use Expo's debugger host (most reliable for mobile)
+      const debuggerHost = Constants.expoConfig?.hostUri || (Constants.manifest as any)?.debuggerHost;
       if (debuggerHost) {
         // Extract IP from debuggerHost (format: "192.168.1.100:19000")
         const ip = debuggerHost.split(':')[0];
@@ -63,20 +69,6 @@ export class NetworkConfig {
       } else if (Platform.OS === 'android') {
         // Android Emulator uses 10.0.2.2 to access host machine
         return '10.0.2.2';
-      }
-
-      // Method 4: Common development IPs (last resort)
-      const commonIPs = [
-        '192.168.1.100',   // Common router IP range
-        '192.168.0.100',   // Alternative router IP range
-        '192.168.68.102',  // Current network (fallback)
-        '10.0.1.100',      // Corporate network range
-        'localhost'        // Local development
-      ];
-
-      for (const ip of commonIPs) {
-        console.log(`🔍 Trying fallback IP: ${ip}`);
-        return ip; // Return first available (we'll test connectivity separately)
       }
 
       // Final fallback
@@ -136,12 +128,17 @@ export class NetworkConfig {
   static async getBestApiUrl(): Promise<string> {
     const primaryUrl = this.getApiUrl();
     
-    // Test primary URL first
+    // For web platform, just return localhost without testing
+    if (Platform.OS === 'web') {
+      return primaryUrl;
+    }
+    
+    // For mobile: Test primary URL first
     if (await this.testConnectivity(primaryUrl)) {
       return primaryUrl;
     }
 
-    // If primary fails, try alternative IPs
+    // If primary fails, try alternative IPs (mobile only)
     const alternativeIPs = [
       '192.168.1.100',
       '192.168.0.100', 
@@ -183,7 +180,7 @@ export class NetworkConfig {
       platform: Platform.OS,
       expoConfig: {
         hostUri: Constants.expoConfig?.hostUri,
-        debuggerHost: Constants.manifest?.debuggerHost,
+        debuggerHost: (Constants.manifest as any)?.debuggerHost,
         manifestUrl: Constants.manifest2?.extra?.expoClient?.hostUri,
       }
     };

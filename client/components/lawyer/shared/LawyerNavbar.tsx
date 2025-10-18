@@ -9,8 +9,8 @@ import {
   User,
   Users
 } from 'lucide-react-native';
-import Colors from '../../constants/Colors';
-import { GlobalStyles } from '../../constants/GlobalStyles';
+import Colors from '../../../constants/Colors';
+import { GlobalStyles } from '../../../constants/GlobalStyles';
 
 interface LawyerNavbarProps {
   activeTab?: 'home' | 'forum' | 'consult' | 'chatbot' | 'profile';

@@ -1,5 +1,5 @@
 import React from 'react';
-import LawyerViewPost from '../../components/lawyer/ViewPost';
+import { ViewPost as LawyerViewPost } from '../../components/lawyer/forum';
 
 const LawyerViewPostPage: React.FC = () => {
   return <LawyerViewPost />;

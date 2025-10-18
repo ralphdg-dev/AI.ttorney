@@ -4,7 +4,7 @@ import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 import { Ionicons } from "@expo/vector-icons";
 import Header from "../../components/Header";
-import LawyerNavbar from "../../components/lawyer/LawyerNavbar";
+import { LawyerNavbar } from '../../components/lawyer/shared';
 import { SidebarWrapper } from "../../components/AppSidebar";
 
 // Replace with your lawyer-specific logo if needed
