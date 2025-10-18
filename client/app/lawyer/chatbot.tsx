@@ -88,10 +88,10 @@ export default function LawyerChatbotScreen() {
         <View style={isUser ? tw`items-end` : tw`items-start`}>
           <View
             style={[
-              tw`max-w-4/5 p-3 rounded-2xl`,
+              tw`max-w-4/5 rounded-2xl`,
               isUser
-                ? { backgroundColor: Colors.primary.blue }
-                : { backgroundColor: "#F3F4F6" },
+                ? { backgroundColor: Colors.primary.blue, paddingHorizontal: 14, paddingVertical: 10 }
+                : { backgroundColor: "#F3F4F6", paddingHorizontal: 14, paddingVertical: 10 },
             ]}
           >
             <Text

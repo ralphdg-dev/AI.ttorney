@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Linking } from "react-native";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Linking, Image } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../constants/Colors";
@@ -10,7 +10,7 @@ import { useAuth } from "../contexts/AuthContext";
 import axios from "axios";
 import ChatHistorySidebar from "../components/chatbot/ChatHistorySidebar";
 import { ChatHistoryService } from "../services/chatHistoryService";
-import { Sparkles, Send } from "lucide-react-native";
+import { Send } from "lucide-react-native";
 import { MarkdownText } from "../components/chatbot/MarkdownText";
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -53,6 +53,25 @@ export default function ChatbotScreen() {
   const [conversationHistory, setConversationHistory] = useState<{role: string, content: string}[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string>("");
   const flatRef = useRef<FlatList>(null);
+
+  // Dynamic greeting that changes per session
+  const greeting = useMemo(() => {
+    const fullName = user?.full_name || user?.username || user?.email?.split('@')[0] || 'there';
+    const firstName = fullName.split(' ')[0]; // Extract first name only
+    const greetings = [
+      `${firstName} returns! May legal puzzle ba tayo ngayon?`,
+      `Welcome back, ${firstName}! Ready to decode some laws?`,
+      `Uy ${firstName}! Anong legal tanong natin today?`,
+      `${firstName}'s here! What legal mystery shall we solve?`,
+      `Kamusta ${firstName}! May kaso ba o chismis lang? Joke!`,
+      `Hey ${firstName}! Let's make Philippine law make sense.`,
+      `${firstName} is back! Time for some legal wisdom?`,
+      `Mabuhay ${firstName}! Ano'ng legal concern natin?`,
+      `Look who's back—${firstName}! Ready to tackle the law?`,
+      `${firstName} returns! Let's navigate some legal waters.`,
+    ];
+    return greetings[Math.floor(Math.random() * greetings.length)];
+  }, [user]); // Changes when user changes
 
   useEffect(() => {
     if (messages.length) {
@@ -382,11 +401,15 @@ export default function ChatbotScreen() {
           {!isUser && (
             <View
               style={[
-                tw`w-8 h-8 rounded-full items-center justify-center mr-3 mt-1`,
-                { backgroundColor: Colors.primary.blue },
+                tw`w-8 h-8 rounded-full items-center justify-center mr-2 mt-1`,
+                { backgroundColor: '#fff' },
               ]}
             >
-              <Sparkles size={16} color="#fff" />
+              <Image 
+                source={require('../assets/images/logo.png')} 
+                style={{ width: 32, height: 32, borderRadius: 16 }}
+                resizeMode="contain"
+              />
             </View>
           )}
           <View
@@ -397,7 +420,8 @@ export default function ChatbotScreen() {
                     backgroundColor: Colors.primary.blue,
                     maxWidth: '85%',
                     alignSelf: 'flex-end',
-                    padding: 16,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
                     ...(Platform.OS === 'web'
                       ? { boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }
                       : {
@@ -411,7 +435,8 @@ export default function ChatbotScreen() {
                 : { 
                     backgroundColor: Colors.background.secondary,
                     maxWidth: '100%',
-                    padding: 16,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
                     ...(Platform.OS === 'web'
                       ? { boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' }
                       : {
@@ -426,7 +451,7 @@ export default function ChatbotScreen() {
           >
             {/* Normalized query indicator */}
             {!isUser && item.normalized_query && (
-              <View style={[tw`mb-3 p-3 rounded-lg`, { backgroundColor: Colors.status.info + '15' }]}>
+              <View style={[tw`mb-2 p-2 rounded-lg`, { backgroundColor: Colors.status.info + '15' }]}>
                 <Text style={[tw`text-xs font-medium`, { color: Colors.status.info }]}>
                   Understood as: {item.normalized_query}
                 </Text>
@@ -443,7 +468,7 @@ export default function ChatbotScreen() {
               ]}
             />
             {!isUser && item.confidence && (
-              <View style={[tw`mt-4 p-3 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}>
+              <View style={[tw`mt-3 p-2 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}>
                 <Text style={[tw`text-xs font-semibold`, { color: Colors.text.secondary }]}>
                   Confidence: {item.confidence === 'high' && 'High'}
                   {item.confidence === 'medium' && 'Medium'}
@@ -454,10 +479,10 @@ export default function ChatbotScreen() {
             
             {/* Show sources with URLs */}
             {!isUser && item.sources && item.sources.length > 0 && (
-              <View style={[tw`mt-4 pt-3 border-t`, { borderTopColor: Colors.border.light }]}>
-                <Text style={[tw`text-sm font-bold mb-3`, { color: Colors.text.primary }]}>Legal Sources</Text>
+              <View style={[tw`mt-3 pt-2 border-t`, { borderTopColor: Colors.border.light }]}>
+                <Text style={[tw`text-sm font-bold mb-2`, { color: Colors.text.primary }]}>Legal Sources</Text>
                 {item.sources.map((source, idx) => (
-                  <View key={idx} style={[tw`mb-3 p-4 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}>
+                  <View key={idx} style={[tw`mb-2 p-3 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}>
                     <Text style={[tw`text-sm font-bold mb-1`, { color: Colors.text.primary }]}>
                       {source.law.toUpperCase()}
                     </Text>
@@ -490,8 +515,8 @@ export default function ChatbotScreen() {
 
             {/* Legal disclaimer */}
             {!isUser && item.legal_disclaimer && (
-              <View style={[tw`mt-4 pt-3 border-t`, { borderTopColor: Colors.border.light }]}>
-                <View style={[tw`p-3 rounded-lg`, { backgroundColor: Colors.status.warning + '15' }]}>
+              <View style={[tw`mt-3 pt-2 border-t`, { borderTopColor: Colors.border.light }]}>
+                <View style={[tw`p-2 rounded-lg`, { backgroundColor: Colors.status.warning + '15' }]}>
                   {renderLegalDisclaimer(item.legal_disclaimer)}
                 </View>
               </View>
@@ -499,8 +524,8 @@ export default function ChatbotScreen() {
 
             {/* Fallback suggestions for complex queries */}
             {!isUser && item.fallback_suggestions && item.fallback_suggestions.length > 0 && (
-              <View style={[tw`mt-4 p-4 rounded-lg`, { backgroundColor: Colors.status.info + '15' }]}>
-                <Text style={[tw`text-sm font-bold mb-3`, { color: Colors.status.info }]}>
+              <View style={[tw`mt-3 p-3 rounded-lg`, { backgroundColor: Colors.status.info + '15' }]}>
+                <Text style={[tw`text-sm font-bold mb-2`, { color: Colors.status.info }]}>
                   Recommended Next Steps
                 </Text>
                 {item.fallback_suggestions.map((suggestion, idx) => (
@@ -545,14 +570,18 @@ export default function ChatbotScreen() {
           <View style={tw`flex-1 items-center justify-center px-8`}>
             <View
               style={[
-                tw`w-20 h-20 rounded-full items-center justify-center mb-6`,
-                { backgroundColor: Colors.primary.blue + '15' },
+                tw`w-24 h-24 rounded-full items-center justify-center mb-6`,
+                { backgroundColor: '#fff' },
               ]}
             >
-              <Sparkles size={40} color={Colors.primary.blue} />
+              <Image 
+                source={require('../assets/images/logo.png')} 
+                style={{ width: 80, height: 80 }}
+                resizeMode="contain"
+              />
             </View>
             <Text style={[tw`text-2xl font-bold text-center mb-3`, { color: Colors.text.primary }]}>
-              May tanong tungkol sa batas?
+              {greeting}
             </Text>
             <Text style={[tw`text-base text-center`, { color: Colors.text.secondary }]}>
               I specialize in Civil, Criminal, Consumer, Family, and Labor Law. Ask away!
@@ -600,11 +629,15 @@ export default function ChatbotScreen() {
             <View style={tw`flex-row items-start`}>
               <View
                 style={[
-                  tw`w-8 h-8 rounded-full items-center justify-center mr-3`,
-                  { backgroundColor: Colors.primary.blue },
+                  tw`w-8 h-8 rounded-full items-center justify-center mr-2`,
+                  { backgroundColor: '#fff' },
                 ]}
               >
-                <Sparkles size={16} color="#fff" />
+                <Image 
+                  source={require('../assets/images/logo.png')} 
+                  style={{ width: 32, height: 32, borderRadius: 16 }}
+                  resizeMode="contain"
+                />
               </View>
               <View style={[tw`p-4 rounded-2xl flex-row items-center`, { backgroundColor: Colors.background.secondary }]}>
                 <ActivityIndicator size="small" color={Colors.primary.blue} style={tw`mr-3`} />
@@ -665,7 +698,7 @@ export default function ChatbotScreen() {
                   <TextInput
                     value={input}
                     onChangeText={setInput}
-                    placeholder="Ask about Civil, Criminal, Consumer, Family, or Labor Law..."
+                    placeholder="Ask your legal question..."
                     placeholderTextColor={Colors.text.tertiary}
                     style={[
                       tw`text-base`,
