@@ -284,7 +284,6 @@ export default function TermDetailScreen() {
             <GSText
               size="sm"
               className="md:text-base lg:text-lg text-gray-800"
-              style={{ lineHeight: 24 }}
             >
               {term.definition_en}
             </GSText>
@@ -306,7 +305,6 @@ export default function TermDetailScreen() {
               <GSText
                 size="sm"
                 className="md:text-base lg:text-lg text-gray-800"
-                style={{ lineHeight: 24 }}
               >
                 {term.definition_fil}
               </GSText>
@@ -340,7 +338,6 @@ export default function TermDetailScreen() {
                     <GSText
                       size="sm"
                       className="italic md:text-base lg:text-lg text-gray-800"
-                      style={{ lineHeight: 24 }}
                     >
                       &quot;{term.example_en}&quot;
                     </GSText>
@@ -361,7 +358,6 @@ export default function TermDetailScreen() {
                     <GSText
                       size="sm"
                       className="italic md:text-base lg:text-lg text-gray-800"
-                      style={{ lineHeight: 24 }}
                     >
                       &quot;{term.example_fil}&quot;
                     </GSText>

@@ -245,10 +245,17 @@ def is_simple_greeting(text: str) -> bool:
     
     text_lower = text.lower().strip()
     
-    # Check for exact matches or simple phrases
+    # Check for exact matches or simple phrases (must be standalone, not part of a longer question)
+    # Only match if the text is JUST a greeting, not a greeting + question
     for greeting in greetings:
-        if greeting in text_lower or text_lower in greeting:
+        if text_lower == greeting or text_lower.startswith(greeting + '!') or text_lower.startswith(greeting + '.'):
             return True
+    
+    # Also match very short greetings (under 20 chars) that contain greeting words
+    if len(text_lower) < 20:
+        for greeting in greetings:
+            if greeting in text_lower:
+                return True
     
     return False
 
@@ -400,12 +407,25 @@ def is_personal_advice_question(text: str) -> bool:
     
     # Personal advice patterns - asking for opinions/decisions
     personal_advice_patterns = [
+        # Legal action decisions (CRITICAL - these need lawyer advice)
+        'should i file', 'dapat ba mag-file', 'should i sue', 'dapat ba kasuhan',
+        'should i press charges', 'dapat ba mag-charge', 'should i report',
+        'dapat ba ireport', 'should i take legal action', 'dapat ba kumilos',
+        'should i go to court', 'dapat ba pumunta sa korte',
+        'should i hire', 'dapat ba kumuha ng', 'should i get a lawyer',
+        'dapat ba kumuha ng abogado', 'should i accept', 'dapat ba tanggapin',
+        'should i sign', 'dapat ba pirmahan', 'should i settle',
+        'dapat ba makipag-settle', 'should i fight', 'dapat ba labanan',
+        # Case strategy questions
+        'will i win', 'mananalo ba ako', 'can i win', 'pwede ba manalo',
+        'what are my chances', 'ano ang tsansa ko', 'is my case strong',
+        'malakas ba ang kaso ko', 'do i have a case', 'may kaso ba ako',
         # Marriage/relationship decisions
         'should i marry', 'dapat ba akong magpakasal', 'dapat ba ikasal', 'dapat ba ako magpakasal',
         'should i get married', 'dapat ba mag-asawa',
         # Divorce/separation decisions  
         'should i divorce', 'dapat ba maghiwalay', 'dapat ba mag-divorce', 'dapat ba hiwalayan',
-        'should i leave my', 'dapat ba iwan ko', 'dapat ba umalis ako',
+        'should i leave my', 'dapat ba iwan ko', 'should i stay with', 'dapat ba manatili',
         # Cheating/infidelity advice
         'what to do with cheating', 'ano gagawin sa cheating', 'ano gawin sa nanloloko',
         'what should i do with my cheating', 'paano ang cheating', 'ano gawin sa nag-cheat',
@@ -414,12 +434,13 @@ def is_personal_advice_question(text: str) -> bool:
         'should i marry my bf', 'should i marry my gf', 'dapat ba pakasalan',
         'marry my boyfriend', 'marry my girlfriend', 'pakasalan ko ba',
         # Forgiveness/reconciliation
-        'should i forgive', 'dapat ba patawarin', 'dapat ba magsisi',
-        # Right/wrong in relationships
+        'should i forgive', 'dapat ba patawarin', 'should i give another chance',
+        # Right/wrong in specific situations
         'is he right', 'is she right', 'tama ba siya', 'mali ba ako',
-        'am i wrong', 'mali ba ako', 'tama ba ako',
-        # General relationship advice
-        'what to do in my relationship', 'ano gawin sa relasyon',
+        'am i wrong', 'mali ba ako', 'am i right', 'tama ba ako',
+        # General personal situation advice
+        'what should i do in my situation', 'ano dapat kong gawin sa sitwasyon ko',
+        'what to do in my case', 'ano gawin sa kaso ko',
         'help with my relationship', 'tulong sa relasyon'
     ]
     
@@ -444,15 +465,25 @@ def is_legal_question(text: str) -> bool:
         'pulisya', 'property', 'ari-arian', 'inheritance', 'mana',
         'consumer', 'konsumer', 'protection', 'proteksyon', 'employment',
         'trabaho', 'labor', 'paggawa', 'business', 'negosyo', 'tax',
-        'buwis', 'obligation', 'obligasyon', 'responsibility', 'responsibilidad'
+        'buwis', 'obligation', 'obligasyon', 'responsibility', 'responsibilidad',
+        # Case-related keywords
+        'case', 'kaso', 'file a case', 'mag-file ng kaso', 'complaint', 'reklamo',
+        'charges', 'kargos', 'lawsuit', 'litigate', 'litigation',
+        # Dispute-related
+        'dispute', 'alitan', 'conflict', 'away', 'neighbor', 'kapitbahay',
+        'landlord', 'tenant', 'may-ari', 'nangungupahan'
     ]
 
-    # Check for legal intent indicators
+    # Check for legal intent indicators (informational questions, NOT advice)
     legal_indicators = [
         'ano ang', 'what is', 'paano', 'how to', 'pwede ba', 'can i',
         'may karapatan ba', 'do i have rights',
         'legal ba', 'is it legal', 'illegal ba', 'is it illegal',
-        'tulungan mo ako', 'help me with', 'konsultasyon'
+        'tulungan mo ako', 'help me with', 'konsultasyon',
+        # Process/procedure questions (NOT decision questions)
+        'how do i file', 'paano mag-file', 'how to file', 'paano ang pag-file',
+        'what is the process', 'ano ang proseso', 'what are the steps', 'ano ang hakbang',
+        'requirements for', 'kailangan para sa', 'how long does', 'gaano katagal'
     ]
 
     # Check if any legal keyword is present
@@ -463,6 +494,42 @@ def is_legal_question(text: str) -> bool:
 
     # Must have either legal keyword or legal intent to be considered a legal question
     return has_legal_keyword or has_legal_intent
+
+
+def is_complex_query(text: str) -> bool:
+    """
+    Detect if a query is complex and requires professional legal advice
+    Complex queries include:
+    - Multiple legal domains
+    - Specific personal situations requiring tailored advice
+    - Questions about legal strategy or outcomes
+    """
+    text_lower = text.lower().strip()
+    
+    # Indicators of complexity
+    complex_indicators = [
+        # Multiple questions
+        'and also', 'at saka', 'also', 'pati na rin', 'kasama na',
+        # Personal situation specifics
+        'my case', 'my situation', 'ang kaso ko', 'sa akin', 'para sa akin',
+        'should i', 'dapat ba ako', 'can i win', 'mananalo ba ako',
+        # Legal strategy questions
+        'best way', 'pinakamabuti', 'strategy', 'estratehiya',
+        'what should i do', 'ano dapat kong gawin', 'paano ko',
+        # Multiple legal domains mentioned
+        'criminal and civil', 'labor and consumer', 'family and property'
+    ]
+    
+    # Check for complexity indicators
+    has_complexity = any(indicator in text_lower for indicator in complex_indicators)
+    
+    # Check if question is very long (>200 chars) - likely detailed/complex
+    is_very_long = len(text) > 200
+    
+    # Check for multiple question marks (multiple questions)
+    has_multiple_questions = text.count('?') > 1
+    
+    return has_complexity or is_very_long or has_multiple_questions
 
 
 def get_embedding(text: str) -> List[float]:
@@ -1343,18 +1410,23 @@ async def ask_legal_question(
         # 🔒 CHECK FOR PERSONAL ADVICE QUESTIONS (even if they contain legal keywords)
         if is_personal_advice_question(request.question):
             # This is asking for personal advice/opinion, not legal information
-            personal_advice_response = generate_out_of_scope_response(
-                request.question,
-                "personal advice",
-                language
-            )
+            if language == "tagalog":
+                personal_advice_response = (
+                    "Naiintindihan ko na kailangan mo ng tulong sa desisyon mo, pero hindi ako makakapagbigay ng personal na legal advice tungkol sa kung ano ang dapat mong gawin sa iyong specific na sitwasyon. "
+                    "Para sa ganitong mga tanong, kailangan mo ng konsultasyon sa isang lisensyadong abogado na makakapag-review ng lahat ng detalye ng iyong kaso."
+                )
+            else:
+                personal_advice_response = (
+                    "I understand you need help with a decision, but I cannot provide personal legal advice about what you should do in your specific situation. "
+                    "For questions like this, you need a consultation with a licensed lawyer who can review all the details of your case."
+                )
             
             return ChatResponse(
                 answer=personal_advice_response,
                 sources=[],
-                simplified_summary="Personal advice question blocked - not legal information",
-                legal_disclaimer="",
-                fallback_suggestions=None
+                simplified_summary="Personal advice question - requires lawyer consultation",
+                legal_disclaimer=get_legal_disclaimer(language),
+                fallback_suggestions=get_fallback_suggestions(language, is_complex=True)
             )
         
         # Check if question is about out-of-scope topics (politics, finance, medicine, etc.)
@@ -1420,12 +1492,12 @@ async def ask_legal_question(
                 answer=no_context_message,
                 sources=[],
                 simplified_summary="No relevant legal information found in database",
-                legal_disclaimer="",
-                fallback_suggestions=None
+                legal_disclaimer=get_legal_disclaimer(language),
+                fallback_suggestions=get_fallback_suggestions(language, is_complex=True)
             )
         
-        # Simplified - no complex query detection needed
-        is_complex = False
+        # Detect if query is complex (requires multiple legal domains or personal advice)
+        is_complex = is_complex_query(request.question)
         
         # Calculate confidence based on source relevance scores
         if sources and len(sources) > 0:
@@ -1557,8 +1629,8 @@ async def ask_legal_question(
         # Get legal disclaimer (simplified)
         legal_disclaimer = get_legal_disclaimer(language)
         
-        # Get fallback suggestions only if needed (simplified)
-        fallback_suggestions = get_fallback_suggestions(language, is_complex=False) if is_complex else None
+        # Get fallback suggestions for complex queries OR low confidence answers
+        fallback_suggestions = get_fallback_suggestions(language, is_complex=True) if (is_complex or confidence == "low") else None
         
         # === SAVE TO CHAT HISTORY ===
         session_id = request.session_id
