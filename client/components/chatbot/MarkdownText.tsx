@@ -109,8 +109,8 @@ const renderInlineMarkdown = (text: string, textColor: string, boldColor: string
 const styles = StyleSheet.create({
   paragraph: {
     fontSize: 16,
-    lineHeight: 26,
-    marginBottom: 8,
+    lineHeight: 22,
+    marginBottom: 0,
   },
   bold: {
     fontWeight: '700',

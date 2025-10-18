@@ -396,18 +396,30 @@ export default function ChatbotScreen() {
   const renderItem = ({ item }: { item: Message }) => {
     const isUser = item.fromUser;
     return (
-      <View style={tw`px-4 py-2`}>
+      <View style={tw`px-4 py-1.5`}>
         <View style={isUser ? tw`items-end` : tw`items-start flex-row`}>
           {!isUser && (
             <View
               style={[
-                tw`w-8 h-8 rounded-full items-center justify-center mr-2 mt-1`,
-                { backgroundColor: '#fff' },
+                tw`w-9 h-9 rounded-full items-center justify-center mr-2.5`,
+                { 
+                  backgroundColor: '#fff',
+                  marginTop: 2,
+                  ...(Platform.OS === 'web'
+                    ? { boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' }
+                    : {
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 3,
+                        elevation: 2,
+                      }),
+                },
               ]}
             >
               <Image 
                 source={require('../assets/images/logo.png')} 
-                style={{ width: 32, height: 32, borderRadius: 16 }}
+                style={{ width: 34, height: 34 }}
                 resizeMode="contain"
               />
             </View>
@@ -421,7 +433,7 @@ export default function ChatbotScreen() {
                     maxWidth: '85%',
                     alignSelf: 'flex-end',
                     paddingHorizontal: 14,
-                    paddingVertical: 10,
+                    paddingVertical: 8,
                     ...(Platform.OS === 'web'
                       ? { boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }
                       : {
@@ -436,7 +448,7 @@ export default function ChatbotScreen() {
                     backgroundColor: Colors.background.secondary,
                     maxWidth: '100%',
                     paddingHorizontal: 14,
-                    paddingVertical: 10,
+                    paddingVertical: 8,
                     ...(Platform.OS === 'web'
                       ? { boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' }
                       : {
@@ -464,9 +476,19 @@ export default function ChatbotScreen() {
               isUserMessage={isUser}
               style={[
                 tw`text-base`,
-                { lineHeight: 26 },
+                { lineHeight: 22 },
               ]}
             />
+            
+            {/* Legal Disclaimer - Always show for bot messages */}
+            {!isUser && (
+              <View style={[tw`mt-3 p-3 rounded-lg`, { backgroundColor: Colors.status.warning + '10', borderLeftWidth: 3, borderLeftColor: Colors.status.warning }]}>
+                <Text style={[tw`text-xs`, { color: Colors.text.secondary, lineHeight: 16 }]}>
+                  ⚠️ This is general legal information, not legal advice. For specific guidance on your situation, please consult with a licensed attorney.
+                </Text>
+              </View>
+            )}
+            
             {!isUser && item.confidence && (
               <View style={[tw`mt-3 p-2 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}>
                 <Text style={[tw`text-xs font-semibold`, { color: Colors.text.secondary }]}>
@@ -567,28 +589,46 @@ export default function ChatbotScreen() {
         {/* Messages list or centered placeholder */}
         <View style={tw`flex-1`}>
         {messages.length === 0 ? (
-          <View style={tw`flex-1 items-center justify-center px-8`}>
+          <View style={tw`flex-1 items-center px-6 pt-12`}>
+            {/* Logo with subtle shadow */}
             <View
               style={[
-                tw`w-24 h-24 rounded-full items-center justify-center mb-6`,
-                { backgroundColor: '#fff' },
+                tw`w-28 h-28 rounded-full items-center justify-center mb-6`,
+                { 
+                  backgroundColor: '#fff',
+                  ...(Platform.OS === 'web'
+                    ? { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }
+                    : {
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.08,
+                        shadowRadius: 12,
+                        elevation: 4,
+                      }),
+                },
               ]}
             >
               <Image 
                 source={require('../assets/images/logo.png')} 
-                style={{ width: 80, height: 80 }}
+                style={{ width: 88, height: 88 }}
                 resizeMode="contain"
               />
             </View>
-            <Text style={[tw`text-2xl font-bold text-center mb-3`, { color: Colors.text.primary }]}>
+            
+            {/* Greeting */}
+            <Text style={[tw`text-3xl font-bold text-center mb-2`, { color: Colors.text.primary }]}>
               {greeting}
             </Text>
-            <Text style={[tw`text-base text-center`, { color: Colors.text.secondary }]}>
+            
+            {/* Subtitle */}
+            <Text style={[tw`text-base text-center mb-10 px-4`, { color: Colors.text.secondary, lineHeight: 24 }]}>
               I specialize in Civil, Criminal, Consumer, Family, and Labor Law. Ask away!
             </Text>
-            <View style={tw`mt-8 w-full px-4`}>
-              <Text style={[tw`text-sm font-semibold mb-3`, { color: Colors.text.primary }]}>
-                Try asking:
+            
+            {/* Suggestions */}
+            <View style={tw`w-full px-2`}>
+              <Text style={[tw`text-sm font-semibold mb-4 px-2`, { color: Colors.text.secondary }]}>
+                Popular questions:
               </Text>
               {[
                 'What are my rights as a tenant?',
@@ -599,13 +639,33 @@ export default function ChatbotScreen() {
                   key={idx}
                   onPress={() => setInput(suggestion)}
                   style={[
-                    tw`p-4 mb-2 rounded-xl`,
-                    { backgroundColor: Colors.background.secondary },
+                    tw`p-4 mb-3 rounded-2xl flex-row items-center`,
+                    { 
+                      backgroundColor: Colors.background.secondary,
+                      borderWidth: 1,
+                      borderColor: Colors.border.light,
+                      ...(Platform.OS === 'web'
+                        ? { boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' }
+                        : {
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 3,
+                            elevation: 1,
+                          }),
+                    },
                   ]}
                 >
-                  <Text style={[tw`text-sm`, { color: Colors.text.primary }]}>
+                  <View style={[
+                    tw`w-8 h-8 rounded-full items-center justify-center mr-3`,
+                    { backgroundColor: Colors.primary.blue + '15' }
+                  ]}>
+                    <Ionicons name="chatbubble-outline" size={16} color={Colors.primary.blue} />
+                  </View>
+                  <Text style={[tw`text-sm flex-1`, { color: Colors.text.primary, lineHeight: 20 }]}>
                     {suggestion}
                   </Text>
+                  <Ionicons name="arrow-forward" size={16} color={Colors.text.tertiary} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -616,7 +676,7 @@ export default function ChatbotScreen() {
             data={messages}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={tw`px-4 pb-4 pt-2`}
+            contentContainerStyle={tw`pb-4 pt-2`}
             showsVerticalScrollIndicator={false}
             style={tw`flex-1`}
           />
@@ -625,23 +685,35 @@ export default function ChatbotScreen() {
 
         {/* Typing indicator */}
         {isTyping && (
-          <View style={tw`px-6 pb-3`}>
+          <View style={tw`px-4 pb-3`}>
             <View style={tw`flex-row items-start`}>
               <View
                 style={[
-                  tw`w-8 h-8 rounded-full items-center justify-center mr-2`,
-                  { backgroundColor: '#fff' },
+                  tw`w-9 h-9 rounded-full items-center justify-center mr-2.5`,
+                  { 
+                    backgroundColor: '#fff',
+                    marginTop: 2,
+                    ...(Platform.OS === 'web'
+                      ? { boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' }
+                      : {
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.1,
+                          shadowRadius: 3,
+                          elevation: 2,
+                        }),
+                  },
                 ]}
               >
                 <Image 
                   source={require('../assets/images/logo.png')} 
-                  style={{ width: 32, height: 32, borderRadius: 16 }}
+                  style={{ width: 34, height: 34 }}
                   resizeMode="contain"
                 />
               </View>
-              <View style={[tw`p-4 rounded-2xl flex-row items-center`, { backgroundColor: Colors.background.secondary }]}>
-                <ActivityIndicator size="small" color={Colors.primary.blue} style={tw`mr-3`} />
-                <Text style={[tw`text-sm font-medium`, { color: Colors.text.secondary }]}>Analyzing your question...</Text>
+              <View style={[tw`px-4 py-3 rounded-2xl flex-row items-center`, { backgroundColor: Colors.background.secondary }]}>
+                <ActivityIndicator size="small" color={Colors.primary.blue} style={tw`mr-2.5`} />
+                <Text style={[tw`text-sm`, { color: Colors.text.secondary }]}>Thinking...</Text>
               </View>
             </View>
           </View>
@@ -672,17 +744,16 @@ export default function ChatbotScreen() {
               },
             ]}
           >
-            <View style={tw`flex-row items-end`}>
+            <View style={tw`flex-row items-center`}>
               <View style={tw`flex-1 mr-3`}>
                 <View
                   style={[
-                    tw`rounded-3xl px-5 py-3`,
+                    tw`rounded-full px-5`,
                     {
                       backgroundColor: Colors.background.secondary,
-                      borderWidth: 1.5,
+                      borderWidth: 1,
                       borderColor: Colors.border.light,
-                      minHeight: 50,
-                      maxHeight: 120,
+                      height: 50,
                       ...(Platform.OS === 'web'
                         ? { boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' }
                         : {
@@ -699,18 +770,19 @@ export default function ChatbotScreen() {
                     value={input}
                     onChangeText={setInput}
                     placeholder="Ask your legal question..."
-                    placeholderTextColor={Colors.text.tertiary}
+                    placeholderTextColor="#9CA3AF"
                     style={[
-                      tw`text-base`,
+                      tw`text-base flex-1`,
                       { 
                         color: Colors.text.primary,
-                        paddingTop: Platform.OS === 'ios' ? 2 : 0,
                         outlineStyle: 'none',
+                        paddingVertical: 0,
+                        height: 48,
                       },
                     ]}
-                    multiline
                     maxLength={1000}
                     onSubmitEditing={sendMessage}
+                    returnKeyType="send"
                   />
                 </View>
               </View>

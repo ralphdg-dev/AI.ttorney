@@ -249,7 +249,7 @@ class ChatRequest(BaseModel):
     
     class Config:
         # Production: Add example for API documentation
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "question": "What is the legal age for marriage in the Philippines?",
                 "conversation_history": [],
