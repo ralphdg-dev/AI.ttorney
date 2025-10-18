@@ -11,6 +11,7 @@ import axios from "axios";
 import ChatHistorySidebar from "../components/chatbot/ChatHistorySidebar";
 import { ChatHistoryService } from "../services/chatHistoryService";
 import { Sparkles, Send } from "lucide-react-native";
+import { MarkdownText } from "../components/chatbot/MarkdownText";
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
 interface SourceCitation {
@@ -141,7 +142,7 @@ export default function ChatbotScreen() {
     }
   };
 
-  // Helper function to render legal disclaimer with clickable links
+  // Helper function to render legal disclaimer with clickable links and bold text
   const renderLegalDisclaimer = (disclaimer: string) => {
     /* eslint-disable @typescript-eslint/no-require-imports */
     // Parse markdown links [text](/path) and make them clickable
@@ -165,6 +166,33 @@ export default function ChatbotScreen() {
       parts.push({ text: disclaimer.substring(lastIndex), isLink: false });
     }
 
+    // Helper to render text with bold support
+    const renderTextWithBold = (text: string, key: number) => {
+      const boldRegex = /\*\*(.+?)\*\*/g;
+      const textParts: (string | React.ReactElement)[] = [];
+      let currentIndex = 0;
+      let boldMatch;
+      let partIndex = 0;
+
+      while ((boldMatch = boldRegex.exec(text)) !== null) {
+        if (boldMatch.index > currentIndex) {
+          textParts.push(text.substring(currentIndex, boldMatch.index));
+        }
+        textParts.push(
+          <Text key={`${key}-bold-${partIndex++}`} style={tw`font-bold`}>
+            {boldMatch[1]}
+          </Text>
+        );
+        currentIndex = boldMatch.index + boldMatch[0].length;
+      }
+
+      if (currentIndex < text.length) {
+        textParts.push(text.substring(currentIndex));
+      }
+
+      return textParts.length > 0 ? textParts : [text];
+    };
+
     return (
       <Text style={tw`text-xs text-gray-600 italic`}>
         {parts.map((part, index) => 
@@ -181,10 +209,10 @@ export default function ChatbotScreen() {
                 }
               }}
             >
-              {part.text}
+              {renderTextWithBold(part.text, index)}
             </Text>
           ) : (
-            <Text key={index}>{part.text}</Text>
+            <Text key={index}>{renderTextWithBold(part.text, index)}</Text>
           )
         )}
       </Text>
@@ -405,16 +433,15 @@ export default function ChatbotScreen() {
               </View>
             )}
 
-            {/* Main answer */}
-            <Text
+            {/* Main answer with markdown support */}
+            <MarkdownText 
+              text={item.text || ''} 
+              isUserMessage={isUser}
               style={[
                 tw`text-base`,
                 { lineHeight: 26 },
-                isUser ? tw`text-white` : { color: Colors.text.primary },
               ]}
-            >
-              {item.text || ''}
-            </Text>
+            />
             {!isUser && item.confidence && (
               <View style={[tw`mt-4 p-3 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}>
                 <Text style={[tw`text-xs font-semibold`, { color: Colors.text.secondary }]}>
