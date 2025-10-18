@@ -256,7 +256,7 @@ export default function UserProfilePage() {
 
   return (
       <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]}>
-        <Header variant="default" title="Profile" showSettings={false} showMenu={true} />
+        <Header title="Profile" showSettings={false} showMenu={true} />
       
       <ScrollView 
         style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]} 

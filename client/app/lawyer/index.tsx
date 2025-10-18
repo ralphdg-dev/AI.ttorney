@@ -1,5 +1,6 @@
 import React, { useMemo, useCallback, memo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
@@ -53,16 +54,16 @@ const LawyerDashboard: React.FC = () => {
     router.push('/lawyer/consult');
   }, [router]);
 
-  // Memoized current date (Philippine timezone)
+  // Memoized current date
   const currentDate = useMemo(() => {
     const now = new Date();
-    const phTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
-    return phTime.toLocaleDateString('en-US', {
+    const options: Intl.DateTimeFormatOptions = {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric'
-    });
+    };
+    return now.toLocaleDateString('en-US', options);
   }, []);
 
   // Memoized calendar consultations data
@@ -84,7 +85,7 @@ const LawyerDashboard: React.FC = () => {
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView style={tw`flex-1 bg-white`}>
+      <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
         <Header 
           variant="home"
           showMenu={true}
@@ -102,7 +103,7 @@ const LawyerDashboard: React.FC = () => {
   }
 
   return (
-      <SafeAreaView style={tw`flex-1 bg-white`}>
+      <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
         <Header 
           variant="home"
           showMenu={true}

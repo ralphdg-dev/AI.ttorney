@@ -11,6 +11,7 @@ import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
 import { useList } from '@/hooks/useOptimizedList';
 import { SkeletonList } from '@/components/ui/SkeletonLoader';
 import { shouldUseNativeDriver } from '../../utils/animations';
+import { NetworkConfig } from '../../utils/networkConfig';
 
 interface PostData {
   id: string;
@@ -223,7 +224,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     
     try {
       const headers = await getAuthHeaders();
-      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_BASE_URL = await NetworkConfig.getBestApiUrl();
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
@@ -627,7 +628,7 @@ const styles = StyleSheet.create({
   },
   createPostButton: {
     position: 'absolute',
-    bottom: 80,
+    bottom: 90,
     right: 20,
     backgroundColor: Colors.primary.blue,
     width: 56,

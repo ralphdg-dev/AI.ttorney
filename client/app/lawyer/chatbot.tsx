@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 import { Ionicons } from "@expo/vector-icons";
@@ -110,7 +111,7 @@ export default function LawyerChatbotScreen() {
 
   if (showIntro) {
     return (
-        <View style={tw`flex-1 bg-white`}>
+        <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
           <Header
             title="AI Legal Assistant"
             showMenu={true}
@@ -151,12 +152,12 @@ export default function LawyerChatbotScreen() {
           </View>
           <LawyerNavbar activeTab="chatbot" />
           <SidebarWrapper />
-        </View>
+        </SafeAreaView>
     );
   }
 
   return (
-      <View style={tw`flex-1 bg-white`}>
+      <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
         <Header
           title="Legal Assistant"
           showMenu={true}
@@ -219,6 +220,6 @@ export default function LawyerChatbotScreen() {
         </KeyboardAvoidingView>
         <LawyerNavbar activeTab="chatbot" />
         <SidebarWrapper />
-      </View>
+      </SafeAreaView>
   );
 }

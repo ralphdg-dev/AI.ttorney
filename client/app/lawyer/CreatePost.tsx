@@ -8,7 +8,8 @@ import CategoryScroller from '@/components/glossary/CategoryScroller';
 import Colors from '../../constants/Colors';
 import { LawyerNavbar } from '../../components/lawyer/shared';
 import { useAuth } from '@/contexts/AuthContext';
-import { useForumCache } from '@/contexts/ForumCacheContext';
+import { useForumCache } from '../../contexts/ForumCacheContext';
+import { NetworkConfig } from '../../utils/networkConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
@@ -89,9 +90,11 @@ const LawyerCreatePost: React.FC = () => {
     try {
       // Use direct API call with authentication
       const headers = await getAuthHeaders();
-      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_BASE_URL = await NetworkConfig.getBestApiUrl();
       
-      console.log(`[LawyerCreatePost] Creating post at ${API_BASE_URL}/api/forum/posts`);
+      if (__DEV__) {
+        console.log(`[LawyerCreatePost] Creating post at ${API_BASE_URL}/api/forum/posts`);
+      }
       const response = await fetch(`${API_BASE_URL}/api/forum/posts`, {
         method: 'POST',
         headers,

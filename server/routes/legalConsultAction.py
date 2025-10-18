@@ -56,6 +56,41 @@ def get_current_user_dict(user = Depends(get_auth_user)) -> Dict[str, Any]:
         "email": user.email
     }
 
+# Helper to transform consultation data
+def transform_consultation_data(consultation: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Transform raw consultation data with user information
+    """
+    user_data = consultation.get('users', {})
+    return {
+        "id": consultation.get("id"),
+        "user_id": consultation.get("user_id"),
+        "lawyer_id": consultation.get("lawyer_id"),
+        "message": consultation.get("message"),
+        "email": consultation.get("email"),
+        "mobile_number": consultation.get("mobile_number"),
+        "status": consultation.get("status"),
+        "consultation_date": consultation.get("consultation_date"),
+        "consultation_time": consultation.get("consultation_time"),
+        "consultation_mode": consultation.get("consultation_mode"),
+        "requested_at": consultation.get("requested_at"),
+        "responded_at": consultation.get("responded_at"),
+        "created_at": consultation.get("created_at"),
+        "updated_at": consultation.get("updated_at"),
+        "client_name": user_data.get("full_name", "Unknown Client"),
+        "client_email": user_data.get("email", consultation.get("email")),
+        "client_username": user_data.get("username")
+    }
+
+# Constant for user join query
+USER_JOIN_QUERY = """*,
+    users!consultation_requests_user_id_fkey(
+        full_name,
+        email,
+        username
+    )
+"""
+
 @router.get("/my-consultations", response_model=List[ConsultationRequest])
 async def get_my_consultations(
     status_filter: Optional[str] = None,
@@ -70,14 +105,7 @@ async def get_my_consultations(
         logger.info(f"Fetching consultations for lawyer: {lawyer_id}, filter: {status_filter}")
         
         # Build the query
-        query = supabase.table("consultation_requests").select("""
-            *,
-            users!consultation_requests_user_id_fkey(
-                full_name,
-                email,
-                username
-            )
-        """).eq("lawyer_id", lawyer_id)
+        query = supabase.table("consultation_requests").select(USER_JOIN_QUERY).eq("lawyer_id", lawyer_id)
         
         # Apply status filter if provided
         if status_filter and status_filter != "all":
@@ -95,31 +123,8 @@ async def get_my_consultations(
         
         consultations = response.data if hasattr(response, 'data') else []
         
-        # Transform the data to include client information
-        transformed_consultations = []
-        for consultation in consultations:
-            # Extract client info from the joined users table
-            user_data = consultation.get('users', {})
-            
-            transformed_consultations.append({
-                "id": consultation.get("id"),
-                "user_id": consultation.get("user_id"),
-                "lawyer_id": consultation.get("lawyer_id"),
-                "message": consultation.get("message"),
-                "email": consultation.get("email"),
-                "mobile_number": consultation.get("mobile_number"),
-                "status": consultation.get("status"),
-                "consultation_date": consultation.get("consultation_date"),
-                "consultation_time": consultation.get("consultation_time"),
-                "consultation_mode": consultation.get("consultation_mode"),
-                "requested_at": consultation.get("requested_at"),
-                "responded_at": consultation.get("responded_at"),
-                "created_at": consultation.get("created_at"),
-                "updated_at": consultation.get("updated_at"),
-                "client_name": user_data.get("full_name", "Unknown Client"),
-                "client_email": user_data.get("email", consultation.get("email")),
-                "client_username": user_data.get("username")
-            })
+        # Transform the data using helper function
+        transformed_consultations = [transform_consultation_data(c) for c in consultations]
         
         logger.info(f"Found {len(transformed_consultations)} consultations for lawyer {lawyer_id}")
         return transformed_consultations
@@ -143,14 +148,7 @@ async def get_consultation_detail(
         lawyer_id = current_user["id"]
         
         # Fetch consultation with user data
-        response = supabase.table("consultation_requests").select("""
-            *,
-            users!consultation_requests_user_id_fkey(
-                full_name,
-                email,
-                username
-            )
-        """).eq("id", consultation_id).eq("lawyer_id", lawyer_id).execute()
+        response = supabase.table("consultation_requests").select(USER_JOIN_QUERY).eq("id", consultation_id).eq("lawyer_id", lawyer_id).execute()
         
         if hasattr(response, 'error') and response.error:
             logger.error(f"Supabase error: {response.error}")
@@ -162,30 +160,9 @@ async def get_consultation_detail(
             raise HTTPException(status_code=404, detail="Consultation not found")
         
         consultation = consultations[0]
-        user_data = consultation.get('users', {})
         
-        # Transform the data
-        transformed_consultation = {
-            "id": consultation.get("id"),
-            "user_id": consultation.get("user_id"),
-            "lawyer_id": consultation.get("lawyer_id"),
-            "message": consultation.get("message"),
-            "email": consultation.get("email"),
-            "mobile_number": consultation.get("mobile_number"),
-            "status": consultation.get("status"),
-            "consultation_date": consultation.get("consultation_date"),
-            "consultation_time": consultation.get("consultation_time"),
-            "consultation_mode": consultation.get("consultation_mode"),
-            "requested_at": consultation.get("requested_at"),
-            "responded_at": consultation.get("responded_at"),
-            "created_at": consultation.get("created_at"),
-            "updated_at": consultation.get("updated_at"),
-            "client_name": user_data.get("full_name", "Unknown Client"),
-            "client_email": user_data.get("email", consultation.get("email")),
-            "client_username": user_data.get("username")
-        }
-        
-        return transformed_consultation
+        # Transform the data using helper function
+        return transform_consultation_data(consultation)
         
     except HTTPException:
         raise

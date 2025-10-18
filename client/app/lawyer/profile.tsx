@@ -609,8 +609,8 @@ const LawyerProfilePage: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-50`}>
-      <Header variant="lawyer-profile" title="Profile" showSettings={false} />
+    <SafeAreaView style={tw`flex-1 bg-gray-50`} edges={['top', 'left', 'right']}>
+      <Header title="Profile" showSettings={false} />
       <ScrollView
         style={tw`flex-1`}
         showsVerticalScrollIndicator={false}

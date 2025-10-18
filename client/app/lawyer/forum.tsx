@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -7,15 +7,15 @@ import { LawyerNavbar } from '../../components/lawyer/shared';
 import Header from '../../components/Header';
 import { SidebarWrapper } from '../../components/AppSidebar';
 
-const LawyerForum = () => {
+const LawyerForum: React.FC = () => {
   const router = useRouter();
 
-  const handleNotificationPress = () => {
+  const handleNotificationPress = useCallback(() => {
     router.push('/notifications');
-  };
+  }, [router]);
 
   return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right']}>
         <Header 
           variant="home"
           showMenu={true}

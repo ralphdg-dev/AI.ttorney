@@ -24,13 +24,8 @@ const ConsultationCalendar: React.FC<ConsultationCalendarProps> = ({
   onDatePress,
   onConsultationPress 
 }) => {
-  // Initialize with Philippine timezone
-  const getPhilippineDate = () => {
-    const now = new Date();
-    return new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
-  };
-  
-  const [currentDate, setCurrentDate] = useState(getPhilippineDate());
+  // Initialize with current date
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedDateConsultations, setSelectedDateConsultations] = useState<typeof consultations>([]);
@@ -83,9 +78,9 @@ const ConsultationCalendar: React.FC<ConsultationCalendarProps> = ({
     return { color: Colors.primary.blue, count: dayConsultations.length };
   };
 
-  // Check if date is today (Philippine timezone)
+  // Check if date is today
   const isToday = (day: number) => {
-    const today = getPhilippineDate();
+    const today = new Date();
     return today.getDate() === day && 
            today.getMonth() === currentMonth && 
            today.getFullYear() === currentYear;
