@@ -243,7 +243,7 @@ router = APIRouter(prefix="/api/chatbot/user", tags=["Legal Chatbot - User"])
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=500, description="User's legal question or greeting")
     conversation_history: Optional[List[Dict[str, str]]] = Field(default=[], max_items=10, description="Previous conversation (max 10 messages)")
-    max_tokens: Optional[int] = Field(default=1200, ge=100, le=2000, description="Max response tokens")
+    max_tokens: Optional[int] = Field(default=800, ge=100, le=1500, description="Max response tokens")
     user_id: Optional[str] = Field(default=None, description="User ID for logging")
     session_id: Optional[str] = Field(default=None, description="Chat session ID for history tracking")
     
@@ -411,7 +411,9 @@ Remember: Include legal terms that would appear in Philippine legal codes to imp
                 {"role": "user", "content": normalization_prompt}
             ],
             max_tokens=150,
-            temperature=0.3
+            temperature=0.2,  # Industry best: Very low for deterministic normalization
+            top_p=0.9,
+            timeout=10.0,  # Industry best: Fast timeout for preprocessing
         )
         
         normalized = response.choices[0].message.content.strip()
@@ -780,22 +782,32 @@ def validate_response_quality(answer: str) -> tuple[bool, str]:
     """
     Industry standard: Validate that response is informational, not advice-giving
     Returns: (is_valid, reason_if_invalid)
+    
+    NOTE: Only flag PERSONALIZED advice, not general explanations of what the law requires
     """
     answer_lower = answer.lower()
     
-    # Check for advice-giving language (critical safety check)
+    # Check for PERSONALIZED advice-giving language (critical safety check)
+    # These patterns indicate telling someone what THEY specifically should do
     advice_patterns = [
-        r'\byou should\b', r'\byou must\b', r'\byou need to\b',
-        r'\bi recommend\b', r'\bi suggest\b', r'\bi advise\b',
-        r'\bmy advice\b', r'\bmake sure you\b', r'\bmake sure to\b',
-        r'\bbe sure to\b', r'\byou have to\b', r'\byou ought to\b',
-        r'\bdapat mo\b', r'\bkailangan mo\b', r'\bgawin mo\b',
-        r'\birecommend ko\b', r'\bsiguraduhin mo\b'
+        r'\bin your case,? you should\b',
+        r'\bin your situation,? you should\b',
+        r'\bi recommend you\b',
+        r'\bi suggest you\b',
+        r'\bi advise you\b',
+        r'\bmy advice is\b',
+        r'\byou should file\b',
+        r'\byou should sue\b',
+        r'\byou need to hire\b',
+        r'\byou must file\b',
+        r'\bsa case mo,? dapat\b',
+        r'\bsa sitwasyon mo,? kailangan\b',
+        r'\birecommend ko na\b',
     ]
     
     for pattern in advice_patterns:
         if re.search(pattern, answer_lower):
-            return False, f"Response contains advice-giving language: {pattern}"
+            return False, f"Response contains personalized advice: {pattern}"
     
     return True, ""
 
@@ -852,7 +864,11 @@ Note: I don't have specific legal documents for this question in my database. Pl
             model=CHAT_MODEL,
             messages=messages,
             max_tokens=max_tokens,
-            temperature=0.5,  # Slightly higher for more conversational tone
+            temperature=0.3,  # Industry best: Lower for factual, legal content
+            top_p=0.9,  # Industry best: Nucleus sampling for consistent quality
+            presence_penalty=0.1,  # Industry best: Slight penalty to reduce repetition
+            frequency_penalty=0.1,  # Industry best: Reduce redundant phrasing
+            timeout=30.0,  # Industry best: 30s timeout for user experience
         )
         
         answer = response.choices[0].message.content
@@ -1049,7 +1065,9 @@ Gawing varied at natural, hindi robotic."""
             model=CHAT_MODEL,
             messages=messages,
             max_tokens=max_tokens,
-            temperature=0.8,
+            temperature=0.7,  # Industry best: Balanced for friendly fallbacks
+            top_p=0.9,
+            timeout=10.0,  # Industry best: Fast timeout for fallback messages
         )
         
         result = response.choices[0].message.content

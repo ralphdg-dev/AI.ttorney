@@ -294,7 +294,7 @@ export default function ChatbotScreen() {
       const response = await axios.post(endpoint, {
         question: userMessage,
         conversation_history: formattedHistory,
-        max_tokens: 1200,
+        max_tokens: 800,
         user_id: user?.id || null,
         session_id: sessionId || null
       }, { headers });
