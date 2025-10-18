@@ -150,22 +150,22 @@ const ConsultationCalendar: React.FC<ConsultationCalendarProps> = ({
 
 
   return (
-    <View style={tw`bg-white rounded-2xl border border-gray-200 p-6`}>
+    <View style={tw`bg-white rounded-2xl border border-gray-200 p-4`}>
       {/* Header */}
-      <View style={tw`flex-row justify-between items-center mb-6`}>
-        <View style={tw`flex-row items-center`}>
-          <Calendar size={20} color={Colors.primary.blue} />
-          <Text style={tw`text-lg font-bold text-gray-900 ml-2`}>
+      <View style={tw`flex-row justify-between items-center mb-4`}>
+        <View style={tw`flex-row items-center flex-1 mr-2`}>
+          <Calendar size={20} color={Colors.primary.blue} style={{ flexShrink: 0 }} />
+          <Text style={tw`text-lg font-bold text-gray-900 ml-2`} numberOfLines={1}>
             Accepted Consultations
           </Text>
         </View>
-        <Text style={tw`text-sm text-gray-500`}>
+        <Text style={tw`text-sm text-gray-500`} numberOfLines={1}>
           {consultations.filter(c => c.status === 'accepted').length} scheduled
         </Text>
       </View>
 
       {/* Month Navigation */}
-      <View style={tw`flex-row justify-between items-center mb-6`}>
+      <View style={tw`flex-row justify-between items-center mb-4`}>
         <TouchableOpacity
           onPress={() => navigateMonth('prev')}
           style={tw`w-10 h-10 rounded-lg bg-gray-50 justify-center items-center`}

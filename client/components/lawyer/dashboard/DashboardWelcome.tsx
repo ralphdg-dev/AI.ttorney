@@ -64,16 +64,16 @@ const DashboardWelcome: React.FC<DashboardWelcomeProps> = memo(({ date, lawyerNa
   }, [lawyerName]);
 
   return (
-    <View style={tw`mx-6 mt-6 mb-6 p-6 bg-white rounded-2xl border border-gray-200`}>
+    <View style={tw`mx-6 mt-6 mb-6 p-4 bg-white rounded-2xl border border-gray-200`}>
       <View style={tw`flex-row items-center mb-3`}>
-        <Calendar size={16} color="#6B7280" />
-        <Text style={tw`text-sm text-gray-600 font-medium ml-2`}>{date}</Text>
+        <Calendar size={16} color="#6B7280" style={{ flexShrink: 0 }} />
+        <Text style={tw`text-sm text-gray-600 font-medium ml-2 flex-1`} numberOfLines={1}>{date}</Text>
       </View>
       
-      <Text style={tw`text-2xl font-bold text-gray-900 mb-2`}>
+      <Text style={tw`text-2xl font-bold text-gray-900 mb-2`} adjustsFontSizeToFit numberOfLines={2}>
         {greeting}, {formattedName}
       </Text>
-      <Text style={tw`text-gray-600 text-base`}>
+      <Text style={tw`text-gray-600 text-base`} numberOfLines={2}>
         Here&apos;s what&apos;s happening with your practice today
       </Text>
     </View>

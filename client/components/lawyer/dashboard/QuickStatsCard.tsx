@@ -29,10 +29,10 @@ const QuickStatsCard: React.FC<QuickStatsCardProps> = memo(({ config, stats, onP
     >
       <View style={tw`bg-white p-4 rounded-2xl border border-gray-200 h-36 justify-between`}>
         <View style={tw`flex-row items-center justify-between mb-2`}>
-          <View style={[tw`w-10 h-10 rounded-xl justify-center items-center`, { backgroundColor: config.bgColor }]}>
+          <View style={[tw`w-10 h-10 rounded-xl justify-center items-center`, { backgroundColor: config.bgColor, flexShrink: 0 }]}>
             <IconComponent size={18} color={config.color} strokeWidth={2.5} />
           </View>
-          <View style={tw`flex-row items-center`}>
+          <View style={[tw`flex-row items-center`, { flexShrink: 0 }]}>
             <ArrowUpRight 
               size={12} 
               color={config.changeType === 'positive' ? '#059669' : '#DC2626'} 
@@ -41,14 +41,15 @@ const QuickStatsCard: React.FC<QuickStatsCardProps> = memo(({ config, stats, onP
           </View>
         </View>
         <View style={tw`flex-1 justify-center`}>
-          <Text style={tw`text-xl font-bold text-gray-900 mb-1`}>{value}</Text>
-          <Text style={tw`text-xs text-gray-600 mb-1 leading-4`} numberOfLines={2}>
+          <Text style={tw`text-xl font-bold text-gray-900 mb-1`} numberOfLines={1}>{value}</Text>
+          <Text style={tw`text-xs text-gray-600 mb-1 leading-4`} numberOfLines={2} adjustsFontSizeToFit>
             {config.label}
           </Text>
         </View>
         <Text 
           style={tw`text-xs ${config.changeType === 'positive' ? 'text-green-600' : 'text-red-600'} font-medium`} 
           numberOfLines={1}
+          adjustsFontSizeToFit
         >
           {change}
         </Text>

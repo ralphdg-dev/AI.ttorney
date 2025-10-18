@@ -120,7 +120,7 @@ const LawyerDashboard: React.FC = () => {
         <DashboardWelcome date={currentDate} lawyerName={lawyerName} />
         
         {/* Quick Stats - Configuration-driven rendering */}
-        <View style={tw`px-4 mb-6`}>
+        <View style={tw`px-6 mb-6`}>
           <View style={tw`flex-row -mx-2`}>
             {QUICK_STATS_CONFIG.map((config, index) => (
               <QuickStatsCard
@@ -134,7 +134,7 @@ const LawyerDashboard: React.FC = () => {
         </View>
 
         {/* Consultation Calendar - Memoized data */}
-        <View style={tw`mx-4 mb-6`}>
+        <View style={tw`mx-6 mb-6`}>
           <ConsultationCalendar 
             consultations={calendarConsultations}
             onDatePress={handleDatePress}
@@ -143,18 +143,18 @@ const LawyerDashboard: React.FC = () => {
         </View>
 
         {/* Recent Consultations */}
-        <View style={tw`p-6 mx-4 mb-6 bg-white border border-gray-200 rounded-2xl`}>
+        <View style={tw`p-4 mx-6 mb-6 bg-white border border-gray-200 rounded-2xl`}>
           <View style={tw`flex-row items-center justify-between mb-6`}>
-            <View>
-              <Text style={tw`text-lg font-bold text-gray-900`}>Recent Activity</Text>
-              <Text style={tw`mt-1 text-sm text-gray-500`}>Latest consultation requests</Text>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={tw`text-lg font-bold text-gray-900`} numberOfLines={1}>Recent Activity</Text>
+              <Text style={tw`mt-1 text-sm text-gray-500`} numberOfLines={1}>Latest consultation requests</Text>
             </View>
             <TouchableOpacity 
-              style={[tw`px-4 py-2 rounded-lg`, { backgroundColor: '#E8F4FD' }]} 
+              style={[tw`px-4 py-2 rounded-lg`, { backgroundColor: '#E8F4FD', flexShrink: 0 }]} 
               activeOpacity={0.7}
               onPress={handleViewAllConsultations}
             >
-              <Text style={[tw`text-sm font-semibold`, { color: Colors.primary.blue }]}>View All</Text>
+              <Text style={[tw`text-sm font-semibold`, { color: Colors.primary.blue }]} numberOfLines={1}>View All</Text>
             </TouchableOpacity>
           </View>
           <View>
