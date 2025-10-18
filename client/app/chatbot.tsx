@@ -252,6 +252,11 @@ export default function ChatbotScreen() {
     setInput("");
     setIsTyping(true);
     setError(null);
+    
+    // Scroll to show the user's message immediately (like ChatGPT)
+    setTimeout(() => {
+      flatRef.current?.scrollToEnd({ animated: true });
+    }, 100);
 
     // Don't create session here - let backend create it on first message
     // This is the industry-standard approach (ChatGPT/Claude)
@@ -358,6 +363,11 @@ export default function ChatbotScreen() {
       };
       
       setMessages((prev) => [...prev, reply]);
+      
+      // Scroll to show the bot's response (like ChatGPT)
+      setTimeout(() => {
+        flatRef.current?.scrollToEnd({ animated: true });
+      }, 100);
       
       console.log('✅ Messages saved to database:', {
         session: sessionId,
