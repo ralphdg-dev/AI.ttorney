@@ -54,7 +54,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     fallbackRoute: '/role-selection'
   },
   '/lawyer/chatbot': {
-    path: '/lawyer/chatbot',
+    path: '/chatbot', // Use shared chatbot for both users and lawyers
     requiredRole: 'verified_lawyer',
     redirectTo: 'role-based',
     serverValidation: true,
@@ -127,7 +127,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   },
   '/chatbot': { 
     path: '/chatbot', 
-    requiredRole: 'registered_user',
+    allowedRoles: ['registered_user', 'verified_lawyer'], // Shared chatbot for both users and lawyers
     redirectTo: 'role-based',
     serverValidation: true,
     errorBoundary: true

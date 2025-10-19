@@ -218,22 +218,17 @@ except Exception as e:
     logger.error(f"Failed to initialize OpenAI client: {e}")
     raise RuntimeError(f"OpenAI initialization failed: {e}")
 
-# Initialize Guardrails (if available)
-SILENT_MODE = os.getenv("GUARDRAILS_SILENT_MODE", "true").lower() == "true"
-
+# Initialize Guardrails (if available) - Unified configuration
 if GUARDRAILS_AVAILABLE and is_guardrails_enabled():
     try:
-        guardrails_instance = get_guardrails_instance()
-        if not SILENT_MODE:
-            print("✅ Guardrails AI enabled for user chatbot")
+        guardrails_instance = get_guardrails_instance(user_type="user")
+        logger.info("✅ Guardrails AI enabled for user chatbot")
     except Exception as e:
-        if not SILENT_MODE:
-            print(f"⚠️  Failed to initialize Guardrails: {e}")
+        logger.warning(f"⚠️  Failed to initialize Guardrails: {e}")
         guardrails_instance = None
 else:
     guardrails_instance = None
-    if not SILENT_MODE:
-        print("ℹ️  Guardrails AI disabled for user chatbot")
+    logger.info("ℹ️  Guardrails AI disabled for user chatbot")
 
 # Create router
 router = APIRouter(prefix="/api/chatbot/user", tags=["Legal Chatbot - User"])
@@ -277,6 +272,7 @@ class FallbackSuggestion(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     sources: List[SourceCitation] = Field(default_factory=list)
+    confidence: Optional[str] = Field(default=None, description="Confidence level: high, medium, or low")
     simplified_summary: Optional[str] = None
     legal_disclaimer: str
     fallback_suggestions: Optional[List[FallbackSuggestion]] = None
@@ -1093,6 +1089,7 @@ def get_legal_disclaimer(language: str) -> str:
 def create_chat_response(
     answer: str,
     sources: List[SourceCitation] = None,
+    confidence: str = None,
     simplified_summary: str = None,
     legal_disclaimer: str = "",
     fallback_suggestions: List[FallbackSuggestion] = None,
@@ -1108,6 +1105,7 @@ def create_chat_response(
     return ChatResponse(
         answer=answer,
         sources=sources or [],
+        confidence=confidence,
         simplified_summary=simplified_summary,
         legal_disclaimer=legal_disclaimer,
         fallback_suggestions=fallback_suggestions,
@@ -1654,6 +1652,7 @@ async def ask_legal_question(
         return create_chat_response(
             answer=answer,
             sources=source_citations,
+            confidence=confidence,
             simplified_summary=simplified_summary,
             legal_disclaimer=legal_disclaimer,
             fallback_suggestions=fallback_suggestions,

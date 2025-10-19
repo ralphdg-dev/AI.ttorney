@@ -17,8 +17,16 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ text, style, isUserM
   const textColor = isUserMessage ? '#FFFFFF' : Colors.text.primary;
   const boldColor = isUserMessage ? '#FFFFFF' : Colors.text.primary;
 
+  // Clean up lawyer chatbot formatting issues
+  // Remove markdown horizontal rules (---) and clean up inline URLs
+  let cleanedText = text
+    .replace(/^---\s*$/gm, '') // Remove horizontal rules
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '$1') // Convert [text](url) to just text
+    .replace(/(https?:\/\/[^\s\)]+)/g, '') // Remove standalone URLs
+    .trim();
+
   // Split text into lines for processing
-  const lines = text.split('\n');
+  const lines = cleanedText.split('\n');
   const elements: ReactElement[] = [];
 
   lines.forEach((line, lineIndex) => {

@@ -6,6 +6,7 @@ import Colors from "../constants/Colors";
 import Header from "../components/Header";
 import { SidebarWrapper } from "../components/AppSidebar";
 import Navbar from "../components/Navbar";
+import { LawyerNavbar } from "../components/lawyer/shared";
 import { useAuth } from "../contexts/AuthContext";
 import axios from "axios";
 import ChatHistorySidebar from "../components/chatbot/ChatHistorySidebar";
@@ -268,7 +269,7 @@ export default function ChatbotScreen() {
       let endpoint = '';
       
       if (userRole === 'verified_lawyer') {
-        // Lawyer endpoint (to be implemented)
+        // Lawyer endpoint - formal legal analysis with legalese
         endpoint = `${API_URL}/api/chatbot/lawyer/ask`;
       } else {
         // General public endpoint (registered_user, guest, etc.)
@@ -294,7 +295,7 @@ export default function ChatbotScreen() {
       const response = await axios.post(endpoint, {
         question: userMessage,
         conversation_history: formattedHistory,
-        max_tokens: 800,
+        max_tokens: userRole === 'verified_lawyer' ? 2000 : 800, // Lawyers get higher token limit
         user_id: user?.id || null,
         session_id: sessionId || null
       }, { headers });
@@ -514,7 +515,7 @@ export default function ChatbotScreen() {
               <View style={[tw`mt-3 pt-2 border-t`, { borderTopColor: Colors.border.light }]}>
                 <Text style={[tw`text-sm font-bold mb-2`, { color: Colors.text.primary }]}>Legal Sources</Text>
                 {item.sources.map((source, idx) => (
-                  <View key={idx} style={[tw`mb-2 p-3 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}>
+                  <View key={idx} style={[tw`mb-3 p-3 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}>
                     <Text style={[tw`text-sm font-bold mb-1`, { color: Colors.text.primary }]}>
                       {source.law.toUpperCase()}
                     </Text>
@@ -522,8 +523,14 @@ export default function ChatbotScreen() {
                       Article {source.article_number}
                     </Text>
                     {source.article_title && (
-                      <Text style={[tw`text-xs mb-3`, { color: Colors.text.secondary }]}>
+                      <Text style={[tw`text-xs mb-2`, { color: Colors.text.secondary, lineHeight: 18 }]}>
                         {source.article_title}
+                      </Text>
+                    )}
+                    {/* Show text preview if available */}
+                    {source.text_preview && (
+                      <Text style={[tw`text-xs mb-3`, { color: Colors.text.secondary, lineHeight: 18 }]} numberOfLines={3}>
+                        {source.text_preview}
                       </Text>
                     )}
                     <View style={tw`flex-row items-center justify-between mt-2`}>
@@ -823,7 +830,12 @@ export default function ChatbotScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
-        <Navbar activeTab="ask" />
+        {/* Conditionally render navbar based on user role */}
+        {user?.role === 'verified_lawyer' ? (
+          <LawyerNavbar activeTab="chatbot" />
+        ) : (
+          <Navbar activeTab="ask" />
+        )}
         <SidebarWrapper />
       </View>
   );

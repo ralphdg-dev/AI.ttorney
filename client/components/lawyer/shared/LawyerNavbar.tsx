@@ -32,7 +32,7 @@ const LawyerNavbar: React.FC<LawyerNavbarProps> = ({
     if (pathname.includes('/lawyer') && (pathname === '/lawyer' || pathname.includes('/lawyer/index'))) return 'home';
     if (pathname.includes('/lawyer/forum')) return 'forum';
     if (pathname.includes('/lawyer/consult')) return 'consult';
-    if (pathname.includes('/lawyer/chatbot')) return 'chatbot';
+    if (pathname.includes('/chatbot')) return 'chatbot'; // Shared chatbot route
     if (pathname.includes('/lawyer/profile')) return 'profile';
     
     return 'home'; // default
@@ -58,7 +58,7 @@ const LawyerNavbar: React.FC<LawyerNavbarProps> = ({
         router.push('/lawyer/consult');
         break;
       case 'chatbot':
-        router.push('/lawyer/chatbot' as any);
+        router.push('/chatbot' as any); // Use shared chatbot
         break;
       case 'profile':
         router.push('/lawyer/profile');
@@ -89,7 +89,7 @@ const LawyerNavbar: React.FC<LawyerNavbarProps> = ({
       id: 'chatbot', 
       label: 'Ask AI', 
       icon: MessageSquarePlus, 
-      route: '/lawyer/chatbot',
+      route: '/chatbot', // Shared chatbot route
       active: currentTab === 'chatbot'
     },
     { 

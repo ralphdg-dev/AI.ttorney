@@ -3,8 +3,8 @@ Enhanced Legal Chatbot API for Lawyers
 Detailed + Contextual Answers with LawPhil Links (No Supreme Court Cases)
 """
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
 from qdrant_client import QdrantClient
 from openai import OpenAI
@@ -13,37 +13,53 @@ import logging
 import time
 from datetime import datetime
 from dotenv import load_dotenv
+import sys
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-# Import guardrails configuration with fallback
-GUARDRAILS_AVAILABLE = True
-GUARDRAILS_CONFIG = {
-    "enable_input_validation": True,
-    "enable_output_validation": True,
-    "strict_mode": True,
-    "log_security_events": True,
-    "max_retries": 2,
-    "timeout_seconds": 30
-}
+# Setup logging for security events (must be before imports that use logger)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-# Disable Guardrails due to system compatibility issues
-# Use basic validation only for now
-print("🔒 Running with basic security validation only")
-print("⚠️ Guardrails AI disabled due to system compatibility issues")
+# Add parent directory to path for config imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def get_guardrails_instance():
-    """Get guardrails instance with fallback"""
-    return None
+# Import unified guardrails configuration
+try:
+    from config.guardrails_config import get_guardrails_instance, is_guardrails_enabled, get_guardrails_config
+    GUARDRAILS_AVAILABLE = True
+    GUARDRAILS_CONFIG = get_guardrails_config()
+except ImportError:
+    logger.warning("⚠️  Guardrails AI not available - running without security validation")
+    GUARDRAILS_AVAILABLE = False
+    GUARDRAILS_CONFIG = {}
 
-def is_guardrails_enabled():
-    """Check if guardrails are enabled with fallback"""
-    return False
+# Import chat history service
+from services.chat_history_service import ChatHistoryService, get_chat_history_service
 
-# Setup logging for security events
-logging.basicConfig(level=logging.INFO)
-security_logger = logging.getLogger("lawyer_chatbot_security")
+# Import authentication (optional for chatbot)
+from auth.service import AuthService
 
 # --- Load configuration ---
 load_dotenv()
+
+# Optional authentication helper
+security = HTTPBearer(auto_error=False)
+
+async def get_optional_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[dict]:
+    """Get current user if authenticated, otherwise return None"""
+    if not credentials:
+        return None
+    
+    try:
+        token = credentials.credentials
+        user_data = await AuthService.get_user(token)
+        return user_data
+    except Exception as e:
+        logger.warning(f"⚠️  Optional auth failed: {e}")
+        return None
 
 COLLECTION_NAME = "legal_knowledge"
 QDRANT_URL = os.getenv("QDRANT_URL")
@@ -57,14 +73,29 @@ TOP_K_RESULTS = 8
 # --- Initialize clients ---
 qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
+# Initialize OpenAI client with timeout settings (industry standard)
 try:
-    import httpx
-    http_client = httpx.Client()
-    openai_client = OpenAI(api_key=OPENAI_API_KEY, http_client=http_client)
-    print("✅ OpenAI client initialized for Legal Chatbot")
+    openai_client = OpenAI(
+        api_key=OPENAI_API_KEY,
+        timeout=120.0,  # Total timeout in seconds
+        max_retries=2   # Automatic retry for transient failures
+    )
+    logger.info("✅ OpenAI client initialized for lawyer chatbot")
 except Exception as e:
-    print(f"⚠️ HTTP client failed: {e}")
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    logger.error(f"Failed to initialize OpenAI client: {e}")
+    raise RuntimeError(f"OpenAI initialization failed: {e}")
+
+# Initialize Guardrails (if available) - Unified configuration
+if GUARDRAILS_AVAILABLE and is_guardrails_enabled():
+    try:
+        guardrails_instance = get_guardrails_instance(user_type="lawyer")
+        logger.info("✅ Guardrails AI enabled for lawyer chatbot")
+    except Exception as e:
+        logger.warning(f"⚠️  Failed to initialize Guardrails: {e}")
+        guardrails_instance = None
+else:
+    guardrails_instance = None
+    logger.info("ℹ️  Guardrails AI disabled for lawyer chatbot")
 
 router = APIRouter(prefix="/api/chatbot/lawyer", tags=["Legal Chatbot - Lawyer"])
 
@@ -80,10 +111,12 @@ LAWS = {
 
 # --- Models ---
 class LawyerChatRequest(BaseModel):
-    question: str
-    conversation_history: Optional[List[Dict[str, str]]] = []
-    max_tokens: Optional[int] = 2000
-    include_cross_references: Optional[bool] = True
+    question: str = Field(..., min_length=1, max_length=1000, description="Lawyer's legal question")
+    conversation_history: Optional[List[Dict[str, str]]] = Field(default=[], max_items=10, description="Previous conversation (max 10 messages)")
+    max_tokens: Optional[int] = Field(default=2000, ge=500, le=3000, description="Max response tokens")
+    include_cross_references: Optional[bool] = Field(default=True, description="Include cross-references")
+    user_id: Optional[str] = Field(default=None, description="User ID for logging")
+    session_id: Optional[str] = Field(default=None, description="Chat session ID for history tracking")
 
 
 class SourceCitation(BaseModel):
@@ -93,7 +126,7 @@ class SourceCitation(BaseModel):
     article_title: Optional[str] = None
     text_preview: str
     relevance_score: float
-    lawphil_link: Optional[str] = None
+    source_url: Optional[str] = Field(default=None, alias="lawphil_link")  # Use source_url to match frontend
 
 
 class SecurityReport(BaseModel):
@@ -114,6 +147,9 @@ class LawyerChatResponse(BaseModel):
     legal_analysis: Optional[str] = None
     related_provisions: Optional[List[str]] = None
     security_report: Optional[SecurityReport] = None
+    session_id: Optional[str] = Field(default=None, description="Chat session ID for tracking conversation")
+    message_id: Optional[str] = Field(default=None, description="Message ID for the assistant's response")
+    user_message_id: Optional[str] = Field(default=None, description="Message ID for the user's question")
 
 
 # --- Helper Functions ---
@@ -203,32 +239,28 @@ def validate_input_security(question: str) -> Dict[str, any]:
     Validate user input using available security system
     Falls back to basic validation if Guardrails unavailable
     """
-    # Try Guardrails first if available
-    if GUARDRAILS_AVAILABLE and is_guardrails_enabled():
+    # Try Guardrails first if available (use already initialized instance)
+    if guardrails_instance:
         try:
-            guardrails = get_guardrails_instance()
-            if guardrails:
-                validation_result = guardrails.validate_input(question)
-                
-                # Log security events
-                if GUARDRAILS_CONFIG.get("log_security_events", True):
-                    security_logger.info(f"Guardrails input validation: {validation_result['is_valid']} - {question[:50]}...")
-                    if not validation_result["is_valid"]:
-                        security_logger.warning(f"Guardrails security issue: {validation_result.get('error', 'Unknown')}")
-                
-                return validation_result
+            validation_result = guardrails_instance.validate_input(question)
+            
+            # Log security events
+            logger.info(f"Guardrails input validation: {validation_result['is_valid']} - {question[:50]}...")
+            if not validation_result["is_valid"]:
+                logger.warning(f"Guardrails security issue: {validation_result.get('error', 'Unknown')}")
+            
+            return validation_result
         except Exception as e:
-            security_logger.error(f"Guardrails validation error: {e}")
+            logger.error(f"Guardrails validation error: {e}")
             # Fall through to basic validation
     
     # Use basic validation as fallback
     basic_result = basic_input_validation(question)
     
     # Log basic validation events
-    if GUARDRAILS_CONFIG.get("log_security_events", True):
-        security_logger.info(f"Basic input validation: {basic_result['is_valid']} - {question[:50]}...")
-        if not basic_result["is_valid"]:
-            security_logger.warning(f"Basic security issues: {basic_result.get('issues', [])}")
+    logger.info(f"Basic input validation: {basic_result['is_valid']} - {question[:50]}...")
+    if not basic_result["is_valid"]:
+        logger.warning(f"Basic security issues: {basic_result.get('issues', [])}")
     
     return basic_result
 
@@ -296,55 +328,49 @@ def basic_output_validation(response: str, context: str = "") -> Dict[str, any]:
 
 def validate_output_security(response: str, context: str = "") -> Dict[str, any]:
     """
-    Validate AI response using available security system
+    Validate AI output using available security system
     Falls back to basic validation if Guardrails unavailable
     """
-    # Try Guardrails first if available
-    if GUARDRAILS_AVAILABLE and is_guardrails_enabled():
+    # Try Guardrails first if available (use already initialized instance)
+    if guardrails_instance:
         try:
-            guardrails = get_guardrails_instance()
-            if guardrails:
-                validation_result = guardrails.validate_output(response, context)
-                
-                # Log security events
-                if GUARDRAILS_CONFIG.get("log_security_events", True):
-                    security_logger.info(f"Guardrails output validation: {validation_result['is_valid']} - Score: {validation_result.get('confidence_score', 'N/A')}")
-                    if not validation_result["is_valid"]:
-                        security_logger.warning(f"Guardrails output issue: {validation_result.get('error', 'Unknown')}")
-                
-                return validation_result
+            validation_result = guardrails_instance.validate_output(response, context)
+            
+            # Log security events
+            logger.info(f"Guardrails output validation: {validation_result['is_valid']}")
+            if not validation_result["is_valid"]:
+                logger.warning(f"Guardrails output issue: {validation_result.get('error', 'Unknown')}")
+            
+            return validation_result
         except Exception as e:
-            security_logger.error(f"Guardrails output validation error: {e}")
+            logger.error(f"Guardrails output validation error: {e}")
             # Fall through to basic validation
     
     # Use basic validation as fallback
     basic_result = basic_output_validation(response, context)
     
     # Log basic validation events
-    if GUARDRAILS_CONFIG.get("log_security_events", True):
-        security_logger.info(f"Basic output validation: {basic_result['is_valid']} - Score: {basic_result.get('confidence_score', 'N/A')}")
-        if not basic_result["is_valid"]:
-            security_logger.warning(f"Basic output issues: {basic_result.get('issues', [])}")
+    logger.info(f"Basic output validation: {basic_result['is_valid']}")
+    if not basic_result["is_valid"]:
+        logger.warning(f"Basic output issues: {basic_result.get('issues', [])}")
     
     return basic_result
 
 
 def create_security_report(input_validation: Dict, output_validation: Dict) -> SecurityReport:
     """
-    Create comprehensive security report for the interaction
-    Works with both Guardrails and basic validation
+    Create comprehensive security report
+    Uses Guardrails if available, otherwise creates basic report
     """
-    # Try Guardrails report first if available
-    if GUARDRAILS_AVAILABLE and is_guardrails_enabled():
+    # Try Guardrails report first if available (use already initialized instance)
+    if guardrails_instance:
         try:
-            guardrails = get_guardrails_instance()
-            if guardrails and hasattr(guardrails, 'get_security_report'):
-                report_data = guardrails.get_security_report(input_validation, output_validation)
-                report_data["timestamp"] = datetime.now().isoformat()
-                report_data["guardrails_enabled"] = True
-                return SecurityReport(**report_data)
+            report_data = guardrails_instance.get_security_report(input_validation, output_validation)
+            report_data["timestamp"] = datetime.now().isoformat()
+            report_data["guardrails_enabled"] = True
+            return SecurityReport(**report_data)
         except Exception as e:
-            security_logger.error(f"Guardrails security report error: {e}")
+            logger.error(f"Guardrails security report error: {e}")
             # Fall through to basic report
     
     # Create basic security report
@@ -510,12 +536,116 @@ Ensure your answer follows the prescribed structure and tone.
     return answer, confidence, "Formal statutory analysis rendered in legalese (no jurisprudence).", related
 
 
+# --- Chat History Helper (Same as User Chatbot) ---
+async def save_chat_interaction(
+    chat_service: ChatHistoryService,
+    effective_user_id: Optional[str],
+    session_id: Optional[str],
+    question: str,
+    answer: str,
+    language: str,
+    metadata: Optional[Dict] = None
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """
+    Helper function to save chat interaction (user message + assistant response)
+    Returns: (session_id, user_message_id, assistant_message_id)
+    
+    Industry-standard approach (like ChatGPT/Claude):
+    - Session is created ONLY when first message is sent
+    - If session_id is provided but doesn't exist, create new one
+    - Backend is source of truth for session existence
+    """
+    from uuid import UUID
+    
+    if not effective_user_id:
+        logger.info("ℹ️  No user_id available - skipping chat history save")
+        return (None, None, None)
+    
+    try:
+        logger.info(f"💾 Saving lawyer chat history for user {effective_user_id}")
+        
+        # Verify session exists if session_id is provided
+        session_exists = False
+        if session_id:
+            try:
+                existing_session = await chat_service.get_session(UUID(session_id))
+                session_exists = existing_session is not None
+                if session_exists:
+                    logger.info(f"   ✅ Using existing session: {session_id}")
+                else:
+                    logger.info(f"   ⚠️  Session {session_id} not found, creating new one")
+                    session_id = None  # Force creation of new session
+            except Exception as e:
+                logger.warning(f"   ⚠️  Error checking session: {e}, creating new one")
+                session_id = None
+        
+        # Create session if needed (first message or invalid session_id)
+        if not session_id:
+            title = question[:50] if len(question) > 50 else question
+            logger.info(f"   Creating new session: {title}")
+            session = await chat_service.create_session(
+                user_id=UUID(effective_user_id),
+                title=title,
+                language=language
+            )
+            session_id = str(session.id)
+            logger.info(f"   ✅ Session created: {session_id}")
+        
+        # Save user message
+        logger.info(f"   Saving user message...")
+        user_msg = await chat_service.add_message(
+            session_id=UUID(session_id),
+            user_id=UUID(effective_user_id),
+            role="user",
+            content=question,
+            metadata={}
+        )
+        user_message_id = str(user_msg.id)
+        logger.info(f"   ✅ User message saved: {user_message_id}")
+        
+        # Save assistant message
+        logger.info(f"   Saving assistant message...")
+        assistant_msg = await chat_service.add_message(
+            session_id=UUID(session_id),
+            user_id=UUID(effective_user_id),
+            role="assistant",
+            content=answer,
+            metadata=metadata or {}
+        )
+        assistant_message_id = str(assistant_msg.id)
+        logger.info(f"   ✅ Assistant message saved: {assistant_message_id}")
+        logger.info(f"💾 Lawyer chat history saved successfully!")
+        
+        return (session_id, user_message_id, assistant_message_id)
+        
+    except Exception as e:
+        import traceback
+        logger.error(f"⚠️  Failed to save lawyer chat history: {e}")
+        logger.error(f"   Traceback: {traceback.format_exc()}")
+        return (session_id, None, None)
+
+
 # --- Main API Endpoint ---
 @router.post("/ask", response_model=LawyerChatResponse)
-async def ask_legal_question_lawyer(request: LawyerChatRequest):
+async def ask_legal_question_lawyer(
+    request: LawyerChatRequest,
+    chat_service: ChatHistoryService = Depends(get_chat_history_service),
+    current_user: Optional[dict] = Depends(get_optional_current_user)
+):
     start_time = time.time()
     input_validation = None
     output_validation = None
+    
+    # Get authenticated user ID if available
+    authenticated_user_id = None
+    if current_user and "user" in current_user:
+        authenticated_user_id = current_user["user"]["id"]
+    
+    # Use authenticated user_id, fallback to request.user_id for backward compatibility
+    effective_user_id = authenticated_user_id or request.user_id
+    
+    # Production logging with request ID for tracing
+    logger.info(f"Lawyer request received - user_id={effective_user_id}, session_id={request.session_id}, question_length={len(request.question)}")
     
     try:
         if not openai_client:
@@ -524,12 +654,12 @@ async def ask_legal_question_lawyer(request: LawyerChatRequest):
             raise HTTPException(status_code=400, detail="Question cannot be empty")
 
         # Step 1: Input Security Validation
-        security_logger.info(f"Processing lawyer chatbot request: {request.question[:100]}...")
+        logger.info(f"Processing lawyer chatbot request: {request.question[:100]}...")
         input_validation = validate_input_security(request.question)
         
         # Check if input validation failed in strict mode
         if GUARDRAILS_CONFIG.get("strict_mode", True) and not input_validation.get("is_valid", True):
-            security_logger.error(f"Input validation failed in strict mode: {input_validation.get('error', 'Unknown')}")
+            logger.error(f"Input validation failed in strict mode: {input_validation.get('error', 'Unknown')}")
             raise HTTPException(
                 status_code=400, 
                 detail=f"Security validation failed: {input_validation.get('error', 'Invalid input detected')}"
@@ -557,12 +687,26 @@ async def ask_legal_question_lawyer(request: LawyerChatRequest):
             # Create security report
             security_report = create_security_report(input_validation, output_validation or {})
             
+            # Save greeting interaction to chat history (using helper function)
+            session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                chat_service=chat_service,
+                effective_user_id=effective_user_id,
+                session_id=request.session_id,
+                question=cleaned_question,
+                answer=ans,
+                language=language,
+                metadata={"type": "greeting", "user_type": "lawyer"}
+            )
+            
             return LawyerChatResponse(
                 answer=ans, 
                 sources=[], 
                 confidence=conf, 
                 language=language,
-                security_report=security_report
+                security_report=security_report,
+                session_id=session_id,
+                message_id=assistant_msg_id,
+                user_message_id=user_msg_id
             )
 
         # Step 2: Retrieve Legal Context
@@ -579,12 +723,12 @@ async def ask_legal_question_lawyer(request: LawyerChatRequest):
         
         # Handle output validation failure in strict mode
         if GUARDRAILS_CONFIG.get("strict_mode", True) and not output_validation.get("is_valid", True):
-            security_logger.error(f"Output validation failed: {output_validation.get('error', 'Unknown')}")
+            logger.error(f"Output validation failed: {output_validation.get('error', 'Unknown')}")
             
             # Retry with more conservative approach if retries are enabled
             max_retries = GUARDRAILS_CONFIG.get("max_retries", 2)
             for retry in range(max_retries):
-                security_logger.info(f"Retrying response generation (attempt {retry + 1}/{max_retries})")
+                logger.info(f"Retrying response generation (attempt {retry + 1}/{max_retries})")
                 
                 # Generate more conservative response
                 conservative_ans, conservative_conf, conservative_analysis, conservative_related = generate_lawyer_answer(
@@ -620,7 +764,7 @@ async def ask_legal_question_lawyer(request: LawyerChatRequest):
                 article_title=s["article_title"],
                 text_preview=s["text_preview"],
                 relevance_score=s["relevance_score"],
-                lawphil_link=s["lawphil_link"]
+                source_url=s.get("lawphil_link") or s.get("source_url")  # Support both field names
             )
             for s in sources
         ]
@@ -628,9 +772,27 @@ async def ask_legal_question_lawyer(request: LawyerChatRequest):
         # Step 6: Generate Security Report
         security_report = create_security_report(input_validation, output_validation)
         
+        # Step 7: Save chat interaction to history (using helper function - same as user chatbot)
+        session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+            chat_service=chat_service,
+            effective_user_id=effective_user_id,
+            session_id=request.session_id,
+            question=cleaned_question,
+            answer=ans,
+            language=language,
+            metadata={
+                "user_type": "lawyer",
+                "legal_analysis": analysis,
+                "related_provisions": related,
+                "security_level": security_report.security_level,
+                "sources": [s.dict() for s in citations],
+                "confidence": conf
+            }
+        )
+        
         # Log processing time and security metrics
         processing_time = time.time() - start_time
-        security_logger.info(f"Request processed in {processing_time:.2f}s - Security Level: {security_report.security_level}")
+        logger.info(f"Request processed in {processing_time:.2f}s - Security Level: {security_report.security_level}")
 
         return LawyerChatResponse(
             answer=ans,
@@ -639,14 +801,17 @@ async def ask_legal_question_lawyer(request: LawyerChatRequest):
             language=language,
             legal_analysis=analysis,
             related_provisions=related,
-            security_report=security_report
+            security_report=security_report,
+            session_id=session_id,
+            message_id=assistant_msg_id,
+            user_message_id=user_msg_id
         )
         
     except HTTPException:
         # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
-        security_logger.error(f"Unexpected error in lawyer chatbot: {e}")
+        logger.error(f"Unexpected error in lawyer chatbot: {e}")
         
         # Create error security report
         error_security_report = SecurityReport(
