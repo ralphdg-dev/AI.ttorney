@@ -37,8 +37,31 @@ qdrant_client = QdrantClient(
     api_key=QDRANT_API_KEY,
 )
 
-# Initialize OpenAI client
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
+# Initialize OpenAI client with a workaround for the proxies issue
+openai_client = None
+try:
+    # Import OpenAI and create client with minimal parameters
+    from openai import OpenAI
+    
+    # Create a custom httpx client without proxies
+    import httpx
+    http_client = httpx.Client()
+    
+    # Initialize OpenAI client with custom http client
+    openai_client = OpenAI(
+        api_key=OPENAI_API_KEY,
+        http_client=http_client
+    )
+    print("✅ OpenAI client initialized successfully with custom http client")
+except Exception as e:
+    print(f"WARNING: Failed to initialize OpenAI client: {e}")
+    # Fallback: try without custom http client
+    try:
+        openai_client = OpenAI(api_key=OPENAI_API_KEY)
+        print("✅ OpenAI client initialized successfully (fallback)")
+    except Exception as e2:
+        print(f"WARNING: Fallback also failed: {e2}")
+        openai_client = None
 
 # Create router
 router = APIRouter(prefix="/api/chatbot/user", tags=["Legal Chatbot - User"])
