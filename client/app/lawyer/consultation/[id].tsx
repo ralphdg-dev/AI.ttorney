@@ -8,9 +8,10 @@ import { HStack } from '../../../components/ui/hstack';
 import { useAuth } from '../../../contexts/AuthContext';
 import Colors from '../../../constants/Colors';
 import tw from 'tailwind-react-native-classnames';
+import { NetworkConfig } from '../../../utils/networkConfig';
 import Header from '../../../components/Header';
-import LawyerNavbar from '../../../components/lawyer/LawyerNavbar';
-import ConfirmationModal from '../../../components/lawyer/ConfirmationModal';
+import { LawyerNavbar } from '../../../components/lawyer/shared';
+import { ConfirmationModal } from '../../../components/lawyer/consultation';
 
 interface ConsultationRequest {
   id: string;
@@ -47,8 +48,9 @@ const ConsultationDetailPage: React.FC = () => {
 
     try {
       setLoading(true);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/consult-actions/${id}`,
+        `${apiUrl}/api/consult-actions/${id}`,
         {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -111,8 +113,9 @@ const ConsultationDetailPage: React.FC = () => {
           break;
       }
 
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/consult-actions/${consultation.id}/${endpoint}`,
+        `${apiUrl}/api/consult-actions/${consultation.id}/${endpoint}`,
         {
           method: 'POST',
           headers: {
@@ -145,7 +148,7 @@ const ConsultationDetailPage: React.FC = () => {
 
   if (loading || !consultation) {
     return (
-      <SafeAreaView style={tw`flex-1 bg-gray-50`}>
+      <SafeAreaView style={tw`flex-1 bg-gray-50`} edges={['top', 'left', 'right']}>
         <Header 
           title="Loading..."
           showBackButton={true}
@@ -159,7 +162,7 @@ const ConsultationDetailPage: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-50`}>
+    <SafeAreaView style={tw`flex-1 bg-gray-50`} edges={['top', 'left', 'right']}>
       <Header 
         title={`Request #${consultation.status.toUpperCase()}-${consultation.id.slice(-4)}`}
         showBackButton={true}

@@ -9,8 +9,8 @@ import {
   User,
   Users
 } from 'lucide-react-native';
-import Colors from '../../constants/Colors';
-import { GlobalStyles } from '../../constants/GlobalStyles';
+import Colors from '../../../constants/Colors';
+import { GlobalStyles } from '../../../constants/GlobalStyles';
 
 interface LawyerNavbarProps {
   activeTab?: 'home' | 'forum' | 'consult' | 'chatbot' | 'profile';
@@ -68,47 +68,51 @@ const LawyerNavbar: React.FC<LawyerNavbarProps> = ({
     }
   };
 
+  const currentTab = getActiveTab();
+
   const tabs = [
     { 
       id: 'home', 
       label: 'Dashboard', 
       icon: Home, 
-      route: '/lawyer' 
+      route: '/lawyer',
+      active: currentTab === 'home'
     },
     { 
       id: 'forum', 
       label: 'Forum', 
       icon: Users, 
-      route: '/lawyer/forum' 
+      route: '/lawyer/forum',
+      active: currentTab === 'forum'
     },
     { 
       id: 'chatbot', 
-      label: 'AI Assistant', 
+      label: 'Ask AI', 
       icon: MessageSquarePlus, 
-      route: '/lawyer/chatbot' 
+      route: '/lawyer/chatbot',
+      active: currentTab === 'chatbot'
     },
     { 
       id: 'consult', 
-      label: 'Consultations', 
+      label: 'Consults', 
       icon: Briefcase, 
-      route: '/lawyer/consult' 
+      route: '/lawyer/consult',
+      active: currentTab === 'consult'
     },
     { 
       id: 'profile', 
       label: 'Profile', 
       icon: User, 
-      route: '/lawyer/profile' 
+      route: '/lawyer/profile',
+      active: currentTab === 'profile'
     },
   ];
-
-  const currentTab = getActiveTab();
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <View style={styles.navbar}>
         {tabs.map((tab) => {
           const IconComponent = tab.icon;
-          const isActive = currentTab === tab.id;
           return (
             <TouchableOpacity
               key={tab.id}
@@ -118,13 +122,13 @@ const LawyerNavbar: React.FC<LawyerNavbarProps> = ({
             >
               <IconComponent
                 size={22}
-                color={isActive ? '#023D7B' : '#6B6B6B'}
+                color={tab.active ? '#023D7B' : '#6B6B6B'}
                 strokeWidth={2.2}
               />
               <Text
                 style={[
                   styles.tabLabel,
-                  isActive ? [styles.activeLabel, { color: '#023D7B' }] : [styles.inactiveLabel, { color: '#6B6B6B' }]
+                  tab.active ? [styles.activeLabel, { color: '#023D7B' }] : [styles.inactiveLabel, { color: '#6B6B6B' }]
                 ]}
               >
                 {tab.label}

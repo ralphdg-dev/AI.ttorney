@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { View, ScrollView, TouchableOpacity } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +11,7 @@ import { Text as GSText } from "@/components/ui/text";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarImage, AvatarFallbackText } from "@/components/ui/avatar";
 import Navbar from "@/components/Navbar";
+import { LawyerNavbar } from "@/components/lawyer/shared";
 import Colors from "@/constants/Colors";
 import { createShadowStyle } from '@/utils/shadowUtils';
 import { 
@@ -44,6 +46,9 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [pushNotifications, setPushNotifications] = useState(true);
+  
+  // Check if user is a lawyer
+  const isLawyer = user?.role === 'verified_lawyer';
 
   const accountSettings: SettingItem[] = [
     {
@@ -138,7 +143,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={tw`flex-1 bg-gray-50`}>
+    <SafeAreaView style={tw`flex-1 bg-gray-50`} edges={['top', 'left', 'right']}>
       {/* Back Button Header */}
       <View style={[tw`bg-white p-4 flex-row items-center`, { borderBottomColor: Colors.border.light, borderBottomWidth: 1 }]}>
         <TouchableOpacity 
@@ -161,7 +166,7 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Section */}
-        <TouchableOpacity onPress={() => router.push('/profile')} activeOpacity={0.7}>
+        <TouchableOpacity onPress={() => router.push(isLawyer ? '/lawyer/profile' : '/profile')} activeOpacity={0.7}>
           <Box 
             className="bg-white rounded-2xl mb-6 p-6" 
             style={cardShadowStyle}
@@ -248,7 +253,7 @@ export default function SettingsScreen() {
 
       </ScrollView>
 
-      <Navbar />
-    </View>
+      {isLawyer ? <LawyerNavbar /> : <Navbar />}
+    </SafeAreaView>
   );
 }

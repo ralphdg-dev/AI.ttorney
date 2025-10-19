@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { ChevronLeft, ChevronRight, Calendar, Clock, Video, MapPin, X } from 'lucide-react-native';
-import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalCloseButton, ModalBody } from '../ui/modal';
-import Colors from '../../constants/Colors';
+import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalCloseButton, ModalBody } from '../../ui/modal';
+import Colors from '../../../constants/Colors';
 import tw from 'tailwind-react-native-classnames';
 
 interface ConsultationCalendarProps {
@@ -24,13 +24,8 @@ const ConsultationCalendar: React.FC<ConsultationCalendarProps> = ({
   onDatePress,
   onConsultationPress 
 }) => {
-  // Initialize with Philippine timezone
-  const getPhilippineDate = () => {
-    const now = new Date();
-    return new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
-  };
-  
-  const [currentDate, setCurrentDate] = useState(getPhilippineDate());
+  // Initialize with current date
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedDateConsultations, setSelectedDateConsultations] = useState<typeof consultations>([]);
@@ -83,9 +78,9 @@ const ConsultationCalendar: React.FC<ConsultationCalendarProps> = ({
     return { color: Colors.primary.blue, count: dayConsultations.length };
   };
 
-  // Check if date is today (Philippine timezone)
+  // Check if date is today
   const isToday = (day: number) => {
-    const today = getPhilippineDate();
+    const today = new Date();
     return today.getDate() === day && 
            today.getMonth() === currentMonth && 
            today.getFullYear() === currentYear;
@@ -150,22 +145,22 @@ const ConsultationCalendar: React.FC<ConsultationCalendarProps> = ({
 
 
   return (
-    <View style={tw`bg-white rounded-2xl border border-gray-200 p-6`}>
+    <View style={tw`bg-white rounded-2xl border border-gray-200 p-4`}>
       {/* Header */}
-      <View style={tw`flex-row justify-between items-center mb-6`}>
-        <View style={tw`flex-row items-center`}>
-          <Calendar size={20} color={Colors.primary.blue} />
-          <Text style={tw`text-lg font-bold text-gray-900 ml-2`}>
+      <View style={tw`flex-row justify-between items-center mb-4`}>
+        <View style={tw`flex-row items-center flex-1 mr-2`}>
+          <Calendar size={20} color={Colors.primary.blue} style={{ flexShrink: 0 }} />
+          <Text style={tw`text-lg font-bold text-gray-900 ml-2`} numberOfLines={1}>
             Accepted Consultations
           </Text>
         </View>
-        <Text style={tw`text-sm text-gray-500`}>
+        <Text style={tw`text-sm text-gray-500`} numberOfLines={1}>
           {consultations.filter(c => c.status === 'accepted').length} scheduled
         </Text>
       </View>
 
       {/* Month Navigation */}
-      <View style={tw`flex-row justify-between items-center mb-6`}>
+      <View style={tw`flex-row justify-between items-center mb-4`}>
         <TouchableOpacity
           onPress={() => navigateMonth('prev')}
           style={tw`w-10 h-10 rounded-lg bg-gray-50 justify-center items-center`}

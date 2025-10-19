@@ -1,4 +1,4 @@
-// C:\Users\Mikko\Desktop\AI.ttorney\client\app\lawyer\ProfileComponents\EditProfileModal.tsx
+// EditProfileModal.tsx - Lawyer profile editing modal component
 import React from "react";
 import {
   View,
@@ -21,12 +21,7 @@ import {
 } from "lucide-react-native";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../../../constants/Colors";
-
-interface TimeSlot {
-  id: string;
-  day: string;
-  isActive: boolean;
-}
+import { TimeSlot } from "../../../services/lawyerProfileServices";
 
 interface ProfileData {
   name: string;

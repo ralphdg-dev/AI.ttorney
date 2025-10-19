@@ -1,14 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends, Header
-from supabase import create_client, Client
+from fastapi import APIRouter, HTTPException, Depends
+from supabase import Client
 from typing import List, Optional, Dict, Any
-import os
-from dotenv import load_dotenv
 import logging
 from pydantic import BaseModel
 from datetime import datetime, date
-
-# Load environment variables
-load_dotenv()
+from config.dependencies import get_current_user as get_auth_user, get_supabase
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -16,15 +12,6 @@ logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/api/consult-actions", tags=["consultation-actions"])
-
-# Supabase configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("Missing Supabase configuration")
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Pydantic models
 class ConsultationRequest(BaseModel):
@@ -59,35 +46,56 @@ class SuccessResponse(BaseModel):
     success: bool
     message: str
 
-# Dependency to verify and extract user ID from token
-async def get_current_user(authorization: str = Header(...)) -> Dict[str, Any]:
+# Helper to convert auth user to dict format
+def get_current_user_dict(user = Depends(get_auth_user)) -> Dict[str, Any]:
     """
-    Extract user ID from Supabase JWT token
+    Convert auth user to dict format for compatibility
     """
-    try:
-        if not authorization.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Invalid authorization header")
-        
-        token = authorization.replace("Bearer ", "")
-        
-        # Verify token and get user data using Supabase
-        user_data = supabase.auth.get_user(token)
-        
-        if not user_data or not user_data.user:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        
-        return {
-            "id": user_data.user.id,
-            "email": user_data.user.email
-        }
-    except Exception as e:
-        logger.error(f"Token verification error: {str(e)}")
-        raise HTTPException(status_code=401, detail="Invalid token")
+    return {
+        "id": user.id,
+        "email": user.email
+    }
+
+# Helper to transform consultation data
+def transform_consultation_data(consultation: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Transform raw consultation data with user information
+    """
+    user_data = consultation.get('users', {})
+    return {
+        "id": consultation.get("id"),
+        "user_id": consultation.get("user_id"),
+        "lawyer_id": consultation.get("lawyer_id"),
+        "message": consultation.get("message"),
+        "email": consultation.get("email"),
+        "mobile_number": consultation.get("mobile_number"),
+        "status": consultation.get("status"),
+        "consultation_date": consultation.get("consultation_date"),
+        "consultation_time": consultation.get("consultation_time"),
+        "consultation_mode": consultation.get("consultation_mode"),
+        "requested_at": consultation.get("requested_at"),
+        "responded_at": consultation.get("responded_at"),
+        "created_at": consultation.get("created_at"),
+        "updated_at": consultation.get("updated_at"),
+        "client_name": user_data.get("full_name", "Unknown Client"),
+        "client_email": user_data.get("email", consultation.get("email")),
+        "client_username": user_data.get("username")
+    }
+
+# Constant for user join query
+USER_JOIN_QUERY = """*,
+    users!consultation_requests_user_id_fkey(
+        full_name,
+        email,
+        username
+    )
+"""
 
 @router.get("/my-consultations", response_model=List[ConsultationRequest])
 async def get_my_consultations(
     status_filter: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user_dict),
+    supabase: Client = Depends(get_supabase)
 ):
     """
     Get consultation requests for the logged-in lawyer with client names from users table
@@ -97,14 +105,7 @@ async def get_my_consultations(
         logger.info(f"Fetching consultations for lawyer: {lawyer_id}, filter: {status_filter}")
         
         # Build the query
-        query = supabase.table("consultation_requests").select("""
-            *,
-            users!consultation_requests_user_id_fkey(
-                full_name,
-                email,
-                username
-            )
-        """).eq("lawyer_id", lawyer_id)
+        query = supabase.table("consultation_requests").select(USER_JOIN_QUERY).eq("lawyer_id", lawyer_id)
         
         # Apply status filter if provided
         if status_filter and status_filter != "all":
@@ -122,31 +123,8 @@ async def get_my_consultations(
         
         consultations = response.data if hasattr(response, 'data') else []
         
-        # Transform the data to include client information
-        transformed_consultations = []
-        for consultation in consultations:
-            # Extract client info from the joined users table
-            user_data = consultation.get('users', {})
-            
-            transformed_consultations.append({
-                "id": consultation.get("id"),
-                "user_id": consultation.get("user_id"),
-                "lawyer_id": consultation.get("lawyer_id"),
-                "message": consultation.get("message"),
-                "email": consultation.get("email"),
-                "mobile_number": consultation.get("mobile_number"),
-                "status": consultation.get("status"),
-                "consultation_date": consultation.get("consultation_date"),
-                "consultation_time": consultation.get("consultation_time"),
-                "consultation_mode": consultation.get("consultation_mode"),
-                "requested_at": consultation.get("requested_at"),
-                "responded_at": consultation.get("responded_at"),
-                "created_at": consultation.get("created_at"),
-                "updated_at": consultation.get("updated_at"),
-                "client_name": user_data.get("full_name", "Unknown Client"),
-                "client_email": user_data.get("email", consultation.get("email")),
-                "client_username": user_data.get("username")
-            })
+        # Transform the data using helper function
+        transformed_consultations = [transform_consultation_data(c) for c in consultations]
         
         logger.info(f"Found {len(transformed_consultations)} consultations for lawyer {lawyer_id}")
         return transformed_consultations
@@ -160,7 +138,8 @@ async def get_my_consultations(
 @router.get("/{consultation_id}", response_model=ConsultationRequest)
 async def get_consultation_detail(
     consultation_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user_dict),
+    supabase: Client = Depends(get_supabase)
 ):
     """
     Get detailed information for a specific consultation request
@@ -169,14 +148,7 @@ async def get_consultation_detail(
         lawyer_id = current_user["id"]
         
         # Fetch consultation with user data
-        response = supabase.table("consultation_requests").select("""
-            *,
-            users!consultation_requests_user_id_fkey(
-                full_name,
-                email,
-                username
-            )
-        """).eq("id", consultation_id).eq("lawyer_id", lawyer_id).execute()
+        response = supabase.table("consultation_requests").select(USER_JOIN_QUERY).eq("id", consultation_id).eq("lawyer_id", lawyer_id).execute()
         
         if hasattr(response, 'error') and response.error:
             logger.error(f"Supabase error: {response.error}")
@@ -188,30 +160,9 @@ async def get_consultation_detail(
             raise HTTPException(status_code=404, detail="Consultation not found")
         
         consultation = consultations[0]
-        user_data = consultation.get('users', {})
         
-        # Transform the data
-        transformed_consultation = {
-            "id": consultation.get("id"),
-            "user_id": consultation.get("user_id"),
-            "lawyer_id": consultation.get("lawyer_id"),
-            "message": consultation.get("message"),
-            "email": consultation.get("email"),
-            "mobile_number": consultation.get("mobile_number"),
-            "status": consultation.get("status"),
-            "consultation_date": consultation.get("consultation_date"),
-            "consultation_time": consultation.get("consultation_time"),
-            "consultation_mode": consultation.get("consultation_mode"),
-            "requested_at": consultation.get("requested_at"),
-            "responded_at": consultation.get("responded_at"),
-            "created_at": consultation.get("created_at"),
-            "updated_at": consultation.get("updated_at"),
-            "client_name": user_data.get("full_name", "Unknown Client"),
-            "client_email": user_data.get("email", consultation.get("email")),
-            "client_username": user_data.get("username")
-        }
-        
-        return transformed_consultation
+        # Transform the data using helper function
+        return transform_consultation_data(consultation)
         
     except HTTPException:
         raise
@@ -220,7 +171,10 @@ async def get_consultation_detail(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/stats", response_model=ConsultationStats)
-async def get_consultation_stats(current_user: Dict[str, Any] = Depends(get_current_user)):
+async def get_consultation_stats(
+    current_user: Dict[str, Any] = Depends(get_current_user_dict),
+    supabase: Client = Depends(get_supabase)
+):
     """
     Get statistics for the logged-in lawyer's consultation requests
     """
@@ -270,37 +224,41 @@ async def get_consultation_stats(current_user: Dict[str, Any] = Depends(get_curr
 @router.post("/{consultation_id}/accept", response_model=SuccessResponse)
 async def accept_consultation(
     consultation_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user_dict),
+    supabase: Client = Depends(get_supabase)
 ):
     """
     Accept a consultation request
     """
-    return await update_consultation_status(consultation_id, "accepted", current_user)
+    return await update_consultation_status(consultation_id, "accepted", current_user, supabase)
 
 @router.post("/{consultation_id}/reject", response_model=SuccessResponse)
 async def reject_consultation(
     consultation_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user_dict),
+    supabase: Client = Depends(get_supabase)
 ):
     """
     Reject a consultation request
     """
-    return await update_consultation_status(consultation_id, "rejected", current_user)
+    return await update_consultation_status(consultation_id, "rejected", current_user, supabase)
 
 @router.post("/{consultation_id}/complete", response_model=SuccessResponse)
 async def complete_consultation(
     consultation_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user_dict),
+    supabase: Client = Depends(get_supabase)
 ):
     """
     Mark a consultation as completed
     """
-    return await update_consultation_status(consultation_id, "completed", current_user)
+    return await update_consultation_status(consultation_id, "completed", current_user, supabase)
 
 async def update_consultation_status(
     consultation_id: str, 
     new_status: str, 
-    current_user: Dict[str, Any]
+    current_user: Dict[str, Any],
+    supabase: Client
 ) -> SuccessResponse:
     """
     Helper function to update consultation status
@@ -348,7 +306,8 @@ async def update_consultation_status(
 @router.post("/{consultation_id}/cancel", response_model=SuccessResponse)
 async def cancel_consultation(
     consultation_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user_dict),
+    supabase: Client = Depends(get_supabase)
 ):
     """
     Cancel a consultation request (user-initiated)

@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from auth.service import AuthService
 from typing import Optional, Dict, Any
@@ -6,15 +6,27 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)  # Don't auto-error so we can log the issue
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Optional[Dict[str, Any]]:
+async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[Dict[str, Any]]:
     """Get current authenticated user"""
     try:
+        if not credentials:
+            logger.error("🔐 No credentials provided - Authorization header missing")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authorization header missing",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
         token = credentials.credentials
+        logger.info(f"🔐 Authenticating user with token: {token[:20]}...")
         user_data = await AuthService.get_user(token)
         
+        logger.info(f"🔐 User data received: {user_data}")
+        
         if not user_data:
+            logger.warning("🔐 No user data returned from AuthService")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication credentials",
@@ -22,8 +34,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             )
         
         return user_data
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Authentication error: {str(e)}")
+        logger.error(f"🔐 Authentication error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",

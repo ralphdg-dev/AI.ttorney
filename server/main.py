@@ -26,6 +26,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Set httpx to WARNING level to reduce noise
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 # Lifespan event handler
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -66,9 +69,12 @@ app.add_middleware(
         "http://localhost:3000",  # React dev server
         "http://localhost:8081",  # Expo dev server
         "exp://localhost:8081",   # Expo dev server
-        "http://192.168.68.102:8081",  # Current network Expo dev server
-        "exp://192.168.68.102:8081",   # Current network Expo dev server
-        "http://192.168.68.102:8000",  # API server access
+        "http://192.168.68.109:8081",  # Current network Expo dev server
+        "exp://192.168.68.109:8081",   # Current network Expo dev server
+        "http://192.168.68.109:8000",  # API server access
+        "http://192.168.68.102:8081",  # Old network Expo dev server
+        "exp://192.168.68.102:8081",   # Old network Expo dev server
+        "http://192.168.68.102:8000",  # Old API server access
         "*",  # Allow all origins for Expo Go (development only)
     ],
     allow_credentials=True,
@@ -79,6 +85,15 @@ app.add_middleware(
 # Import routes after app creation to avoid circular imports
 from routes import auth
 from routes.forum import router as forum_router
+
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"🌐 {request.method} {request.url.path}")
+    logger.info(f"🔑 Headers: {dict(request.headers)}")
+    response = await call_next(request)
+    logger.info(f"📤 Response status: {response.status_code}")
+    return response
 
 # Global exception handler
 @app.exception_handler(Exception)
@@ -117,6 +132,10 @@ from api.chatbot_user import router as user_chatbot_router
 from api.chatbot_lawyer import router as lawyer_chatbot_router
 app.include_router(user_chatbot_router)
 app.include_router(lawyer_chatbot_router)
+
+# Import and include chat history routes
+from routes.chat_history import router as chat_history_router
+app.include_router(chat_history_router)
 
 @app.get("/")
 async def root():

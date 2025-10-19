@@ -101,7 +101,7 @@ export default function TermListItem({ item, onPress, containerStyle }: TermList
           <Text 
             numberOfLines={2}
             ellipsizeMode="tail"
-            style={[tw`text-sm leading-5`, { color: Colors.text.sub }]}
+            style={[tw`text-sm`, { color: Colors.text.sub }]}
           >
             {item.definition}
           </Text>
@@ -109,7 +109,7 @@ export default function TermListItem({ item, onPress, containerStyle }: TermList
             <Text 
               numberOfLines={2}
               ellipsizeMode="tail"
-              style={[tw`text-sm leading-5 mt-1 italic`, { color: '#6B7280' }]}
+              style={[tw`text-sm mt-1 italic`, { color: '#6B7280' }]}
             >
               {item.filipinoDefinition}
             </Text>

@@ -1,22 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-  Alert,
-  ScrollView,
-  Linking,
-} from "react-native";
-import tw from "tailwind-react-native-classnames";
-import Colors from "../../constants/Colors";
+import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import tw from 'tailwind-react-native-classnames';
+import Colors from '../../constants/Colors';
 import { Ionicons } from "@expo/vector-icons";
 import Header from "../../components/Header";
-import LawyerNavbar from "../../components/lawyer/LawyerNavbar";
+import { LawyerNavbar } from '../../components/lawyer/shared';
+import { SidebarWrapper } from "../../components/AppSidebar";
 import {
   LawyerChatbotService,
   LawyerChatMessage,
@@ -192,13 +182,10 @@ export default function LawyerChatbotScreen() {
         <View style={isUser ? tw`items-end` : tw`items-start`}>
           <View
             style={[
-              tw`p-3 rounded-2xl`,
-              {
-                backgroundColor: isUser ? Colors.primary.blue : "#F3F4F6",
-                maxWidth: "100%",
-                flexShrink: 1,
-                alignSelf: isUser ? "flex-end" : "flex-start",
-              },
+              tw`max-w-4/5 rounded-2xl`,
+              isUser
+                ? { backgroundColor: Colors.primary.blue, paddingHorizontal: 14, paddingVertical: 10 }
+                : { backgroundColor: "#F3F4F6", paddingHorizontal: 14, paddingVertical: 10 },
             ]}
           >
             {isUser ? (
@@ -228,13 +215,10 @@ export default function LawyerChatbotScreen() {
 
   if (showIntro) {
     return (
-      <View style={tw`flex-1 bg-white`}>
-        <Header title="AI Legal Assistant" showMenu={true} />
-        <View style={tw`flex-1 justify-center items-center px-6`}>
-          <Image
-            source={lawyerLogo}
-            style={tw`w-32 h-32 mb-3`}
-            resizeMode="contain"
+        <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
+          <Header
+            title="AI Legal Assistant"
+            showMenu={true}
           />
           <Text
             style={[
@@ -260,24 +244,37 @@ export default function LawyerChatbotScreen() {
             <Text style={tw`text-white font-semibold text-base`}>
               Chat with Legal Assistant
             </Text>
-          </TouchableOpacity>
-        </View>
-        <LawyerNavbar activeTab="chatbot" />
-      </View>
+
+            <TouchableOpacity
+              style={[
+                tw`flex-row items-center px-6 py-3 rounded-full`,
+                { backgroundColor: Colors.primary.blue },
+              ]}
+              onPress={() => setShowIntro(false)}
+            >
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={20}
+                color="white"
+                style={tw`mr-2`}
+              />
+              <Text style={tw`text-white font-semibold text-base`}>
+                Chat with Legal Assistant
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <LawyerNavbar activeTab="chatbot" />
+          <SidebarWrapper />
+        </SafeAreaView>
     );
   }
 
   return (
-    <View style={tw`flex-1 bg-white`}>
-      <Header title="Legal Assistant" showMenu={true} />
-      <FlatList
-        ref={flatRef}
-        data={messages}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={tw`pb-4`}
-        showsVerticalScrollIndicator={false}
-      />
+      <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
+        <Header
+          title="Legal Assistant"
+          showMenu={true}
+        />
 
       {isTyping && (
         <View style={tw`px-4 pb-2`}>
@@ -341,19 +338,9 @@ export default function LawyerChatbotScreen() {
               </Text>
             )}
           </View>
-
-          <TouchableOpacity
-            onPress={sendMessage}
-            style={[
-              tw`p-2 rounded-full`,
-              { backgroundColor: Colors.primary.blue },
-            ]}
-          >
-            <Ionicons name="send" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-      <LawyerNavbar activeTab="chatbot" />
-    </View>
+        </KeyboardAvoidingView>
+        <LawyerNavbar activeTab="chatbot" />
+        <SidebarWrapper />
+      </SafeAreaView>
   );
 }

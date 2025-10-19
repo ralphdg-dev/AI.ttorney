@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Menu, Search, Bell, ArrowLeft, Settings } from 'lucide-react-native';
 import { useSidebar } from './AppSidebar';
 import { useRouter } from 'expo-router';
@@ -19,7 +18,7 @@ interface HeaderProps {
   onSearchPress?: () => void;
   onNotificationPress?: () => void;
   onSettingsPress?: () => void;
-  variant?: 'default' | 'home' | 'minimal' | 'lawyer-home' | 'lawyer-cases' | 'lawyer-consult' | 'lawyer-clients' | 'lawyer-profile';
+  variant?: 'home' | 'minimal';
   rightComponent?: React.ReactNode;
 }
 
@@ -40,7 +39,6 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const { openSidebar } = useSidebar();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
 
   const handleMenuPress = () => {
     if (onMenuPress) {
@@ -95,7 +93,8 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   const renderCenterSection = () => {
-    if (variant === 'home') {
+    // Show logo if variant is 'home' and no title provided
+    if (variant === 'home' && !title) {
       return (
         <View style={styles.titleContainer}>
           <Image 
@@ -107,6 +106,7 @@ const Header: React.FC<HeaderProps> = ({
       );
     }
 
+    // Show title if provided
     if (title) {
       return (
         <Text style={styles.title}>
@@ -169,8 +169,7 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <View style={[
-      styles.container, 
-      { paddingTop: insets.top + 8 },
+      styles.container,
       variant === 'minimal' && styles.minimalContainer
     ]}>
       <View style={styles.content}>
@@ -213,7 +212,8 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: -1,
+    zIndex: 0,
+    pointerEvents: 'none',
   },
   logo: {
     width: 160,

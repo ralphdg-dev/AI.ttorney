@@ -1,18 +1,20 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, Image, SafeAreaView } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, Image, SafeAreaView, TextInput, Animated } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { User, Bookmark, MoreHorizontal, Flag } from 'lucide-react-native';
-import ReportModal from '../common/ReportModal';
-import { ReportService } from '../../services/reportService';
+import { User, Bookmark, MoreHorizontal, Flag, Send, Shield } from 'lucide-react-native';
+import ReportModal from '../../common/ReportModal';
+import { ReportService } from '../../../services/reportService';
 import tw from 'tailwind-react-native-classnames';
-import Colors from '../../constants/Colors';
-import Header from '../Header';
-import { BookmarkService } from '../../services/bookmarkService';
-import { useAuth } from '../../contexts/AuthContext';
-import SkeletonLoader from '../ui/SkeletonLoader';
+import Colors from '../../../constants/Colors';
+import Header from '../../Header';
+import { BookmarkService } from '../../../services/bookmarkService';
+import { useAuth } from '../../../contexts/AuthContext';
+import SkeletonLoader from '../../ui/SkeletonLoader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useForumCache } from '../../contexts/ForumCacheContext';
-import { createShadowStyle } from '../../utils/shadowUtils';
+import { useForumCache } from '../../../contexts/ForumCacheContext';
+import { createShadowStyle } from '../../../utils/shadowUtils';
+import { shouldUseNativeDriver } from '../../../utils/animations';
+import { NetworkConfig } from '../../../utils/networkConfig';
 
 
 interface PostData {
@@ -56,11 +58,14 @@ interface Reply {
     isLawyer?: boolean;
     lawyerBadge?: string;
   };
+  // Optimistic UI props
+  isOptimistic?: boolean;
+  animatedOpacity?: Animated.Value;
 }
 
 
 
-const ViewPostReadOnly: React.FC = () => {
+const ViewPost: React.FC = () => {
   const router = useRouter();
   const { postId } = useLocalSearchParams();
   const { user: currentUser, session } = useAuth();
@@ -78,6 +83,22 @@ const ViewPostReadOnly: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [repliesLoading, setRepliesLoading] = useState(false);
+  const [optimisticReplies, setOptimisticReplies] = useState<Reply[]>([]);
+  const [replyText, setReplyText] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
+  
+  // Check if current user is a lawyer
+  const isLawyer = currentUser?.role === 'verified_lawyer';
+
+  // Helper function to get initials from name
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   // Optimized auth headers helper with minimal logging
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
@@ -335,7 +356,7 @@ const ViewPostReadOnly: React.FC = () => {
                 user: isReplyAnon ? undefined : {
                   name: replyUserData?.full_name || replyUserData?.username || 'User',
                   username: replyUserData?.username || 'user',
-                  avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+                  avatar: replyUserData?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
                   isLawyer: replyUserData?.role === 'verified_lawyer',
                   lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
                 }
@@ -363,6 +384,39 @@ const ViewPostReadOnly: React.FC = () => {
   loadPost();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId, getCachedPost, getCachedPostFromForum, prefetchPost, currentUser, session]);
+
+  // Function to add optimistic reply
+  const addOptimisticReply = useCallback((replyData: { body: string }) => {
+    const animatedOpacity = new Animated.Value(0);
+    const optimisticReply: Reply = {
+      id: `optimistic-reply-${Date.now()}`,
+      body: replyData.body,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      user_id: currentUser?.id || 'current-lawyer',
+      is_anonymous: false,
+      is_flagged: false,
+      user: {
+        name: currentUser?.full_name || 'You',
+        username: currentUser?.username || 'you',
+        avatar: (currentUser as any)?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+        isLawyer: true,
+        lawyerBadge: 'Verified'
+      },
+      isOptimistic: true,
+      animatedOpacity,
+    };
+
+    setOptimisticReplies(prev => [...prev, optimisticReply]);
+    
+    Animated.timing(animatedOpacity, {
+      toValue: 0.8,
+      duration: 250,
+      useNativeDriver: shouldUseNativeDriver('opacity'),
+    }).start();
+    
+    return optimisticReply.id;
+  }, [currentUser]);
 
   // Fallback to API when no cache available
   const loadFromAPI = useCallback(async (postId: string) => {
@@ -425,14 +479,13 @@ const ViewPostReadOnly: React.FC = () => {
           user: isAnon ? undefined : {
             name: userData?.full_name || userData?.username || 'User',
             username: userData?.username || 'user',
-            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+            avatar: userData?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
             isLawyer: userData?.role === 'verified_lawyer',
             lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
           },
           comments: 0,
         };
         
-        // Show the post immediately
         setPost(mapped);
         setPostReady(true);
         setLoading(false);
@@ -446,7 +499,6 @@ const ViewPostReadOnly: React.FC = () => {
           });
           
           if (repliesResponse.ok) {
-            // Process replies data from API response
             const repliesData = await repliesResponse.json();
             if (repliesData.success && Array.isArray((repliesData as any)?.data)) {
               const rows = (repliesData as any).data as any[];
@@ -465,21 +517,17 @@ const ViewPostReadOnly: React.FC = () => {
                   user: isReplyAnon ? undefined : {
                     name: replyUserData?.full_name || replyUserData?.username || 'User',
                     username: replyUserData?.username || 'user',
-                    avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+                    avatar: replyUserData?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
                     isLawyer: replyUserData?.role === 'verified_lawyer',
                     lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
                   }
                 };
               });
               
-              // Update UI with replies - sort by newest first
               setReplies(mappedReplies.sort((a, b) => 
                 new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
               ));
               setRepliesLoading(false);
-              
-              // Post with replies already set in state
-              // No need to cache again here
             }
           }
         } catch {
@@ -501,6 +549,68 @@ const ViewPostReadOnly: React.FC = () => {
       setLoading(false);
     }
   }, [getAuthHeaders]);
+
+  // Function to confirm optimistic reply
+  const confirmOptimisticReply = useCallback((optimisticId: string, reloadPost: (id: string) => Promise<void>) => {
+    setOptimisticReplies(prev => {
+      const reply = prev.find(r => r.id === optimisticId);
+      if (reply?.animatedOpacity) {
+        Animated.timing(reply.animatedOpacity, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: shouldUseNativeDriver('opacity'),
+        }).start();
+        
+        setTimeout(() => {
+          if (postId) {
+            reloadPost(String(postId));
+          }
+          setTimeout(() => {
+            setOptimisticReplies(current => current.filter(r => r.id !== optimisticId));
+          }, 200);
+        }, 300);
+      }
+      return prev;
+    });
+  }, [postId]);
+
+  // Function to remove failed optimistic reply
+  const removeOptimisticReply = useCallback((optimisticId: string) => {
+    setOptimisticReplies(prev => prev.filter(r => r.id !== optimisticId));
+  }, []);
+
+  // Handle reply submission
+  const handleSendReply = useCallback(async () => {
+    const text = replyText.trim();
+    if (!text || !postId) return;
+    
+    const optimisticId = addOptimisticReply({ body: text });
+    setReplyText('');
+    
+    try {
+      setIsReplying(true);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const headers = await getAuthHeaders();
+      
+      const response = await fetch(`${apiUrl}/api/forum/posts/${postId}/replies`, {
+        method: 'POST',
+        headers: headers as HeadersInit,
+        body: JSON.stringify({ body: text, is_anonymous: false }),
+      });
+      
+      if (response.ok) {
+        confirmOptimisticReply(optimisticId, loadFromAPI);
+      } else {
+        removeOptimisticReply(optimisticId);
+        setReplyText(text);
+      }
+    } catch {
+      removeOptimisticReply(optimisticId);
+      setReplyText(text);
+    } finally {
+      setIsReplying(false);
+    }
+  }, [replyText, postId, addOptimisticReply, confirmOptimisticReply, removeOptimisticReply, getAuthHeaders, loadFromAPI]);
 
   // Replies are now loaded with the post in loadPost and loadFromAPI
   // No separate loadReplies function needed
@@ -682,7 +792,7 @@ const ViewPostReadOnly: React.FC = () => {
 
       <ScrollView 
         style={tw`flex-1 bg-white`}
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: isLawyer ? 80 : 20 }}
         showsVerticalScrollIndicator={false}
       >
         
@@ -710,11 +820,17 @@ const ViewPostReadOnly: React.FC = () => {
                   <View style={tw`w-12 h-12 rounded-full border border-gray-200 items-center justify-center mr-3`}>
                     <User size={20} color="#6B7280" />
                   </View>
-                ) : (
+                ) : displayUser.avatar && !displayUser.avatar.includes('flaticon') ? (
                   <Image 
                     source={{ uri: displayUser.avatar }} 
                     style={tw`w-12 h-12 rounded-full mr-3`}
                   />
+                ) : (
+                  <View style={[tw`w-12 h-12 rounded-full items-center justify-center mr-3`, { backgroundColor: Colors.primary.blue }]}>
+                    <Text style={tw`text-white font-semibold text-base`}>
+                      {getInitials(displayUser.name)}
+                    </Text>
+                  </View>
                 )}
               <View style={tw`flex-1`}>
                 <View style={tw`flex-row items-start justify-between mb-1`}>
@@ -786,7 +902,7 @@ const ViewPostReadOnly: React.FC = () => {
             {/* Replies Section */}
             <View style={tw`mt-6 pt-6 border-t border-gray-100 bg-white`}>
               <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
-                Replies ({replies.length})
+                Replies ({[...replies, ...optimisticReplies].length})
               </Text>
               
               {repliesLoading ? (
@@ -800,27 +916,33 @@ const ViewPostReadOnly: React.FC = () => {
                       </View>
                   </View>
                 ))
-              ) : replies.length > 0 ? (
-                // Display actual replies
-                replies.map((reply) => {
+              ) : [...replies, ...optimisticReplies].length > 0 ? (
+                // Display actual replies and optimistic replies
+                [...replies, ...optimisticReplies].map((reply) => {
                   const isReplyAnonymous = reply.is_anonymous || false;
                   const replyUser = isReplyAnonymous 
                     ? { name: 'Anonymous User', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png', isLawyer: false }
                     : (reply.user || { name: 'User', avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', isLawyer: false });
                   const replyTimestamp = formatTimestamp(reply.created_at);
                   
-                  return (
+                  const replyComponent = (
                     <View key={reply.id} style={tw`mb-6 pl-4 bg-white`}>
                       <View style={tw`flex-row items-start mb-2`}>
                         {isReplyAnonymous ? (
                           <View style={tw`w-10 h-10 rounded-full bg-gray-100 border border-gray-200 items-center justify-center mr-3`}>
                             <User size={16} color="#6B7280" />
                           </View>
-                        ) : (
+                        ) : replyUser.avatar && !replyUser.avatar.includes('flaticon') ? (
                           <Image 
-                            source={{ uri: replyUser.avatar || 'https://cdn-icons-png.flaticon.com/512/847/847969.png' }} 
+                            source={{ uri: replyUser.avatar }} 
                             style={tw`w-10 h-10 rounded-full mr-3`}
                           />
+                        ) : (
+                          <View style={[tw`w-10 h-10 rounded-full items-center justify-center mr-3`, { backgroundColor: Colors.primary.blue }]}>
+                            <Text style={tw`text-white font-semibold text-sm`}>
+                              {getInitials(replyUser.name)}
+                            </Text>
+                          </View>
                         )}
                         <View style={tw`flex-1`}>
                           {/* [Full Name] [lawyer badge] */}
@@ -832,11 +954,8 @@ const ViewPostReadOnly: React.FC = () => {
                               {replyUser.isLawyer && (
                                 <View style={tw`px-2 py-0.5 bg-green-50 rounded-full border border-green-100`}>
                                   <View style={tw`flex-row items-center`}>
-                                    <Image 
-                                      source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3472/3472620.png' }}
-                                      style={[tw`w-3 h-3 mr-1`, { tintColor: '#15803d' }]}
-                                    />
-                                    <Text style={tw`text-xs font-medium text-green-700`}>Verified Lawyer</Text>
+                                    <Shield size={10} color="#15803d" fill="#15803d" />
+                                    <Text style={tw`text-xs font-medium text-green-700 ml-1`}>Verified Lawyer</Text>
                                   </View>
                                 </View>
                               )}
@@ -859,6 +978,20 @@ const ViewPostReadOnly: React.FC = () => {
                       </View>
                     </View>
                   );
+                  
+                  // Wrap optimistic replies with animated opacity
+                  if (reply.isOptimistic && reply.animatedOpacity) {
+                    return (
+                      <Animated.View
+                        key={reply.id}
+                        style={{ opacity: reply.animatedOpacity }}
+                      >
+                        {replyComponent}
+                      </Animated.View>
+                    );
+                  }
+                  
+                  return replyComponent;
                 })
               ) : (
                 // No replies message
@@ -870,6 +1003,33 @@ const ViewPostReadOnly: React.FC = () => {
           </View>
         )}
       </ScrollView>
+
+      {/* Reply Input - Only visible for lawyers */}
+      {isLawyer && post && (
+        <View style={tw`absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3`}>
+          <View style={tw`flex-row items-center`}>
+            <TextInput
+              style={tw`flex-1 border border-gray-300 rounded-full px-4 py-2 mr-3 text-base`}
+              placeholder="Write a reply..."
+              value={replyText}
+              onChangeText={setReplyText}
+              multiline={false}
+            />
+            <TouchableOpacity
+              onPress={handleSendReply}
+              disabled={!replyText.trim() || isReplying}
+              style={[
+                tw`w-10 h-10 rounded-full items-center justify-center`,
+                {
+                  backgroundColor: replyText.trim() && !isReplying ? Colors.primary.blue : '#D1D5DB'
+                }
+              ]}
+            >
+              <Send size={18} color="white" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Report Modal */}
       <ReportModal
@@ -884,6 +1044,6 @@ const ViewPostReadOnly: React.FC = () => {
   );
 };
 
-export default ViewPostReadOnly;
+export default ViewPost;
 
 

@@ -19,13 +19,14 @@ import {
   MapPin,
 } from "lucide-react-native";
 import { ConsultationListSkeleton } from "./consultation/ConsultationCardSkeleton";
-import LawyerNavbar from "../../components/lawyer/LawyerNavbar";
+import { LawyerNavbar } from "../../components/lawyer/shared";
 import Header from "../../components/Header";
-import ConfirmationModal from "../../components/lawyer/ConfirmationModal";
+import { ConfirmationModal } from "../../components/lawyer/consultation";
 import { useAuth } from "../../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../../constants/Colors";
 import { shouldUseNativeDriver } from "../../utils/animations";
+import { NetworkConfig } from "../../utils/networkConfig";
 
 interface ConsultationRequest {
   id: string;
@@ -159,10 +160,9 @@ const LawyerConsultPage: React.FC = () => {
     try {
       setLoading(true);
 
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(
-        `${
-          process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000"
-        }/api/consult-actions/my-consultations${
+        `${apiUrl}/api/consult-actions/my-consultations${
           filter !== "all" ? `?status_filter=${filter}` : ""
         }`,
         {
@@ -185,8 +185,10 @@ const LawyerConsultPage: React.FC = () => {
         Alert.alert("Error", "Failed to load consultation requests");
       }
     } catch (error) {
-      console.error("Error fetching consultation requests:", error);
-      Alert.alert("Error", "Failed to load consultation requests");
+      if (__DEV__) {
+        console.error("Error fetching consultation requests:", error);
+      }
+      Alert.alert("Error", "Failed to load consultations. Please check your connection.");
     } finally {
       setLoading(false);
     }
@@ -197,10 +199,9 @@ const LawyerConsultPage: React.FC = () => {
     if (!user?.id) return;
 
     try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(
-        `${
-          process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000"
-        }/api/consult-actions/stats`,
+        `${apiUrl}/api/consult-actions/stats`,
         {
           headers: {
             Authorization: `Bearer ${session?.access_token}`,
@@ -217,15 +218,20 @@ const LawyerConsultPage: React.FC = () => {
         }));
       }
     } catch (error) {
-      console.error("Error fetching stats:", error);
+      if (__DEV__) {
+        console.error("Error fetching stats:", error);
+      }
       // If API fails, we'll rely on the calculated stats
     }
   };
 
   useEffect(() => {
     if (user?.id && session?.access_token) {
-      fetchConsultationRequests();
-      fetchStats(); // Still call API as fallback
+      // Wrap in async IIFE to handle promises properly
+      (async () => {
+        await fetchConsultationRequests();
+        await fetchStats();
+      })();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, session?.access_token, filter]);
@@ -392,10 +398,9 @@ const LawyerConsultPage: React.FC = () => {
           break;
       }
 
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(
-        `${
-          process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000"
-        }/api/consult-actions/${confirmationModal.requestId}/${endpoint}`,
+        `${apiUrl}/api/consult-actions/${confirmationModal.requestId}/${endpoint}`,
         {
           method: "POST",
           headers: {
@@ -446,12 +451,10 @@ const LawyerConsultPage: React.FC = () => {
 
   if (loading && consultationRequests.length === 0) {
     return (
-      <SafeAreaView style={tw`flex-1 bg-gray-50`}>
+      <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
         <Header
-          variant="lawyer-consult"
           title="Consultations"
-          showSearch={true}
-          onSearchPress={() => console.log("Search consultations")}
+          showSearch={false}
         />
         <ScrollView
           style={tw`flex-1`}
@@ -508,12 +511,10 @@ const LawyerConsultPage: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-50`}>
+    <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
       <Header
-        variant="lawyer-consult"
         title="Consultations"
-        showSearch={true}
-        onSearchPress={() => console.log("Search consultations")}
+        showSearch={false}
       />
 
       <ScrollView

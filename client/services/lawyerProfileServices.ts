@@ -1,7 +1,7 @@
 // C:\Users\Mikko\Desktop\AI.ttorney\client\services\lawyerProfileServices.ts
 import { useAuth } from "../contexts/AuthContext";
 
-interface TimeSlot {
+export interface TimeSlot {
   id: string;
   day: string;
   startTime: string;
@@ -9,7 +9,7 @@ interface TimeSlot {
   isActive: boolean;
 }
 
-interface ProfileData {
+export interface ProfileData {
   name: string;
   email: string;
   phone: string;

@@ -3,6 +3,7 @@ import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, clearAuthStorage } from '../config/supabase';
 import { router, useSegments } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Role hierarchy based on backend schema
 export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
@@ -87,6 +88,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleAuthStateChange = React.useCallback(async (session: Session, shouldNavigate = false) => {
     try {
+      // Store access token in AsyncStorage for services that need it
+      if (session?.access_token) {
+        await AsyncStorage.setItem('access_token', session.access_token);
+      }
+      
       // Fetch user profile from your custom users table
       const { data: profile, error } = await supabase
         .from('users')
@@ -258,6 +264,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear auth state immediately to prevent further API calls
       setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
+      
+      // Clear access token from AsyncStorage
+      await AsyncStorage.removeItem('access_token');
       
       // Clear local storage first
       await clearAuthStorage();

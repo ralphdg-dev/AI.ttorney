@@ -19,22 +19,15 @@ import {
   MapPin,
   Clock,
 } from "lucide-react-native";
-import LawyerNavbar from "../../components/lawyer/LawyerNavbar";
+import { LawyerNavbar } from "../../components/lawyer/shared";
 import Header from "../../components/Header";
-import EditProfileModal from "./ProfileComponents/EditProfileModal";
+import { EditProfileModal } from "../../components/lawyer/profile";
 import Colors from "../../constants/Colors";
 import { useAuth } from "../../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
-import { useLawyerProfile } from "../../services/lawyerProfileServices";
+import { useLawyerProfile, TimeSlot } from "../../services/lawyerProfileServices";
 import { supabase } from "../../config/supabase";
-
-interface TimeSlot {
-  id: string;
-  day: string;
-  startTime: string;
-  endTime: string;
-  isActive: boolean;
-}
+import { useRouter } from "expo-router";
 
 interface ProfileData {
   name: string;
@@ -84,7 +77,19 @@ for (let h = 0; h < 24; h++) {
 }
 
 const LawyerProfilePage: React.FC = () => {
+  const router = useRouter();
   const { user, signOut, refreshUserData } = useAuth();
+  
+  // Helper function to get initials from name
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+  
   const [profileData, setProfileData] = useState<ProfileData>({
     name: "",
     email: "",
@@ -492,10 +497,13 @@ const LawyerProfilePage: React.FC = () => {
       const combinedData = {
         name: profileData.name,
         email: profileData.email,
+        avatar: profileData.avatar || '',
         phone: contactInfo.phone_number,
         location: contactInfo.location,
         bio: contactInfo.bio,
-        specialization: contactInfo.specializations,
+        specialization: Array.isArray(contactInfo.specializations) 
+          ? contactInfo.specializations 
+          : [contactInfo.specializations],
         days: profileData.days,
         hours_available: profileData.hours_available,
       };
@@ -598,7 +606,7 @@ const LawyerProfilePage: React.FC = () => {
   };
 
   const handleSettings = () => {
-    console.log("Settings");
+    router.push('/settings');
   };
 
   const handleLogout = async () => {
@@ -614,8 +622,8 @@ const LawyerProfilePage: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-50`}>
-      <Header variant="lawyer-profile" title="Profile" showSettings={false} />
+    <SafeAreaView style={tw`flex-1 bg-gray-50`} edges={['top', 'left', 'right']}>
+      <Header title="Profile" showSettings={false} />
       <ScrollView
         style={tw`flex-1`}
         showsVerticalScrollIndicator={false}
@@ -624,10 +632,18 @@ const LawyerProfilePage: React.FC = () => {
         <View style={tw`bg-white p-4 border-b border-gray-200`}>
           <View style={tw`flex-row items-center`}>
             <View style={tw`relative mr-4`}>
-              <Image
-                source={{ uri: profileData.avatar }}
-                style={tw`w-20 h-20 rounded-full`}
-              />
+              {profileData.avatar && !profileData.avatar.includes('unsplash') ? (
+                <Image
+                  source={{ uri: profileData.avatar }}
+                  style={tw`w-20 h-20 rounded-full`}
+                />
+              ) : (
+                <View style={[tw`w-20 h-20 rounded-full items-center justify-center`, { backgroundColor: Colors.primary.blue }]}>
+                  <Text style={tw`text-white font-bold text-2xl`}>
+                    {getInitials(profileData.name || 'User')}
+                  </Text>
+                </View>
+              )}
               <View
                 style={[
                   tw`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center`,
@@ -954,7 +970,7 @@ const LawyerProfilePage: React.FC = () => {
           hours_available: lawyerContactInfo.hours_available,
         }}
         availabilitySlots={availabilitySlots}
-        onAvailabilityChange={setAvailabilitySlots}
+        onAvailabilityChange={(slots) => setAvailabilitySlots(slots)}
       />
       <LawyerNavbar activeTab="profile" />
     </SafeAreaView>
