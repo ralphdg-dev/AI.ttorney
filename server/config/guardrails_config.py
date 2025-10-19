@@ -150,17 +150,17 @@ class LawyerChatbotGuardrails:
                 print(f"⚠️ Failed to initialize GroundedAIHallucination validator: {e}")
         
         # Skip LlamaGuard7B for now due to initialization issues
-        # if 'LlamaGuard7B' in available_validators:
-        #     try:
-        #         validators.append(
-        #             available_validators['LlamaGuard7B'](
-        #                 threshold=0.8,
-        #                 on_fail="filter"
-        #             )
-        #         )
-        #         print("✅ LlamaGuard7B validator added to output guard")
-        #     except Exception as e:
-        #         print(f"⚠️ Failed to initialize LlamaGuard7B validator: {e}")
+        if 'LlamaGuard7B' in available_validators:
+            try:
+                validators.append(
+                    available_validators['LlamaGuard7B'](
+                        threshold=0.8,
+                        on_fail="filter"
+                    )
+                )
+                print("✅ LlamaGuard7B validator added to output guard")
+            except Exception as e:
+                print(f"⚠️ Failed to initialize LlamaGuard7B validator: {e}")
         
         # Bias check in responses
         if 'BiasCheck' in available_validators:

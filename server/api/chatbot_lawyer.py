@@ -15,7 +15,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 # Import guardrails configuration with fallback
-GUARDRAILS_AVAILABLE = False
+GUARDRAILS_AVAILABLE = True
 GUARDRAILS_CONFIG = {
     "enable_input_validation": True,
     "enable_output_validation": True,
@@ -71,8 +71,8 @@ router = APIRouter(prefix="/api/chatbot/lawyer", tags=["Legal Chatbot - Lawyer"]
 # --- Core LawPhil References ---
 LAWS = {
     "Civil Code": "https://lawphil.net/statutes/repacts/ra1949/ra_386_1949.html",
-    "Revised Penal Code": "https://lawphil.net/statutes/acts/act_3815_1930.html",
-    "Rules of Court": "https://lawphil.net/courts/rules/rc_roc.html",
+    "Revised Penal Code": "https://lawphil.net/statutes/acts/act1930/act_3815_1930b.html",
+    "Rules of Court": "https://lawphil.net/courts/rules/rc_1-71_civil.html",
     "Labor Code": "https://lawphil.net/statutes/presdecs/pd1974/pd_442_1974.html",
     "Corporation Code": "https://lawphil.net/statutes/repacts/ra2019/ra_11232_2019.html",
     "Family Code": "https://lawphil.net/executive/execord/eo1987/eo_209_1987.html"
