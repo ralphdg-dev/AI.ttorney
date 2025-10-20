@@ -538,7 +538,7 @@ export default function ChatbotScreen() {
             <MarkdownText
               text={item.text || ""}
               isUserMessage={isUser}
-              style={[tw`text-base`, { lineHeight: 22 }]}
+              style={[tw`text-base`, { lineHeight: 22}]}
             />
 
             {/* Legal Disclaimer - show only if NOT a verified lawyer */}
@@ -556,7 +556,7 @@ export default function ChatbotScreen() {
                 <Text
                   style={[
                     tw`text-xs`,
-                    { color: Colors.text.secondary, lineHeight: 16 },
+                    { color: Colors.text.secondary, lineHeight: 16},
                   ]}
                 >
                   ⚠️ This is general legal information, not legal advice. For
@@ -697,7 +697,7 @@ export default function ChatbotScreen() {
             )}
 
             {/* Fallback suggestions for complex queries */}
-            {!isUser &&
+            {!isUser && !isLawyer() && 
               item.fallback_suggestions &&
               item.fallback_suggestions.length > 0 && (
                 <View

@@ -422,6 +422,145 @@ def validate_response_quality(answer: str) -> tuple[bool, str]:
     return True, ""
 
 
+def is_gibberish_input(text: str) -> tuple[bool, Optional[str]]:
+    """
+    Detect gibberish, nonsensical, or unclear input that cannot be processed
+    
+    Returns:
+        tuple: (is_gibberish, reason)
+    """
+    text = text.strip()
+    
+    # Allow common short responses and basic words
+    common_short_words = {
+        'ok', 'no', 'yes', 'hi', 'hey', 'law', 'help', 'what', 'how', 'why', 'who', 'when', 'where',
+        'ano', 'sino', 'saan', 'bakit', 'paano', 'kailan', 'oo', 'hindi', 'po', 'salamat', 'thanks'
+    }
+    
+    # Check for extremely short input (less than 2 characters) or single character
+    if len(text) < 2:
+        return True, "Input too short to process"
+    
+    # Allow common short words
+    if text.lower() in common_short_words:
+        return False, None
+    
+    # Check for random character sequences
+    if len(text) > 5:
+        # Count vowels and consonants
+        vowels = sum(1 for char in text.lower() if char in 'aeiouáéíóúàèìòù')
+        consonants = sum(1 for char in text.lower() if char.isalpha() and char not in 'aeiouáéíóúàèìòù')
+        total_letters = vowels + consonants
+        
+        # If there are letters but very few vowels (less than 10%), likely gibberish
+        if total_letters > 5 and vowels / total_letters < 0.1:
+            return True, "Input appears to contain random characters"
+        
+        # Additional check: Look for long sequences without recognizable patterns
+        if len(text) > 20:
+            # Check if text contains mostly unpronounceable consonant clusters
+            consonant_clusters = 0
+            i = 0
+            while i < len(text) - 2:
+                if (text[i].isalpha() and text[i].lower() not in 'aeiouáéíóúàèìòù' and
+                    text[i+1].isalpha() and text[i+1].lower() not in 'aeiouáéíóúàèìòù' and
+                    text[i+2].isalpha() and text[i+2].lower() not in 'aeiouáéíóúàèìòù'):
+                    consonant_clusters += 1
+                i += 1
+            
+            # If more than 30% of the text is unpronounceable consonant clusters
+            if consonant_clusters > len(text) * 0.3:
+                return True, "Input contains unpronounceable character sequences"
+    
+    # Check for excessive repetition of characters
+    if len(text) > 10:
+        # Count repeated character sequences
+        repeated_chars = 0
+        for i in range(len(text) - 2):
+            if text[i] == text[i+1] == text[i+2]:
+                repeated_chars += 1
+        
+        if repeated_chars > len(text) * 0.3:  # More than 30% repeated characters
+            return True, "Input contains excessive character repetition"
+    
+    # Check for keyboard mashing patterns
+    keyboard_patterns = [
+        'qwerty', 'asdf', 'zxcv', 'qaz', 'wsx', 'edc', 'rfv', 'tgb', 'yhn', 'ujm',
+        'aaaa', 'bbbb', 'cccc', 'dddd', 'eeee', 'ffff', 'gggg', 'hhhh', 'iiii', 'jjjj'
+    ]
+    
+    text_lower = text.lower()
+    for pattern in keyboard_patterns:
+        if pattern in text_lower and len(pattern) >= 4:
+            return True, "Input appears to be keyboard mashing"
+    
+    # Check for lack of meaningful words
+    words = text.split()
+    if len(words) > 2:
+        # Check if most words are very short or contain no vowels
+        meaningless_words = 0
+        for word in words:
+            word_clean = ''.join(char for char in word.lower() if char.isalpha())
+            if len(word_clean) > 2:
+                vowel_count = sum(1 for char in word_clean if char in 'aeiouáéíóúàèìòù')
+                if vowel_count == 0:  # No vowels in word longer than 2 characters
+                    meaningless_words += 1
+        
+        if meaningless_words > len(words) * 0.6:  # More than 60% meaningless words
+            return True, "Input contains mostly unclear or meaningless words"
+    
+    # Check for excessive special characters or numbers without context
+    special_char_count = sum(1 for char in text if not char.isalnum() and not char.isspace())
+    if len(text) > 5 and special_char_count > len(text) * 0.5:
+        return True, "Input contains excessive special characters"
+    
+    # Check for numbers-only input (but allow short numbers that might be legal references)
+    if text.isdigit() and len(text) > 4:
+        return True, "Input appears to be random numbers without context"
+    
+    # Check for very short input that's not in common words (like "xyz")
+    if len(text) == 3 and text.lower() not in common_short_words:
+        # Check if it's a meaningful 3-letter combination
+        vowel_count = sum(1 for char in text.lower() if char in 'aeiouáéíóúàèìòù')
+        if vowel_count == 0:  # No vowels in 3-letter word
+            return True, "Input appears to be meaningless character combination"
+    
+    # Check for long random-looking strings (like the user's input)
+    if len(text) > 15:
+        # Check if the text lacks common English/Tagalog word patterns
+        common_patterns = [
+            'tion', 'ing', 'ed', 'er', 'ly', 'an', 'en', 'on', 'in', 'at', 'or', 'ar',
+            'ang', 'mga', 'ung', 'ing', 'ong', 'ako', 'ito', 'yan', 'nag', 'mag', 'pag'
+        ]
+        
+        pattern_matches = 0
+        text_lower = text.lower()
+        for pattern in common_patterns:
+            if pattern in text_lower:
+                pattern_matches += 1
+        
+        # If it's a long string with very few recognizable patterns and looks random
+        if pattern_matches == 0 and len(text) > 25:
+            # Additional randomness check: look for alternating consonant-vowel patterns that seem artificial
+            artificial_score = 0
+            for i in range(len(text) - 4):
+                substring = text[i:i+5].lower()
+                if substring.isalpha():
+                    # Check for patterns like "vwxyz" or other suspicious sequences
+                    consecutive_consonants = 0
+                    for j in range(len(substring) - 1):
+                        if (substring[j] not in 'aeiouáéíóúàèìòù' and 
+                            substring[j+1] not in 'aeiouáéíóúàèìòù'):
+                            consecutive_consonants += 1
+                    if consecutive_consonants >= 3:
+                        artificial_score += 1
+            
+            if artificial_score > 3:  # Multiple suspicious patterns
+                return True, "Input appears to be random character sequence"
+    
+    return False, None
+
+
 def normalize_emotional_query(question: str, language: str) -> str:
     """Normalize emotional/informal queries for better search"""
     try:
@@ -1066,6 +1205,35 @@ async def ask_legal_question_lawyer(
         is_prohibited, prohibition_reason = detect_prohibited_input(request.question)
         if is_prohibited:
             raise HTTPException(status_code=400, detail=prohibition_reason)
+        
+        # Check for gibberish input
+        is_gibberish, gibberish_reason = is_gibberish_input(request.question)
+        if is_gibberish:
+            language = detect_language(request.question)
+            logger.info(f"Gibberish input detected: {gibberish_reason}")
+            
+            if language in ["tagalog", "taglish"]:
+                clarification_response = (
+                    "Paumanhin, ngunit hindi ko maintindihan ang inyong tanong. "
+                    "Maaari po ba kayong magbigay ng mas malinaw na legal na katanungan? "
+                    "Halimbawa: 'Ano ang mga karapatan ng empleyado sa illegal dismissal?' o "
+                    "'Paano mag-file ng small claims case?'"
+                )
+            else:
+                clarification_response = (
+                    "I apologize, but I'm having difficulty understanding your question. "
+                    "Could you please provide a clearer legal inquiry? "
+                    "For example: 'What are the elements of breach of contract?' or "
+                    "'How do I file a complaint for unfair labor practice?'"
+                )
+            
+            return LawyerChatResponse(
+                answer=clarification_response,
+                sources=[],
+                confidence="low",
+                language=language,
+                fallback_suggestions=get_fallback_suggestions(language, is_complex=False)
+            )
         
         # Detect language
         language = detect_language(request.question)

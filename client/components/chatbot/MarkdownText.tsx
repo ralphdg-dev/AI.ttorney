@@ -119,6 +119,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
     marginBottom: 0,
+    textAlign: 'justify',
   },
   bold: {
     fontWeight: '700',
