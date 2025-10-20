@@ -205,9 +205,8 @@ router.post('/', authenticateAdmin, async (req, res) => {
       example_fil: example_fil?.trim() || null,
       category: category.toLowerCase(),
       is_verified: is_verified !== undefined ? is_verified : null,
-      verified_by: verified_by?.trim() || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      verified_by: verified_by?.trim() || null
+      // Let database handle created_at and updated_at with default now() in Asia/Manila timezone
     };
 
     const { data: newTerm, error } = await supabaseAdmin
@@ -235,6 +234,108 @@ router.post('/', authenticateAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Internal server error'
+    });
+  }
+});
+
+// Bulk create glossary terms from CSV
+router.post('/bulk', authenticateAdmin, async (req, res) => {
+  try {
+    const { terms } = req.body;
+
+    if (!terms || !Array.isArray(terms) || terms.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Terms array is required and must not be empty'
+      });
+    }
+
+    const validCategories = ['family', 'criminal', 'civil', 'labor', 'consumer', 'others'];
+    const results = {
+      created: 0,
+      failed: 0,
+      errors: []
+    };
+
+    // Process each term
+    for (let i = 0; i < terms.length; i++) {
+      const term = terms[i];
+      
+      try {
+        // Validate required fields
+        if (!term.term_en || !term.category) {
+          results.failed++;
+          results.errors.push({
+            index: i + 1,
+            term: term.term_en || 'Unknown',
+            error: 'English term and category are required'
+          });
+          continue;
+        }
+
+        // Validate category
+        if (!validCategories.includes(term.category.toLowerCase())) {
+          results.failed++;
+          results.errors.push({
+            index: i + 1,
+            term: term.term_en,
+            error: `Invalid category. Must be one of: ${validCategories.join(', ')}`
+          });
+          continue;
+        }
+
+        const termData = {
+          term_en: term.term_en.trim(),
+          term_fil: term.term_fil?.trim() || null,
+          definition_en: term.definition_en?.trim() || null,
+          definition_fil: term.definition_fil?.trim() || null,
+          example_en: term.example_en?.trim() || null,
+          example_fil: term.example_fil?.trim() || null,
+          category: term.category.toLowerCase(),
+          is_verified: term.is_verified !== undefined ? term.is_verified : false,
+          verified_by: term.verified_by?.trim() || null
+          // Let database handle created_at and updated_at with default now() in Asia/Manila timezone
+        };
+
+        const { error } = await supabaseAdmin
+          .from('glossary_terms')
+          .insert(termData);
+
+        if (error) {
+          results.failed++;
+          results.errors.push({
+            index: i + 1,
+            term: term.term_en,
+            error: error.message
+          });
+        } else {
+          results.created++;
+        }
+
+      } catch (termError) {
+        results.failed++;
+        results.errors.push({
+          index: i + 1,
+          term: term.term_en || 'Unknown',
+          error: termError.message
+        });
+      }
+    }
+
+    // Return results
+    res.status(results.failed > 0 ? 207 : 201).json({
+      success: results.created > 0,
+      message: `Bulk upload completed: ${results.created} created, ${results.failed} failed`,
+      created: results.created,
+      failed: results.failed,
+      errors: results.errors.length > 0 ? results.errors : undefined
+    });
+
+  } catch (error) {
+    console.error('Error in bulk create glossary terms route:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error: ' + error.message
     });
   }
 });

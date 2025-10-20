@@ -89,6 +89,30 @@ const glossaryTermsService = {
     }
   },
 
+  // Bulk create glossary terms from CSV
+  async bulkCreateGlossaryTerms(termsArray) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/glossary-terms/bulk`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...glossaryTermsService.getAuthHeader()
+        },
+        body: JSON.stringify({ terms: termsArray })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to bulk create glossary terms:', error);
+      throw error;
+    }
+  },
+
   // Update glossary term
   async updateGlossaryTerm(id, termData) {
     try {

@@ -12,7 +12,7 @@ import ManageLegalSeekers from './pages/users/ManageLegalSeekers';
 import ManageLawyers from './pages/users/ManageLawyers';
 import ManageLawyerApplications from './pages/users/ManageLawyerApplications';
 import ManageAdminsPage from './pages/admin/ManageAdmins';
-import ManageGlossaryTerms from './pages/content/ManageGlossaryTerms';
+import ManageGlossaryTerms from './pages/legal-resources/ManageGlossaryTerms';
 
 // Placeholder components for missing pages
 const Settings = () => (

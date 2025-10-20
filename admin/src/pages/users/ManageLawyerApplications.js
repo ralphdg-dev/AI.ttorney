@@ -693,11 +693,12 @@ const ManageLawyerApplications = () => {
       render: (row) => {
         if (!row.roll_sign_date) return 'N/A';
         const date = new Date(row.roll_sign_date);
-        return date.toLocaleDateString('en-US', {
+        return new Intl.DateTimeFormat('en-US', {
           month: 'short',
           day: 'numeric', 
-          year: 'numeric'
-        });
+          year: 'numeric',
+          timeZone: 'Asia/Manila'
+        }).format(date);
       }
     },
     {
