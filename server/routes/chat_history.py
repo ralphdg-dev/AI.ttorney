@@ -6,6 +6,7 @@ RESTful API for managing chat sessions and messages
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
 from uuid import UUID
+from datetime import datetime
 import logging
 
 from models.chat_models import (
@@ -72,18 +73,18 @@ async def get_user_sessions(
     - **page_size**: Items per page (default: 20, max: 100)
     """
     try:
-        # Debug logging
-        logger.info(f"Current user structure: {current_user}")
-        logger.info(f"Current user keys: {current_user.keys() if current_user else 'None'}")
-        
         user_id = UUID(current_user["user"]["id"])
+        logger.info(f"Fetching sessions for user: {user_id}")
         
-        return await service.get_user_sessions(
+        sessions = await service.get_user_sessions(
             user_id=user_id,
             include_archived=include_archived,
             page=page,
             page_size=page_size
         )
+        
+        logger.info(f"Returning {sessions.total} sessions for user {user_id}")
+        return sessions
         
     except KeyError as e:
         logger.error(f"KeyError accessing user data: {str(e)}, current_user structure: {current_user}")
@@ -181,28 +182,46 @@ async def delete_session(
     """
     Delete a session (hard delete - removes all messages)
     
+    Industry standard implementation:
+    - Validates session ownership
+    - Cascades delete to all messages
+    - Returns success confirmation
+    - Comprehensive error handling
+    
     - **session_id**: UUID of the session to delete
     """
     try:
-        # Verify session belongs to user
+        user_id = current_user["user"]["id"]
+        logger.info(f"Delete request for session {session_id} by user {user_id}")
+        
+        # Verify session exists and belongs to user
         session = await service.get_session(session_id)
         if not session:
+            logger.warning(f"Session {session_id} not found")
             raise HTTPException(status_code=404, detail="Session not found")
         
-        if str(session.user_id) != current_user["user"]["id"]:
-            raise HTTPException(status_code=403, detail="Access denied")
+        if str(session.user_id) != user_id:
+            logger.warning(f"Unauthorized delete attempt: session {session_id} by user {user_id}")
+            raise HTTPException(status_code=403, detail="Access denied: You don't own this session")
         
+        # Perform deletion (CASCADE will delete all messages)
         success = await service.delete_session(session_id)
         
         if not success:
+            logger.error(f"Failed to delete session {session_id}")
             raise HTTPException(status_code=500, detail="Failed to delete session")
         
-        return {"message": "Session deleted successfully"}
+        logger.info(f"Successfully deleted session {session_id} for user {user_id}")
+        return {
+            "message": "Session deleted successfully",
+            "session_id": str(session_id),
+            "deleted_at": datetime.utcnow().isoformat()
+        }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting session: {str(e)}")
+        logger.error(f"Unexpected error deleting session {session_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to delete session")
 
 

@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated, Platform, ActivityIndicator } from 'react-native';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 import { ChatHistoryService, Conversation } from '../../services/chatHistoryService';
-import { MessageSquare, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { MessageSquare, Plus, Trash2, ChevronLeft, ChevronRight, AlertCircle, AlertTriangle } from 'lucide-react-native';
+import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody, ModalFooter } from '../ui/modal';
+import { Button, ButtonText } from '../ui/button/index';
+import { Heading } from '../ui/heading';
 
 interface ChatHistorySidebarProps {
   userId?: string;
@@ -23,12 +26,19 @@ export default function ChatHistorySidebar({
 }: ChatHistorySidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   const [slideAnim] = useState(
     new Animated.Value(SIDEBAR_POSITION === 'right' ? SIDEBAR_WIDTH : -SIDEBAR_WIDTH)
   );
 
   useEffect(() => {
-    loadConversations();
+    if (userId) {
+      loadConversations();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
@@ -41,8 +51,18 @@ export default function ChatHistorySidebar({
   }, [isOpen, slideAnim]);
 
   const loadConversations = async () => {
-    const convos = await ChatHistoryService.getConversationsList(userId);
-    setConversations(convos);
+    try {
+      setIsLoading(true);
+      setError(null);
+      const convos = await ChatHistoryService.getConversationsList(userId);
+      setConversations(convos);
+      console.log('✅ Loaded', convos.length, 'conversations');
+    } catch (err) {
+      console.error('❌ Error loading conversations:', err);
+      setError('Failed to load chat history');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleNewChat = async () => {
@@ -57,8 +77,63 @@ export default function ChatHistorySidebar({
 
   const handleDeleteConversation = async (conversationId: string, e: any) => {
     e.stopPropagation();
-    await ChatHistoryService.deleteConversation(conversationId, userId);
-    await loadConversations();
+    
+    // Show GlueStack UI confirmation modal
+    setConversationToDelete(conversationId);
+    setShowDeleteModal(true);
+  };
+  
+  const confirmDelete = async () => {
+    if (conversationToDelete) {
+      setShowDeleteModal(false);
+      await performDelete(conversationToDelete);
+      setConversationToDelete(null);
+    }
+  };
+  
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setConversationToDelete(null);
+  };
+  
+  const performDelete = async (conversationId: string) => {
+    try {
+      setDeletingId(conversationId);
+      setError(null);
+      
+      // Optimistic update: Remove from UI immediately
+      const previousConversations = [...conversations];
+      setConversations(prev => prev.filter(c => c.id !== conversationId));
+      
+      // Call API to delete
+      const success = await ChatHistoryService.deleteConversation(conversationId, userId);
+      
+      if (!success) {
+        // Rollback on failure
+        setConversations(previousConversations);
+        setError('Failed to delete conversation');
+        return;
+      }
+      
+      console.log('✅ Deleted conversation:', conversationId);
+      
+      // If deleted conversation was the current one, start a new chat
+      if (conversationId === currentConversationId) {
+        console.log('🔄 Deleted current conversation, starting new chat');
+        await onNewChat();
+      }
+      
+      // Reload to ensure sync with backend
+      await loadConversations();
+      
+    } catch (err) {
+      console.error('❌ Error deleting conversation:', err);
+      setError('Failed to delete conversation');
+      // Reload to restore correct state
+      await loadConversations();
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const groupConversationsByDate = () => {
@@ -165,14 +240,26 @@ export default function ChatHistorySidebar({
         >
           <TouchableOpacity
             onPress={handleNewChat}
+            disabled={isLoading}
             style={[
               tw`flex-row items-center justify-center py-3 px-4 rounded-lg`,
-              { backgroundColor: Colors.primary.blue },
+              { 
+                backgroundColor: isLoading ? Colors.secondary.lightGray : Colors.primary.blue,
+                opacity: isLoading ? 0.6 : 1
+              },
             ]}
           >
             <Plus size={20} color="#fff" style={tw`mr-2`} />
             <Text style={tw`text-white font-semibold text-base`}>New Chat</Text>
           </TouchableOpacity>
+          
+          {/* Error message */}
+          {error && (
+            <View style={[tw`mt-3 p-2 rounded-lg flex-row items-center`, { backgroundColor: Colors.status.error + '15' }]}>
+              <AlertCircle size={16} color={Colors.status.error} style={tw`mr-2`} />
+              <Text style={[tw`text-xs flex-1`, { color: Colors.status.error }]}>{error}</Text>
+            </View>
+          )}
         </View>
 
         {/* Conversations List */}
@@ -181,6 +268,15 @@ export default function ChatHistorySidebar({
           showsVerticalScrollIndicator={false}
           contentContainerStyle={tw`pb-4`}
         >
+          {/* Loading indicator */}
+          {isLoading && conversations.length === 0 && (
+            <View style={tw`px-4 py-8 items-center`}>
+              <ActivityIndicator size="large" color={Colors.primary.blue} />
+              <Text style={[tw`text-center mt-4 text-sm`, { color: Colors.text.tertiary }]}>
+                Loading conversations...
+              </Text>
+            </View>
+          )}
           {Object.entries(groupedConversations).map(([group, convos]) => {
             if (convos.length === 0) return null;
 
@@ -236,9 +332,14 @@ export default function ChatHistorySidebar({
                     </View>
                     <TouchableOpacity
                       onPress={(e) => handleDeleteConversation(conv.id, e)}
-                      style={tw`p-1`}
+                      disabled={deletingId === conv.id}
+                      style={[tw`p-1`, { opacity: deletingId === conv.id ? 0.5 : 1 }]}
                     >
-                      <Trash2 size={16} color={Colors.text.tertiary} />
+                      {deletingId === conv.id ? (
+                        <ActivityIndicator size="small" color={Colors.text.tertiary} />
+                      ) : (
+                        <Trash2 size={16} color={Colors.status.error} />
+                      )}
                     </TouchableOpacity>
                   </TouchableOpacity>
                 ))}
@@ -246,7 +347,7 @@ export default function ChatHistorySidebar({
             );
           })}
 
-          {conversations.length === 0 && (
+          {!isLoading && conversations.length === 0 && (
             <View style={tw`px-4 py-8 items-center`}>
               <MessageSquare size={48} color={Colors.text.tertiary} />
               <Text
@@ -261,6 +362,40 @@ export default function ChatHistorySidebar({
           )}
         </ScrollView>
       </Animated.View>
+
+      {/* Delete Confirmation Modal */}
+      <Modal isOpen={showDeleteModal} onClose={cancelDelete} size="md">
+        <ModalBackdrop />
+        <ModalContent>
+          <ModalHeader>
+            <View style={tw`flex-row items-center`}>
+              <AlertTriangle size={24} color={Colors.status.error} style={tw`mr-2`} />
+              <Heading size="lg">Delete Conversation</Heading>
+            </View>
+          </ModalHeader>
+          <ModalBody>
+            <Text style={[tw`text-base`, { color: Colors.text.primary }]}>
+              This action cannot be undone. All messages in this conversation will be permanently deleted.
+            </Text>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              variant="outline"
+              action="secondary"
+              onPress={cancelDelete}
+              style={tw`mr-3`}
+            >
+              <ButtonText>Cancel</ButtonText>
+            </Button>
+            <Button
+              action="negative"
+              onPress={confirmDelete}
+            >
+              <ButtonText>Delete</ButtonText>
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </>
   );
 }

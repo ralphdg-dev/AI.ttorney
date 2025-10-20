@@ -110,14 +110,27 @@ export default function ChatbotScreen() {
   }, [user]);
 
   const initializeConversation = useCallback(async () => {
-    const convId = await ChatHistoryService.getCurrentConversationId(user?.id);
-    if (convId) {
-      setCurrentConversationId(convId);
-      await loadConversation(convId);
-    } else {
-      // No current conversation - start fresh (will create session on first message)
+    try {
+      console.log('🔄 Initializing conversation for user:', user?.id);
+      const convId = await ChatHistoryService.getCurrentConversationId(user?.id);
+      
+      if (convId) {
+        console.log('📂 Found existing conversation:', convId);
+        setCurrentConversationId(convId);
+        await loadConversation(convId);
+      } else {
+        console.log('✨ No existing conversation, starting fresh');
+        // No current conversation - start fresh (will create session on first message)
+        setCurrentConversationId("");
+        setMessages([]);
+        setConversationHistory([]);
+      }
+    } catch (error) {
+      console.error('❌ Error initializing conversation:', error);
+      // Graceful fallback: start with empty state
       setCurrentConversationId("");
       setMessages([]);
+      setConversationHistory([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
@@ -156,18 +169,45 @@ export default function ChatbotScreen() {
         content: msg.text,
       }));
       setConversationHistory(history);
+      
+      // Store the conversation ID for persistence
+      if (user?.id) {
+        await ChatHistoryService.setCurrentConversationId(conversationId, user.id);
+      }
     } catch (error) {
       console.error("❌ Error loading conversation:", error);
+      // Clear invalid conversation ID and start fresh
+      setCurrentConversationId("");
+      setMessages([]);
+      setConversationHistory([]);
+      setError("Failed to load conversation. Starting a new chat.");
       throw error;
     }
   };
 
   const handleNewChat = async () => {
-    const newConvId = await ChatHistoryService.startNewConversation(user?.id);
-    setCurrentConversationId(newConvId);
-    setMessages([]);
-    setConversationHistory([]);
-    setError(null);
+    try {
+      console.log('✨ Starting new chat for user:', user?.id);
+      const newConvId = await ChatHistoryService.startNewConversation(user?.id);
+      console.log('✅ New conversation created:', newConvId);
+      
+      setCurrentConversationId(newConvId);
+      setMessages([]);
+      setConversationHistory([]);
+      setError(null);
+      
+      // Store the new conversation ID
+      if (user?.id) {
+        await ChatHistoryService.setCurrentConversationId(newConvId, user.id);
+      }
+    } catch (error) {
+      console.error('❌ Error creating new chat:', error);
+      // Fallback: clear state and let backend create session on first message
+      setCurrentConversationId("");
+      setMessages([]);
+      setConversationHistory([]);
+      setError(null);
+    }
   };
 
   const handleConversationSelect = async (conversationId: string) => {
@@ -185,9 +225,14 @@ export default function ChatbotScreen() {
     try {
       await loadConversation(conversationId);
       console.log("✅ Conversation loaded successfully");
+      
+      // Scroll to bottom after loading
+      setTimeout(() => {
+        flatRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     } catch (error) {
       console.error("❌ Failed to load conversation:", error);
-      setError("Failed to load conversation. Please try again.");
+      // Error is already handled in loadConversation
     }
   };
 
@@ -818,13 +863,17 @@ export default function ChatbotScreen() {
                   { color: Colors.text.secondary },
                 ]}
               >
-                Popular questions:
+                Quick start prompts:
               </Text>
-              {[
+              {(isLawyer() ? [
+                "Analyze the elements of estafa under Article 315 RPC",
+                "Compare grounds for annulment vs legal separation",
+                "Summarize employer obligations under DOLE DO 174",
+              ] : [
                 "What are my rights as a tenant?",
                 "How do I file a small claims case?",
                 "What is the legal age of consent?",
-              ].map((suggestion, idx) => (
+              ]).map((suggestion, idx) => (
                 <TouchableOpacity
                   key={idx}
                   onPress={() => setInput(suggestion)}

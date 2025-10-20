@@ -181,18 +181,40 @@ class ChatHistoryService:
             raise
     
     async def delete_session(self, session_id: UUID) -> bool:
-        """Delete a session (hard delete, CASCADE will delete messages)"""
+        """
+        Delete a session (hard delete, CASCADE will delete messages)
+        
+        Industry standard implementation:
+        - Validates session exists before deletion
+        - Uses CASCADE to automatically delete related messages
+        - Comprehensive error logging
+        - Returns success/failure status
+        """
         try:
+            logger.info(f"Attempting to delete session {session_id}")
+            
+            # Verify session exists first
+            session = await self.get_session(session_id)
+            if not session:
+                logger.warning(f"Cannot delete non-existent session {session_id}")
+                return False
+            
+            # Perform deletion (CASCADE will delete all related messages)
             response = self.supabase.table("chat_sessions")\
                 .delete()\
                 .eq("id", str(session_id))\
                 .execute()
             
-            logger.info(f"Deleted session {session_id}")
-            return True
+            # Verify deletion was successful
+            if response.data is not None:
+                logger.info(f"Successfully deleted session {session_id} and all related messages")
+                return True
+            else:
+                logger.error(f"Delete operation returned no data for session {session_id}")
+                return False
             
         except Exception as e:
-            logger.error(f"Error deleting session {session_id}: {str(e)}")
+            logger.error(f"Error deleting session {session_id}: {str(e)}", exc_info=True)
             return False
     
     async def archive_session(self, session_id: UUID) -> bool:

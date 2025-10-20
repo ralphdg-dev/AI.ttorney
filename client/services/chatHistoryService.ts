@@ -85,23 +85,30 @@ export class ChatHistoryService {
 
   static async startNewConversation(userId?: string, title: string = 'New Conversation'): Promise<string> {
     try {
+      console.log('✨ Creating new conversation for user:', userId);
       // Create a new session via the backend API
       const headers = await this.getHeaders();
       const response = await axios.post(
         `${API_BASE_URL}/api/chat-history/sessions`,
         { title, language: 'en' },
-        { headers }
+        { headers, timeout: 10000 }
       );
 
       const sessionId = response.data.id;
+      console.log('✅ New session created:', sessionId);
       
       // Store the new session ID as current
       const key = userId ? `${CURRENT_CONVERSATION_KEY}_${userId}` : CURRENT_CONVERSATION_KEY;
       await AsyncStorage.setItem(key, sessionId);
+      console.log('💾 Stored session ID in local storage');
       
       return sessionId;
-    } catch (error) {
-      console.error('Error starting new conversation:', error);
+    } catch (error: any) {
+      console.error('❌ Error starting new conversation:', error);
+      if (error.response) {
+        console.error('   Status:', error.response.status);
+        console.error('   Data:', error.response.data);
+      }
       throw error;
     }
   }
@@ -188,40 +195,63 @@ export class ChatHistoryService {
 
   static async getConversationsList(userId?: string, includeArchived: boolean = false): Promise<Conversation[]> {
     try {
+      console.log('📜 Fetching conversations list for user:', userId);
       const headers = await this.getHeaders();
+      
       const response = await axios.get(
         `${API_BASE_URL}/api/chat-history/sessions`,
         { 
           headers,
-          params: { include_archived: includeArchived, page: 1, page_size: 50 }
+          params: { include_archived: includeArchived, page: 1, page_size: 50 },
+          timeout: 10000 // 10 second timeout
         }
       );
 
       if (response.data && response.data.sessions) {
+        console.log('✅ Loaded', response.data.sessions.length, 'conversations');
         return response.data.sessions;
       }
       
+      console.warn('⚠️  No sessions in response');
       return [];
-    } catch (error) {
-      console.error('Error getting conversations list:', error);
-      // Fallback to local storage for backward compatibility
-      const key = userId ? `${ACTIVE_CONVERSATIONS_KEY}_${userId}` : ACTIVE_CONVERSATIONS_KEY;
-      const stored = await AsyncStorage.getItem(key);
-      return stored ? JSON.parse(stored) : [];
+    } catch (error: any) {
+      console.error('❌ Error getting conversations list:', error);
+      if (error.response) {
+        console.error('   Status:', error.response.status);
+        console.error('   Data:', error.response.data);
+      }
+      // Return empty array on error - let UI handle gracefully
+      return [];
     }
   }
 
   static async deleteConversation(conversationId: string, userId?: string): Promise<boolean> {
     try {
+      console.log('🗑️ Deleting conversation:', conversationId);
       const headers = await this.getHeaders();
-      await axios.delete(
+      
+      const response = await axios.delete(
         `${API_BASE_URL}/api/chat-history/sessions/${conversationId}`,
         { headers }
       );
       
+      console.log('✅ Delete response:', response.data);
+      
+      // Clear from local storage if it's the current conversation
+      const key = userId ? `${CURRENT_CONVERSATION_KEY}_${userId}` : CURRENT_CONVERSATION_KEY;
+      const currentId = await AsyncStorage.getItem(key);
+      if (currentId === conversationId) {
+        await AsyncStorage.removeItem(key);
+        console.log('🧹 Cleared current conversation from storage');
+      }
+      
       return true;
-    } catch (error) {
-      console.error('Error deleting conversation:', error);
+    } catch (error: any) {
+      console.error('❌ Error deleting conversation:', error);
+      if (error.response) {
+        console.error('   Status:', error.response.status);
+        console.error('   Data:', error.response.data);
+      }
       return false;
     }
   }
