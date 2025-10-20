@@ -36172,3 +36172,4 @@ client/.env
 server/.env
 server/.env
 server/.env
+client/.env.development

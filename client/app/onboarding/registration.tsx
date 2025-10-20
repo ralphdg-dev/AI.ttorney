@@ -7,9 +7,11 @@ import PrimaryButton from '../../components/ui/PrimaryButton';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../lib/api-client';
 import { useToast, Toast, ToastTitle, ToastDescription } from '../../components/ui/toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function UserRegistration() {
   const toast = useToast();
+  const { signInWithGoogle } = useAuth();
   
   // Screen dimensions for responsive design
   const { width: screenWidth } = Dimensions.get('window');
@@ -675,7 +677,47 @@ export default function UserRegistration() {
             height: 56,
             alignSelf: 'center',
           }}
-          onPress={() => { /* TODO: google sign up */ }}
+          onPress={async () => {
+            setLoading(true);
+            try {
+              const result = await signInWithGoogle();
+              if (result.success) {
+                toast.show({
+                  placement: "top",
+                  render: ({ id }) => (
+                    <Toast nativeID={id} action="success" variant="solid" className="mt-12">
+                      <ToastTitle size="md">Welcome!</ToastTitle>
+                      <ToastDescription size="sm">Account created successfully with Google</ToastDescription>
+                    </Toast>
+                  ),
+                });
+              } else {
+                toast.show({
+                  placement: "top",
+                  render: ({ id }) => (
+                    <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+                      <ToastTitle size="md">Sign-Up Failed</ToastTitle>
+                      <ToastDescription size="sm">{result.error || "Failed to sign up with Google"}</ToastDescription>
+                    </Toast>
+                  ),
+                });
+                setLoading(false);
+              }
+            } catch (error) {
+              console.error('Google signup error:', error);
+              toast.show({
+                placement: "top",
+                render: ({ id }) => (
+                  <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+                    <ToastTitle size="md">Error</ToastTitle>
+                    <ToastDescription size="sm">Failed to sign up with Google</ToastDescription>
+                  </Toast>
+                ),
+              });
+              setLoading(false);
+            }
+          }}
+          disabled={loading}
           activeOpacity={0.8}
         >
           <Image

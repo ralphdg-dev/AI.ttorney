@@ -16,6 +16,7 @@ import { ForumCacheProvider } from "../contexts/ForumCacheContext";
 import { SidebarProvider } from "../components/AppSidebar";
 import { AuthGuard } from "../components/AuthGuard";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
+import { configureGoogleSignIn } from "../utils/googleAuth";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -33,6 +34,11 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
+
+  // Configure Google Sign-In on app startup
+  useEffect(() => {
+    configureGoogleSignIn();
+  }, []);
 
   if (!fontsLoaded) {
     return null;

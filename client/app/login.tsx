@@ -10,7 +10,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function Login() {
   const toast = useToast();
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -107,9 +107,47 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    // TODO: Implement Google login
-    console.log("Google login pressed");
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    
+    try {
+      const result = await signInWithGoogle();
+
+      if (result.success) {
+        toast.show({
+          placement: "top",
+          render: ({ id }) => (
+            <Toast nativeID={id} action="success" variant="solid" className="mt-12">
+              <ToastTitle size="md">Welcome!</ToastTitle>
+              <ToastDescription size="sm">Signed in with Google successfully</ToastDescription>
+            </Toast>
+          ),
+        });
+      } else {
+        toast.show({
+          placement: "top",
+          render: ({ id }) => (
+            <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+              <ToastTitle size="md">Google Sign-In Failed</ToastTitle>
+              <ToastDescription size="sm">{result.error || "Failed to sign in with Google"}</ToastDescription>
+            </Toast>
+          ),
+        });
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error('Google login error:', error);
+      toast.show({
+        placement: "top",
+        render: ({ id }) => (
+          <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+            <ToastTitle size="md">Connection Error</ToastTitle>
+            <ToastDescription size="sm">Please check your internet connection</ToastDescription>
+          </Toast>
+        ),
+      });
+      setIsLoading(false);
+    }
   };
 
   return (

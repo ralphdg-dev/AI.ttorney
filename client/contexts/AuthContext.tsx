@@ -4,6 +4,7 @@ import { supabase, clearAuthStorage } from '../config/supabase';
 import { router, useSegments } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { signInWithGoogle as googleSignIn } from '../utils/googleAuth';
 
 // Role hierarchy based on backend schema
 export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
@@ -33,6 +34,7 @@ export interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   setUser: (user: User | null) => void;
   refreshUserData: () => Promise<void>;
@@ -257,6 +259,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const signInWithGoogle = async () => {
+    try {
+      setIsLoading(true);
+      setHasRedirectedToStatus(false);
+
+      // Get Google ID token
+      const googleResult = await googleSignIn();
+
+      if (!googleResult.success || !googleResult.idToken) {
+        return { 
+          success: false, 
+          error: googleResult.error || 'Failed to sign in with Google' 
+        };
+      }
+
+      // Sign in to Supabase with Google ID token
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: googleResult.idToken,
+      });
+
+      if (error) {
+        console.error('Supabase Google sign in error:', error.message);
+        return { 
+          success: false, 
+          error: 'Failed to authenticate with Google' 
+        };
+      }
+
+      if (data.session) {
+        await handleAuthStateChange(data.session, true);
+        return { success: true };
+      }
+
+      return { success: false, error: 'Google sign in failed. Please try again' };
+    } catch (error: any) {
+      console.error('Google sign in catch:', error);
+      return { 
+        success: false, 
+        error: error.message || 'Failed to sign in with Google' 
+      };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const signOut = async () => {
     setIsSigningOut(true);
     
@@ -335,6 +383,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading,
     isAuthenticated: !!authState.session && !!authState.user,
     signIn,
+    signInWithGoogle,
     signOut,
     setUser: setUserData,
     refreshUserData,
