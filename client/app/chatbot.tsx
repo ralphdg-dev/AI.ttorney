@@ -9,6 +9,7 @@ import {
   View,
   Text,
   FlatList,
+  ScrollView,
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -16,6 +17,7 @@ import {
   ActivityIndicator,
   Linking,
   Image,
+  Animated,
 } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,6 +33,78 @@ import { ChatHistoryService } from "../services/chatHistoryService";
 import { Send } from "lucide-react-native";
 import { MarkdownText } from "../components/chatbot/MarkdownText";
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
+
+// ChatGPT-style animated thinking indicator
+const ThinkingIndicator = () => {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animateDot = (dot: Animated.Value, delay: number) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+
+    animateDot(dot1, 0);
+    animateDot(dot2, 200);
+    animateDot(dot3, 400);
+  }, []);
+
+  const dotStyle = (animatedValue: Animated.Value) => ({
+    opacity: animatedValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.3, 1],
+    }),
+    transform: [
+      {
+        translateY: animatedValue.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -4],
+        }),
+      },
+    ],
+  });
+
+  return (
+    <View style={tw`flex-row items-center`}>
+      <Animated.View
+        style={[
+          tw`w-2 h-2 rounded-full mx-0.5`,
+          { backgroundColor: '#3B82F6' },
+          dotStyle(dot1),
+        ]}
+      />
+      <Animated.View
+        style={[
+          tw`w-2 h-2 rounded-full mx-0.5`,
+          { backgroundColor: '#3B82F6' },
+          dotStyle(dot2),
+        ]}
+      />
+      <Animated.View
+        style={[
+          tw`w-2 h-2 rounded-full mx-0.5`,
+          { backgroundColor: '#3B82F6' },
+          dotStyle(dot3),
+        ]}
+      />
+    </View>
+  );
+};
 
 interface SourceCitation {
   source: string;
@@ -498,27 +572,10 @@ export default function ChatbotScreen() {
       <View style={tw`px-4 py-1.5`}>
         <View style={isUser ? tw`items-end` : tw`items-start flex-row`}>
           {!isUser && (
-            <View
-              style={[
-                tw`w-9 h-9 rounded-full items-center justify-center mr-2.5`,
-                {
-                  backgroundColor: "#fff",
-                  marginTop: 2,
-                  ...(Platform.OS === "web"
-                    ? { boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)" }
-                    : {
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 3,
-                        elevation: 2,
-                      }),
-                },
-              ]}
-            >
+            <View style={tw`mr-2.5`}>
               <Image
                 source={require("../assets/images/logo.png")}
-                style={{ width: 34, height: 34 }}
+                style={{ width: 34, height: 34, marginTop: 2 }}
                 resizeMode="contain"
               />
             </View>
@@ -585,52 +642,6 @@ export default function ChatbotScreen() {
               isUserMessage={isUser}
               style={[tw`text-base`, { lineHeight: 22}]}
             />
-
-            {/* Legal Disclaimer - show only if NOT a verified lawyer */}
-            {!isUser && !isLawyer() && (
-              <View
-                style={[
-                  tw`mt-3 p-3 rounded-lg`,
-                  {
-                    backgroundColor: Colors.status.warning + "10",
-                    borderLeftWidth: 3,
-                    borderLeftColor: Colors.status.warning,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    tw`text-xs`,
-                    { color: Colors.text.secondary, lineHeight: 16},
-                  ]}
-                >
-                  ⚠️ This is general legal information, not legal advice. For
-                  specific guidance on your situation, please consult with a
-                  licensed attorney.
-                </Text>
-              </View>
-            )}
-
-            {!isUser && item.confidence && (
-              <View
-                style={[
-                  tw`mt-3 p-2 rounded-lg`,
-                  { backgroundColor: Colors.background.tertiary },
-                ]}
-              >
-                <Text
-                  style={[
-                    tw`text-xs font-semibold`,
-                    { color: Colors.text.secondary },
-                  ]}
-                >
-                  Confidence: {item.confidence === "high" && "High"}
-                  {item.confidence === "medium" && "Medium"}
-                  {item.confidence === "low" &&
-                    "Low"}
-                </Text>
-              </View>
-            )}
 
             {/* Show sources with URLs */}
             {!isUser && item.sources && item.sources.length > 0 && (
@@ -808,25 +819,13 @@ export default function ChatbotScreen() {
       {/* Messages list or centered placeholder */}
       <View style={tw`flex-1`}>
         {messages.length === 0 ? (
-          <View style={tw`flex-1 items-center px-6 pt-12`}>
-            {/* Logo with subtle shadow */}
-            <View
-              style={[
-                tw`w-28 h-28 rounded-full items-center justify-center mb-6`,
-                {
-                  backgroundColor: "#fff",
-                  ...(Platform.OS === "web"
-                    ? { boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)" }
-                    : {
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.08,
-                        shadowRadius: 12,
-                        elevation: 4,
-                      }),
-                },
-              ]}
-            >
+          <ScrollView
+            contentContainerStyle={tw`items-center px-6 pt-12 pb-48`}
+            showsVerticalScrollIndicator={false}
+            style={tw`flex-1`}
+          >
+            {/* Logo */}
+            <View style={tw`mb-6`}>
               <Image
                 source={require("../assets/images/logo.png")}
                 style={{ width: 88, height: 88 }}
@@ -923,45 +922,26 @@ export default function ChatbotScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
+          </ScrollView>
         ) : (
           <FlatList
             ref={flatRef}
             data={messages}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={tw`pb-4 pt-2`}
+            contentContainerStyle={tw`pb-48 pt-2`}
             showsVerticalScrollIndicator={false}
             style={tw`flex-1`}
-          />
-        )}
-      </View>
-
-      {/* Typing indicator */}
-      {isTyping && (
+            ListFooterComponent={
+              <>
+                {/* Typing indicator */}
+                {isTyping && (
         <View style={tw`px-4 pb-3`}>
           <View style={tw`flex-row items-start`}>
-            <View
-              style={[
-                tw`w-9 h-9 rounded-full items-center justify-center mr-2.5`,
-                {
-                  backgroundColor: "#fff",
-                  marginTop: 2,
-                  ...(Platform.OS === "web"
-                    ? { boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)" }
-                    : {
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 3,
-                        elevation: 2,
-                      }),
-                },
-              ]}
-            >
+            <View style={tw`mr-2.5`}>
               <Image
                 source={require("../assets/images/logo.png")}
-                style={{ width: 34, height: 34 }}
+                style={{ width: 34, height: 34, marginTop: 2 }}
                 resizeMode="contain"
               />
             </View>
@@ -971,21 +951,14 @@ export default function ChatbotScreen() {
                 { backgroundColor: Colors.background.secondary },
               ]}
             >
-              <ActivityIndicator
-                size="small"
-                color={Colors.primary.blue}
-                style={tw`mr-2.5`}
-              />
-              <Text style={[tw`text-sm`, { color: Colors.text.secondary }]}>
-                Thinking...
-              </Text>
+              <ThinkingIndicator />
             </View>
           </View>
         </View>
-      )}
+                )}
 
-      {/* Error message */}
-      {error && (
+                {/* Error message */}
+                {error && (
         <View style={tw`px-6 pb-3`}>
           <View
             style={[
@@ -1004,20 +977,32 @@ export default function ChatbotScreen() {
             </Text>
           </View>
         </View>
-      )}
+                )}
+              </>
+            }
+          />
+        )}
+      </View>
 
-      {/* Composer */}
+      {/* Composer - Fixed at bottom */}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        style={{
+          position: 'absolute',
+          bottom: 80,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+          backgroundColor: '#FFFFFF',
+        }}
       >
         <View
           style={[
             tw`px-4 pt-3 pb-2 border-t`,
             {
               borderTopColor: Colors.border.light,
-              backgroundColor: Colors.background.primary,
-              marginBottom: 80,
+              backgroundColor: '#FFFFFF',
             },
           ]}
         >
