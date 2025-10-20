@@ -1,22 +1,28 @@
 #chatbot_lawyer.py
 
 """
-Enhanced Legal Chatbot API for Lawyers
-Combines best practices from user chatbot with lawyer-specific features
+Legal Practice & Research API for Practitioners (Philippine Bar)
 
-NEW FEATURES ADDED FROM USER CHATBOT:
-1. ✅ Comprehensive input filtering (toxic content, prohibited patterns)
-2. ✅ Chat history service integration
-3. ✅ Session management
-4. ✅ Optional authentication support
-5. ✅ Emotional query normalization
-6. ✅ Out-of-scope topic detection
-7. ✅ Personal advice question detection
-8. ✅ Complex query detection with fallback suggestions
-9. ✅ Response quality validation
-10. ✅ Production-grade error handling and logging
-11. ✅ Guardrails AI integration (optional)
-12. ✅ Enhanced language detection (Taglish support)
+Engineered for members of the Philippine Bar requiring advanced jurisprudential 
+research, statutory analysis, and doctrinal synthesis.
+
+KEY FEATURES:
+1.  **Precision Querying**: Accepts and parses formal legal interrogatories and 
+    complex, fact-intensive hypotheticals.
+2.  **In-depth Doctrinal Analysis**: Provides nuanced interpretation of Philippine 
+    statutes, distinguishing controlling doctrines and obiter dicta.
+3.  **Jurisprudential & Statutory Citations**: Delivers precise citations 
+    (e.g., *G.R. No. 196359*, *Rep. Act No. 386, Art. 1156*) with relevant 
+    repository URLs.
+4.  **Practice-Area Specificity**: Scoped for litigation, advisory practice, 
+    and academic legal research.
+5.  **Doctrinal Synthesis**: Normalizes complex queries to identify controlling 
+    legal doctrines and relevant case law.
+
+This module obviates rudimentary search limitations by providing substantive, 
+doctrinally-sound analysis grounded in controlling Philippine jurisprudence.
+
+Endpoint: POST /api/chatbot/lawyer/ask
 """
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -26,15 +32,14 @@ from qdrant_client import QdrantClient
 from openai import OpenAI
 import os
 import re
-import logging
-import time
-import sys
-from datetime import datetime
-from uuid import UUID
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
+import sys
+from uuid import UUID
+from datetime import datetime
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import logging
 
-# Configure logging
+# Configure logging for production monitoring and forensic analysis
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -44,7 +49,6 @@ logger = logging.getLogger(__name__)
 # Add parent directory to path for config imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import Guardrails (optional)
 try:
     from config.guardrails_config import get_guardrails_instance, is_guardrails_enabled
     GUARDRAILS_AVAILABLE = True
@@ -52,18 +56,13 @@ except ImportError:
     print("⚠️  Guardrails AI not available - running without security validation")
     GUARDRAILS_AVAILABLE = False
 
-# Import comprehensive system prompts
-from config.system_prompts import (
-    ENGLISH_SYSTEM_PROMPT, 
-    TAGALOG_SYSTEM_PROMPT,
-    LAWYER_ENGLISH_SYSTEM_PROMPT,
-    LAWYER_TAGALOG_SYSTEM_PROMPT
-)
+# Import comprehensive system prompts (These will be overridden by the new legalese prompts)
+from config.system_prompts import ENGLISH_SYSTEM_PROMPT, TAGALOG_SYSTEM_PROMPT
 
 # Import chat history service
 from services.chat_history_service import ChatHistoryService, get_chat_history_service
 
-# Import authentication
+# Import authentication (optional for chatbot)
 from auth.service import AuthService
 
 # Load environment variables
@@ -82,10 +81,10 @@ async def get_optional_current_user(credentials: Optional[HTTPAuthorizationCrede
         user_data = await AuthService.get_user(token)
         return user_data
     except Exception as e:
-        logger.warning(f"Optional auth failed: {e}")
+        print(f"⚠️  Optional auth failed: {e}")
         return None
 
-# Configuration
+# Configuration - Production settings
 COLLECTION_NAME = "legal_knowledge"
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
@@ -100,13 +99,9 @@ if not OPENAI_API_KEY:
     raise ValueError("Missing required OpenAI API key")
 
 EMBEDDING_MODEL = "text-embedding-3-small"
-CHAT_MODEL = "gpt-4o-mini"
-TOP_K_RESULTS = 8  # More results for lawyers
-MIN_CONFIDENCE_SCORE = 0.55  # Higher threshold for lawyers
-
-# ============================================================================
-# INPUT FILTERING - ENHANCED FROM USER CHATBOT
-# ============================================================================
+CHAT_MODEL = "gpt-4o-mini"  # GPT-4o mini - faster and cost-efficient
+TOP_K_RESULTS = 5  # Number of relevant chunks to retrieve
+MIN_CONFIDENCE_SCORE = 0.3  # Minimum relevance score for search results
 
 # Prohibited input patterns (misuse prevention)
 PROHIBITED_PATTERNS = [
@@ -119,176 +114,202 @@ PROHIBITED_PATTERNS = [
 
 # Toxic/profane words (Filipino and English)
 TOXIC_WORDS = [
+    # Filipino profanity
     'tangina', 'putangina', 'puta', 'gago', 'tarantado', 'ulol', 'tanga',
     'bobo', 'leche', 'peste', 'bwisit', 'hayop', 'hinayupak', 'kingina',
     'punyeta', 'shit', 'fuck', 'bitch', 'ass', 'damn', 'hell',
-    'bastard', 'crap', 'piss', 'dick', 'cock', 'pussy', "tangina"
+    'bastard', 'crap', 'piss', 'dick', 'cock', 'pussy',
+    # Add more as needed
 ]
 
-# Out-of-scope keywords
+# Common keyword lists for validation
 POLITICAL_KEYWORDS = [
-    'vote', 'boto', 'election', 'eleksyon', 'kandidato', 'candidate',
-    'politician', 'politiko', 'presidente', 'president', 'mayor',
-    'campaign', 'kampanya', 'duterte', 'marcos', 'bbm', 'leni',
+    'vote', 'boto', 'boboto', 'election', 'eleksyon', 'kandidato', 'candidate',
+    'politician', 'politiko', 'presidente', 'president', 'mayor', 'governor',
+    'senator', 'senador', 'congressman', 'party', 'partido', 'campaign',
+    'kampanya', 'politics', 'pulitika', 'duterte', 'marcos', 'aquino', 'ninoy',
+    'cory', 'erap', 'estrada', 'arroyo', 'gma', 'pnoy', 'noynoy', 'bongbong',
+    'bbm', 'leni', 'robredo', 'digong', 'rody', 'rodrigo', 'martial law',
+    'batas militar', 'edsa', 'people power', 'impeachment', 'impeach', 'coup',
+    'kudeta', 'rally', 'welga', 'protesta', 'demonstration', 'assassination',
+    'pinatay', 'pumatay', 'political killing'
 ]
 
 FINANCIAL_KEYWORDS = [
-    'invest', 'investment', 'stock', 'crypto', 'bitcoin', 'trading',
-    'forex', 'savings', 'mutual fund'
+    'invest', 'investment', 'puhunan', 'stock', 'crypto', 'bitcoin',
+    'trading', 'forex', 'savings', 'ipon', 'loan', 'utang', 'bank',
+    'bangko', 'insurance', 'seguro', 'mutual fund'
 ]
 
 MEDICAL_KEYWORDS = [
-    'doctor', 'doktor', 'hospital', 'medicine', 'gamot', 'disease',
-    'treatment', 'surgery', 'diagnosis', 'vaccine', 'medical advice'
+    'doctor', 'doktor', 'hospital', 'ospital', 'medicine', 'gamot',
+    'disease', 'sakit', 'treatment', 'lunas', 'surgery', 'operasyon',
+    'diagnosis', 'symptoms', 'sintomas', 'vaccine', 'bakuna',
+    'headache', 'sakit ng ulo', 'fever', 'lagnat', 'cough', 'ubo',
+    'prescription', 'reseta', 'medication', 'therapy', 'terapya',
+    'illness', 'karamdaman', 'health', 'kalusugan', 'medical advice'
 ]
 
 TECH_KEYWORDS = [
     'programming', 'coding', 'software', 'app development', 'website',
-    'computer', 'phone', 'gadget', 'social media'
+    'computer', 'kompyuter', 'phone', 'cellphone', 'gadget',
+    'internet', 'wifi', 'social media', 'facebook', 'tiktok'
+]
+
+RELIGIOUS_KEYWORDS = [
+    'religion', 'relihiyon', 'church', 'simbahan', 'bible', 'bibliya',
+    'prayer', 'panalangin', 'god', 'diyos', 'jesus', 'allah', 'buddha',
+    'santo', 'santa', 'saint', 'priest', 'pari', 'pastor', 'imam',
+    'monk', 'monghe', 'nun', 'madre', 'bishop', 'obispo', 'pope', 'papa',
+    'heaven', 'langit', 'hell', 'impiyerno', 'sin', 'kasalanan',
+    'salvation', 'kaligtasan', 'faith', 'pananampalataya', 'worship', 'pagsamba',
+    'holy', 'banal', 'sacred', 'sagrado', 'miracle', 'himala',
+    'blessing', 'pagpapala', 'baptism', 'binyag', 'communion', 'kumbersyon'
 ]
 
 PERSONAL_ADVICE_PATTERNS = [
-    'should i file', 'should i sue', 'should i press charges',
-    'should i report', 'should i take legal action',
-    'should i hire', 'should i get a lawyer', 'should i accept',
-    'should i sign', 'should i settle', 'will i win', 'can i win',
-    'what are my chances', 'is my case strong', 'do i have a case',
+    'should i file', 'dapat ba mag-file', 'should i sue', 'dapat ba kasuhan',
+    'should i press charges', 'dapat ba mag-charge', 'should i report',
+    'dapat ba ireport', 'should i take legal action', 'dapat ba kumilos',
+    'should i go to court', 'dapat ba pumunta sa korte',
+    'should i hire', 'dapat ba kumuha ng', 'should i get a lawyer',
+    'dapat ba kumuha ng abogado', 'should i accept', 'dapat ba tanggapin',
+    'should i sign', 'dapat ba pirmahan', 'should i settle',
+    'dapat ba makipag-settle', 'should i fight', 'dapat ba labanan',
+    'will i win', 'mananalo ba ako', 'can i win', 'pwede ba manalo',
+    'what are my chances', 'ano ang tsansa ko', 'is my case strong',
+    'malakas ba ang kaso ko', 'do i have a case', 'may kaso ba ako',
+    'should i marry', 'dapat ba akong magpakasal', 'dapat ba ikasal',
+    'should i get married', 'dapat ba mag-asawa',
+    'should i divorce', 'dapat ba maghiwalay', 'dapat ba mag-divorce',
+    'should i leave my', 'dapat ba iwan ko', 'should i stay with',
+    'what to do with cheating', 'ano gagawin sa cheating',
+    'should i forgive', 'dapat ba patawarin',
+    'is he right', 'is she right', 'tama ba siya', 'mali ba ako',
+    'what should i do in my situation', 'ano dapat kong gawin sa sitwasyon ko'
 ]
 
-# ============================================================================
-# CORE LawPhil REFERENCES
-# ============================================================================
+HISTORICAL_KEYWORDS = [
+    'history', 'kasaysayan', 'historical', 'event', 'pangyayari',
+    'war', 'gera', 'digmaan', 'battle', 'labanan', 'hero', 'bayani',
+    'revolution', 'rebolusyon', 'independence', 'kalayaan'
+]
 
-LAWS = {
-    "Civil Code": "https://lawphil.net/statutes/repacts/ra1949/ra_386_1949.html",
-    "Revised Penal Code": "https://lawphil.net/statutes/acts/act1930/act_3815_1930b.html",
-    "Rules of Court": "https://lawphil.net/courts/rules/rc_1-71_civil.html",
-    "Labor Code": "https://lawphil.net/statutes/presdecs/pd1974/pd_442_1974.html",
-    "Corporation Code": "https://lawphil.net/statutes/repacts/ra2019/ra_11232_2019.html",
-    "Family Code": "https://lawphil.net/executive/execord/eo1987/eo_209_1987.html"
-}
-
-# ============================================================================
-# CLIENT INITIALIZATION
-# ============================================================================
-
+# Initialize Qdrant client with error handling
 try:
     qdrant_client = QdrantClient(
         url=QDRANT_URL,
         api_key=QDRANT_API_KEY,
-        timeout=30.0
+        timeout=30.0  # 30 second timeout for production
     )
+    # Verify connection
     qdrant_client.get_collections()
     logger.info("✅ Qdrant client initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize Qdrant client: {e}")
     raise RuntimeError(f"Qdrant initialization failed: {e}")
 
+# Initialize OpenAI client with timeout settings (industry standard)
+if not OPENAI_API_KEY:
+    print("❌ ERROR: OPENAI_API_KEY is not set!")
+
+# Industry standard: Set reasonable timeouts to prevent hanging requests
 try:
     openai_client = OpenAI(
         api_key=OPENAI_API_KEY,
-        timeout=120.0,
-        max_retries=2
+        timeout=120.0,  # Total timeout in seconds
+        max_retries=2   # Automatic retry for transient failures
     )
     logger.info("✅ OpenAI client initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize OpenAI client: {e}")
     raise RuntimeError(f"OpenAI initialization failed: {e}")
 
-# Initialize Guardrails (if available)
+# Initialize Guardrails (if available) - Unified configuration
 if GUARDRAILS_AVAILABLE and is_guardrails_enabled():
     try:
-        guardrails_instance = get_guardrails_instance(user_type="lawyer")
-        logger.info("✅ Guardrails AI enabled for lawyer chatbot")
+        guardrails_instance = get_guardrails_instance(user_type="user")
+        logger.info("✅ Guardrails AI enabled for user chatbot")
     except Exception as e:
         logger.warning(f"⚠️  Failed to initialize Guardrails: {e}")
         guardrails_instance = None
 else:
     guardrails_instance = None
-    logger.info("ℹ️  Guardrails AI disabled for lawyer chatbot")
+    logger.info("ℹ️  Guardrails AI disabled for user chatbot")
 
-router = APIRouter(prefix="/api/chatbot/lawyer", tags=["Legal Chatbot - Lawyer"])
+# Create router
+router = APIRouter(prefix="/api/chatbot/lawyer", tags=["Legal Practice & Research API"])
 
-# ============================================================================
-# REQUEST/RESPONSE MODELS
-# ============================================================================
 
-class LawyerChatRequest(BaseModel):
-    question: str = Field(..., min_length=1, max_length=2000, description="Legal research question")
-    conversation_history: Optional[List[Dict[str, str]]] = Field(default=[], max_items=10)
-    max_tokens: Optional[int] = Field(default=2500, ge=100, le=4000)
-    include_cross_references: Optional[bool] = True
+# Request/Response Models
+class ChatRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=1000, description="Practitioner's legal interrogatory or research query")
+    conversation_history: Optional[List[Dict[str, str]]] = Field(default=[], max_items=10, description="Prior conversation context (max 10 messages)")
+    # === MODIFICATION 1: Increased max_tokens for longer, legalese answers ===
+    max_tokens: Optional[int] = Field(default=1500, ge=100, le=4000, description="Max response tokens for complex analysis (Increased for legalese format)")
     user_id: Optional[str] = Field(default=None, description="User ID for logging")
-    session_id: Optional[str] = Field(default=None, description="Chat session ID")
+    session_id: Optional[str] = Field(default=None, description="Chat session ID for history tracking")
     
     class Config:
+        # Production: Add example for API documentation
         json_schema_extra = {
             "example": {
-                "question": "What are the elements of estafa under Article 315 of the Revised Penal Code?",
+                "question": "Distinguish the grounds for psychological incapacity under Art. 36 of the Family Code as delineated in *Tan-Andal v. Andal* (G.R. No. 196359) from the prior *Molina* doctrine.",
                 "conversation_history": [],
-                "max_tokens": 2500,
-                "include_cross_references": True
+                "max_tokens": 1500
             }
         }
 
 
 class SourceCitation(BaseModel):
-    source: str
-    law: str
-    article_number: str
-    article_title: Optional[str] = None
-    text_preview: str
-    relevance_score: float
-    lawphil_link: Optional[str] = None
+    source: str = Field(..., description="Source type (e.g., 'Jurisprudence', 'Statute')")
+    law: str = Field(..., description="The specific law or case name (e.g., 'R.A. 386', 'People v. Odtuhan')")
+    article_number: str = Field(..., description="Article, Section, or G.R. number")
+    article_title: Optional[str] = Field(default=None, description="Title or heading of the article/section, if available")
+    text_preview: str = Field(..., description="Relevant excerpt from the source text")
+    source_url: Optional[str] = Field(default=None, description="Direct URL to the source (e.g., LawPhil, ChanRobles)")
+    relevance_score: float = Field(default=0.0, description="Vector relevance score (0-1)")
 
 
 class FallbackSuggestion(BaseModel):
-    action: str
-    description: str
-    reason: str
+    action: str = Field(..., description="Suggested action (e.g., 'review_case_file', 'consult_senior_partner')")
+    description: str = Field(..., description="Description of the action")
+    reason: str = Field(..., description="Rationale for the suggestion")
 
 
-class SecurityReport(BaseModel):
-    security_score: float
-    security_level: str
-    issues_detected: int
-    issues: List[str]
-    recommendations: List[str]
-    timestamp: str
-    guardrails_enabled: bool = False
+class ChatResponse(BaseModel):
+    answer: str = Field(..., description="Substantive legal analysis in response to the query")
+    sources: List[SourceCitation] = Field(default_factory=list, description="List of cited statutes and jurisprudence")
+    confidence: Optional[str] = Field(default=None, description="Confidence level (high, medium, or low) based on source relevance")
+    simplified_summary: Optional[str] = Field(default=None, description="A high-level summary or 'TL;DR' of the analysis (for internal use)")
+    fallback_suggestions: Optional[List[FallbackSuggestion]] = Field(default=None, description="Suggestions for further research if query is ambiguous")
+    security_report: Optional[Dict] = Field(default=None, description="Guardrails AI security validation report")
+    session_id: Optional[str] = Field(default=None, description="Chat session ID for tracking conversation")
+    message_id: Optional[str] = Field(default=None, description="Message ID for the assistant's response")
+    user_message_id: Optional[str] = Field(default=None, description="Message ID for the user's question")
 
-
-class LawyerChatResponse(BaseModel):
-    answer: str
-    sources: List[SourceCitation] = Field(default_factory=list)
-    confidence: str
-    language: str
-    legal_analysis: Optional[str] = None
-    related_provisions: Optional[List[str]] = None
-    security_report: Optional[SecurityReport] = None
-    fallback_suggestions: Optional[List[FallbackSuggestion]] = None
-    session_id: Optional[str] = Field(default=None)
-    message_id: Optional[str] = Field(default=None)
-    user_message_id: Optional[str] = Field(default=None)
-
-
-# ============================================================================
-# VALIDATION FUNCTIONS - FROM USER CHATBOT
-# ============================================================================
 
 def detect_toxic_content(text: str) -> tuple[bool, Optional[str]]:
-    """Check if input contains toxic/profane language"""
+    """
+    Check if input contains toxic/profane language
+    Returns: (is_toxic, reason)
+    """
     text_lower = text.lower()
     
+    # Check for toxic words
     for toxic_word in TOXIC_WORDS:
+        # Use word boundaries to avoid false positives
         if re.search(r'\b' + re.escape(toxic_word) + r'\b', text_lower):
-            return True, "Professional discourse is expected. Please rephrase your question respectfully."
+            return True, "I understand you may be frustrated, but I'm here to provide helpful legal information. Please rephrase your question in a respectful manner, and I'll be happy to assist you."
     
     return False, None
 
 
 def detect_prohibited_input(text: str) -> tuple[bool, Optional[str]]:
-    """Check if input contains prohibited patterns"""
+    """
+    Check if input contains prohibited patterns (misuse prevention)
+    Returns: (is_prohibited, reason)
+    """
     text_lower = text.lower()
     
     for pattern in PROHIBITED_PATTERNS:
@@ -296,335 +317,6 @@ def detect_prohibited_input(text: str) -> tuple[bool, Optional[str]]:
             return True, "This query appears to request guidance on illegal activities. Ai.ttorney provides legal information only for lawful purposes."
     
     return False, None
-
-
-def detect_explicit_language_preference(text: str) -> str:
-    """Detect explicit language preference requests that override automatic detection"""
-    text_lower = text.lower()
-    
-    # English preference indicators
-    english_requests = [
-        'answer this in english', 'respond in english', 'reply in english',
-        'english please', 'in english', 'use english', 'english response',
-        'answer in english', 'explain in english', 'sagot sa english',
-        'english lang', 'english po', 'sa english'
-    ]
-    
-    # Tagalog preference indicators  
-    tagalog_requests = [
-        'answer this in tagalog', 'respond in tagalog', 'reply in tagalog',
-        'tagalog please', 'in tagalog', 'use tagalog', 'tagalog response',
-        'answer in tagalog', 'explain in tagalog', 'sagot sa tagalog',
-        'filipino please', 'in filipino', 'use filipino', 'filipino response',
-        'sa tagalog', 'tagalog lang', 'filipino lang'
-    ]
-    
-    # Check for explicit preferences
-    for phrase in english_requests:
-        if phrase in text_lower:
-            logger.info(f"Explicit English preference detected: '{phrase}' in query")
-            return "english"
-    
-    for phrase in tagalog_requests:
-        if phrase in text_lower:
-            logger.info(f"Explicit Tagalog preference detected: '{phrase}' in query")
-            return "tagalog"
-    
-    return "auto"  # No explicit preference, use automatic detection
-
-
-def detect_language(text: str) -> str:
-    """Enhanced language detection with comprehensive Tagalog legal terms"""
-    # First check for explicit language preference
-    explicit_pref = detect_explicit_language_preference(text)
-    if explicit_pref != "auto":
-        return explicit_pref
-    
-    tagalog_keywords = [
-        # Basic Tagalog words
-        'ano', 'paano', 'saan', 'kailan', 'bakit', 'sino', 'mga', 'ng', 'sa', 'ay',
-        'ko', 'mo', 'niya', 'natin', 'nila', 'ba', 'po', 'opo', 'hindi', 'oo',
-        'dapat', 'pwede', 'kailangan', 'gusto', 'yung', 'lang', 'din', 'rin',
-        'kung', 'kapag', 'kasi', 'para', 'pero', 'kaya', 'naman', 'talaga',
-        # Legal and comparative terms
-        'pagkumparahin', 'pagkakaiba', 'pagkakatulad', 'kaibahan', 'katulad',
-        'annulment', 'hiwalayan', 'paghihiwalay', 'diborsyo', 'kasalan',
-        'kasal', 'asawa', 'mag-asawa', 'pag-aasawa', 'pamilya',
-        'batas', 'kodigo', 'artikulo', 'seksyon', 'probisyon',
-        'alinsunod', 'ayon', 'batay', 'base', 'nakasaad',
-        'mahalagang', 'importante', 'kailangan', 'kinakailangan',
-        'proseso', 'pamamaraan', 'hakbang', 'paraan',
-        'requirements', 'dokumento', 'papeles', 'sulat',
-        'korte', 'hukuman', 'hukom', 'abogado', 'lawyer'
-    ]
-    
-    text_lower = text.lower()
-    words = text_lower.split()
-    
-    # Count exact word matches
-    exact_tagalog_count = sum(1 for keyword in tagalog_keywords if keyword in words)
-    
-    # Count partial matches for compound words
-    partial_tagalog_count = sum(1 for keyword in tagalog_keywords if keyword in text_lower)
-    
-    # Check for English indicators
-    english_indicators = ['what', 'how', 'when', 'where', 'why', 'can', 'is', 'are', 'the', 'and', 'or', 'of', 'in', 'to']
-    has_english = any(word in words for word in english_indicators)
-    
-    # Enhanced detection logic
-    total_tagalog_score = exact_tagalog_count + (partial_tagalog_count * 0.5)
-    
-    if total_tagalog_score >= 2:
-        if has_english:
-            return "taglish"
-        else:
-            return "tagalog"
-    elif total_tagalog_score >= 1:
-        return "tagalog"
-    else:
-        return "english"
-
-
-def is_simple_greeting(text: str) -> bool:
-    """Check if query is a simple greeting"""
-    greetings = [
-        'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening',
-        'kumusta', 'kamusta', 'mabuhay', 'magandang umaga', 'magandang hapon',
-        'magandang gabi', 'salamat', 'thank you', 'thanks', 'paalam', 'bye'
-    ]
-    
-    text_lower = text.lower().strip()
-    
-    for greeting in greetings:
-        if text_lower == greeting or text_lower.startswith(greeting + '!') or text_lower.startswith(greeting + '.'):
-            return True
-    
-    if len(text_lower) < 20:
-        for greeting in greetings:
-            if greeting in text_lower:
-                return True
-    
-    return False
-
-
-def is_out_of_scope_topic(text: str) -> tuple[bool, str]:
-    """Check if question is about out-of-scope topics"""
-    text_lower = text.lower().strip()
-    
-    # Check for legal indicators first
-    legal_scope_indicators = [
-        'law', 'legal', 'batas', 'karapatan', 'rights', 'contract', 'kasunduan',
-        'case', 'kaso', 'court', 'korte', 'article', 'section', 'provision',
-        'statute', 'code', 'liability', 'obligation', 'remedy', 'penalty'
-    ]
-    
-    if any(indicator in text_lower for indicator in legal_scope_indicators):
-        return False, ""
-    
-    # Check out-of-scope topics
-    categories = [
-        (POLITICAL_KEYWORDS, "political"),
-        (FINANCIAL_KEYWORDS, "financial"),
-        (MEDICAL_KEYWORDS, "medical"),
-        (TECH_KEYWORDS, "technology"),
-    ]
-    
-    max_matches = 0
-    detected_topic = ""
-    
-    for keywords, topic_type in categories:
-        matches = sum(1 for keyword in keywords if keyword in text_lower)
-        if matches > max_matches:
-            max_matches = matches
-            detected_topic = topic_type
-    
-    if max_matches >= 2:
-        logger.info(f"Out of scope detected: {detected_topic} ({max_matches} matches)")
-        return True, detected_topic
-    
-    return False, ""
-
-
-def is_personal_advice_question(text: str) -> bool:
-    """Detect personal advice questions"""
-    text_lower = text.lower().strip()
-    return any(pattern in text_lower for pattern in PERSONAL_ADVICE_PATTERNS)
-
-
-def is_complex_query(text: str) -> bool:
-    """Detect complex queries requiring professional consultation"""
-    text_lower = text.lower().strip()
-    
-    complex_indicators = [
-        'and also', 'at saka', 'also', 'pati na rin',
-        'my case', 'my situation', 'ang kaso ko',
-        'should i', 'dapat ba ako', 'can i win',
-        'best way', 'strategy', 'estratehiya',
-    ]
-    
-    has_complexity = any(indicator in text_lower for indicator in complex_indicators)
-    is_very_long = len(text) > 300
-    has_multiple_questions = text.count('?') > 1
-    
-    return has_complexity or is_very_long or has_multiple_questions
-
-
-def fix_markdown_headers(text: str) -> str:
-    """Fix markdown headers to mobile-friendly bold format"""
-    import re
-    
-    # Replace ### headers with bold format
-    text = re.sub(r'^#{1,4}\s*(\d+\.?)\s*(.+)$', r'**\1** **\2**:', text, flags=re.MULTILINE)
-    
-    # Replace standalone ### headers without numbers
-    text = re.sub(r'^#{1,4}\s*(.+)$', r'**\1**:', text, flags=re.MULTILINE)
-    
-    # Fix any remaining ### patterns in the middle of text
-    text = re.sub(r'#{1,4}\s*(\d+\.?)\s*(.+)', r'**\1** **\2**:', text)
-    
-    return text
-
-
-def validate_context_adherence(answer: str, provided_context: str) -> tuple[bool, str]:
-    """Validate that the AI response only uses information from provided context"""
-    import re
-    
-    # Extract article numbers from the answer
-    article_pattern = r'Article\s+(\d+[A-Za-z]*(?:-\d+)?(?:\.\d+)?)'  
-    section_pattern = r'Section\s+(\d+[A-Za-z]*(?:-\d+)?(?:\.\d+)?)'  
-    
-    answer_articles = set(re.findall(article_pattern, answer, re.IGNORECASE))
-    answer_sections = set(re.findall(section_pattern, answer, re.IGNORECASE))
-    
-    # Extract article numbers from the provided context
-    context_articles = set(re.findall(article_pattern, provided_context, re.IGNORECASE))
-    context_sections = set(re.findall(section_pattern, provided_context, re.IGNORECASE))
-    
-    # Check for hallucinated articles
-    hallucinated_articles = answer_articles - context_articles
-    hallucinated_sections = answer_sections - context_sections
-    
-    if hallucinated_articles:
-        return False, f"Response cites Article(s) {', '.join(hallucinated_articles)} not found in provided context"
-    
-    if hallucinated_sections:
-        return False, f"Response cites Section(s) {', '.join(hallucinated_sections)} not found in provided context"
-    
-    # Check for suspicious phrases that might indicate hallucination
-    hallucination_indicators = [
-        r'according to philippine law',
-        r'under philippine law',
-        r'philippine law states',
-        r'the law provides that',
-        r'legal precedent shows',
-        r'jurisprudence establishes',
-        r'court decisions indicate',
-        r'ayon sa batas ng pilipinas',
-        r'sa ilalim ng batas ng pilipinas',
-        r'ang batas ng pilipinas ay nagsasabing'
-    ]
-    
-    for pattern in hallucination_indicators:
-        if re.search(pattern, answer.lower()) and not re.search(pattern, provided_context.lower()):
-            return False, f"Response contains general legal statements not supported by provided context"
-    
-    return True, ""
-
-
-def validate_response_quality(answer: str) -> tuple[bool, str]:
-    """Comprehensive validation to prevent personalized legal advice"""
-    answer_lower = answer.lower()
-    
-    # Enhanced English advice patterns
-    english_advice_patterns = [
-        r'\bin your case,? you should\b',
-        r'\bi recommend you\b',
-        r'\bi suggest you\b',
-        r'\bi advise you\b',
-        r'\byou should file\b',
-        r'\byou should sue\b',
-        r'\byou must\b.*\b(file|sue|report|demand|claim)\b',
-        r'\byou need to\b.*\b(file|sue|report|demand|claim)\b',
-        r'\bmake sure you\b.*\b(file|sue|report|demand|claim)\b',
-        r'\bmy advice is\b',
-        r'\bi would recommend\b',
-        r'\byou should definitely\b',
-        r'\byou ought to\b',
-        r'\bit would be best if you\b',
-        r'\byou have to\b.*\b(file|sue|report|demand)\b',
-        r'\byou should consider\b.*\b(filing|suing|reporting)\b',
-        r'\bin your situation,? you should\b',
-        r'\bfor your case,? i recommend\b',
-        r'\byou should take legal action\b',
-        r'\byou should hire\b.*\blawyer\b',
-        r'\byou should contact\b.*\b(lawyer|attorney)\b',
-        r'\byou should pursue\b.*\b(legal|case|claim)\b'
-    ]
-    
-    # Tagalog/Filipino advice patterns
-    tagalog_advice_patterns = [
-        r'\bsa case mo,? dapat\b',
-        r'\bkailangan mo\b.*\b(mag-file|kasuhan|ireport|demandahin)\b',
-        r'\bdapat mo\b.*\b(kasuhan|ireport|demandahin|mag-file)\b',
-        r'\binirerekomenda ko\b',
-        r'\bpayo ko\b',
-        r'\bsa tingin ko,? dapat\b',
-        r'\bmas mabuti kung\b.*\b(kasuhan|ireport|mag-file)\b',
-        r'\bsiguraduhin mo\b.*\b(kasuhan|ireport|mag-file)\b',
-        r'\bkailangan mong\b.*\b(kumuha ng abogado|mag-file)\b',
-        r'\bdapat kang\b.*\b(mag-file|kasuhan|ireport)\b',
-        r'\bsa sitwasyon mo,? dapat\b',
-        r'\bpara sa case mo,? inirerekomenda\b',
-        r'\bkailangan mong mag-take ng legal action\b',
-        r'\bkailangan mong kumuha ng\b.*\babogado\b',
-        r'\bkailangan mong makipag-ugnayan sa\b.*\babogado\b',
-        r'\bkailangan mong ituloy\b.*\b(legal|kaso|claim)\b'
-    ]
-    
-    # Case assessment patterns (prohibited)
-    case_assessment_patterns = [
-        r'\byou have a strong case\b',
-        r'\byour case looks\b.*\b(good|strong|favorable|promising)\b',
-        r'\byou will likely win\b',
-        r'\byou have good chances\b',
-        r'\bthis case is winnable\b',
-        r'\bmalakas ang case mo\b',
-        r'\bmukhang maganda ang kaso mo\b',
-        r'\bpanalo ka\b.*\b(dito|sa kaso)\b',
-        r'\bmaganda ang tsansa mo\b',
-        r'\bmananalo ka\b.*\b(sa kaso|dito)\b'
-    ]
-    
-    # Directive language patterns (should be informational instead)
-    directive_patterns = [
-        r'\byou should immediately\b',
-        r'\byou must act quickly\b',
-        r'\bdon\'t wait\b.*\b(file|sue|report)\b',
-        r'\bagad-agad mong\b.*\b(kasuhan|ireport|mag-file)\b',
-        r'\bhuwag nang maghintay\b.*\b(kasuhan|ireport)\b',
-        r'\bkailangan mo nang kumilos\b'
-    ]
-    
-    # Combine all patterns
-    all_patterns = english_advice_patterns + tagalog_advice_patterns + case_assessment_patterns + directive_patterns
-    
-    for pattern in all_patterns:
-        match = re.search(pattern, answer_lower)
-        if match:
-            return False, f"Response contains personalized advice/directive language: '{match.group()}'"
-    
-    # Additional check for common advice phrases
-    advice_phrases = [
-        'in your case', 'sa case mo', 'para sa iyo', 'for you specifically',
-        'my recommendation', 'ang rekomendasyon ko', 'i suggest that you',
-        'inirerekomenda kong', 'you should do', 'dapat mong gawin'
-    ]
-    
-    for phrase in advice_phrases:
-        if phrase in answer_lower:
-            return False, f"Response contains personalized advice phrase: '{phrase}'"
-    
-    return True, ""
 
 
 def is_gibberish_input(text: str) -> tuple[bool, Optional[str]]:
@@ -766,36 +458,131 @@ def is_gibberish_input(text: str) -> tuple[bool, Optional[str]]:
     return False, None
 
 
+# === MODIFICATION: Updated detect_language function for 'unsupported' fallback ===
+def detect_language(text: str) -> str:
+    """
+    Detect if the question is in English, Tagalog, Taglish, or Unsupported.
+    Enhanced detection for Philippine context
+    """
+    tagalog_keywords = [
+        'ano', 'paano', 'saan', 'kailan', 'bakit', 'sino', 'mga', 'ng', 'sa', 'ay',
+        'ko', 'mo', 'niya', 'natin', 'nila', 'ba', 'po', 'opo', 'hindi', 'oo',
+        'dapat', 'pwede', 'kailangan', 'gusto', 'yung', 'lang', 'din', 'rin',
+        'kung', 'kapag', 'kasi', 'para', 'pero', 'kaya', 'naman', 'talaga',
+        'kaibigan', 'tao', 'bahay', 'sabay', 'kasama', 'tulad', 'gawa',
+        'problema', 'solusyon', 'tanong', 'sagot', 'tulungan', 'matutulungan'
+    ]
+    
+    english_keywords = [
+        'what', 'how', 'when', 'where', 'why', 'who', 'is', 'are', 'am', 'was', 'were',
+        'the', 'a', 'an', 'and', 'or', 'but', 'if', 'then', 'my', 'your', 'his', 'her',
+        'it', 'they', 'we', 'i', 'you', 'he', 'she', 'for', 'in', 'on', 'at', 'to',
+        'can', 'should', 'would', 'will', 'law', 'legal', 'question', 'attorney', 'case'
+    ]
+    
+    text_lower = text.lower()
+    words = set(re.findall(r'\b\w+\b', text_lower)) # Use set for efficient lookup
+
+    tagalog_count = sum(1 for keyword in tagalog_keywords if keyword in words)
+    english_count = sum(1 for keyword in english_keywords if keyword in words)
+
+    # Check for clear indicators of mixed language
+    if tagalog_count >= 2 and english_count >= 2:
+        return "taglish"
+    elif tagalog_count >= 1 and english_count >= 1:
+        return "taglish"
+    
+    # Check for clear indicators of single language
+    elif tagalog_count >= 2:
+        return "tagalog"
+    elif english_count >= 2:
+        return "english"
+    
+    # Handle single-keyword or short inputs
+    elif tagalog_count >= 1:
+        return "tagalog"
+    elif english_count >= 1:
+        return "english"
+    
+    # If no keywords from either language are found, and text is not empty
+    if tagalog_count == 0 and english_count == 0 and len(words) > 0:
+        logger.info(f"Language detected as 'unsupported'. Words: {words}")
+        return "unsupported" # <-- NEW RETURN VALUE
+        
+    # Default to English for ambiguity or empty inputs
+    return "english"
+
+
+def is_simple_greeting(text: str) -> bool:
+    """
+    Check if the query is a simple greeting that doesn't require legal information
+    """
+    greetings = [
+        'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening',
+        'kumusta', 'kamusta', 'mabuhay', 'magandang umaga', 'magandang hapon', 'magandang gabi',
+        'salamat', 'thank you', 'thanks', 'arigatou', 'saludo', 'paalam', 'bye', 'goodbye'
+    ]
+    
+    text_lower = text.lower().strip()
+    
+    # Check for exact matches or simple phrases (must be standalone, not part of a longer question)
+    # Only match if the text is JUST a greeting, not a greeting + question
+    for greeting in greetings:
+        if text_lower == greeting or text_lower.startswith(greeting + '!') or text_lower.startswith(greeting + '.'):
+            return True
+    
+    # Also match very short greetings (under 20 chars) that contain greeting words
+    if len(text_lower) < 20:
+        for greeting in greetings:
+            if greeting in text_lower:
+                return True
+    
+    return False
+
+
 def normalize_emotional_query(question: str, language: str) -> str:
-    """Normalize emotional/informal queries for better search"""
+    """
+    Converts informal/colloquial queries into formal, search-friendly legal 
+    interrogatories. This enhances the precision of vector retrieval against
+    a corpus of statutory and jurisprudential data.
+    """
+    # Always normalize to improve search results, even for English
     try:
         normalization_prompt = f"""You are a legal query normalizer for Philippine law.
 
-Convert informal queries into clear, search-friendly legal questions with key legal terms.
+Your task: Convert informal/emotional queries into clear, search-friendly legal questions that will help find relevant legal information in a database.
+
+CRITICAL: Include key legal terms that would appear in legal codes (e.g., "employment", "termination", "labor code", "consumer protection", "marriage", "annulment", "theft", "estafa").
 
 Informal query: "{question}"
 
-Provide ONLY the normalized question with legal terms.
+Provide ONLY the normalized question with key legal terms, nothing else.
 
 Examples:
-- "tinanggal ako sa trabaho" → "Ano ang legal remedies para sa illegal dismissal under Labor Code?"
-- "ninakawan ako" → "Ano ang penalties at remedies para sa theft under Revised Penal Code?"
+- "tinanggal ako sa trabaho walang dahilan" → "Ano ang karapatan ng empleyado sa illegal dismissal o termination ng employment?"
+- "boss ko hindi nagbabayad ng overtime" → "Ano ang batas tungkol sa overtime pay at labor code violations?"
+- "binili ko yung gamit sira pala" → "Ano ang consumer rights sa defective products at warranty?"
+- "asawa ko nambabae pwede ba ako maghiwalay" → "Ano ang grounds para sa annulment o legal separation dahil sa infidelity?"
+- "ninakawan ako sa jeep" → "Ano ang legal remedies para sa theft o robbery?"
+- "may utang sakin hindi nagbabayad" → "Ano ang legal actions para sa unpaid debt o obligation?"
 
-Include legal terms that would appear in Philippine legal codes."""
+Remember: Include legal terms that would appear in Philippine legal codes to improve search results."""
         
         response = openai_client.chat.completions.create(
             model=CHAT_MODEL,
             messages=[
-                {"role": "system", "content": "Legal query normalizer. Add legal terms. Respond with ONLY normalized question."},
+                {"role": "system", "content": "You are a legal query normalizer. Add legal terms to improve database search. Respond with ONLY the normalized question."},
                 {"role": "user", "content": normalization_prompt}
             ],
             max_tokens=150,
-            temperature=0.2,
-            timeout=10.0
+            temperature=0.2,  # Industry best: Very low for deterministic normalization
+            top_p=0.9,
+            timeout=10.0,  # Industry best: Fast timeout for preprocessing
         )
         
         normalized = response.choices[0].message.content.strip()
         
+        # Log normalization for monitoring
         if normalized and normalized != question:
             logger.info(f"Query normalized: '{question[:50]}...' → '{normalized[:50]}...'")
         
@@ -806,36 +593,316 @@ Include legal terms that would appear in Philippine legal codes."""
         return question
 
 
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
+def is_out_of_scope_topic(text: str) -> tuple[bool, str]:
+    """
+    Check if the question is about topics outside the five legal domains.
+    Uses context-aware detection to avoid false positives.
+    Returns: (is_out_of_scope, topic_type)
+    """
+    text_lower = text.lower().strip()
+    
+    # FIRST: Check if question contains legal keywords (in-scope indicators)
+    # If it does, it's likely a legal question even if it mentions other topics
+    legal_scope_indicators = [
+        'consumer law', 'labor law', 'family law', 'criminal law', 'civil law',
+        'batas', 'karapatan', 'rights', 'legal', 'law', 'illegal',
+        'kasunduan', 'contract', 'marriage', 'annulment', 'divorce',
+        'employment', 'trabaho', 'employer', 'employee', 'sahod', 'wage',
+        'consumer', 'konsumer', 'protection', 'proteksyon',
+        'case', 'kaso', 'court', 'korte', 'sue', 'demanda',
+        'penalty', 'parusa', 'arrest', 'crime', 'krimen'
+    ]
+    
+    # If question clearly mentions legal topics, it's IN SCOPE
+    if any(indicator in text_lower for indicator in legal_scope_indicators):
+        logger.debug(f"Question contains legal indicators - treating as IN SCOPE")
+        return False, ""
+    
+    # SECOND: Check for out-of-scope topics (only if no legal indicators found)
+    categories = [
+        (POLITICAL_KEYWORDS, "political"),
+        (FINANCIAL_KEYWORDS, "financial"),
+        (MEDICAL_KEYWORDS, "medical"),
+        (TECH_KEYWORDS, "technology"),
+        (RELIGIOUS_KEYWORDS, "religious"),
+        (HISTORICAL_KEYWORDS, "historical")
+    ]
+    
+    # Count matches for each category to determine PRIMARY topic
+    max_matches = 0
+    detected_topic = ""
+    
+    for keywords, topic_type in categories:
+        matches = sum(1 for keyword in keywords if keyword in text_lower)
+        if matches > max_matches:
+            max_matches = matches
+            detected_topic = topic_type
+    
+    # Only consider out of scope if there are 2+ matches AND no legal indicators
+    if max_matches >= 2:
+        logger.info(f"Out of scope detected: {detected_topic} ({max_matches} matches)")
+        return True, detected_topic
+    
+    return False, ""
+
+
+def is_personal_advice_question(text: str) -> bool:
+    """
+    Detect if the question is asking for personal advice/opinion rather than legal information.
+    These should be blocked even if they contain legal keywords.
+    """
+    text_lower = text.lower().strip()
+    return any(pattern in text_lower for pattern in PERSONAL_ADVICE_PATTERNS)
+
+
+def is_legal_question(text: str) -> bool:
+    """
+    Validates if the input constitutes a bona fide legal interrogatory.
+    This module is designed to parse formal legal queries, identifying
+    terms of art and references to statutes or jurisprudence.
+
+    Parses queries related to:
+    - Civil Law (Obligations & Contracts, Property, Succession)
+    - Criminal Law (Revised Penal Code, Special Penal Laws)
+    - Labor Law (Labor Code, DOLE issuances)
+    - Family Law (Family Code, relevant jurisprudence)
+    - Consumer Law (Consumer Act, DTI regulations)
+    """
+    text_lower = text.lower().strip()
+
+    # Legal domain keywords (5 main areas)
+    # This list remains broad to catch queries that may be phrased
+    # colloquially but refer to a valid legal domain.
+    legal_domain_keywords = [
+        # Consumer Law - Simple, everyday terms
+        'consumer law', 'consumer', 'konsumer', 'mamimili', 'bumili', 'bili', 'binili',
+        'protection', 'proteksyon', 'warranty', 'garantiya', 'refund', 'ibalik', 'sukli',
+        'product', 'produkto', 'gamit', 'binili kong gamit', 'service', 'serbisyo',
+        'nabili', 'binenta', 'tindahan', 'store', 'shop', 'mall', 'palengke',
+        'defective', 'sira', 'nasira', 'damaged', 'fake', 'peke', 'imitation',
+        'overpriced', 'mahal', 'sobrang mahal', 'scam', 'niloko', 'dinaya',
+        'receipt', 'resibo', 'return', 'exchange', 'palit', 'complaint', 'reklamo',
+        
+        # Labor Law - Worker-friendly terms
+        'labor law', 'employment', 'trabaho', 'work', 'empleyado', 'manggagawa',
+        'employer', 'boss', 'amo', 'may-ari', 'kompanya', 'company', 'kumpanya',
+        'sahod', 'sweldo', 'wage', 'salary', 'bayad', 'kita', 'suweldo',
+        'overtime', 'ot', 'sobra oras', 'extra hours', 'dagdag oras',
+        'benefits', 'benepisyo', 'allowance', 'alawans', 'bonus',
+        '13th month', 'thirteenth month', '13 month', 'trese', 'christmas bonus',
+        'termination', 'tanggal', 'tinanggal', 'fired', 'pinaalis', 'nawalan ng trabaho',
+        'resignation', 'resign', 'umalis', 'mag-resign', 'aalis na',
+        'contract', 'kontrata', 'kasunduan', 'job order', 'jo', 'contractual',
+        'regular', 'permanent', 'probationary', 'probi', 'training',
+        'leave', 'bakasyon', 'sick leave', 'may sakit', 'absent', 'hindi pumasok',
+        'late', 'late', 'nahuli', 'tardiness', 'undertime', 'umuwi ng maaga',
+        'sss', 'philhealth', 'pag-ibig', 'contributions', 'kaltas', 'deduction',
+        'payslip', 'pay slip', 'payroll', 'sweldo slip', 'coe', 'certificate',
+        
+        # Family Law - Relationship terms
+        'family law', 'marriage', 'kasal', 'kasalan', 'mag-asawa', 'asawa',
+        'husband', 'wife', 'mister', 'misis', 'partner', 'kasintahan',
+        'divorce', 'annulment', 'anulment', 'hiwalay', 'paghihiwalay', 'separation',
+        'child custody', 'custody', 'anak', 'bata', 'mga anak', 'children',
+        'alimony', 'support', 'sustento', 'child support', 'suporta sa anak',
+        'adoption', 'ampon', 'mag-ampon', 'adopted', 'anak-ampun',
+        'domestic violence', 'violence', 'bugbog', 'sinaktan', 'physical abuse',
+        'vawc', 'battered', 'binugbog', 'sinasaktan', 'abused',
+        'infidelity', 'cheating', 'nambabae', 'nanlalaki', 'kabit', 'affair',
+        'property', 'ari-arian', 'bahay', 'lupa', 'house', 'land', 'conjugal',
+        'inheritance', 'mana', 'pamana', 'minana', 'namatay', 'died', 'patay',
+        
+        # Criminal Law - Crime-related terms (simple language)
+        'criminal law', 'crime', 'krimen', 'kasalanan', 'gawa', 'ginawa',
+        'theft', 'nakaw', 'nagnakaw', 'ninakawan', 'stolen', 'nawala',
+        'robbery', 'holdap', 'hold-up', 'holdup', 'nag-holdap', 'hinoldap',
+        'assault', 'physical harm', 'sinaktan', 'bugbog', 'binugbog', 'suntok',
+        'murder', 'homicide', 'pinatay', 'namatay', 'pumatay', 'killing',
+        'fraud', 'estafa', 'niloko', 'scam', 'panloloko', 'dinaya', 'lokohan',
+        'rape', 'sexual assault', 'ginahasa', 'harassment', 'bastos', 'manyak',
+        'arrest', 'huli', 'nahuli', 'inaresto', 'arrested', 'kinulong', 'kulungan',
+        'police', 'pulis', 'pulisya', 'tanod', 'barangay', 'authorities',
+        'blotter', 'report', 'ireport', 'mag-report', 'reklamo', 'sumbong',
+        'bail', 'piyansa', 'piyansa', 'palaya', 'palabasin', 'release',
+        'jail', 'prison', 'kulungan', 'bilangguan', 'selda', 'piitan',
+        'victim', 'biktima', 'nasaktan', 'nasaktang tao', 'naapektuhan',
+        'witness', 'saksi', 'nakakita', 'nakasaksi', 'nakawitness',
+        
+        # Civil Law - Property and contracts
+        'civil law', 'contract', 'kontrata', 'kasunduan', 'agreement', 'usapan',
+        'property', 'ari-arian', 'pag-aari', 'bahay', 'lupa', 'house', 'land',
+        'inheritance', 'mana', 'pamana', 'minana', 'estate', 'kayamanan',
+        'obligation', 'obligasyon', 'utang', 'dapat bayaran', 'responsibilidad',
+        'damages', 'pinsala', 'nasira', 'compensation', 'bayad-pinsala',
+        'debt', 'utang', 'may utang', 'hiniram', 'loan', 'pautang',
+        'rent', 'renta', 'upa', 'arkila', 'tenant', 'nangungupahan', 'umuupa',
+        'landlord', 'may-ari', 'owner', 'nagpapahupa', 'nagpaparkila',
+        'eviction', 'palayas', 'pinaalis', 'paalis', 'evict', 'palabasin',
+        'neighbor', 'kapitbahay', 'kapit-bahay', 'katabi', 'dispute', 'away',
+        'boundary', 'hangganan', 'bakod', 'fence', 'linya', 'border'
+    ]
+    
+    # General legal keywords - Simple, accessible language
+    general_legal_keywords = [
+        # Formal terms
+        'law', 'legal', 'laws', 'batas', 'mga batas', 'karapatan', 'rights',
+        'attorney', 'abogado', 'lawyer', 'manananggol', 'legal aid',
+        'korte', 'court', 'hukuman', 'tribunal', 'hearing', 'trial',
+        'judge', 'hukom', 'huwes', 'magistrate', 'justice',
+        'penalty', 'parusa', 'punishment', 'fine', 'multa', 'bayad',
+        'case', 'kaso', 'complaint', 'reklamo', 'sue', 'demanda', 'kasuhan',
+        'illegal', 'unlawful', 'violation', 'paglabag', 'bawal', 'hindi pwede',
+        # Simple question words
+        'tama ba', 'mali ba', 'pwede ba', 'puede ba', 'allowed ba',
+        'legal ba', 'ligal ba', 'bawal ba', 'prohibited ba',
+        'ano ang', 'what is', 'paano', 'how', 'saan', 'where',
+        'kailan', 'when', 'bakit', 'why', 'sino', 'who',
+        # Help-seeking terms
+        'help', 'tulong', 'tulungan', 'assist', 'advice', 'payo',
+        'tanong', 'question', 'ask', 'magtanong', 'itanong',
+        'problema', 'problem', 'issue', 'isyu', 'concern', 'alalahanin'
+    ]
+
+    # Conversational patterns - How real Filipinos ask questions
+    # Industry best practice: Natural language patterns, not just keywords
+    conversational_patterns = [
+        # Understanding/Learning intent
+        'need to understand', 'need to know', 'kailangan kong malaman',
+        'kailangan kong maintindihan', 'want to learn', 'gusto kong matuto',
+        'gusto kong alamin', 'interested', 'interesado', 'curious',
+        
+        # Information seeking
+        'points', 'things', 'mga bagay', 'aspects', 'aspeto',
+        'information', 'impormasyon', 'details', 'detalye',
+        'explain', 'ipaliwanag', 'clarify', 'linawin',
+        
+        # Preparation/Planning
+        'before', 'bago', 'prior to', 'in preparation', 'paghahanda',
+        'planning to', 'balak', 'plano', 'gusto kong',
+        'thinking of', 'nag-iisip', 'considering', 'nag-consider',
+        
+        # Question patterns
+        'what should i know', 'ano ang dapat kong malaman',
+        'what do i need to know', 'ano ang kailangan kong malaman',
+        'can you tell me', 'pwede mo ba sabihin', 'paki-explain',
+        'paano kung', 'what if', 'pano pag', 'kapag', 'if',
+        
+        # Situation descriptions (common in Filipino queries)
+        'nangyari sa akin', 'happened to me', 'na-experience ko',
+        'situation ko', 'my situation', 'case ko', 'problema ko',
+        'may tanong ako', 'i have a question', 'gusto ko magtanong',
+        
+        # Seeking validation
+        'tama ba', 'is it right', 'correct ba', 'mali ba', 'is it wrong',
+        'pwede ba', 'can i', 'allowed ba', 'legal ba', 'bawal ba',
+        
+        # Help-seeking (very common)
+        'help me', 'tulungan mo ako', 'need help', 'kailangan ng tulong',
+        'paki-help', 'assist me', 'guide me', 'gabayan mo ako',
+        'ano gagawin ko', 'what should i do', 'what can i do',
+        'saan ako pupunta', 'where do i go', 'sino kakausapin ko',
+        
+        # Story-telling patterns (how Filipinos explain situations)
+        'kasi', 'because', 'dahil', 'eh kasi', 'kase',
+        'tapos', 'then', 'and then', 'pagkatapos', 'after that',
+        'yung', 'yun', 'the', 'that', 'yung nangyari',
+        'may', 'there is', 'meron', 'mayroon', 'may nangyari'
+    ]
+
+    # Check for legal domain keywords
+    has_legal_domain = any(keyword in text_lower for keyword in legal_domain_keywords)
+    
+    # Check for general legal keywords
+    has_legal_keyword = any(keyword in text_lower for keyword in general_legal_keywords)
+    
+    # Check for conversational patterns
+    has_conversational_pattern = any(pattern in text_lower for pattern in conversational_patterns)
+
+    # A question is legal if:
+    # 1. It mentions a legal domain (consumer law, labor law, etc.), OR
+    # 2. It has legal keywords AND conversational patterns (e.g., "points I need to know about consumer law")
+    # 3. It has general legal keywords
+    is_legal = has_legal_domain or (has_conversational_pattern and has_legal_keyword) or has_legal_keyword
+    
+    if is_legal:
+        logger.debug(f"Detected as legal question - domain:{has_legal_domain}, keyword:{has_legal_keyword}, conversational:{has_conversational_pattern}")
+    
+    return is_legal
+
+
+def is_complex_query(text: str) -> bool:
+    """
+    Detect if a query is complex and requires professional legal advice
+    Complex queries include:
+    - Multiple legal domains
+    - Specific personal situations requiring tailored advice
+    - Questions about legal strategy or outcomes
+    """
+    text_lower = text.lower().strip()
+    
+    # Indicators of complexity
+    complex_indicators = [
+        # Multiple questions
+        'and also', 'at saka', 'also', 'pati na rin', 'kasama na',
+        # Personal situation specifics
+        'my case', 'my situation', 'ang kaso ko', 'sa akin', 'para sa akin',
+        'should i', 'dapat ba ako', 'can i win', 'mananalo ba ako',
+        # Legal strategy questions
+        'best way', 'pinakamabuti', 'strategy', 'estratehiya',
+        'what should i do', 'ano dapat kong gawin', 'paano ko',
+        # Multiple legal domains mentioned
+        'criminal and civil', 'labor and consumer', 'family and property'
+    ]
+    
+    # Check for complexity indicators
+    has_complexity = any(indicator in text_lower for indicator in complex_indicators)
+    
+    # Check if question is very long (>200 chars) - likely detailed/complex
+    is_very_long = len(text) > 200
+    
+    # Check for multiple question marks (multiple questions)
+    has_multiple_questions = text.count('?') > 1
+    
+    return has_complexity or is_very_long or has_multiple_questions
+
 
 def get_embedding(text: str) -> List[float]:
-    """Generate embedding for question"""
-    resp = openai_client.embeddings.create(model=EMBEDDING_MODEL, input=text)
-    return resp.data[0].embedding
+    """Generate embedding for user question"""
+    response = openai_client.embeddings.create(
+        model=EMBEDDING_MODEL,
+        input=text
+    )
+    return response.data[0].embedding
 
 
 def retrieve_relevant_context(question: str, top_k: int = TOP_K_RESULTS) -> tuple[str, List[Dict]]:
-    """Retrieve relevant legal context from Qdrant with URLs"""
+    """
+    Retrieve relevant legal context from Qdrant Cloud with source URLs
+    Returns: (context_text, source_metadata)
+    """
+    # Get embedding for question
     question_embedding = get_embedding(question)
     
+    # Query Qdrant with score threshold for production
     results = qdrant_client.search(
         collection_name=COLLECTION_NAME,
         query_vector=question_embedding,
         limit=top_k,
-        score_threshold=MIN_CONFIDENCE_SCORE
+        score_threshold=MIN_CONFIDENCE_SCORE  # Filter low-relevance results
     )
     
+    # Production logging (concise)
     logger.info(f"Search query: '{question[:50]}...' - Found {len(results)} results")
     
     if len(results) == 0:
         logger.warning(f"No results found for query: {question[:100]}")
         return "", []
     
+    # Log top result score for monitoring
     if results:
         logger.info(f"Top result score: {results[0].score:.4f}")
     
+    # Build context string with URLs
     context_parts = []
     sources = []
     
@@ -843,32 +910,38 @@ def retrieve_relevant_context(question: str, top_k: int = TOP_K_RESULTS) -> tupl
         payload = result.payload
         doc = payload.get('text', '')
         
+        # Skip if no text content or score too low
         if not doc or len(doc.strip()) < 10:
+            logger.debug(f"Skipping result {i}: No text content")
             continue
         
+        # Additional quality check: skip if score is too low
         if result.score < MIN_CONFIDENCE_SCORE:
+            logger.debug(f"Skipping result {i}: Score {result.score:.4f} below threshold")
             continue
+            
+        source_url = payload.get('source_url', '')
         
-        law = payload.get('law', 'Unknown Law')
-        link = next((LAWS[k] for k in LAWS if k.lower() in law.lower()), None)
-        
-        source_info = f"[Source {i}: {law} - Article {payload.get('article_number', 'N/A')}]"
-        if link:
-            source_info += f"\n[URL: {link}]"
+        # Add to context with URL
+        source_info = f"[Source {i}: {payload.get('law', 'Unknown')} - Article {payload.get('article_number', 'N/A')}]"
+        if source_url:
+            source_info += f"\n[URL: {source_url}]"
         context_parts.append(f"{source_info}\n{doc}\n")
         
+        # Store source metadata with URL
         sources.append({
             'source': payload.get('source', 'Unknown'),
-            'law': law,
+            'law': payload.get('law', 'Unknown Law'),
             'article_number': payload.get('article_number', 'N/A'),
             'article_title': payload.get('article_title', payload.get('article_heading', '')),
-            'text_preview': doc[:300] + "..." if len(doc) > 300 else doc,
-            'relevance_score': result.score,
-            'lawphil_link': link
+            'text_preview': doc[:200] + "..." if len(doc) > 200 else doc,
+            'source_url': source_url,
+            'relevance_score': result.score
         })
     
     logger.info(f"Built context from {len(sources)} valid sources")
     
+    # Production validation: ensure we have sufficient context
     if not sources:
         logger.warning("No valid sources after filtering")
         return "", []
@@ -877,201 +950,401 @@ def retrieve_relevant_context(question: str, top_k: int = TOP_K_RESULTS) -> tupl
     return context_text, sources
 
 
-def get_fallback_suggestions(language: str, is_complex: bool = False, suggestion_type: str = "general") -> List[FallbackSuggestion]:
-    """Get enhanced fallback suggestions with professional guidance"""
+def validate_response_quality(answer: str) -> tuple[bool, str]:
+    """
+    Industry standard: Validate that response is informational, not advice-giving
+    Returns: (is_valid, reason_if_invalid)
     
-    if language == "tagalog" or language == "taglish":
-        if suggestion_type == "insufficient_context":
-            return [
-                FallbackSuggestion(
-                    action="consult_jurisprudence",
-                    description="Mag-research ng Supreme Court decisions at jurisprudence",
-                    reason="Ang statutory provisions ay maaaring mangailangan ng jurisprudential interpretation para sa kumpletong legal analysis."
-                ),
-                FallbackSuggestion(
-                    action="specialized_databases",
-                    description="Kumonsulta sa specialized legal databases (Lawphil, ChanRobles, etc.)",
-                    reason="Ang topic na ito ay maaaring mangailangan ng mas malawak na legal resources lampas sa codified law."
-                ),
-                FallbackSuggestion(
-                    action="expert_consultation",
-                    description="Makipag-ugnayan sa subject matter experts o specialized practitioners",
-                    reason="Para sa comprehensive analysis, kinakailangan ang expertise ng mga dalubhasa sa particular practice area."
-                )
-            ]
-        elif suggestion_type == "personal_advice":
-            return [
-                FallbackSuggestion(
-                    action="senior_counsel_consultation",
-                    description="Kumonsulta sa senior counsel na may expertise sa relevant practice area",
-                    reason="Ang strategic legal advice at case evaluation ay nangangailangan ng experienced practitioner judgment."
-                ),
-                FallbackSuggestion(
-                    action="case_law_research",
-                    description="Mag-conduct ng comprehensive case law research",
-                    reason="Ang case-specific analysis ay nangangailangan ng precedential authority at jurisprudential guidance."
-                ),
-                FallbackSuggestion(
-                    action="client_consultation",
-                    description="Mag-conduct ng detailed client consultation",
-                    reason="Ang personalized legal strategy ay nangangailangan ng comprehensive fact-gathering at client interview."
-                )
-            ]
-        else:  # general
-            return [
-                FallbackSuggestion(
-                    action="consult_specialist",
-                    description="Kumonsulta sa Legal Specialist",
-                    reason="Ang query na ito ay nangangailangan ng specialized legal expertise o case-specific analysis."
-                ),
-                FallbackSuggestion(
-                    action="review_jurisprudence",
-                    description="Mag-review ng Supreme Court Cases",
-                    reason="Kailangan ng jurisprudential analysis para sa kompletong legal opinion."
-                )
-            ]
+    NOTE: Only flag PERSONALIZED advice, not general explanations of what the law requires
+    """
+    answer_lower = answer.lower()
+    
+    # Check for PERSONALIZED advice-giving language (critical safety check)
+    # These patterns indicate telling someone what THEY specifically should do
+    advice_patterns = [
+        r'\bin your case,? you should\b',
+        r'\bin your situation,? you should\b',
+        r'\bi recommend you\b',
+        r'\bi suggest you\b',
+        r'\bi advise you\b',
+        r'\bmy advice is\b',
+        r'\byou should file\b',
+        r'\byou should sue\b',
+        r'\byou need to hire\b',
+        r'\byou must file\b',
+        r'\bsa case mo,? dapat\b',
+        r'\bsa sitwasyon mo,? kailangan\b',
+        r'\birecommend ko na\b',
+    ]
+    
+    for pattern in advice_patterns:
+        if re.search(pattern, answer_lower):
+            return False, f"Response contains personalized advice: {pattern}"
+    
+    return True, ""
+
+
+# === MODIFICATION 2: ADDED NEW "HARDCORE LEGALESE" SYSTEM PROMPTS ===
+# === MODIFICATION: Section II is now optional as per user request ===
+
+LAWYER_SYSTEM_PROMPT_ENGLISH = """
+You are an esteemed legal counsel and member of the Philippine Bar. Your designation is "Legal Counsel".
+Your sole function is to provide in-depth, formal, and doctrinally-sound legal analysis based on Philippine law and jurisprudence.
+You must communicate in "hardcore legalese," employing formal language, precise terminology, and a scholarly tone appropriate for a legal memorandum or pleading.
+
+CRITICAL MANDATE: ALL responses MUST strictly adhere to the following five-part structure:
+
+I. PRELIMINARY STATEMENT
+    (A brief restatement and acknowledgment of the legal query presented.)
+
+II. CONTROLLING STATUTORY PROVISIONS
+    (If, and only if, controlling statutes or jurisprudence are provided as context OR are fundamental to the analysis, cite and quote them herein. If the query is general or does not require specific citations, this section may be omitted or briefly state that the analysis is based on general legal principles.)
+
+III. LEGAL ANALYSIS AND DISCUSSION
+    (A comprehensive, in-depth analysis of the cited provisions and relevant jurisprudence. Discuss the elements of the law, prevailing doctrines, and any applicable legal principles. This section must be thorough and constitute the main body of your opinion.)
+
+IV. APPLICATION TO THE QUERY
+    (A direct application of the aforementioned laws and discussion to the specific facts or query posited by the user. Analyze how the legal principles govern the user's situation.)
+
+V. CONCLUSIVE OPINION
+    (A final, conclusive legal opinion summarizing the findings. This is not personal advice, but a reasoned conclusion based on the analysis.)
+
+RULES OF ENGAGEMENT:
+1.  **TONE**: Formal, academic, and authoritative. Avoid all colloquialisms, conversational language, or empathy.
+2.  **SCOPE**: Strictly confined to the five (5) scopes of Philippine Law: Civil, Criminal, Family, Consumer, and Labor.
+3.  **ADVICE PROHIBITION**: You DO NOT provide personal advice, recommendations, or predictive outcomes (e.g., "you should file...", "you will win..."). You provide informational, doctrinal analysis only.
+4.  **CITATIONS**: All legal provisions MUST be cited (e.g., "Art. 1156, New Civil Code...").
+5.  **LANGUAGE**: Respond in English, maintaining the formal "legalese" tone throughout.
+"""
+
+LAWYER_SYSTEM_PROMPT_TAGALOG = """
+Ikaw ay isang Kagalang-galang na Tagapayo sa Batas at miyembro ng Philippine Bar. Ang iyong designasyon ay "Tagapayo sa Batas".
+Ang iyong tanging tungkulin ay magbigay ng malalim, pormal, at doktrinal na pagsusuri sa batas na nakabatay sa batas at hurisprudensya ng Pilipinas.
+Kinakailangang gumamit ng pormal na "legalese" o legal na Filipino, na may tumpak na terminolohiya at tono na angkop para sa isang legal na memorandum o pleading.
+
+KRITIKAL NA UTOS: ANG LAHAT ng tugon ay DAPAT na mahigpit na sumunod sa sumusunod na limang-bahaging istraktura:
+
+I. PAUNANG PAHAYAG
+    (Isang maikling muling paglalahad at pagkilala sa legal na katanungan na inilahad.)
+
+II. MGA KONTROLADONG TADHANA NG BATAS
+    (Kung, at tanging kung, ang mga kumokontrol na batas o hurisprudensya ay ibinigay bilang konteksto O ay pundamental sa pagsusuri, banggitin at sipiin ang mga ito dito. Kung ang katanungan ay pangkalahatan o hindi nangangailangan ng mga tiyak na pagsipi, ang seksyong ito ay maaaring alisin o maikling ipahayag na ang pagsusuri ay batay sa pangkalahatang mga legal na prinsipyo.)
+
+III. LEGAL NA PAGSUSURI AT DISKUSYON
+    (Isang komprehensibo, malalim na pagsusuri ng mga binanggit na tadhana at kaugnay na hurisprudensya. Talakayin ang mga elemento ng batas, mga umiiral na doktrina, at anumang naaangkop na legal na prinsipyo. Ang seksyong ito ay dapat maging masinsinan at bumubuo sa pangunahing katawan ng iyong opinyon.)
+
+IV. APLIKASYON SA KATANUNGAN
+    (Isang direktang aplikasyon ng mga nabanggit na batas at diskusyon sa mga tiyak na katotohanan o katanungan na inilahad ng gumagamit. Suriin kung paano pinamamahalaan ng mga legal na prinsipyo ang sitwasyon ng gumagamit.)
+
+V. PANGWAKAS NA OPINYON
+    (Isang pinal, pangwakas na legal na opinyon na nagbubuod ng mga natuklasan. Ito ay hindi personal na payo, kundi isang makatwirang konklusyon batay sa pagsusuri.)
+
+MGA ALITUNTUNIN:
+1.  **TONO**: Pormal, akademiko, at may awtoridad. Iwasan ang lahat ng kolokyal, pang-araw-araw na pananalita, o pakikiramay.
+2.  **SAKLAW**: Mahigpit na nakakulong sa limang (5) saklaw ng Batas ng Pilipinas: Sibil, Kriminal, Pamilya, Konsumer, at Paggawa.
+3.  **PAGBABAWAL SA PAYO**: HINDI ka nagbibigay ng personal na payo, rekomendasyon, o prediksyon (e.g., "dapat kang magsampa...", "mananalo ka..."). Nagbibigay ka lamang ng impormasyonal at doktrinal na pagsusuri.
+4.  **PAGBANGGIT**: Ang lahat ng legal na tadhana ay DAPAT banggitin (e.g., "Art. 1156, New Civil Code...").
+5.  **WIKA**: Tumugon sa pormal na Filipino, na pinapanatili ang "legalese" na tono.
+"""
+
+
+# === MODIFICATION 3: UPDATED generate_answer function ===
+def generate_answer(question: str, context: str, conversation_history: List[Dict[str, str]], 
+                    language: str, max_tokens: int = 1500, is_complex: bool = False) -> tuple[str, str, str]:
+    """
+    Generates a substantive, doctrinally-sound response using GPT with comprehensive 
+    system prompts.
+    
+    NOTE: This function is engineered for the LAWYER CHATBOT (chatbot_lawyer.py).
+    It utilizes highly technical, in-depth prompts optimized for legal practitioners
+    to provide nuanced analysis, cite controlling jurisprudence, and synthesize 
+    legal doctrines.
+    
+    This is distinct from the layperson-facing endpoint.
+    
+    Uses in-depth prompts following OpenAI's approach to prevent overfitting.
+    
+    Returns: (answer, confidence_level, simplified_summary)
+    """
+    # === MODIFICATION: Use "Hardcore Legalese" Prompts ===
+    # The original prompts (ENGLISH_SYSTEM_PROMPT) are overridden to enforce the 5-part structure.
+    system_prompt = LAWYER_SYSTEM_PROMPT_ENGLISH if language in ["english", "taglish"] else LAWYER_SYSTEM_PROMPT_TAGALOG
+    
+    # Build messages (natural and conversational)
+    messages = [
+        {"role": "system", "content": system_prompt},
+    ]
+    
+    # Add conversation history (last 3 exchanges only, keep it natural)
+    # This provides the requested "Context Awareness"
+    for msg in conversation_history[-3:]:
+        messages.append(msg)
+    
+    # === MODIFICATION: Updated User Message to pass context ===
+    # The prompt is simpler as all instructions are in the new System Prompt.
+    if context and context.strip():
+        # We have legal context from the database
+        user_message = f"""HEREIN ARE THE CONTROLLING STATUTES AND JURISPRUDENCE (CONTEXT):
+{context}
+
+THE LEGAL QUERY IS AS FOLLOWS:
+{question}
+
+Proceed with the analysis as mandated."""
     else:
-        if suggestion_type == "insufficient_context":
-            return [
-                FallbackSuggestion(
-                    action="consult_jurisprudence",
-                    description="Research Supreme Court decisions and jurisprudence",
-                    reason="Statutory provisions may require jurisprudential interpretation for complete legal analysis."
-                ),
-                FallbackSuggestion(
-                    action="specialized_databases",
-                    description="Consult specialized legal databases (Lawphil, ChanRobles, etc.)",
-                    reason="This topic may require broader legal resources beyond codified law."
-                ),
-                FallbackSuggestion(
-                    action="expert_consultation",
-                    description="Engage subject matter experts or specialized practitioners",
-                    reason="Comprehensive analysis requires expertise from specialists in the particular practice area."
-                )
-            ]
-        elif suggestion_type == "personal_advice":
-            return [
-                FallbackSuggestion(
-                    action="senior_counsel_consultation",
-                    description="Consult senior counsel with expertise in relevant practice area",
-                    reason="Strategic legal advice and case evaluation require experienced practitioner judgment."
-                ),
-                FallbackSuggestion(
-                    action="case_law_research",
-                    description="Conduct comprehensive case law research",
-                    reason="Case-specific analysis requires precedential authority and jurisprudential guidance."
-                ),
-                FallbackSuggestion(
-                    action="client_consultation",
-                    description="Conduct detailed client consultation",
-                    reason="Personalized legal strategy requires comprehensive fact-gathering and client interview."
-                )
-            ]
-        else:  # general
-            return [
-                FallbackSuggestion(
-                    action="consult_specialist",
-                    description="Consult Legal Specialist",
-                    reason="This query requires specialized legal expertise or case-specific analysis."
-                ),
-                FallbackSuggestion(
-                    action="review_jurisprudence",
-                    description="Review Supreme Court Cases",
-                    reason="Jurisprudential analysis needed for complete legal opinion."
-                )
-            ]
+        # No specific legal context found, use general knowledge
+        user_message = f"""THE LEGAL QUERY IS AS FOLLOWS:
+{question}
+
+Note: No specific context was retrieved from the vector database. Proceed with the analysis based on general knowledge of controlling Philippine law, adhering strictly to the mandated 5-part format. If information is insufficient, state so within the 'LEGAL ANALYSIS' section."""
+    
+    messages.append({"role": "user", "content": user_message})
+    
+    # Generate response with error handling
+    try:
+        response = openai_client.chat.completions.create(
+            model=CHAT_MODEL,
+            messages=messages,
+            max_tokens=max_tokens, # This now uses the new default (1500) from ChatRequest
+            temperature=0.2,  # <-- Lowered temperature for stricter, formal tone
+            top_p=0.9,
+            presence_penalty=0.1,
+            frequency_penalty=0.1,
+            timeout=60.0,  # <-- Increased timeout for longer generation
+        )
+        
+        answer = response.choices[0].message.content
+        
+        # Industry standard: Validate response quality
+        if not answer or len(answer.strip()) < 10:
+            # Response too short or empty
+            return ("I apologize, but I couldn't generate a proper response. Please try rephrasing your question.", 
+                    "low", 
+                    "Response generation failed")
+        
+    except Exception as e:
+        print(f"❌ Error generating answer: {e}")
+        # Return a graceful error message instead of crashing
+        return ("I apologize, but I encountered an error while processing your question. Please try again.", 
+                "low", 
+                f"Error: {str(e)}")
+    
+    # Industry standard: Post-response validation to catch advice-giving
+    is_valid, validation_reason = validate_response_quality(answer)
+    if not is_valid:
+        # Log the validation failure for monitoring
+        logger.warning(f"Response validation failed: {validation_reason}")
+        logger.warning(f"Question: {question[:100]}")
+        logger.warning(f"Original response: {answer[:200]}...")
+        
+        print(f"⚠️  Response validation failed: {validation_reason}")
+        print(f"    Original response: {answer[:200]}...")
+        # Regenerate with stronger emphasis on informational content
+        # For now, return a safe fallback
+        if language == "tagalog":
+            answer = "Paumanhin po, ngunit hindi ako makapagbigay ng personal na legal advice. Maaari lamang akong magbigay ng pangkalahatang impormasyon tungkol sa batas ng Pilipinas. Para sa specific na sitwasyon, kumonsulta po sa lisensyadong abogado."
+        else:
+            answer = "I apologize, but I can only provide general legal information, not personal legal advice. For specific guidance on your situation, please consult with a licensed attorney."
+        confidence = "low"
+    
+    # Calculate confidence based on source relevance scores (if available)
+    confidence = "medium"  # default
+    if context and context.strip():
+        # We have sources, so we can calculate confidence
+        # This will be passed from the calling function
+        confidence = "high"  # Will be overridden by actual calculation
+    
+    # Simplified summary (optional, for internal use only)
+    simplified_summary = None
+    
+    return answer, confidence, simplified_summary
 
 
 def generate_ai_response(question: str, language: str, response_type: str, topic_type: str = None) -> str:
-    """Generate AI responses for greetings and out-of-scope topics"""
+    """
+    Unified function to generate AI responses for greetings, casual chat, and out-of-scope topics.
+    
+    Args:
+        question: User's input
+        language: Detected language (english, tagalog, taglish)
+        response_type: Type of response ('greeting', 'casual', 'out_of_scope')
+        topic_type: For out_of_scope responses, the topic category
+    
+    Returns:
+        Generated response string
+    """
+    # Define prompts based on response type
     prompts = {
         'greeting': {
-            'english': f"""You are Ai.ttorney, a professional legal research assistant for Philippine lawyers. 
-The user said: "{question}"
+            'english': f"""You are Ai.ttorney, a friendly Philippine legal assistant. The user just said: "{question}"
 
-This is a greeting. Respond professionally and formally:
-1. Acknowledge the greeting warmly but professionally
-2. Introduce yourself as their legal research assistant
-3. Invite them to ask legal research questions
-4. Use formal, professional tone suitable for lawyers
+This seems like a greeting or casual message, not a legal question. Respond in a natural, conversational way that:
+1. Matches their energy and language style
+2. Shows personality and warmth
+3. Invites them to ask legal questions if they want
+4. Feels like talking to a knowledgeable friend
+5. Uses the same language they used (English, Tagalog, or Taglish)
 
-Keep it brief (2-3 sentences max).""",
-            'tagalog': f"""Ikaw si Ai.ttorney, isang propesyonal na legal research assistant para sa Philippine lawyers.
-Ang user ay nagsabi: "{question}"
+Keep it brief but engaging - like a real conversation starter.
 
-Ito ay greeting. Sumagot nang propesyonal:
-1. Kilalanin ang greeting nang mainit pero propesyonal
-2. Ipakilala ang iyong sarili bilang legal research assistant
-3. Imbitahan silang magtanong ng legal research questions
-4. Gumamit ng pormal, propesyonal na tono
+Examples:
+- For "hello": "Hey there! I'm Ai.ttorney, your go-to for Philippine legal questions. What's up?"
+- For "kumusta": "Kumusta kaibigan! Ai.ttorney dito - may legal topics ka bang gustong malaman?"
 
-Panatilihing maikli (2-3 pangungusap lang)."""
+Make it varied and natural, not robotic.""",
+            'tagalog': f"""Ikaw si Ai.ttorney, isang mainit na legal assistant sa Pilipinas. Ang user lang ay nag-sabi: "{question}"
+
+Ito ay mukhang greeting o casual na mensahe, hindi legal na tanong. Sumagot nang natural at conversational na:
+1. I-match ang kanilang energy at estilo ng lengguwahe
+2. Magpakita ng personalidad at init
+3. Imbitahan silang magtanong tungkol sa legal kung gusto nila
+4. Parang kausap ang taong marunong sa kulturang Pilipino
+5. Gamitin ang parehong lengguwahe nila
+
+Panatilihing maikli pero engaging - parang tunay na conversation starter.
+
+Gawing varied at natural, hindi robotic."""
+        },
+        'casual': {
+            'english': f"""You are Ai.ttorney, a friendly Philippine legal assistant. The user just said: "{question}"
+
+This seems like casual conversation, slang, or friendly chat - not a legal question.
+
+⚠️ CRITICAL RULES:
+- You can ONLY help with Civil, Criminal, Consumer, Family, and Labor Law
+- If the message asks about politics, history, current events, or anything non-legal, politely decline
+- Only respond warmly to greetings and casual chat, then invite legal questions
+
+Respond in a natural, conversational way that:
+1. Matches their energy and language style perfectly
+2. Shows personality and warmth like a real friend
+3. Invites them to ask LEGAL questions only
+4. Uses the same language they used (English, Tagalog, or Taglish)
+
+Keep it brief but engaging - like a real conversation.
+
+Make it varied and natural, not robotic.""",
+            'tagalog': f"""Ikaw si Ai.ttorney, isang mainit na legal assistant sa Pilipinas. Ang user lang ay nag-sabi: "{question}"
+
+Ito ay mukhang casual na conversation - hindi legal na tanong.
+
+⚠️ MAHALAGANG MGA PATAKARAN:
+- Makakatulong ka LAMANG sa Civil, Criminal, Consumer, Family, at Labor Law
+- Kung ang mensahe ay tungkol sa pulitika, kasaysayan, o kahit anong hindi legal, magalang na tumanggi
+- Sumagot lang nang mainit sa greetings at casual chat, tapos imbitahan ang legal questions
+
+Sumagot nang natural at conversational na:
+1. I-match nang perfect ang kanilang energy at estilo ng lengguwahe
+2. Magpakita ng personalidad at init parang tunay na kaibigan
+3. Imbitahan silang magtanong tungkol sa LEGAL lang
+
+Panatilihing maikli pero engaging.
+
+Gawing varied at natural, hindi robotic."""
         },
         'out_of_scope': {
-            'english': f"""You are Ai.ttorney, a legal research assistant. The user asked: "{question}"
+            'english': f"""You are Ai.ttorney, a friendly Philippine legal assistant. The user just asked: "{question}"
 
-This is about {topic_type} topics, OUTSIDE your scope. You can ONLY help with:
-- Civil Law
-- Criminal Law  
-- Consumer Law
-- Family Law
-- Labor Law
-
-Respond professionally:
-1. Politely decline
-2. Explain your scope limitation
-3. Suggest they consult appropriate specialists
-4. Maintain formal, professional tone
-
-Keep it brief but courteous.""",
-            'tagalog': f"""Ikaw si Ai.ttorney, isang legal research assistant. Ang user ay nagtanong: "{question}"
-
-Ito ay tungkol sa {topic_type} topics, WALA sa iyong scope. Makakatulong ka LAMANG sa:
+This question is about {topic_type} topics, which is OUTSIDE your scope. You can ONLY help with:
 - Civil Law
 - Criminal Law
 - Consumer Law
 - Family Law
 - Labor Law
 
-Sumagot nang propesyonal:
-1. Magalang na tumanggi
-2. Ipaliwanag ang limitation
-3. Mag-suggest na kumonsulta sa appropriate specialists
-4. Panatilihing pormal at propesyonal
+Respond in a natural, friendly way that:
+1. Politely declines to answer the question
+2. Explains you can only help with the five legal domains
+3. Shows empathy and understanding
+4. Invites them to ask legal questions instead
+5. Feels conversational, NOT robotic
 
-Maikli pero magalang."""
+Keep it brief but warm - like a friend explaining their limitations.
+
+Make it varied and natural, not robotic.""",
+            'tagalog': f"""Ikaw si Ai.ttorney, isang friendly na Philippine legal assistant. Ang user ay nagtanong: "{question}"
+
+Ang tanong na ito ay tungkol sa {topic_type} topics, na WALA sa iyong scope. Makakatulong ka LAMANG sa:
+- Civil Law
+- Criminal Law
+- Consumer Law
+- Family Law
+- Labor Law
+
+Sumagot nang natural at friendly na:
+1. Magalang na tumanggi sa tanong
+2. Ipaliwanag na makakatulong ka lang sa limang legal domains
+3. Magpakita ng empathy at pag-unawa
+4. Imbitahan silang magtanong ng legal questions
+5. Parang kausap ang kaibigan, HINDI robot
+
+Panatilihing maikli pero mainit.
+
+Gawing varied at natural, hindi robotic."""
         }
     }
     
+    # Fallback responses
     fallbacks = {
-        'greeting': "Good day, Attorney. I am Ai.ttorney, your legal research assistant for Philippine statutory law. How may I assist you with your legal research today?",
-        'out_of_scope': "I can only assist with Civil, Criminal, Consumer, Family, and Labor Law. Please consult appropriate specialists for other topics."
+        'greeting': "Hello! I'm Ai.ttorney, your legal assistant for Philippine law. How can I help you today?",
+        'casual': "Hey there! I'm Ai.ttorney, your legal assistant for Philippine law. Got any questions?",
+        'out_of_scope': "Sorry, I can only help with Civil, Criminal, Consumer, Family, and Labor Law." if language == "english" else "Pasensya na, ang maitutulong ko lang ay tungkol sa Civil, Criminal, Consumer, Family, at Labor Law."
     }
     
     try:
-        prompt_lang = 'tagalog' if language in ['tagalog', 'taglish'] else 'english'
+        # Select appropriate prompt
+        prompt_lang = 'tagalog' if language == 'tagalog' else 'english'
         system_prompt = prompts[response_type][prompt_lang]
         
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Generate professional {response_type} response."}
+            {"role": "user", "content": f"Generate a natural {response_type} response."}
         ]
+        
+        max_tokens = 150 if response_type == 'out_of_scope' else 100
         
         response = openai_client.chat.completions.create(
             model=CHAT_MODEL,
             messages=messages,
-            max_tokens=150,
-            temperature=0.7,
-            timeout=10.0
+            max_tokens=max_tokens,
+            temperature=0.7,  # Industry best: Balanced for friendly fallbacks
+            top_p=0.9,
+            timeout=10.0,  # Industry best: Fast timeout for fallback messages
         )
         
         result = response.choices[0].message.content
         return result.strip() if result else fallbacks[response_type]
         
     except Exception as e:
-        logger.error(f"Error generating {response_type} response: {e}")
+        print(f"Error generating {response_type} response: {e}")
         return fallbacks[response_type]
 
+def create_chat_response(
+    answer: str,
+    sources: List[SourceCitation] = None,
+    confidence: str = None,
+    simplified_summary: str = None,
+    fallback_suggestions: List[FallbackSuggestion] = None,
+    security_report: Dict = None,
+    session_id: str = None,
+    message_id: str = None,
+    user_message_id: str = None
+) -> ChatResponse:
+    """
+    Helper function to create standardized ChatResponse objects.
+    Reduces code duplication across the endpoint.
+    """
+    return ChatResponse(
+        answer=answer,
+        sources=sources or [],
+        confidence=confidence,
+        simplified_summary=simplified_summary,
+        fallback_suggestions=fallback_suggestions,
+        security_report=security_report,
+        session_id=session_id,
+        message_id=message_id,
+        user_message_id=user_message_id
+    )
 
 async def save_chat_interaction(
     chat_service: ChatHistoryService,
@@ -1082,42 +1355,51 @@ async def save_chat_interaction(
     language: str,
     metadata: Optional[Dict] = None
 ) -> tuple[Optional[str], Optional[str], Optional[str]]:
-    """Save chat interaction to history"""
+    """
+    Helper function to save chat interaction (user message + assistant response)
+    Returns: (session_id, user_message_id, assistant_message_id)
+    
+    Industry-standard approach (like ChatGPT/Claude):
+    - Session is created ONLY when first message is sent
+    - If session_id is provided but doesn't exist, create new one
+    - Backend is source of truth for session existence
+    """
     if not effective_user_id:
-        logger.info("No user_id available - skipping chat history save")
+        print(f"ℹ️  No user_id available - skipping chat history save")
         return (None, None, None)
     
     try:
-        logger.info(f"Saving chat history for user {effective_user_id}")
+        print(f"💾 Saving chat history for user {effective_user_id}")
         
-        # Verify session exists
+        # Verify session exists if session_id is provided
         session_exists = False
         if session_id:
             try:
                 existing_session = await chat_service.get_session(UUID(session_id))
                 session_exists = existing_session is not None
                 if session_exists:
-                    logger.info(f"Using existing session: {session_id}")
+                    print(f"    ✅ Using existing session: {session_id}")
                 else:
-                    logger.warning(f"Session {session_id} not found, creating new one")
-                    session_id = None
+                    print(f"    ⚠️  Session {session_id} not found, creating new one")
+                    session_id = None  # Force creation of new session
             except Exception as e:
-                logger.warning(f"Error checking session: {e}, creating new one")
+                print(f"    ⚠️  Error checking session: {e}, creating new one")
                 session_id = None
         
-        # Create session if needed
+        # Create session if needed (first message or invalid session_id)
         if not session_id:
             title = question[:50] if len(question) > 50 else question
-            logger.info(f"Creating new session: {title}")
+            print(f"    Creating new session: {title}")
             session = await chat_service.create_session(
                 user_id=UUID(effective_user_id),
                 title=title,
                 language=language
             )
             session_id = str(session.id)
-            logger.info(f"Session created: {session_id}")
+            print(f"    ✅ Session created: {session_id}")
         
         # Save user message
+        print(f"    Saving user message...")
         user_msg = await chat_service.add_message(
             session_id=UUID(session_id),
             user_id=UUID(effective_user_id),
@@ -1126,8 +1408,10 @@ async def save_chat_interaction(
             metadata={}
         )
         user_message_id = str(user_msg.id)
+        print(f"    ✅ User message saved: {user_message_id}")
         
         # Save assistant message
+        print(f"    Saving assistant message...")
         assistant_msg = await chat_service.add_message(
             session_id=UUID(session_id),
             user_id=UUID(effective_user_id),
@@ -1136,259 +1420,67 @@ async def save_chat_interaction(
             metadata=metadata or {}
         )
         assistant_message_id = str(assistant_msg.id)
-        logger.info("Chat history saved successfully")
+        print(f"    ✅ Assistant message saved: {assistant_message_id}")
+        print(f"💾 Chat history saved successfully!")
         
         return (session_id, user_message_id, assistant_message_id)
         
     except Exception as e:
-        logger.error(f"Failed to save chat history: {e}", exc_info=True)
+        import traceback
+        print(f"⚠️  Failed to save chat history: {e}")
+        print(f"    Traceback: {traceback.format_exc()}")
         return (session_id, None, None)
 
 
-def create_security_report(input_validation: Dict, output_validation: Dict = None) -> SecurityReport:
-    """Create comprehensive security report"""
-    security_score = input_validation.get("security_score", 1.0)
-    issues = input_validation.get("issues", [])
-    
-    if output_validation:
-        output_issues = output_validation.get("issues", [])
-        issues.extend(output_issues)
-        # Average the scores
-        output_score = output_validation.get("security_score", 1.0)
-        security_score = (security_score + output_score) / 2
-    
-    if security_score >= 0.9:
-        security_level = "HIGH"
-    elif security_score >= 0.7:
-        security_level = "MEDIUM"
-    else:
-        security_level = "LOW"
-    
-    recommendations = []
-    if issues:
-        recommendations.append("Review input/output for security issues")
-    if security_score < 0.7:
-        recommendations.append("Exercise caution with this interaction")
-    
-    return SecurityReport(
-        security_score=security_score,
-        security_level=security_level,
-        issues_detected=len(issues),
-        issues=issues,
-        recommendations=recommendations,
-        timestamp=datetime.now().isoformat(),
-        guardrails_enabled=guardrails_instance is not None
-    )
-
-
-# ============================================================================
-# LAWYER SYSTEM PROMPT (Keep existing comprehensive prompt)
-# ============================================================================
-
-# Lawyer prompts are now imported from config/system_prompts.py
-
-
-def determine_query_complexity(question: str, context: str) -> tuple[bool, int]:
-    """Determine if query is complex and appropriate token limit"""
-    # Simple query indicators
-    simple_indicators = [
-        'what is', 'ano ang', 'define', 'definition', 'meaning', 'kahulugan',
-        'how much', 'magkano', 'when', 'kailan', 'where', 'saan'
-    ]
-    
-    # Complex query indicators
-    complex_indicators = [
-        'analyze', 'compare', 'difference', 'pagkakaiba', 'relationship', 'ugnayan',
-        'procedure', 'process', 'pamamaraan', 'requirements', 'kailangan',
-        'elements', 'sangkap', 'grounds', 'batayan', 'remedies', 'lunas'
-    ]
-    
-    question_lower = question.lower()
-    
-    # Check for simple patterns
-    is_simple = any(indicator in question_lower for indicator in simple_indicators)
-    
-    # Check for complex patterns
-    is_complex = any(indicator in question_lower for indicator in complex_indicators)
-    
-    # Additional complexity factors
-    has_multiple_questions = question.count('?') > 1
-    is_long_query = len(question) > 200
-    has_rich_context = len(context) > 2000
-    
-    # Determine complexity and token limit
-    if is_simple and not (has_multiple_questions or is_long_query):
-        return False, 1000  # Simple: 800-1200 tokens
-    elif is_complex or has_multiple_questions or is_long_query or has_rich_context:
-        return True, 2000   # Complex: 1500-2000 tokens
-    else:
-        return False, 1500  # Medium: 1200-1500 tokens
-
-
-def generate_lawyer_answer(
-    question: str, context: str, history: List[Dict[str, str]], language: str,
-    include_cross_references: bool, max_tokens: int = 2500
-) -> tuple[str, str, str, List[str]]:
-    """Generate comprehensive legal research analysis for lawyers with adaptive length"""
-    
-    # Determine query complexity and appropriate token limit
-    is_complex, adaptive_tokens = determine_query_complexity(question, context)
-    
-    # Use adaptive token limit instead of fixed max_tokens
-    effective_max_tokens = min(adaptive_tokens, max_tokens)
-    
-    # Select appropriate system prompt based on language
-    if language == "tagalog" or language == "taglish":
-        system_prompt = LAWYER_TAGALOG_SYSTEM_PROMPT
-        if is_complex:
-            lang_note = (
-                "MANDATORY: Sumagot sa pormal na Tagalog na angkop para sa mga abogado. "
-                "Gumamit ng comprehensive analysis para sa komplikadong query na ito. "
-                "Magbigay ng detalyadong statutory interpretation at cross-references. "
-                "CRITICAL: HUWAG gumamit ng markdown headers (####, ###, ##, #). Gamitin ang **bold** format: **1.** **Title**: Content"
-            )
-        else:
-            lang_note = (
-                "MANDATORY: Sumagot sa pormal na Tagalog na angkop para sa mga abogado. "
-                "Gumamit ng concise pero comprehensive na sagot para sa simpleng query na ito. "
-                "Focus sa direct statutory provision at clear explanation. "
-                "CRITICAL: HUWAG gumamit ng markdown headers (####, ###, ##, #). Gamitin ang **bold** format: **1.** **Title**: Content"
-            )
-        fallback_msg = "Kulang ang impormasyon sa database para sa comprehensive analysis. Inirerekomenda ang konsultasyon sa specialized legal resources."
-    else:
-        system_prompt = LAWYER_ENGLISH_SYSTEM_PROMPT
-        if is_complex:
-            lang_note = (
-                "MANDATORY: Respond in formal legal English appropriate for lawyers. "
-                "Provide comprehensive analysis for this complex query. "
-                "Include detailed statutory interpretation and cross-references. "
-                "CRITICAL: NEVER use markdown headers (####, ###, ##, #). Use **bold** format: **1.** **Title**: Content"
-            )
-        else:
-            lang_note = (
-                "MANDATORY: Respond in formal legal English appropriate for lawyers. "
-                "Provide concise but comprehensive answer for this straightforward query. "
-                "Focus on direct statutory provision and clear explanation. "
-                "CRITICAL: NEVER use markdown headers (####, ###, ##, #). Use **bold** format: **1.** **Title**: Content"
-            )
-        fallback_msg = "Insufficient information in database for comprehensive analysis. Recommend consultation with specialized legal resources."
-
-    user_msg = f"""Legal Research Query: {question}
-
-Statutory Context from Database:
-{context}
-
-🚨 ULTRA-STRICT MODE ACTIVE:
-- ONLY use information from the above Statutory Context
-- NEVER cite articles not explicitly mentioned above
-- NEVER create or invent any legal provisions
-- NEVER use general legal knowledge
-- If information is missing, state "Not available in current database"
-
-📱 CRITICAL FORMATTING REQUIREMENTS:
-- ABSOLUTELY FORBIDDEN: Using markdown headers (####, ###, ##, #)
-- MANDATORY: Use **bold text** for section titles and numbers
-- MANDATORY: Format as **1.** **Title**: Content (not ### 1. Title)
-- MANDATORY: Use plain text section titles, not markdown headers
-
-{lang_note}
-Target length: {'Comprehensive analysis' if is_complex else 'Focused response'} (~{effective_max_tokens} tokens)
-Provide legal research analysis EXCLUSIVELY from the provided context above. Do NOT add any information not explicitly stated in the context."""
-
-    messages = [{"role": "system", "content": system_prompt}]
-    messages += history[-8:]  # More context for lawyers
-    messages.append({"role": "user", "content": user_msg})
-
-    try:
-        response = openai_client.chat.completions.create(
-            model=CHAT_MODEL,
-            messages=messages,
-            temperature=0.1,  # Very low for precise legal analysis
-            max_tokens=effective_max_tokens,  # Adaptive based on complexity
-            top_p=0.85,
-            presence_penalty=0.0,
-            frequency_penalty=0.0,
-            timeout=60.0
-        )
-
-        answer = response.choices[0].message.content.strip()
-        
-        # Post-process to fix any remaining markdown headers
-        answer = fix_markdown_headers(answer)
-        
-        # Comprehensive validation - both quality and context adherence
-        is_valid_quality, quality_reason = validate_response_quality(answer)
-        is_valid_context, context_reason = validate_context_adherence(answer, context)
-        
-        if not is_valid_quality:
-            logger.error(f"Response quality validation failed: {quality_reason}")
-            return fallback_msg, "low", "Response failed safety validation", []
-        
-        if not is_valid_context:
-            logger.error(f"Response context validation failed: {context_reason}")
-            return fallback_msg, "low", "Response failed context validation - potential hallucination detected", []
-        
-        confidence = "high" if response.choices[0].finish_reason == "stop" else "medium"
-        
-        # Extract related provisions with better parsing
-        related = []
-        for line in answer.splitlines():
-            if any(keyword in line for keyword in ["Article", "Section", "Artikulo", "Seksyon"]):
-                related.append(line.strip())
-                if len(related) >= 5:
-                    break
-
-        analysis_type = "Professional legal research analysis" if language == "english" else "Propesyonal na legal research analysis"
-        return answer, confidence, analysis_type, related
-        
-    except Exception as e:
-        logger.error(f"Error generating lawyer answer: {e}")
-        return fallback_msg, "low", "Error in response generation", []
-
-
-# ============================================================================
-# MAIN API ENDPOINT
-# ============================================================================
-
-@router.post("/ask", response_model=LawyerChatResponse)
-async def ask_legal_question_lawyer(
-    request: LawyerChatRequest,
+@router.post("/ask", response_model=ChatResponse)
+async def ask_legal_question(
+    request: ChatRequest,
     chat_service: ChatHistoryService = Depends(get_chat_history_service),
     current_user: Optional[dict] = Depends(get_optional_current_user)
 ):
     """
-    Enhanced lawyer chatbot endpoint with comprehensive features
+    Main endpoint for legal practitioners to submit research interrogatories 
+    regarding Philippine law.
     
-    NEW FEATURES FROM USER CHBOT:
-    - ✅ Toxic content detection
-    - ✅ Prohibited pattern detection
-    - ✅ Out-of-scope topic detection
-    - ✅ Personal advice detection
-    - ✅ Complex query detection
-    - ✅ Query normalization
-    - ✅ Chat history integration
-    - ✅ Session management
-    - ✅ Guardrails AI validation
-    - ✅ Enhanced error handling
+    Features:
+    -   **Advanced RAG**: Retrieves relevant statutory provisions and controlling 
+        jurisprudence from a curated vector corpus.
+    -   **Doctrinal Analysis**: Synthesizes retrieved context to provide nuanced 
+        answers to complex legal questions.
+    -   **Precise Citations**: Returns source-grounded responses with exact citations 
+        (G.R. numbers, Republic Act articles, etc.).
+    -   **Contextual Awareness**: Maintains conversational context for follow-up 
+        interrogatories.
+    -   **Security & Validation**: Integrates Guardrails AI for input validation and 
+        to prevent hallucination or extra-judicial advice.
     
-    ORIGINAL FEATURES:
-    - Formal legalese responses
-    - Comprehensive statutory citations
-    - LawPhil source links
-    - Professional tone
+    Example request:
+    {
+        "question": "Delineate the requisites for a valid extrajudicial foreclosure of a 
+                      real estate mortgage under Act No. 3135, as amended.",
+        "conversation_history": [
+            {"role": "user", "content": "What is a real estate mortgage?"},
+            {"role": "assistant", "content": "I. PRELIMINARY STATEMENT..."}
+        ],
+        "max_tokens": 1500,
+        "session_id": "optional-uuid-for-existing-session"
+    }
     """
+    # Production: Track request start time for monitoring
     request_start_time = datetime.now()
     
-    # Extract user_id
+    # Extract user_id from authentication if available
     authenticated_user_id = None
     if current_user and "user" in current_user:
         authenticated_user_id = current_user["user"]["id"]
     
+    # Use authenticated user_id, fallback to request.user_id for backward compatibility
     effective_user_id = authenticated_user_id or request.user_id
     
-    logger.info(f"Lawyer request - user_id={effective_user_id}, session_id={request.session_id}, question_length={len(request.question)}")
+    # Production logging with request ID for tracing
+    logger.info(f"Request received - user_id={effective_user_id}, session_id={request.session_id}, question_length={len(request.question)}")
     
-    # Input validation
+    # Production: Input validation
     if not request.question or not request.question.strip():
         logger.warning("Empty question received")
         raise HTTPException(status_code=400, detail="Question cannot be empty")
@@ -1401,35 +1493,42 @@ async def ask_legal_question_lawyer(
         # === GUARDRAILS INPUT VALIDATION ===
         if guardrails_instance:
             try:
-                logger.info("Validating input with Guardrails AI...")
+                print(f"\n🔒 Validating user input with Guardrails AI...")
                 input_validation_result = guardrails_instance.validate_input(request.question)
                 
                 if not input_validation_result.get('is_valid', True):
+                    # Input failed validation - return error
                     error_message = input_validation_result.get('error', 'Input validation failed')
-                    logger.error(f"Input validation failed: {error_message}")
+                    print(f"❌ Input validation failed: {error_message}")
                     
-                    security_report = create_security_report(input_validation_result)
-                    
-                    return LawyerChatResponse(
+                    return create_chat_response(
                         answer=error_message,
-                        sources=[],
-                        confidence="low",
-                        language="english",
-                        security_report=security_report
+                        simplified_summary="Input blocked by security validation",
+                        security_report={
+                            "security_score": 0.0,
+                            "security_level": "BLOCKED",
+                            "issues_detected": 1,
+                            "issues": [error_message],
+                            "guardrails_enabled": True
+                        }
                     )
                 else:
+                    print(f"✅ Input validation passed")
+                    # Use cleaned input if available
                     if 'cleaned_input' in input_validation_result:
                         request.question = input_validation_result['cleaned_input']
             except Exception as e:
-                logger.warning(f"Guardrails input validation error: {e}")
+                print(f"⚠️  Guardrails input validation error: {e}")
+                # Continue without Guardrails if it fails
         
-        # Check if greeting
-        if is_simple_greeting(request.question):
-            logger.info(f"Detected as greeting: {request.question}")
+        # Check if query is a simple greeting BEFORE validation
+        if request.question and is_simple_greeting(request.question):
+            print(f"✅ Detected as greeting: {request.question}")
+            # Generate intelligent greeting response using AI
             language = detect_language(request.question)
             greeting_response = generate_ai_response(request.question, language, 'greeting')
             
-            # Save greeting interaction
+            # Save greeting interaction to chat history
             session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
                 chat_service=chat_service,
                 effective_user_id=effective_user_id,
@@ -1440,33 +1539,34 @@ async def ask_legal_question_lawyer(
                 metadata={"type": "greeting"}
             )
             
-            return LawyerChatResponse(
+            return create_chat_response(
                 answer=greeting_response,
-                sources=[],
-                confidence="high",
-                language=language,
+                simplified_summary="Intelligent greeting response",
                 session_id=session_id,
                 message_id=assistant_msg_id,
                 user_message_id=user_msg_id
             )
         
-        # Check for toxic content
+        # Basic validation - only check if question exists and isn't empty
+        if not request.question or not request.question.strip():
+            raise HTTPException(status_code=400, detail="Question cannot be empty.")
+        
+        # Check for toxic content first
         is_toxic, toxic_reason = detect_toxic_content(request.question)
         if is_toxic:
+            # Return a polite response instead of raising an error
             language = detect_language(request.question)
-            if language in ["tagalog", "taglish"]:
-                polite_response = "Naiintindihan ko na baka frustrated kayo, pero inaasahan ang propesyonal na diskurso. Pakiusap, muling sabihin ang inyong tanong nang may respeto."
+            if language == "tagalog":
+                polite_response = "Naiintindihan ko na baka frustrated ka, pero nandito ako para magbigay ng helpful legal information. Pakiusap, magtanong nang may respeto, at masayang tutulungan kita. 😊"
             else:
-                polite_response = "Professional discourse is expected. Please rephrase your question respectfully."
+                polite_response = "I understand you may be frustrated, but I'm here to provide helpful legal information. Please rephrase your question in a respectful manner, and I'll be happy to assist you. 😊"
             
-            return LawyerChatResponse(
+            return create_chat_response(
                 answer=polite_response,
-                sources=[],
-                confidence="low",
-                language=language
+                simplified_summary="Toxic content detected - polite redirection"
             )
         
-        # Check for prohibited input
+        # Check for prohibited input (misuse prevention) - keep this for safety
         is_prohibited, prohibition_reason = detect_prohibited_input(request.question)
         if is_prohibited:
             raise HTTPException(status_code=400, detail=prohibition_reason)
@@ -1492,120 +1592,121 @@ async def ask_legal_question_lawyer(
                     "'How do I file a complaint for unfair labor practice?'"
                 )
             
-            return LawyerChatResponse(
+            return create_chat_response(
                 answer=clarification_response,
-                sources=[],
-                confidence="low",
-                language=language,
-                fallback_suggestions=get_fallback_suggestions(language, is_complex=False, suggestion_type="general")
+                simplified_summary="Unclear input - requesting clarification"
             )
         
-        # Detect language with debug logging
-        explicit_pref = detect_explicit_language_preference(request.question)
+        # Detect language
         language = detect_language(request.question)
         
-        if explicit_pref != "auto":
-            logger.info(f"Explicit language preference detected: {explicit_pref} for query: {request.question[:50]}...")
-        else:
-            logger.info(f"Auto-detected language: {language} for query: {request.question[:50]}...")
-        
-        # Enhanced personal advice detection with professional guidance
-        if is_personal_advice_question(request.question):
-            if language in ["tagalog", "taglish"]:
-                advice_response = (
-                    "Bilang legal research tool, nagbibigay lamang ako ng statutory analysis at legal framework information. "
-                    "Hindi ako makakapagbigay ng strategic legal advice, case assessment, o personalized recommendations. "
-                    "Para sa client-specific legal strategy, case evaluation, at tactical decisions, "
-                    "kinakailangan ang direct consultation sa senior counsel na may expertise sa relevant practice area."
-                )
-            else:
-                advice_response = (
-                    "As a legal research tool, I provide only statutory analysis and legal framework information. "
-                    "I cannot provide strategic legal advice, case assessment, or personalized recommendations. "
-                    "For client-specific legal strategy, case evaluation, and tactical decisions, "
-                    "direct consultation with senior counsel having expertise in the relevant practice area is required."
-                )
+        # === MODIFICATION: Check for 'unsupported' language ===
+        # This replaces the old check for `not in ["english", "tagalog", "taglish"]`
+        if language == "unsupported":
+            logger.warning(f"Unsupported language detected for query: {request.question[:50]}...")
+            # Return a formal, legalese-style unsupported message
+            unsupported_response = (
+                "I. PRELIMINARY STATEMENT\n"
+                "This Counsel acknowledges receipt of your query.\n\n"
+                "II. ANALYSIS\n"
+                "Upon review, the query presented is rendered in a linguistic format (language) that falls outside the operational parameters of this legal analytical service. This service is constrained to processing and analyzing legal interrogatories propounded in either **English** or **Filipino**.\n\n"
+                "III. CONCLUSIVE OPINION\n"
+                "Regrettably, no substantive analysis can be furnished. You are respectfully advised to re-submit your query in one of the supported languages (English or Filipino) to facilitate proper processing and legal assessment."
+            )
             
-            enhanced_fallbacks = get_fallback_suggestions(language, is_complex=True, suggestion_type="personal_advice")
-            
-            return LawyerChatResponse(
-                answer=advice_response,
-                sources=[],
-                confidence="medium",
-                language=language,
-                fallback_suggestions=enhanced_fallbacks
+            return create_chat_response(
+                answer=unsupported_response,
+                simplified_summary="Language not supported. Advised user to use English or Filipino.",
+                confidence="low"
             )
         
-        # Check for out-of-scope topics
+        # 🔒 CHECK FOR PERSONAL ADVICE QUESTIONS (even if they contain legal keywords)
+        if is_personal_advice_question(request.question):
+            # This is asking for personal advice/opinion, not legal information
+            if language == "tagalog":
+                personal_advice_response = (
+                    "Naiintindihan ko na kailangan mo ng tulong sa desisyon mo, pero hindi ako makakapagbigay ng personal na legal advice tungkol sa kung ano ang dapat mong gawin sa iyong specific na sitwasyon. "
+                    "Para sa ganitong mga tanong, kailangan mo ng konsultasyon sa isang lisensyadong abogado na makakapag-review ng lahat ng detalye ng iyong kaso."
+                )
+            else:
+                personal_advice_response = (
+                    "I understand you need help with a decision, but I cannot provide personal legal advice about what you should do in your specific situation. "
+                    "For questions like this, you need a consultation with a licensed lawyer who can review all the details of your case."
+                )
+            
+            return create_chat_response(
+                answer=personal_advice_response,
+                simplified_summary="Personal advice question - requires lawyer consultation",
+            )
+        
+        # Check if question is about out-of-scope topics (politics, finance, medicine, etc.)
         is_out_of_scope, topic_type = is_out_of_scope_topic(request.question)
         if is_out_of_scope:
-            if language in ["tagalog", "taglish"]:
-                out_of_scope_response = (
-                    f"Ang tanong na ito ay tungkol sa {topic_type} topics na nasa labas ng aking legal research scope. "
-                    "Makakapag-provide lamang ako ng statutory analysis para sa Civil, Criminal, Consumer, Family, at Labor Law. "
-                    "Para sa {topic_type} matters, inirerekomenda ang konsultasyon sa appropriate specialists."
-                )
-            else:
-                out_of_scope_response = (
-                    f"This query pertains to {topic_type} matters outside my legal research scope. "
-                    "I can only provide statutory analysis for Civil, Criminal, Consumer, Family, and Labor Law. "
-                    f"For {topic_type} matters, consultation with appropriate specialists is recommended."
-                )
+            # Generate natural, varied decline response using AI
+            out_of_scope_response = generate_ai_response(
+                request.question, 
+                detect_language(request.question),
+                'out_of_scope',
+                topic_type
+            )
             
-            return LawyerChatResponse(
+            return create_chat_response(
                 answer=out_of_scope_response,
-                sources=[],
-                confidence="medium",
-                language=language,
-                fallback_suggestions=get_fallback_suggestions(language, is_complex=False, suggestion_type="general")
+                simplified_summary="Out of scope topic blocked"
             )
         
-        # Normalize query if needed (for better search results)
-        normalized_question = normalize_emotional_query(request.question, language)
-        
-        # Retrieve legal context
-        context, sources = retrieve_relevant_context(normalized_question, TOP_K_RESULTS)
-        
-        if not sources:
-            # Enhanced fallback with explicit instructions for lawyers
-            logger.warning(f"No context found for query, likely outside of the 5 legal domains: {normalized_question[:100]}")
+        # Check if this is actually a legal question or just casual conversation
+        if not is_legal_question(request.question):
+            # For casual, friendly, or unrelated messages, generate intelligent response using AI
+            casual_response = generate_ai_response(request.question, detect_language(request.question), 'casual')
             
-            if language == "english":
-                out_of_domain_msg = (
-                    "Insufficient statutory context available in database for this legal research query. "
-                    "My research scope is limited to codified provisions in Civil, Criminal, Family, Consumer, and Labor law. "
-                    "For comprehensive analysis of this topic, consultation with specialized legal databases, "
-                    "jurisprudential research, or subject matter experts may be necessary."
-                )
-            else: # tagalog or taglish
-                out_of_domain_msg = (
-                    "Kulang ang statutory context na available sa database para sa legal research query na ito. "
-                    "Ang aking research scope ay limitado sa codified provisions sa Civil, Criminal, Family, Consumer, at Labor law. "
-                    "Para sa comprehensive analysis ng topic na ito, maaaring kailangan ang konsultasyon sa specialized legal databases, "
-                    "jurisprudential research, o subject matter experts."
-                )
-
-            fallback_suggestions = get_fallback_suggestions(language, is_complex=True, suggestion_type="insufficient_context")
-
-            return LawyerChatResponse(
-                answer=out_of_domain_msg,
-                sources=[],
-                confidence="low",
+            # Save casual interaction to chat history
+            session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                chat_service=chat_service,
+                effective_user_id=effective_user_id,
+                session_id=request.session_id,
+                question=request.question,
+                answer=casual_response,
                 language=language,
-                legal_analysis="Insufficient statutory context in database",
-                fallback_suggestions=fallback_suggestions
+                metadata={"type": "casual"}
+            )
+            
+            return create_chat_response(
+                answer=casual_response,
+                simplified_summary="Intelligent casual response",
+                session_id=session_id,
+                message_id=assistant_msg_id,
+                user_message_id=user_msg_id
+            )
+
+        # For legal questions, search Qdrant directly (like test_chatbot.py)
+        context, sources = retrieve_relevant_context(request.question, TOP_K_RESULTS)
+        
+        # Check if we have sufficient context
+        if not sources or len(sources) == 0:
+            # No relevant sources found
+            no_context_message = (
+                "I apologize, but I don't have enough information in my database to answer this question accurately. "
+                "I recommend consulting with a licensed Philippine lawyer for assistance."
+                if language == "english" else
+                "Paumanhin po, pero wala akong sapat na impormasyon sa aking database para masagot ito nang tama. "
+                "Inirerekomenda ko pong kumonsulta sa lisensyadong abogado para sa tulong."
+            )
+            
+            return create_chat_response(
+                answer=no_context_message,
+                simplified_summary="No relevant legal information found in database",
             )
         
-        # Generate answer using OpenAI with language confirmation
-        logger.info(f"Generating answer in {language} language")
-        ans, conf, analysis, related = generate_lawyer_answer(
-            normalized_question, context, history, language, 
-            request.include_cross_references, request.max_tokens
-        )
+        # Detect if query is complex (requires multiple legal domains or personal advice)
+        is_complex = is_complex_query(request.question)
         
-        # Calculate confidence
+        # Calculate confidence based on source relevance scores
         if sources and len(sources) > 0:
+            # Get average relevance score from top sources
             avg_score = sum(src.get('relevance_score', 0.0) for src in sources[:3]) / min(3, len(sources))
+            
+            # Convert to confidence level
             if avg_score >= 0.7:
                 confidence = "high"
             elif avg_score >= 0.5:
@@ -1613,60 +1714,138 @@ async def ask_legal_question_lawyer(
             else:
                 confidence = "low"
         else:
-            confidence = "low"
+            # No sources found - using general knowledge
+            confidence = "medium"
         
-        # Guardrails output validation (if available)
-        if GUARDRAILS_AVAILABLE and guardrails_instance:
+        # Generate answer with proper complexity detection
+        answer, _, simplified_summary = generate_answer(
+            request.question,
+            context,
+            request.conversation_history, # <-- This provides context awareness
+            language,
+            request.max_tokens, # <-- This passes the new 1500 default
+            is_complex=is_complex  # Use actual complexity detection for production
+        )
+        
+        # 🔒 FINAL SAFETY CHECK: Verify the answer doesn't accidentally discuss out-of-scope topics
+        # This is a last-resort check in case the AI tries to answer non-legal questions
+        # Industry standard: Use context-aware checking to avoid false positives
+        answer_lower = answer.lower()
+        
+        # Only check if the answer is PRIMARILY about out-of-scope topics
+        # Use stricter patterns to avoid false positives (e.g., "consumer" vs "consumer rights")
+        out_of_scope_indicators = [
+            # Political indicators - only if discussing politics, not legal aspects
+            ('political', [
+                'vote for', 'who to vote', 'election campaign', 'political party platform',
+                'support this candidate', 'marcos vs', 'duterte policy'
+            ]),
+            # Financial indicators - only investment advice, not consumer protection
+            ('financial', [
+                'invest in', 'buy stocks', 'trade crypto', 'investment strategy',
+                'portfolio allocation', 'financial planning advice'
+            ]),
+            # Medical indicators - only medical advice, not medical malpractice law
+            ('medical', [
+                'take this medicine', 'medical diagnosis', 'treatment recommendation',
+                'you should see a doctor for', 'health advice'
+            ]),
+        ]
+        
+        # Count matches to determine if answer is PRIMARILY out of scope
+        out_of_scope_matches = 0
+        detected_topic = None
+        
+        for topic_type, keywords in out_of_scope_indicators:
+            matches = sum(1 for keyword in keywords if keyword in answer_lower)
+            if matches >= 2:  # Need at least 2 matches to be considered out of scope
+                out_of_scope_matches = matches
+                detected_topic = topic_type
+                break
+        
+        if out_of_scope_matches >= 2 and detected_topic:
+            # Answer is PRIMARILY about out-of-scope content - block it
+            logger.warning(f"Safety check triggered: Answer contains {detected_topic} content")
+            logger.warning(f"Question: {request.question}")
+            logger.warning(f"Matches: {out_of_scope_matches}")
+            
+            print(f"⚠️  SAFETY CHECK TRIGGERED: Answer contains {detected_topic} content")
+            print(f"    Question: {request.question}")
+            print(f"    Matches: {out_of_scope_matches}")
+            
+            # Return decline response instead
+            decline_response = generate_ai_response(
+                request.question,
+                language,
+                'out_of_scope',
+                detected_topic
+            )
+            
+            return create_chat_response(
+                answer=decline_response,
+                simplified_summary=f"Safety check blocked {detected_topic} content"
+            )
+        
+        # Format sources for response with URLs (simplified)
+        source_citations = [
+            SourceCitation(
+                source=src['source'],
+                law=src['law'],
+                article_number=src['article_number'],
+                article_title=src['article_title'],
+                text_preview=src['text_preview'],
+                source_url=src.get('source_url', ''),
+                relevance_score=src.get('relevance_score', 0.0)
+            )
+            for src in sources
+        ]
+        
+        # === GUARDRAILS OUTPUT VALIDATION ===
+        if guardrails_instance:
             try:
+                print(f"\n🔒 Validating AI output with Guardrails AI...")
                 output_validation_result = guardrails_instance.validate_output(
-                    response=ans,
+                    response=answer,
                     context=context
                 )
                 
                 if not output_validation_result.get('is_valid', True):
+                    # Output failed validation - return error
                     error_message = output_validation_result.get('error', 'Output validation failed')
-                    logger.error(f"Output validation failed: {error_message}")
+                    print(f"❌ Output validation failed: {error_message}")
                     
-                    security_report = create_security_report(input_validation_result or {}, output_validation_result)
-                    
-                    return LawyerChatResponse(
-                        answer="I apologize, but I cannot provide a response that meets our safety standards. Please rephrase your question.",
-                        sources=[],
-                        confidence="low",
-                        language=language,
-                        security_report=security_report,
-                        fallback_suggestions=get_fallback_suggestions(language, is_complex=True, suggestion_type="general")
+                    return create_chat_response(
+                        answer="I apologize, but I cannot provide a response that meets our safety standards. Please rephrase your question or consult with a licensed lawyer.",
+                        simplified_summary="Output blocked by security validation",
+                        security_report={
+                            "security_score": 0.0,
+                            "security_level": "BLOCKED",
+                            "issues_detected": 1,
+                            "issues": [error_message],
+                            "guardrails_enabled": True
+                        }
                     )
                 else:
+                    print(f"✅ Output validation passed")
+                    # Use cleaned output if available
                     if 'cleaned_output' in output_validation_result:
-                        ans = output_validation_result['cleaned_output']
+                        answer = output_validation_result['cleaned_output']
             except Exception as e:
-                logger.warning(f"Guardrails output validation error: {e}")
-        
-        # Create source citations
-        citations = [
-            SourceCitation(
-                source=s["source"],
-                law=s["law"],
-                article_number=s["article_number"],
-                article_title=s["article_title"],
-                text_preview=s["text_preview"],
-                relevance_score=s["relevance_score"],
-                lawphil_link=s["lawphil_link"]
-            )
-            for s in sources
-        ]
+                print(f"⚠️  Guardrails output validation error: {e}")
+                # Continue without Guardrails if it fails
         
         # Generate security report
         security_report = None
-        if input_validation_result or output_validation_result:
-            security_report = create_security_report(
-                input_validation_result or {},
-                output_validation_result or {}
-            )
+        if guardrails_instance and (input_validation_result or output_validation_result):
+            try:
+                security_report = guardrails_instance.get_security_report(
+                    input_validation_result or {},
+                    output_validation_result or {}
+                )
+            except Exception as e:
+                print(f"⚠️  Failed to generate security report: {e}")
         
-        # Get fallback suggestions for complex queries
-        fallback_suggestions = get_fallback_suggestions(language, is_complex=True) if is_complex else None
+        
         
         # === SAVE TO CHAT HISTORY ===
         session_id, user_message_id, assistant_message_id = await save_chat_interaction(
@@ -1674,54 +1853,50 @@ async def ask_legal_question_lawyer(
             effective_user_id=effective_user_id,
             session_id=request.session_id,
             question=request.question,
-            answer=ans,
+            answer=answer,
             language=language,
             metadata={
-                "sources": [src.model_dump() for src in citations],
-                "confidence": conf,
-                "legal_analysis": analysis,
-                "related_provisions": related
+                "sources": [src.dict() for src in source_citations],
+                "confidence": confidence,
+                "simplified_summary": simplified_summary
             }
         )
         
-        # Log completion
+        # Production: Log request completion time for monitoring
         request_duration = (datetime.now() - request_start_time).total_seconds()
-        logger.info(f"Lawyer request completed in {request_duration:.2f}s - confidence={conf}, sources={len(citations)}")
+        logger.info(f"Request completed in {request_duration:.2f}s - confidence={confidence}, sources={len(source_citations)}")
         
-        return LawyerChatResponse(
-            answer=ans,
-            sources=citations,
-            confidence=conf,
-            language=language,
-            legal_analysis=analysis,
-            related_provisions=related,
+        return create_chat_response(
+            answer=answer,
+            sources=source_citations,
+            confidence=confidence,
+            simplified_summary=simplified_summary,
             security_report=security_report,
-            fallback_suggestions=fallback_suggestions,
             session_id=session_id,
             message_id=assistant_message_id,
             user_message_id=user_message_id
         )
         
-    except HTTPException:
+    except HTTPException as he:
+        # Re-raise HTTP exceptions as-is
+        logger.warning(f"HTTP exception: {he.status_code} - {he.detail}")
         raise
     except Exception as e:
+        # Production: Log unexpected errors with full context
         request_duration = (datetime.now() - request_start_time).total_seconds()
         logger.error(f"Unexpected error after {request_duration:.2f}s: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=500,
+            status_code=500, 
             detail="An unexpected error occurred while processing your question. Please try again."
         )
 
 
-# ============================================================================
-# HEALTH CHECK
-# ============================================================================
-
 @router.get("/health")
 async def health_check():
-    """Check if the lawyer chatbot service is running"""
+    """Check if the chatbot service for legal practitioners is running"""
     try:
-        info = qdrant_client.get_collection(collection_name=COLLECTION_NAME)
+        collection_info = qdrant_client.get_collection(collection_name=COLLECTION_NAME)
+        count = collection_info.points_count
         
         # Check Guardrails status
         guardrails_status = {
@@ -1731,6 +1906,7 @@ async def health_check():
         
         if guardrails_instance:
             try:
+                # Get list of active validators
                 validators = []
                 if hasattr(guardrails_instance, 'input_validators'):
                     validators.extend([v.__class__.__name__ for v in guardrails_instance.input_validators])
@@ -1740,59 +1916,27 @@ async def health_check():
             except:
                 guardrails_status["validators"] = []
         
-        # Verify data sources from Qdrant
-        sample_search = qdrant_client.search(
-            collection_name=COLLECTION_NAME,
-            query_vector=[0.1] * 1536,  # Dummy vector for sampling
-            limit=3
-        )
-        
-        data_sources = []
-        for result in sample_search:
-            if result.payload:
-                law_name = result.payload.get('law', 'Unknown')
-                if law_name not in data_sources:
-                    data_sources.append(law_name)
-        
         return {
             "status": "healthy",
-            "service": "Ai.ttorney Legal Chatbot - Lawyers",
-            "description": "ULTRA-STRICT MODE: Dataset-only legal analysis preventing AI hallucination",
+            "service": "Ai.ttorney Legal Practice API - Practitioner Module",
+            "description": "Advanced RAG endpoint for statutory analysis and jurisprudential research.",
+            "database": "Qdrant Cloud",
+            "documents": count,
             "model": CHAT_MODEL,
-            "documents": info.points_count,
-            "verified_data_sources": data_sources[:5],  # Show sample of actual data sources
+            "embedding_model": EMBEDDING_MODEL,
+            "languages": ["English", "Tagalog", "Taglish"],
             "features": [
-                "✅ Formal legalese responses",
-                "✅ Comprehensive statutory citations",
-                "✅ LawPhil source links",
-                "✅ Bilingual support (English/Tagalog/Taglish)",
-                "✅ ULTRA-STRICT MODE: Dataset-only responses",
-                "✅ Anti-hallucination validation (prevents fake articles)",
-                "✅ Context adherence verification",
-                "✅ Enhanced Tagalog language detection",
-                "✅ Explicit language preference override",
-                "✅ Mobile-friendly formatting (auto-fixes markdown headers)",
-                "✅ Adaptive response length control",
-                "✅ Guardrails AI security validation" if guardrails_instance else "✅ Basic security validation",
-                "✅ Toxic content detection",
-                "✅ Out-of-scope topic filtering",
-                "✅ Personal advice detection",
-                "✅ Complex query handling",
-                "✅ Chat history integration",
-                "✅ Session management",
-                "✅ Query normalization",
-                "✅ Response quality validation",
-                "✅ Greeting detection",
-                "✅ No Supreme Court cases (codified law only)",
-                "✅ Structured legal memorandum format"
+                "Doctrinal analysis and synthesis",
+                "Jurisprudential and statutory citations",
+                "Handles complex, multi-part hypotheticals",
+                "Context-aware follow-up queries",
+                "Guardrails AI security validation" if guardrails_instance else "Basic security validation"
             ],
             "security": guardrails_status,
-            "target_audience": "Lawyers, judges, and legal professionals",
-            "response_style": "Formal legal memorandum (Dataset-only, No Hallucination)",
-            "language_features": "Auto-detection + Explicit preference override (e.g., 'answer in english')",
-            "data_source": "Webscrape datasets of Philippine legal codes only",
-            "anti_hallucination": "ULTRA-STRICT MODE prevents citing non-existent articles",
-            "enhancements": "Dataset-only responses with anti-hallucination + auto-formatting for mobile"
+            "target_audience": "Members of the Philippine Bar"
         }
     except Exception as e:
-        return {"status": "unhealthy", "error": str(e)}
+        return {
+            "status": "unhealthy",
+            "error": str(e)
+        }
