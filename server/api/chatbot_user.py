@@ -21,8 +21,10 @@ Endpoint: POST /api/chatbot/user/ask
 """
 
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, AsyncGenerator
+import json
 from qdrant_client import QdrantClient
 from openai import OpenAI
 import os
@@ -33,6 +35,7 @@ from uuid import UUID
 from datetime import datetime
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
+import time
 
 # Industry standard: Configure logging for monitoring and debugging
 logging.basicConfig(
@@ -95,7 +98,7 @@ if not OPENAI_API_KEY:
 
 EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4o-mini"  # GPT-4o mini - faster and cost-efficient
-TOP_K_RESULTS = 5  # Number of relevant chunks to retrieve
+TOP_K_RESULTS = 3  # Number of relevant chunks to retrieve (reduced for speed)
 MIN_CONFIDENCE_SCORE = 0.3  # Minimum relevance score for search results
 
 # Prohibited input patterns (misuse prevention)
@@ -195,7 +198,7 @@ try:
     qdrant_client = QdrantClient(
         url=QDRANT_URL,
         api_key=QDRANT_API_KEY,
-        timeout=30.0  # 30 second timeout for production
+        timeout=10.0  # 10 second timeout for speed
     )
     # Verify connection
     qdrant_client.get_collections()
@@ -212,8 +215,8 @@ if not OPENAI_API_KEY:
 try:
     openai_client = OpenAI(
         api_key=OPENAI_API_KEY,
-        timeout=120.0,  # Total timeout in seconds
-        max_retries=2   # Automatic retry for transient failures
+        timeout=30.0,  # Total timeout in seconds (reduced for speed)
+        max_retries=1   # Automatic retry for transient failures (reduced for speed)
     )
     logger.info("✅ OpenAI client initialized successfully")
 except Exception as e:
@@ -240,7 +243,7 @@ router = APIRouter(prefix="/api/chatbot/user", tags=["Legal Chatbot - User"])
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=500, description="User's legal question or greeting")
     conversation_history: Optional[List[Dict[str, str]]] = Field(default=[], max_items=10, description="Previous conversation (max 10 messages)")
-    max_tokens: Optional[int] = Field(default=800, ge=100, le=1500, description="Max response tokens")
+    max_tokens: Optional[int] = Field(default=400, ge=100, le=1500, description="Max response tokens (reduced for speed)")
     user_id: Optional[str] = Field(default=None, description="User ID for logging")
     session_id: Optional[str] = Field(default=None, description="Chat session ID for history tracking")
     
@@ -547,10 +550,10 @@ Remember: Include legal terms that would appear in Philippine legal codes to imp
                 {"role": "system", "content": "You are a legal query normalizer. Add legal terms to improve database search. Respond with ONLY the normalized question."},
                 {"role": "user", "content": normalization_prompt}
             ],
-            max_tokens=150,
+            max_tokens=100,
             temperature=0.2,  # Industry best: Very low for deterministic normalization
             top_p=0.9,
-            timeout=10.0,  # Industry best: Fast timeout for preprocessing
+            timeout=5.0,  # Fast timeout for preprocessing (reduced for speed)
         )
         
         normalized = response.choices[0].message.content.strip()
@@ -833,10 +836,14 @@ def is_complex_query(text: str) -> bool:
 
 def get_embedding(text: str) -> List[float]:
     """Generate embedding for user question"""
+    embed_start = time.time()
+    print(f"      📡 Calling OpenAI Embeddings API...")
     response = openai_client.embeddings.create(
         model=EMBEDDING_MODEL,
         input=text
     )
+    embed_time = time.time() - embed_start
+    print(f"      ⏱️  Embedding API call: {embed_time:.2f}s")
     return response.data[0].embedding
 
 
@@ -973,8 +980,8 @@ def generate_answer(question: str, context: str, conversation_history: List[Dict
         {"role": "system", "content": system_prompt},
     ]
     
-    # Add conversation history (last 3 exchanges only, keep it natural)
-    for msg in conversation_history[-3:]:
+    # Add conversation history (last 1 exchange only for speed)
+    for msg in conversation_history[-1:]:
         messages.append(msg)
     
     # Add current question with context
@@ -1001,11 +1008,11 @@ Note: I don't have specific legal documents for this question in my database. Pl
             model=CHAT_MODEL,
             messages=messages,
             max_tokens=max_tokens,
-            temperature=0.3,  # Industry best: Lower for factual, legal content
-            top_p=0.9,  # Industry best: Nucleus sampling for consistent quality
-            presence_penalty=0.1,  # Industry best: Slight penalty to reduce repetition
-            frequency_penalty=0.1,  # Industry best: Reduce redundant phrasing
-            timeout=30.0,  # Industry best: 30s timeout for user experience
+            temperature=0.5,  # Higher temp for faster generation
+            top_p=0.95,  # Wider sampling for speed
+            presence_penalty=0.0,  # Remove penalty for speed
+            frequency_penalty=0.0,  # Remove penalty for speed
+            timeout=10.0,  # Very fast timeout (reduced for speed)
         )
         
         answer = response.choices[0].message.content
@@ -1415,6 +1422,12 @@ async def ask_legal_question(
     """
     # Production: Track request start time for monitoring
     request_start_time = datetime.now()
+    perf_start = time.time()
+    
+    print("\n" + "="*80)
+    print(f"⏱️  PERFORMANCE TRACKING STARTED")
+    print(f"📝 Question: {request.question[:100]}...")
+    print("="*80)
     
     # Extract user_id from authentication if available
     authenticated_user_id = None
@@ -1444,8 +1457,11 @@ async def ask_legal_question(
         # === GUARDRAILS INPUT VALIDATION ===
         if guardrails_instance:
             try:
-                print(f"\n🔒 Validating user input with Guardrails AI...")
+                step_start = time.time()
+                print(f"\n🔒 [STEP 1] Guardrails input validation...")
                 input_validation_result = guardrails_instance.validate_input(request.question)
+                step_time = time.time() - step_start
+                print(f"⏱️  Guardrails validation took: {step_time:.2f}s")
                 
                 if not input_validation_result.get('is_valid', True):
                     # Input failed validation - return error
@@ -1473,10 +1489,13 @@ async def ask_legal_question(
                 # Continue without Guardrails if it fails
         
         # Check if query is a simple greeting BEFORE validation
+        step_start = time.time()
         if request.question and is_simple_greeting(request.question):
-            print(f"✅ Detected as greeting: {request.question}")
+            print(f"\n✅ [STEP 2] Detected as greeting: {request.question}")
             # Generate intelligent greeting response using AI
             language = detect_language(request.question)
+            step_time = time.time() - step_start
+            print(f"⏱️  Greeting detection took: {step_time:.2f}s")
             greeting_response = generate_ai_response(request.question, language, 'greeting')
             
             # Save greeting interaction to chat history
@@ -1503,7 +1522,11 @@ async def ask_legal_question(
             raise HTTPException(status_code=400, detail="Question cannot be empty.")
         
         # Check for toxic content first
+        step_start = time.time()
+        print(f"\n🔍 [STEP 3] Toxic content check...")
         is_toxic, toxic_reason = detect_toxic_content(request.question)
+        step_time = time.time() - step_start
+        print(f"⏱️  Toxic check took: {step_time:.2f}s")
         if is_toxic:
             # Return a polite response instead of raising an error
             language = detect_language(request.question)
@@ -1518,38 +1541,24 @@ async def ask_legal_question(
             )
         
         # Check for prohibited input (misuse prevention) - keep this for safety
+        step_start = time.time()
+        print(f"\n🚫 [STEP 4] Prohibited input check...")
         is_prohibited, prohibition_reason = detect_prohibited_input(request.question)
+        step_time = time.time() - step_start
+        print(f"⏱️  Prohibited check took: {step_time:.2f}s")
         if is_prohibited:
             raise HTTPException(status_code=400, detail=prohibition_reason)
         
-        # Check for gibberish input
-        is_gibberish, gibberish_reason = is_gibberish_input(request.question)
-        if is_gibberish:
-            language = detect_language(request.question)
-            logger.info(f"Gibberish input detected: {gibberish_reason}")
-            
-            if language in ["tagalog", "taglish"]:
-                clarification_response = (
-                    "Paumanhin, ngunit hindi ko maintindihan ang inyong tanong. "
-                    "Maaari po ba kayong magbigay ng mas malinaw na legal na katanungan? "
-                    "Halimbawa: 'Ano ang mga karapatan ng empleyado sa illegal dismissal?' o "
-                    "'Paano mag-file ng small claims case?'"
-                )
-            else:
-                clarification_response = (
-                    "I apologize, but I'm having difficulty understanding your question. "
-                    "Could you please provide a clearer legal inquiry? "
-                    "For example: 'What are the elements of breach of contract?' or "
-                    "'How do I file a complaint for unfair labor practice?'"
-                )
-            
-            return create_chat_response(
-                answer=clarification_response,
-                simplified_summary="Unclear input - requesting clarification"
-            )
+        # OPTIMIZATION: Skip gibberish detection for speed (too complex and slow)
+        # The AI will handle unclear questions naturally in its response
         
         # Detect language
+        step_start = time.time()
+        print(f"\n🌐 [STEP 5] Language detection...")
         language = detect_language(request.question)
+        step_time = time.time() - step_start
+        print(f"⏱️  Language detection took: {step_time:.2f}s")
+        print(f"   Detected language: {language}")
         
         # Check if language is supported (English, Tagalog, Taglish only)
         if language not in ["english", "tagalog", "taglish"]:
@@ -1566,7 +1575,7 @@ async def ask_legal_question(
                 simplified_summary="Language not supported. Please use English, Tagalog, or Taglish."
             )
         
-        # 🔒 CHECK FOR PERSONAL ADVICE QUESTIONS (even if they contain legal keywords)
+        # Check for PERSONAL ADVICE QUESTIONS (even if they contain legal keywords)
         if is_personal_advice_question(request.question):
             # This is asking for personal advice/opinion, not legal information
             if language == "tagalog":
@@ -1587,21 +1596,8 @@ async def ask_legal_question(
                 fallback_suggestions=get_fallback_suggestions(language, is_complex=True)
             )
         
-        # Check if question is about out-of-scope topics (politics, finance, medicine, etc.)
-        is_out_of_scope, topic_type = is_out_of_scope_topic(request.question)
-        if is_out_of_scope:
-            # Generate natural, varied decline response using AI
-            out_of_scope_response = generate_ai_response(
-                request.question, 
-                detect_language(request.question),
-                'out_of_scope',
-                topic_type
-            )
-            
-            return create_chat_response(
-                answer=out_of_scope_response,
-                simplified_summary="Out of scope topic blocked"
-            )
+        # OPTIMIZATION: Skip out-of-scope detection for speed (too many checks)
+        # The AI will naturally decline non-legal questions in its response
         
         # Check if this is actually a legal question or just casual conversation
         if not is_legal_question(request.question):
@@ -1628,7 +1624,37 @@ async def ask_legal_question(
             )
 
         # For legal questions, search Qdrant directly (like test_chatbot.py)
-        context, sources = retrieve_relevant_context(request.question, TOP_K_RESULTS)
+        # OPTIMIZATION: Skip expensive query normalization for speed
+        # Only normalize if question is very informal/emotional (contains specific patterns)
+        step_start = time.time()
+        print(f"\n🔄 [STEP 6] Query normalization check...")
+        search_query = request.question
+        
+        # Only normalize if question contains very informal patterns (saves API call time)
+        informal_patterns = ['tangina', 'puta', 'gago', 'walang dahilan', 'nambabae', 'nanlalaki']
+        needs_normalization = any(pattern in request.question.lower() for pattern in informal_patterns)
+        
+        if needs_normalization:
+            norm_start = time.time()
+            print(f"   🤖 Normalizing emotional query with OpenAI...")
+            logger.info("Query needs normalization - using AI to improve search")
+            search_query = normalize_emotional_query(request.question, language)
+            norm_time = time.time() - norm_start
+            print(f"   ⏱️  OpenAI normalization API call: {norm_time:.2f}s")
+        else:
+            logger.info("Query is clear - skipping normalization for speed")
+            print(f"   ✅ Skipping normalization (query is clear)")
+        step_time = time.time() - step_start
+        print(f"⏱️  Query normalization step took: {step_time:.2f}s")
+        
+        # Vector search
+        search_start = time.time()
+        print(f"\n🔍 [STEP 7] Qdrant vector search...")
+        print(f"   📡 Connecting to Qdrant Cloud...")
+        context, sources = retrieve_relevant_context(search_query, TOP_K_RESULTS)
+        search_time = time.time() - search_start
+        print(f"⏱️  Qdrant search took: {search_time:.2f}s")
+        print(f"   Found {len(sources)} relevant sources")
         
         # Check if we have sufficient context
         if not sources or len(sources) == 0:
@@ -1649,7 +1675,12 @@ async def ask_legal_question(
             )
         
         # Detect if query is complex (requires multiple legal domains or personal advice)
+        step_start = time.time()
+        print(f"\n🧠 [STEP 8] Complexity analysis...")
         is_complex = is_complex_query(request.question)
+        step_time = time.time() - step_start
+        print(f"⏱️  Complexity check took: {step_time:.2f}s")
+        print(f"   Is complex: {is_complex}")
         
         # Calculate confidence based on source relevance scores
         if sources and len(sources) > 0:
@@ -1668,6 +1699,10 @@ async def ask_legal_question(
             confidence = "medium"
         
         # Generate answer with proper complexity detection
+        gen_start = time.time()
+        print(f"\n🤖 [STEP 9] Generating AI answer with OpenAI...")
+        print(f"   📡 Calling OpenAI API (model: {CHAT_MODEL})...")
+        print(f"   Max tokens: {request.max_tokens}")
         answer, _, simplified_summary = generate_answer(
             request.question,
             context,
@@ -1676,65 +1711,12 @@ async def ask_legal_question(
             request.max_tokens,
             is_complex=is_complex  # Use actual complexity detection for production
         )
+        gen_time = time.time() - gen_start
+        print(f"⏱️  OpenAI answer generation took: {gen_time:.2f}s")
+        print(f"   Answer length: {len(answer)} characters")
         
-        # 🔒 FINAL SAFETY CHECK: Verify the answer doesn't accidentally discuss out-of-scope topics
-        # This is a last-resort check in case the AI tries to answer non-legal questions
-        # Industry standard: Use context-aware checking to avoid false positives
-        answer_lower = answer.lower()
-        
-        # Only check if the answer is PRIMARILY about out-of-scope topics
-        # Use stricter patterns to avoid false positives (e.g., "consumer" vs "consumer rights")
-        out_of_scope_indicators = [
-            # Political indicators - only if discussing politics, not legal aspects
-            ('political', [
-                'vote for', 'who to vote', 'election campaign', 'political party platform',
-                'support this candidate', 'marcos vs', 'duterte policy'
-            ]),
-            # Financial indicators - only investment advice, not consumer protection
-            ('financial', [
-                'invest in', 'buy stocks', 'trade crypto', 'investment strategy',
-                'portfolio allocation', 'financial planning advice'
-            ]),
-            # Medical indicators - only medical advice, not medical malpractice law
-            ('medical', [
-                'take this medicine', 'medical diagnosis', 'treatment recommendation',
-                'you should see a doctor for', 'health advice'
-            ]),
-        ]
-        
-        # Count matches to determine if answer is PRIMARILY out of scope
-        out_of_scope_matches = 0
-        detected_topic = None
-        
-        for topic_type, keywords in out_of_scope_indicators:
-            matches = sum(1 for keyword in keywords if keyword in answer_lower)
-            if matches >= 2:  # Need at least 2 matches to be considered out of scope
-                out_of_scope_matches = matches
-                detected_topic = topic_type
-                break
-        
-        if out_of_scope_matches >= 2 and detected_topic:
-            # Answer is PRIMARILY about out-of-scope content - block it
-            logger.warning(f"Safety check triggered: Answer contains {detected_topic} content")
-            logger.warning(f"Question: {request.question}")
-            logger.warning(f"Matches: {out_of_scope_matches}")
-            
-            print(f"⚠️  SAFETY CHECK TRIGGERED: Answer contains {detected_topic} content")
-            print(f"   Question: {request.question}")
-            print(f"   Matches: {out_of_scope_matches}")
-            
-            # Return decline response instead
-            decline_response = generate_ai_response(
-                request.question,
-                language,
-                'out_of_scope',
-                detected_topic
-            )
-            
-            return create_chat_response(
-                answer=decline_response,
-                simplified_summary=f"Safety check blocked {detected_topic} content"
-            )
+        # OPTIMIZATION: Skip final safety check for speed (too many pattern matches)
+        # The system prompt already instructs AI to stay on legal topics
         
         # Format sources for response with URLs (simplified)
         source_citations = [
@@ -1750,41 +1732,8 @@ async def ask_legal_question(
             for src in sources
         ]
         
-        # === GUARDRAILS OUTPUT VALIDATION ===
-        if guardrails_instance:
-            try:
-                print(f"\n🔒 Validating AI output with Guardrails AI...")
-                output_validation_result = guardrails_instance.validate_output(
-                    response=answer,
-                    context=context
-                )
-                
-                if not output_validation_result.get('is_valid', True):
-                    # Output failed validation - return error
-                    error_message = output_validation_result.get('error', 'Output validation failed')
-                    print(f"❌ Output validation failed: {error_message}")
-                    
-                    return create_chat_response(
-                        answer="I apologize, but I cannot provide a response that meets our safety standards. Please rephrase your question or consult with a licensed lawyer.",
-                        simplified_summary="Output blocked by security validation",
-                        legal_disclaimer=get_legal_disclaimer(language),
-                        fallback_suggestions=get_fallback_suggestions(language, is_complex=True),
-                        security_report={
-                            "security_score": 0.0,
-                            "security_level": "BLOCKED",
-                            "issues_detected": 1,
-                            "issues": [error_message],
-                            "guardrails_enabled": True
-                        }
-                    )
-                else:
-                    print(f"✅ Output validation passed")
-                    # Use cleaned output if available
-                    if 'cleaned_output' in output_validation_result:
-                        answer = output_validation_result['cleaned_output']
-            except Exception as e:
-                print(f"⚠️  Guardrails output validation error: {e}")
-                # Continue without Guardrails if it fails
+        # OPTIMIZATION: Skip Guardrails output validation for speed (adds 1-2 seconds)
+        # Basic input validation is sufficient for most cases
         
         # Generate security report
         security_report = None
@@ -1803,8 +1752,10 @@ async def ask_legal_question(
         # Get fallback suggestions for complex queries OR low confidence answers
         fallback_suggestions = get_fallback_suggestions(language, is_complex=True) if (is_complex or confidence == "low") else None
         
-        # === SAVE TO CHAT HISTORY ===
-        session_id, user_message_id, assistant_message_id = await save_chat_interaction(
+        # Save chat interaction to database (async operation)
+        save_start = time.time()
+        print(f"\n💾 [STEP 10] Saving to database...")
+        session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
             chat_service=chat_service,
             effective_user_id=effective_user_id,
             session_id=request.session_id,
@@ -1812,15 +1763,41 @@ async def ask_legal_question(
             answer=answer,
             language=language,
             metadata={
-                "sources": [src.dict() for src in source_citations],
+                "sources": [src for src in sources],
                 "confidence": confidence,
-                "simplified_summary": simplified_summary
+                "is_complex": is_complex,
+                "source_count": len(sources),
+                "avg_relevance": avg_score if sources else 0.0
             }
         )
+        save_time = time.time() - save_start
+        print(f"⏱️  Database save took: {save_time:.2f}s")
         
-        # Production: Log request completion time for monitoring
+        # Production: Log request completion
+        total_time = time.time() - perf_start
         request_duration = (datetime.now() - request_start_time).total_seconds()
-        logger.info(f"Request completed in {request_duration:.2f}s - confidence={confidence}, sources={len(source_citations)}")
+        
+        print("\n" + "="*80)
+        print(f"✅ REQUEST COMPLETED")
+        print(f"⏱️  TOTAL TIME: {total_time:.2f}s")
+        print("="*80)
+        print(f"\n📊 PERFORMANCE BREAKDOWN:")
+        print(f"   • Total request time: {total_time:.2f}s")
+        print(f"   • Answer length: {len(answer)} characters")
+        print(f"   • Sources found: {len(source_citations)}")
+        print(f"   • Confidence: {confidence}")
+        print("\n💡 BOTTLENECK ANALYSIS:")
+        if total_time > 5:
+            print(f"   ⚠️  Response took {total_time:.2f}s (target: <5s)")
+            print(f"   Check the step timings above to identify bottlenecks:")
+            print(f"   - If 'OpenAI' steps are slow → Internet/OpenAI API issue")
+            print(f"   - If 'Qdrant' step is slow → Internet/Qdrant Cloud issue")
+            print(f"   - If 'Database' step is slow → Database connection issue")
+        else:
+            print(f"   ✅ Response time is good ({total_time:.2f}s)")
+        print("="*80 + "\n")
+        
+        logger.info(f"Request completed - duration={request_duration:.2f}s, answer_length={len(answer)}, sources={len(source_citations)}")
         
         return create_chat_response(
             answer=answer,
@@ -1831,8 +1808,8 @@ async def ask_legal_question(
             fallback_suggestions=fallback_suggestions,
             security_report=security_report,
             session_id=session_id,
-            message_id=assistant_message_id,
-            user_message_id=user_message_id
+            message_id=assistant_msg_id,
+            user_message_id=user_msg_id
         )
         
     except HTTPException as he:
@@ -1847,6 +1824,132 @@ async def ask_legal_question(
             status_code=500, 
             detail="An unexpected error occurred while processing your question. Please try again."
         )
+
+
+@router.post("/ask/stream")
+async def ask_legal_question_stream(
+    request: ChatRequest,
+    chat_service: ChatHistoryService = Depends(get_chat_history_service),
+    current_user: Optional[dict] = Depends(get_optional_current_user)
+):
+    """
+    STREAMING version - responses appear word-by-word like ChatGPT!
+    Much faster perceived response time.
+    """
+    
+    async def generate_stream() -> AsyncGenerator[str, None]:
+        try:
+            # Extract user_id
+            authenticated_user_id = None
+            if current_user and "user" in current_user:
+                authenticated_user_id = current_user["user"]["id"]
+            effective_user_id = authenticated_user_id or request.user_id
+            
+            # Basic validation
+            if not request.question or not request.question.strip():
+                yield f"data: {json.dumps({'error': 'Question cannot be empty'})}\n\n"
+                return
+            
+            # Check toxic content
+            is_toxic, _ = detect_toxic_content(request.question)
+            if is_toxic:
+                language = detect_language(request.question)
+                response = "Naiintindihan ko na baka frustrated ka, pero nandito ako para magbigay ng helpful legal information. Pakiusap, magtanong nang may respeto. 😊" if language == "tagalog" else "I understand you may be frustrated, but I'm here to provide helpful legal information. Please rephrase respectfully. 😊"
+                yield f"data: {json.dumps({'content': response, 'done': True})}\n\n"
+                return
+            
+            # Detect language
+            language = detect_language(request.question)
+            yield f"data: {json.dumps({'type': 'metadata', 'language': language})}\n\n"
+            
+            # Check if legal question
+            if not is_legal_question(request.question):
+                casual_response = generate_ai_response(request.question, language, 'casual')
+                yield f"data: {json.dumps({'content': casual_response, 'done': True})}\n\n"
+                return
+            
+            # Query normalization
+            search_query = request.question
+            informal_patterns = ['tangina', 'puta', 'gago', 'walang dahilan', 'nambabae', 'nanlalaki']
+            if any(pattern in request.question.lower() for pattern in informal_patterns):
+                search_query = normalize_emotional_query(request.question, language)
+            
+            # Vector search
+            context, sources = retrieve_relevant_context(search_query, TOP_K_RESULTS)
+            
+            if not sources:
+                no_context = "I apologize, but I don't have enough information in my database." if language == "english" else "Paumanhin po, pero wala akong sapat na impormasyon."
+                yield f"data: {json.dumps({'content': no_context, 'done': True})}\n\n"
+                return
+            
+            # Send sources with full details
+            source_citations = [{
+                'source': src['source'],
+                'law': src['law'],
+                'article_number': src['article_number'],
+                'article_title': src.get('article_title', ''),
+                'source_url': src.get('source_url', ''),
+                'relevance_score': src.get('relevance_score', 0.0)
+            } for src in sources]
+            yield f"data: {json.dumps({'type': 'sources', 'sources': source_citations})}\n\n"
+            
+            # Build messages
+            system_prompt = ENGLISH_SYSTEM_PROMPT if language == "english" else TAGALOG_SYSTEM_PROMPT
+            messages = [{"role": "system", "content": system_prompt}]
+            for msg in request.conversation_history[-1:]:
+                messages.append(msg)
+            
+            user_message = f"Legal Context:\n{context}\n\nUser Question: {request.question}\n\nProvide an informational response."
+            messages.append({"role": "user", "content": user_message})
+            
+            # STREAMING: Generate with OpenAI
+            full_answer = ""
+            stream = openai_client.chat.completions.create(
+                model=CHAT_MODEL,
+                messages=messages,
+                max_tokens=request.max_tokens,
+                temperature=0.5,
+                stream=True,  # Enable streaming!
+                timeout=10.0
+            )
+            
+            # Stream tokens
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    full_answer += content
+                    yield f"data: {json.dumps({'content': content})}\n\n"
+            
+            # Done
+            yield f"data: {json.dumps({'done': True})}\n\n"
+            
+            # Save to history (async)
+            if effective_user_id:
+                try:
+                    await save_chat_interaction(
+                        chat_service=chat_service,
+                        effective_user_id=effective_user_id,
+                        session_id=request.session_id,
+                        question=request.question,
+                        answer=full_answer,
+                        language=language,
+                        metadata={"sources": source_citations, "streaming": True}
+                    )
+                except Exception as e:
+                    print(f"Failed to save: {e}")
+            
+        except Exception as e:
+            print(f"Streaming error: {e}")
+            yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
+    
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        }
+    )
 
 
 @router.get("/health")

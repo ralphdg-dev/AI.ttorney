@@ -430,8 +430,8 @@ export default function ChatbotScreen() {
         // Lawyer endpoint - formal legal analysis with legalese
         endpoint = `${API_URL}/api/chatbot/lawyer/ask`;
       } else {
-        // General public endpoint (registered_user, guest, etc.)
-        endpoint = `${API_URL}/api/chatbot/user/ask`;
+        // General public endpoint (registered_user, guest, etc.) - STREAMING!
+        endpoint = `${API_URL}/api/chatbot/user/ask/stream`;
       }
 
       // Prepare conversation history in the format expected by backend
@@ -449,32 +449,142 @@ export default function ChatbotScreen() {
         headers["Authorization"] = `Bearer ${session.access_token}`;
       }
 
-      // Call enhanced chatbot API with authentication
-      const response = await axios.post(
-        endpoint,
-        {
-          question: userMessage,
-          conversation_history: formattedHistory,
-          max_tokens: userRole === "verified_lawyer" ? 2000 : 800, // Lawyers get higher token limit
-          user_id: user?.id || null,
-          session_id: sessionId || null,
-        },
-        { headers }
-      );
+      // Variables to store response data
+      let answer = "";
+      let sources: any[] = [];
+      let confidence = "";
+      let language = "";
+      let legal_disclaimer = "";
+      let fallback_suggestions = null;
+      let normalized_query = "";
+      let is_complex_query = false;
+      let returnedSessionId = null;
+      let assistantMessageId = null;
+      let userMessageId = null;
 
-      const {
-        answer,
-        sources,
-        confidence,
-        language,
-        legal_disclaimer,
-        fallback_suggestions,
-        normalized_query,
-        is_complex_query,
-        session_id: returnedSessionId,
-        message_id: assistantMessageId,
-        user_message_id: userMessageId,
-      } = response.data;
+      if (userRole === "verified_lawyer") {
+        // Lawyers use regular non-streaming endpoint
+        const response = await axios.post(
+          endpoint,
+          {
+            question: userMessage,
+            conversation_history: formattedHistory,
+            max_tokens: 2000,
+            user_id: user?.id || null,
+            session_id: sessionId || null,
+          },
+          { headers }
+        );
+
+        const data = response.data;
+        answer = data.answer;
+        sources = data.sources;
+        confidence = data.confidence;
+        language = data.language;
+        legal_disclaimer = data.legal_disclaimer;
+        fallback_suggestions = data.fallback_suggestions;
+        normalized_query = data.normalized_query;
+        is_complex_query = data.is_complex_query;
+        returnedSessionId = data.session_id;
+        assistantMessageId = data.message_id;
+        userMessageId = data.user_message_id;
+      } else {
+        // General users get STREAMING responses!
+        const streamingMsgId = (Date.now() + 1).toString();
+        const streamingMsg: Message = {
+          id: streamingMsgId,
+          text: "",
+          fromUser: false,
+          sources: [],
+        };
+        setMessages((prev) => [...prev, streamingMsg]);
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            question: userMessage,
+            conversation_history: formattedHistory,
+            max_tokens: 400,
+            user_id: user?.id || null,
+            session_id: sessionId || null,
+          }),
+        });
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let lastUpdateTime = 0;
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+
+                  if (data.content) {
+                    answer += data.content;
+                    const now = Date.now();
+                    if (now - lastUpdateTime > 100) {
+                      lastUpdateTime = now;
+                      setMessages((prev) => {
+                        const newMessages = [...prev];
+                        const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
+                        if (msgIndex !== -1) {
+                          newMessages[msgIndex] = { ...newMessages[msgIndex], text: answer };
+                        }
+                        return newMessages;
+                      });
+                    }
+                  }
+
+                  if (data.sources) {
+                    sources = data.sources;
+                    setMessages((prev) => {
+                      const newMessages = [...prev];
+                      const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
+                      if (msgIndex !== -1) {
+                        newMessages[msgIndex] = { ...newMessages[msgIndex], sources: data.sources };
+                      }
+                      return newMessages;
+                    });
+                  }
+
+                  if (data.type === 'metadata') {
+                    language = data.language;
+                  }
+                } catch (e) {
+                  console.error('Error parsing stream data:', e);
+                }
+              }
+            }
+          }
+        }
+
+        // Final update
+        setMessages((prev) => {
+          const newMessages = [...prev];
+          const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
+          if (msgIndex !== -1) {
+            newMessages[msgIndex] = {
+              ...newMessages[msgIndex],
+              text: answer,
+              sources: sources,
+              confidence: confidence,
+              language: language,
+            };
+          }
+          return newMessages;
+        });
+
+        assistantMessageId = streamingMsgId;
+      }
 
       console.log("📨 Backend response:", {
         sessionId: returnedSessionId,
@@ -544,21 +654,24 @@ export default function ChatbotScreen() {
         );
       }
 
-      // Add bot reply with all enhanced data and real ID from backend
-      const reply: Message = {
-        id: assistantMessageId || (Date.now() + 1).toString(),
-        text: answer,
-        fromUser: false,
-        sources: sources || [],
-        confidence: confidence,
-        language: language,
-        legal_disclaimer: legal_disclaimer,
-        fallback_suggestions: fallback_suggestions,
-        normalized_query: normalized_query,
-        is_complex_query: is_complex_query,
-      };
+      // For non-streaming (lawyers), add bot reply with all enhanced data
+      if (userRole === "verified_lawyer") {
+        const reply: Message = {
+          id: assistantMessageId || (Date.now() + 1).toString(),
+          text: answer,
+          fromUser: false,
+          sources: sources || [],
+          confidence: confidence,
+          language: language,
+          legal_disclaimer: legal_disclaimer,
+          fallback_suggestions: fallback_suggestions,
+          normalized_query: normalized_query,
+          is_complex_query: is_complex_query,
+        };
 
-      setMessages((prev) => [...prev, reply]);
+        setMessages((prev) => [...prev, reply]);
+      }
+      // For streaming users, the message already exists and was updated in real-time
 
       // Scroll to show the bot's response (like ChatGPT)
       setTimeout(() => {
@@ -1027,7 +1140,7 @@ export default function ChatbotScreen() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
         style={{
           position: 'absolute',
-          bottom: 80,
+          bottom: 60,
           left: 0,
           right: 0,
           zIndex: 10,
@@ -1036,9 +1149,10 @@ export default function ChatbotScreen() {
       >
         <View
           style={[
-            tw`px-4 pt-3 pb-2 border-t`,
+            tw`px-4 pt-3 pb-4 border-t border-b`,
             {
               borderTopColor: Colors.border.light,
+              borderBottomColor: Colors.border.light,
               backgroundColor: '#FFFFFF',
             },
           ]}
