@@ -28,7 +28,7 @@ import Navbar from "../components/Navbar";
 import { LawyerNavbar } from "../components/lawyer/shared";
 import { useAuth } from "../contexts/AuthContext";
 import axios from "axios";
-import ChatHistorySidebar from "../components/chatbot/ChatHistorySidebar";
+import ChatHistorySidebar, { ChatHistorySidebarRef } from "../components/chatbot/ChatHistorySidebar";
 import { ChatHistoryService } from "../services/chatHistoryService";
 import { Send } from "lucide-react-native";
 import { MarkdownText } from "../components/chatbot/MarkdownText";
@@ -148,6 +148,8 @@ export default function ChatbotScreen() {
   const [currentConversationId, setCurrentConversationId] =
     useState<string>("");
   const flatRef = useRef<FlatList>(null);
+  const sidebarRef = useRef<ChatHistorySidebarRef>(null);
+  const isFirstMessageRef = useRef<boolean>(true); // Track if this is the first message in conversation
 
   // Dynamic greeting that changes per session
   const greeting = useMemo(() => {
@@ -191,11 +193,13 @@ export default function ChatbotScreen() {
       if (convId) {
         console.log('📂 Found existing conversation:', convId);
         setCurrentConversationId(convId);
+        isFirstMessageRef.current = false; // Existing conversation
         await loadConversation(convId);
       } else {
         console.log('✨ No existing conversation, starting fresh');
         // No current conversation - start fresh (will create session on first message)
         setCurrentConversationId("");
+        isFirstMessageRef.current = true; // New conversation
         setMessages([]);
         setConversationHistory([]);
       }
@@ -249,6 +253,11 @@ export default function ChatbotScreen() {
       if (user?.id) {
         await ChatHistoryService.setCurrentConversationId(conversationId, user.id);
       }
+
+      // Scroll to bottom after messages are set (ChatGPT behavior)
+      setTimeout(() => {
+        flatRef.current?.scrollToEnd({ animated: false });
+      }, 300);
     } catch (error) {
       console.error("❌ Error loading conversation:", error);
       // Clear invalid conversation ID and start fresh
@@ -260,28 +269,29 @@ export default function ChatbotScreen() {
     }
   };
 
+  // Utility: Generate conversation title from user message (DRY principle)
+  const generateConversationTitle = useCallback((message: string): string => {
+    const maxLength = 50;
+    const cleanMessage = message.trim();
+    return cleanMessage.length > maxLength 
+      ? cleanMessage.substring(0, maxLength) + '...'
+      : cleanMessage;
+  }, []);
+
   const handleNewChat = async () => {
-    try {
-      console.log('✨ Starting new chat for user:', user?.id);
-      const newConvId = await ChatHistoryService.startNewConversation(user?.id, 'New Conversation', session?.access_token);
-      console.log('✅ New conversation created:', newConvId);
-      
-      setCurrentConversationId(newConvId);
-      setMessages([]);
-      setConversationHistory([]);
-      setError(null);
-      
-      // Store the new conversation ID
-      if (user?.id) {
-        await ChatHistoryService.setCurrentConversationId(newConvId, user.id);
-      }
-    } catch (error) {
-      console.error('❌ Error creating new chat:', error);
-      // Fallback: clear state and let backend create session on first message
-      setCurrentConversationId("");
-      setMessages([]);
-      setConversationHistory([]);
-      setError(null);
+    // Industry-standard approach (ChatGPT/Claude): Don't create session until first message
+    // This prevents "New Conversation" titles from appearing
+    console.log('✨ Starting new chat - will create session on first message');
+    
+    setCurrentConversationId("");
+    isFirstMessageRef.current = true;
+    setMessages([]);
+    setConversationHistory([]);
+    setError(null);
+    
+    // Clear stored conversation ID
+    if (user?.id) {
+      await ChatHistoryService.setCurrentConversationId("", user.id);
     }
   };
 
@@ -290,6 +300,7 @@ export default function ChatbotScreen() {
 
     // Update current conversation ID first
     setCurrentConversationId(conversationId);
+    isFirstMessageRef.current = false; // Existing conversation
 
     // Clear existing state
     setMessages([]);
@@ -300,11 +311,6 @@ export default function ChatbotScreen() {
     try {
       await loadConversation(conversationId);
       console.log("✅ Conversation loaded successfully");
-      
-      // Scroll to bottom after loading
-      setTimeout(() => {
-        flatRef.current?.scrollToEnd({ animated: true });
-      }, 100);
     } catch (error) {
       console.error("❌ Failed to load conversation:", error);
       // Error is already handled in loadConversation
@@ -479,7 +485,9 @@ export default function ChatbotScreen() {
 
       // Update session ID if backend created a new one
       if (returnedSessionId) {
-        if (!sessionId || sessionId !== returnedSessionId) {
+        const isNewSession = !sessionId || sessionId !== returnedSessionId;
+        
+        if (isNewSession) {
           console.log("🆕 New session created:", returnedSessionId);
           setCurrentConversationId(returnedSessionId);
           sessionId = returnedSessionId;
@@ -491,7 +499,33 @@ export default function ChatbotScreen() {
               user.id
             );
           }
+
+          // Optimistic UI update: Add conversation to sidebar immediately (first message only)
+          if (isFirstMessageRef.current) {
+            const title = generateConversationTitle(userMessage);
+            console.log("⚡ Optimistically adding conversation to sidebar:", title);
+            console.log("   Session ID:", returnedSessionId);
+            console.log("   Title:", title);
+            console.log("   Sidebar ref exists:", !!sidebarRef.current);
+            
+            if (sidebarRef.current?.addNewConversation) {
+              sidebarRef.current.addNewConversation(returnedSessionId, title);
+              console.log("✅ Conversation added to sidebar");
+            } else {
+              console.warn("⚠️ Sidebar ref not ready, refreshing list instead");
+              sidebarRef.current?.refreshConversations();
+            }
+            
+            isFirstMessageRef.current = false;
+          }
         }
+      } else if (isFirstMessageRef.current && user?.id) {
+        // FALLBACK: Backend didn't return session_id, refresh sidebar to show new conversation
+        console.warn("⚠️ Backend didn't return session_id, refreshing sidebar as fallback");
+        setTimeout(() => {
+          sidebarRef.current?.refreshConversations();
+        }, 500); // Small delay to let backend finish saving
+        isFirstMessageRef.current = false;
       }
 
       // Update conversation history
@@ -808,6 +842,7 @@ export default function ChatbotScreen() {
     >
       {/* Chat History Sidebar */}
       <ChatHistorySidebar
+        ref={sidebarRef}
         userId={user?.id}
         sessionToken={session?.access_token}
         currentConversationId={currentConversationId}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated, Platform, ActivityIndicator } from 'react-native';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
@@ -19,13 +19,22 @@ interface ChatHistorySidebarProps {
 const SIDEBAR_WIDTH = 280;
 const SIDEBAR_POSITION = 'right'; // 'left' or 'right'
 
-export default function ChatHistorySidebar({
-  userId,
-  sessionToken,
-  currentConversationId,
-  onConversationSelect,
-  onNewChat,
-}: ChatHistorySidebarProps) {
+export interface ChatHistorySidebarRef {
+  refreshConversations: () => Promise<void>;
+  addNewConversation: (conversationId: string, title: string) => void;
+  updateConversationTitle: (conversationId: string, title: string) => void;
+}
+
+const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarProps>((
+  {
+    userId,
+    sessionToken,
+    currentConversationId,
+    onConversationSelect,
+    onNewChat,
+  },
+  ref
+) => {
   const [isOpen, setIsOpen] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +61,7 @@ export default function ChatHistorySidebar({
     }).start();
   }, [isOpen, slideAnim]);
 
-  const loadConversations = async () => {
+  const loadConversations = React.useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -65,11 +74,59 @@ export default function ChatHistorySidebar({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userId, sessionToken]);
+
+  // Expose methods to parent component (industry-standard pattern)
+  useImperativeHandle(ref, () => ({
+    // Full refresh (use sparingly - only when necessary)
+    refreshConversations: async () => {
+      console.log('🔄 Sidebar: refreshConversations called');
+      await loadConversations();
+    },
+    
+    // Optimistic update: Add new conversation to list without API call
+    addNewConversation: (conversationId: string, title: string) => {
+      console.log('➕ Sidebar: addNewConversation called', { conversationId, title });
+      const newConversation: Conversation = {
+        id: conversationId,
+        title: title,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        last_message_at: new Date().toISOString(),
+        message_count: 1,
+        preview: '',
+        is_archived: false,
+        language: 'en'
+      };
+      
+      // Add to top of list (most recent first)
+      setConversations(prev => {
+        console.log('   Previous conversations count:', prev.length);
+        const updated = [newConversation, ...prev];
+        console.log('   New conversations count:', updated.length);
+        return updated;
+      });
+      console.log('✅ Optimistically added conversation:', conversationId);
+    },
+    
+    // Optimistic update: Update conversation title without API call
+    updateConversationTitle: (conversationId: string, title: string) => {
+      console.log('✏️ Sidebar: updateConversationTitle called', { conversationId, title });
+      setConversations(prev => 
+        prev.map(conv => 
+          conv.id === conversationId 
+            ? { ...conv, title, updated_at: new Date().toISOString() }
+            : conv
+        )
+      );
+      console.log('✅ Optimistically updated title:', conversationId);
+    },
+  }), [loadConversations]);
 
   const handleNewChat = async () => {
     await onNewChat();
-    await loadConversations();
+    // Don't reload conversations - new chat will appear when first message is sent
+    // This prevents unnecessary API calls and matches ChatGPT behavior
   };
 
   const handleSelectConversation = (conversationId: string) => {
@@ -147,11 +204,24 @@ export default function ChatHistorySidebar({
       Older: [],
     };
 
+    // Get current time in Manila timezone (UTC+8)
     const now = new Date();
+    const manilaOffset = 8 * 60; // Manila is UTC+8
+    const localOffset = now.getTimezoneOffset(); // Local offset in minutes (negative for ahead of UTC)
+    const offsetDiff = manilaOffset + localOffset; // Difference to Manila time
+    const nowManila = new Date(now.getTime() + offsetDiff * 60 * 1000);
+    
+    // Get start of today in Manila time
+    const todayManila = new Date(nowManila.getFullYear(), nowManila.getMonth(), nowManila.getDate());
+
     conversations.forEach((conv) => {
-      const date = new Date(conv.updated_at);
-      const diffTime = now.getTime() - date.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      // Convert UTC timestamp to Manila time
+      const dateUTC = new Date(conv.updated_at);
+      const dateManila = new Date(dateUTC.getTime() + offsetDiff * 60 * 1000);
+      
+      // Calculate difference in days from start of today (Manila time)
+      const diffTime = todayManila.getTime() - new Date(dateManila.getFullYear(), dateManila.getMonth(), dateManila.getDate()).getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
       if (diffDays === 0) {
         groups.Today.push(conv);
@@ -320,17 +390,6 @@ export default function ChatHistorySidebar({
                           {conv.title}
                         </Text>
                       </View>
-                      {conv.preview && (
-                        <Text
-                          style={[
-                            tw`text-xs ml-6`,
-                            { color: Colors.text.tertiary },
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {conv.preview}
-                        </Text>
-                      )}
                     </View>
                     <TouchableOpacity
                       onPress={(e) => handleDeleteConversation(conv.id, e)}
@@ -400,4 +459,8 @@ export default function ChatHistorySidebar({
       </Modal>
     </>
   );
-}
+});
+
+ChatHistorySidebar.displayName = 'ChatHistorySidebar';
+
+export default ChatHistorySidebar;
