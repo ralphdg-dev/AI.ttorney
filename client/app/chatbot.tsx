@@ -207,7 +207,7 @@ export default function ChatbotScreen() {
       setConversationHistory([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, session?.access_token]);
 
   const loadConversation = async (conversationId: string) => {
     if (!conversationId) {
@@ -221,7 +221,8 @@ export default function ChatbotScreen() {
     try {
       const loadedMessages = await ChatHistoryService.loadConversation(
         conversationId,
-        user?.id
+        user?.id,
+        session?.access_token
       );
       console.log("✅ Loaded messages:", loadedMessages.length);
 
@@ -262,7 +263,7 @@ export default function ChatbotScreen() {
   const handleNewChat = async () => {
     try {
       console.log('✨ Starting new chat for user:', user?.id);
-      const newConvId = await ChatHistoryService.startNewConversation(user?.id);
+      const newConvId = await ChatHistoryService.startNewConversation(user?.id, 'New Conversation', session?.access_token);
       console.log('✅ New conversation created:', newConvId);
       
       setCurrentConversationId(newConvId);
@@ -808,6 +809,7 @@ export default function ChatbotScreen() {
       {/* Chat History Sidebar */}
       <ChatHistorySidebar
         userId={user?.id}
+        sessionToken={session?.access_token}
         currentConversationId={currentConversationId}
         onConversationSelect={handleConversationSelect}
         onNewChat={handleNewChat}

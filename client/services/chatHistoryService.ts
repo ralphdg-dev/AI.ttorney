@@ -43,17 +43,7 @@ const ACTIVE_CONVERSATIONS_KEY = '@active_conversations';
  */
 export class ChatHistoryService {
   
-  private static async getAuthToken(): Promise<string | null> {
-    try {
-      return await AsyncStorage.getItem('access_token');
-    } catch (error) {
-      console.error('Error getting auth token:', error);
-      return null;
-    }
-  }
-  
-  private static async getHeaders(): Promise<Record<string, string>> {
-    const token = await this.getAuthToken();
+  private static getHeaders(token?: string): Record<string, string> {
     return {
       'Content-Type': 'application/json',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -83,11 +73,11 @@ export class ChatHistoryService {
     }
   }
 
-  static async startNewConversation(userId?: string, title: string = 'New Conversation'): Promise<string> {
+  static async startNewConversation(userId?: string, title: string = 'New Conversation', token?: string): Promise<string> {
     try {
       console.log('✨ Creating new conversation for user:', userId);
       // Create a new session via the backend API
-      const headers = await this.getHeaders();
+      const headers = this.getHeaders(token);
       const response = await axios.post(
         `${API_BASE_URL}/api/chat-history/sessions`,
         { title, language: 'en' },
@@ -116,12 +106,13 @@ export class ChatHistoryService {
   static async saveMessage(
     message: ChatMessage,
     conversationId: string,
-    userId?: string
+    userId?: string,
+    token?: string
   ): Promise<boolean> {
     try {
       // Messages are now saved automatically by the backend
       // This method is kept for backward compatibility
-      await this.updateConversationMetadata(conversationId, message, userId);
+      await this.updateConversationMetadata(conversationId, message, userId, token);
       return true;
     } catch (error) {
       console.error('Error saving message:', error);
@@ -131,7 +122,8 @@ export class ChatHistoryService {
 
   static async loadConversation(
     conversationId: string,
-    userId?: string
+    userId?: string,
+    token?: string
   ): Promise<ChatMessage[]> {
     try {
       console.log('📡 ChatHistoryService.loadConversation called');
@@ -148,7 +140,7 @@ export class ChatHistoryService {
         return [];
       }
 
-      const headers = await this.getHeaders();
+      const headers = this.getHeaders(token);
       console.log('   Headers:', Object.keys(headers));
       
       const url = `${API_BASE_URL}/api/chat-history/sessions/${conversationId}`;
@@ -193,10 +185,10 @@ export class ChatHistoryService {
     }
   }
 
-  static async getConversationsList(userId?: string, includeArchived: boolean = false): Promise<Conversation[]> {
+  static async getConversationsList(userId?: string, includeArchived: boolean = false, token?: string): Promise<Conversation[]> {
     try {
       console.log('📜 Fetching conversations list for user:', userId);
-      const headers = await this.getHeaders();
+      const headers = this.getHeaders(token);
       
       const response = await axios.get(
         `${API_BASE_URL}/api/chat-history/sessions`,
@@ -225,10 +217,10 @@ export class ChatHistoryService {
     }
   }
 
-  static async deleteConversation(conversationId: string, userId?: string): Promise<boolean> {
+  static async deleteConversation(conversationId: string, userId?: string, token?: string): Promise<boolean> {
     try {
       console.log('🗑️ Deleting conversation:', conversationId);
-      const headers = await this.getHeaders();
+      const headers = this.getHeaders(token);
       
       const response = await axios.delete(
         `${API_BASE_URL}/api/chat-history/sessions/${conversationId}`,
@@ -256,9 +248,9 @@ export class ChatHistoryService {
     }
   }
   
-  static async archiveConversation(conversationId: string): Promise<boolean> {
+  static async archiveConversation(conversationId: string, token?: string): Promise<boolean> {
     try {
-      const headers = await this.getHeaders();
+      const headers = this.getHeaders(token);
       await axios.post(
         `${API_BASE_URL}/api/chat-history/sessions/${conversationId}/archive`,
         {},
@@ -272,9 +264,9 @@ export class ChatHistoryService {
     }
   }
   
-  static async updateConversationTitle(conversationId: string, title: string): Promise<boolean> {
+  static async updateConversationTitle(conversationId: string, title: string, token?: string): Promise<boolean> {
     try {
-      const headers = await this.getHeaders();
+      const headers = this.getHeaders(token);
       await axios.patch(
         `${API_BASE_URL}/api/chat-history/sessions/${conversationId}`,
         { title },
@@ -294,10 +286,11 @@ export class ChatHistoryService {
 
   private static async updateActiveConversationsList(
     conversationId: string,
-    userId?: string
+    userId?: string,
+    token?: string
   ): Promise<void> {
     try {
-      const conversations = await this.getConversationsList(userId);
+      const conversations = await this.getConversationsList(userId, false, token);
       
       const exists = conversations.find(c => c.id === conversationId);
       if (exists) return;
@@ -324,10 +317,11 @@ export class ChatHistoryService {
   private static async updateConversationMetadata(
     conversationId: string,
     message: ChatMessage,
-    userId?: string
+    userId?: string,
+    token?: string
   ): Promise<void> {
     try {
-      const conversations = await this.getConversationsList(userId);
+      const conversations = await this.getConversationsList(userId, false, token);
       const index = conversations.findIndex(c => c.id === conversationId);
 
       if (index !== -1) {

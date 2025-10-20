@@ -10,6 +10,7 @@ import { Heading } from '../ui/heading';
 
 interface ChatHistorySidebarProps {
   userId?: string;
+  sessionToken?: string;
   currentConversationId: string;
   onConversationSelect: (conversationId: string) => void;
   onNewChat: () => void;
@@ -20,6 +21,7 @@ const SIDEBAR_POSITION = 'right'; // 'left' or 'right'
 
 export default function ChatHistorySidebar({
   userId,
+  sessionToken,
   currentConversationId,
   onConversationSelect,
   onNewChat,
@@ -36,11 +38,11 @@ export default function ChatHistorySidebar({
   );
 
   useEffect(() => {
-    if (userId) {
+    if (userId && sessionToken) {
       loadConversations();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, sessionToken]);
 
   useEffect(() => {
     Animated.timing(slideAnim, {
@@ -54,7 +56,7 @@ export default function ChatHistorySidebar({
     try {
       setIsLoading(true);
       setError(null);
-      const convos = await ChatHistoryService.getConversationsList(userId);
+      const convos = await ChatHistoryService.getConversationsList(userId, false, sessionToken);
       setConversations(convos);
       console.log('✅ Loaded', convos.length, 'conversations');
     } catch (err) {
@@ -106,7 +108,7 @@ export default function ChatHistorySidebar({
       setConversations(prev => prev.filter(c => c.id !== conversationId));
       
       // Call API to delete
-      const success = await ChatHistoryService.deleteConversation(conversationId, userId);
+      const success = await ChatHistoryService.deleteConversation(conversationId, userId, sessionToken);
       
       if (!success) {
         // Rollback on failure
