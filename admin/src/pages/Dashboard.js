@@ -1,35 +1,39 @@
-import React from 'react';
-import CountCards from '../components/dashboard/CountCards';
-import LineChartCard from '../components/dashboard/LineChartCard';
-import ReportsListCard from '../components/dashboard/ReportsListCard';
-import RecentLawyerApplicationsCard from '../components/dashboard/RecentLawyerApplicationsCard';
-import ForumPostsByCategoryCard from '../components/dashboard/ForumPostsByCategoryCard';
-import TermsByCategoryCard from '../components/dashboard/TermsByCategoryCard';
-import ArticlesByCategoryCard from '../components/dashboard/ArticlesByCategoryCard';
+import React from "react";
+import CountCards from "../components/dashboard/CountCards";
+import LineChartCard from "../components/dashboard/LineChartCard";
+import ReportsListCard from "../components/dashboard/ReportsListCard";
+import RecentLawyerApplicationsCard from "../components/dashboard/RecentLawyerApplicationsCard";
+import ForumPostsByCategoryCard from "../components/dashboard/ForumPostsByCategoryCard";
+import TermsByCategoryCard from "../components/dashboard/TermsByCategoryCard";
+import ArticlesByCategoryCard from "../components/dashboard/ArticlesByCategoryCard";
 
 const Dashboard = () => (
-  <div className="space-y-4">
-    {/* KPIs + Summary (row-span) + second row in one grid */}
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-      {/* KPIs area */}
-      <div className="lg:col-span-9">
+  <div className=" space-y-6 bg-gray-50 min-h-screen">
+    {/* TOP GRID */}
+    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+      {/* Count cards */}
+      <div className="xl:col-span-9">
         <CountCards />
       </div>
-      {/* Summary card spans two rows */}
-      <div className="lg:col-span-3 lg:row-span-2 h-full">
-        <RecentLawyerApplicationsCard />
+
+      {/* Lawyer applications */}
+      <div className="xl:col-span-3 xl:row-span-2">
+        <div className="h-full min-h-[280px] sm:min-h-[320px] md:min-h-[380px]">
+          <RecentLawyerApplicationsCard />
+        </div>
       </div>
-      {/* Second row content aligned with KPIs width */}
-      <div className="lg:col-span-9">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+      {/* Charts section */}
+      <div className="xl:col-span-9">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <LineChartCard />
           <ReportsListCard />
         </div>
       </div>
     </div>
 
-    {/* Bottom row: three cards */}
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    {/* BOTTOM GRID */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
       <ForumPostsByCategoryCard />
       <TermsByCategoryCard />
       <ArticlesByCategoryCard />
