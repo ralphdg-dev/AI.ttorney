@@ -2,16 +2,45 @@ const express = require("express");
 const router = express.Router();
 const { supabaseAdmin } = require("../config/supabase");
 
+function computeDelta(current, old) {
+  if (old === 0) return { delta: 0, up: true };
+  const delta = ((current - old) / old) * 100;
+  return {
+    delta: Number(delta.toFixed(1)),
+    up: delta >= 0,
+  };
+}
+
 router.get("/user-count", async (req, res) => {
   try {
-    const { count, error } = await supabaseAdmin
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+
+    // Current total users
+    const { count: currentCount, error: currentError } = await supabaseAdmin
       .from("users")
       .select("*", { count: "exact", head: true })
       .eq("role", "registered_user");
 
-    if (error) throw error;
+    if (currentError) throw currentError;
 
-    res.json({ legalSeekers: count });
+    // Count up to 30 days ago
+    const { count: oldCount, error: oldError } = await supabaseAdmin
+      .from("users")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "registered_user")
+      .lte("created_at", thirtyDaysAgo.toISOString());
+
+    if (oldError) throw oldError;
+
+    const { delta, up } = computeDelta(currentCount, oldCount);
+
+    res.json({
+      legalSeekers: currentCount,
+      delta,
+      up,
+    });
   } catch (error) {
     console.error("Error fetching user count:", error);
     res.status(500).json({ error: error.message });
@@ -20,33 +49,74 @@ router.get("/user-count", async (req, res) => {
 
 router.get("/lawyer-count", async (req, res) => {
   try {
-    const { count, error } = await supabaseAdmin
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+
+    const { count: currentCount, error: currentError } = await supabaseAdmin
       .from("users")
       .select("*", { count: "exact", head: true })
       .eq("role", "verified_lawyer");
 
-    if (error) throw error;
+    if (currentError) throw currentError;
 
-    res.json({ verifiedLawyer: count });
+    const { count: oldCount, error: oldError } = await supabaseAdmin
+      .from("users")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "verified_lawyer")
+      .lte("created_at", thirtyDaysAgo.toISOString());
+
+    if (oldError) throw oldError;
+
+    const { delta, up } = computeDelta(currentCount, oldCount);
+
+    res.json({
+      verifiedLawyer: currentCount,
+      delta,
+      up,
+    });
   } catch (error) {
-    console.error("Error fetching user count:", error);
+    console.error("Error fetching lawyer count:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
 router.get("/weekly-forum-posts", async (req, res) => {
   try {
+    const today = new Date();
     const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setDate(today.getDate() - 7);
 
-    const { count, error } = await supabaseAdmin
+    const thirtySevenDaysAgo = new Date();
+    thirtySevenDaysAgo.setDate(today.getDate() - 37);
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+
+    // Current week posts
+    const { count: currentCount, error: currentError } = await supabaseAdmin
       .from("forum_posts")
       .select("*", { count: "exact", head: true })
       .gte("created_at", sevenDaysAgo.toISOString());
 
-    if (error) throw error;
+    if (currentError) throw currentError;
 
-    res.json({ weeklyForumPosts: count });
+    // 30 days ago to 23 days ago (the same 7-day span, shifted)
+    const { count: oldCount, error: oldError } = await supabaseAdmin
+      .from("forum_posts")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", thirtySevenDaysAgo.toISOString())
+      .lt("created_at", thirtyDaysAgo.toISOString());
+
+    if (oldError) throw oldError;
+
+    const { delta, up } = computeDelta(currentCount, oldCount);
+
+    res.json({
+      weeklyForumPosts: currentCount,
+      delta,
+      up,
+    });
   } catch (error) {
     console.error("Error fetching weekly forum posts:", error);
     res.status(500).json({ error: error.message });
@@ -55,19 +125,42 @@ router.get("/weekly-forum-posts", async (req, res) => {
 
 router.get("/consultations-count", async (req, res) => {
   try {
+    const today = new Date();
     const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setDate(today.getDate() - 7);
 
-    const { count, error } = await supabaseAdmin
+    const thirtySevenDaysAgo = new Date();
+    thirtySevenDaysAgo.setDate(today.getDate() - 37);
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+
+    // Current week
+    const { count: currentCount, error: currentError } = await supabaseAdmin
       .from("consultation_requests")
       .select("*", { count: "exact", head: true })
       .gte("created_at", sevenDaysAgo.toISOString());
 
-    if (error) throw error;
+    if (currentError) throw currentError;
 
-    res.json({ consultationsCount: count });
+    // Same week window, but 30 days ago
+    const { count: oldCount, error: oldError } = await supabaseAdmin
+      .from("consultation_requests")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", thirtySevenDaysAgo.toISOString())
+      .lt("created_at", thirtyDaysAgo.toISOString());
+
+    if (oldError) throw oldError;
+
+    const { delta, up } = computeDelta(currentCount, oldCount);
+
+    res.json({
+      consultationsCount: currentCount,
+      delta,
+      up,
+    });
   } catch (error) {
-    console.error("Error fetching weekly forum posts:", error);
+    console.error("Error fetching consultations count:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -184,7 +277,14 @@ router.get("/forum-posts-by-category", async (req, res) => {
 
     if (error) throw error;
 
-    const categories = ["civil", "consumer", "criminal", "family", "labor", "others"];
+    const categories = [
+      "civil",
+      "consumer",
+      "criminal",
+      "family",
+      "labor",
+      "others",
+    ];
     const counts = categories.reduce((acc, cat) => {
       acc[cat] = 0;
       return acc;
@@ -217,7 +317,14 @@ router.get("/terms-by-category", async (req, res) => {
 
     if (error) throw error;
 
-    const categories = ["civil", "consumer", "criminal", "family", "labor", "others"];
+    const categories = [
+      "civil",
+      "consumer",
+      "criminal",
+      "family",
+      "labor",
+      "others",
+    ];
     const counts = categories.reduce((acc, cat) => {
       acc[cat] = 0;
       return acc;
@@ -250,7 +357,14 @@ router.get("/articles-by-category", async (req, res) => {
 
     if (error) throw error;
 
-    const categories = ["civil", "consumer", "criminal", "family", "labor", "others"];
+    const categories = [
+      "civil",
+      "consumer",
+      "criminal",
+      "family",
+      "labor",
+      "others",
+    ];
     const counts = categories.reduce((acc, cat) => {
       acc[cat] = 0;
       return acc;
@@ -277,7 +391,5 @@ router.get("/articles-by-category", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-
 
 module.exports = router;
