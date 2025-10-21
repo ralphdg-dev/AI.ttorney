@@ -68,9 +68,9 @@ const BanRestrictUsers = () => {
       setLoading(true);
       const response = await usersService.getLegalSeekers({
         page: currentPage,
-        limit: 20,
+        limit: 50, // Increased from 20 to 50 to show more users per page
         search: searchTerm,
-        status: statusFilter === "all" ? "all" : statusFilter,
+        status: statusFilter === "all" ? "" : statusFilter, // Use empty string instead of "all"
         archived: "active",
       });
 
@@ -83,6 +83,10 @@ const BanRestrictUsers = () => {
           return riskLevel.level.toLowerCase() === riskFilter;
         });
       }
+
+      console.log("Users API response:", response);
+      console.log("Total users fetched:", filteredUsers.length);
+      console.log("Pagination info:", response.pagination);
 
       setUsers(filteredUsers);
       setPagination(response.pagination);
@@ -169,14 +173,14 @@ const BanRestrictUsers = () => {
     if (!dateString) {
       return "No date available";
     }
-    
+
     const date = new Date(dateString);
-    
+
     // Check if the date is valid
     if (isNaN(date.getTime())) {
       return "Invalid date";
     }
-    
+
     return date.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
@@ -384,8 +388,12 @@ const BanRestrictUsers = () => {
       align: "center",
       render: (user) => {
         // Try different possible date field names
-        const joinDate = user.created_at || user.createdAt || user.date_joined || user.registration_date;
-        
+        const joinDate =
+          user.created_at ||
+          user.createdAt ||
+          user.date_joined ||
+          user.registration_date;
+
         return (
           <div className="flex items-center justify-center text-sm text-gray-500">
             <Calendar className="w-4 h-4 mr-1" />
@@ -444,7 +452,14 @@ const BanRestrictUsers = () => {
           <h1 className="text-2xl font-bold text-gray-900">
             Ban/Restrict Users
           </h1>
-          <p className="text-gray-600">Manage user access and restrictions</p>
+          <p className="text-gray-600">
+            Manage user access and restrictions
+            {pagination.total && (
+              <span className="ml-2 text-sm font-medium text-blue-600">
+                ({pagination.total} total users)
+              </span>
+            )}
+          </p>
         </div>
       </div>
 
