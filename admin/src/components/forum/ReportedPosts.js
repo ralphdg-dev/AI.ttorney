@@ -141,11 +141,11 @@ const ReportedPosts = () => {
 
   const getPriorityColor = (category) => {
     const priorityColors = {
-      harassment: 'text-red-600',
-      inappropriate: 'text-red-500',
       spam: 'text-orange-500',
+      harassment: 'text-red-600',
+      hate_speech: 'text-red-700',
       misinformation: 'text-purple-600',
-      off_topic: 'text-blue-500',
+      inappropriate: 'text-red-500',
       other: 'text-gray-500'
     };
     return priorityColors[category] || 'text-gray-500';
