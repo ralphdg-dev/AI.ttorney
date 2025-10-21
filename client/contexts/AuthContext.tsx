@@ -4,7 +4,11 @@ import { supabase, clearAuthStorage } from '../config/supabase';
 import { router, useSegments } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { signInWithGoogle as googleSignIn } from '../utils/googleAuth';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+
+// Complete the WebBrowser session on component unmount
+WebBrowser.maybeCompleteAuthSession();
 
 // Role hierarchy based on backend schema
 export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
@@ -215,6 +219,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Handle OAuth callback URLs
+  useEffect(() => {
+    const handleUrl = async (event: { url: string }) => {
+      console.log('📱 Received URL:', event.url);
+      
+      // Check if this is an OAuth callback
+      if (event.url.includes('#access_token=') || event.url.includes('?access_token=')) {
+        console.log('🔐 Processing OAuth callback...');
+        
+        // Extract the URL fragment/query
+        const url = event.url;
+        const params = new URLSearchParams(url.split('#')[1] || url.split('?')[1]);
+        
+        const access_token = params.get('access_token');
+        const refresh_token = params.get('refresh_token');
+        
+        if (access_token && refresh_token) {
+          console.log('✅ Tokens found in URL, setting session...');
+          
+          // Set the session in Supabase
+          const { data, error } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+          
+          if (error) {
+            console.error('❌ Error setting session:', error.message);
+          } else if (data.session) {
+            console.log('✅ Session set successfully');
+            await handleAuthStateChange(data.session, true);
+          }
+        }
+      }
+    };
+
+    // Listen for URL events
+    const subscription = Linking.addEventListener('url', handleUrl);
+
+    // Check if app was opened with a URL
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleUrl({ url });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [handleAuthStateChange]);
+
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -264,41 +318,91 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       setHasRedirectedToStatus(false);
 
-      // Get Google ID token
-      const googleResult = await googleSignIn();
+      console.log('🔐 Starting Supabase Google OAuth flow...');
 
-      if (!googleResult.success || !googleResult.idToken) {
-        return { 
-          success: false, 
-          error: googleResult.error || 'Failed to sign in with Google' 
-        };
-      }
+      // Create redirect URL for OAuth callback
+      const redirectTo = 'ai-ttorney://';
+      console.log('🔗 Redirect URL:', redirectTo);
 
-      // Sign in to Supabase with Google ID token
-      const { data, error } = await supabase.auth.signInWithIdToken({
+      // Step 1: Initiate Supabase Google OAuth
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        token: googleResult.idToken,
+        options: {
+          redirectTo,
+          skipBrowserRedirect: false,
+        },
       });
 
       if (error) {
-        console.error('Supabase Google sign in error:', error.message);
-        return { 
-          success: false, 
-          error: 'Failed to authenticate with Google' 
+        console.error('❌ OAuth initiation failed:', error.message);
+        return {
+          success: false,
+          error: 'Failed to start Google Sign-In. Please try again.',
         };
       }
 
-      if (data.session) {
-        await handleAuthStateChange(data.session, true);
-        return { success: true };
+      if (!data.url) {
+        console.error('❌ OAuth URL not generated');
+        return {
+          success: false,
+          error: 'Failed to generate sign-in URL. Please try again.',
+        };
       }
 
-      return { success: false, error: 'Google sign in failed. Please try again' };
+      console.log('✅ OAuth URL generated');
+
+      // Step 2: Open browser for OAuth
+      console.log('🌐 Opening browser for authentication...');
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectTo
+      );
+
+      console.log('📱 Browser result:', result.type);
+
+      if (result.type === 'cancel') {
+        console.log('ℹ️ User cancelled sign-in');
+        return {
+          success: false,
+          error: 'Sign-in was cancelled',
+        };
+      }
+
+      if (result.type !== 'success') {
+        console.error('❌ OAuth flow failed:', result.type);
+        return {
+          success: false,
+          error: 'Sign-in failed. Please try again.',
+        };
+      }
+
+      // Step 3: Process OAuth callback
+      console.log('🔄 Processing OAuth callback...');
+      
+      // Supabase will automatically handle the session via the auth state listener
+      // Just wait a moment for it to process
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      console.log('✅ Google Sign-In completed successfully');
+      return { success: true };
+
     } catch (error: any) {
-      console.error('Google sign in catch:', error);
+      console.error('❌ Unexpected error during Google Sign-In:', error);
+      
+      // Handle unexpected errors gracefully
+      let errorMessage = 'An unexpected error occurred. Please try again.';
+      
+      if (error.message?.includes('network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (error.message?.includes('cancelled')) {
+        errorMessage = 'Sign-in was cancelled';
+      }
+      
       return { 
         success: false, 
-        error: error.message || 'Failed to sign in with Google' 
+        error: errorMessage,
       };
     } finally {
       setIsLoading(false);
