@@ -587,7 +587,7 @@ export default function ChatbotScreen() {
               console.log('✅ Stream completed');
               isStreamingRef.current = false; // Mark streaming as complete
               
-              // Final update with sources (CRITICAL: ensures sources are always displayed)
+              // Final update with sources and disclaimer (CRITICAL: ensures sources are always displayed)
               setMessages((prev) => {
                 const newMessages = [...prev];
                 const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
@@ -597,9 +597,10 @@ export default function ChatbotScreen() {
                     text: answer,
                     sources: sources, // Add sources to message
                     language: language,
-                    confidence: confidence
+                    confidence: confidence,
+                    legal_disclaimer: legal_disclaimer // Add disclaimer only if provided
                   };
-                  console.log('✅ Final message updated with sources:', sources.length);
+                  console.log('✅ Final message updated with sources:', sources.length, 'and disclaimer:', !!legal_disclaimer);
                 }
                 return newMessages;
               });
@@ -647,6 +648,12 @@ export default function ChatbotScreen() {
                   if (data.sources) {
                     sources = data.sources;
                     console.log('📚 Legal sources received:', sources.length);
+                  }
+
+                  // Store legal disclaimer if provided
+                  if (data.type === 'disclaimer' && data.disclaimer) {
+                    legal_disclaimer = data.disclaimer;
+                    console.log('⚖️ Legal disclaimer received');
                   }
 
                   if (data.type === 'metadata') {

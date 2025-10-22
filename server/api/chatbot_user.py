@@ -640,8 +640,75 @@ def is_legal_question(text: str) -> bool:
     """
     Check if the input is actually asking for legal information or advice.
     Handles both direct questions and conversational queries.
+    
+    CRITICAL: Must exclude non-legal topics (medical, tech, religious, etc.)
+    to prevent false positives and irrelevant legal sources/disclaimers.
     """
     text_lower = text.lower().strip()
+    
+    # FIRST: Check for explicitly non-legal topics (medical, tech, etc.)
+    # This prevents false positives from generic words like "gamit", "sira"
+    non_legal_topics = {
+        'medical': [
+            'gamot', 'medicine', 'medication', 'lunas', 'treatment',
+            'sakit', 'illness', 'disease', 'sintomas', 'symptoms',
+            'doctor', 'doktor', 'hospital', 'ospital', 'clinic', 'klinika',
+            'sugat', 'wound', 'injury', 'pinsala sa katawan',
+            'lagnat', 'fever', 'sipon', 'cold', 'ubo', 'cough',
+            'trangkaso', 'flu', 'covid', 'virus', 'bacteria',
+            'surgery', 'operasyon', 'operation', 'medical procedure',
+            'prescription', 'reseta', 'diagnosis', 'check-up',
+            'vaccine', 'bakuna', 'injection', 'iniksyon',
+            'maggamot', 'gumaling', 'healing', 'paggaling',
+            'health', 'kalusugan', 'wellness', 'fitness',
+            'therapy', 'terapya', 'rehabilitation', 'rehab'
+        ],
+        'technology': [
+            'computer', 'kompyuter', 'laptop', 'phone', 'cellphone',
+            'software', 'app', 'application', 'program',
+            'internet', 'wifi', 'website', 'online',
+            'facebook', 'tiktok', 'instagram', 'social media',
+            'hack', 'hacker', 'virus', 'malware',
+            'install', 'download', 'upload', 'i-download',
+            'password', 'account', 'login', 'mag-login',
+            'gadget', 'device', 'smartphone', 'tablet'
+        ],
+        'religious': [
+            'prayer', 'panalangin', 'dasal', 'rosary',
+            'church', 'simbahan', 'chapel', 'kapilya',
+            'priest', 'pari', 'pastor', 'imam', 'monk',
+            'bible', 'bibliya', 'quran', 'scripture',
+            'god', 'diyos', 'allah', 'jesus', 'maria',
+            'santo', 'santa', 'saint', 'angel', 'anghel',
+            'blessing', 'pagpapala', 'miracle', 'himala',
+            'sin', 'kasalanan', 'confession', 'kumpisal',
+            'mass', 'misa', 'worship', 'pagsamba'
+        ],
+        'general_advice': [
+            'recipe', 'lutuin', 'cooking', 'pagluluto',
+            'exercise', 'ehersisyo', 'workout', 'gym',
+            'diet', 'pagkain', 'nutrition', 'nutrisyon',
+            'relationship advice', 'love advice', 'payo sa pag-ibig',
+            'fashion', 'damit', 'style', 'estilo',
+            'beauty', 'ganda', 'makeup', 'cosmetics'
+        ]
+    }
+    
+    # Check each non-legal category
+    for category, keywords in non_legal_topics.items():
+        matches = sum(1 for keyword in keywords if keyword in text_lower)
+        # If 2+ matches in a non-legal category, it's NOT a legal question
+        if matches >= 2:
+            logger.info(f"Query identified as {category} topic ({matches} matches) - NOT legal")
+            return False
+        # Even 1 strong medical indicator is enough to exclude
+        if category == 'medical' and matches >= 1:
+            # Check if it's ONLY medical (no legal context)
+            legal_context_words = ['law', 'batas', 'legal', 'rights', 'karapatan', 'court', 'korte']
+            has_legal_context = any(word in text_lower for word in legal_context_words)
+            if not has_legal_context:
+                logger.info(f"Query identified as medical topic - NOT legal")
+                return False
 
     # Legal domain keywords (5 main areas)
     # Industry best practice: Include colloquial terms, misspellings, and simple language
@@ -782,23 +849,54 @@ def is_legal_question(text: str) -> bool:
         'may', 'there is', 'meron', 'mayroon', 'may nangyari'
     ]
 
-    # Check for legal domain keywords
-    has_legal_domain = any(keyword in text_lower for keyword in legal_domain_keywords)
+    # Remove overly generic words that cause false positives
+    # These are too broad and match non-legal queries
+    generic_words_to_exclude = [
+        'gamit', 'sira', 'nasira',  # Too generic - matches "gamot", "sugat", etc.
+        'may sakit',  # Medical, not legal
+        'help', 'tulong',  # Too generic without legal context
+    ]
     
-    # Check for general legal keywords
-    has_legal_keyword = any(keyword in text_lower for keyword in general_legal_keywords)
+    # Filter out generic words from legal keywords
+    filtered_legal_domain = [k for k in legal_domain_keywords if k not in generic_words_to_exclude]
+    filtered_general_legal = [k for k in general_legal_keywords if k not in generic_words_to_exclude]
+    
+    # Check for legal domain keywords (with filtered list)
+    has_legal_domain = any(keyword in text_lower for keyword in filtered_legal_domain)
+    
+    # Check for STRONG legal keywords (must be explicit)
+    strong_legal_keywords = [
+        'law', 'batas', 'legal', 'illegal', 'karapatan', 'rights',
+        'court', 'korte', 'case', 'kaso', 'sue', 'demanda',
+        'attorney', 'abogado', 'lawyer',
+        'penalty', 'parusa', 'fine', 'multa',
+        'arrest', 'huli', 'police', 'pulis',
+        'contract', 'kontrata', 'agreement',
+        'crime', 'krimen', 'theft', 'nakaw',
+        'estafa', 'fraud', 'scam',
+        'labor code', 'civil code', 'revised penal code',
+        'republic act', 'presidential decree'
+    ]
+    has_strong_legal_keyword = any(keyword in text_lower for keyword in strong_legal_keywords)
+    
+    # Check for general legal keywords (filtered)
+    has_legal_keyword = any(keyword in text_lower for keyword in filtered_general_legal)
     
     # Check for conversational patterns
     has_conversational_pattern = any(pattern in text_lower for pattern in conversational_patterns)
 
     # A question is legal if:
     # 1. It mentions a legal domain (consumer law, labor law, etc.), OR
-    # 2. It has legal keywords AND conversational patterns (e.g., "points I need to know about consumer law")
-    # 3. It has general legal keywords
-    is_legal = has_legal_domain or (has_conversational_pattern and has_legal_keyword) or has_legal_keyword
+    # 2. It has STRONG legal keywords (explicit legal terms), OR
+    # 3. It has legal keywords AND conversational patterns
+    # 
+    # CHANGED: Require stronger evidence to avoid false positives
+    is_legal = has_legal_domain or has_strong_legal_keyword or (has_conversational_pattern and has_legal_keyword)
     
     if is_legal:
-        logger.debug(f"Detected as legal question - domain:{has_legal_domain}, keyword:{has_legal_keyword}, conversational:{has_conversational_pattern}")
+        logger.debug(f"Detected as legal question - domain:{has_legal_domain}, strong_keyword:{has_strong_legal_keyword}, keyword:{has_legal_keyword}, conversational:{has_conversational_pattern}")
+    else:
+        logger.debug(f"NOT a legal question - will provide casual/redirect response")
     
     return is_legal
 
@@ -1115,37 +1213,44 @@ Gawing varied at natural, hindi robotic."""
         'casual': {
             'english': f"""You are Ai.ttorney, a friendly Philippine legal assistant. The user just said: "{question}"
 
-This seems like casual conversation, slang, or friendly chat - not a legal question.
+This is NOT a legal question. It appears to be about a non-legal topic (medical, technology, religious, general advice, etc.).
 
-⚠️ CRITICAL RULES:
-- You can ONLY help with Civil, Criminal, Consumer, Family, and Labor Law
-- If the message asks about politics, history, current events, or anything non-legal, politely decline
-- Only respond warmly to greetings and casual chat, then invite legal questions
+⚠️ CRITICAL INSTRUCTIONS:
+- You can ONLY help with Philippine Civil, Criminal, Consumer, Family, and Labor Law
+- This question is OUTSIDE your scope
+- Politely decline and explain you cannot help with this topic
+- Suggest they consult the appropriate professional (doctor, tech support, religious leader, etc.)
+- Be brief, respectful, and redirect them clearly
 
-Respond in a natural, conversational way that:
-1. Matches their energy and language style perfectly
-2. Shows personality and warmth like a real friend
-3. Invites them to ask LEGAL questions only
-4. Uses the same language they used (English, Tagalog, or Taglish)
+Response format:
+1. Acknowledge their question briefly
+2. Explain you cannot help with this specific topic
+3. Suggest the appropriate professional to consult
+4. Optionally invite them to ask legal questions instead
 
-Keep it brief but engaging - like a real conversation.
+Example for medical: "I understand you're asking about [medical topic], but I'm a legal assistant and can only help with Philippine law. For medical concerns, I recommend consulting with a licensed medical professional or doctor. If you have any legal questions, feel free to ask!"
 
-Make it varied and natural, not robotic.""",
+Keep it brief (2-3 sentences max). Use the same language they used (English, Tagalog, or Taglish).""",
             'tagalog': f"""Ikaw si Ai.ttorney, isang mainit na legal assistant sa Pilipinas. Ang user lang ay nag-sabi: "{question}"
 
-Ito ay mukhang casual na conversation - hindi legal na tanong.
+Ito ay HINDI legal na tanong. Mukhang tungkol ito sa non-legal topic (medical, technology, religious, general advice, etc.).
 
-⚠️ MAHALAGANG MGA PATAKARAN:
-- Makakatulong ka LAMANG sa Civil, Criminal, Consumer, Family, at Labor Law
-- Kung ang mensahe ay tungkol sa pulitika, kasaysayan, o kahit anong hindi legal, magalang na tumanggi
-- Sumagot lang nang mainit sa greetings at casual chat, tapos imbitahan ang legal questions
+⚠️ MAHALAGANG INSTRUKSYON:
+- Makakatulong ka LAMANG sa Philippine Civil, Criminal, Consumer, Family, at Labor Law
+- Ang tanong na ito ay LABAS sa iyong scope
+- Magalang na tumanggi at ipaliwanag na hindi ka makakatulong sa topic na ito
+- Mag-suggest na kumonsulta sila sa tamang propesyonal (doktor, tech support, religious leader, etc.)
+- Maging maikli, magalang, at malinaw na mag-redirect
 
-Sumagot nang natural at conversational na:
-1. I-match nang perfect ang kanilang energy at estilo ng lengguwahe
-2. Magpakita ng personalidad at init parang tunay na kaibigan
-3. Imbitahan silang magtanong tungkol sa LEGAL lang
+Format ng sagot:
+1. Kilalanin ang kanilang tanong nang maikli
+2. Ipaliwanag na hindi ka makakatulong sa specific topic na ito
+3. Mag-suggest ng tamang propesyonal na konsultahin
+4. Optional: Imbitahan silang magtanong tungkol sa legal
 
-Panatilihing maikli pero engaging.
+Halimbawa para sa medical: "Naiintindihan ko na nagtanong ka tungkol sa [medical topic], pero ako ay legal assistant at makakatulong lamang sa batas ng Pilipinas. Para sa medical concerns, inirerekomenda kong kumonsulta sa lisensyadong medical professional o doktor. Kung may legal na tanong ka, handa akong tumulong!"
+
+Panatilihing maikli (2-3 pangungusap lang). Gamitin ang parehong lengguwahe nila.
 
 Gawing varied at natural, hindi robotic."""
         },
@@ -1227,14 +1332,118 @@ Gawing varied at natural, hindi robotic."""
         return fallbacks[response_type]
 
 
-def get_legal_disclaimer(language: str) -> str:
+def requires_legal_disclaimer(question: str, answer: str) -> bool:
     """
-    Get legal disclaimer in appropriate language with in-app legal help link
+    Determine if a response requires a legal disclaimer.
+    Only legal questions/answers should have disclaimers.
+    
+    Industry best practice: Don't show legal disclaimers for:
+    - Simple greetings ("hello", "hi", "kumusta")
+    - General chitchat
+    - Non-legal questions
+    
+    Args:
+        question: User's input question
+        answer: Generated response
+    
+    Returns:
+        bool: True if legal disclaimer is needed, False otherwise
     """
+    question_lower = question.lower().strip()
+    answer_lower = answer.lower().strip()
+    
+    # 1. Check if it's a simple greeting - NO disclaimer needed
+    if is_simple_greeting(question):
+        logger.debug("No disclaimer needed: Simple greeting detected")
+        return False
+    
+    # 2. Check if question is very short and non-legal - NO disclaimer needed
+    if len(question_lower) < 15:
+        # Short questions that are clearly non-legal
+        non_legal_short = [
+            'hello', 'hi', 'hey', 'kumusta', 'kamusta', 'salamat', 'thank', 'thanks',
+            'ok', 'okay', 'yes', 'no', 'oo', 'hindi', 'what', 'ano', 'who', 'sino'
+        ]
+        if any(word in question_lower for word in non_legal_short):
+            # Check if answer also doesn't contain legal content
+            legal_indicators_in_answer = [
+                'law', 'batas', 'legal', 'article', 'artikulo', 'code', 'kodigo',
+                'rights', 'karapatan', 'court', 'korte', 'case', 'kaso'
+            ]
+            if not any(indicator in answer_lower for indicator in legal_indicators_in_answer):
+                logger.debug("No disclaimer needed: Short non-legal question")
+                return False
+    
+    # 3. Check if question contains legal keywords - NEEDS disclaimer
+    legal_keywords = [
+        # Legal domain terms
+        'law', 'batas', 'legal', 'illegal', 'karapatan', 'rights',
+        'court', 'korte', 'case', 'kaso', 'sue', 'demanda',
+        
+        # Consumer law
+        'consumer', 'konsumer', 'warranty', 'refund', 'defective', 'sira',
+        
+        # Labor law
+        'employment', 'trabaho', 'employer', 'boss', 'sahod', 'wage',
+        'overtime', 'termination', 'tanggal', 'fired', 'resign',
+        
+        # Family law
+        'marriage', 'kasal', 'divorce', 'annulment', 'custody', 'alimony',
+        'domestic violence', 'vawc', 'infidelity', 'cheating',
+        
+        # Criminal law
+        'crime', 'krimen', 'theft', 'nakaw', 'robbery', 'holdap',
+        'assault', 'murder', 'fraud', 'estafa', 'arrest', 'huli',
+        
+        # Civil law
+        'contract', 'kontrata', 'property', 'ari-arian', 'inheritance',
+        'debt', 'utang', 'rent', 'renta', 'eviction', 'palayas'
+    ]
+    
+    # Check if question contains any legal keywords
+    has_legal_keywords = any(keyword in question_lower for keyword in legal_keywords)
+    
+    # 4. Check if answer contains legal information - NEEDS disclaimer
+    legal_answer_indicators = [
+        'article', 'artikulo', 'section', 'seksiyon',
+        'republic act', 'ra ', 'presidential decree', 'pd ',
+        'civil code', 'labor code', 'family code', 'revised penal code',
+        'according to law', 'ayon sa batas', 'under philippine law',
+        'legal', 'batas', 'karapatan', 'rights'
+    ]
+    
+    has_legal_answer = any(indicator in answer_lower for indicator in legal_answer_indicators)
+    
+    # Decision logic: Show disclaimer if question OR answer contains legal content
+    if has_legal_keywords or has_legal_answer:
+        logger.debug(f"Legal disclaimer needed: legal_keywords={has_legal_keywords}, legal_answer={has_legal_answer}")
+        return True
+    
+    logger.debug("No disclaimer needed: No legal content detected")
+    return False
+
+
+def get_legal_disclaimer(language: str, question: str = "", answer: str = "") -> str:
+    """
+    Get legal disclaimer in appropriate language with in-app legal help link.
+    Only returns disclaimer if the question/answer is actually legal-related.
+    
+    Args:
+        language: Detected language (english, tagalog, taglish)
+        question: User's question (optional, for context)
+        answer: Generated answer (optional, for context)
+    
+    Returns:
+        str: Legal disclaimer if needed, empty string otherwise
+    """
+    # Check if disclaimer is actually needed
+    if question and answer and not requires_legal_disclaimer(question, answer):
+        return ""  # No disclaimer for non-legal queries
+    
     disclaimers = {
-        "english": "⚖️ Important: This is general legal information only, not legal advice. For your specific situation, you can consult with a licensed Philippine lawyer through our [Legal Help](/legal-help) section.",
-        "tagalog": "⚖️ Mahalaga: Ito ay pangkalahatang impormasyon lamang, hindi legal advice. Para sa iyong partikular na sitwasyon, maaari kang kumonsulta sa lisensyadong abogado sa aming [Legal Help](/legal-help) section.",
-        "taglish": "⚖️ Important: Ito ay general legal information lang, hindi legal advice. Para sa iyong specific situation, you can consult with a licensed Philippine lawyer sa aming [Legal Help](/legal-help) section."
+        "english": "⚖️ Important: This is general legal information only, not legal advice. For your specific situation, you can consult with a licensed Philippine lawyer through our [Lawyer Directory](/directory) section.",
+        "tagalog": "⚖️ Mahalaga: Ito ay pangkalahatang impormasyon lamang, hindi legal advice. Para sa iyong partikular na sitwasyon, maaari kang kumonsulta sa lisensyadong abogado sa aming [Lawyer Directory](/directory) section.",
+        "taglish": "⚖️ Important: Ito ay general legal information lang, hindi legal advice. Para sa iyong specific situation, you can consult with a licensed Philippine lawyer sa aming [Lawyer Directory](/directory) section."
     }
     return disclaimers.get(language, disclaimers["english"])
 
@@ -1751,8 +1960,8 @@ async def ask_legal_question(
             except Exception as e:
                 print(f"⚠️  Failed to generate security report: {e}")
         
-        # Get legal disclaimer (simplified)
-        legal_disclaimer = get_legal_disclaimer(language)
+        # Get legal disclaimer (only for legal questions)
+        legal_disclaimer = get_legal_disclaimer(language, request.question, answer)
         
         # Get fallback suggestions for complex queries OR low confidence answers
         fallback_suggestions = get_fallback_suggestions(language, is_complex=True) if (is_complex or confidence == "low") else None
@@ -1955,6 +2164,11 @@ async def ask_legal_question_stream(
             # Send any remaining tokens in buffer
             if token_buffer:
                 yield format_sse({'content': token_buffer})
+            
+            # Send legal disclaimer (only if needed for legal questions)
+            legal_disclaimer = get_legal_disclaimer(language, request.question, full_answer)
+            if legal_disclaimer:
+                yield format_sse({'type': 'disclaimer', 'disclaimer': legal_disclaimer})
             
             # Done
             yield format_sse({'done': True})
