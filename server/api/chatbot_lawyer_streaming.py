@@ -111,7 +111,12 @@ async def ask_legal_question_stream(
             authenticated_user_id = None
             if current_user and "user" in current_user:
                 authenticated_user_id = current_user["user"]["id"]
+                print(f"✅ Authenticated user ID: {authenticated_user_id}")
+            else:
+                print(f"⚠️  No authenticated user found. current_user: {current_user}")
+            
             effective_user_id = authenticated_user_id or request.user_id
+            print(f"📝 Effective user ID for chat history: {effective_user_id}")
             
             # Production logging
             logger.info(f"Streaming request - user_id={effective_user_id}, session_id={request.session_id}, question_length={len(request.question)}")

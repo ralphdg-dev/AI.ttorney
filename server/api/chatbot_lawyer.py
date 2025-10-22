@@ -1378,28 +1378,30 @@ async def save_chat_interaction(
                 existing_session = await chat_service.get_session(UUID(session_id))
                 session_exists = existing_session is not None
                 if session_exists:
-                    print(f"    ✅ Using existing session: {session_id}")
+                    print(f"   ✅ Using existing session: {session_id}")
                 else:
-                    print(f"    ⚠️  Session {session_id} not found, creating new one")
+                    print(f"   ⚠️  Session {session_id} not found, creating new one")
                     session_id = None  # Force creation of new session
             except Exception as e:
-                print(f"    ⚠️  Error checking session: {e}, creating new one")
+                print(f"   ⚠️  Error checking session: {e}, creating new one")
                 session_id = None
         
         # Create session if needed (first message or invalid session_id)
         if not session_id:
             title = question[:50] if len(question) > 50 else question
-            print(f"    Creating new session: {title}")
+            print(f"   Creating new session: {title}")
+            # Map language to database format ('en' or 'fil')
+            db_language = 'en' if language in ['english', 'en'] else 'fil'
             session = await chat_service.create_session(
                 user_id=UUID(effective_user_id),
                 title=title,
-                language=language
+                language=db_language
             )
             session_id = str(session.id)
-            print(f"    ✅ Session created: {session_id}")
+            print(f"   ✅ Session created: {session_id}")
         
         # Save user message
-        print(f"    Saving user message...")
+        print(f"   Saving user message...")
         user_msg = await chat_service.add_message(
             session_id=UUID(session_id),
             user_id=UUID(effective_user_id),
@@ -1408,10 +1410,10 @@ async def save_chat_interaction(
             metadata={}
         )
         user_message_id = str(user_msg.id)
-        print(f"    ✅ User message saved: {user_message_id}")
+        print(f"   ✅ User message saved: {user_message_id}")
         
         # Save assistant message
-        print(f"    Saving assistant message...")
+        print(f"   Saving assistant message...")
         assistant_msg = await chat_service.add_message(
             session_id=UUID(session_id),
             user_id=UUID(effective_user_id),
@@ -1420,7 +1422,7 @@ async def save_chat_interaction(
             metadata=metadata or {}
         )
         assistant_message_id = str(assistant_msg.id)
-        print(f"    ✅ Assistant message saved: {assistant_message_id}")
+        print(f"   ✅ Assistant message saved: {assistant_message_id}")
         print(f"💾 Chat history saved successfully!")
         
         return (session_id, user_message_id, assistant_message_id)
@@ -1428,7 +1430,7 @@ async def save_chat_interaction(
     except Exception as e:
         import traceback
         print(f"⚠️  Failed to save chat history: {e}")
-        print(f"    Traceback: {traceback.format_exc()}")
+        print(f"   Traceback: {traceback.format_exc()}")
         return (session_id, None, None)
 
 
@@ -1473,9 +1475,13 @@ async def ask_legal_question(
     authenticated_user_id = None
     if current_user and "user" in current_user:
         authenticated_user_id = current_user["user"]["id"]
+        print(f"✅ Authenticated user ID: {authenticated_user_id}")
+    else:
+        print(f"⚠️  No authenticated user found. current_user: {current_user}")
     
     # Use authenticated user_id, fallback to request.user_id for backward compatibility
     effective_user_id = authenticated_user_id or request.user_id
+    print(f"📝 Effective user ID for chat history: {effective_user_id}")
     
     # Production logging with request ID for tracing
     logger.info(f"Request received - user_id={effective_user_id}, session_id={request.session_id}, question_length={len(request.question)}")

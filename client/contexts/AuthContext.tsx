@@ -184,12 +184,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } else if (event === 'TOKEN_REFRESHED' && session) {
               await handleAuthStateChange(session, false);
             } else if (event === 'SIGNED_OUT') {
+              // Clear auth state and redirect flag
               setAuthState({ session: null, user: null, supabaseUser: null });
               setHasRedirectedToStatus(false);
-              router.replace('/login');
+              setIsLoading(false);
+              setIsSigningOut(false);
+              
+              // Only navigate if not already on login page
+              const currentPath = `/${segments.join('/')}`;
+              if (currentPath !== '/login') {
+                router.replace('/login');
+              }
             }
             
-            setIsLoading(false);
+            // Ensure loading is always set to false after auth state changes
+            if (event !== 'SIGNED_OUT') {
+              setIsLoading(false);
+            }
           }
         );
 
@@ -254,9 +265,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    setIsSigningOut(true);
-    
     try {
+      // Set signing out state
+      setIsSigningOut(true);
+      setIsLoading(true);
+      
       // Clear auth state immediately to prevent further API calls
       setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
@@ -264,18 +277,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear local storage first
       await clearAuthStorage();
       
-      // Then sign out from Supabase Auth
+      // Sign out from Supabase Auth (this will trigger SIGNED_OUT event)
       await supabase.auth.signOut({ scope: 'local' });
       
-      // Navigate to login
-      router.replace('/login');
+      // The SIGNED_OUT event listener will handle navigation and state cleanup
     } catch (error) {
       console.error('Sign out error:', error);
+      
       // Force clear state on error
       setAuthState({ session: null, user: null, supabaseUser: null });
-      router.replace('/login');
-    } finally {
+      setHasRedirectedToStatus(false);
+      setIsLoading(false);
       setIsSigningOut(false);
+      
+      // Navigate to login on error
+      router.replace('/login');
     }
   };
 
