@@ -190,13 +190,15 @@ const ManageLawyerApplications = () => {
         await lawyerApplicationsService.getLawyerApplication(row.id);
 
       // Check roll number for the detailed view as well
-      if (applicationDetails.roll_number) {
-        const rollCheck = await rollMatchService.checkRollNumber(
-          applicationDetails.roll_number
-        );
-        applicationDetails.pra_status = rollCheck.status;
-        applicationDetails.pra_match_details = rollCheck.lawyer || null;
-      }
+      const rollCheck = await rollMatchService.checkApplicationDetails({
+        rollNumber: applicationDetails.roll_number,
+        fullName: applicationDetails.full_name,
+        rollSignDate: applicationDetails.roll_sign_date,
+      }); 
+      applicationDetails.pra_status = rollCheck.status;
+      applicationDetails.pra_match_details = rollCheck.lawyer || null;
+
+      setSelected(applicationDetails);
 
       setSelected(applicationDetails);
     } catch (error) {

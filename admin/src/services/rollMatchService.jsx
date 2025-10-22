@@ -27,27 +27,95 @@ class RollMatchService {
     }
   }
 
-  // Check if a roll number exists in the lawyers list
-  async checkRollNumber(rollNumber) {
+  /**
+   * Helper function to normalize and split a full name.
+   */
+  _parseFullName(fullName) {
+    if (!fullName || typeof fullName !== "string") {
+      return { firstname: "", lastname: "" };
+    }
+    const words = fullName.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length === 0) {
+      return { firstname: "", lastname: "" };
+    }
+    const lastname = words.pop();
+    const firstname = words.join(" ");
+    return { firstname, lastname };
+  }
+
+  /**
+   * [NEW] Helper function to convert "August 29, 2024" to "2024-08-29"
+   */
+  _normalizeJsonDate(dateString) {
+    if (!dateString || dateString.trim() === "") {
+      return null;
+    }
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        // Check for invalid date
+        return null;
+      }
+      const year = date.getFullYear();
+      const month = (date.getMonth() + 1).toString().padStart(2, "0"); // getMonth() is 0-indexed
+      const day = date.getDate().toString().padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    } catch (error) {
+      console.error(`Error parsing date: ${dateString}`, error);
+      return null;
+    }
+  }
+
+  /**
+   * [MODIFIED] Checks an application by Roll Number, Full Name, AND Roll Sign Date.
+   * This is for the "View Details" modal.
+   */
+  async checkApplicationDetails({ rollNumber, fullName, rollSignDate }) {
     if (!this.initialized) {
       await this.loadLawyersList();
     }
 
-    if (!rollNumber || rollNumber.trim() === "") {
+    // 1. Check for valid input
+    if (!rollNumber || !fullName || !rollSignDate) {
       return {
         matched: false,
         status: "not_found",
-        reason: "No roll number provided",
+        reason: "Roll number, full name, or sign date is missing.",
       };
     }
 
+    // 2. Normalize inputs
     const normalizedRollNumber = rollNumber.toString().trim();
+    const { firstname: inputFirstname, lastname: inputLastname } =
+      this._parseFullName(fullName);
+    const appDate = (rollSignDate || "").trim(); // This is already in "yyyy-mm-dd"
 
+    if (!inputLastname || appDate === "") {
+      return {
+        matched: false,
+        status: "not_found",
+        reason: "Invalid name or date.",
+      };
+    }
+
+    // 3. Find the match with "AND" logic
     const matchedLawyer = this.lawyersList.find((lawyer) => {
+      // Normalize JSON data for comparison
       const lawyerRollNo = (lawyer["Roll No."] || "").toString().trim();
-      return lawyerRollNo === normalizedRollNumber;
+      const lawyerLastname = (lawyer.Lastname || "").trim().toLowerCase();
+      const lawyerFirstname = (lawyer.Firstname || "").trim().toLowerCase();
+      const lawyerDate = this._normalizeJsonDate(lawyer["Roll Signed Date"]); // Convert "Month DD, YYYY"
+
+      // THE CORE "AND" LOGIC
+      return (
+        lawyerRollNo === normalizedRollNumber &&
+        lawyerLastname === inputLastname &&
+        lawyerFirstname === inputFirstname &&
+        lawyerDate === appDate // <-- ADDED DATE CHECK
+      );
     });
 
+    // 4. Return result
     if (matchedLawyer) {
       return {
         matched: true,
@@ -57,7 +125,7 @@ class RollMatchService {
           firstname: matchedLawyer.Firstname,
           middleName: matchedLawyer["Middle Name"],
           address: matchedLawyer.Address,
-          rollSignDate: matchedLawyer["Roll Signed Date"],
+          rollSignDate: matchedLawyer["Roll Signed Date"], // Return original JSON format
           rollNo: matchedLawyer["Roll No."],
         },
       };
@@ -66,33 +134,56 @@ class RollMatchService {
     return {
       matched: false,
       status: "not_found",
-      reason: "Roll number not found in PRA records",
+      reason:
+        "Roll number, name, and sign date do not match any single record.",
     };
   }
 
-  // Batch check multiple roll numbers
+  // [MODIFIED] Batch check multiple applications (for the main list)
   async checkMultipleRollNumbers(applications) {
     if (!this.initialized) {
       await this.loadLawyersList();
     }
 
+    const getAppName = (app) =>
+      app.full_name || (app.users && app.users.full_name) || "";
+
     return applications.map((app) => {
       const rollNumber = app.roll_number;
+      const fullName = getAppName(app);
+      const appDate = (app.roll_sign_date || "").trim(); // Get the date from the app
 
-      if (!rollNumber || rollNumber.trim() === "") {
-        return {
-          ...app,
-          pra_status: "not_found",
-          pra_match_details: null,
-        };
+      // 1. Check for valid input
+      if (!rollNumber || !fullName || !appDate) {
+        return { ...app, pra_status: "not_found", pra_match_details: null };
       }
 
+      // 2. Normalize inputs
       const normalizedRollNumber = rollNumber.toString().trim();
+      const { firstname: inputFirstname, lastname: inputLastname } =
+        this._parseFullName(fullName);
+
+      if (!inputLastname) {
+        return { ...app, pra_status: "not_found", pra_match_details: null };
+      }
+
+      // 3. Find the match with "AND" logic
       const matchedLawyer = this.lawyersList.find((lawyer) => {
         const lawyerRollNo = (lawyer["Roll No."] || "").toString().trim();
-        return lawyerRollNo === normalizedRollNumber;
+        const lawyerLastname = (lawyer.Lastname || "").trim().toLowerCase();
+        const lawyerFirstname = (lawyer.Firstname || "").trim().toLowerCase();
+        const lawyerDate = this._normalizeJsonDate(lawyer["Roll Signed Date"]); // Convert "Month DD, YYYY"
+
+        // THE CORE "AND" LOGIC
+        return (
+          lawyerRollNo === normalizedRollNumber &&
+          lawyerLastname === inputLastname &&
+          lawyerFirstname === inputFirstname &&
+          lawyerDate === appDate // <-- ADDED DATE CHECK
+        );
       });
 
+      // 4. Return result
       if (matchedLawyer) {
         return {
           ...app,
@@ -116,7 +207,7 @@ class RollMatchService {
     });
   }
 
-  // Get statistics about matches
+  // Get statistics about matches (Unchanged)
   getMatchStatistics(applications) {
     const total = applications.length;
     const matched = applications.filter(
