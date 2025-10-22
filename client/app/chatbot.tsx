@@ -148,6 +148,7 @@ export default function ChatbotScreen() {
   const [currentConversationId, setCurrentConversationId] =
     useState<string>("");
   const [isLoadingConversation, setIsLoadingConversation] = useState(false); // Track if loading a conversation
+  const [isScrolledToBottom, setIsScrolledToBottom] = useState(true); // Track if scrolled to bottom to prevent flash
   const flatRef = useRef<FlatList>(null);
   const sidebarRef = useRef<ChatHistorySidebarRef>(null);
   const isFirstMessageRef = useRef<boolean>(true); // Track if this is the first message in conversation
@@ -188,21 +189,16 @@ export default function ChatbotScreen() {
 
   const initializeConversation = useCallback(async () => {
     try {
-      console.log('🔄 Initializing conversation for user:', user?.id);
-      const convId = await ChatHistoryService.getCurrentConversationId(user?.id);
+      console.log('🔄 Initializing conversation - always starting fresh');
+      // Always start with greeting screen, don't auto-load last conversation
+      setCurrentConversationId("");
+      isFirstMessageRef.current = true; // New conversation
+      setMessages([]);
+      setConversationHistory([]);
       
-      if (convId) {
-        console.log('📂 Found existing conversation:', convId);
-        setCurrentConversationId(convId);
-        isFirstMessageRef.current = false; // Existing conversation
-        await loadConversation(convId);
-      } else {
-        console.log('✨ No existing conversation, starting fresh');
-        // No current conversation - start fresh (will create session on first message)
-        setCurrentConversationId("");
-        isFirstMessageRef.current = true; // New conversation
-        setMessages([]);
-        setConversationHistory([]);
+      // Clear any stored conversation ID so we start fresh
+      if (user?.id) {
+        await ChatHistoryService.setCurrentConversationId("", user.id);
       }
     } catch (error) {
       console.error('❌ Error initializing conversation:', error);
@@ -212,7 +208,7 @@ export default function ChatbotScreen() {
       setConversationHistory([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, session?.access_token]);
+  }, [user?.id]);
 
   const loadConversation = async (conversationId: string) => {
     if (!conversationId) {
@@ -242,9 +238,6 @@ export default function ChatbotScreen() {
         );
       }
 
-      // ALWAYS set messages, even if empty
-      setMessages(loadedMessages as Message[]);
-
       // Rebuild conversation history for context
       const history = loadedMessages.map((msg) => ({
         role: msg.fromUser ? "user" : "assistant",
@@ -257,10 +250,8 @@ export default function ChatbotScreen() {
         await ChatHistoryService.setCurrentConversationId(conversationId, user.id);
       }
 
-      // Scroll to bottom after messages are set (ChatGPT behavior)
-      setTimeout(() => {
-        flatRef.current?.scrollToEnd({ animated: false });
-      }, 300);
+      // Set messages - FlatList will automatically position at bottom via onContentSizeChange
+      setMessages(loadedMessages as Message[]);
     } catch (error) {
       console.error("❌ Error loading conversation:", error);
       // Clear invalid conversation ID and start fresh
@@ -311,6 +302,7 @@ export default function ChatbotScreen() {
     setMessages([]);
     setConversationHistory([]);
     setError(null);
+    setIsScrolledToBottom(false); // Hide content until scrolled to bottom
 
     // Load the conversation
     try {
@@ -469,6 +461,7 @@ export default function ChatbotScreen() {
 
       if (userRole === "verified_lawyer") {
         // Lawyers use regular non-streaming endpoint
+        console.log('📤 Sending request to lawyer endpoint:', endpoint);
         const response = await axios.post(
           endpoint,
           {
@@ -478,8 +471,12 @@ export default function ChatbotScreen() {
             user_id: user?.id || null,
             session_id: sessionId || null,
           },
-          { headers }
+          { 
+            headers,
+            timeout: 60000 // 60 second timeout
+          }
         );
+        console.log('✅ Lawyer endpoint response received');
 
         const data = response.data;
         answer = data.answer;
@@ -495,6 +492,7 @@ export default function ChatbotScreen() {
         userMessageId = data.user_message_id;
       } else {
         // General users get STREAMING responses!
+        console.log('📤 Sending request to streaming endpoint:', endpoint);
         const streamingMsgId = (Date.now() + 1).toString();
         const streamingMsg: Message = {
           id: streamingMsgId,
@@ -504,27 +502,51 @@ export default function ChatbotScreen() {
         };
         setMessages((prev) => [...prev, streamingMsg]);
 
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            question: userMessage,
-            conversation_history: formattedHistory,
-            max_tokens: 400,
-            user_id: user?.id || null,
-            session_id: sessionId || null,
-          }),
-        });
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        let lastUpdateTime = 0;
-        let displayedText = '';
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              question: userMessage,
+              conversation_history: formattedHistory,
+              max_tokens: 400,
+              user_id: user?.id || null,
+              session_id: sessionId || null,
+            }),
+            signal: controller.signal,
+          });
 
-        if (reader) {
+          clearTimeout(timeoutId);
+
+          // Check response status
+          if (!response.ok) {
+            console.error('❌ Streaming endpoint error:', response.status, response.statusText);
+            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+          }
+
+          console.log('✅ Streaming endpoint connected');
+
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let lastUpdateTime = 0;
+          let displayedText = '';
+
+          if (!reader) {
+            console.error('❌ No reader available from response body');
+            throw new Error('Unable to read streaming response');
+          }
+
+          console.log('📖 Reading stream...');
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+            if (done) {
+              console.log('✅ Stream completed');
+              break;
+            }
 
             const chunk = decoder.decode(value);
             const lines = chunk.split('\n');
@@ -579,47 +601,23 @@ export default function ChatbotScreen() {
                     language = data.language;
                   }
                 } catch (e) {
-                  console.error('Error parsing stream data:', e);
+                  console.error('❌ Error parsing stream data:', e, 'Line:', line);
                 }
               }
             }
           }
-        }
-
-        // Ensure all text is displayed before adding sources
-        if (displayedText !== answer) {
-          setMessages((prev) => {
-            const newMessages = [...prev];
-            const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
-            if (msgIndex !== -1) {
-              newMessages[msgIndex] = { ...newMessages[msgIndex], text: answer };
-            }
-            return newMessages;
-          });
-        }
-
-        // Final update with sources (after typing animation completes)
-        setMessages((prev) => {
-          const newMessages = [...prev];
-          const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
-          if (msgIndex !== -1) {
-            newMessages[msgIndex] = {
-              ...newMessages[msgIndex],
-              text: answer,
-              sources: sources,
-              confidence: confidence,
-              language: language,
-            };
+        } catch (streamError: any) {
+          clearTimeout(timeoutId);
+          console.error('❌ Streaming error:', streamError);
+          
+          // Remove empty streaming message on error
+          setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
+          
+          if (streamError.name === 'AbortError') {
+            throw new Error('Request timed out after 60 seconds. Please try again.');
           }
-          return newMessages;
-        });
-        
-        // Scroll to show sources
-        setTimeout(() => {
-          flatRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-
-        assistantMessageId = streamingMsgId;
+          throw streamError;
+        }
       }
 
       console.log("📨 Backend response:", {
@@ -720,23 +718,44 @@ export default function ChatbotScreen() {
         assistantMsg: assistantMessageId,
       });
     } catch (err: any) {
-      console.error("Chat error:", err);
+      console.error("❌ Chat error:", err);
+      console.error("   Error type:", err.name);
+      console.error("   Error message:", err.message);
+      if (err.response) {
+        console.error("   Response status:", err.response.status);
+        console.error("   Response data:", err.response.data);
+      }
 
       let errorMessage = "Sorry, I encountered an error. Please try again.";
 
-      if (err.response?.status === 400) {
-        // Handle prohibited input or validation errors
+      // Network errors
+      if (err.message?.includes('Network') || err.code === 'ECONNABORTED') {
+        errorMessage = "Network error. Please check your connection and try again.";
+      }
+      // Timeout errors
+      else if (err.message?.includes('timeout') || err.message?.includes('timed out')) {
+        errorMessage = "Request timed out. The server is taking too long to respond. Please try again.";
+      }
+      // HTTP errors
+      else if (err.response?.status === 400) {
         errorMessage =
           err.response.data.detail ||
           "Invalid question. Please rephrase your query.";
       } else if (err.response?.status === 503) {
         errorMessage =
           "The legal knowledge base is not yet initialized. Please contact support.";
+      } else if (err.response?.status === 500) {
+        errorMessage = "Server error. Please try again in a moment.";
       } else if (err.response?.data?.detail) {
         errorMessage = err.response.data.detail;
       }
+      // Use error message if available
+      else if (err.message && !err.message.includes('undefined')) {
+        errorMessage = err.message;
+      }
 
       setError(errorMessage);
+      console.error("   Showing error to user:", errorMessage);
 
       const errorReply: Message = {
         id: (Date.now() + 1).toString(),
@@ -1127,9 +1146,32 @@ export default function ChatbotScreen() {
             data={messages}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={tw`pb-48 pt-2`}
+            contentContainerStyle={tw`pb-40 pt-2`}
             showsVerticalScrollIndicator={false}
-            style={tw`flex-1`}
+            onLayout={() => {
+              // Scroll to absolute bottom when FlatList is laid out
+              if (messages.length > 0 && !isTyping) {
+                // Use scrollToOffset with large value to ensure we reach the very bottom
+                setTimeout(() => {
+                  flatRef.current?.scrollToOffset({ offset: 999999, animated: false });
+                  // Show content after scrolling to bottom
+                  setTimeout(() => setIsScrolledToBottom(true), 50);
+                }, 50);
+              }
+            }}
+            onContentSizeChange={(width, height) => {
+              // Auto-scroll to absolute bottom when content size changes
+              // Use scrollToOffset to ensure we reach the very end including all padding
+              setTimeout(() => {
+                flatRef.current?.scrollToOffset({ offset: height + 1000, animated: false });
+              }, 100);
+              // Backup scroll attempt and show content
+              setTimeout(() => {
+                flatRef.current?.scrollToOffset({ offset: 999999, animated: false });
+                setIsScrolledToBottom(true);
+              }, 200);
+            }}
+            style={[tw`flex-1`, { opacity: isScrolledToBottom ? 1 : 0 }]}
             ListFooterComponent={
               <>
                 {/* Typing indicator - only show when actively typing */}

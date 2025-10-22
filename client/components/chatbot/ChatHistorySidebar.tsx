@@ -46,8 +46,10 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
     new Animated.Value(SIDEBAR_POSITION === 'right' ? SIDEBAR_WIDTH : -SIDEBAR_WIDTH)
   );
 
+  // Load conversations immediately when component mounts and when userId/sessionToken change
   useEffect(() => {
     if (userId && sessionToken) {
+      console.log('🔄 ChatHistorySidebar: Auto-loading conversations on mount/change');
       loadConversations();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -340,13 +342,42 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
           showsVerticalScrollIndicator={false}
           contentContainerStyle={tw`pb-4`}
         >
-          {/* Loading indicator */}
+          {/* Loading skeleton - shows while loading */}
           {isLoading && conversations.length === 0 && (
-            <View style={tw`px-4 py-8 items-center`}>
-              <ActivityIndicator size="large" color={Colors.primary.blue} />
-              <Text style={[tw`text-center mt-4 text-sm`, { color: Colors.text.tertiary }]}>
-                Loading conversations...
+            <View style={tw`mt-4`}>
+              <Text
+                style={[
+                  tw`px-4 py-2 text-xs font-semibold`,
+                  { color: Colors.text.tertiary },
+                ]}
+              >
+                Recent
               </Text>
+              {/* Skeleton items - fill entire sidebar */}
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map((i) => (
+                <View
+                  key={i}
+                  style={[
+                    tw`px-4 py-3 mx-2 rounded-lg mb-2`,
+                    { backgroundColor: Colors.secondary.lightGray, opacity: 0.5 }
+                  ]}
+                >
+                  <View style={tw`flex-row items-center mb-1`}>
+                    <View
+                      style={[
+                        tw`w-4 h-4 rounded mr-2`,
+                        { backgroundColor: Colors.border.medium }
+                      ]}
+                    />
+                    <View
+                      style={[
+                        tw`h-3 rounded flex-1`,
+                        { backgroundColor: Colors.border.medium }
+                      ]}
+                    />
+                  </View>
+                </View>
+              ))}
             </View>
           )}
           {Object.entries(groupedConversations).map(([group, convos]) => {

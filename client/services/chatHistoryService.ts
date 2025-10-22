@@ -36,12 +36,16 @@ export interface Conversation {
 
 const CURRENT_CONVERSATION_KEY = '@current_conversation_id';
 const ACTIVE_CONVERSATIONS_KEY = '@active_conversations';
+const CONVERSATIONS_CACHE_KEY = '@conversations_cache';
+const CACHE_DURATION = 30000; // 30 seconds cache
 
 /**
  * Chat History Service
  * Manages conversation persistence using session-based backend API
+ * Includes caching for optimized performance
  */
 export class ChatHistoryService {
+  private static conversationsCache: { data: Conversation[]; timestamp: number } | null = null;
   
   private static getHeaders(token?: string): Record<string, string> {
     return {
@@ -76,16 +80,22 @@ export class ChatHistoryService {
   static async startNewConversation(userId?: string, title: string = 'New Conversation', token?: string): Promise<string> {
     try {
       console.log('✨ Creating new conversation for user:', userId);
+      const startTime = Date.now();
+      
       // Create a new session via the backend API
       const headers = this.getHeaders(token);
       const response = await axios.post(
         `${API_BASE_URL}/api/chat-history/sessions`,
         { title, language: 'en' },
-        { headers, timeout: 10000 }
+        { headers, timeout: 3000 } // 3 second timeout
       );
 
       const sessionId = response.data.id;
-      console.log('✅ New session created:', sessionId);
+      const createTime = Date.now() - startTime;
+      console.log(`✅ New session created in ${createTime}ms:`, sessionId);
+      
+      // Invalidate cache to force refresh
+      this.conversationsCache = null;
       
       // Store the new session ID as current
       const key = userId ? `${CURRENT_CONVERSATION_KEY}_${userId}` : CURRENT_CONVERSATION_KEY;
@@ -94,7 +104,10 @@ export class ChatHistoryService {
       
       return sessionId;
     } catch (error: any) {
-      console.error('❌ Error starting new conversation:', error);
+      console.error('❌ Error starting new conversation:', error.message);
+      if (error.code === 'ECONNABORTED') {
+        console.error('   Request timed out after 3 seconds');
+      }
       if (error.response) {
         console.error('   Status:', error.response.status);
         console.error('   Data:', error.response.data);
@@ -128,7 +141,7 @@ export class ChatHistoryService {
     try {
       console.log('📡 ChatHistoryService.loadConversation called');
       console.log('   Conversation ID:', conversationId);
-      console.log('   User ID:', userId);
+      const startTime = Date.now();
       
       // Validate that conversationId is a UUID
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -141,14 +154,15 @@ export class ChatHistoryService {
       }
 
       const headers = this.getHeaders(token);
-      console.log('   Headers:', Object.keys(headers));
-      
       const url = `${API_BASE_URL}/api/chat-history/sessions/${conversationId}`;
-      console.log('   URL:', url);
       
-      const response = await axios.get(url, { headers });
-      console.log('   Response status:', response.status);
-      console.log('   Response data keys:', Object.keys(response.data));
+      const response = await axios.get(url, { 
+        headers,
+        timeout: 15000 // 15 second timeout - conversations can have many messages
+      });
+      
+      const loadTime = Date.now() - startTime;
+      console.log(`⚡ Conversation loaded in ${loadTime}ms`);
 
       if (response.data && response.data.messages) {
         const messages = response.data.messages.map((msg: any) => ({
@@ -173,10 +187,12 @@ export class ChatHistoryService {
       console.warn('⚠️  No messages in response');
       return [];
     } catch (error: any) {
-      console.error('❌ Error loading conversation:', error);
+      console.error('❌ Error loading conversation:', error.message);
+      if (error.code === 'ECONNABORTED') {
+        console.error('   Request timed out after 3 seconds');
+      }
       if (error.response) {
         console.error('   Status:', error.response.status);
-        console.error('   Data:', error.response.data);
       }
       // Clear invalid conversation ID
       const key = userId ? `${CURRENT_CONVERSATION_KEY}_${userId}` : CURRENT_CONVERSATION_KEY;
@@ -185,33 +201,76 @@ export class ChatHistoryService {
     }
   }
 
-  static async getConversationsList(userId?: string, includeArchived: boolean = false, token?: string): Promise<Conversation[]> {
+  static async getConversationsList(userId?: string, includeArchived: boolean = false, token?: string, forceRefresh: boolean = false): Promise<Conversation[]> {
     try {
+      // Check cache first (only for non-archived requests)
+      if (!includeArchived && !forceRefresh && this.conversationsCache) {
+        const cacheAge = Date.now() - this.conversationsCache.timestamp;
+        if (cacheAge < CACHE_DURATION) {
+          console.log('⚡ Using cached conversations (age:', Math.round(cacheAge / 1000), 'seconds)');
+          return this.conversationsCache.data;
+        }
+      }
+
       console.log('📜 Fetching conversations list for user:', userId);
+      const startTime = Date.now();
       const headers = this.getHeaders(token);
       
+      // Optimized request with reasonable timeout and page size
       const response = await axios.get(
         `${API_BASE_URL}/api/chat-history/sessions`,
         { 
           headers,
-          params: { include_archived: includeArchived, page: 1, page_size: 50 },
-          timeout: 10000 // 10 second timeout
+          params: { 
+            include_archived: includeArchived, 
+            page: 1, 
+            page_size: 50, // Reduced for faster response
+            sort: 'updated_at', // Ensure most recent first
+            order: 'desc'
+          },
+          timeout: 10000 // 10 second timeout - reasonable for fetching list
         }
       );
 
+      const loadTime = Date.now() - startTime;
+      console.log(`⚡ API response time: ${loadTime}ms`);
+
       if (response.data && response.data.sessions) {
-        console.log('✅ Loaded', response.data.sessions.length, 'conversations');
-        return response.data.sessions;
+        const conversations = response.data.sessions;
+        console.log('✅ Loaded', conversations.length, 'conversations in', loadTime, 'ms');
+        
+        // Cache the result (only for non-archived requests)
+        if (!includeArchived) {
+          this.conversationsCache = {
+            data: conversations,
+            timestamp: Date.now()
+          };
+        }
+        
+        return conversations;
       }
       
       console.warn('⚠️  No sessions in response');
       return [];
     } catch (error: any) {
-      console.error('❌ Error getting conversations list:', error);
+      const loadTime = Date.now() - (error.config?.metadata?.startTime || Date.now());
+      console.error(`❌ Error getting conversations list (${loadTime}ms):`, error.message);
+      
+      if (error.code === 'ECONNABORTED') {
+        console.error('   Request timed out after 3 seconds');
+      }
+      
       if (error.response) {
         console.error('   Status:', error.response.status);
         console.error('   Data:', error.response.data);
       }
+      
+      // Return cached data if available, even if stale
+      if (this.conversationsCache && !includeArchived) {
+        console.log('⚠️  Returning stale cache due to error');
+        return this.conversationsCache.data;
+      }
+      
       // Return empty array on error - let UI handle gracefully
       return [];
     }
@@ -228,6 +287,9 @@ export class ChatHistoryService {
       );
       
       console.log('✅ Delete response:', response.data);
+      
+      // Invalidate cache
+      this.conversationsCache = null;
       
       // Clear from local storage if it's the current conversation
       const key = userId ? `${CURRENT_CONVERSATION_KEY}_${userId}` : CURRENT_CONVERSATION_KEY;
@@ -257,11 +319,23 @@ export class ChatHistoryService {
         { headers }
       );
       
+      // Invalidate cache
+      this.conversationsCache = null;
+      
       return true;
     } catch (error) {
       console.error('Error archiving conversation:', error);
       return false;
     }
+  }
+  
+  /**
+   * Manually clear the conversations cache
+   * Useful for force refresh scenarios
+   */
+  static clearCache(): void {
+    console.log('🧹 Clearing conversations cache');
+    this.conversationsCache = null;
   }
   
   static async updateConversationTitle(conversationId: string, title: string, token?: string): Promise<boolean> {
@@ -270,8 +344,11 @@ export class ChatHistoryService {
       await axios.patch(
         `${API_BASE_URL}/api/chat-history/sessions/${conversationId}`,
         { title },
-        { headers }
+        { headers, timeout: 5000 }
       );
+      
+      // Invalidate cache to force refresh
+      this.conversationsCache = null;
       
       return true;
     } catch (error) {
