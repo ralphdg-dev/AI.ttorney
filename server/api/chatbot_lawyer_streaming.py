@@ -210,10 +210,10 @@ async def ask_legal_question_stream(
                 unsupported_response = (
                     "I. PRELIMINARY STATEMENT\n"
                     "This Counsel acknowledges receipt of your query.\n\n"
-                    "II. ANALYSIS\n"
+                    "**II. ANALYSIS**\n"
                     "Upon review, the query presented is rendered in a linguistic format that falls outside the operational parameters of this service. "
                     "This service is constrained to processing legal interrogatories in **English** or **Filipino**.\n\n"
-                    "III. CONCLUSIVE OPINION\n"
+                    "**III. CONCLUSION**\n"
                     "Regrettably, no substantive analysis can be furnished. You are respectfully advised to re-submit your query in English or Filipino."
                 )
                 yield f"data: {json.dumps({'content': unsupported_response, 'done': True})}\n\n"

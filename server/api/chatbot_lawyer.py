@@ -994,19 +994,19 @@ You must communicate in "hardcore legalese," employing formal language, precise 
 
 CRITICAL MANDATE: ALL responses MUST strictly adhere to the following five-part structure:
 
-I. PRELIMINARY STATEMENT
+**I. PRELIMINARY STATEMENT**
     (A brief restatement and acknowledgment of the legal query presented.)
 
-II. CONTROLLING STATUTORY PROVISIONS
+**II. CONTROLLING STATUTORY PROVISIONS**
     (If, and only if, controlling statutes or jurisprudence are provided as context OR are fundamental to the analysis, cite and quote them herein. If the query is general or does not require specific citations, this section may be omitted or briefly state that the analysis is based on general legal principles.)
 
-III. LEGAL ANALYSIS AND DISCUSSION
+**III. LEGAL ANALYSIS AND DISCUSSION**
     (A comprehensive, in-depth analysis of the cited provisions and relevant jurisprudence. Discuss the elements of the law, prevailing doctrines, and any applicable legal principles. This section must be thorough and constitute the main body of your opinion.)
 
-IV. APPLICATION TO THE QUERY
+**IV. APPLICATION TO THE QUERY**
     (A direct application of the aforementioned laws and discussion to the specific facts or query posited by the user. Analyze how the legal principles govern the user's situation.)
 
-V. CONCLUSIVE OPINION
+**V. CONCLUSION**
     (A final, conclusive legal opinion summarizing the findings. This is not personal advice, but a reasoned conclusion based on the analysis.)
 
 RULES OF ENGAGEMENT:
@@ -1024,19 +1024,19 @@ Kinakailangang gumamit ng pormal na "legalese" o legal na Filipino, na may tumpa
 
 KRITIKAL NA UTOS: ANG LAHAT ng tugon ay DAPAT na mahigpit na sumunod sa sumusunod na limang-bahaging istraktura:
 
-I. PAUNANG PAHAYAG
+**I. PAUNANG PAHAYAG**
     (Isang maikling muling paglalahad at pagkilala sa legal na katanungan na inilahad.)
 
-II. MGA KONTROLADONG TADHANA NG BATAS
+**II. MGA KONTROLADONG TADHANA NG BATAS**
     (Kung, at tanging kung, ang mga kumokontrol na batas o hurisprudensya ay ibinigay bilang konteksto O ay pundamental sa pagsusuri, banggitin at sipiin ang mga ito dito. Kung ang katanungan ay pangkalahatan o hindi nangangailangan ng mga tiyak na pagsipi, ang seksyong ito ay maaaring alisin o maikling ipahayag na ang pagsusuri ay batay sa pangkalahatang mga legal na prinsipyo.)
 
-III. LEGAL NA PAGSUSURI AT DISKUSYON
+**III. LEGAL NA PAGSUSURI AT DISKUSYON**
     (Isang komprehensibo, malalim na pagsusuri ng mga binanggit na tadhana at kaugnay na hurisprudensya. Talakayin ang mga elemento ng batas, mga umiiral na doktrina, at anumang naaangkop na legal na prinsipyo. Ang seksyong ito ay dapat maging masinsinan at bumubuo sa pangunahing katawan ng iyong opinyon.)
 
-IV. APLIKASYON SA KATANUNGAN
+**IV. APLIKASYON SA KATANUNGAN**
     (Isang direktang aplikasyon ng mga nabanggit na batas at diskusyon sa mga tiyak na katotohanan o katanungan na inilahad ng gumagamit. Suriin kung paano pinamamahalaan ng mga legal na prinsipyo ang sitwasyon ng gumagamit.)
 
-V. PANGWAKAS NA OPINYON
+**V. KONSEPSYON**
     (Isang pinal, pangwakas na legal na opinyon na nagbubuod ng mga natuklasan. Ito ay hindi personal na payo, kundi isang makatwirang konklusyon batay sa pagsusuri.)
 
 MGA ALITUNTUNIN:
@@ -1608,9 +1608,9 @@ async def ask_legal_question(
             unsupported_response = (
                 "I. PRELIMINARY STATEMENT\n"
                 "This Counsel acknowledges receipt of your query.\n\n"
-                "II. ANALYSIS\n"
+                "**II. ANALYSIS**\n"
                 "Upon review, the query presented is rendered in a linguistic format (language) that falls outside the operational parameters of this legal analytical service. This service is constrained to processing and analyzing legal interrogatories propounded in either **English** or **Filipino**.\n\n"
-                "III. CONCLUSIVE OPINION\n"
+                "**III. CONCLUSION**\n"
                 "Regrettably, no substantive analysis can be furnished. You are respectfully advised to re-submit your query in one of the supported languages (English or Filipino) to facilitate proper processing and legal assessment."
             )
             
