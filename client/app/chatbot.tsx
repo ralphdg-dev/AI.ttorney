@@ -147,6 +147,7 @@ export default function ChatbotScreen() {
   >([]);
   const [currentConversationId, setCurrentConversationId] =
     useState<string>("");
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false); // Track if loading a conversation
   const flatRef = useRef<FlatList>(null);
   const sidebarRef = useRef<ChatHistorySidebarRef>(null);
   const isFirstMessageRef = useRef<boolean>(true); // Track if this is the first message in conversation
@@ -222,6 +223,8 @@ export default function ChatbotScreen() {
     console.log("📥 Loading conversation:", conversationId);
     console.log("   User ID:", user?.id);
 
+    setIsLoadingConversation(true); // Start loading
+
     try {
       const loadedMessages = await ChatHistoryService.loadConversation(
         conversationId,
@@ -266,6 +269,8 @@ export default function ChatbotScreen() {
       setConversationHistory([]);
       setError("Failed to load conversation. Starting a new chat.");
       throw error;
+    } finally {
+      setIsLoadingConversation(false); // Done loading
     }
   };
 
@@ -514,6 +519,7 @@ export default function ChatbotScreen() {
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
         let lastUpdateTime = 0;
+        let displayedText = '';
 
         if (reader) {
           while (true) {
@@ -530,30 +536,43 @@ export default function ChatbotScreen() {
 
                   if (data.content) {
                     answer += data.content;
-                    const now = Date.now();
-                    if (now - lastUpdateTime > 100) {
-                      lastUpdateTime = now;
-                      setMessages((prev) => {
-                        const newMessages = [...prev];
-                        const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
-                        if (msgIndex !== -1) {
-                          newMessages[msgIndex] = { ...newMessages[msgIndex], text: answer };
-                        }
-                        return newMessages;
-                      });
+                    
+                    // Turn off typing indicator as soon as first text arrives
+                    setIsTyping(false);
+                    
+                    // Smooth character-by-character animation
+                    const chars = data.content.split('');
+                    for (const char of chars) {
+                      displayedText += char;
+                      const now = Date.now();
+                      
+                      // Update every 50ms for slower, smoother typing effect
+                      if (now - lastUpdateTime > 50) {
+                        lastUpdateTime = now;
+                        const currentText = displayedText;
+                        setMessages((prev) => {
+                          const newMessages = [...prev];
+                          const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
+                          if (msgIndex !== -1) {
+                            newMessages[msgIndex] = { ...newMessages[msgIndex], text: currentText };
+                          }
+                          return newMessages;
+                        });
+                        
+                        // Auto-scroll to bottom as text appears
+                        setTimeout(() => {
+                          flatRef.current?.scrollToEnd({ animated: true });
+                        }, 10);
+                        
+                        // Small delay for smoother typing effect
+                        await new Promise(resolve => setTimeout(resolve, 20));
+                      }
                     }
                   }
 
+                  // Store sources but don't display them yet (wait for streaming to finish)
                   if (data.sources) {
                     sources = data.sources;
-                    setMessages((prev) => {
-                      const newMessages = [...prev];
-                      const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
-                      if (msgIndex !== -1) {
-                        newMessages[msgIndex] = { ...newMessages[msgIndex], sources: data.sources };
-                      }
-                      return newMessages;
-                    });
                   }
 
                   if (data.type === 'metadata') {
@@ -567,7 +586,19 @@ export default function ChatbotScreen() {
           }
         }
 
-        // Final update
+        // Ensure all text is displayed before adding sources
+        if (displayedText !== answer) {
+          setMessages((prev) => {
+            const newMessages = [...prev];
+            const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
+            if (msgIndex !== -1) {
+              newMessages[msgIndex] = { ...newMessages[msgIndex], text: answer };
+            }
+            return newMessages;
+          });
+        }
+
+        // Final update with sources (after typing animation completes)
         setMessages((prev) => {
           const newMessages = [...prev];
           const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
@@ -582,6 +613,11 @@ export default function ChatbotScreen() {
           }
           return newMessages;
         });
+        
+        // Scroll to show sources
+        setTimeout(() => {
+          flatRef.current?.scrollToEnd({ animated: true });
+        }, 100);
 
         assistantMessageId = streamingMsgId;
       }
@@ -716,6 +752,12 @@ export default function ChatbotScreen() {
 
   const renderItem = ({ item }: { item: Message }) => {
     const isUser = item.fromUser;
+    
+    // Don't render empty bot messages (streaming placeholder)
+    if (!isUser && !item.text?.trim()) {
+      return null;
+    }
+    
     return (
       <View style={tw`px-4 py-1.5`}>
         <View style={isUser ? tw`items-end` : tw`items-start flex-row`}>
@@ -969,110 +1011,116 @@ export default function ChatbotScreen() {
       {/* Messages list or centered placeholder */}
       <View style={tw`flex-1`}>
         {messages.length === 0 ? (
-          <ScrollView
-            contentContainerStyle={tw`items-center px-6 pt-12 pb-48`}
-            showsVerticalScrollIndicator={false}
-            style={tw`flex-1`}
-          >
-            {/* Logo */}
-            <View style={tw`mb-6`}>
-              <Image
-                source={require("../assets/images/logo.png")}
-                style={{ width: 88, height: 88 }}
-                resizeMode="contain"
-              />
-            </View>
-
-            {/* Greeting */}
-            <Text
-              style={[
-                tw`text-3xl font-bold text-center mb-2`,
-                { color: Colors.text.primary },
-              ]}
+          isLoadingConversation ? (
+            // Show blank screen when loading a conversation from history
+            <View style={tw`flex-1`} />
+          ) : (
+            // Show greeting screen only for new conversations
+            <ScrollView
+              contentContainerStyle={tw`items-center px-6 pt-12 pb-48`}
+              showsVerticalScrollIndicator={false}
+              style={tw`flex-1`}
             >
-              {greeting}
-            </Text>
+              {/* Logo */}
+              <View style={tw`mb-6`}>
+                <Image
+                  source={require("../assets/images/logo.png")}
+                  style={{ width: 88, height: 88 }}
+                  resizeMode="contain"
+                />
+              </View>
 
-            {/* Subtitle */}
-            <Text
-              style={[
-                tw`text-base text-center mb-10 px-4`,
-                { color: Colors.text.secondary, lineHeight: 24 },
-              ]}
-            >
-              I specialize in Civil, Criminal, Consumer, Family, and Labor Law.
-              Ask away!
-            </Text>
-
-            {/* Suggestions */}
-            <View style={tw`w-full px-2`}>
+              {/* Greeting */}
               <Text
                 style={[
-                  tw`text-sm font-semibold mb-4 px-2`,
-                  { color: Colors.text.secondary },
+                  tw`text-3xl font-bold text-center mb-2`,
+                  { color: Colors.text.primary },
                 ]}
               >
-                Quick start prompts:
+                {greeting}
               </Text>
-              {(isLawyer() ? [
-                "Analyze the elements of estafa under Article 315 RPC",
-                "Compare grounds for annulment vs legal separation",
-                "Summarize employer obligations under DOLE DO 174",
-              ] : [
-                "What are my rights as a tenant?",
-                "How do I file a small claims case?",
-                "What is the legal age of consent?",
-              ]).map((suggestion, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  onPress={() => setInput(suggestion)}
+
+              {/* Subtitle */}
+              <Text
+                style={[
+                  tw`text-base text-center mb-10 px-4`,
+                  { color: Colors.text.secondary, lineHeight: 24 },
+                ]}
+              >
+                I specialize in Civil, Criminal, Consumer, Family, and Labor Law.
+                Ask away!
+              </Text>
+
+              {/* Suggestions */}
+              <View style={tw`w-full px-2`}>
+                <Text
                   style={[
-                    tw`p-4 mb-3 rounded-2xl flex-row items-center`,
-                    {
-                      backgroundColor: Colors.background.secondary,
-                      borderWidth: 1,
-                      borderColor: Colors.border.light,
-                      ...(Platform.OS === "web"
-                        ? { boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)" }
-                        : {
-                            shadowColor: "#000",
-                            shadowOffset: { width: 0, height: 1 },
-                            shadowOpacity: 0.05,
-                            shadowRadius: 3,
-                            elevation: 1,
-                          }),
-                    },
+                    tw`text-sm font-semibold mb-4 px-2`,
+                    { color: Colors.text.secondary },
                   ]}
                 >
-                  <View
+                  Quick start prompts:
+                </Text>
+                {(isLawyer() ? [
+                  "Analyze the elements of estafa under Article 315 RPC",
+                  "Compare grounds for annulment vs legal separation",
+                  "Summarize employer obligations under DOLE DO 174",
+                ] : [
+                  "What are my rights as a tenant?",
+                  "How do I file a small claims case?",
+                  "What is the legal age of consent?",
+                ]).map((suggestion, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => setInput(suggestion)}
                     style={[
-                      tw`w-8 h-8 rounded-full items-center justify-center mr-3`,
-                      { backgroundColor: Colors.primary.blue + "15" },
+                      tw`p-4 mb-3 rounded-2xl flex-row items-center`,
+                      {
+                        backgroundColor: Colors.background.secondary,
+                        borderWidth: 1,
+                        borderColor: Colors.border.light,
+                        ...(Platform.OS === "web"
+                          ? { boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)" }
+                          : {
+                              shadowColor: "#000",
+                              shadowOffset: { width: 0, height: 1 },
+                              shadowOpacity: 0.05,
+                              shadowRadius: 3,
+                              elevation: 1,
+                            }),
+                      },
                     ]}
                   >
+                    <View
+                      style={[
+                        tw`w-8 h-8 rounded-full items-center justify-center mr-3`,
+                        { backgroundColor: Colors.primary.blue + "15" },
+                      ]}
+                    >
+                      <Ionicons
+                        name="chatbubble-outline"
+                        size={16}
+                        color={Colors.primary.blue}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        tw`text-sm flex-1`,
+                        { color: Colors.text.primary, lineHeight: 20 },
+                      ]}
+                    >
+                      {suggestion}
+                    </Text>
                     <Ionicons
-                      name="chatbubble-outline"
+                      name="arrow-forward"
                       size={16}
-                      color={Colors.primary.blue}
+                      color={Colors.text.tertiary}
                     />
-                  </View>
-                  <Text
-                    style={[
-                      tw`text-sm flex-1`,
-                      { color: Colors.text.primary, lineHeight: 20 },
-                    ]}
-                  >
-                    {suggestion}
-                  </Text>
-                  <Ionicons
-                    name="arrow-forward"
-                    size={16}
-                    color={Colors.text.tertiary}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          )
         ) : (
           <FlatList
             ref={flatRef}
@@ -1084,9 +1132,9 @@ export default function ChatbotScreen() {
             style={tw`flex-1`}
             ListFooterComponent={
               <>
-                {/* Typing indicator */}
+                {/* Typing indicator - only show when actively typing */}
                 {isTyping && (
-        <View style={tw`px-4 pb-3`}>
+        <View style={tw`px-4 py-1.5`}>
           <View style={tw`flex-row items-start`}>
             <View style={tw`mr-2.5`}>
               <Image
