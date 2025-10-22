@@ -14,12 +14,13 @@ interface AuthGuardProps {
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
-  const { user, session, isLoading, isAuthenticated } = useAuth();
+  const { user, session, isLoading, isAuthenticated, isSigningOut } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
   useEffect(() => {
-    if (isLoading) return;
+    // Don't run route checks while loading or signing out
+    if (isLoading || isSigningOut) return;
 
     const currentPath = `/${segments.join('/')}`;
     const routeConfig = getRouteConfig(currentPath);
@@ -73,10 +74,10 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       // Log public access
       logRouteAccess(currentPath, null, 'granted', 'Public route');
     }
-  }, [isAuthenticated, user, session, isLoading, segments, router]);
+  }, [isAuthenticated, user, session, isLoading, isSigningOut, segments, router]);
 
-  // Show loading screen while checking authentication OR if we need to redirect
-  if (isLoading) {
+  // Show loading screen while checking authentication OR signing out
+  if (isLoading || isSigningOut) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#023D7B" />
