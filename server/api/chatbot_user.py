@@ -44,6 +44,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Streaming constants (DRY principle - ChatGPT/Claude style)
+STREAMING_TOKEN_BATCH_SIZE = 3  # Minimum tokens to accumulate before sending
+STREAMING_MAX_INTERVAL_MS = 80  # Maximum time (ms) between updates
+STREAMING_TIMEOUT_SECONDS = 10.0  # Timeout for OpenAI streaming requests
+
 # Add parent directory to path for config imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -1826,6 +1831,12 @@ async def ask_legal_question(
         )
 
 
+# Helper: Format SSE (Server-Sent Events) message (DRY principle)
+def format_sse(data: dict) -> str:
+    """Format data as Server-Sent Events message for consistent streaming responses"""
+    return f"data: {json.dumps(data)}\n\n"
+
+
 @router.post("/ask/stream")
 async def ask_legal_question_stream(
     request: ChatRequest,
@@ -1847,7 +1858,7 @@ async def ask_legal_question_stream(
             
             # Basic validation
             if not request.question or not request.question.strip():
-                yield f"data: {json.dumps({'error': 'Question cannot be empty'})}\n\n"
+                yield format_sse({'error': 'Question cannot be empty'})
                 return
             
             # Check toxic content
@@ -1855,17 +1866,17 @@ async def ask_legal_question_stream(
             if is_toxic:
                 language = detect_language(request.question)
                 response = "Naiintindihan ko na baka frustrated ka, pero nandito ako para magbigay ng helpful legal information. Pakiusap, magtanong nang may respeto. 😊" if language == "tagalog" else "I understand you may be frustrated, but I'm here to provide helpful legal information. Please rephrase respectfully. 😊"
-                yield f"data: {json.dumps({'content': response, 'done': True})}\n\n"
+                yield format_sse({'content': response, 'done': True})
                 return
             
             # Detect language
             language = detect_language(request.question)
-            yield f"data: {json.dumps({'type': 'metadata', 'language': language})}\n\n"
+            yield format_sse({'type': 'metadata', 'language': language})
             
             # Check if legal question
             if not is_legal_question(request.question):
                 casual_response = generate_ai_response(request.question, language, 'casual')
-                yield f"data: {json.dumps({'content': casual_response, 'done': True})}\n\n"
+                yield format_sse({'content': casual_response, 'done': True})
                 return
             
             # Query normalization
@@ -1879,7 +1890,7 @@ async def ask_legal_question_stream(
             
             if not sources:
                 no_context = "I apologize, but I don't have enough information in my database." if language == "english" else "Paumanhin po, pero wala akong sapat na impormasyon."
-                yield f"data: {json.dumps({'content': no_context, 'done': True})}\n\n"
+                yield format_sse({'content': no_context, 'done': True})
                 return
             
             # Send sources with full details
@@ -1891,7 +1902,7 @@ async def ask_legal_question_stream(
                 'source_url': src.get('source_url', ''),
                 'relevance_score': src.get('relevance_score', 0.0)
             } for src in sources]
-            yield f"data: {json.dumps({'type': 'sources', 'sources': source_citations})}\n\n"
+            yield format_sse({'type': 'sources', 'sources': source_citations})
             
             # Build messages
             system_prompt = ENGLISH_SYSTEM_PROMPT if language == "english" else TAGALOG_SYSTEM_PROMPT
@@ -1902,26 +1913,51 @@ async def ask_legal_question_stream(
             user_message = f"Legal Context:\n{context}\n\nUser Question: {request.question}\n\nProvide an informational response."
             messages.append({"role": "user", "content": user_message})
             
-            # STREAMING: Generate with OpenAI
+            # STREAMING: Generate with OpenAI (ChatGPT/Claude style)
             full_answer = ""
+            token_buffer = ""  # Buffer for batching tokens
+            token_count = 0
+            last_send_time = time.time()
+            
             stream = openai_client.chat.completions.create(
                 model=CHAT_MODEL,
                 messages=messages,
                 max_tokens=request.max_tokens,
                 temperature=0.5,
                 stream=True,  # Enable streaming!
-                timeout=10.0
+                timeout=STREAMING_TIMEOUT_SECONDS
             )
             
-            # Stream tokens
+            # Stream tokens with batching for natural reading speed
+            # Industry standard: 3-5 tokens per batch, 50-80ms intervals (ChatGPT/Claude)
             for chunk in stream:
                 if chunk.choices[0].delta.content:
                     content = chunk.choices[0].delta.content
                     full_answer += content
-                    yield f"data: {json.dumps({'content': content})}\n\n"
+                    token_buffer += content
+                    token_count += 1
+                    
+                    current_time = time.time()
+                    time_since_last_send_ms = (current_time - last_send_time) * 1000
+                    
+                    # Send batch when: minimum tokens accumulated OR max interval elapsed
+                    should_send_batch = (
+                        token_count >= STREAMING_TOKEN_BATCH_SIZE or 
+                        time_since_last_send_ms >= STREAMING_MAX_INTERVAL_MS
+                    )
+                    
+                    if should_send_batch and token_buffer:
+                        yield format_sse({'content': token_buffer})
+                        token_buffer = ""
+                        token_count = 0
+                        last_send_time = current_time
+            
+            # Send any remaining tokens in buffer
+            if token_buffer:
+                yield format_sse({'content': token_buffer})
             
             # Done
-            yield f"data: {json.dumps({'done': True})}\n\n"
+            yield format_sse({'done': True})
             
             # Save to history (async)
             if effective_user_id:
@@ -1939,8 +1975,8 @@ async def ask_legal_question_stream(
                     print(f"Failed to save: {e}")
             
         except Exception as e:
-            print(f"Streaming error: {e}")
-            yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
+            logger.error(f"Streaming error: {e}")
+            yield format_sse({'error': str(e), 'done': True})
     
     return StreamingResponse(
         generate_stream(),
