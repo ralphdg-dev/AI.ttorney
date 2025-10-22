@@ -432,6 +432,9 @@ export default function ChatbotScreen() {
 
   const sendMessage = async () => {
     if (!input.trim()) return;
+    
+    // Prevent duplicate sends (important for when Enter key triggers both onSubmitEditing and onPress)
+    if (isTyping || isStreamingRef.current) return;
 
     const userMessage = input.trim();
     const newMsg: Message = {
@@ -463,8 +466,8 @@ export default function ChatbotScreen() {
       let endpoint = "";
 
       if (userRole === "verified_lawyer") {
-        // Lawyer endpoint - formal legal analysis with legalese
-        endpoint = `${apiUrl}/api/chatbot/lawyer/ask`;
+        // Lawyer endpoint - formal legal analysis with legalese - STREAMING!
+        endpoint = `${apiUrl}/api/chatbot/lawyer/ask/stream`;
       } else {
         // General public endpoint (registered_user, guest, etc.) - STREAMING!
         endpoint = `${apiUrl}/api/chatbot/user/ask/stream`;
@@ -491,46 +494,15 @@ export default function ChatbotScreen() {
       let confidence = "";
       let language = "";
       let legal_disclaimer = "";
-      let fallback_suggestions = null;
+      let fallback_suggestions: any = undefined;
       let normalized_query = "";
       let is_complex_query = false;
       let returnedSessionId = null;
       let assistantMessageId = null;
       let userMessageId = null;
 
-      if (userRole === "verified_lawyer") {
-        // Lawyers use regular non-streaming endpoint
-        console.log('📤 Sending request to lawyer endpoint:', endpoint);
-        const response = await axios.post(
-          endpoint,
-          {
-            question: userMessage,
-            conversation_history: formattedHistory,
-            max_tokens: 2000,
-            user_id: user?.id || null,
-            session_id: sessionId || null,
-          },
-          { 
-            headers,
-            timeout: 60000 // 60 second timeout
-          }
-        );
-        console.log('✅ Lawyer endpoint response received');
-
-        const data = response.data;
-        answer = data.answer;
-        sources = data.sources;
-        confidence = data.confidence;
-        language = data.language;
-        legal_disclaimer = data.legal_disclaimer;
-        fallback_suggestions = data.fallback_suggestions;
-        normalized_query = data.normalized_query;
-        is_complex_query = data.is_complex_query;
-        returnedSessionId = data.session_id;
-        assistantMessageId = data.message_id;
-        userMessageId = data.user_message_id;
-      } else {
-        // General users get STREAMING responses!
+      // Both lawyers and general users get STREAMING responses!
+      if (true) {
         console.log('📤 Sending request to streaming endpoint:', endpoint);
         const streamingMsgId = (Date.now() + 1).toString();
         const streamingMsg: Message = {
@@ -553,7 +525,7 @@ export default function ChatbotScreen() {
             body: JSON.stringify({
               question: userMessage,
               conversation_history: formattedHistory,
-              max_tokens: 400,
+              max_tokens: userRole === "verified_lawyer" ? 1500 : 400, // Lawyers get more tokens for formal responses
               user_id: user?.id || null,
               session_id: sessionId || null,
             }),
@@ -747,8 +719,9 @@ export default function ChatbotScreen() {
         );
       }
 
-      // For non-streaming (lawyers), add bot reply with all enhanced data
-      if (userRole === "verified_lawyer") {
+      // NOTE: Streaming already adds the message, so we don't need to add it again here
+      // This code block is no longer needed since both lawyers and users use streaming
+      if (false) { // Disabled - streaming handles message display
         const reply: Message = {
           id: assistantMessageId || (Date.now() + 1).toString(),
           text: answer,
