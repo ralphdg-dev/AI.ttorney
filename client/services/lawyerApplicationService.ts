@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+import { NetworkConfig } from '../utils/networkConfig';
 
 interface FileUploadResponse {
   success: boolean;
@@ -114,7 +113,8 @@ class LawyerApplicationService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}${endpoint}`, {
         ...options,
         headers,
         signal: controller.signal,

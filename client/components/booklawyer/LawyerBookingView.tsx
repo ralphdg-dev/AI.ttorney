@@ -390,8 +390,10 @@ export default function LawyerBookingView() {
 
       console.log("Sending consultation request:", consultationRequestData);
 
+      const { NetworkConfig } = await import('@/utils/networkConfig');
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(
-        "http://localhost:8000/consultation-requests/",
+        `${apiUrl}/consultation-requests/`,
         {
           method: "POST",
           headers: {

@@ -1,5 +1,6 @@
 // C:\Users\Mikko\Desktop\AI.ttorney\client\services\lawyerProfileServices.ts
 import { useAuth } from "../contexts/AuthContext";
+import { NetworkConfig } from '../utils/networkConfig';
 
 export interface TimeSlot {
   id: string;
@@ -28,10 +29,8 @@ interface LawyerProfileResponse {
 }
 
 class LawyerProfileService {
-  private baseUrl: string;
-
   constructor() {
-    this.baseUrl = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
+    // No longer need to store baseUrl, will use NetworkConfig dynamically
   }
 
   async saveLawyerProfile(
@@ -66,7 +65,8 @@ class LawyerProfileService {
         hours_available: profileData.hours_available,
       });
 
-      const response = await fetch(`${this.baseUrl}/api/lawyer/profile`, {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/lawyer/profile`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -130,7 +130,8 @@ class LawyerProfileService {
 
   async getLawyerProfile(accessToken: string): Promise<LawyerProfileResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/lawyer/profile`, {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/lawyer/profile`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${accessToken}`,

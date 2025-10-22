@@ -67,7 +67,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
       }
 
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/lawyer-applications/me`, {
+      const { NetworkConfig } = await import('../utils/networkConfig');
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/lawyer-applications/me`, {
         headers: {
           'Authorization': `Bearer ${authState.session.access_token}`,
           'Content-Type': 'application/json',

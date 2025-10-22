@@ -24,6 +24,7 @@ import { useToast, Toast, ToastTitle, ToastDescription } from "../../components/
 import { Avatar, AvatarImage, AvatarFallbackText } from "../../components/ui/avatar";
 import { VStack } from "../../components/ui/vstack";
 import { createShadowStyle } from "../../utils/shadowUtils";
+import { NetworkConfig } from "../../utils/networkConfig";
 
 interface UserProfileData {
   full_name: string;
@@ -47,7 +48,6 @@ interface ApiRequestOptions {
 }
 
 // Constants
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 const DEFAULT_PROFILE_PHOTO = "";
 const DEFAULT_TIMEOUT_MS = 10000; // 10 seconds default
 const EMAIL_TIMEOUT_MS = 20000; // 20 seconds for email operations
@@ -77,7 +77,8 @@ const makeApiRequest = async ({ method, endpoint, body, timeout = DEFAULT_TIMEOU
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const apiUrl = await NetworkConfig.getBestApiUrl();
+    const response = await fetch(`${apiUrl}${endpoint}`, {
       method,
       headers: {
         'Authorization': `Bearer ${session.access_token}`,

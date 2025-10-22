@@ -111,9 +111,11 @@ export default function DirectoryScreen() {
         return;
       }
 
+      const { NetworkConfig } = await import('@/utils/networkConfig');
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const url = forceRefresh
-        ? "http://localhost:8000/legal-consultations/lawyers?refresh=true"
-        : "http://localhost:8000/legal-consultations/lawyers";
+        ? `${apiUrl}/legal-consultations/lawyers?refresh=true`
+        : `${apiUrl}/legal-consultations/lawyers`;
 
       const response = await fetch(url);
       const result = await response.json();

@@ -31,7 +31,7 @@ import ChatHistorySidebar, { ChatHistorySidebarRef } from "../components/chatbot
 import { ChatHistoryService } from "../services/chatHistoryService";
 import { Send } from "lucide-react-native";
 import { MarkdownText } from "../components/chatbot/MarkdownText";
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
+import { NetworkConfig } from "../utils/networkConfig";
 
 // ChatGPT-style animated thinking indicator
 const ThinkingIndicator = () => {
@@ -455,16 +455,19 @@ export default function ChatbotScreen() {
     let sessionId = currentConversationId;
 
     try {
+      // Get API URL dynamically using NetworkConfig
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      
       // Determine endpoint based on user role
       const userRole = user?.role || "guest";
       let endpoint = "";
 
       if (userRole === "verified_lawyer") {
         // Lawyer endpoint - formal legal analysis with legalese
-        endpoint = `${API_URL}/api/chatbot/lawyer/ask`;
+        endpoint = `${apiUrl}/api/chatbot/lawyer/ask`;
       } else {
         // General public endpoint (registered_user, guest, etc.) - STREAMING!
-        endpoint = `${API_URL}/api/chatbot/user/ask/stream`;
+        endpoint = `${apiUrl}/api/chatbot/user/ask/stream`;
       }
 
       // Prepare conversation history in the format expected by backend

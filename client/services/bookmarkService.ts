@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+import { NetworkConfig } from '../utils/networkConfig';
 
 export class BookmarkService {
   private static async getAuthHeaders(session?: any): Promise<HeadersInit> {
@@ -32,8 +31,9 @@ export class BookmarkService {
    */
   static async addBookmark(postId: string, userId: string, session?: any): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const headers = await this.getAuthHeaders(session);
-      const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks`, {
+      const response = await fetch(`${apiUrl}/api/forum/bookmarks`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ post_id: postId }),
@@ -56,8 +56,9 @@ export class BookmarkService {
    */
   static async removeBookmark(postId: string, userId: string, session?: any): Promise<{ success: boolean; error?: string }> {
     try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const headers = await this.getAuthHeaders(session);
-      const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks/${postId}`, {
+      const response = await fetch(`${apiUrl}/api/forum/bookmarks/${postId}`, {
         method: 'DELETE',
         headers,
       });
@@ -91,8 +92,9 @@ export class BookmarkService {
         return { success: true, isBookmarked: cached.isBookmarked };
       }
       
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const headers = await this.getAuthHeaders(session);
-      const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks/check/${postId}`, {
+      const response = await fetch(`${apiUrl}/api/forum/bookmarks/check/${postId}`, {
         method: 'GET',
         headers,
       });
@@ -119,8 +121,9 @@ export class BookmarkService {
    */
   static async getUserBookmarks(userId: string, session?: any): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const headers = await this.getAuthHeaders(session);
-      const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks/user`, {
+      const response = await fetch(`${apiUrl}/api/forum/bookmarks/user`, {
         method: 'GET',
         headers,
       });
@@ -148,7 +151,8 @@ export class BookmarkService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
       
-      const response = await fetch(`${API_BASE_URL}/api/forum/bookmarks/toggle`, {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/forum/bookmarks/toggle`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ post_id: postId }),

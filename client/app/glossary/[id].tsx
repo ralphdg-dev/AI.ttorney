@@ -19,8 +19,7 @@ import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
 import { Star, BookOpen, Globe } from "lucide-react-native";
 import { useFavorites } from "@/contexts/FavoritesContext";
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
+import { NetworkConfig } from "@/utils/networkConfig";
 
 interface GlossaryTerm {
   id: number;
@@ -54,7 +53,8 @@ export default function TermDetailScreen() {
     try {
       setLoading(true);
 
-      const response = await fetch(`${API_BASE_URL}/glossary/terms/${id}`);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/glossary/terms/${id}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

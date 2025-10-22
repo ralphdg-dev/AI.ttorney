@@ -427,12 +427,12 @@ const ViewPost: React.FC = () => {
     
     try {
       const headers = await getAuthHeaders();
-      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000);
       
-      const postResponse = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
+      const postResponse = await fetch(`${apiUrl}/api/forum/posts/${postId}`, {
         method: 'GET',
         headers,
         signal: controller.signal,
@@ -492,7 +492,7 @@ const ViewPost: React.FC = () => {
         
         // Fetch replies immediately after post
         try {
-          const repliesResponse = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
+          const repliesResponse = await fetch(`${apiUrl}/api/forum/posts/${postId}/replies`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json', ...headers } as HeadersInit,
             signal: controller.signal,

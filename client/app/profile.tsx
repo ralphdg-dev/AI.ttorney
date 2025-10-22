@@ -23,6 +23,7 @@ import { Avatar, AvatarImage, AvatarFallbackText } from "../components/ui/avatar
 import { supabase } from "../config/supabase";
 import { SidebarWrapper } from "../components/AppSidebar";
 import { createShadowStyle } from "../utils/shadowUtils";
+import { NetworkConfig } from "../utils/networkConfig";
 
 interface UserProfileData {
   full_name: string;
@@ -33,7 +34,6 @@ interface UserProfileData {
 }
 
 // Constants
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 const DEFAULT_PROFILE_PHOTO = "";
 const REQUEST_TIMEOUT_MS = 5000;
 
@@ -62,7 +62,8 @@ const makeApiRequest = async (endpoint: string): Promise<Response> => {
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const apiUrl = await NetworkConfig.getBestApiUrl();
+    const response = await fetch(`${apiUrl}${endpoint}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,

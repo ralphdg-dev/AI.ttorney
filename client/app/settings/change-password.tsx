@@ -13,9 +13,7 @@ import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
 import { supabase } from "@/config/supabase";
 import { createShadowStyle } from "@/utils/shadowUtils";
-
-// API Base URL
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+import { NetworkConfig } from "@/utils/networkConfig";
 
 export default function ChangePasswordScreen() {
   const router = useRouter();
@@ -75,7 +73,8 @@ export default function ChangePasswordScreen() {
       }
 
       // Call backend API to change password
-      const response = await fetch(`${API_BASE_URL}/api/user/change-password`, {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/user/change-password`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,

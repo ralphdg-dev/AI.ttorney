@@ -10,6 +10,7 @@ import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useForumCache } from '@/contexts/ForumCacheContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NetworkConfig } from '@/utils/networkConfig';
 
 // Shared categories reference
 
@@ -92,10 +93,10 @@ const CreatePost: React.FC = () => {
     try {
       // Use direct API call with authentication
       const headers = await getAuthHeaders();
-      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       
-      console.log(`[CreatePost] Creating post at ${API_BASE_URL}/api/forum/posts`);
-      const response = await fetch(`${API_BASE_URL}/api/forum/posts`, {
+      console.log(`[CreatePost] Creating post at ${apiUrl}/api/forum/posts`);
+      const response = await fetch(`${apiUrl}/api/forum/posts`, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),

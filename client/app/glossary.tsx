@@ -28,8 +28,8 @@ import {
   CacheService,
   generateGlossaryCacheKey,
 } from "@/services/cacheService";
+import { NetworkConfig } from "@/utils/networkConfig";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 const ITEMS_PER_PAGE = 10;
 
 export default function GlossaryScreen() {
@@ -158,7 +158,8 @@ export default function GlossaryScreen() {
         params.append("search", search.trim());
       }
 
-      const response = await fetch(`${API_BASE_URL}/glossary/terms?${params}`);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/glossary/terms?${params}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
