@@ -152,6 +152,8 @@ export default function ChatbotScreen() {
   const flatRef = useRef<FlatList>(null);
   const sidebarRef = useRef<ChatHistorySidebarRef>(null);
   const isFirstMessageRef = useRef<boolean>(true); // Track if this is the first message in conversation
+  const isStreamingRef = useRef<boolean>(false); // Track if currently streaming to prevent scroll jumping
+  const lastContentHeight = useRef<number>(0); // Track last content height to prevent redundant scrolls
 
   // Dynamic greeting that changes per session
   const greeting = useMemo(() => {
@@ -408,11 +410,12 @@ export default function ChatbotScreen() {
     setInput("");
     setIsTyping(true);
     setError(null);
+    isStreamingRef.current = false; // Reset streaming flag
 
-    // Scroll to show the user's message immediately (like ChatGPT)
+    // Scroll to show the user's message immediately
     setTimeout(() => {
-      flatRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+      flatRef.current?.scrollToOffset({ offset: 999999, animated: true });
+    }, 50);
 
     // Don't create session here - let backend create it on first message
     // This is the industry-standard approach (ChatGPT/Claude)
@@ -501,6 +504,7 @@ export default function ChatbotScreen() {
           sources: [],
         };
         setMessages((prev) => [...prev, streamingMsg]);
+        isStreamingRef.current = true; // Mark as streaming
 
         // Create abort controller for timeout
         const controller = new AbortController();
@@ -533,7 +537,7 @@ export default function ChatbotScreen() {
           const reader = response.body?.getReader();
           const decoder = new TextDecoder();
           let lastUpdateTime = 0;
-          let displayedText = '';
+          const UPDATE_INTERVAL = 30; // Update every 30ms for smooth typing
 
           if (!reader) {
             console.error('❌ No reader available from response body');
@@ -545,6 +549,16 @@ export default function ChatbotScreen() {
             const { done, value } = await reader.read();
             if (done) {
               console.log('✅ Stream completed');
+              isStreamingRef.current = false; // Mark streaming as complete
+              // Final update to ensure all text is displayed
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
+                if (msgIndex !== -1) {
+                  newMessages[msgIndex] = { ...newMessages[msgIndex], text: answer };
+                }
+                return newMessages;
+              });
               break;
             }
 
@@ -562,33 +576,20 @@ export default function ChatbotScreen() {
                     // Turn off typing indicator as soon as first text arrives
                     setIsTyping(false);
                     
-                    // Smooth character-by-character animation
-                    const chars = data.content.split('');
-                    for (const char of chars) {
-                      displayedText += char;
-                      const now = Date.now();
+                    // Throttled updates for smooth typing effect
+                    const now = Date.now();
+                    if (now - lastUpdateTime >= UPDATE_INTERVAL) {
+                      lastUpdateTime = now;
                       
-                      // Update every 50ms for slower, smoother typing effect
-                      if (now - lastUpdateTime > 50) {
-                        lastUpdateTime = now;
-                        const currentText = displayedText;
-                        setMessages((prev) => {
-                          const newMessages = [...prev];
-                          const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
-                          if (msgIndex !== -1) {
-                            newMessages[msgIndex] = { ...newMessages[msgIndex], text: currentText };
-                          }
-                          return newMessages;
-                        });
-                        
-                        // Auto-scroll to bottom as text appears
-                        setTimeout(() => {
-                          flatRef.current?.scrollToEnd({ animated: true });
-                        }, 10);
-                        
-                        // Small delay for smoother typing effect
-                        await new Promise(resolve => setTimeout(resolve, 20));
-                      }
+                      setMessages((prev) => {
+                        const newMessages = [...prev];
+                        const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
+                        if (msgIndex !== -1) {
+                          newMessages[msgIndex] = { ...newMessages[msgIndex], text: answer };
+                        }
+                        return newMessages;
+                      });
+                      // No manual scroll - let onContentSizeChange handle it
                     }
                   }
 
@@ -707,10 +708,10 @@ export default function ChatbotScreen() {
       }
       // For streaming users, the message already exists and was updated in real-time
 
-      // Scroll to show the bot's response (like ChatGPT)
+      // Scroll to bottom after streaming completes to show sources
       setTimeout(() => {
-        flatRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+        flatRef.current?.scrollToOffset({ offset: 999999, animated: true });
+      }, 200);
 
       console.log("✅ Messages saved to database:", {
         session: sessionId,
@@ -849,7 +850,7 @@ export default function ChatbotScreen() {
             <MarkdownText
               text={item.text || ""}
               isUserMessage={isUser}
-              style={[tw`text-base`, { lineHeight: 22}]}
+              style={[tw`text-base`, { lineHeight: 22, maxWidth: 600 }]}
             />
 
             {/* Show sources with URLs */}
@@ -1052,7 +1053,7 @@ export default function ChatbotScreen() {
               {/* Greeting */}
               <Text
                 style={[
-                  tw`text-3xl font-bold text-center mb-2`,
+                  tw`text-2xl font-bold text-center mb-2`,
                   { color: Colors.text.primary },
                 ]}
               >
@@ -1146,12 +1147,11 @@ export default function ChatbotScreen() {
             data={messages}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={tw`pb-40 pt-2`}
+            contentContainerStyle={tw`pb-64 pt-2`}
             showsVerticalScrollIndicator={false}
             onLayout={() => {
               // Scroll to absolute bottom when FlatList is laid out
               if (messages.length > 0 && !isTyping) {
-                // Use scrollToOffset with large value to ensure we reach the very bottom
                 setTimeout(() => {
                   flatRef.current?.scrollToOffset({ offset: 999999, animated: false });
                   // Show content after scrolling to bottom
@@ -1159,17 +1159,22 @@ export default function ChatbotScreen() {
                 }, 50);
               }
             }}
-            onContentSizeChange={(width, height) => {
-              // Auto-scroll to absolute bottom when content size changes
-              // Use scrollToOffset to ensure we reach the very end including all padding
-              setTimeout(() => {
-                flatRef.current?.scrollToOffset({ offset: height + 1000, animated: false });
-              }, 100);
-              // Backup scroll attempt and show content
-              setTimeout(() => {
+            onContentSizeChange={(width: number, height: number) => {
+              // Only scroll when content actually grows (not on every render)
+              const heightIncreased = height > lastContentHeight.current;
+              lastContentHeight.current = height;
+              
+              if (!isScrolledToBottom) {
+                // Initial load
                 flatRef.current?.scrollToOffset({ offset: 999999, animated: false });
-                setIsScrolledToBottom(true);
-              }, 200);
+                setTimeout(() => setIsScrolledToBottom(true), 100);
+              } else if (!isStreamingRef.current && heightIncreased) {
+                // After streaming completes and content grows, scroll smoothly
+                setTimeout(() => {
+                  flatRef.current?.scrollToOffset({ offset: 999999, animated: false });
+                }, 50);
+              }
+              // During streaming: do nothing to prevent jumping
             }}
             style={[tw`flex-1`, { opacity: isScrolledToBottom ? 1 : 0 }]}
             ListFooterComponent={
