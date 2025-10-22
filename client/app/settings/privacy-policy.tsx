@@ -1,5 +1,6 @@
 import React from "react";
-import { ScrollView } from "react-native";
+import { ScrollView, StatusBar } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
@@ -13,7 +14,9 @@ export default function PrivacyPolicyScreen() {
   const router = useRouter();
 
   return (
-    <Box className="flex-1 bg-white">
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <Box className="flex-1 bg-white">
       <Header showBackButton={true} showMenu={false} onBackPress={() => router.back()} />
 
       <ScrollView
@@ -115,8 +118,8 @@ export default function PrivacyPolicyScreen() {
           </VStack>
         </VStack>
       </ScrollView>
-      
       <Navbar />
     </Box>
+    </SafeAreaView>
   );
 }

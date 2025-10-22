@@ -1,13 +1,5 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  TextInput,
-  ActivityIndicator,
-} from "react-native";
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, StatusBar } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Save,
@@ -536,7 +528,8 @@ export default function EditProfilePage() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[tw`flex-1 justify-center items-center`, { backgroundColor: Colors.background.secondary }]}>
+      <SafeAreaView style={[tw`flex-1 justify-center items-center`, { backgroundColor: Colors.background.primary }]}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <ActivityIndicator size="large" color={Colors.primary.blue} />
         <Text style={[tw`mt-4 text-base`, { color: Colors.text.secondary }]}>Loading profile...</Text>
       </SafeAreaView>
@@ -544,7 +537,8 @@ export default function EditProfilePage() {
   }
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]}>
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.primary }]}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       {/* Back Button Header */}
       <View style={[tw`bg-white p-4 flex-row items-center justify-between`, { borderBottomColor: Colors.border.light, borderBottomWidth: 1 }]}>
         <TouchableOpacity

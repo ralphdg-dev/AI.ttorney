@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import BackButton from '../../../components/ui/BackButton';
 import StickyFooterButton from '../../../components/ui/StickyFooterButton';
 import { router } from 'expo-router';
+import Colors from '../../../constants/Colors';
 import { lawyerApplicationService } from '../../../services/lawyerApplicationService';
 
 export default function LawyerTerms() {
@@ -102,8 +103,8 @@ export default function LawyerTerms() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
 
       {/* Header with BackButton */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 16 }}>

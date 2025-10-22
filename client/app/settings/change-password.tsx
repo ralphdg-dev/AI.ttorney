@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { View, ScrollView, Alert, TouchableOpacity, ActivityIndicator } from "react-native";
+import React, { useState } from 'react';
+import { View, TouchableOpacity, Alert, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,8 +8,9 @@ import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
 import { Input, InputField } from "@/components/ui/input";
-import { AlertCircle, CheckCircle, Eye, EyeOff, Lock, ChevronRight } from "lucide-react-native";
+import { AlertCircle, CheckCircle, Eye, EyeOff, Lock } from "lucide-react-native";
 import { useToast, Toast, ToastTitle, ToastDescription } from "@/components/ui/toast";
+import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
 import { supabase } from "@/config/supabase";
@@ -146,19 +148,16 @@ export default function ChangePasswordScreen() {
   };
 
   return (
-    <View style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]}>
-      {/* Back Button Header */}
-      <View style={[tw`bg-white p-4 flex-row items-center`, { borderBottomColor: Colors.border.light, borderBottomWidth: 1 }]}>
-        <TouchableOpacity 
-          onPress={() => router.back()}
-          style={[tw`p-2 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}
-          activeOpacity={0.7}
-        >
-          <View style={{ transform: [{ rotate: '180deg' }] }}>
-            <ChevronRight size={24} color={Colors.text.secondary} />
-          </View>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      
+      {/* Header with back button */}
+      <Header 
+        title="Change Password" 
+        showBackButton={true}
+        showMenu={false}
+        onBackPress={() => router.back()}
+      />
 
       <ScrollView
         style={tw`flex-1`}
@@ -430,6 +429,6 @@ export default function ChangePasswordScreen() {
       </ScrollView>
       
       <Navbar />
-    </View>
+    </SafeAreaView>
   );
 }

@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { View, SafeAreaView, StatusBar, Text, TextInput, TouchableOpacity, Image, Alert, Modal, ScrollView, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView, StatusBar, ScrollView, View, Text, TextInput, TouchableOpacity, Image, Alert, Modal, Platform } from 'react-native';
+import { router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import BackButton from '../../../components/ui/BackButton';
 import StickyFooterButton from '../../../components/ui/StickyFooterButton';
 import { lawyerApplicationService } from '../../../services/lawyerApplicationService';
 import { useAuth } from '../../../contexts/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Colors from '../../../constants/Colors';
 
 export default function LawyerReg() {
   const { user } = useAuth();
@@ -240,8 +241,8 @@ export default function LawyerReg() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
 
       <View
         style={{

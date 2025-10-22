@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, FlatList, useWindowDimensions, TouchableOpacity } from "react-native";
+import { View, FlatList, useWindowDimensions, TouchableOpacity, StatusBar } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
@@ -10,6 +11,7 @@ import { Text as GSText } from "@/components/ui/text";
 import { Input, InputField, InputSlot } from "@/components/ui/input";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
+import { LAYOUT } from "@/constants/LayoutConstants";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import Navbar from "@/components/Navbar";
 import { SidebarWrapper } from "@/components/AppSidebar";
@@ -27,9 +29,12 @@ export default function GuidesScreen() {
   
   const ARTICLES_PER_PAGE = 12;
 
-  const horizontalPadding = 24;
-  const minCardWidth = 320;
-  const numColumns = Math.max(1, Math.min(3, Math.floor((width - horizontalPadding * 2) / minCardWidth)));
+  const horizontalPadding = LAYOUT.SPACING.lg; // 24
+  const cardGap = LAYOUT.SPACING.md; // 16
+  
+  // FAANG approach: Always 1 column on mobile for better UX
+  const numColumns = 1;
+  const cardWidth = width - (horizontalPadding * 2);
 
   // Fetch articles
   const { articles: legalArticles, loading, error, refetch, getArticlesByCategory, searchArticles } = useLegalArticles();
@@ -282,8 +287,9 @@ const renderPagination = () => {
   
 
   return (
-    <View style={tw`flex-1 bg-gray-50`}>
-        <Header title="Know Your Batas" showMenu={true} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <Header title="Know Your Batas" showMenu={true} />
 
         <ToggleGroup options={tabOptions} activeOption={activeTab} onOptionChange={onToggleChange} />
 
@@ -326,27 +332,26 @@ const renderPagination = () => {
             <FlatList
               ref={flatListRef}
               data={paginatedArticles}
-              key={`${numColumns}-${activeCategory}-${currentPage}`}
+              key={`guides-${numColumns}-${activeCategory}-${currentPage}-${width}`}
               keyExtractor={(item) => item.id}
               numColumns={numColumns}
+              extraData={width}
               ListHeaderComponent={renderListHeader}
               ListFooterComponent={renderPagination}
               contentContainerStyle={{ 
-                paddingHorizontal: 24, 
-                paddingBottom: 50,  
+                paddingHorizontal: horizontalPadding,
+                paddingBottom: 100,  
                 flexGrow: 1 
               }}
-              columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
+              columnWrapperStyle={undefined}
               renderItem={({ item }) => (
                 <ArticleCard
                   item={item}
                   onPress={handleArticlePress}
                   onToggleBookmark={handleToggleBookmark}
                   containerStyle={{
-                    width: numColumns > 1
-                      ? (width - horizontalPadding * 2 - 12) / numColumns
-                      : "100%",
-                    marginHorizontal: 0
+                    width: cardWidth,
+                    marginBottom: cardGap,
                   }}
                 />
               )}
@@ -368,6 +373,6 @@ const renderPagination = () => {
 
         <Navbar activeTab="learn" />
         <SidebarWrapper />
-      </View>
+      </SafeAreaView>
   );
 }

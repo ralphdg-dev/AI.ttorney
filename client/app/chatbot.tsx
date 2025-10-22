@@ -17,7 +17,9 @@ import {
   Linking,
   Image,
   Animated,
+  StatusBar,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../constants/Colors";
@@ -26,12 +28,12 @@ import { SidebarWrapper } from "../components/AppSidebar";
 import Navbar from "../components/Navbar";
 import { LawyerNavbar } from "../components/lawyer/shared";
 import { useAuth } from "../contexts/AuthContext";
-import axios from "axios";
 import ChatHistorySidebar, { ChatHistorySidebarRef } from "../components/chatbot/ChatHistorySidebar";
 import { ChatHistoryService } from "../services/chatHistoryService";
 import { Send } from "lucide-react-native";
 import { MarkdownText } from "../components/chatbot/MarkdownText";
 import { NetworkConfig } from "../utils/networkConfig";
+import { LAYOUT, getTotalUIHeight } from "../constants/LayoutConstants";
 
 // ChatGPT-style animated thinking indicator
 const ThinkingIndicator = () => {
@@ -137,6 +139,7 @@ interface Message {
 
 export default function ChatbotScreen() {
   const { user, session, isLawyer } = useAuth();
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -460,6 +463,7 @@ export default function ChatbotScreen() {
     try {
       // Get API URL dynamically using NetworkConfig
       const apiUrl = await NetworkConfig.getBestApiUrl();
+      console.log('🌐 API URL detected:', apiUrl);
       
       // Determine endpoint based on user role
       const userRole = user?.role || "guest";
@@ -472,6 +476,8 @@ export default function ChatbotScreen() {
         // General public endpoint (registered_user, guest, etc.) - STREAMING!
         endpoint = `${apiUrl}/api/chatbot/user/ask/stream`;
       }
+      
+      console.log('📍 Full endpoint URL:', endpoint);
 
       // Prepare conversation history in the format expected by backend
       const formattedHistory = conversationHistory.map((msg) => ({
@@ -536,11 +542,17 @@ export default function ChatbotScreen() {
 
           // Check response status
           if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
             console.error('❌ Streaming endpoint error:', response.status, response.statusText);
-            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+            console.error('❌ Error details:', errorText);
+            throw new Error(`Server returned ${response.status}: ${response.statusText}\n${errorText}`);
           }
 
           console.log('✅ Streaming endpoint connected');
+          console.log('📋 Response headers:', {
+            contentType: response.headers.get('content-type'),
+            hasBody: !!response.body
+          });
 
           const reader = response.body?.getReader();
           const decoder = new TextDecoder();
@@ -549,7 +561,14 @@ export default function ChatbotScreen() {
 
           if (!reader) {
             console.error('❌ No reader available from response body');
-            throw new Error('Unable to read streaming response');
+            console.error('❌ Response details:', {
+              status: response.status,
+              statusText: response.statusText,
+              headers: Object.fromEntries(response.headers.entries()),
+              bodyUsed: response.bodyUsed,
+              hasBody: !!response.body
+            });
+            throw new Error('Unable to read streaming response. Server may not be running or endpoint may not support streaming.');
           }
 
           console.log('📖 Reading stream...');
@@ -1041,12 +1060,15 @@ export default function ChatbotScreen() {
   };
 
   return (
-    <View
+    <SafeAreaView
       style={[
         tw`flex-1`,
-        { backgroundColor: Colors.background.primary, overflow: "hidden" },
+        { backgroundColor: Colors.background.primary },
       ]}
+      edges={['top', 'left', 'right']}
     >
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      
       {/* Chat History Sidebar */}
       <ChatHistorySidebar
         ref={sidebarRef}
@@ -1058,7 +1080,13 @@ export default function ChatbotScreen() {
       />
 
       {/* Header */}
-      <Header title="AI Legal Assistant" showMenu={true} />
+      <Header 
+        title="AI Legal Assistant" 
+        showMenu={true}
+        showChatHistoryToggle={true}
+        isChatHistoryOpen={sidebarRef.current?.isOpen?.() || false}
+        onChatHistoryToggle={() => sidebarRef.current?.toggleSidebar?.()}
+      />
 
       {/* Messages list or centered placeholder */}
       <View style={tw`flex-1`}>
@@ -1288,13 +1316,13 @@ export default function ChatbotScreen() {
       {/* Composer - Fixed at bottom */}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
         style={{
           position: 'absolute',
-          bottom: 60,
+          bottom: getTotalUIHeight(insets.bottom),
           left: 0,
           right: 0,
-          zIndex: 10,
+          zIndex: LAYOUT.Z_INDEX.fixed,
           backgroundColor: '#FFFFFF',
         }}
       >
@@ -1390,6 +1418,6 @@ export default function ChatbotScreen() {
         <Navbar activeTab="ask" />
       )}
       <SidebarWrapper />
-    </View>
+    </SafeAreaView>
   );
 }

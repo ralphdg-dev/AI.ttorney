@@ -7,6 +7,7 @@ import {
   Alert,
   Animated,
   Easing,
+  StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -451,7 +452,8 @@ const LawyerConsultPage: React.FC = () => {
 
   if (loading && consultationRequests.length === 0) {
     return (
-      <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header
           title="Consultations"
           showSearch={false}
@@ -511,7 +513,8 @@ const LawyerConsultPage: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header
         title="Consultations"
         showSearch={false}

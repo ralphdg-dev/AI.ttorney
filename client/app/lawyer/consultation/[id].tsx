@@ -148,7 +148,7 @@ const ConsultationDetailPage: React.FC = () => {
 
   if (loading || !consultation) {
     return (
-      <SafeAreaView style={tw`flex-1 bg-gray-50`} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
         <Header 
           title="Loading..."
           showBackButton={true}
@@ -162,7 +162,7 @@ const ConsultationDetailPage: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-50`} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <Header 
         title={`Request #${consultation.status.toUpperCase()}-${consultation.id.slice(-4)}`}
         showBackButton={true}

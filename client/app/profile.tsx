@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -256,8 +257,9 @@ export default function UserProfilePage() {
   }
 
   return (
-      <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]}>
-        <Header title="Profile" showSettings={false} showMenu={true} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <Header title="Profile" showMenu={true} />
       
       <ScrollView 
         style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]} 

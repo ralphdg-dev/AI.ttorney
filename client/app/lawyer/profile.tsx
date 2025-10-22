@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -622,7 +623,8 @@ const LawyerProfilePage: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-50`} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header title="Profile" showSettings={false} />
       <ScrollView
         style={tw`flex-1`}

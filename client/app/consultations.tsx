@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { View, RefreshControl, ScrollView, Animated } from 'react-native';
+import { View, RefreshControl, ScrollView, Animated, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import tw from "tailwind-react-native-classnames";
 import Header from "../components/Header";
@@ -174,8 +175,9 @@ export default function ConsultationsScreen() {
     return filtered;
   }, [activeFilter, searchQuery, consultations]);
   return (
-      <View style={tw`flex-1 bg-gray-50`}>
-        <Header title="My Consultations" showMenu={true} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <Header title="My Consultations" showMenu={true} />
         
         <SearchBarWithFilter
           searchQuery={searchQuery}
@@ -239,8 +241,8 @@ export default function ConsultationsScreen() {
           setSelectedStatus={setActiveFilter}
         />
 
-        <Navbar />
-        <SidebarWrapper />
-      </View>
+      <Navbar activeTab="profile" />
+      <SidebarWrapper />
+    </SafeAreaView>
   );
 }

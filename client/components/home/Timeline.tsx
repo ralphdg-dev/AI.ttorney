@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, FlatList, RefreshControl, Animated, TouchableOpacity, StyleSheet, ListRenderItem } from 'react-native';
+import { View, FlatList, RefreshControl, Animated, TouchableOpacity, StyleSheet, ListRenderItem, Platform } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus } from 'lucide-react-native';
 import Post from './Post';
 import { useAuth } from '../../contexts/AuthContext';
 import { useForumCache } from '../../contexts/ForumCacheContext';
 import Colors from '../../constants/Colors';
+import { LAYOUT } from '../../constants/LayoutConstants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
 import { useList } from '@/hooks/useOptimizedList';
@@ -47,6 +49,7 @@ interface TimelineProps {
 
 const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { session, isAuthenticated, user: currentUser } = useAuth();
   const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
   const [posts, setPosts] = useState<PostData[]>([]);
@@ -607,9 +610,41 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         />
       )}
 
-      {/* Floating Create Post Button */}
-      <TouchableOpacity style={styles.createPostButton} onPress={handleCreatePost} activeOpacity={0.8}>
-        <Plus size={24} color="#FFFFFF" />
+      {/* Floating Create Post Button - Responsive positioning */}
+      <TouchableOpacity 
+        style={{
+          position: 'absolute',
+          // Calculate bottom position: navbar height + safe area + spacing
+          bottom: LAYOUT.NAVBAR_HEIGHT + (insets.bottom || 0) + LAYOUT.SPACING.md,
+          right: LAYOUT.SPACING.lg,
+          backgroundColor: Colors.primary.blue,
+          width: LAYOUT.MIN_TOUCH_TARGET + LAYOUT.SPACING.md, // 60px (larger than min)
+          height: LAYOUT.MIN_TOUCH_TARGET + LAYOUT.SPACING.md,
+          borderRadius: (LAYOUT.MIN_TOUCH_TARGET + LAYOUT.SPACING.md) / 2,
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: LAYOUT.Z_INDEX.fixed,
+          ...Platform.select({
+            ios: {
+              shadowColor: Colors.primary.blue,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+            },
+            android: {
+              elevation: 8,
+            },
+            web: {
+              boxShadow: `0 4px 12px ${Colors.primary.blue}40`,
+            },
+          }),
+        }}
+        onPress={handleCreatePost} 
+        activeOpacity={0.8}
+        accessibilityLabel="Create new post"
+        accessibilityRole="button"
+      >
+        <Plus size={LAYOUT.SPACING.lg} color="#FFFFFF" strokeWidth={2.5} />
       </TouchableOpacity>
     </View>
   );
@@ -637,17 +672,7 @@ const styles = StyleSheet.create({
     height: 20, // Add a spacer at the bottom to prevent content from being hidden
   },
   createPostButton: {
-    position: 'absolute',
-    bottom: 90,
-    right: 20,
-    backgroundColor: Colors.primary.blue,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    boxShadow: `0 4px 8px ${Colors.primary.blue}30`,
-    elevation: 8,
+    // Removed - now using dynamic style
   },
 });
 

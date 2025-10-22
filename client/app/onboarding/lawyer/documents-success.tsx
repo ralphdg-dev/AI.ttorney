@@ -3,11 +3,12 @@ import { SafeAreaView, StatusBar, View, Image, Text } from 'react-native';
 import BackButton from '../../../components/ui/BackButton';
 import { router } from 'expo-router';
 import StickyFooterButton from '../../../components/ui/StickyFooterButton';
+import Colors from '../../../constants/Colors';
 
 export default function DocumentsSuccess() {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
 
       {/* Header with BackButton */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 16 }}>

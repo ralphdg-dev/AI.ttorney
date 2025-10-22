@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, StatusBar, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import CategoryScroller from '@/components/glossary/CategoryScroller';
@@ -154,9 +155,15 @@ const CreatePost: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={{ flex: 1 }}>
+          {/* Header */}
+          <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={20} color="#536471" />
         </TouchableOpacity>
@@ -210,7 +217,9 @@ const CreatePost: React.FC = () => {
       </View>
       
       <Navbar activeTab="home" />
-    </View>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 

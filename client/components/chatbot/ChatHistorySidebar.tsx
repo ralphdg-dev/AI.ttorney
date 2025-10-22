@@ -1,9 +1,10 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated, Platform, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 import { ChatHistoryService, Conversation } from '../../services/chatHistoryService';
-import { MessageSquare, Plus, Trash2, ChevronLeft, ChevronRight, AlertCircle, AlertTriangle } from 'lucide-react-native';
+import { MessageSquare, Plus, Trash2, AlertCircle, AlertTriangle } from 'lucide-react-native';
 import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody, ModalFooter } from '../ui/modal';
 import { Button, ButtonText } from '../ui/button/index';
 import { Heading } from '../ui/heading';
@@ -23,6 +24,8 @@ export interface ChatHistorySidebarRef {
   refreshConversations: () => Promise<void>;
   addNewConversation: (conversationId: string, title: string) => void;
   updateConversationTitle: (conversationId: string, title: string) => void;
+  toggleSidebar: () => void;
+  isOpen: () => boolean;
 }
 
 const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarProps>((
@@ -123,7 +126,15 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
       );
       console.log('✅ Optimistically updated title:', conversationId);
     },
-  }), [loadConversations]);
+    
+    // Toggle sidebar open/close
+    toggleSidebar: () => {
+      setIsOpen(prev => !prev);
+    },
+    
+    // Get sidebar open state
+    isOpen: () => isOpen,
+  }), [loadConversations, isOpen]);
 
   const handleNewChat = async () => {
     await onNewChat();
@@ -245,33 +256,6 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
 
   return (
     <>
-      {/* Toggle Button */}
-      <TouchableOpacity
-        onPress={() => setIsOpen(!isOpen)}
-        style={[
-          tw`absolute top-4 z-50 p-2 rounded-full`,
-          {
-            right: isOpen ? SIDEBAR_WIDTH + 8 : 8,
-            backgroundColor: Colors.background.secondary,
-            ...(Platform.OS === 'web'
-              ? { boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }
-              : {
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 4,
-                  elevation: 3,
-                }),
-          },
-        ]}
-      >
-        {isOpen ? (
-          <ChevronRight size={24} color={Colors.text.primary} />
-        ) : (
-          <ChevronLeft size={24} color={Colors.text.primary} />
-        )}
-      </TouchableOpacity>
-
       {/* Overlay */}
       {isOpen && (
         <TouchableOpacity
@@ -305,13 +289,14 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
           },
         ]}
       >
-        {/* Header */}
-        <View
-          style={[
-            tw`px-4 py-4 border-b`,
-            { borderBottomColor: Colors.border.light },
-          ]}
-        >
+        <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+          {/* Header */}
+          <View
+            style={[
+              tw`px-4 py-4 border-b`,
+              { borderBottomColor: Colors.border.light },
+            ]}
+          >
           <TouchableOpacity
             onPress={handleNewChat}
             disabled={isLoading}
@@ -453,6 +438,7 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
             </View>
           )}
         </ScrollView>
+        </SafeAreaView>
       </Animated.View>
 
       {/* Delete Confirmation Modal */}

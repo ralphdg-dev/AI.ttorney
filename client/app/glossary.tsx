@@ -7,7 +7,9 @@ import {
   ActivityIndicator,
   Alert,
   useWindowDimensions,
+  StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { fadeIn, fadeOut } from '@/utils/animations';
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
@@ -547,71 +549,73 @@ export default function GlossaryScreen() {
   }, [activeTab, handleItemPress, handleToggleBookmark, numColumns, screenWidth, horizontalPadding]);
 
   return (
-      <View className="flex-1 bg-gray-50">
-        <Header title="Know Your Batas" showMenu={true} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <Header title="Know Your Batas" showMenu={true} />
 
-        <ToggleGroup
-          options={tabOptions}
-          activeOption={activeTab}
-          onOptionChange={handleTabChange}
-        />
+      <ToggleGroup
+        options={tabOptions}
+        activeOption={activeTab}
+        onOptionChange={handleTabChange}
+      />
 
-        <Box className={`px-${horizontalPadding / 4} pt-6 pb-4`}>
-          <Input
-            variant="outline"
-            size="lg"
-            className="bg-white rounded-lg border border-gray-300"
-          >
-            <InputSlot className="pl-4">
-              <Ionicons name="search" size={20} color="#9CA3AF" />
-            </InputSlot>
-            <InputField
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
-              placeholderTextColor="#9CA3AF"
-              className="text-gray-800 text-base"
-              editable={!termsLoading && !articlesLoading}
-            />
-            <InputSlot className="pr-4">
-              <Ionicons name="options" size={20} color={Colors.text.sub} />
-            </InputSlot>
-          </Input>
-        </Box>
-
-        <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-          <FlatList
-            ref={flatListRef}
-            data={paginatedData}
-            key={`${numColumns}-${activeCategory}-${currentPage}-${activeTab}`}
-            keyExtractor={(item) => item.id}
-            numColumns={numColumns}
-            ListHeaderComponent={renderListHeader}
-            ListFooterComponent={renderPaginationControls}
-            ListEmptyComponent={renderEmptyState}
-            contentContainerStyle={{
-              paddingHorizontal: horizontalPadding,
-              paddingBottom: 100,
-              flexGrow: 1,
-            }}
-            columnWrapperStyle={
-              numColumns > 1
-                ? { justifyContent: "space-between", marginBottom: 0 }
-                : undefined
-            }
-            renderItem={renderItem}
-            showsVerticalScrollIndicator={false}
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={10}
-            initialNumToRender={8}
-            windowSize={10}
-            refreshing={termsLoading || articlesLoading}
-            onRefresh={() => activeTab === "terms" ? fetchLegalTerms(currentPage) : refetch()}
+      <Box className={`px-${horizontalPadding / 4} pt-6 pb-4`}>
+        <Input
+          variant="outline"
+          size="lg"
+          className="bg-white rounded-lg border border-gray-300"
+        >
+          <InputSlot className="pl-4">
+            <Ionicons name="search" size={20} color="#9CA3AF" />
+          </InputSlot>
+          <InputField
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
+            placeholderTextColor="#9CA3AF"
+            className="text-gray-800 text-base"
+            editable={!termsLoading && !articlesLoading}
           />
-        </Animated.View>
+          <InputSlot className="pr-4">
+            <Ionicons name="options" size={20} color={Colors.text.sub} />
+          </InputSlot>
+        </Input>
+      </Box>
 
-        <Navbar activeTab="learn" />
-        <SidebarWrapper />
-      </View>
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <FlatList
+          ref={flatListRef}
+          data={paginatedData}
+          key={`glossary-${numColumns}-${activeCategory}-${currentPage}-${activeTab}-${screenWidth}`}
+          keyExtractor={(item) => item.id}
+          numColumns={numColumns}
+          extraData={screenWidth}
+          ListHeaderComponent={renderListHeader}
+          ListFooterComponent={renderPaginationControls}
+          ListEmptyComponent={renderEmptyState}
+          contentContainerStyle={{
+            paddingHorizontal: horizontalPadding,
+            paddingBottom: 100,
+            flexGrow: 1,
+          }}
+          columnWrapperStyle={
+            numColumns > 1
+              ? { justifyContent: "space-between", marginBottom: 0 }
+              : undefined
+          }
+          renderItem={renderItem}
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          initialNumToRender={8}
+          windowSize={10}
+          refreshing={termsLoading || articlesLoading}
+          onRefresh={() => activeTab === "terms" ? fetchLegalTerms(currentPage) : refetch()}
+        />
+      </Animated.View>
+
+      <Navbar activeTab="learn" />
+      <SidebarWrapper />
+    </SafeAreaView>
   );
 }

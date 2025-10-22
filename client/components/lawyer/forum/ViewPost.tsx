@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, Image, SafeAreaView, TextInput, Animated } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, Animated, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { User, Bookmark, MoreHorizontal, Flag, Send, Shield } from 'lucide-react-native';
 import ReportModal from '../../common/ReportModal';
@@ -650,7 +651,8 @@ const ViewPost: React.FC = () => {
   const shouldShowReadMore = displayContent.length > 280;
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { position: 'relative', zIndex: 1, backgroundColor: 'transparent' }]}>
+    <SafeAreaView style={[tw`flex-1`, { position: 'relative', zIndex: 1, backgroundColor: Colors.background.primary }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       {/* Loading Overlay - Covers any parent loading indicators */}
       {(loading || !postReady) && (
         <View style={{
