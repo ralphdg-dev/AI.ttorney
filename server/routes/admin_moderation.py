@@ -21,10 +21,11 @@ Date: 2025-10-22
 
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal
 from datetime import datetime
 from middleware.auth import require_role
 from services.supabase_service import SupabaseService
+from models.violation_types import ViolationType
 import httpx
 import logging
 
@@ -199,7 +200,10 @@ async def get_suspended_users(
 @router.get("/violations", response_model=ViolationsResponse)
 async def get_violations(
     user_id: Optional[str] = Query(None, description="Filter by user ID"),
-    violation_type: Optional[str] = Query(None, description="Filter by type: forum_post, forum_reply, chatbot_message"),
+    violation_type: Optional[Literal["forum_post", "forum_reply", "chatbot_prompt"]] = Query(
+        None, 
+        description="Filter by type: forum_post, forum_reply, chatbot_prompt"
+    ),
     action_taken: Optional[str] = Query(None, description="Filter by action: warning, strike_added, suspended, banned"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -225,6 +229,12 @@ async def get_violations(
         if user_id:
             params["user_id"] = f"eq.{user_id}"
         if violation_type:
+            # Validate violation type
+            if not ViolationType.is_valid(violation_type):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid violation_type. Must be one of: {ViolationType.values()}"
+                )
             params["violation_type"] = f"eq.{violation_type}"
         if action_taken:
             params["action_taken"] = f"eq.{action_taken}"

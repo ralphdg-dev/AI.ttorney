@@ -7,6 +7,7 @@ from services.bookmark_service import BookmarkService
 from services.report_service import ReportService
 from services.content_moderation_service import get_moderation_service
 from services.violation_tracking_service import get_violation_tracking_service
+from models.violation_types import ViolationType
 import httpx
 import logging
 from middleware.auth import require_role
@@ -178,7 +179,7 @@ async def create_post(
                 # Record violation and get action taken
                 violation_result = await violation_service.record_violation(
                     user_id=user_id,
-                    violation_type="forum_post",
+                    violation_type=ViolationType.FORUM_POST,
                     content_text=body.body.strip(),
                     moderation_result=moderation_result,
                     content_id=None  # No post ID yet since we're blocking it
@@ -740,7 +741,7 @@ async def create_reply(
                 # Record violation and get action taken
                 violation_result = await violation_service.record_violation(
                     user_id=user_id,
-                    violation_type="forum_reply",
+                    violation_type=ViolationType.FORUM_REPLY,
                     content_text=body.body.strip(),
                     moderation_result=moderation_result,
                     content_id=None  # No reply ID yet since we're blocking it

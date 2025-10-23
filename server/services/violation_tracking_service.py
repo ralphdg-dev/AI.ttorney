@@ -22,10 +22,11 @@ Date: 2025-10-22
 """
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from datetime import datetime, timedelta
 import httpx
 from services.supabase_service import SupabaseService
+from models.violation_types import ViolationType, SuspensionType
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ class ViolationTrackingService:
     async def record_violation(
         self,
         user_id: str,
-        violation_type: str,
+        violation_type: Union[str, ViolationType],
         content_text: str,
         moderation_result: Dict[str, Any],
         content_id: Optional[str] = None,
@@ -68,10 +69,10 @@ class ViolationTrackingService:
         
         Args:
             user_id: UUID of the user who violated rules
-            violation_type: Type of content ('forum_post', 'forum_reply', 'chatbot_message')
+            violation_type: Type of content (ViolationType enum or string: 'forum_post', 'forum_reply', 'chatbot_prompt')
             content_text: The actual violating content
             moderation_result: Result from ContentModerationService.moderate_content()
-            content_id: Optional ID of the post/reply/message
+            content_id: Optional ID of the post/reply/prompt
             ip_address: Optional IP address for audit
             user_agent: Optional user agent for audit
         
@@ -88,7 +89,14 @@ class ViolationTrackingService:
             Exception: If database operations fail
         """
         try:
-            logger.info(f"🚨 Recording violation for user {user_id[:8]}... (type: {violation_type})")
+            # Convert enum to string if needed
+            violation_type_str = violation_type.value if isinstance(violation_type, ViolationType) else violation_type
+            
+            # Validate violation type
+            if not ViolationType.is_valid(violation_type_str):
+                raise ValueError(f"Invalid violation_type: {violation_type_str}. Must be one of: {ViolationType.values()}")
+            
+            logger.info(f"🚨 Recording violation for user {user_id[:8]}... (type: {violation_type_str})")
             
             # Step 1: Get current user status
             user_data = await self._get_user_status(user_id)
@@ -138,7 +146,7 @@ class ViolationTrackingService:
             # Step 5: Record violation in database
             violation_id = await self._insert_violation_record(
                 user_id=user_id,
-                violation_type=violation_type,
+                violation_type=violation_type_str,
                 content_id=content_id,
                 content_text=content_text,
                 moderation_result=moderation_result,
@@ -153,7 +161,7 @@ class ViolationTrackingService:
             if action_taken in ["suspended", "banned"]:
                 await self._create_suspension_record(
                     user_id=user_id,
-                    suspension_type="permanent" if action_taken == "banned" else "temporary",
+                    suspension_type=SuspensionType.PERMANENT if action_taken == "banned" else SuspensionType.TEMPORARY,
                     violation_id=violation_id,
                     suspension_number=new_suspension_count,
                     strikes_at_suspension=current_strikes + 1,
@@ -396,7 +404,7 @@ class ViolationTrackingService:
     async def _create_suspension_record(
         self,
         user_id: str,
-        suspension_type: str,
+        suspension_type: Union[str, SuspensionType],
         violation_id: str,
         suspension_number: int,
         strikes_at_suspension: int,
@@ -404,10 +412,17 @@ class ViolationTrackingService:
     ) -> bool:
         """Create suspension record in database."""
         try:
+            # Convert enum to string if needed
+            suspension_type_str = suspension_type.value if isinstance(suspension_type, SuspensionType) else suspension_type
+            
+            # Validate suspension type
+            if not SuspensionType.is_valid(suspension_type_str):
+                raise ValueError(f"Invalid suspension_type: {suspension_type_str}. Must be one of: {SuspensionType.values()}")
+            
             suspension_data = {
                 "user_id": user_id,
-                "suspension_type": suspension_type,
-                "reason": f"Automatic {suspension_type} suspension after {strikes_at_suspension} strikes",
+                "suspension_type": suspension_type_str,
+                "reason": f"Automatic {suspension_type_str} suspension after {strikes_at_suspension} strikes",
                 "violation_ids": [violation_id],
                 "suspension_number": suspension_number,
                 "strikes_at_suspension": strikes_at_suspension,
