@@ -11,16 +11,34 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useForumCache } from '../../contexts/ForumCacheContext';
 import { NetworkConfig } from '../../utils/networkConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useToast, Toast, ToastTitle, ToastDescription } from '@/components/ui/toast';
+import { ModerationWarningBanner } from '@/components/moderation/ModerationWarningBanner';
+import { getUserModerationStatus, parseModerationError, type ModerationStatus } from '@/services/moderationService';
 
 
 const LawyerCreatePost: React.FC = () => {
   const router = useRouter();
   const { session, isAuthenticated } = useAuth();
   const { clearCache } = useForumCache();
+  const toast = useToast();
   const [content, setContent] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
   const [isPosting, setIsPosting] = useState(false);
+  const [moderationStatus, setModerationStatus] = useState<ModerationStatus | null>(null);
   const MAX_LEN = 500;
+
+  // Fetch moderation status on mount
+  useEffect(() => {
+    const fetchModerationStatus = async () => {
+      if (session?.access_token) {
+        const status = await getUserModerationStatus(session.access_token);
+        if (status) {
+          setModerationStatus(status);
+        }
+      }
+    };
+    fetchModerationStatus();
+  }, [session?.access_token]);
 
   // Helper function to get auth headers using AuthContext
   const getAuthHeaders = async (): Promise<HeadersInit> => {
@@ -104,6 +122,109 @@ const LawyerCreatePost: React.FC = () => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`[LawyerCreatePost] Failed to create post: ${response.status}`, errorText);
+        
+        // Handle 403 Forbidden (suspended/banned)
+        if (response.status === 403) {
+          // Remove optimistic post
+          if (optimisticId) {
+            (global as any).forumActions?.removeOptimisticPost(optimisticId);
+          }
+          
+          const newStatus = await getUserModerationStatus(session?.access_token || '');
+          if (newStatus) {
+            setModerationStatus(newStatus);
+          }
+          
+          try {
+            const parsed = JSON.parse(errorText);
+            const message = parsed.detail || 'Your account is suspended or banned.';
+            toast.show({
+              placement: 'top',
+              duration: 7000,
+              render: ({ id }) => {
+                return (
+                  <Toast nativeID={id} action="error" variant="solid">
+                    <ToastTitle>Access Denied</ToastTitle>
+                    <ToastDescription>{message}</ToastDescription>
+                  </Toast>
+                );
+              },
+            });
+          } catch {
+            toast.show({
+              placement: 'top',
+              duration: 7000,
+              render: ({ id }) => {
+                return (
+                  <Toast nativeID={id} action="error" variant="solid">
+                    <ToastTitle>Access Denied</ToastTitle>
+                    <ToastDescription>Your account is suspended or banned.</ToastDescription>
+                  </Toast>
+                );
+              },
+            });
+          }
+          return;
+        }
+        
+        // Parse moderation error (400 Bad Request)
+        const moderationError = parseModerationError(errorText);
+        if (moderationError) {
+          // Remove optimistic post
+          if (optimisticId) {
+            (global as any).forumActions?.removeOptimisticPost(optimisticId);
+          }
+          
+          // Update moderation status
+          const newStatus = await getUserModerationStatus(session?.access_token || '');
+          if (newStatus) {
+            setModerationStatus(newStatus);
+          }
+          
+          // Show toast based on action taken
+          if (moderationError.action_taken === 'strike_added') {
+            toast.show({
+              placement: 'top',
+              duration: 5000,
+              render: ({ id }) => {
+                return (
+                  <Toast nativeID={id} action="warning" variant="solid">
+                    <ToastTitle>Content Violation - Strike Added</ToastTitle>
+                    <ToastDescription>{moderationError.detail}</ToastDescription>
+                  </Toast>
+                );
+              },
+            });
+          } else if (moderationError.action_taken === 'suspended') {
+            toast.show({
+              placement: 'top',
+              duration: 7000,
+              render: ({ id }) => {
+                return (
+                  <Toast nativeID={id} action="error" variant="solid">
+                    <ToastTitle>Account Suspended</ToastTitle>
+                    <ToastDescription>{moderationError.detail}</ToastDescription>
+                  </Toast>
+                );
+              },
+            });
+          } else if (moderationError.action_taken === 'banned') {
+            toast.show({
+              placement: 'top',
+              duration: 10000,
+              render: ({ id }) => {
+                return (
+                  <Toast nativeID={id} action="error" variant="solid">
+                    <ToastTitle>Account Permanently Banned</ToastTitle>
+                    <ToastDescription>{moderationError.detail}</ToastDescription>
+                  </Toast>
+                );
+              },
+            });
+          }
+          return;
+        }
+        
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
       
@@ -159,7 +280,17 @@ const LawyerCreatePost: React.FC = () => {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={{ flex: 1 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
+          {/* Moderation Warning Banner */}
+          {moderationStatus && (
+            <ModerationWarningBanner
+              strikeCount={moderationStatus.strike_count}
+              suspensionCount={moderationStatus.suspension_count}
+              accountStatus={moderationStatus.account_status}
+              suspensionEnd={moderationStatus.suspension_end}
+            />
+          )}
+
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -219,7 +350,7 @@ const LawyerCreatePost: React.FC = () => {
               </Text>
             </View>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
       
       <LawyerNavbar activeTab="forum" />
