@@ -190,11 +190,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setIsLoading(false);
               setIsSigningOut(false);
               
-              // Only navigate if not already on login page
-              const currentPath = `/${segments.join('/')}`;
-              if (currentPath !== '/login') {
-                router.replace('/login');
-              }
+              // Navigation is already handled by signOut function
+              // This event handler just ensures state is cleared
             }
             
             // Ensure loading is always set to false after auth state changes
@@ -266,10 +263,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      // Set signing out state
-      setIsSigningOut(true);
-      setIsLoading(true);
-      
       // Clear auth state immediately to prevent further API calls
       setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
@@ -277,10 +270,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear local storage first
       await clearAuthStorage();
       
-      // Sign out from Supabase Auth (this will trigger SIGNED_OUT event)
-      await supabase.auth.signOut({ scope: 'local' });
+      // Redirect to login immediately
+      router.replace('/login');
       
-      // The SIGNED_OUT event listener will handle navigation and state cleanup
+      // Sign out from Supabase Auth in the background (this will trigger SIGNED_OUT event)
+      supabase.auth.signOut({ scope: 'local' }).catch((error) => {
+        console.error('Background sign out error:', error);
+      });
+      
+      // Clear loading states after redirect
+      setIsLoading(false);
+      setIsSigningOut(false);
     } catch (error) {
       console.error('Sign out error:', error);
       

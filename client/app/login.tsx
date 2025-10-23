@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
@@ -17,6 +17,9 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Refs for input fields
+  const passwordInputRef = useRef<TextInput>(null);
   
   // Validation states
   const [emailError, setEmailError] = useState("");
@@ -165,6 +168,8 @@ export default function Login() {
                 if (emailError) setEmailError("");
               }}
               onBlur={() => email && validateEmail(email, true)}
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+              returnKeyType="next"
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -183,6 +188,7 @@ export default function Login() {
             </Text>
             <View style={tw`relative`}>
               <TextInput
+                ref={passwordInputRef}
                 style={[
                   tw`border rounded-lg px-4 py-3 bg-white pr-12`,
                   {
@@ -199,6 +205,8 @@ export default function Login() {
                   if (passwordError) setPasswordError("");
                 }}
                 onBlur={() => password && validatePassword(password, true)}
+                onSubmitEditing={handleLogin}
+                returnKeyType="go"
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}

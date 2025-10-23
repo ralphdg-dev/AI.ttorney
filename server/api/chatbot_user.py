@@ -1764,7 +1764,58 @@ async def ask_legal_question(
         if is_prohibited:
             raise HTTPException(status_code=400, detail=prohibition_reason)
         
+        # OPTIMIZATION: Skip gibberish detection for speed (too complex and slow)
+        # The AI will handle unclear questions naturally in its response
+        
+        # Detect language
+        step_start = time.time()
+        print(f"\n🌐 [STEP 5] Language detection...")
+        language = detect_language(request.question)
+        step_time = time.time() - step_start
+        print(f"⏱️  Language detection took: {step_time:.2f}s")
+        print(f"   Detected language: {language}")
+        
+        # Check if language is supported (English, Tagalog, Taglish only)
+        if language not in ["english", "tagalog", "taglish"]:
+            unsupported_response = (
+                "I'm sorry, but I can only provide accurate legal information in English, Tagalog, or Taglish. "
+                "Please ask your question in one of these languages for the best assistance."
+                if language == "english" else
+                "Paumanhin po, pero maaari lamang akong magbigay ng tumpak na impormasyon legal sa English, Tagalog, o Taglish. "
+                "Mangyaring magtanong sa isa sa mga wikang ito para sa pinakamahusay na tulong."
+            )
+            
+            return create_chat_response(
+                answer=unsupported_response,
+                simplified_summary="Language not supported. Please use English, Tagalog, or Taglish."
+            )
+        
+        # Check for PERSONAL ADVICE QUESTIONS (even if they contain legal keywords)
+        if is_personal_advice_question(request.question):
+            # This is asking for personal advice/opinion, not legal information
+            if language == "tagalog":
+                personal_advice_response = (
+                    "Naiintindihan ko na kailangan mo ng tulong sa desisyon mo, pero hindi ako makakapagbigay ng personal na legal advice tungkol sa kung ano ang dapat mong gawin sa iyong specific na sitwasyon. "
+                    "Para sa ganitong mga tanong, kailangan mo ng konsultasyon sa isang lisensyadong abogado na makakapag-review ng lahat ng detalye ng iyong kaso."
+                )
+            else:
+                personal_advice_response = (
+                    "I understand you need help with a decision, but I cannot provide personal legal advice about what you should do in your specific situation. "
+                    "For questions like this, you need a consultation with a licensed lawyer who can review all the details of your case."
+                )
+            
+            return create_chat_response(
+                answer=personal_advice_response,
+                simplified_summary="Personal advice question - requires lawyer consultation",
+                legal_disclaimer=get_legal_disclaimer(language),
+                fallback_suggestions=get_fallback_suggestions(language, is_complex=True)
+            )
+        
+        # OPTIMIZATION: Skip out-of-scope detection for speed (too many checks)
+        # The AI will naturally decline non-legal questions in its response
+        
         # STEP 4.5: Content Moderation using OpenAI omni-moderation-latest
+        # Run moderation on ALL messages (legal and casual) before generating any response
         # Only moderate for authenticated users to track violations
         if effective_user_id:
             step_start = time.time()
@@ -1832,56 +1883,6 @@ async def ask_legal_question(
                 logger.error(f"❌ Content moderation error: {str(e)}")
                 # Fail-open: Continue without moderation if service fails
                 print(f"⚠️  Content moderation failed, continuing without moderation: {e}")
-        
-        # OPTIMIZATION: Skip gibberish detection for speed (too complex and slow)
-        # The AI will handle unclear questions naturally in its response
-        
-        # Detect language
-        step_start = time.time()
-        print(f"\n🌐 [STEP 5] Language detection...")
-        language = detect_language(request.question)
-        step_time = time.time() - step_start
-        print(f"⏱️  Language detection took: {step_time:.2f}s")
-        print(f"   Detected language: {language}")
-        
-        # Check if language is supported (English, Tagalog, Taglish only)
-        if language not in ["english", "tagalog", "taglish"]:
-            unsupported_response = (
-                "I'm sorry, but I can only provide accurate legal information in English, Tagalog, or Taglish. "
-                "Please ask your question in one of these languages for the best assistance."
-                if language == "english" else
-                "Paumanhin po, pero maaari lamang akong magbigay ng tumpak na impormasyon legal sa English, Tagalog, o Taglish. "
-                "Mangyaring magtanong sa isa sa mga wikang ito para sa pinakamahusay na tulong."
-            )
-            
-            return create_chat_response(
-                answer=unsupported_response,
-                simplified_summary="Language not supported. Please use English, Tagalog, or Taglish."
-            )
-        
-        # Check for PERSONAL ADVICE QUESTIONS (even if they contain legal keywords)
-        if is_personal_advice_question(request.question):
-            # This is asking for personal advice/opinion, not legal information
-            if language == "tagalog":
-                personal_advice_response = (
-                    "Naiintindihan ko na kailangan mo ng tulong sa desisyon mo, pero hindi ako makakapagbigay ng personal na legal advice tungkol sa kung ano ang dapat mong gawin sa iyong specific na sitwasyon. "
-                    "Para sa ganitong mga tanong, kailangan mo ng konsultasyon sa isang lisensyadong abogado na makakapag-review ng lahat ng detalye ng iyong kaso."
-                )
-            else:
-                personal_advice_response = (
-                    "I understand you need help with a decision, but I cannot provide personal legal advice about what you should do in your specific situation. "
-                    "For questions like this, you need a consultation with a licensed lawyer who can review all the details of your case."
-                )
-            
-            return create_chat_response(
-                answer=personal_advice_response,
-                simplified_summary="Personal advice question - requires lawyer consultation",
-                legal_disclaimer=get_legal_disclaimer(language),
-                fallback_suggestions=get_fallback_suggestions(language, is_complex=True)
-            )
-        
-        # OPTIMIZATION: Skip out-of-scope detection for speed (too many checks)
-        # The AI will naturally decline non-legal questions in its response
         
         # Check if this is actually a legal question or just casual conversation
         if not is_legal_question(request.question):
@@ -2152,7 +2153,12 @@ async def ask_legal_question_stream(
             
             # Toxicity check removed - OpenAI moderation handles this more comprehensively
             
+            # Detect language first
+            language = detect_language(request.question)
+            yield format_sse({'type': 'metadata', 'language': language})
+            
             # Content Moderation using OpenAI omni-moderation-latest
+            # Run moderation on ALL messages (legal and casual) before generating any response
             # Only moderate for authenticated users to track violations
             if effective_user_id:
                 moderation_service = get_moderation_service()
@@ -2188,9 +2194,6 @@ async def ask_legal_question_stream(
                                 "message": "Your content violated our community guidelines. Please be mindful of your language."
                             }
                         
-                        # Detect language for appropriate response
-                        language = detect_language(request.question)
-                        
                         # Return simplified message to user with violation info
                         if language == "tagalog":
                             violation_message = f"""🚨 Labag sa Patakaran\n\n{moderation_service.get_violation_message(moderation_result, context="chatbot")}\n\n⚠️ {violation_result['message']}"""
@@ -2203,10 +2206,6 @@ async def ask_legal_question_stream(
                 except Exception as e:
                     logger.error(f"❌ Content moderation error: {str(e)}")
                     # Fail-open: Continue without moderation if service fails
-            
-            # Detect language
-            language = detect_language(request.question)
-            yield format_sse({'type': 'metadata', 'language': language})
             
             # Check if legal question
             if not is_legal_question(request.question):

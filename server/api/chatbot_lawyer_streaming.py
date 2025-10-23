@@ -43,7 +43,6 @@ from api.chatbot_lawyer import (
     LAWYER_SYSTEM_PROMPT_TAGALOG,
     
     # Validation functions
-    detect_toxic_content,
     detect_prohibited_input,
     is_gibberish_input,
     detect_language,
@@ -61,6 +60,11 @@ from api.chatbot_lawyer import (
     # Logging
     logger
 )
+
+# Import content moderation and violation tracking
+from services.content_moderation_service import get_moderation_service
+from services.violation_tracking_service import get_violation_tracking_service
+from models.violation_types import ViolationType
 
 # Create router
 router = APIRouter(prefix="/api/chatbot/lawyer", tags=["Legal Practice & Research API - Streaming"])
@@ -170,16 +174,72 @@ async def ask_legal_question_stream(
                         logger.error(f"Failed to save greeting history: {e}")
                 return
             
-            # Check for toxic content
-            is_toxic, toxic_reason = detect_toxic_content(request.question)
-            if is_toxic:
-                language = detect_language(request.question)
-                if language == "tagalog":
-                    response = "Naiintindihan ko na baka frustrated ka, pero nandito ako para magbigay ng helpful legal information. Pakiusap, magtanong nang may respeto. 😊"
+            # Content Moderation using OpenAI omni-moderation-latest
+            # Run moderation on ALL messages before generating any response
+            print(f"\n🔍 Content moderation check (streaming)...")
+            moderation_service = get_moderation_service()
+            violation_service = get_violation_tracking_service()
+            
+            try:
+                moderation_result = await moderation_service.moderate_content(request.question.strip())
+                
+                # If content is flagged, record violation and apply action
+                if not moderation_service.is_content_safe(moderation_result):
+                    user_id_log = effective_user_id[:8] if effective_user_id else "unauthenticated"
+                    logger.warning(f"⚠️  Chatbot prompt flagged for user {user_id_log}: {moderation_result['violation_summary']}")
+                    
+                    # Record violation only for authenticated users
+                    violation_result = None
+                    if effective_user_id:
+                        try:
+                            print(f"📝 Recording violation for user: {effective_user_id}")
+                            violation_result = await violation_service.record_violation(
+                                user_id=effective_user_id,
+                                violation_type=ViolationType.CHATBOT_PROMPT,
+                                content_text=request.question.strip(),
+                                moderation_result=moderation_result,
+                                content_id=None
+                            )
+                            print(f"✅ Violation recorded: {violation_result}")
+                        except Exception as violation_error:
+                            logger.error(f"❌ Failed to record violation: {str(violation_error)}")
+                            violation_result = None
+                    
+                    # Set default violation result for unauthenticated users or if recording failed
+                    if not violation_result:
+                        violation_result = {
+                            "action_taken": "warning",
+                            "strike_count": 0,
+                            "suspension_count": 0,
+                            "message": "Your content violated our community guidelines. Please be mindful of your language."
+                        }
+                    
+                    # Detect language for appropriate response
+                    language = detect_language(request.question)
+                    
+                    # Return simplified message to user with violation info
+                    if language == "tagalog":
+                        violation_message = f"""🚨 Labag sa Patakaran
+
+{moderation_service.get_violation_message(moderation_result, context="chatbot")}
+
+⚠️ {violation_result['message']}"""
+                    else:
+                        violation_message = f"""🚨 Content Policy Violation
+
+{moderation_service.get_violation_message(moderation_result, context="chatbot")}
+
+⚠️ {violation_result['message']}"""
+                    
+                    yield f"data: {json.dumps({'content': violation_message, 'done': True})}\n\n"
+                    return
                 else:
-                    response = "I understand you may be frustrated, but I'm here to provide helpful legal information. Please rephrase your question respectfully. 😊"
-                yield f"data: {json.dumps({'content': response, 'done': True})}\n\n"
-                return
+                    print(f"✅ Content moderation passed (streaming)")
+                    
+            except Exception as e:
+                logger.error(f"❌ Content moderation error: {str(e)}")
+                # Fail-open: Continue without moderation if service fails
+                print(f"⚠️  Content moderation failed, continuing without moderation: {e}")
             
             # Check for prohibited input
             is_prohibited, prohibition_reason = detect_prohibited_input(request.question)
