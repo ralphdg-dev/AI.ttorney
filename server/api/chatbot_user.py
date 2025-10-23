@@ -65,6 +65,11 @@ from config.system_prompts import ENGLISH_SYSTEM_PROMPT, TAGALOG_SYSTEM_PROMPT
 # Import chat history service
 from services.chat_history_service import ChatHistoryService, get_chat_history_service
 
+# Import content moderation and violation tracking
+from services.content_moderation_service import get_moderation_service
+from services.violation_tracking_service import get_violation_tracking_service
+from models.violation_types import ViolationType
+
 # Import authentication (optional for chatbot)
 from auth.service import AuthService
 
@@ -1655,6 +1660,19 @@ async def ask_legal_question(
     effective_user_id = authenticated_user_id or request.user_id
     print(f"📝 Effective user ID for chat history: {effective_user_id}")
     
+    # STEP 0: Check if user is allowed to use chatbot (not suspended/banned)
+    # Only check for authenticated users
+    if effective_user_id:
+        violation_service = get_violation_tracking_service()
+        user_status = await violation_service.check_user_status(effective_user_id)
+        
+        if not user_status["is_allowed"]:
+            logger.warning(f"🚫 User {effective_user_id[:8]}... blocked from chatbot: {user_status['account_status']}")
+            return create_chat_response(
+                answer=user_status["reason"],
+                simplified_summary=f"User blocked: {user_status['account_status']}"
+            )
+    
     # Production logging with request ID for tracing
     logger.info(f"Request received - user_id={effective_user_id}, session_id={request.session_id}, question_length={len(request.question)}")
     
@@ -1735,24 +1753,7 @@ async def ask_legal_question(
         if not request.question or not request.question.strip():
             raise HTTPException(status_code=400, detail="Question cannot be empty.")
         
-        # Check for toxic content first
-        step_start = time.time()
-        print(f"\n🔍 [STEP 3] Toxic content check...")
-        is_toxic, toxic_reason = detect_toxic_content(request.question)
-        step_time = time.time() - step_start
-        print(f"⏱️  Toxic check took: {step_time:.2f}s")
-        if is_toxic:
-            # Return a polite response instead of raising an error
-            language = detect_language(request.question)
-            if language == "tagalog":
-                polite_response = "Naiintindihan ko na baka frustrated ka, pero nandito ako para magbigay ng helpful legal information. Pakiusap, magtanong nang may respeto, at masayang tutulungan kita. 😊"
-            else:
-                polite_response = "I understand you may be frustrated, but I'm here to provide helpful legal information. Please rephrase your question in a respectful manner, and I'll be happy to assist you. 😊"
-            
-            return create_chat_response(
-                answer=polite_response,
-                simplified_summary="Toxic content detected - polite redirection"
-            )
+        # Toxicity check removed - OpenAI moderation handles this more comprehensively
         
         # Check for prohibited input (misuse prevention) - keep this for safety
         step_start = time.time()
@@ -1762,6 +1763,75 @@ async def ask_legal_question(
         print(f"⏱️  Prohibited check took: {step_time:.2f}s")
         if is_prohibited:
             raise HTTPException(status_code=400, detail=prohibition_reason)
+        
+        # STEP 4.5: Content Moderation using OpenAI omni-moderation-latest
+        # Only moderate for authenticated users to track violations
+        if effective_user_id:
+            step_start = time.time()
+            print(f"\n🔍 [STEP 4.5] Content moderation check...")
+            moderation_service = get_moderation_service()
+            violation_service = get_violation_tracking_service()
+            
+            try:
+                moderation_result = await moderation_service.moderate_content(request.question.strip())
+                step_time = time.time() - step_start
+                print(f"⏱️  Content moderation took: {step_time:.2f}s")
+                
+                # If content is flagged, record violation and apply action
+                if not moderation_service.is_content_safe(moderation_result):
+                    logger.warning(f"⚠️  Chatbot prompt flagged for user {effective_user_id[:8]}: {moderation_result['violation_summary']}")
+                    
+                    # Record violation and get action taken
+                    try:
+                        print(f"📝 Recording violation for user: {effective_user_id}")
+                        violation_result = await violation_service.record_violation(
+                            user_id=effective_user_id,
+                            violation_type=ViolationType.CHATBOT_PROMPT,
+                            content_text=request.question.strip(),
+                            moderation_result=moderation_result,
+                            content_id=None  # No specific content ID for chatbot prompts
+                        )
+                        print(f"✅ Violation recorded: {violation_result}")
+                    except Exception as violation_error:
+                        logger.error(f"❌ Failed to record violation: {str(violation_error)}")
+                        import traceback
+                        print(f"Violation error traceback: {traceback.format_exc()}")
+                        # Return generic error message if violation recording fails
+                        violation_result = {
+                            "action_taken": "error",
+                            "strike_count": 0,
+                            "suspension_count": 0,
+                            "message": "Your content violated our community guidelines. Please be mindful of your language."
+                        }
+                    
+                    # Detect language for appropriate response
+                    language = detect_language(request.question)
+                    
+                    # Return simplified message to user with violation info
+                    if language == "tagalog":
+                        violation_message = f"""🚨 Labag sa Patakaran
+
+{moderation_service.get_violation_message(moderation_result, context="chatbot")}
+
+⚠️ {violation_result['message']}"""
+                    else:
+                        violation_message = f"""🚨 Content Policy Violation
+
+{moderation_service.get_violation_message(moderation_result, context="chatbot")}
+
+⚠️ {violation_result['message']}"""
+                    
+                    return create_chat_response(
+                        answer=violation_message,
+                        simplified_summary="Content moderation violation detected"
+                    )
+                else:
+                    print(f"✅ Content moderation passed")
+                    
+            except Exception as e:
+                logger.error(f"❌ Content moderation error: {str(e)}")
+                # Fail-open: Continue without moderation if service fails
+                print(f"⚠️  Content moderation failed, continuing without moderation: {e}")
         
         # OPTIMIZATION: Skip gibberish detection for speed (too complex and slow)
         # The AI will handle unclear questions naturally in its response
@@ -2065,18 +2135,74 @@ async def ask_legal_question_stream(
                 authenticated_user_id = current_user["user"]["id"]
             effective_user_id = authenticated_user_id or request.user_id
             
+            # Check if user is allowed to use chatbot (not suspended/banned)
+            if effective_user_id:
+                violation_service = get_violation_tracking_service()
+                user_status = await violation_service.check_user_status(effective_user_id)
+                
+                if not user_status["is_allowed"]:
+                    logger.warning(f"🚫 User {effective_user_id[:8]}... blocked from chatbot: {user_status['account_status']}")
+                    yield format_sse({'content': user_status["reason"], 'done': True})
+                    return
+            
             # Basic validation
             if not request.question or not request.question.strip():
                 yield format_sse({'error': 'Question cannot be empty'})
                 return
             
-            # Check toxic content
-            is_toxic, _ = detect_toxic_content(request.question)
-            if is_toxic:
-                language = detect_language(request.question)
-                response = "Naiintindihan ko na baka frustrated ka, pero nandito ako para magbigay ng helpful legal information. Pakiusap, magtanong nang may respeto. 😊" if language == "tagalog" else "I understand you may be frustrated, but I'm here to provide helpful legal information. Please rephrase respectfully. 😊"
-                yield format_sse({'content': response, 'done': True})
-                return
+            # Toxicity check removed - OpenAI moderation handles this more comprehensively
+            
+            # Content Moderation using OpenAI omni-moderation-latest
+            # Only moderate for authenticated users to track violations
+            if effective_user_id:
+                moderation_service = get_moderation_service()
+                violation_service = get_violation_tracking_service()
+                
+                try:
+                    moderation_result = await moderation_service.moderate_content(request.question.strip())
+                    
+                    # If content is flagged, record violation and apply action
+                    if not moderation_service.is_content_safe(moderation_result):
+                        logger.warning(f"⚠️  Chatbot prompt flagged for user {effective_user_id[:8]}: {moderation_result['violation_summary']}")
+                        
+                        # Record violation and get action taken
+                        try:
+                            print(f"📝 Recording violation for user: {effective_user_id}")
+                            violation_result = await violation_service.record_violation(
+                                user_id=effective_user_id,
+                                violation_type=ViolationType.CHATBOT_PROMPT,
+                                content_text=request.question.strip(),
+                                moderation_result=moderation_result,
+                                content_id=None
+                            )
+                            print(f"✅ Violation recorded: {violation_result}")
+                        except Exception as violation_error:
+                            logger.error(f"❌ Failed to record violation: {str(violation_error)}")
+                            import traceback
+                            print(f"Violation error traceback: {traceback.format_exc()}")
+                            # Return generic error message if violation recording fails
+                            violation_result = {
+                                "action_taken": "error",
+                                "strike_count": 0,
+                                "suspension_count": 0,
+                                "message": "Your content violated our community guidelines. Please be mindful of your language."
+                            }
+                        
+                        # Detect language for appropriate response
+                        language = detect_language(request.question)
+                        
+                        # Return simplified message to user with violation info
+                        if language == "tagalog":
+                            violation_message = f"""🚨 Labag sa Patakaran\n\n{moderation_service.get_violation_message(moderation_result, context="chatbot")}\n\n⚠️ {violation_result['message']}"""
+                        else:
+                            violation_message = f"""🚨 Content Policy Violation\n\n{moderation_service.get_violation_message(moderation_result, context="chatbot")}\n\n⚠️ {violation_result['message']}"""
+                        
+                        yield format_sse({'content': violation_message, 'done': True})
+                        return
+                        
+                except Exception as e:
+                    logger.error(f"❌ Content moderation error: {str(e)}")
+                    # Fail-open: Continue without moderation if service fails
             
             # Detect language
             language = detect_language(request.question)

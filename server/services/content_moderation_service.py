@@ -270,33 +270,56 @@ class ContentModerationService:
         """
         return not moderation_result["flagged"]
     
-    def get_violation_message(self, moderation_result: Dict[str, Any]) -> str:
+    def get_violation_message(self, moderation_result: Dict[str, Any], context: str = "post") -> str:
         """
         Get a user-friendly message explaining why content was blocked.
         
         Args:
             moderation_result: Result from moderate_content()
+            context: Context of the violation - "post" (forum), "reply" (forum), or "chatbot"
         
         Returns:
-            User-friendly error message
+            User-friendly error message appropriate for the context
         """
         if not moderation_result["flagged"]:
             return ""
         
         categories = moderation_result["categories"]
-        flagged_categories = [k.replace("-", " ").replace("/", " - ").title() 
-                             for k, v in categories.items() if v]
+        category_scores = moderation_result.get("category_scores", {})
         
-        if not flagged_categories:
-            return "Your content violates our community guidelines. Please revise and try again."
+        # Get flagged categories with their scores
+        flagged_with_scores = [
+            (k, category_scores.get(k, 0.0)) 
+            for k, v in categories.items() if v
+        ]
         
-        # Generate specific message based on violations
-        if len(flagged_categories) == 1:
-            category = flagged_categories[0]
-            return f"Your content was flagged for {category}. Please revise your post to comply with our community guidelines."
+        if not flagged_with_scores:
+            if context == "chatbot":
+                return "Your message violates our community guidelines. Please be mindful of your language when interacting with the chatbot."
+            else:
+                return "Your content violates our community guidelines. Please revise and try again."
+        
+        # Get the PRIMARY category (highest score) to avoid overwhelming the user
+        primary_category, _ = max(flagged_with_scores, key=lambda x: x[1])
+        primary_category_name = primary_category.replace("-", " ").replace("/", " - ").title()
+        
+        # Simplify category names for better readability
+        category_simplifications = {
+            "Harassment - Threatening": "Threatening Behavior",
+            "Self Harm - Intent": "Self-Harm Content",
+            "Self Harm - Instructions": "Self-Harm Content",
+            "Violence - Graphic": "Violent Content",
+            "Hate - Threatening": "Hate Speech",
+            "Sexual - Minors": "Inappropriate Content"
+        }
+        
+        primary_category_name = category_simplifications.get(primary_category_name, primary_category_name)
+        
+        # Generate message with only the primary category
+        if context == "chatbot":
+            return f"Your message was flagged for {primary_category_name}. Please be mindful of your language when using the chatbot."
         else:
-            categories_str = ", ".join(flagged_categories[:-1]) + f" and {flagged_categories[-1]}"
-            return f"Your content was flagged for {categories_str}. Please revise your post to comply with our community guidelines."
+            return f"Your content was flagged for {primary_category_name}. Please revise your post to comply with our community guidelines."
 
 
 # Singleton instance for reuse across the application
