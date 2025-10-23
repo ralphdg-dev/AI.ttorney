@@ -68,6 +68,24 @@ const ReportedPosts = () => {
       });
 
       console.log('Reports response:', response);
+      console.log('Reports data:', response.data);
+      if (response.data && response.data.length > 0) {
+        console.log('First report sample:', response.data[0]);
+        console.log('First report post data:', response.data[0].post);
+        
+        // Log all reports with their target_ids and post status
+        console.log('=== ALL REPORTS ANALYSIS ===');
+        response.data.forEach((report, index) => {
+          console.log(`Report ${index + 1}:`, {
+            report_id: report.id,
+            target_id: report.target_id,
+            target_type: report.target_type,
+            reason: report.reason,
+            post_found: report.post !== null,
+            post_content_preview: report.post?.content?.substring(0, 50) || 'NO POST DATA'
+          });
+        });
+      }
       setReports(response.data || []);
       setPagination(response.pagination || {});
       setError(null);
@@ -178,21 +196,35 @@ const ReportedPosts = () => {
     {
       key: 'reported_post',
       header: 'REPORTED POST',
-      render: (report) => (
-        <div className="max-w-xs">
-          <p className="text-sm text-gray-900 truncate">
-            {report.post ? 
-              forumManagementService.formatPostContent(report.post.content, 60) :
-              'Post not available'
-            }
-          </p>
-          {report.post && (
-            <p className="text-xs text-gray-500 mt-1">
-              by {forumManagementService.formatUserDisplay(report.post.user, report.post.is_anonymous)}
+      render: (report) => {
+        console.log('Rendering report:', report.id, 'Post data:', report.post);
+        
+        return (
+          <div className="max-w-xs">
+            <p className="text-sm text-gray-900 truncate">
+              {report.post && report.post.body ? 
+                forumManagementService.formatPostContent(report.post.body, 60) :
+                report.post === null ? 
+                  'Post deleted or not found' :
+                  'Post not available'
+              }
             </p>
-          )}
-        </div>
-      )
+            {report.post && report.post.body && (
+              <p className="text-xs text-gray-500 mt-1">
+                by {report.post.user ? 
+                  forumManagementService.formatUserDisplay(report.post.user, report.post.is_anonymous) :
+                  'Unknown user'
+                }
+              </p>
+            )}
+            {report.post && report.post.is_flagged && (
+              <p className="text-xs text-red-500 mt-1">
+                (Post has been flagged)
+              </p>
+            )}
+          </div>
+        );
+      }
     },
     {
       key: 'reporter',
@@ -229,7 +261,7 @@ const ReportedPosts = () => {
       header: 'ACTIONS',
       align: 'center',
       render: (report) => (
-        <div className="flex space-x-2 justify-center">
+        <div className="flex items-center justify-center space-x-2">
           <Tooltip content="View Details" placement="top">
             <button
               onClick={() => openResolutionModal(report, 'view')}
@@ -413,8 +445,18 @@ const ReportedPosts = () => {
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Reported Post:</p>
                   <div className="bg-gray-50 p-3 rounded border text-sm">
-                    {selectedReport.post ? selectedReport.post.content : 'Post not available'}
+                    {selectedReport.post && selectedReport.post.body ? 
+                      selectedReport.post.body :
+                      selectedReport.post === null ?
+                        'Post has been deleted or not found' :
+                        'Post not available'
+                    }
                   </div>
+                  {selectedReport.post && selectedReport.post.is_flagged && (
+                    <p className="text-xs text-red-500 mt-1">
+                      ⚠️ This post has been flagged
+                    </p>
+                  )}
                 </div>
               </div>
 

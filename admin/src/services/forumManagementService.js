@@ -271,6 +271,30 @@ class ForumManagementService {
     }
   }
 
+  // Debug reported posts data mismatch
+  async debugReportedPosts() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/forum/reported-posts/debug`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to debug reported posts');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Debug reported posts error:', error);
+      throw error;
+    }
+  }
+
   // Utility methods for formatting
   formatPostContent(content, maxLength = 100) {
     if (!content) return 'No content';

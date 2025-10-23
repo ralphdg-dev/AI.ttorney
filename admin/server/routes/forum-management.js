@@ -9,7 +9,7 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
   try {
     console.log("=== FORUM POSTS ENDPOINT CALLED ===");
     console.log("Query params:", req.query);
-    
+
     const {
       page = 1,
       limit = 50,
@@ -24,37 +24,43 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
     const offset = (page - 1) * limit;
 
     // Query forum_posts with user information
-    console.log(`Fetching forum posts: page ${page}, limit ${limit}, offset ${offset}`);
+    console.log(
+      `Fetching forum posts: page ${page}, limit ${limit}, offset ${offset}`
+    );
     const { data: testPosts, error: testError } = await supabaseAdmin
       .from("forum_posts")
-      .select(`
+      .select(
+        `
         *,
         user:users(id, full_name, email, username, role)
-      `)
+      `
+      )
       .range(offset, offset + parseInt(limit) - 1)
       .order(sort_by, { ascending: sort_order === "asc" });
-    
-    console.log("Basic query result:", { 
-      count: testPosts?.length || 0, 
+
+    console.log("Basic query result:", {
+      count: testPosts?.length || 0,
       error: testError,
-      sample: testPosts?.[0] || null
+      sample: testPosts?.[0] || null,
     });
 
     // Debug: Check what fields are available in the first post
     if (testPosts && testPosts.length > 0) {
-      console.log("Available fields in forum_posts:", Object.keys(testPosts[0]));
+      console.log(
+        "Available fields in forum_posts:",
+        Object.keys(testPosts[0])
+      );
       console.log("Sample post data:", {
         id: testPosts[0].id,
-        content: testPosts[0].content,
+        content: testPosts[0].body,
         text: testPosts[0].text,
         body: testPosts[0].body,
         message: testPosts[0].message,
         description: testPosts[0].description,
         title: testPosts[0].title,
-        category_id: testPosts[0].category_id,
         category: testPosts[0].category,
         type: testPosts[0].type,
-        tag: testPosts[0].tag
+        tag: testPosts[0].tag,
       });
     }
 
@@ -63,7 +69,7 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
       return res.status(500).json({
         success: false,
         error: `Database error: ${testError.message}`,
-        details: testError
+        details: testError,
       });
     }
 
@@ -72,8 +78,13 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
       return res.json({
         success: true,
         data: [],
-        pagination: { page: 1, limit: parseInt(limit), total: 0, totalPages: 0 },
-        message: "No posts found in database"
+        pagination: {
+          page: 1,
+          limit: parseInt(limit),
+          total: 0,
+          totalPages: 0,
+        },
+        message: "No posts found in database",
       });
     }
 
@@ -81,42 +92,46 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
     const getCategoryDisplayName = (categoryId) => {
       const categories = {
         // Standard category IDs
-        'family': 'Family Law',
-        'criminal': 'Criminal Law',
-        'civil': 'Civil Law',
-        'labor': 'Labor Law',
-        'corporate': 'Corporate Law',
-        'property': 'Property Law',
-        'tax': 'Tax Law',
-        'constitutional': 'Constitutional Law',
-        'administrative': 'Administrative Law',
-        'other': 'Other',
+        family: "Family Law",
+        criminal: "Criminal Law",
+        civil: "Civil Law",
+        labor: "Labor Law",
+        corporate: "Corporate Law",
+        property: "Property Law",
+        tax: "Tax Law",
+        constitutional: "Constitutional Law",
+        administrative: "Administrative Law",
+        other: "Other",
         // Possible variations
-        'Family': 'Family Law',
-        'Criminal': 'Criminal Law',
-        'Civil': 'Civil Law',
-        'Labor': 'Labor Law',
-        'Corporate': 'Corporate Law',
-        'Property': 'Property Law',
-        'Tax': 'Tax Law',
-        'Constitutional': 'Constitutional Law',
-        'Administrative': 'Administrative Law',
-        'Other': 'Other',
+        Family: "Family Law",
+        Criminal: "Criminal Law",
+        Civil: "Civil Law",
+        Labor: "Labor Law",
+        Corporate: "Corporate Law",
+        Property: "Property Law",
+        Tax: "Tax Law",
+        Constitutional: "Constitutional Law",
+        Administrative: "Administrative Law",
+        Other: "Other",
         // Numeric IDs (if using numbers)
-        '1': 'Family Law',
-        '2': 'Criminal Law',
-        '3': 'Civil Law',
-        '4': 'Labor Law',
-        '5': 'Corporate Law',
-        '6': 'Property Law',
-        '7': 'Tax Law',
-        '8': 'Constitutional Law',
-        '9': 'Administrative Law',
-        '10': 'Other'
+        1: "Family Law",
+        2: "Criminal Law",
+        3: "Civil Law",
+        4: "Labor Law",
+        5: "Corporate Law",
+        6: "Property Law",
+        7: "Tax Law",
+        8: "Constitutional Law",
+        9: "Administrative Law",
+        10: "Other",
       };
-      
-      console.log(`Mapping category: "${categoryId}" -> "${categories[categoryId] || categoryId || 'Uncategorized'}"`);
-      return categories[categoryId] || categoryId || 'Uncategorized';
+
+      console.log(
+        `Mapping category: "${categoryId}" -> "${
+          categories[categoryId] || categoryId || "Uncategorized"
+        }"`
+      );
+      return categories[categoryId] || categoryId || "Uncategorized";
     };
 
     // Process posts with actual data
@@ -124,39 +139,51 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
       // Debug category for first few posts
       if (index < 3) {
         console.log(`Post ${post.id} category debug:`, {
-          category_id: post.category_id,
           category: post.category,
           type: post.type,
           tag: post.tag,
           forum_category: post.forum_category,
-          law_category: post.law_category
+          law_category: post.law_category,
         });
       }
-      
-      const categoryValue = post.category_id || post.category || post.type || post.tag || post.forum_category || post.law_category;
-      
+
+      const categoryValue =
+        post.category ||
+        post.type ||
+        post.tag ||
+        post.forum_category ||
+        post.law_category;
+
       return {
         ...post,
         // Try different possible content field names
-        content: post.content || post.text || post.body || post.message || post.description || post.title || 'No content available',
+        content:
+          post.body ||
+          post.text ||
+          post.message ||
+          post.description ||
+          post.title ||
+          "No content available",
         // Try different possible category field names
         category_display_name: getCategoryDisplayName(categoryValue),
         // Use joined user data or create fallback
-        user: post.is_anonymous ? {
-          id: null,
-          full_name: 'Anonymous User',
-          email: '',
-          username: 'anonymous',
-          role: 'user'
-        } : (post.user || {
-          id: post.user_id || null,
-          full_name: 'Unknown User',
-          email: '',
-          username: 'unknown',
-          role: 'user'
-        }),
+        user: post.is_anonymous
+          ? {
+              id: null,
+              full_name: "Anonymous User",
+              email: "",
+              username: "anonymous",
+              role: "user",
+            }
+          : post.user || {
+              id: post.user_id || null,
+              full_name: "Unknown User",
+              email: "",
+              username: "unknown",
+              role: "user",
+            },
         reports: [],
-        _count: { forum_replies: 0 }
+        _count: { forum_replies: 0 },
       };
     });
 
@@ -172,8 +199,10 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
     const totalCount = count || testPosts.length;
     const totalPages = Math.ceil(totalCount / parseInt(limit));
 
-    console.log(`Returning ${processedPosts.length} posts out of ${totalCount} total`);
-    
+    console.log(
+      `Returning ${processedPosts.length} posts out of ${totalCount} total`
+    );
+
     return res.json({
       success: true,
       data: processedPosts,
@@ -181,10 +210,9 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total: totalCount,
-        totalPages: totalPages
-      }
+        totalPages: totalPages,
+      },
     });
-
   } catch (error) {
     console.error("Get forum posts error:", error);
     res.status(500).json({
@@ -204,18 +232,15 @@ router.get("/posts/:id", authenticateAdmin, async (req, res) => {
       .select(
         `
         id,
-        content,
-        category_id,
+        body,
+        category,
         is_anonymous,
         created_at,
         updated_at,
-        is_deleted,
-        deleted_at,
-        deleted_by,
         user:users(id, full_name, email, username, role),
         replies:forum_replies(
           id,
-          content,
+          body,
           is_anonymous,
           created_at,
           user:users(id, full_name, email, username, role)
@@ -335,34 +360,99 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
 // Debug endpoint to check reports in database
 router.get("/reported-posts/debug", authenticateAdmin, async (req, res) => {
   try {
-    const { data: allReports, error } = await supabaseAdmin
+    console.log("=== DEBUG ENDPOINT CALLED ===");
+    
+    // Get sample reports
+    const { data: allReports, error: reportsError } = await supabaseAdmin
       .from("forum_reports")
       .select("*")
-      .limit(20);
+      .limit(10);
 
-    if (error) {
+    console.log("Reports query result:", { count: allReports?.length, error: reportsError });
+
+    // Get sample posts
+    const { data: allPosts, error: postsError } = await supabaseAdmin
+      .from("forum_posts")
+      .select("id, content, created_at")
+      .limit(10);
+
+    console.log("Posts query result:", { count: allPosts?.length, error: postsError });
+
+    if (reportsError || postsError) {
       return res.json({
         success: false,
-        error: error.message,
-        details: error,
+        reportsError: reportsError?.message,
+        postsError: postsError?.message,
       });
+    }
+
+    // Analyze data types and values
+    const reportAnalysis = allReports?.map(r => ({
+      id: r.id,
+      target_id: r.target_id,
+      target_id_type: typeof r.target_id,
+      target_id_length: r.target_id?.toString()?.length,
+      target_type: r.target_type,
+      reason: r.reason,
+    })) || [];
+
+    const postAnalysis = allPosts?.map(p => ({
+      id: p.id,
+      id_type: typeof p.id,
+      id_length: p.id?.toString()?.length,
+      content_preview: p.content?.substring(0, 50),
+    })) || [];
+
+    // Try to find matches
+    const matches = [];
+    const mismatches = [];
+    
+    for (const report of allReports || []) {
+      if (report.target_type === 'post') {
+        const matchingPost = allPosts?.find(p => 
+          p.id === report.target_id || 
+          p.id.toString() === report.target_id?.toString() ||
+          String(p.id) === String(report.target_id)
+        );
+        
+        if (matchingPost) {
+          matches.push({
+            report_id: report.id,
+            target_id: report.target_id,
+            post_id: matchingPost.id,
+            match_type: 'found'
+          });
+        } else {
+          mismatches.push({
+            report_id: report.id,
+            target_id: report.target_id,
+            target_id_type: typeof report.target_id,
+            available_post_ids: allPosts?.slice(0, 5).map(p => ({ id: p.id, type: typeof p.id }))
+          });
+        }
+      }
     }
 
     const reasons = [...new Set(allReports?.map((r) => r.reason) || [])];
 
     res.json({
       success: true,
-      totalReports: allReports?.length || 0,
+      summary: {
+        totalReports: allReports?.length || 0,
+        totalPosts: allPosts?.length || 0,
+        matches: matches.length,
+        mismatches: mismatches.length,
+      },
       uniqueReasons: reasons,
-      sampleReports: allReports?.slice(0, 3).map((r) => ({
-        id: r.id,
-        reason: r.reason,
-        target_type: r.target_type,
-        submitted_at: r.submitted_at,
-      })),
-      allReports: allReports,
+      reportAnalysis,
+      postAnalysis,
+      matches,
+      mismatches,
+      sampleReports: allReports?.slice(0, 3),
+      samplePosts: allPosts?.slice(0, 3),
     });
   } catch (error) {
+    console.error("Debug endpoint error:", error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -475,29 +565,158 @@ router.get("/reported-posts", authenticateAdmin, async (req, res) => {
         id: reports[0].id,
         reason: reports[0].reason,
         target_type: reports[0].target_type,
+        target_id: reports[0].target_id,
         submitted_at: reports[0].submitted_at,
       });
+    }
+
+    // Test: Check if we can access forum_posts table at all
+    console.log("Testing forum_posts table access...");
+    const { data: testPosts, error: testPostsError } = await supabaseAdmin
+      .from("forum_posts")
+      .select("id, body, created_at, is_flagged")
+      .limit(10);
+
+    if (testPostsError) {
+      console.error("Cannot access forum_posts table:", testPostsError);
+    } else {
+      console.log(
+        `forum_posts table accessible: found ${testPosts?.length || 0} posts`
+      );
+      if (testPosts && testPosts.length > 0) {
+        console.log("=== AVAILABLE POSTS IN DATABASE ===");
+        testPosts.forEach((post, index) => {
+          console.log(`Post ${index + 1}: ID="${post.id}", is_flagged=${post.is_flagged}, created_at=${post.created_at}, body_preview="${post.body?.substring(0, 30)}..."`);
+        });
+        
+        // Check if any of the reported target_ids match existing posts
+        console.log("=== CHECKING REPORT TARGET_IDS AGAINST EXISTING POSTS ===");
+        if (reports && reports.length > 0) {
+          reports.forEach((report, index) => {
+            const matchingPost = testPosts.find(p => p.id === report.target_id);
+            console.log(`Report ${index + 1} (${report.target_id}): ${matchingPost ? '✅ MATCH FOUND' : '❌ NO MATCH'}`);
+            if (matchingPost) {
+              console.log(`  -> Matching post: is_flagged=${matchingPost.is_flagged}, body="${matchingPost.body?.substring(0, 50)}..."`);
+            }
+          });
+        }
+      }
     }
 
     // For each report, get the associated post data
     const reportsWithPosts = await Promise.all(
       (reports || []).map(async (report) => {
         if (report.target_type === "post") {
-          const { data: post } = await supabaseAdmin
+          console.log(
+            `\n=== FETCHING POST FOR REPORT ${report.id} ===`
+          );
+          console.log(`Target ID: "${report.target_id}" (type: ${typeof report.target_id}, length: ${report.target_id?.toString()?.length})`);
+
+          let post = null;
+          let postError = null;
+
+          // Method 1: Direct UUID match (including deleted posts)
+          console.log("Method 1: Direct UUID match (including deleted posts)");
+          const { data: post1, error: error1 } = await supabaseAdmin
             .from("forum_posts")
             .select(
               `
               id,
-              content,
-              category_id,
+              body,
+              category,
               is_anonymous,
               created_at,
-              is_deleted,
               user:users(id, full_name, email, username, role)
             `
             )
             .eq("id", report.target_id)
-            .single();
+            .maybeSingle(); // Use maybeSingle instead of single to avoid errors
+          
+          console.log(`Query result for ${report.target_id}:`, { 
+            found: !!post1, 
+            error: error1?.message,
+            post_preview: post1 ? `ID=${post1.id}, body="${post1.body?.substring(0, 30)}..."` : 'null'
+          });
+
+          if (post1) {
+            console.log("✅ Method 1 SUCCESS: Direct UUID match found");
+            post = post1;
+          } else {
+            console.log("❌ Method 1 FAILED:", error1?.message || "No match found");
+            
+            // Method 2: String conversion
+            console.log("Method 2: String conversion");
+            const { data: post2, error: error2 } = await supabaseAdmin
+              .from("forum_posts")
+              .select(
+                `
+                id,
+                body,
+                category,
+                is_anonymous,
+                created_at,
+                user:users(id, full_name, email, username, role)
+              `
+              )
+              .eq("id", String(report.target_id))
+              .maybeSingle();
+
+            if (post2) {
+              console.log("✅ Method 2 SUCCESS: String conversion match found");
+              post = post2;
+            } else {
+              console.log("❌ Method 2 FAILED:", error2?.message || "No match found");
+              
+              // Method 3: Check if target_id exists at all in posts table
+              console.log("Method 3: Checking if any posts exist with similar IDs");
+              const { data: allPosts, error: error3 } = await supabaseAdmin
+                .from("forum_posts")
+                .select("id")
+                .limit(10);
+
+              if (allPosts && allPosts.length > 0) {
+                console.log("Available post IDs (first 10):", allPosts.map(p => `"${p.id}"`));
+                
+                // Try to find exact match in the list
+                const exactMatch = allPosts.find(p => p.id === report.target_id || String(p.id) === String(report.target_id));
+                if (exactMatch) {
+                  console.log("🔍 FOUND EXACT MATCH in list, trying to fetch again...");
+                  const { data: post3, error: error3b } = await supabaseAdmin
+                    .from("forum_posts")
+                    .select(
+                      `
+                      id,
+                      body,
+                      category,
+                      is_anonymous,
+                      created_at,
+                      user:users(id, full_name, email, username, role)
+                    `
+                    )
+                    .eq("id", exactMatch.id)
+                    .maybeSingle();
+                  
+                  if (post3) {
+                    console.log("✅ Method 3 SUCCESS: Found via exact match");
+                    post = post3;
+                  } else {
+                    console.log("❌ Method 3 FAILED:", error3b?.message);
+                  }
+                } else {
+                  console.log("❌ No exact match found in available post IDs");
+                }
+              } else {
+                console.log("❌ Method 3 FAILED: Could not fetch post IDs:", error3?.message);
+              }
+            }
+          }
+
+          if (post) {
+            console.log(`✅ FINAL SUCCESS: Post found for report ${report.id}`);
+            console.log(`Post ID: "${post.id}", Content preview: "${post.body?.substring(0, 50)}..."`);
+          } else {
+            console.log(`❌ FINAL FAILURE: No post found for report ${report.id} with target_id "${report.target_id}"`);
+          }
 
           return {
             ...report,
