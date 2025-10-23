@@ -26,7 +26,7 @@ from typing import Dict, Any, Optional, List, Union
 from datetime import datetime, timedelta
 import httpx
 from services.supabase_service import SupabaseService
-from models.violation_types import ViolationType, SuspensionType
+from models.violation_types import ViolationType, SuspensionType, AccountStatus
 
 logger = logging.getLogger(__name__)
 
@@ -114,21 +114,21 @@ class ViolationTrackingService:
             action_taken = "strike_added"
             new_suspension_count = current_suspensions
             suspension_end = None
-            account_status = "active"
+            account_status = AccountStatus.ACTIVE
             
             if new_strike_count >= self.STRIKES_FOR_SUSPENSION:
                 # User has reached strike threshold
                 if current_suspensions >= self.SUSPENSIONS_FOR_BAN:
                     # This is the 3rd suspension (or more) → Permanent Ban
                     action_taken = "banned"
-                    account_status = "banned"
+                    account_status = AccountStatus.BANNED
                     new_suspension_count = current_suspensions + 1
                     new_strike_count = 0  # Reset strikes (doesn't matter for banned users)
                     logger.warning(f"🔨 PERMANENT BAN for user {user_id[:8]}... (suspension #{new_suspension_count})")
                 else:
                     # Temporary suspension (7 days)
                     action_taken = "suspended"
-                    account_status = "suspended"
+                    account_status = AccountStatus.SUSPENDED
                     suspension_end = datetime.utcnow() + timedelta(days=self.SUSPENSION_DURATION_DAYS)
                     new_suspension_count = current_suspensions + 1
                     new_strike_count = 0  # Reset strikes after suspension
@@ -322,20 +322,27 @@ class ViolationTrackingService:
         user_id: str,
         strike_count: int,
         suspension_count: int,
-        account_status: str,
+        account_status: Union[str, AccountStatus],
         suspension_end: Optional[datetime]
     ) -> bool:
         """Update user's moderation status."""
         try:
+            # Convert enum to string if needed
+            account_status_str = account_status.value if isinstance(account_status, AccountStatus) else account_status
+            
+            # Validate account status
+            if not AccountStatus.is_valid(account_status_str):
+                raise ValueError(f"Invalid account_status: {account_status_str}. Must be one of: {AccountStatus.values()}")
+            
             update_data = {
                 "strike_count": strike_count,
                 "suspension_count": suspension_count,
-                "account_status": account_status,
+                "account_status": account_status_str,
                 "suspension_end": suspension_end.isoformat() if suspension_end else None,
                 "last_violation_at": datetime.utcnow().isoformat()
             }
             
-            if account_status == "banned":
+            if account_status_str == AccountStatus.BANNED.value:
                 update_data["banned_at"] = datetime.utcnow().isoformat()
             
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -449,7 +456,7 @@ class ViolationTrackingService:
             if not user_data:
                 return False
             
-            if user_data.get("account_status") == "suspended":
+            if user_data.get("account_status") == AccountStatus.SUSPENDED.value:
                 suspension_end = user_data.get("suspension_end")
                 if suspension_end:
                     suspension_end_dt = datetime.fromisoformat(suspension_end.replace('Z', '+00:00'))
@@ -460,7 +467,7 @@ class ViolationTrackingService:
                             user_id=user_id,
                             strike_count=0,
                             suspension_count=user_data.get("suspension_count", 0),
-                            account_status="active",
+                            account_status=AccountStatus.ACTIVE,
                             suspension_end=None
                         )
                         return True

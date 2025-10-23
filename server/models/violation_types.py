@@ -37,14 +37,8 @@ class SuspensionType(str, Enum):
     """
     Enum for suspension types.
     
-    Recommended database enum definition:
+    Database enum definition:
     CREATE TYPE suspension_type AS ENUM ('temporary', 'permanent');
-    
-    Current implementation uses TEXT field, but should be migrated to ENUM for:
-    - Data integrity (prevents invalid values)
-    - Better indexing performance
-    - Self-documenting schema
-    - Type safety in queries
     """
     TEMPORARY = "temporary"  # 7-day suspension (1st and 2nd offense)
     PERMANENT = "permanent"  # Permanent ban (3rd offense)
@@ -57,4 +51,26 @@ class SuspensionType(str, Enum):
     @classmethod
     def is_valid(cls, value: str) -> bool:
         """Check if a value is a valid suspension type."""
+        return value in cls.values()
+
+
+class AccountStatus(str, Enum):
+    """
+    Enum for user account status.
+    
+    Database enum definition:
+    CREATE TYPE account_status AS ENUM ('active', 'suspended', 'banned');
+    """
+    ACTIVE = "active"        # User can post and interact normally
+    SUSPENDED = "suspended"  # User temporarily blocked (7 days)
+    BANNED = "banned"        # User permanently blocked
+    
+    @classmethod
+    def values(cls) -> list[str]:
+        """Get all valid account status values."""
+        return [member.value for member in cls]
+    
+    @classmethod
+    def is_valid(cls, value: str) -> bool:
+        """Check if a value is a valid account status."""
         return value in cls.values()
