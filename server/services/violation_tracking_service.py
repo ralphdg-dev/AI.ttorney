@@ -60,9 +60,7 @@ class ViolationTrackingService:
         violation_type: Union[str, ViolationType],
         content_text: str,
         moderation_result: Dict[str, Any],
-        content_id: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None
+        content_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Record a content violation and apply appropriate action.
@@ -73,8 +71,6 @@ class ViolationTrackingService:
             content_text: The actual violating content
             moderation_result: Result from ContentModerationService.moderate_content()
             content_id: Optional ID of the post/reply/prompt
-            ip_address: Optional IP address for audit
-            user_agent: Optional user agent for audit
         
         Returns:
             Dict containing:
@@ -152,9 +148,7 @@ class ViolationTrackingService:
                 moderation_result=moderation_result,
                 action_taken=action_taken,
                 strike_count_after=new_strike_count,
-                suspension_count_after=new_suspension_count,
-                ip_address=ip_address,
-                user_agent=user_agent
+                suspension_count_after=new_suspension_count
             )
             
             # Step 6: Create suspension record if suspended or banned
@@ -367,9 +361,7 @@ class ViolationTrackingService:
         action_taken: str,
         strike_count_after: int,
         suspension_count_after: int,
-        content_id: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None
+        content_id: Optional[str] = None
     ) -> str:
         """Insert violation record into database."""
         try:
@@ -383,9 +375,8 @@ class ViolationTrackingService:
                 "violation_summary": moderation_result.get("violation_summary", ""),
                 "action_taken": action_taken,
                 "strike_count_after": strike_count_after,
-                "suspension_count_after": suspension_count_after,
-                "ip_address": ip_address,
-                "user_agent": user_agent
+                "suspension_count_after": suspension_count_after
+                # Note: ip_address and user_agent are logged above but not stored in DB
             }
             
             async with httpx.AsyncClient(timeout=10.0) as client:
