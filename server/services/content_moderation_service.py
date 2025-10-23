@@ -50,6 +50,8 @@ import os
 from typing import Dict, Any, List, Optional
 import logging
 from dotenv import load_dotenv
+from services.filipino_profanity_filter import get_filipino_profanity_filter
+from services.safety_filter import get_safety_filter
 
 # Load environment variables
 load_dotenv()
@@ -92,20 +94,23 @@ class ContentModerationService:
         
         self.client = AsyncOpenAI(api_key=api_key)
         self.model = "omni-moderation-latest"
+        self.filipino_filter = get_filipino_profanity_filter()
+        self.safety_filter = get_safety_filter()
         
-        # Configurable thresholds (can be adjusted via environment variables)
+        # STRICT THRESHOLDS - Zero tolerance for harmful content
+        # Lower values = more sensitive detection
         self.thresholds = {
-            "hate": float(os.getenv("MODERATION_THRESHOLD_HATE", "0.7")),
-            "hate/threatening": float(os.getenv("MODERATION_THRESHOLD_HATE_THREATENING", "0.5")),
-            "harassment": float(os.getenv("MODERATION_THRESHOLD_HARASSMENT", "0.7")),
-            "harassment/threatening": float(os.getenv("MODERATION_THRESHOLD_HARASSMENT_THREATENING", "0.5")),
-            "self-harm": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM", "0.5")),
-            "self-harm/intent": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM_INTENT", "0.5")),
-            "self-harm/instructions": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM_INSTRUCTIONS", "0.5")),
-            "sexual": float(os.getenv("MODERATION_THRESHOLD_SEXUAL", "0.8")),
-            "sexual/minors": float(os.getenv("MODERATION_THRESHOLD_SEXUAL_MINORS", "0.3")),
-            "violence": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE", "0.7")),
-            "violence/graphic": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE_GRAPHIC", "0.6")),
+            "hate": float(os.getenv("MODERATION_THRESHOLD_HATE", "0.5")),  # Lowered from 0.7
+            "hate/threatening": float(os.getenv("MODERATION_THRESHOLD_HATE_THREATENING", "0.3")),  # Lowered from 0.5
+            "harassment": float(os.getenv("MODERATION_THRESHOLD_HARASSMENT", "0.5")),  # Lowered from 0.7
+            "harassment/threatening": float(os.getenv("MODERATION_THRESHOLD_HARASSMENT_THREATENING", "0.3")),  # Lowered from 0.5
+            "self-harm": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM", "0.3")),  # Lowered from 0.5
+            "self-harm/intent": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM_INTENT", "0.3")),  # Lowered from 0.5
+            "self-harm/instructions": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM_INSTRUCTIONS", "0.3")),  # Lowered from 0.5
+            "sexual": float(os.getenv("MODERATION_THRESHOLD_SEXUAL", "0.5")),  # Lowered from 0.8
+            "sexual/minors": float(os.getenv("MODERATION_THRESHOLD_SEXUAL_MINORS", "0.01")),  # CRITICAL: Near-zero tolerance
+            "violence": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE", "0.5")),  # Lowered from 0.7
+            "violence/graphic": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE_GRAPHIC", "0.4")),  # Lowered from 0.6
         }
         
         logger.info(f"✅ Content moderation service initialized with model: {self.model}")
@@ -146,8 +151,97 @@ class ContentModerationService:
             result = await moderate_content("Ang dami kong galit sa mga lawyers")
         """
         try:
-            # Call OpenAI Moderation API
-            logger.info(f"🔍 Moderating content (length: {len(content)} chars)")
+            # STEP 0: Safety filter - ZERO TOLERANCE for child safety, abuse, harassment
+            safety_check = self.safety_filter.analyze(content)
+            
+            if safety_check["is_unsafe"]:
+                logger.error(f"🚨 SAFETY VIOLATION: {safety_check['violations']} (severity: {safety_check['severity']})")
+                # Immediate flag for safety violations
+                return {
+                    "flagged": True,
+                    "categories": {
+                        "harassment": True,
+                        "hate": safety_check["severity"] == "critical",
+                        "hate/threatening": safety_check["severity"] == "critical",
+                        "harassment/threatening": safety_check["severity"] in ["critical", "high"],
+                        "self-harm": "abuse_pattern" in safety_check["violations"],
+                        "self-harm/intent": False,
+                        "self-harm/instructions": False,
+                        "sexual": "sexual_harassment" in safety_check["violations"],
+                        "sexual/minors": "child_sexualization" in safety_check["violations"] or "grooming_behavior" in safety_check["violations"],
+                        "violence": "veiled_threat" in safety_check["violations"],
+                        "violence/graphic": False
+                    },
+                    "category_scores": {
+                        "harassment": 0.99,
+                        "hate": 0.95 if safety_check["severity"] == "critical" else 0.80,
+                        "hate/threatening": 0.90 if safety_check["severity"] == "critical" else 0.0,
+                        "harassment/threatening": 0.95 if safety_check["severity"] in ["critical", "high"] else 0.0,
+                        "self-harm": 0.85 if "abuse_pattern" in safety_check["violations"] else 0.0,
+                        "self-harm/intent": 0.0,
+                        "self-harm/instructions": 0.0,
+                        "sexual": 0.90 if "sexual_harassment" in safety_check["violations"] else 0.0,
+                        "sexual/minors": 0.99 if "child_sexualization" in safety_check["violations"] or "grooming_behavior" in safety_check["violations"] else 0.0,
+                        "violence": 0.85 if "veiled_threat" in safety_check["violations"] else 0.0,
+                        "violence/graphic": 0.0
+                    },
+                    "violation_summary": safety_check["message"],
+                    "raw_response": {
+                        "flagged": True,
+                        "source": "safety_filter",
+                        "violations": safety_check["violations"],
+                        "severity": safety_check["severity"]
+                    }
+                }
+            
+            # STEP 1: Check for Filipino profanity (catches what OpenAI might miss)
+            profanity_check = self.filipino_filter.contains_profanity(content)
+            
+            if profanity_check["is_profane"]:
+                logger.warning(f"🚨 Filipino profanity detected: {profanity_check['matched_words']}")
+                # Return flagged result immediately
+                return {
+                    "flagged": True,
+                    "categories": {
+                        "harassment": True,
+                        "hate": profanity_check["severity"] == "high",
+                        "hate/threatening": False,
+                        "harassment/threatening": profanity_check["severity"] == "high",
+                        "self-harm": False,
+                        "self-harm/intent": False,
+                        "self-harm/instructions": False,
+                        "sexual": False,
+                        "sexual/minors": False,
+                        "violence": False,
+                        "violence/graphic": False
+                    },
+                    "category_scores": {
+                        "harassment": 0.95 if profanity_check["severity"] == "high" else 0.85,
+                        "hate": 0.90 if profanity_check["severity"] == "high" else 0.75,
+                        "hate/threatening": 0.0,
+                        "harassment/threatening": 0.85 if profanity_check["severity"] == "high" else 0.0,
+                        "self-harm": 0.0,
+                        "self-harm/intent": 0.0,
+                        "self-harm/instructions": 0.0,
+                        "sexual": 0.0,
+                        "sexual/minors": 0.0,
+                        "violence": 0.0,
+                        "violence/graphic": 0.0
+                    },
+                    "violation_summary": self.filipino_filter.get_violation_message(
+                        profanity_check["matched_words"],
+                        profanity_check["severity"]
+                    ),
+                    "raw_response": {
+                        "flagged": True,
+                        "source": "filipino_profanity_filter",
+                        "matched_words": profanity_check["matched_words"],
+                        "severity": profanity_check["severity"]
+                    }
+                }
+            
+            # STEP 2: Call OpenAI Moderation API for additional checks
+            logger.info(f"🔍 Moderating content with OpenAI (length: {len(content)} chars)")
             
             response = await self.client.moderations.create(
                 model=self.model,

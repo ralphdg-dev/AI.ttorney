@@ -83,7 +83,12 @@ async def get_moderation_status(
         raise
     except Exception as e:
         logger.error(f"❌ Error getting moderation status: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+        # Return default values if columns don't exist yet (before migration)
+        logger.warning("Returning default moderation status (columns may not exist yet)")
+        return ModerationStatusResponse(
+            strike_count=0,
+            suspension_count=0,
+            account_status="active",
+            suspension_end=None,
+            last_violation_at=None
         )
