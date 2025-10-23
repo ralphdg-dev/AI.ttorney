@@ -4,7 +4,7 @@
  * Handles fetching user moderation status (strikes, suspensions, bans)
  */
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+import { NetworkConfig } from '../utils/networkConfig';
 
 export interface ModerationStatus {
   strike_count: number;
@@ -27,7 +27,10 @@ export interface ModerationError {
  */
 export const getUserModerationStatus = async (token: string): Promise<ModerationStatus | null> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/user/moderation-status`, {
+    // Use auto-detected API URL
+    const apiUrl = await NetworkConfig.getBestApiUrl();
+    
+    const response = await fetch(`${apiUrl}/api/user/moderation-status`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

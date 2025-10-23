@@ -35,6 +35,126 @@ import { MarkdownText } from "../components/chatbot/MarkdownText";
 import { NetworkConfig } from "../utils/networkConfig";
 import { LAYOUT, getTotalUIHeight } from "../constants/LayoutConstants";
 
+// ============================================================================
+// HELPER FUNCTIONS - DRY Principle
+// ============================================================================
+
+/**
+ * Stream chat response using XMLHttpRequest (React Native compatible)
+ * Follows clean code principles with single responsibility
+ */
+interface StreamChatResponseParams {
+  endpoint: string;
+  headers: Record<string, string>;
+  requestBody: any;
+  onContent: (content: string) => void;
+  onSources: (sources: any[]) => void;
+  onMetadata: (metadata: any) => void;
+  onComplete: () => void;
+  onError: () => void;
+  onFinish: () => void;
+}
+
+const streamChatResponse = (params: StreamChatResponseParams): Promise<void> => {
+  const {
+    endpoint,
+    headers,
+    requestBody,
+    onContent,
+    onSources,
+    onMetadata,
+    onComplete,
+    onError,
+    onFinish,
+  } = params;
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    
+    console.log('📤 Opening XHR connection to:', endpoint);
+    xhr.open('POST', endpoint, true);
+    
+    // Set headers
+    Object.keys(headers).forEach(key => {
+      xhr.setRequestHeader(key, headers[key]);
+    });
+    
+    let buffer = '';
+    let lastUpdateTime = 0;
+    const UPDATE_INTERVAL = 50; // Smooth 20fps updates
+    
+    // Handle streaming data
+    xhr.onprogress = () => {
+      const responseText = xhr.responseText;
+      const newData = responseText.substring(buffer.length);
+      buffer = responseText;
+      
+      if (!newData) return;
+      
+      // Process Server-Sent Events (SSE)
+      const lines = newData.split('\n');
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.substring(6));
+            
+            // Handle different message types
+            if (data.type === 'sources') {
+              onSources(data.sources || []);
+              console.log('📚 Received sources:', data.sources?.length || 0);
+            } else if (data.type === 'metadata') {
+              onMetadata(data);
+              console.log('📋 Metadata:', { language: data.language });
+            } else if (data.content) {
+              onContent(data.content);
+              
+              // Throttled UI updates for smooth rendering
+              const now = Date.now();
+              if (now - lastUpdateTime >= UPDATE_INTERVAL) {
+                // UI update handled by parent component
+                lastUpdateTime = now;
+              }
+            } else if (data.done) {
+              console.log('✅ Stream completed');
+              onComplete();
+            }
+          } catch (e) {
+            console.error('❌ Error parsing SSE data:', e);
+          }
+        }
+      }
+    };
+    
+    // Handle completion
+    xhr.onload = () => {
+      console.log('✅ XHR completed');
+      onFinish();
+      resolve();
+    };
+    
+    // Handle errors
+    xhr.onerror = () => {
+      console.error('❌ XHR error');
+      onError();
+      onFinish();
+      reject(new Error('Network error. Please check your connection.'));
+    };
+    
+    xhr.ontimeout = () => {
+      console.error('❌ XHR timeout');
+      onError();
+      reject(new Error('Request timed out after 60 seconds.'));
+    };
+    
+    // Send request
+    xhr.send(JSON.stringify(requestBody));
+  });
+};
+
+// ============================================================================
+// COMPONENTS
+// ============================================================================
+
 // ChatGPT-style animated thinking indicator
 const ThinkingIndicator = () => {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -141,6 +261,28 @@ export default function ChatbotScreen() {
   const { user, session, isLawyer } = useAuth();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
+  
+  // Helper function to update message with sources (DRY principle)
+  const updateMessageWithSources = useCallback((
+    msgId: string,
+    text: string,
+    sources: any[],
+    language: string
+  ) => {
+    setMessages((prev) => {
+      const newMessages = [...prev];
+      const msgIndex = newMessages.findIndex(m => m.id === msgId);
+      if (msgIndex !== -1) {
+        newMessages[msgIndex] = { 
+          ...newMessages[msgIndex], 
+          text,
+          sources,
+          language
+        };
+      }
+      return newMessages;
+    });
+  }, []);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -503,9 +645,9 @@ export default function ChatbotScreen() {
       let fallback_suggestions: any = undefined;
       let normalized_query = "";
       let is_complex_query = false;
-      let returnedSessionId = null;
-      let assistantMessageId = null;
-      let userMessageId = null;
+      let returnedSessionId: string | null = null;
+      let assistantMessageId: string | null = null;
+      let userMessageId: string | null = null;
 
       // Both lawyers and general users get STREAMING responses!
       if (true) {
@@ -525,147 +667,48 @@ export default function ChatbotScreen() {
         const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
         try {
-          const response = await fetch(endpoint, {
-            method: 'POST',
+          await streamChatResponse({
+            endpoint,
             headers,
-            body: JSON.stringify({
+            requestBody: {
               question: userMessage,
               conversation_history: formattedHistory,
-              max_tokens: userRole === "verified_lawyer" ? 1500 : 400, // Lawyers get more tokens for formal responses
+              max_tokens: userRole === "verified_lawyer" ? 1500 : 400,
               user_id: user?.id || null,
               session_id: sessionId || null,
-            }),
-            signal: controller.signal,
-          });
-
-          clearTimeout(timeoutId);
-
-          // Check response status
-          if (!response.ok) {
-            const errorText = await response.text().catch(() => 'Unknown error');
-            console.error('❌ Streaming endpoint error:', response.status, response.statusText);
-            console.error('❌ Error details:', errorText);
-            throw new Error(`Server returned ${response.status}: ${response.statusText}\n${errorText}`);
-          }
-
-          console.log('✅ Streaming endpoint connected');
-          console.log('📋 Response headers:', {
-            contentType: response.headers.get('content-type'),
-            hasBody: !!response.body
-          });
-
-          const reader = response.body?.getReader();
-          const decoder = new TextDecoder();
-          let lastUpdateTime = 0;
-          const UPDATE_INTERVAL = 50; // Update every 50ms (matches backend batching for smooth, natural speed)
-
-          if (!reader) {
-            console.error('❌ No reader available from response body');
-            console.error('❌ Response details:', {
-              status: response.status,
-              statusText: response.statusText,
-              headers: Object.fromEntries(response.headers.entries()),
-              bodyUsed: response.bodyUsed,
-              hasBody: !!response.body
-            });
-            throw new Error('Unable to read streaming response. Server may not be running or endpoint may not support streaming.');
-          }
-
-          console.log('📖 Reading stream...');
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              console.log('✅ Stream completed');
-              isStreamingRef.current = false; // Mark streaming as complete
-              
-              // Final update with sources and disclaimer (CRITICAL: ensures sources are always displayed)
-              setMessages((prev) => {
-                const newMessages = [...prev];
-                const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
-                if (msgIndex !== -1) {
-                  newMessages[msgIndex] = { 
-                    ...newMessages[msgIndex], 
-                    text: answer,
-                    sources: sources, // Add sources to message
-                    language: language,
-                    confidence: confidence,
-                    legal_disclaimer: legal_disclaimer // Add disclaimer only if provided
-                  };
-                  console.log('✅ Final message updated with sources:', sources.length, 'and disclaimer:', !!legal_disclaimer);
-                }
-                return newMessages;
-              });
-              
-              // Final smooth scroll to show sources
+            },
+            onContent: (content: string) => {
+              answer += content;
+            },
+            onSources: (receivedSources: any[]) => {
+              sources = receivedSources;
+            },
+            onMetadata: (metadata: any) => {
+              language = metadata.language;
+              returnedSessionId = metadata.session_id;
+              userMessageId = metadata.user_message_id;
+              assistantMessageId = metadata.assistant_message_id;
+            },
+            onComplete: () => {
+              isStreamingRef.current = false;
+              updateMessageWithSources(streamingMsgId, answer, sources, language);
               setTimeout(() => {
                 shouldAutoScroll.current = true;
                 smoothScrollToBottom();
               }, 100);
-              
-              break;
-            }
-
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const data = JSON.parse(line.slice(6));
-
-                  if (data.content) {
-                    answer += data.content;
-                    
-                    // Turn off typing indicator as soon as first text arrives
-                    setIsTyping(false);
-                    
-                    // Throttled updates for smooth typing effect (ChatGPT-style)
-                    const now = Date.now();
-                    if (now - lastUpdateTime >= UPDATE_INTERVAL) {
-                      lastUpdateTime = now;
-                      
-                      setMessages((prev) => {
-                        const newMessages = [...prev];
-                        const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
-                        if (msgIndex !== -1) {
-                          newMessages[msgIndex] = { ...newMessages[msgIndex], text: answer };
-                        }
-                        return newMessages;
-                      });
-                    }
-                  }
-
-                  // Store sources - will be displayed after streaming completes
-                  if (data.sources) {
-                    sources = data.sources;
-                    console.log('📚 Legal sources received:', sources.length);
-                  }
-
-                  // Store legal disclaimer if provided
-                  if (data.type === 'disclaimer' && data.disclaimer) {
-                    legal_disclaimer = data.disclaimer;
-                    console.log('⚖️ Legal disclaimer received');
-                  }
-
-                  if (data.type === 'metadata') {
-                    language = data.language;
-                  }
-                } catch (e) {
-                  console.error('❌ Error parsing stream data:', e, 'Line:', line);
-                }
-              }
-            }
-          }
+            },
+            onError: () => {
+              setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
+            },
+            onFinish: () => {
+              clearTimeout(timeoutId);
+              setIsTyping(false);
+            },
+          });
         } catch (streamError: any) {
           clearTimeout(timeoutId);
           console.error('❌ Streaming error:', streamError);
-          
-          // Remove empty streaming message on error
           setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
-          
-          if (streamError.name === 'AbortError') {
-            throw new Error('Request timed out after 60 seconds. Please try again.');
-          }
           throw streamError;
         }
       }
@@ -731,9 +774,10 @@ export default function ChatbotScreen() {
 
       // Update the user message with the real ID from backend
       if (userMessageId) {
+        const messageId = userMessageId; // Type narrowing: now TypeScript knows it's string, not null
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === newMsg.id ? { ...msg, id: userMessageId } : msg
+            msg.id === newMsg.id ? { ...msg, id: messageId } : msg
           )
         );
       }
