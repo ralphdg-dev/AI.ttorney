@@ -110,13 +110,13 @@ class ViolationTrackingService:
             
             if new_strike_count >= self.STRIKES_FOR_SUSPENSION:
                 # User has reached strike threshold
-                if current_suspensions >= self.SUSPENSIONS_FOR_BAN - 1:
-                    # This is the 3rd suspension → Permanent Ban
+                if current_suspensions >= self.SUSPENSIONS_FOR_BAN:
+                    # This is the 3rd suspension (or more) → Permanent Ban
                     action_taken = "banned"
                     account_status = "banned"
                     new_suspension_count = current_suspensions + 1
                     new_strike_count = 0  # Reset strikes (doesn't matter for banned users)
-                    logger.warning(f"🔨 PERMANENT BAN for user {user_id[:8]}... (3rd suspension)")
+                    logger.warning(f"🔨 PERMANENT BAN for user {user_id[:8]}... (suspension #{new_suspension_count})")
                 else:
                     # Temporary suspension (7 days)
                     action_taken = "suspended"
