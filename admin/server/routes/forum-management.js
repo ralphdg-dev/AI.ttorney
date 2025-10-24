@@ -15,7 +15,6 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
       limit = 50,
       search = "",
       category = "all",
-      status = "all",
       reported = "all",
       sort_by = "created_at",
       sort_order = "desc",
@@ -31,9 +30,9 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
       .from("forum_posts")
       .select(
         `
-        *,
-        user:users(id, full_name, email, username, role)
-      `
+				*,
+				user:users(id, full_name, email, username, role)
+			`
       )
       .range(offset, offset + parseInt(limit) - 1)
       .order(sort_by, { ascending: sort_order === "asc" });
@@ -231,29 +230,29 @@ router.get("/posts/:id", authenticateAdmin, async (req, res) => {
       .from("forum_posts")
       .select(
         `
-        id,
-        body,
-        category,
-        is_anonymous,
-        created_at,
-        updated_at,
-        user:users(id, full_name, email, username, role),
-        replies:forum_replies(
-          id,
-          body,
-          is_anonymous,
-          created_at,
-          user:users(id, full_name, email, username, role)
-        ),
-        reports:forum_reports(
-          id,
-          reason,
-          category,
-          reason_context,
-          created_at,
-          reporter:users!forum_reports_user_id_fkey(id, full_name, email, username)
-        )
-      `
+				id,
+				body,
+				category,
+				is_anonymous,
+				created_at,
+				updated_at,
+				user:users(id, full_name, email, username, role),
+				replies:forum_replies(
+					id,
+					body,
+					is_anonymous,
+					created_at,
+					user:users(id, full_name, email, username, role)
+				),
+				reports:forum_reports(
+					id,
+					reason,
+					category,
+					reason_context,
+					created_at,
+					reporter:users!forum_reports_user_id_fkey(id, full_name, email, username)
+				)
+			`
       )
       .eq("id", id)
       .single();
@@ -361,14 +360,17 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
 router.get("/reported-posts/debug", authenticateAdmin, async (req, res) => {
   try {
     console.log("=== DEBUG ENDPOINT CALLED ===");
-    
+
     // Get sample reports
     const { data: allReports, error: reportsError } = await supabaseAdmin
       .from("forum_reports")
       .select("*")
       .limit(10);
 
-    console.log("Reports query result:", { count: allReports?.length, error: reportsError });
+    console.log("Reports query result:", {
+      count: allReports?.length,
+      error: reportsError,
+    });
 
     // Get sample posts
     const { data: allPosts, error: postsError } = await supabaseAdmin
@@ -376,7 +378,10 @@ router.get("/reported-posts/debug", authenticateAdmin, async (req, res) => {
       .select("id, content, created_at")
       .limit(10);
 
-    console.log("Posts query result:", { count: allPosts?.length, error: postsError });
+    console.log("Posts query result:", {
+      count: allPosts?.length,
+      error: postsError,
+    });
 
     if (reportsError || postsError) {
       return res.json({
@@ -387,47 +392,52 @@ router.get("/reported-posts/debug", authenticateAdmin, async (req, res) => {
     }
 
     // Analyze data types and values
-    const reportAnalysis = allReports?.map(r => ({
-      id: r.id,
-      target_id: r.target_id,
-      target_id_type: typeof r.target_id,
-      target_id_length: r.target_id?.toString()?.length,
-      target_type: r.target_type,
-      reason: r.reason,
-    })) || [];
+    const reportAnalysis =
+      allReports?.map((r) => ({
+        id: r.id,
+        target_id: r.target_id,
+        target_id_type: typeof r.target_id,
+        target_id_length: r.target_id?.toString()?.length,
+        target_type: r.target_type,
+        reason: r.reason,
+      })) || [];
 
-    const postAnalysis = allPosts?.map(p => ({
-      id: p.id,
-      id_type: typeof p.id,
-      id_length: p.id?.toString()?.length,
-      content_preview: p.content?.substring(0, 50),
-    })) || [];
+    const postAnalysis =
+      allPosts?.map((p) => ({
+        id: p.id,
+        id_type: typeof p.id,
+        id_length: p.id?.toString()?.length,
+        content_preview: p.content?.substring(0, 50),
+      })) || [];
 
     // Try to find matches
     const matches = [];
     const mismatches = [];
-    
+
     for (const report of allReports || []) {
-      if (report.target_type === 'post') {
-        const matchingPost = allPosts?.find(p => 
-          p.id === report.target_id || 
-          p.id.toString() === report.target_id?.toString() ||
-          String(p.id) === String(report.target_id)
+      if (report.target_type === "post") {
+        const matchingPost = allPosts?.find(
+          (p) =>
+            p.id === report.target_id ||
+            p.id.toString() === report.target_id?.toString() ||
+            String(p.id) === String(report.target_id)
         );
-        
+
         if (matchingPost) {
           matches.push({
             report_id: report.id,
             target_id: report.target_id,
             post_id: matchingPost.id,
-            match_type: 'found'
+            match_type: "found",
           });
         } else {
           mismatches.push({
             report_id: report.id,
             target_id: report.target_id,
             target_id_type: typeof report.target_id,
-            available_post_ids: allPosts?.slice(0, 5).map(p => ({ id: p.id, type: typeof p.id }))
+            available_post_ids: allPosts
+              ?.slice(0, 5)
+              .map((p) => ({ id: p.id, type: typeof p.id })),
           });
         }
       }
@@ -460,7 +470,6 @@ router.get("/reported-posts/debug", authenticateAdmin, async (req, res) => {
   }
 });
 
-// Get all reported posts
 router.get("/reported-posts", authenticateAdmin, async (req, res) => {
   try {
     console.log("Reported posts endpoint called with query:", req.query);
@@ -468,7 +477,7 @@ router.get("/reported-posts", authenticateAdmin, async (req, res) => {
     const {
       page = 1,
       limit = 50,
-      status = "pending",
+      status = "all", // default to all to show all statuses
       category = "all",
       sort_by = "submitted_at",
       sort_order = "desc",
@@ -476,76 +485,40 @@ router.get("/reported-posts", authenticateAdmin, async (req, res) => {
 
     const offset = (page - 1) * limit;
 
-    // First, let's check what reports exist in the database
-    const { data: allReports, error: checkError } = await supabaseAdmin
-      .from("forum_reports")
-      .select("id, reason, target_type")
-      .eq("target_type", "post")
-      .limit(10);
-
-    console.log("Sample reports in database:", allReports);
-    console.log("Unique reasons found:", [
-      ...new Set(allReports?.map((r) => r.reason) || []),
-    ]);
-
-    // Build the base query
+    // Build the base query for forum_reports
     let query = supabaseAdmin
       .from("forum_reports")
       .select(
         `
-        id,
-        reason,
-        reason_context,
-        target_type,
-        target_id,
-        submitted_at,
-        reporter:users!forum_reports_reporter_id_fkey(
-          id,
-          full_name,
-          email,
-          username
-        )
-      `
+				id,
+				reason,
+				reason_context,
+				status,
+				target_type,
+				target_id,
+				submitted_at,
+				reporter:users!forum_reports_reporter_id_fkey(
+					id,
+					full_name,
+					email,
+					username
+				)
+			`
       )
-      .eq("target_type", "post"); // Only get post reports for now
+      .eq("target_type", "post");
 
-    // Apply search filter if provided
-    if (req.query.search && req.query.search.trim() !== "") {
-      const searchTerm = req.query.search.trim();
-      console.log(`Applying search filter: ${searchTerm}`);
-      // Search in reason, reason_context, and reporter name
-      query = query.or(
-        `reason.ilike.%${searchTerm}%,reason_context.ilike.%${searchTerm}%`
-      );
+    // Apply filters
+    if (status !== "all") {
+      query = query.eq("status", status);
     }
 
-    // Apply category filter
     if (category !== "all") {
-      console.log(`Category filter requested: ${category}`);
-
-      // Map category filter to reason field - try both exact match and case variations
-      const possibleReasons = [
-        category, // exact match
-        category.toLowerCase(), // lowercase
-        category.charAt(0).toUpperCase() + category.slice(1).toLowerCase(), // capitalize first letter
-      ];
-
-      console.log(`Trying to match reasons: ${possibleReasons.join(", ")}`);
-
-      // Use 'in' filter to match any of the possible variations
-      query = query.in("reason", possibleReasons);
-    } else {
-      console.log("No category filter applied (showing all)");
+      query = query.ilike("reason", `%${category}%`);
     }
 
-    // Note: Status filtering is not implemented since your table doesn't have a status column
-    // All reports are considered 'pending' by default
-
-    // Sort by submitted_at (your table's timestamp column)
     const sortColumn = sort_by === "created_at" ? "submitted_at" : sort_by;
     query = query.order(sortColumn, { ascending: sort_order === "asc" });
 
-    // Apply pagination
     query = query.range(offset, offset + limit - 1);
 
     const { data: reports, error } = await query;
@@ -558,207 +531,61 @@ router.get("/reported-posts", authenticateAdmin, async (req, res) => {
       });
     }
 
-    console.log(`Found ${reports?.length || 0} reports after filtering`);
-
-    if (reports && reports.length > 0) {
-      console.log("First report sample:", {
-        id: reports[0].id,
-        reason: reports[0].reason,
-        target_type: reports[0].target_type,
-        target_id: reports[0].target_id,
-        submitted_at: reports[0].submitted_at,
-      });
-    }
-
-    // Test: Check if we can access forum_posts table at all
-    console.log("Testing forum_posts table access...");
-    const { data: testPosts, error: testPostsError } = await supabaseAdmin
-      .from("forum_posts")
-      .select("id, body, created_at, is_flagged")
-      .limit(10);
-
-    if (testPostsError) {
-      console.error("Cannot access forum_posts table:", testPostsError);
-    } else {
-      console.log(
-        `forum_posts table accessible: found ${testPosts?.length || 0} posts`
-      );
-      if (testPosts && testPosts.length > 0) {
-        console.log("=== AVAILABLE POSTS IN DATABASE ===");
-        testPosts.forEach((post, index) => {
-          console.log(`Post ${index + 1}: ID="${post.id}", is_flagged=${post.is_flagged}, created_at=${post.created_at}, body_preview="${post.body?.substring(0, 30)}..."`);
-        });
-        
-        // Check if any of the reported target_ids match existing posts
-        console.log("=== CHECKING REPORT TARGET_IDS AGAINST EXISTING POSTS ===");
-        if (reports && reports.length > 0) {
-          reports.forEach((report, index) => {
-            const matchingPost = testPosts.find(p => p.id === report.target_id);
-            console.log(`Report ${index + 1} (${report.target_id}): ${matchingPost ? '✅ MATCH FOUND' : '❌ NO MATCH'}`);
-            if (matchingPost) {
-              console.log(`  -> Matching post: is_flagged=${matchingPost.is_flagged}, body="${matchingPost.body?.substring(0, 50)}..."`);
-            }
-          });
-        }
-      }
-    }
-
-    // For each report, get the associated post data
+    // Attach each reported post data
     const reportsWithPosts = await Promise.all(
       (reports || []).map(async (report) => {
-        if (report.target_type === "post") {
-          console.log(
-            `\n=== FETCHING POST FOR REPORT ${report.id} ===`
-          );
-          console.log(`Target ID: "${report.target_id}" (type: ${typeof report.target_id}, length: ${report.target_id?.toString()?.length})`);
-
-          let post = null;
-          let postError = null;
-
-          // Method 1: Direct UUID match (including deleted posts)
-          console.log("Method 1: Direct UUID match (including deleted posts)");
-          const { data: post1, error: error1 } = await supabaseAdmin
-            .from("forum_posts")
-            .select(
-              `
-              id,
-              body,
-              category,
-              is_anonymous,
-              created_at,
-              user:users(id, full_name, email, username, role)
+        let post = null;
+        const { data: postData, error: postError } = await supabaseAdmin
+          .from("forum_posts")
+          .select(
             `
-            )
-            .eq("id", report.target_id)
-            .maybeSingle(); // Use maybeSingle instead of single to avoid errors
-          
-          console.log(`Query result for ${report.target_id}:`, { 
-            found: !!post1, 
-            error: error1?.message,
-            post_preview: post1 ? `ID=${post1.id}, body="${post1.body?.substring(0, 30)}..."` : 'null'
-          });
+						id,
+						body,
+						category,
+						is_anonymous,
+						is_flagged,
+						created_at,
+						user:users(id, full_name, email, username, role)
+					`
+          )
+          .eq("id", report.target_id)
+          .maybeSingle();
 
-          if (post1) {
-            console.log("✅ Method 1 SUCCESS: Direct UUID match found");
-            post = post1;
-          } else {
-            console.log("❌ Method 1 FAILED:", error1?.message || "No match found");
-            
-            // Method 2: String conversion
-            console.log("Method 2: String conversion");
-            const { data: post2, error: error2 } = await supabaseAdmin
-              .from("forum_posts")
-              .select(
-                `
-                id,
-                body,
-                category,
-                is_anonymous,
-                created_at,
-                user:users(id, full_name, email, username, role)
-              `
-              )
-              .eq("id", String(report.target_id))
-              .maybeSingle();
-
-            if (post2) {
-              console.log("✅ Method 2 SUCCESS: String conversion match found");
-              post = post2;
-            } else {
-              console.log("❌ Method 2 FAILED:", error2?.message || "No match found");
-              
-              // Method 3: Check if target_id exists at all in posts table
-              console.log("Method 3: Checking if any posts exist with similar IDs");
-              const { data: allPosts, error: error3 } = await supabaseAdmin
-                .from("forum_posts")
-                .select("id")
-                .limit(10);
-
-              if (allPosts && allPosts.length > 0) {
-                console.log("Available post IDs (first 10):", allPosts.map(p => `"${p.id}"`));
-                
-                // Try to find exact match in the list
-                const exactMatch = allPosts.find(p => p.id === report.target_id || String(p.id) === String(report.target_id));
-                if (exactMatch) {
-                  console.log("🔍 FOUND EXACT MATCH in list, trying to fetch again...");
-                  const { data: post3, error: error3b } = await supabaseAdmin
-                    .from("forum_posts")
-                    .select(
-                      `
-                      id,
-                      body,
-                      category,
-                      is_anonymous,
-                      created_at,
-                      user:users(id, full_name, email, username, role)
-                    `
-                    )
-                    .eq("id", exactMatch.id)
-                    .maybeSingle();
-                  
-                  if (post3) {
-                    console.log("✅ Method 3 SUCCESS: Found via exact match");
-                    post = post3;
-                  } else {
-                    console.log("❌ Method 3 FAILED:", error3b?.message);
-                  }
-                } else {
-                  console.log("❌ No exact match found in available post IDs");
-                }
-              } else {
-                console.log("❌ Method 3 FAILED: Could not fetch post IDs:", error3?.message);
-              }
-            }
-          }
-
-          if (post) {
-            console.log(`✅ FINAL SUCCESS: Post found for report ${report.id}`);
-            console.log(`Post ID: "${post.id}", Content preview: "${post.body?.substring(0, 50)}..."`);
-          } else {
-            console.log(`❌ FINAL FAILURE: No post found for report ${report.id} with target_id "${report.target_id}"`);
-          }
-
-          return {
-            ...report,
-            status: "pending", // Default status since your table doesn't have this
-            category: report.reason, // Use reason as category
-            created_at: report.submitted_at, // Map to expected field name
-            post: post || null,
-          };
+        if (postError) {
+          console.error(
+            `Error fetching post for report ${report.id}:`,
+            postError
+          );
         }
-        return report;
+
+        post = postData || null;
+
+        return {
+          ...report,
+          category: report.reason,
+          created_at: report.submitted_at,
+          post,
+        };
       })
     );
 
-    // Get total count with same filters
+    // Count query
     let countQuery = supabaseAdmin
       .from("forum_reports")
       .select("id", { count: "exact", head: true })
       .eq("target_type", "post");
 
-    // Apply same search filter to count
-    if (req.query.search && req.query.search.trim() !== "") {
-      const searchTerm = req.query.search.trim();
-      countQuery = countQuery.or(
-        `reason.ilike.%${searchTerm}%,reason_context.ilike.%${searchTerm}%`
-      );
-    }
-
-    // Apply same category filter to count
-    if (category !== "all") {
-      const possibleReasons = [
-        category,
-        category.toLowerCase(),
-        category.charAt(0).toUpperCase() + category.slice(1).toLowerCase(),
-      ];
-      countQuery = countQuery.in("reason", possibleReasons);
+    if (status !== "all") {
+      countQuery = countQuery.eq("status", status);
     }
 
     const { count, error: countError } = await countQuery;
 
+    if (countError) console.error("Count error:", countError);
+
     res.json({
       success: true,
-      data: reportsWithPosts || [],
+      data: reportsWithPosts,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -779,24 +606,23 @@ router.get("/reported-posts", authenticateAdmin, async (req, res) => {
 router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { action, resolution_notes } = req.body; // action: 'dismiss' | 'action_taken'
+    // ✅ REMOVED: resolution_notes from body
+    const { action } = req.body; // action: 'dismiss' | 'sanctioned'
     const adminId = req.adminId;
 
-    if (!action || !["dismiss", "action_taken"].includes(action)) {
+    if (!action || !["dismiss", "sanctioned"].includes(action)) {
       return res.status(400).json({
         success: false,
-        error: "Invalid action. Must be dismiss or action_taken",
+        error: "Invalid action. Must be 'dismiss' or 'sanctioned'",
       });
     }
 
+    // ✅ UPDATED: This now *only* updates the 'status' column
     const { data, error } = await supabaseAdmin
       .from("forum_reports")
       .update({
-        status: "resolved",
-        resolution: action,
-        resolution_notes: resolution_notes || "",
-        resolved_at: new Date().toISOString(),
-        resolved_by: adminId,
+        status: action,
+        // resolution, resolution_notes, resolved_at, resolved_by are all removed
       })
       .eq("id", id)
       .select()
@@ -806,22 +632,24 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
       return res.status(404).json({
         success: false,
         error: "Report not found or update failed",
+        details: error?.message,
       });
     }
 
-    // Log the resolution
+    // Log the resolution (simplified details)
     await supabaseAdmin.from("admin_audit_logs").insert({
       admin_id: adminId,
       action: `report_${action}`,
       target_type: "forum_report",
       target_id: id,
-      details: { resolution_notes },
+      // ✅ REMOVED: resolution_notes from details
+      details: { status_updated_to: action },
     });
 
     res.json({
       success: true,
       message: `Report ${
-        action === "dismiss" ? "dismissed" : "resolved with action"
+        action === "dismiss" ? "dismissed" : "sanctioned"
       } successfully`,
       data: data,
     });
@@ -860,14 +688,6 @@ router.get("/statistics", authenticateAdmin, async (req, res) => {
       supabaseAdmin
         .from("forum_reports")
         .select("id", { count: "exact", head: true }),
-      supabaseAdmin
-        .from("forum_reports")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "pending"),
-      supabaseAdmin
-        .from("forum_reports")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "resolved"),
     ]);
 
     res.json({

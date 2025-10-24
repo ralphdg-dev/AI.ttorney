@@ -1,96 +1,85 @@
-import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Eye, CheckCircle, XCircle, Calendar, User, MessageSquare, Search } from 'lucide-react';
-import forumManagementService from '../../services/forumManagementService';
-import DataTable from '../ui/DataTable';
-import Pagination from '../ui/Pagination';
-import Tooltip from '../ui/Tooltip';
+import React, { useState, useEffect } from "react";
+import {
+  AlertTriangle,
+  Eye,
+  CheckCircle,
+  XCircle,
+  Calendar,
+  User,
+  Search,
+  X,
+} from "lucide-react";
+import forumManagementService from "../../services/forumManagementService";
+import DataTable from "../ui/DataTable";
+import Pagination from "../ui/Pagination";
+import Tooltip from "../ui/Tooltip";
 
 const ReportedPosts = () => {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [pagination, setPagination] = useState({});
-  
+
   // Filters
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('pending');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('created_at');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("created_at");
+  const [sortOrder, setSortOrder] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
 
   // Resolution modal
   const [showResolutionModal, setShowResolutionModal] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
-  const [resolutionAction, setResolutionAction] = useState('');
-  const [resolutionNotes, setResolutionNotes] = useState('');
+  const [resolutionAction, setResolutionAction] = useState("");
+  // ✅ REMOVED: resolutionNotes state
   const [resolving, setResolving] = useState(false);
 
   const statusOptions = [
-    { value: 'pending', label: 'Pending Reports' },
-    { value: 'resolved', label: 'Resolved Reports' },
-    { value: 'all', label: 'All Reports' }
+    { value: "all", label: "All Reports" },
+    { value: "pending", label: "Pending Reports" },
+    { value: "dismissed", label: "Dismissed Reports" },
+    { value: "sanctioned", label: "Sanctioned Reports" },
   ];
 
   const categoryOptions = [
-    { value: 'all', label: 'All Categories' },
-    { value: 'spam', label: 'Spam' },
-    { value: 'harassment', label: 'Harassment' },
-    { value: 'hate_speech', label: 'Hate Speech' },
-    { value: 'misinformation', label: 'Misinformation' },
-    { value: 'inappropriate', label: 'Inappropriate Content' },
-    { value: 'other', label: 'Other' }
+    { value: "all", label: "All Categories" },
+    { value: "spam", label: "Spam" },
+    { value: "harassment", label: "Harassment" },
+    { value: "hate_speech", label: "Hate Speech" },
+    { value: "misinformation", label: "Misinformation" },
+    { value: "inappropriate", label: "Inappropriate Content" },
+    { value: "other", label: "Other" },
   ];
 
   useEffect(() => {
     fetchReports();
-  }, [searchTerm, statusFilter, categoryFilter, sortBy, sortOrder, currentPage]);
+  }, [
+    searchTerm,
+    statusFilter,
+    categoryFilter,
+    sortBy,
+    sortOrder,
+    currentPage,
+  ]);
 
   const fetchReports = async () => {
     try {
       setLoading(true);
-      console.log('Fetching reports with params:', {
-        page: currentPage,
-        limit: 20,
-        status: statusFilter,
-        category: categoryFilter,
-        sort_by: sortBy,
-        sort_order: sortOrder
-      });
-
       const response = await forumManagementService.getReportedPosts({
         page: currentPage,
         limit: 20,
         status: statusFilter,
         category: categoryFilter,
         sort_by: sortBy,
-        sort_order: sortOrder
+        sort_order: sortOrder,
       });
 
-      console.log('Reports response:', response);
-      console.log('Reports data:', response.data);
-      if (response.data && response.data.length > 0) {
-        console.log('First report sample:', response.data[0]);
-        console.log('First report post data:', response.data[0].post);
-        
-        // Log all reports with their target_ids and post status
-        console.log('=== ALL REPORTS ANALYSIS ===');
-        response.data.forEach((report, index) => {
-          console.log(`Report ${index + 1}:`, {
-            report_id: report.id,
-            target_id: report.target_id,
-            target_type: report.target_type,
-            reason: report.reason,
-            post_found: report.post !== null,
-            post_content_preview: report.post?.content?.substring(0, 50) || 'NO POST DATA'
-          });
-        });
-      }
       setReports(response.data || []);
       setPagination(response.pagination || {});
       setError(null);
     } catch (err) {
-      console.error('Detailed error fetching reports:', err);
+      console.error("Error fetching reports:", err);
       setError(`Failed to fetch reports: ${err.message}`);
       setReports([]);
       setPagination({});
@@ -100,27 +89,21 @@ const ReportedPosts = () => {
   };
 
   const handleResolveReport = async () => {
-    if (!selectedReport || !resolutionAction) return;
-
+    if (!selectedReport || !resolutionAction || resolutionAction === "view")
+      return;
     try {
       setResolving(true);
+      setError(null);
+      // ✅ REMOVED: resolutionNotes from the service call
       await forumManagementService.resolveReport(
         selectedReport.id,
-        resolutionAction,
-        resolutionNotes
+        resolutionAction
       );
-      
-      // Refresh the reports list
       await fetchReports();
-      
-      // Close modal and reset state
-      setShowResolutionModal(false);
-      setSelectedReport(null);
-      setResolutionAction('');
-      setResolutionNotes('');
+      closeModal();
     } catch (err) {
-      setError(err.message);
-      console.error('Error resolving report:', err);
+      setError(`Failed to resolve report: ${err.message}`);
+      console.error("Error resolving report:", err);
     } finally {
       setResolving(false);
     }
@@ -129,153 +112,146 @@ const ReportedPosts = () => {
   const openResolutionModal = (report, action) => {
     setSelectedReport(report);
     setResolutionAction(action);
+    // ✅ REMOVED: setResolutionNotes
+    setError(null);
     setShowResolutionModal(true);
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const closeModal = () => {
+    setShowResolutionModal(false);
+    setSelectedReport(null);
+    setResolutionAction("");
+    // ✅ REMOVED: setResolutionNotes
+    setError(null);
   };
+
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
-      resolved: { color: 'bg-green-100 text-green-800', label: 'Resolved' }
+      pending: { color: "bg-yellow-100 text-yellow-800", label: "Pending" },
+      dismissed: { color: "bg-red-100 text-red-800", label: "Dismissed" },
+      sanctioned: { color: "bg-green-100 text-green-800", label: "Sanctioned" },
     };
-    
-    const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', label: status };
-    
+
+    const config = statusConfig[status] || {
+      color: "bg-gray-100 text-gray-800",
+      label: status || "Unknown",
+    };
+
     return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${config.color}`}>
+      <span
+        className={`px-2 py-1 text-xs font-medium rounded-full ${config.color}`}
+      >
         {config.label}
       </span>
     );
   };
 
-  const getPriorityColor = (category) => {
-    const priorityColors = {
-      spam: 'text-orange-500',
-      harassment: 'text-red-600',
-      hate_speech: 'text-red-700',
-      misinformation: 'text-purple-600',
-      inappropriate: 'text-red-500',
-      other: 'text-gray-500'
-    };
-    return priorityColors[category] || 'text-gray-500';
+  const getModalTitle = () => {
+    if (resolutionAction === "view") return "View Report Details";
+    if (resolutionAction === "dismiss") return "Dismiss Report";
+    if (resolutionAction === "sanctioned")
+      return "Mark Action Taken (Sanctioned)";
+    return "Resolve Report";
   };
 
-  // DataTable columns configuration
   const columns = [
     {
-      key: 'report_details',
-      header: 'REPORT DETAILS',
+      key: "report_details",
+      header: "REPORT DETAILS",
       render: (report) => (
         <div className="space-y-1">
           <div className="flex items-center">
-            <AlertTriangle className={`w-4 h-4 mr-2 ${getPriorityColor(report.category)}`} />
+            <AlertTriangle className="w-4 h-4 text-yellow-600 mr-2" />
             <span className="text-sm font-medium text-gray-900">
-              {forumManagementService.getReportCategoryDisplayName(report.category)}
+              {forumManagementService.getReportCategoryDisplayName(
+                report.reason
+              )}
             </span>
           </div>
-          <p className="text-sm text-gray-600">
-            {report.reason}
-          </p>
           {report.reason_context && (
             <p className="text-xs text-gray-500 italic">
               "{report.reason_context}"
             </p>
           )}
         </div>
-      )
+      ),
     },
     {
-      key: 'reported_post',
-      header: 'REPORTED POST',
-      render: (report) => {
-        console.log('Rendering report:', report.id, 'Post data:', report.post);
-        
-        return (
-          <div className="max-w-xs">
-            <p className="text-sm text-gray-900 truncate">
-              {report.post && report.post.body ? 
-                forumManagementService.formatPostContent(report.post.body, 60) :
-                report.post === null ? 
-                  'Post deleted or not found' :
-                  'Post not available'
-              }
+      key: "reported_post",
+      header: "REPORTED POST",
+      render: (report) => (
+        <div className="max-w-xs">
+          <p className="text-sm text-gray-900 truncate">
+            {report.post?.body || "Post not found or has been deleted"}
+          </p>
+          {report.post?.user && (
+            <p className="text-xs text-gray-500 mt-1">
+              by{" "}
+              {forumManagementService.formatUserDisplay(
+                report.post.user,
+                report.post.is_anonymous
+              )}
             </p>
-            {report.post && report.post.body && (
-              <p className="text-xs text-gray-500 mt-1">
-                by {report.post.user ? 
-                  forumManagementService.formatUserDisplay(report.post.user, report.post.is_anonymous) :
-                  'Unknown user'
-                }
-              </p>
-            )}
-            {report.post && report.post.is_flagged && (
-              <p className="text-xs text-red-500 mt-1">
-                (Post has been flagged)
-              </p>
-            )}
-          </div>
-        );
-      }
+          )}
+        </div>
+      ),
     },
     {
-      key: 'reporter',
-      header: 'REPORTER',
+      key: "reporter",
+      header: "REPORTER",
       render: (report) => (
         <div className="flex items-center">
           <User className="w-4 h-4 text-gray-400 mr-2" />
           <span className="text-sm text-gray-900">
-            {report.reporter ? 
-              (report.reporter.full_name || report.reporter.email) :
-              'Unknown'
-            }
+            {forumManagementService.formatUserDisplay(report.reporter)}
           </span>
         </div>
-      )
+      ),
     },
     {
-      key: 'status',
-      header: 'STATUS',
-      render: (report) => getStatusBadge(report.status)
+      key: "status",
+      header: "STATUS",
+      render: (report) => getStatusBadge(report.status),
     },
     {
-      key: 'reported_at',
-      header: 'REPORTED',
+      key: "reported_at",
+      header: "REPORTED",
       render: (report) => (
         <div className="flex items-center text-sm text-gray-500">
           <Calendar className="w-4 h-4 mr-1" />
           {formatDate(report.created_at)}
         </div>
-      )
+      ),
     },
     {
-      key: 'actions',
-      header: 'ACTIONS',
-      align: 'center',
+      key: "actions",
+      header: "ACTIONS",
+      align: "center",
       render: (report) => (
         <div className="flex items-center justify-center space-x-2">
           <Tooltip content="View Details" placement="top">
             <button
-              onClick={() => openResolutionModal(report, 'view')}
+              onClick={() => openResolutionModal(report, "view")}
               className="text-gray-600 hover:text-gray-900 hover:scale-110 transition-all duration-200 p-1 rounded"
             >
               <Eye className="w-4 h-4" />
             </button>
           </Tooltip>
-          
-          {report.status === 'pending' && (
+
+          {report.status === "pending" && (
             <>
               <Tooltip content="Dismiss Report" placement="top">
                 <button
-                  onClick={() => openResolutionModal(report, 'dismiss')}
+                  onClick={() => openResolutionModal(report, "dismiss")}
                   className="text-gray-600 hover:text-gray-900 hover:scale-110 transition-all duration-200 p-1 rounded"
                 >
                   <XCircle className="w-4 h-4" />
@@ -283,7 +259,7 @@ const ReportedPosts = () => {
               </Tooltip>
               <Tooltip content="Mark Action Taken" placement="top">
                 <button
-                  onClick={() => openResolutionModal(report, 'action_taken')}
+                  onClick={() => openResolutionModal(report, "sanctioned")}
                   className="text-gray-600 hover:text-gray-900 hover:scale-110 transition-all duration-200 p-1 rounded"
                 >
                   <CheckCircle className="w-4 h-4" />
@@ -292,13 +268,12 @@ const ReportedPosts = () => {
             </>
           )}
         </div>
-      )
-    }
+      ),
+    },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reported Posts</h1>
@@ -309,7 +284,6 @@ const ReportedPosts = () => {
       {/* Filters */}
       <div className="bg-white p-6 rounded-lg shadow-sm border">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
@@ -321,65 +295,38 @@ const ReportedPosts = () => {
             />
           </div>
 
-          {/* Status Filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            {statusOptions.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
+            {statusOptions.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
               </option>
             ))}
           </select>
 
-          {/* Category Filter */}
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            {categoryOptions.map((category) => (
-              <option key={category.value} value={category.value}>
-                {category.label}
+            {categoryOptions.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
               </option>
             ))}
           </select>
         </div>
-
-        {/* Secondary Filters Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          {/* Sort By */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="submitted_at">Report Date</option>
-            <option value="reason">Report Reason</option>
-          </select>
-          
-          {/* Sort Order */}
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="desc">Newest First</option>
-            <option value="asc">Oldest First</option>
-          </select>
-        </div>
       </div>
 
-      {/* Error Message */}
-      {error && (
+      {error && !showResolutionModal && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           {error}
         </div>
       )}
 
-      {/* Reports Table */}
       {loading ? (
         <div className="bg-white rounded-lg shadow-sm border p-8 text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -398,7 +345,6 @@ const ReportedPosts = () => {
               </div>
             }
           />
-          
           {pagination.totalPages > 1 && (
             <Pagination
               currentPage={currentPage}
@@ -414,88 +360,125 @@ const ReportedPosts = () => {
 
       {/* Resolution Modal */}
       {showResolutionModal && selectedReport && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                {resolutionAction === 'view' ? 'Report Details' : 
-                 resolutionAction === 'dismiss' ? 'Dismiss Report' : 'Mark Action Taken'}
-              </h3>
-              
-              <div className="mb-4 space-y-3">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Report Category:</p>
-                  <p className="text-sm font-medium">
-                    {forumManagementService.getReportCategoryDisplayName(selectedReport.category)}
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4"
+          onClick={closeModal}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-2xl z-50 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-xl font-bold text-gray-900">
+                {getModalTitle()}
+              </h2>
+              <button
+                onClick={closeModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                  {error}
+                </div>
+              )}
+
+              {/* Report Details */}
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="space-y-1">
+                  <label className="font-semibold text-gray-600">
+                    Reporter
+                  </label>
+                  <p className="text-gray-800">
+                    {forumManagementService.formatUserDisplay(
+                      selectedReport.reporter
+                    )}
                   </p>
                 </div>
-                
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Reason:</p>
-                  <p className="text-sm">{selectedReport.reason}</p>
+                <div className="space-y-1">
+                  <label className="font-semibold text-gray-600">
+                    Reported On
+                  </label>
+                  <p className="text-gray-800">
+                    {formatDate(selectedReport.created_at)}
+                  </p>
                 </div>
+                <div className="space-y-1 col-span-2">
+                  <label className="font-semibold text-gray-600">Reason</label>
+                  <p className="text-gray-800 bg-yellow-50 p-2 rounded border border-yellow-200">
+                    <strong className="text-yellow-800">
+                      {forumManagementService.getReportCategoryDisplayName(
+                        selectedReport.reason
+                      )}
+                    </strong>
+                    {selectedReport.reason_context && (
+                      <span className="italic">
+                        : "{selectedReport.reason_context}"
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
 
-                {selectedReport.reason_context && (
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Additional Context:</p>
-                    <p className="text-sm italic">"{selectedReport.reason_context}"</p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Reported Post:</p>
-                  <div className="bg-gray-50 p-3 rounded border text-sm">
-                    {selectedReport.post && selectedReport.post.body ? 
-                      selectedReport.post.body :
-                      selectedReport.post === null ?
-                        'Post has been deleted or not found' :
-                        'Post not available'
-                    }
-                  </div>
-                  {selectedReport.post && selectedReport.post.is_flagged && (
-                    <p className="text-xs text-red-500 mt-1">
-                      ⚠️ This post has been flagged
+              {/* Reported Post Content */}
+              <div className="space-y-1">
+                <label className="font-semibold text-gray-600">
+                  Reported Post Content
+                </label>
+                <div className="border rounded-lg p-4 bg-gray-50 max-h-48 overflow-y-auto">
+                  <p className="text-gray-800">
+                    {selectedReport.post?.body ||
+                      "Post not found or has been deleted."}
+                  </p>
+                  {selectedReport.post && (
+                    <p className="text-xs text-gray-500 mt-2 pt-2 border-t">
+                      Posted by{" "}
+                      {forumManagementService.formatUserDisplay(
+                        selectedReport.post.user,
+                        selectedReport.post.is_anonymous
+                      )}
                     </p>
                   )}
                 </div>
               </div>
 
-              {resolutionAction !== 'view' && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Resolution Notes:
-                  </label>
-                  <textarea
-                    value={resolutionNotes}
-                    onChange={(e) => setResolutionNotes(e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter notes about your decision..."
-                  />
-                </div>
+              {/* ✅ REMOVED: Resolution Notes textarea block */}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end p-6 border-t bg-gray-50 space-x-3">
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                {resolutionAction === "view" ? "Close" : "Cancel"}
+              </button>
+
+              {resolutionAction === "dismiss" && (
+                <button
+                  onClick={handleResolveReport}
+                  disabled={resolving}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-300"
+                >
+                  {resolving ? "Dismissing..." : "Confirm Dismissal"}
+                </button>
               )}
 
-              <div className="flex justify-end space-x-3">
+              {resolutionAction === "sanctioned" && (
                 <button
-                  onClick={() => setShowResolutionModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                  onClick={handleResolveReport}
+                  disabled={resolving}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-300"
                 >
-                  Cancel
+                  {resolving ? "Confirming..." : "Confirm Action Taken"}
                 </button>
-                
-                {resolutionAction !== 'view' && (
-                  <button
-                    onClick={handleResolveReport}
-                    disabled={resolving}
-                    className={`px-4 py-2 text-sm font-medium text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed ${
-                      resolutionAction === 'dismiss' ? 'bg-gray-600 hover:bg-gray-700' : 'bg-green-600 hover:bg-green-700'
-                    }`}
-                  >
-                    {resolving ? 'Processing...' : 
-                     resolutionAction === 'dismiss' ? 'Dismiss Report' : 'Mark Action Taken'}
-                  </button>
-                )}
-              </div>
+              )}
             </div>
           </div>
         </div>
