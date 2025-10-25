@@ -15,6 +15,7 @@ import { FavoritesProvider } from "../contexts/FavoritesContext";
 import { ForumCacheProvider } from "../contexts/ForumCacheContext";
 import { SidebarProvider } from "../components/AppSidebar";
 import { AuthGuard } from "../components/AuthGuard";
+import { SuspensionGuard } from "../components/SuspensionGuard";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 
 // Keep the splash screen visible while we fetch resources
@@ -44,9 +45,10 @@ export default function RootLayout() {
           <FavoritesProvider>
             <ForumCacheProvider>
               <AuthGuard>
-                <RouteErrorBoundary>
-                  <SidebarProvider>
-                  <Stack screenOptions={{ headerShown: false }}>
+                <SuspensionGuard>
+                  <RouteErrorBoundary>
+                    <SidebarProvider>
+                    <Stack screenOptions={{ headerShown: false }}>
                     <Stack.Screen
                       name="index"
                       options={{ headerShown: false }}
@@ -156,7 +158,8 @@ export default function RootLayout() {
                   </Stack>
                   </SidebarProvider>
                 </RouteErrorBoundary>
-              </AuthGuard>
+              </SuspensionGuard>
+            </AuthGuard>
             </ForumCacheProvider>
           </FavoritesProvider>
       </AuthProvider>

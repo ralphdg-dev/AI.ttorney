@@ -39,6 +39,7 @@ export interface AuthContextType {
   isLawyer: () => boolean;
   isAdmin: () => boolean;
   checkLawyerApplicationStatus: () => Promise<any>;
+  checkSuspensionStatus: () => Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null } | null>;
   hasRedirectedToStatus: boolean;
   setHasRedirectedToStatus: (value: boolean) => void;
   initialAuthCheck: boolean;
@@ -60,6 +61,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [hasRedirectedToStatus, setHasRedirectedToStatus] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
+
+  const checkSuspensionStatus = React.useCallback(async (): Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null } | null> => {
+    try {
+      if (!authState.session?.access_token) {
+        return null;
+      }
+
+      const { NetworkConfig } = await import('../utils/networkConfig');
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/user/moderation-status`, {
+        headers: {
+          'Authorization': `Bearer ${authState.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          isSuspended: data.account_status === 'suspended',
+          suspensionCount: data.suspension_count || 0,
+          suspensionEnd: data.suspension_end || null,
+        };
+      }
+      
+      return null;
+    } catch {
+      return null;
+    }
+  }, [authState.session?.access_token]);
 
   const checkLawyerApplicationStatus = React.useCallback(async (): Promise<any> => {
     try {
@@ -110,6 +141,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Only handle navigation on explicit login attempts
       if (shouldNavigate && profile) {
+        // FIRST: Check if user is suspended - this takes priority over everything
+        const suspensionStatus = await checkSuspensionStatus();
+        if (suspensionStatus && suspensionStatus.isSuspended) {
+          console.log('🚫 User is suspended, redirecting to suspended screen');
+          router.replace('/suspended' as any);
+          return;
+        }
+        
         let applicationStatus = null;
         
         // Check lawyer application status if user has pending_lawyer flag
@@ -274,7 +313,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       router.replace('/login');
       
       // Sign out from Supabase Auth in the background (this will trigger SIGNED_OUT event)
-      supabase.auth.signOut({ scope: 'local' }).catch((error) => {
+      supabase.auth.signOut({ scope: 'local' }).catch((error: any) => {
         console.error('Background sign out error:', error);
       });
       
@@ -351,12 +390,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLawyer,
     isAdmin,
     checkLawyerApplicationStatus,
+    checkSuspensionStatus,
     hasRedirectedToStatus,
     setHasRedirectedToStatus,
     initialAuthCheck,
     isSigningOut,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [authState.user, authState.session, isLoading, hasRedirectedToStatus, isSigningOut]);
+  }), [authState.user, authState.session, isLoading, hasRedirectedToStatus, isSigningOut, checkLawyerApplicationStatus, checkSuspensionStatus]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
