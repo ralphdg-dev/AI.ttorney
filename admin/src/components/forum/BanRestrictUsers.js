@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import {
   Search,
   Shield,
@@ -718,13 +719,13 @@ const BanRestrictUsers = () => {
       )}
 
       {/* User Details Modal */}
-      {showUserDetailsModal && selectedUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border w-4/5 max-w-4xl shadow-lg rounded-md bg-white">
+      {showUserDetailsModal && selectedUser && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+          <div className="bg-white rounded-md shadow-lg border p-5 mx-4 max-h-[90vh] overflow-y-auto" style={{ width: '600px' }}>
             <div className="mt-3">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-medium text-gray-900">
-                  User Details: {selectedUser.full_name || "No name"}
+                <h3 className="text-lg font-medium text-gray-900">
+                  User Details
                 </h3>
                 <button
                   onClick={() => setShowUserDetailsModal(false)}
@@ -734,140 +735,205 @@ const BanRestrictUsers = () => {
                 </button>
               </div>
 
-              {/* User Info */}
-              <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* User Basic Info - Two Column Layout */}
+              <div className="grid grid-cols-2 gap-6">
+                {/* Left Column */}
+                <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-600">Email</p>
-                    <p className="font-medium">{selectedUser.email}</p>
+                    <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                      Full Name
+                    </label>
+                    <div className="text-xs text-gray-900">
+                      {selectedUser.full_name || 'N/A'}
+                    </div>
                   </div>
+
                   <div>
-                    <p className="text-sm text-gray-600">Current Strikes</p>
-                    <p className="font-medium">{selectedUser.strike_count || 0}</p>
+                    <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                      Current Strikes
+                    </label>
+                    <div className="text-xs text-gray-900">
+                      {selectedUser.strike_count || 0}
+                    </div>
                   </div>
+
                   <div>
-                    <p className="text-sm text-gray-600">Suspensions</p>
-                    <p className="font-medium">{selectedUser.suspension_count || 0}</p>
+                    <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                      Status
+                    </label>
+                    <div>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium ${
+                        selectedUser.account_status === 'active' 
+                          ? 'bg-green-100 text-green-800 border border-green-200'
+                          : selectedUser.account_status === 'suspended'
+                          ? 'bg-red-100 text-red-800 border border-red-200'
+                          : selectedUser.account_status === 'banned'
+                          ? 'bg-red-100 text-red-800 border border-red-200'
+                          : 'bg-green-100 text-green-800 border border-green-200'
+                      }`}>
+                        {(selectedUser.account_status || 'active').charAt(0).toUpperCase() + (selectedUser.account_status || 'active').slice(1)}
+                      </span>
+                    </div>
                   </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-600">Status</p>
-                    <p className="font-medium capitalize">{selectedUser.account_status || 'active'}</p>
+                    <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                      Email
+                    </label>
+                    <div className="text-xs text-gray-900">
+                      {selectedUser.email}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                      Suspensions
+                    </label>
+                    <div className="text-xs text-gray-900">
+                      {selectedUser.suspension_count || 0}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                      Last Login
+                    </label>
+                    <div className="text-xs text-gray-900">
+                      {selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never'}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {loadingDetails ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="mt-2 text-gray-600">Loading user history...</p>
-                </div>
-              ) : (
+              {/* Admin History & Audit Trail Section */}
+              <div className="border-t border-gray-200 pt-4">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Violations History */}
-                  <div>
-                    <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                      <AlertTriangle className="w-5 h-5 mr-2 text-orange-500" />
-                      Violations History ({userViolations.length})
-                    </h4>
-                    <div className="max-h-96 overflow-y-auto">
-                      {userViolations.length === 0 ? (
-                        <p className="text-gray-500 text-center py-4">No violations found</p>
+                    
+                    {/* Violations History Column */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-3 w-3 text-gray-600" />
+                          <h4 className="text-xs font-medium text-gray-900">Violations History</h4>
+                          <span className="text-[10px] text-gray-500">({userViolations.length} entries)</span>
+                        </div>
+                      </div>
+
+                      {userViolations.length > 0 ? (
+                        <div className="overflow-hidden border border-gray-200 rounded-lg">
+                          <div className="max-h-32 overflow-y-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50 sticky top-0">
+                                <tr>
+                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                    Action
+                                  </th>
+                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                    Date
+                                  </th>
+                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                    Details
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {userViolations.map((violation) => (
+                                  <tr key={violation.id} className="hover:bg-gray-50">
+                                    <td className="px-2 py-1.5">
+                                      <div className="text-[9px] font-medium text-gray-900">
+                                        {violation.action_taken.replace('_', ' ')}
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
+                                      {formatDate(violation.created_at)}
+                                    </td>
+                                    <td className="px-2 py-1.5 max-w-32">
+                                      <div className="text-[9px] text-gray-700 truncate" title={violation.violation_summary}>
+                                        {violation.violation_summary || violation.violation_type.replace('_', ' ')}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       ) : (
-                        <div className="space-y-3">
-                          {userViolations.map((violation) => (
-                            <div key={violation.id} className="border rounded-lg p-3 bg-white">
-                              <div className="flex justify-between items-start mb-2">
-                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                  violation.action_taken === 'strike_added' 
-                                    ? 'bg-orange-100 text-orange-800'
-                                    : violation.action_taken === 'suspended'
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {violation.action_taken.replace('_', ' ').toUpperCase()}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  {formatDate(violation.created_at)}
-                                </span>
-                              </div>
-                              <p className="text-sm text-gray-600 mb-2">
-                                <strong>Type:</strong> {violation.violation_type.replace('_', ' ')}
-                              </p>
-                              <p className="text-sm text-gray-800 mb-2">
-                                <strong>Summary:</strong> {violation.violation_summary}
-                              </p>
-                              <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                                Content: {violation.content_text.substring(0, 100)}
-                                {violation.content_text.length > 100 && '...'}
-                              </p>
-                              <div className="flex justify-between text-xs text-gray-500 mt-2">
-                                <span>Strikes after: {violation.strike_count_after}</span>
-                                <span>Suspensions after: {violation.suspension_count_after}</span>
-                              </div>
-                            </div>
-                          ))}
+                        <div className="text-center py-6">
+                          <AlertTriangle className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                          <p className="text-[10px] text-gray-500">No violations found</p>
                         </div>
                       )}
                     </div>
-                  </div>
 
-                  {/* Suspensions History */}
-                  <div>
-                    <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                      <History className="w-5 h-5 mr-2 text-red-500" />
-                      Suspensions History ({userSuspensions.length})
-                    </h4>
-                    <div className="max-h-96 overflow-y-auto">
-                      {userSuspensions.length === 0 ? (
-                        <p className="text-gray-500 text-center py-4">No suspensions found</p>
+                    {/* Suspensions History Column */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <History className="h-3 w-3 text-gray-600" />
+                          <h4 className="text-xs font-medium text-gray-900">Suspensions History</h4>
+                          <span className="text-[10px] text-gray-500">({userSuspensions.length} entries)</span>
+                        </div>
+                      </div>
+
+                      {userSuspensions.length > 0 ? (
+                        <div className="overflow-hidden border border-gray-200 rounded-lg">
+                          <div className="max-h-32 overflow-y-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50 sticky top-0">
+                                <tr>
+                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                    Type
+                                  </th>
+                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                    Status
+                                  </th>
+                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                    Date
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {userSuspensions.map((suspension) => (
+                                  <tr key={suspension.id} className="hover:bg-gray-50">
+                                    <td className="px-2 py-1.5">
+                                      <div className="text-[9px] font-medium text-gray-900">
+                                        {suspension.suspension_type} #{suspension.suspension_number}
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-1.5">
+                                      <div className="text-[9px]">
+                                        <div className={`font-medium ${
+                                          suspension.status === 'active' ? 'text-red-600' :
+                                          suspension.status === 'lifted' ? 'text-green-600' : 'text-gray-600'
+                                        }`}>
+                                          {suspension.status}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
+                                      {formatDate(suspension.started_at)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       ) : (
-                        <div className="space-y-3">
-                          {userSuspensions.map((suspension) => (
-                            <div key={suspension.id} className="border rounded-lg p-3 bg-white">
-                              <div className="flex justify-between items-start mb-2">
-                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                  suspension.suspension_type === 'permanent' 
-                                    ? 'bg-red-100 text-red-800'
-                                    : 'bg-yellow-100 text-yellow-800'
-                                }`}>
-                                  {suspension.suspension_type.toUpperCase()} #{suspension.suspension_number}
-                                </span>
-                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                  suspension.status === 'active' 
-                                    ? 'bg-red-100 text-red-800'
-                                    : suspension.status === 'lifted'
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {suspension.status.toUpperCase()}
-                                </span>
-                              </div>
-                              <p className="text-sm text-gray-800 mb-2">
-                                <strong>Reason:</strong> {suspension.reason}
-                              </p>
-                              <div className="text-xs text-gray-500 space-y-1">
-                                <p><strong>Started:</strong> {formatDate(suspension.started_at)}</p>
-                                {suspension.ends_at && (
-                                  <p><strong>Ends:</strong> {formatDate(suspension.ends_at)}</p>
-                                )}
-                                <p><strong>Strikes at suspension:</strong> {suspension.strikes_at_suspension}</p>
-                                {suspension.status === 'lifted' && (
-                                  <>
-                                    <p><strong>Lifted:</strong> {formatDate(suspension.lifted_at)}</p>
-                                    <p><strong>Lifted reason:</strong> {suspension.lifted_reason}</p>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          ))}
+                        <div className="text-center py-6">
+                          <History className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                          <p className="text-[10px] text-gray-500">No suspensions found</p>
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
-              )}
 
-              <div className="flex justify-end mt-6">
+              <div className="flex justify-end pt-6 border-t border-gray-200">
                 <button
                   onClick={() => setShowUserDetailsModal(false)}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
@@ -877,7 +943,8 @@ const BanRestrictUsers = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

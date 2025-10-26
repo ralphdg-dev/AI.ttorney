@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import {
   Search,
   Filter,
@@ -447,9 +448,9 @@ const ManageTopicsThreads = () => {
       )}
 
       {/* Moderation Modal */}
-      {showModerationModal && selectedPost && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+      {showModerationModal && selectedPost && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+          <div className="bg-white rounded-md shadow-lg border p-5 mx-4 max-h-[90vh] overflow-y-auto" style={{ width: '600px' }}>
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 {moderationAction === "view"
@@ -523,7 +524,8 @@ const ManageTopicsThreads = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
