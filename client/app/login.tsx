@@ -1,5 +1,5 @@
-import React, { useState, useRef } from "react";
-import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import React, { useState, useRef, useEffect } from "react";
+import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../constants/Colors";
@@ -10,7 +10,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function Login() {
   const toast = useToast();
-  const { signIn } = useAuth();
+  const { signIn, isLoading: authLoading, isAuthenticated, initialAuthCheck } = useAuth();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,6 +25,22 @@ export default function Login() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
+  // Handle auth state - redirect if already authenticated
+  useEffect(() => {
+    // Only check after initial auth check is complete
+    if (initialAuthCheck && isAuthenticated) {
+      router.replace('/home');
+    }
+  }, [initialAuthCheck, isAuthenticated]);
+
+  // Show loading only during initial auth check (not after logout)
+  if (!initialAuthCheck) {
+    return (
+      <View style={tw`flex-1 bg-white justify-center items-center`}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+      </View>
+    );
+  }
 
   // Validation functions
   const validateEmail = (emailValue: string, showError: boolean = true) => {

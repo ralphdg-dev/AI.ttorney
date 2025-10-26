@@ -131,6 +131,28 @@ class SupabaseService:
             logger.error(f"Get user error: {str(e)}")
             return {"success": False, "error": str(e)}
     
+    async def delete_auth_user(self, user_id: str) -> Dict[str, Any]:
+        """Delete an auth user (requires service role key) - used for rollback on registration failure"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    f"{self.auth_url}/admin/users/{user_id}",
+                    headers=self._get_headers(use_service_key=True)
+                )
+                
+                if response.status_code in [200, 204]:
+                    logger.info(f"Successfully deleted auth user: {user_id}")
+                    return {"success": True}
+                else:
+                    error_data = response.json() if response.content else {}
+                    error_msg = error_data.get("message") or f"Delete failed: {response.status_code}"
+                    logger.error(f"Failed to delete auth user {user_id}: {error_data}")
+                    return {"success": False, "error": error_msg}
+                    
+        except Exception as e:
+            logger.error(f"Delete auth user error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
     async def sign_out(self, access_token: str) -> Dict[str, Any]:
         """Sign out user"""
         try:

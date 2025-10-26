@@ -73,7 +73,15 @@ class AuthService:
             
             if not profile_response["success"]:
                 logger.error(f"Profile creation failed: {profile_response['error']}")
-                # TODO: Consider rolling back auth.users creation here
+                
+                # CRITICAL: Rollback auth user creation to prevent orphaned records
+                try:
+                    logger.warning(f"Rolling back auth user creation for ID: {auth_user['id']}")
+                    await self.supabase.delete_auth_user(auth_user["id"])
+                    logger.info(f"Successfully rolled back auth user: {auth_user['id']}")
+                except Exception as rollback_error:
+                    logger.error(f"Failed to rollback auth user: {rollback_error}")
+                
                 return {"success": False, "error": f"Failed to create user profile: {profile_response['error']}"}
             
             return {
