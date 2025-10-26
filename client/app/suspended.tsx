@@ -12,14 +12,25 @@ interface SuspensionInfo {
 }
 
 export default function SuspendedScreen() {
-  const { user, signOut, session } = useAuth();
+  const { user, signOut, session, isLoading: authLoading } = useAuth();
   const [suspensionInfo, setSuspensionInfo] = useState<SuspensionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
-    fetchSuspensionInfo();
-  }, []);
+    // Wait for auth context to finish loading
+    if (authLoading) {
+      return;
+    }
+
+    // Wait for session to be available before fetching
+    if (session?.access_token) {
+      fetchSuspensionInfo();
+    } else {
+      // Session is null after auth loading complete, redirect to login
+      router.replace('/login');
+    }
+  }, [session, authLoading]);
 
   const fetchSuspensionInfo = async () => {
     try {
@@ -44,10 +55,21 @@ export default function SuspendedScreen() {
           account_status: data.account_status,
         });
       } else {
-        console.error('Failed to fetch suspension info');
+        const errorText = await response.text();
+        // Set default suspension info to stop loading
+        setSuspensionInfo({
+          suspension_count: 1,
+          suspension_end: null,
+          account_status: 'suspended',
+        });
       }
     } catch (error) {
-      console.error('Error fetching suspension info:', error);
+      // Set default suspension info to stop loading
+      setSuspensionInfo({
+        suspension_count: 1,
+        suspension_end: null,
+        account_status: 'suspended',
+      });
     } finally {
       setLoading(false);
     }
@@ -116,7 +138,7 @@ export default function SuspendedScreen() {
   return (
     <View className="flex-1 bg-white">
       {/* Simple Header with Logo Only */}
-      <View className="bg-white px-4 py-3 border-b border-gray-200 items-center">
+      <View className="bg-white px-4 pt-10 pb-3 border-b border-gray-200 items-center">
         <Image
           source={require('../assets/images/logo.png')}
           style={{ width: 140, height: 35 }}
@@ -125,7 +147,7 @@ export default function SuspendedScreen() {
       </View>
 
       <ScrollView className="flex-1">
-        <View className="p-6 pt-12">
+        <View className="p-6 pt-16">
           {/* Header */}
           <View className="mb-6">
             <Text className="text-2xl font-bold text-gray-900 mb-3">We suspended your account</Text>
@@ -156,7 +178,7 @@ export default function SuspendedScreen() {
               <ShieldAlert size={20} color="#023D7B" />
             </View>
             <Text className="flex-1 text-sm text-gray-700 leading-5">
-              Your account doesn't follow our Community Guidelines.
+              Your account activity needs to align with our Community Guidelines.
             </Text>
           </View>
 
@@ -174,7 +196,7 @@ export default function SuspendedScreen() {
               <EyeOff size={20} color="#023D7B" />
             </View>
             <Text className="flex-1 text-sm text-gray-700 leading-5">
-              This account isn't visible to other users right now, and you can't use it.
+              Your account is currently restricted and cannot be accessed by others.
             </Text>
           </View>
         </View>
