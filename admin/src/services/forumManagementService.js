@@ -23,9 +23,16 @@ class ForumManagementService {
       localStorage.getItem("access_token") ||
       localStorage.getItem("authToken");
 
-    console.log("Auth token found:", !!token);
+    console.log("=== AUTH DEBUG ===");
+    console.log("Checking localStorage keys:");
+    console.log("- admin_token:", !!localStorage.getItem("admin_token"));
+    console.log("- token:", !!localStorage.getItem("token"));
+    console.log("- access_token:", !!localStorage.getItem("access_token"));
+    console.log("- authToken:", !!localStorage.getItem("authToken"));
+    console.log("Selected token found:", !!token);
     if (token) {
       console.log("Token length:", token.length);
+      console.log("Token preview:", token.substring(0, 20) + "...");
     }
 
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -56,6 +63,10 @@ class ForumManagementService {
         sort_order,
       });
 
+      console.log("=== FETCHING FORUM POSTS ===");
+      console.log("Query params:", params);
+      console.log("URL:", `${API_BASE_URL}/forum/posts?${queryParams}`);
+
       const response = await fetch(
         `${API_BASE_URL}/forum/posts?${queryParams}`,
         {
@@ -71,6 +82,24 @@ class ForumManagementService {
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to fetch forum posts");
+      }
+
+      console.log("Forum posts response:", {
+        success: data.success,
+        count: data.data?.length || 0,
+        pagination: data.pagination,
+        sampleIds: data.data?.slice(0, 3).map(p => ({ id: p.id, content: p.content?.substring(0, 30) })) || []
+      });
+
+      // Validate that all returned posts have valid IDs
+      if (data.data) {
+        const invalidPosts = data.data.filter(post => !post.id);
+        if (invalidPosts.length > 0) {
+          console.warn("Found posts without IDs:", invalidPosts);
+        }
+        
+        // Log all post IDs for debugging
+        console.log("All post IDs returned:", data.data.map(p => p.id));
       }
 
       return data;
@@ -107,24 +136,69 @@ class ForumManagementService {
   // Moderate a forum post (delete, flag, or restore)
   async moderatePost(id, action, reason = "") {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/forum/posts/${id}/moderate`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            ...this.getAuthHeader(),
-          },
-          body: JSON.stringify({ action, reason }),
-        }
-      );
+      console.log("=== MODERATION ATTEMPT ===");
+      console.log("Post ID:", id);
+      console.log("Action:", action);
+      console.log("Reason:", reason);
 
-      const data = await response.json();
+      // Check if post exists first
+      console.log("=== CHECKING POST EXISTENCE ===");
+      try {
+        const existsCheck = await this.checkPostExists(id);
+        console.log("Post existence check result:", existsCheck);
+        
+        if (!existsCheck.exists) {
+          throw new Error(`Post with ID ${id} does not exist in the database. It may have been deleted or the ID is incorrect.`);
+        }
+      } catch (existsError) {
+        console.error("Post existence check failed:", existsError);
+        throw new Error(`Unable to verify post existence: ${existsError.message}`);
+      }
+
+      const url = `${API_BASE_URL}/forum/posts/${id}/moderate`;
+      const headers = {
+        "Content-Type": "application/json",
+        ...this.getAuthHeader(),
+      };
+      const body = { action, reason };
+
+      console.log("=== MODERATION DEBUG ===");
+      console.log("URL:", url);
+      console.log("Method: PATCH");
+      console.log("Headers:", headers);
+      console.log("Body:", body);
+      console.log("Post ID:", id, "Type:", typeof id);
+      console.log("Action:", action);
+      console.log("API_BASE_URL:", API_BASE_URL);
+
+      const response = await fetch(url, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      console.log("Response status:", response.status);
+      console.log("Response ok:", response.ok);
+      console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+
+      let data;
+      try {
+        data = await response.json();
+        console.log("Response data:", data);
+      } catch (jsonError) {
+        console.error("Failed to parse JSON response:", jsonError);
+        const textResponse = await response.text();
+        console.log("Raw response text:", textResponse);
+        throw new Error(`Invalid JSON response: ${jsonError.message}`);
+      }
 
       if (!response.ok) {
+        console.error("Request failed with status:", response.status);
+        console.error("Error data:", data);
         throw new Error(data.error || `Failed to ${action} post`);
       }
 
+      console.log("Moderation successful:", data);
       return data;
     } catch (error) {
       console.error(`Moderate post (${action}) error:`, error);
@@ -132,9 +206,9 @@ class ForumManagementService {
     }
   }
 
-  // Delete a forum post
+  // Delete a forum post (actually flags it since there's no soft delete)
   async deletePost(id, reason = "") {
-    return this.moderatePost(id, "delete", reason);
+    return this.moderatePost(id, "flag", reason);
   }
 
   // Flag a forum post
@@ -287,6 +361,30 @@ class ForumManagementService {
       return data;
     } catch (error) {
       console.error("Get forum statistics error:", error);
+      throw error;
+    }
+  }
+
+  // Check if a specific post exists in the database
+  async checkPostExists(id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/forum/posts/${id}/exists`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.getAuthHeader(),
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to check post existence");
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Check post exists error:", error);
       throw error;
     }
   }

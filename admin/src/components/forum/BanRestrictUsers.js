@@ -7,6 +7,8 @@ import {
   User,
   Calendar,
   AlertTriangle,
+  Plus,
+  Minus,
 } from "lucide-react";
 import usersService from "../../services/usersService";
 import DataTable from "../ui/DataTable";
@@ -28,7 +30,7 @@ const BanRestrictUsers = () => {
   // Ban/Restrict modal
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [actionType, setActionType] = useState(""); // 'ban', 'restrict', 'unban'
+  const [actionType, setActionType] = useState(""); // 'ban', 'restrict', 'unban', 'add_strike', 'remove_strike'
   const [actionReason, setActionReason] = useState("");
   const [actionDuration, setActionDuration] = useState("permanent");
   const [processing, setProcessing] = useState(false);
@@ -105,46 +107,29 @@ const BanRestrictUsers = () => {
     try {
       setProcessing(true);
 
-      // Calculate end date for temporary bans/restrictions
-      let endDate = null;
-      if (actionDuration !== "permanent" && actionType !== "unban") {
-        const now = new Date();
-        const duration = parseInt(actionDuration.split("_")[0]);
-        const unit = actionDuration.split("_")[1];
-
-        switch (unit) {
-          case "day":
-          case "days":
-            endDate = new Date(now.getTime() + duration * 24 * 60 * 60 * 1000);
-            break;
-          case "week":
-          case "weeks":
-            endDate = new Date(
-              now.getTime() + duration * 7 * 24 * 60 * 60 * 1000
-            );
-            break;
-          case "month":
-          case "months":
-            endDate = new Date(now.setMonth(now.getMonth() + duration));
-            break;
-          case "year":
-            endDate = new Date(now.setFullYear(now.getFullYear() + duration));
-            break;
-        }
-      }
-
-      // This would be implemented in the usersService
-      // For now, we'll simulate the API call
       console.log("User action:", {
         userId: selectedUser.id,
         action: actionType,
         reason: actionReason,
         duration: actionDuration,
-        endDate,
       });
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Call the appropriate API endpoint
+      if (actionType === 'add_strike' || actionType === 'remove_strike') {
+        const strikeAction = actionType === 'add_strike' ? 'add' : 'remove';
+        await usersService.updateUserStrikes(
+          selectedUser.id,
+          strikeAction,
+          actionReason
+        );
+      } else {
+        await usersService.moderateUser(
+          selectedUser.id,
+          actionType,
+          actionReason,
+          actionDuration
+        );
+      }
 
       // Refresh the users list
       await fetchUsers();
@@ -155,6 +140,9 @@ const BanRestrictUsers = () => {
       setActionType("");
       setActionReason("");
       setActionDuration("permanent");
+      
+      // Clear any previous errors
+      setError(null);
     } catch (err) {
       setError(err.message);
       console.error("Error performing user action:", err);
@@ -191,27 +179,28 @@ const BanRestrictUsers = () => {
   };
 
   const getUserStatusBadge = (user) => {
-    // This would be based on actual user status fields
-    // For now, we'll simulate based on user data
-    if (user.is_banned) {
-      return (
-        <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
-          Banned
-        </span>
-      );
+    // Use account_status from the database
+    switch (user.account_status) {
+      case 'banned':
+        return (
+          <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+            Banned
+          </span>
+        );
+      case 'suspended':
+        return (
+          <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+            Suspended
+          </span>
+        );
+      case 'active':
+      default:
+        return (
+          <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+            Active
+          </span>
+        );
     }
-    if (user.is_restricted) {
-      return (
-        <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
-          Restricted
-        </span>
-      );
-    }
-    return (
-      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-        Active
-      </span>
-    );
   };
 
   const getUserRiskLevel = (user) => {
@@ -275,17 +264,13 @@ const BanRestrictUsers = () => {
       header: "STRIKES",
       align: "center",
       render: (user) => {
-        // Calculate strikes based on user violations (reports, rejections, etc.)
-        const strikes =
-          (user.reject_count || 0) +
-          (user.report_count || 0) +
-          (user.violation_count || 0);
+        // Calculate strikes based on user violations (using correct database fields)
+        const strikes = (user.strike_count || 0) + (user.reject_count || 0);
         const maxStrikes = 3;
 
-        // Calculate suspension count based on total violations
-        const totalViolations = strikes;
-        const suspensionCount = Math.floor(totalViolations / 3);
-        const isPermanentlyBanned = suspensionCount >= 3;
+        // Use suspension count from database
+        const suspensionCount = user.suspension_count || 0;
+        const isPermanentlyBanned = user.account_status === 'banned';
 
         // Get strike description
         const getStrikeDescription = (strikeCount) => {
@@ -349,12 +334,9 @@ const BanRestrictUsers = () => {
       header: "SUSPENSION",
       align: "center",
       render: (user) => {
-        const strikes =
-          (user.reject_count || 0) +
-          (user.report_count || 0) +
-          (user.violation_count || 0);
-        const suspensionCount = Math.floor(strikes / 3);
-        const isPermanentlyBanned = suspensionCount >= 3;
+        const strikes = (user.strike_count || 0) + (user.reject_count || 0);
+        const suspensionCount = user.suspension_count || 0;
+        const isPermanentlyBanned = user.account_status === 'banned';
 
         return (
           <div className="text-center">
@@ -407,8 +389,30 @@ const BanRestrictUsers = () => {
       header: "ACTIONS",
       align: "center",
       render: (user) => (
-        <div className="flex space-x-2 justify-center">
-          {!user.is_banned && !user.is_restricted && (
+        <div className="flex space-x-1 justify-center">
+          {/* Strike Management */}
+          <Tooltip content="Add Strike" placement="top">
+            <button
+              onClick={() => openActionModal(user, "add_strike")}
+              className="text-orange-600 hover:text-orange-900 hover:scale-110 transition-all duration-200 p-1 rounded"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          
+          {/* Only show remove strike if user has strikes */}
+          {((user.strike_count || 0) + (user.reject_count || 0)) > 0 && (
+            <Tooltip content="Remove Strike" placement="top">
+              <button
+                onClick={() => openActionModal(user, "remove_strike")}
+                className="text-green-600 hover:text-green-900 hover:scale-110 transition-all duration-200 p-1 rounded"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+            </Tooltip>
+          )}
+
+          {user.account_status === 'active' && (
             <>
               <Tooltip content="Restrict User" placement="top">
                 <button
@@ -429,7 +433,7 @@ const BanRestrictUsers = () => {
             </>
           )}
 
-          {(user.is_banned || user.is_restricted) && (
+          {(user.account_status === 'banned' || user.account_status === 'suspended') && (
             <Tooltip content="Restore User" placement="top">
               <button
                 onClick={() => openActionModal(user, "unban")}
@@ -556,6 +560,10 @@ const BanRestrictUsers = () => {
                   ? "Ban User"
                   : actionType === "restrict"
                   ? "Restrict User"
+                  : actionType === "add_strike"
+                  ? "Add Strike"
+                  : actionType === "remove_strike"
+                  ? "Remove Strike"
                   : "Restore User Access"}
               </h3>
 
@@ -569,7 +577,7 @@ const BanRestrictUsers = () => {
                 </div>
               </div>
 
-              {actionType !== "unban" && (
+              {actionType !== "unban" && actionType !== "add_strike" && actionType !== "remove_strike" && (
                 <>
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -601,6 +609,21 @@ const BanRestrictUsers = () => {
                     />
                   </div>
                 </>
+              )}
+
+              {(actionType === "add_strike" || actionType === "remove_strike") && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Reason (Required):
+                  </label>
+                  <textarea
+                    value={actionReason}
+                    onChange={(e) => setActionReason(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={`Enter reason for ${actionType === "add_strike" ? "adding" : "removing"} strike...`}
+                  />
+                </div>
               )}
 
               {actionType === "unban" && (
@@ -637,6 +660,10 @@ const BanRestrictUsers = () => {
                       ? "bg-red-600 hover:bg-red-700"
                       : actionType === "restrict"
                       ? "bg-yellow-600 hover:bg-yellow-700"
+                      : actionType === "add_strike"
+                      ? "bg-orange-600 hover:bg-orange-700"
+                      : actionType === "remove_strike"
+                      ? "bg-green-600 hover:bg-green-700"
                       : "bg-green-600 hover:bg-green-700"
                   }`}
                 >
@@ -646,6 +673,10 @@ const BanRestrictUsers = () => {
                     ? "Ban User"
                     : actionType === "restrict"
                     ? "Restrict User"
+                    : actionType === "add_strike"
+                    ? "Add Strike"
+                    : actionType === "remove_strike"
+                    ? "Remove Strike"
                     : "Restore Access"}
                 </button>
               </div>

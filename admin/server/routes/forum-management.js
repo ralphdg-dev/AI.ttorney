@@ -282,7 +282,11 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { action, reason } = req.body; // action: 'delete' | 'flag' | 'restore'
-    const adminId = req.adminId;
+    const adminId = req.admin?.id; // Get admin ID from the authenticated admin object
+
+    console.log("=== MODERATION REQUEST ===");
+    console.log("Admin object:", req.admin);
+    console.log("Admin ID:", adminId);
 
     if (!action || !["delete", "flag", "restore"].includes(action)) {
       return res.status(400).json({
@@ -291,62 +295,172 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
       });
     }
 
-    let updateData = {};
-
-    if (action === "delete") {
-      updateData = {
-        is_deleted: true,
-        deleted_at: new Date().toISOString(),
-        deleted_by: adminId,
-        moderation_reason: reason || "Deleted by admin",
-      };
-    } else if (action === "flag") {
-      updateData = {
-        is_flagged: true,
-        flagged_at: new Date().toISOString(),
-        flagged_by: adminId,
-        moderation_reason: reason || "Flagged by admin",
-      };
-    } else if (action === "restore") {
-      updateData = {
-        is_deleted: false,
-        is_flagged: false,
-        deleted_at: null,
-        deleted_by: null,
-        flagged_at: null,
-        flagged_by: null,
-        moderation_reason: null,
-      };
-    }
-
-    const { data, error } = await supabaseAdmin
+    // First check if the post exists
+    const { data: post, error: postError } = await supabaseAdmin
       .from("forum_posts")
-      .update(updateData)
+      .select("id, is_flagged")
       .eq("id", id)
-      .select()
       .single();
 
-    if (error || !data) {
+    if (postError || !post) {
       return res.status(404).json({
         success: false,
-        error: "Forum post not found or update failed",
+        error: "Forum post not found",
       });
     }
 
-    // Log the moderation action
-    await supabaseAdmin.from("admin_audit_logs").insert({
-      admin_id: adminId,
-      action: `forum_post_${action}`,
-      target_type: "forum_post",
-      target_id: id,
-      details: { reason, previous_state: data },
-    });
+    if (action === "flag" || action === "delete") {
+      // Check if post is already flagged by this admin
+      const { data: existingFlag } = await supabaseAdmin
+        .from("flagged_posts")
+        .select("id")
+        .eq("forum_post_id", id)
+        .eq("flagged_by_admin_id", adminId)
+        .eq("status", "active")
+        .single();
 
-    res.json({
-      success: true,
-      message: `Post ${action}d successfully`,
-      data: data,
-    });
+      if (existingFlag) {
+        return res.status(400).json({
+          success: false,
+          error: "Post is already flagged by this admin",
+          already_flagged: true
+        });
+      }
+
+      // Create entry in flagged_posts table
+      console.log("=== CREATING FLAG RECORD ===");
+      console.log("Post ID:", id);
+      console.log("Admin ID:", adminId);
+      console.log("Reason:", reason);
+      console.log("Action:", action);
+
+      const flagData = {
+        forum_post_id: id,
+        flagged_by_admin_id: adminId, // Use admin ID from admin table
+        reason:
+          reason ||
+          (action === "delete"
+            ? "Marked for deletion by admin"
+            : "Flagged by admin"),
+        status: "active",
+      };
+
+      console.log("Flag data to insert:", flagData);
+
+      const { data: flagResult, error: flagError } = await supabaseAdmin
+        .from("flagged_posts")
+        .insert(flagData)
+        .select();
+
+      if (flagError) {
+        console.error("Error creating flag record:", flagError);
+        console.error("Flag error details:", {
+          message: flagError.message,
+          details: flagError.details,
+          hint: flagError.hint,
+          code: flagError.code,
+        });
+        return res.status(500).json({
+          success: false,
+          error: `Failed to create flag record: ${flagError.message}`,
+          details: flagError.details,
+        });
+      }
+
+      console.log("Flag record created successfully:", flagResult);
+
+      // Update the post to mark it as flagged
+      const { data: updatedPost, error: updateError } = await supabaseAdmin
+        .from("forum_posts")
+        .update({
+          is_flagged: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (updateError) {
+        return res.status(500).json({
+          success: false,
+          error: "Failed to update post flag status",
+        });
+      }
+
+      // Log the moderation action (if audit logs table exists)
+      try {
+        await supabaseAdmin.from("admin_audit_logs").insert({
+          admin_id: adminId,
+          action: `forum_post_${action}`,
+          target_type: "forum_post",
+          target_id: id,
+          details: { reason, action_type: action },
+        });
+      } catch (auditError) {
+        console.warn("Failed to log audit trail:", auditError.message);
+        // Don't fail the main operation if audit logging fails
+      }
+
+      res.json({
+        success: true,
+        message: `Post ${action}d successfully`,
+        data: updatedPost,
+      });
+    } else if (action === "restore") {
+      // Resolve all active flags for this post
+      const { error: resolveError } = await supabaseAdmin
+        .from("flagged_posts")
+        .update({
+          status: "resolved",
+          resolved_by_admin_id: adminId,
+          resolved_at: new Date().toISOString(),
+          resolution_notes: reason || "Restored by admin",
+        })
+        .eq("forum_post_id", id)
+        .eq("status", "active");
+
+      if (resolveError) {
+        console.error("Error resolving flags:", resolveError);
+      }
+
+      // Update the post to remove flag
+      const { data: updatedPost, error: updateError } = await supabaseAdmin
+        .from("forum_posts")
+        .update({
+          is_flagged: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (updateError) {
+        return res.status(500).json({
+          success: false,
+          error: "Failed to update post flag status",
+        });
+      }
+
+      // Log the moderation action (if audit logs table exists)
+      try {
+        await supabaseAdmin.from("admin_audit_logs").insert({
+          admin_id: adminId,
+          action: `forum_post_${action}`,
+          target_type: "forum_post",
+          target_id: id,
+          details: { reason, action_type: action },
+        });
+      } catch (auditError) {
+        console.warn("Failed to log audit trail:", auditError.message);
+        // Don't fail the main operation if audit logging fails
+      }
+
+      res.json({
+        success: true,
+        message: "Post restored successfully",
+        data: updatedPost,
+      });
+    }
   } catch (error) {
     console.error("Moderate forum post error:", error);
     res.status(500).json({
@@ -662,33 +776,125 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
   }
 });
 
+// Get flagging history for a specific post
+router.get("/posts/:id/flags", authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: flags, error } = await supabaseAdmin
+      .from("flagged_posts")
+      .select(
+        `
+        id,
+        reason,
+        status,
+        flagged_at,
+        resolved_at,
+        resolution_notes,
+        flagged_by:admin!flagged_posts_flagged_by_admin_id_fkey(id, username, email),
+        resolved_by:admin!flagged_posts_resolved_by_admin_id_fkey(id, username, email)
+      `
+      )
+      .eq("forum_post_id", id)
+      .order("flagged_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching flags:", error);
+      return res.status(500).json({
+        success: false,
+        error: `Failed to fetch flags: ${error.message}`,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: flags || [],
+      count: flags?.length || 0,
+    });
+  } catch (error) {
+    console.error("Get post flags error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+    });
+  }
+});
+
+// Debug endpoint to check if a specific post exists
+router.get("/posts/:id/exists", authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log(`=== CHECKING POST EXISTENCE: ${id} ===`);
+
+    const { data: post, error } = await supabaseAdmin
+      .from("forum_posts")
+      .select(
+        "id, body, created_at, is_flagged, user_id, is_anonymous, category"
+      )
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Database error:", error);
+      return res.status(500).json({
+        success: false,
+        error: `Database error: ${error.message}`,
+        exists: false,
+      });
+    }
+
+    const exists = !!post;
+    console.log("Post exists:", exists);
+    if (exists) {
+      console.log("Post data:", {
+        id: post.id,
+        content_preview: post.body?.substring(0, 50),
+        created_at: post.created_at,
+        is_flagged: post.is_flagged,
+        user_id: post.user_id,
+        is_anonymous: post.is_anonymous,
+        category: post.category,
+      });
+    }
+
+    res.json({
+      success: true,
+      exists,
+      data: post,
+      message: exists ? "Post found in database" : "Post not found in database",
+    });
+  } catch (error) {
+    console.error("Check post existence error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+      exists: false,
+    });
+  }
+});
+
 // Get forum statistics
 router.get("/statistics", authenticateAdmin, async (req, res) => {
   try {
     // Get various forum statistics
-    const [
-      totalPosts,
-      activePosts,
-      deletedPosts,
-      totalReports,
-      pendingReports,
-      resolvedReports,
-    ] = await Promise.all([
-      supabaseAdmin
-        .from("forum_posts")
-        .select("id", { count: "exact", head: true }),
-      supabaseAdmin
-        .from("forum_posts")
-        .select("id", { count: "exact", head: true })
-        .eq("is_deleted", false),
-      supabaseAdmin
-        .from("forum_posts")
-        .select("id", { count: "exact", head: true })
-        .eq("is_deleted", true),
-      supabaseAdmin
-        .from("forum_reports")
-        .select("id", { count: "exact", head: true }),
-    ]);
+    const [totalPosts, activePosts, flaggedPosts, totalReports] =
+      await Promise.all([
+        supabaseAdmin
+          .from("forum_posts")
+          .select("id", { count: "exact", head: true }),
+        supabaseAdmin
+          .from("forum_posts")
+          .select("id", { count: "exact", head: true })
+          .eq("is_flagged", false),
+        supabaseAdmin
+          .from("forum_posts")
+          .select("id", { count: "exact", head: true })
+          .eq("is_flagged", true),
+        supabaseAdmin
+          .from("forum_reports")
+          .select("id", { count: "exact", head: true }),
+      ]);
 
     res.json({
       success: true,
@@ -696,12 +902,10 @@ router.get("/statistics", authenticateAdmin, async (req, res) => {
         posts: {
           total: totalPosts.count || 0,
           active: activePosts.count || 0,
-          deleted: deletedPosts.count || 0,
+          flagged: flaggedPosts.count || 0,
         },
         reports: {
           total: totalReports.count || 0,
-          pending: pendingReports.count || 0,
-          resolved: resolvedReports.count || 0,
         },
       },
     });

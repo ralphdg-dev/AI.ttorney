@@ -121,15 +121,53 @@ const ManageTopicsThreads = () => {
       setSelectedPost(null);
       setModerationAction("");
       setModerationReason("");
+      
+      // Show success message
+      setError(null);
     } catch (err) {
-      setError(err.message);
       console.error("Error moderating post:", err);
+      
+      // Check if it's a "post not found" error
+      if (err.message.includes("not found") || err.message.includes("404")) {
+        setError(`This post no longer exists in the database. The post list will be refreshed.`);
+        
+        // Refresh the posts list to remove stale entries
+        await fetchPosts();
+        
+        // Close modal since the post doesn't exist
+        setShowModerationModal(false);
+        setSelectedPost(null);
+        setModerationAction("");
+        setModerationReason("");
+      } else if (err.message.includes("already flagged")) {
+        setError(`This post is already flagged by you. Please refresh the page to see the current status.`);
+        
+        // Refresh the posts list to show current flag status
+        await fetchPosts();
+        
+        // Close modal
+        setShowModerationModal(false);
+        setSelectedPost(null);
+        setModerationAction("");
+        setModerationReason("");
+      } else {
+        setError(`Failed to ${moderationAction} post: ${err.message}`);
+      }
     } finally {
       setModerating(false);
     }
   };
 
   const openModerationModal = (post, action) => {
+    console.log("=== OPENING MODERATION MODAL ===");
+    console.log("Selected post:", {
+      id: post.id,
+      content: post.content?.substring(0, 50) + "...",
+      created_at: post.created_at,
+      user: post.user
+    });
+    console.log("Action:", action);
+    
     setSelectedPost(post);
     setModerationAction(action);
     setShowModerationModal(true);
@@ -146,13 +184,6 @@ const ManageTopicsThreads = () => {
   };
 
   const getStatusBadge = (post) => {
-    if (post.is_deleted) {
-      return (
-        <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
-          Deleted
-        </span>
-      );
-    }
     if (post.is_flagged) {
       return (
         <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
@@ -241,10 +272,15 @@ const ManageTopicsThreads = () => {
         <div className="flex space-x-2">
           {!post.is_deleted && (
             <>
-              <Tooltip content="Flag Post" placement="top">
+              <Tooltip content={post.is_flagged ? "Already Flagged" : "Flag Post"} placement="top">
                 <button
                   onClick={() => openModerationModal(post, "flag")}
-                  className="text-gray-600 hover:text-gray-900 hover:scale-110 transition-all duration-200 p-2 rounded-lg hover:bg-gray-50"
+                  disabled={post.is_flagged}
+                  className={`p-2 rounded-lg transition-all duration-200 ${
+                    post.is_flagged
+                      ? "text-yellow-600 bg-yellow-50 cursor-not-allowed"
+                      : "text-gray-600 hover:text-gray-900 hover:scale-110 hover:bg-gray-50"
+                  }`}
                 >
                   <Flag className="w-4 h-4" />
                 </button>

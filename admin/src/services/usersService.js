@@ -240,6 +240,56 @@ class UsersService {
       throw error;
     }
   }
+
+  // Update user strikes
+  async updateUserStrikes(id, action, reason = '') {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/legal-seekers/${id}/strikes`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        },
+        body: JSON.stringify({ action, reason })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update user strikes');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Update user strikes error:', error);
+      throw error;
+    }
+  }
+
+  // Ban/Restrict/Unban user
+  async moderateUser(id, action, reason = '', duration = 'permanent') {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/legal-seekers/${id}/moderation`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        },
+        body: JSON.stringify({ action, reason, duration })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to ${action} user`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error(`User ${action} error:`, error);
+      throw error;
+    }
+  }
 }
 
 const usersService = new UsersService();
