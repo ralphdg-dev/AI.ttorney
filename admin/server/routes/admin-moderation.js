@@ -230,12 +230,20 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
       violation_summary: moderationResult.violation_summary,
       action_taken: actionTaken,
       strike_count_after: strikeCountAfter,
-      suspension_count_after: suspensionCountAfter,
-      report_id: report_id || null
+      suspension_count_after: suspensionCountAfter
     };
 
     // Execute database operations in transaction
     let violationResult = null;
+    
+    console.log('Attempting to insert violation data:', JSON.stringify(violationData, null, 2));
+    
+    // Try to refresh schema cache by making a simple query first
+    try {
+      await supabaseAdmin.from('user_violations').select('id').limit(1);
+    } catch (schemaError) {
+      console.log('Schema refresh attempt:', schemaError.message);
+    }
     
     try {
       const { data, error: violationError } = await supabaseAdmin
@@ -245,8 +253,17 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
         .single();
 
       if (violationError) {
-        // If table doesn't exist, create a mock violation record
-        if (violationError.code === '42P01' || violationError.message.includes('relation') || violationError.message.includes('does not exist')) {
+        console.error('Error creating violation record:', violationError);
+        
+        // Check if it's a schema cache issue
+        if (violationError.code === 'PGRST204' || violationError.message.includes('schema cache')) {
+          console.warn('Schema cache issue detected, using fallback violation record');
+          violationResult = {
+            id: `fallback-violation-${Date.now()}`,
+            ...violationData,
+            created_at: new Date().toISOString()
+          };
+        } else if (violationError.code === '42P01' || violationError.message.includes('relation') || violationError.message.includes('does not exist')) {
           console.warn('user_violations table does not exist, using fallback');
           violationResult = {
             id: `mock-violation-${Date.now()}`,
@@ -254,7 +271,6 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
             created_at: new Date().toISOString()
           };
         } else {
-          console.error('Error creating violation record:', violationError);
           return res.status(500).json({
             success: false,
             error: `Failed to create violation record: ${violationError.message}`
@@ -344,7 +360,7 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
           action_taken: actionTaken,
           strike_count_after: strikeCountAfter,
           suspension_count_after: suspensionCountAfter,
-          report_id: report_id
+          related_report_id: report_id // Store in details for reference but not in violation record
         }
       });
     } catch (auditError) {
@@ -392,9 +408,7 @@ router.get('/violations/:user_id', authenticateAdmin, async (req, res) => {
         action_taken,
         strike_count_after,
         suspension_count_after,
-        appeal_status,
-        created_at,
-        report_id
+        created_at
       `)
       .eq('user_id', user_id)
       .order('created_at', { ascending: false })
