@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { router, usePathname } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { LoadingWithTrivia } from './LoadingWithTrivia';
 
 /**
  * SuspensionGuard Component
@@ -18,19 +19,33 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
   const [isChecking, setIsChecking] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
 
+  // Reset hasChecked when user changes (login/logout)
+  React.useEffect(() => {
+    setHasChecked(false);
+  }, [user?.id]);
+
   useEffect(() => {
     const checkSuspension = async () => {
+      // CRITICAL: Skip check if user is signing out to prevent infinite loading after logout
+      if (isSigningOut) {
+        return;
+      }
+
       // Skip check if:
       // 1. Already on suspended screen
       // 2. On login/register screens
-      // 3. No user session
+      // 3. No user session (CRITICAL: prevents check after logout when user/session are null)
       // 4. Already checking
-      // 5. User is signing out (IMPORTANT: prevents infinite loading)
-      const publicRoutes = ['/login', '/register', '/suspended', '/forgot-password'];
+      // 5. Auth is still loading
+      // 6. Already checked for this user
+      const publicRoutes = ['/login', '/register', '/suspended', '/forgot-password', '/onboarding'];
       const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route));
       
-      if (isPublicRoute || !user || !session || isChecking || isLoading || isSigningOut) {
-        setHasChecked(true);
+      if (isPublicRoute || !user || !session || isChecking || isLoading || hasChecked) {
+        if (!hasChecked && !isPublicRoute && user && session && !isLoading) {
+          // Only set hasChecked if we have a valid user session
+          setHasChecked(true);
+        }
         return;
       }
 
@@ -56,7 +71,7 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     checkSuspension();
-  }, [pathname, user, session, isLoading, isSigningOut]);
+  }, [pathname, user?.id]);
 
   // Don't show loading if user is signing out
   if (isSigningOut) {
@@ -64,22 +79,11 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
   }
 
   // Show loading indicator while checking suspension status
-  if ((isChecking || !hasChecked) && user && session && pathname !== '/suspended') {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-      </View>
-    );
+  // CRITICAL: Never show loading on login page to prevent infinite loading after logout
+  const isLoginPage = pathname === '/login';
+  if ((isChecking || !hasChecked) && user && session && pathname !== '/suspended' && !isLoginPage) {
+    return <LoadingWithTrivia />;
   }
 
   return <>{children}</>;
 };
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-});

@@ -318,8 +318,9 @@ export const getRoleBasedRedirect = (role: UserRole, isVerified?: boolean, pendi
           return '/onboarding/lawyer/lawyer-status/pending';
       }
     } else {
-      // If pending_lawyer is true but no application status, show loading
-      return 'loading';
+      // If pending_lawyer is true but no application status, default to pending
+      // Don't return 'loading' as it's not a valid route
+      return '/onboarding/lawyer/lawyer-status/pending';
     }
   }
 

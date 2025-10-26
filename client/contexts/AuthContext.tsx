@@ -127,9 +127,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', session.user.id)
         .single();
 
-
       if (error) {
         console.error('Error fetching user profile:', error);
+        setIsLoading(false);
         return;
       }
 
@@ -145,6 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const suspensionStatus = await checkSuspensionStatus();
         if (suspensionStatus && suspensionStatus.isSuspended) {
           console.log('🚫 User is suspended, redirecting to suspended screen');
+          setIsLoading(false);
           router.replace('/suspended' as any);
           return;
         }
@@ -153,41 +154,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Check lawyer application status if user has pending_lawyer flag
         if (profile.pending_lawyer) {
-          // Set redirect flag only for pending lawyer users to prevent future status redirects
           setHasRedirectedToStatus(true);
           
-          const statusData = await checkLawyerApplicationStatus();
-          if (statusData && statusData.has_application && statusData.application) {
-            applicationStatus = statusData.application.status;
-          }
-          
-          const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, profile.pending_lawyer, applicationStatus || undefined);
-          
-          // Handle different redirect scenarios
-          if (redirectPath === 'loading') {
-            // Only redirect to loading if not already on a lawyer route
-            const currentPath = `/${segments.join('/')}`;
-            const isOnLawyerRoute = currentPath.startsWith('/lawyer');
-            
-            if (!isOnLawyerRoute) {
-              // Show loading screen while fetching status
-              router.replace('/loading' as any);
+          try {
+            const statusData = await checkLawyerApplicationStatus();
+            if (statusData && statusData.has_application && statusData.application) {
+              applicationStatus = statusData.application.status;
             }
-          } else if (redirectPath && redirectPath.includes('/lawyer-status/')) {
-            router.replace(redirectPath as any);
-          } else if (redirectPath) {
-            router.replace(redirectPath as any);
+          } catch (err) {
+            console.error('Error fetching lawyer application status:', err);
+            applicationStatus = 'pending';
           }
+          
+          const redirectPath = getRoleBasedRedirect(
+            profile.role, 
+            profile.is_verified, 
+            profile.pending_lawyer, 
+            applicationStatus || 'pending'
+          );
+          
+          console.log('🔄 Redirecting pending lawyer to:', redirectPath);
+          setIsLoading(false);
+          router.replace(redirectPath as any);
         } else {
           // User doesn't have pending lawyer status, redirect normally
           const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
+          console.log('🔄 Redirecting user to:', redirectPath);
+          setIsLoading(false);
           router.replace(redirectPath as any);
         }
+      } else {
+        // Not navigating, just set loading to false
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('Error handling auth state change:', error);
+      setIsLoading(false);
     }
-  }, [checkLawyerApplicationStatus, segments]);
+  }, [checkLawyerApplicationStatus, checkSuspensionStatus]);
 
   useEffect(() => {
     // Initialize auth state and listen for auth changes
@@ -302,35 +306,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      // Clear auth state immediately to prevent further API calls
+      // Set signing out flag FIRST so guards know to skip checks
+      setIsSigningOut(true);
+      
+      // Clear auth state IMMEDIATELY
       setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
+      setIsLoading(false);
       
-      // Clear local storage first
-      await clearAuthStorage();
-      
-      // Redirect to login immediately
+      // Redirect to login IMMEDIATELY - don't wait for anything
       router.replace('/login');
       
-      // Sign out from Supabase Auth in the background (this will trigger SIGNED_OUT event)
-      supabase.auth.signOut({ scope: 'local' }).catch((error: any) => {
-        console.error('Background sign out error:', error);
-      });
+      // Clear signing out flag after a tiny delay to ensure navigation completes
+      setTimeout(() => setIsSigningOut(false), 100);
       
-      // Clear loading states after redirect
-      setIsLoading(false);
-      setIsSigningOut(false);
+      // Clear storage and sign out in background (non-blocking)
+      clearAuthStorage().catch(() => {});
+      supabase.auth.signOut({ scope: 'local' }).catch(() => {});
     } catch (error) {
       console.error('Sign out error:', error);
       
-      // Force clear state on error
+      // Force clear ALL states and redirect immediately
+      setIsSigningOut(true);
       setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
       setIsLoading(false);
-      setIsSigningOut(false);
-      
-      // Navigate to login on error
       router.replace('/login');
+      setTimeout(() => setIsSigningOut(false), 100);
     }
   };
 

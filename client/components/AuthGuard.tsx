@@ -8,6 +8,7 @@ import {
   logRouteAccess,
   getRoleBasedRedirect 
 } from '../config/routes';
+import { LoadingWithTrivia } from './LoadingWithTrivia';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -19,13 +20,21 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const segments = useSegments();
 
   useEffect(() => {
-    // Don't run route checks while loading or signing out
-    if (isLoading || isSigningOut) return;
+    // Don't run route checks while loading (but allow during sign out for immediate redirect)
+    if (isLoading) return;
+    
+    // During sign out, skip all checks and allow navigation to login
+    if (isSigningOut) return;
 
     const currentPath = `/${segments.join('/')}`;
     const routeConfig = getRouteConfig(currentPath);
     
     if (!routeConfig) return;
+
+    // Skip checks for lawyer status screens to prevent redirect loops
+    if (currentPath.includes('/lawyer-status/')) {
+      return;
+    }
 
     // Handle authenticated users - check both session and user exist
     if (isAuthenticated && user && session) {
@@ -74,15 +83,12 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       // Log public access
       logRouteAccess(currentPath, null, 'granted', 'Public route');
     }
-  }, [isAuthenticated, user, session, isLoading, isSigningOut, segments, router]);
+  }, [isAuthenticated, user?.id, user?.role, isLoading, isSigningOut, segments.join('/')]);
 
-  // Show loading screen while checking authentication OR signing out
-  if (isLoading || isSigningOut) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#023D7B" />
-      </View>
-    );
+  // Show loading screen while checking authentication (but NOT during sign out)
+  // During sign out, we want immediate redirect without loading screen
+  if (isLoading && !isSigningOut) {
+    return <LoadingWithTrivia />;
   }
 
   // Don't block rendering on login page - let it show immediately

@@ -18,11 +18,8 @@ export default function Onboarding() {
     // If user is already authenticated, redirect them to their appropriate dashboard
     if (isAuthenticated && user) {
       const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
-      if (redirectPath === 'loading') {
-        router.replace('/loading-status');
-      } else {
-        router.replace(redirectPath as any);
-      }
+      // getRoleBasedRedirect never returns 'loading' anymore, it defaults to pending status
+      router.replace(redirectPath as any);
     }
   }, [isAuthenticated, user]);
 

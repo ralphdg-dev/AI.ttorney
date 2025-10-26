@@ -1,74 +1,31 @@
-import { Text, Image, Animated } from 'react-native';
-import { shouldUseNativeDriver } from '@/utils/animations';
 import { Redirect } from "expo-router";
-import { useEffect, useState, useRef } from "react";
-import tw from "tailwind-react-native-classnames";
-import logo from ".././assets/images/logo.gif";
+import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { getRoleBasedRedirect } from "../config/routes";
+import { LoadingWithTrivia } from "../components/LoadingWithTrivia";
 
 export default function SplashScreen() {
-  const [shouldRedirect, setShouldRedirect] = useState(false);
   const [redirectPath, setRedirectPath] = useState<string | null>(null);
-  const fadeAnim = useRef(new Animated.Value(1)).current;
   const { user, isLoading, isAuthenticated, initialAuthCheck } = useAuth();
 
   useEffect(() => {
-    const checkAuthAndRedirect = async () => {
-      // Wait a minimum time for branding (1.5 seconds instead of 4)
-      const minDisplayTime = 1500;
-      const startTime = Date.now();
+    // Only redirect when auth check is complete
+    if (!isLoading && initialAuthCheck) {
+      let targetPath = "/login";
       
-      // Wait for auth to be determined
-      if (!isLoading && initialAuthCheck) {
-        let targetPath = "/login"; // Default to login page for unauthenticated users
-        
-        if (isAuthenticated && user) {
-          // User is authenticated, redirect to appropriate dashboard
-          targetPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
-          
-          // If user has pending_lawyer, use loading screen to fetch actual status
-          if (user.pending_lawyer) {
-            targetPath = "/loading-status";
-          }
-        }
-        
-        // Ensure minimum display time
-        const elapsedTime = Date.now() - startTime;
-        const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
-        
-        setTimeout(() => {
-          Animated.timing(fadeAnim, {
-            toValue: 0,
-            duration: 500, // Faster fade
-            useNativeDriver: shouldUseNativeDriver('opacity'),
-          }).start(() => {
-            setRedirectPath(targetPath);
-            setShouldRedirect(true);
-          });
-        }, remainingTime);
+      if (isAuthenticated && user) {
+        targetPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
       }
-    };
+      
+      setRedirectPath(targetPath);
+    }
+  }, [isLoading, isAuthenticated, user, initialAuthCheck]);
 
-    checkAuthAndRedirect();
-  }, [isLoading, isAuthenticated, user, initialAuthCheck, fadeAnim]);
-
-  if (shouldRedirect && redirectPath) {
+  // Redirect when ready
+  if (redirectPath && !isLoading) {
     return <Redirect href={redirectPath as any} />;
   }
 
-  return (
-    <Animated.View
-      style={[
-        tw`flex-1 bg-white justify-center items-center`,
-        { opacity: fadeAnim }, 
-      ]}
-    >
-      <Image source={logo} style={tw`w-44 h-44 mr-14`} />
-      <Text style={tw`text-2xl font-bold`}>Ai.ttorney</Text>
-      <Text style={tw`text-gray-500 italic`}>
-        Justice at Your Fingertips
-      </Text>
-    </Animated.View>
-  );
+  // Show unified loading screen for entire app
+  return <LoadingWithTrivia />;
 }
