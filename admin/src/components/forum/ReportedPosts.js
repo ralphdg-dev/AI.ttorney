@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import {
   AlertTriangle,
   Eye,
@@ -359,9 +360,9 @@ const ReportedPosts = () => {
       )}
 
       {/* Resolution Modal */}
-      {showResolutionModal && selectedReport && (
+      {showResolutionModal && selectedReport && ReactDOM.createPortal(
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4"
           onClick={closeModal}
         >
           <div
@@ -481,7 +482,8 @@ const ReportedPosts = () => {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
