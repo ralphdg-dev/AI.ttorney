@@ -46,7 +46,6 @@ export default function UserRegistration() {
   const [usernameError, setUsernameError] = useState('');
   const [usernameStatus, setUsernameStatus] = useState<'none' | 'checking' | 'available' | 'taken' | 'invalid'>('none');
   const [passwordError, setPasswordError] = useState('');
-  const [birthdateError, setBirthdateError] = useState('');
   const [validationLoading, setValidationLoading] = useState({ email: false, username: false });
   
   // Debounce timers for validation
@@ -230,35 +229,9 @@ export default function UserRegistration() {
     return { strength: score, label: 'Strong', color: '#059669' };
   };
 
-  // Age validation function
-  const validateAge = (date: Date | null): boolean => {
-    if (!date) {
-      setBirthdateError('');
-      return false;
-    }
-    
-    const today = new Date();
-    const birthDate = new Date(date);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    // Adjust age if birthday hasn't occurred this year
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    if (age < 18) {
-      setBirthdateError('You must be at least 18 years old to create an account');
-      return false;
-    }
-    
-    setBirthdateError('');
-    return true;
-  };
-
   const passwordStrength = getPasswordStrength(password);
   const passwordsMatch = password.length > 0 && password === confirmPassword;
-  const hasValidationErrors = !!emailError || !!usernameError || !!passwordError || !!birthdateError || (confirmPassword && !passwordsMatch);
+  const hasValidationErrors = !!emailError || !!usernameError || !!passwordError || (confirmPassword && !passwordsMatch);
   const isComplete = Boolean(
     firstName && 
     lastName && 
@@ -442,17 +415,12 @@ export default function UserRegistration() {
             setShowDatePicker(true);
           }}
           activeOpacity={0.8}
-          className={`p-3 w-full bg-white rounded-lg border ${birthdateError ? 'border-red-500 mb-1' : 'border-gray-300 mb-3'}`}
+          className="p-3 mb-3 w-full bg-white rounded-lg border border-gray-300"
         >
           <Text className={`${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'} ${birthdate ? 'text-gray-900' : 'text-gray-400'}`}>
             {birthdate ? formatDate(birthdate) : 'Select date'}
           </Text>
         </TouchableOpacity>
-        {birthdateError ? (
-          <Text className="mb-3 text-xs text-red-500">
-            {birthdateError}
-          </Text>
-        ) : null}
 
         {/* Password */}
         <Text className={`font-semibold text-gray-900 mb-1.5 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'}`}>
@@ -918,7 +886,6 @@ export default function UserRegistration() {
                   sel0.setHours(0,0,0,0);
                   const finalDate = sel0.getTime() > today0.getTime() ? today0 : sel0;
                   setBirthdate(finalDate);
-                  validateAge(finalDate);
                   setShowDatePicker(false);
                 }}
                 className="py-2.5 px-3"
