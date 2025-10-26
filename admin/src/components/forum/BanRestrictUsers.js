@@ -9,8 +9,11 @@ import {
   AlertTriangle,
   Plus,
   Minus,
+  Eye,
+  History,
 } from "lucide-react";
 import usersService from "../../services/usersService";
+import adminModerationService from "../../services/adminModerationService";
 import DataTable from "../ui/DataTable";
 import Pagination from "../ui/Pagination";
 import Tooltip from "../ui/Tooltip";
@@ -34,6 +37,12 @@ const BanRestrictUsers = () => {
   const [actionReason, setActionReason] = useState("");
   const [actionDuration, setActionDuration] = useState("permanent");
   const [processing, setProcessing] = useState(false);
+
+  // User details modal
+  const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
+  const [userViolations, setUserViolations] = useState([]);
+  const [userSuspensions, setUserSuspensions] = useState([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   const statusOptions = [
     { value: "all", label: "All Users" },
@@ -157,6 +166,30 @@ const BanRestrictUsers = () => {
     setShowActionModal(true);
   };
 
+  const openUserDetailsModal = async (user) => {
+    setSelectedUser(user);
+    setShowUserDetailsModal(true);
+    setLoadingDetails(true);
+    setUserViolations([]);
+    setUserSuspensions([]);
+
+    try {
+      // Fetch user violations and suspensions
+      const [violationsResponse, suspensionsResponse] = await Promise.all([
+        adminModerationService.getUserViolations(user.id),
+        adminModerationService.getUserSuspensions(user.id)
+      ]);
+
+      setUserViolations(violationsResponse.data || []);
+      setUserSuspensions(suspensionsResponse.data || []);
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      setError('Failed to load user details');
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) {
       return "No date available";
@@ -264,8 +297,8 @@ const BanRestrictUsers = () => {
       header: "STRIKES",
       align: "center",
       render: (user) => {
-        // Calculate strikes based on user violations (using correct database fields)
-        const strikes = (user.strike_count || 0) + (user.reject_count || 0);
+        // Use only strike_count from database (rejections are separate)
+        const strikes = user.strike_count || 0;
         const maxStrikes = 3;
 
         // Use suspension count from database
@@ -313,17 +346,6 @@ const BanRestrictUsers = () => {
                   />
                 ))}
               </div>
-              {suspensionCount > 0 && (
-                <span
-                  className={`ml-2 text-xs font-bold px-2 py-1 rounded-full shadow-sm ${
-                    isPermanentlyBanned
-                      ? "bg-red-500 text-white border border-red-600"
-                      : "bg-orange-500 text-white border border-orange-600"
-                  }`}
-                >
-                  {isPermanentlyBanned ? "BANNED" : `${suspensionCount}S`}
-                </span>
-              )}
             </div>
           </Tooltip>
         );
@@ -334,7 +356,7 @@ const BanRestrictUsers = () => {
       header: "SUSPENSION",
       align: "center",
       render: (user) => {
-        const strikes = (user.strike_count || 0) + (user.reject_count || 0);
+        const strikes = user.strike_count || 0;
         const suspensionCount = user.suspension_count || 0;
         const isPermanentlyBanned = user.account_status === 'banned';
 
@@ -390,6 +412,16 @@ const BanRestrictUsers = () => {
       align: "center",
       render: (user) => (
         <div className="flex space-x-1 justify-center">
+          {/* View User Details */}
+          <Tooltip content="View Details" placement="top">
+            <button
+              onClick={() => openUserDetailsModal(user)}
+              className="text-blue-600 hover:text-blue-900 hover:scale-110 transition-all duration-200 p-1 rounded"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          
           {/* Strike Management */}
           <Tooltip content="Add Strike" placement="top">
             <button
@@ -401,7 +433,7 @@ const BanRestrictUsers = () => {
           </Tooltip>
           
           {/* Only show remove strike if user has strikes */}
-          {((user.strike_count || 0) + (user.reject_count || 0)) > 0 && (
+          {(user.strike_count || 0) > 0 && (
             <Tooltip content="Remove Strike" placement="top">
               <button
                 onClick={() => openActionModal(user, "remove_strike")}
@@ -678,6 +710,169 @@ const BanRestrictUsers = () => {
                     : actionType === "remove_strike"
                     ? "Remove Strike"
                     : "Restore Access"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Details Modal */}
+      {showUserDetailsModal && selectedUser && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-5 border w-4/5 max-w-4xl shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-medium text-gray-900">
+                  User Details: {selectedUser.full_name || "No name"}
+                </h3>
+                <button
+                  onClick={() => setShowUserDetailsModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* User Info */}
+              <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Email</p>
+                    <p className="font-medium">{selectedUser.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Current Strikes</p>
+                    <p className="font-medium">{selectedUser.strike_count || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Suspensions</p>
+                    <p className="font-medium">{selectedUser.suspension_count || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Status</p>
+                    <p className="font-medium capitalize">{selectedUser.account_status || 'active'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {loadingDetails ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-2 text-gray-600">Loading user history...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Violations History */}
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                      <AlertTriangle className="w-5 h-5 mr-2 text-orange-500" />
+                      Violations History ({userViolations.length})
+                    </h4>
+                    <div className="max-h-96 overflow-y-auto">
+                      {userViolations.length === 0 ? (
+                        <p className="text-gray-500 text-center py-4">No violations found</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {userViolations.map((violation) => (
+                            <div key={violation.id} className="border rounded-lg p-3 bg-white">
+                              <div className="flex justify-between items-start mb-2">
+                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                  violation.action_taken === 'strike_added' 
+                                    ? 'bg-orange-100 text-orange-800'
+                                    : violation.action_taken === 'suspended'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {violation.action_taken.replace('_', ' ').toUpperCase()}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {formatDate(violation.created_at)}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-600 mb-2">
+                                <strong>Type:</strong> {violation.violation_type.replace('_', ' ')}
+                              </p>
+                              <p className="text-sm text-gray-800 mb-2">
+                                <strong>Summary:</strong> {violation.violation_summary}
+                              </p>
+                              <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                                Content: {violation.content_text.substring(0, 100)}
+                                {violation.content_text.length > 100 && '...'}
+                              </p>
+                              <div className="flex justify-between text-xs text-gray-500 mt-2">
+                                <span>Strikes after: {violation.strike_count_after}</span>
+                                <span>Suspensions after: {violation.suspension_count_after}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Suspensions History */}
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                      <History className="w-5 h-5 mr-2 text-red-500" />
+                      Suspensions History ({userSuspensions.length})
+                    </h4>
+                    <div className="max-h-96 overflow-y-auto">
+                      {userSuspensions.length === 0 ? (
+                        <p className="text-gray-500 text-center py-4">No suspensions found</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {userSuspensions.map((suspension) => (
+                            <div key={suspension.id} className="border rounded-lg p-3 bg-white">
+                              <div className="flex justify-between items-start mb-2">
+                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                  suspension.suspension_type === 'permanent' 
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {suspension.suspension_type.toUpperCase()} #{suspension.suspension_number}
+                                </span>
+                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                  suspension.status === 'active' 
+                                    ? 'bg-red-100 text-red-800'
+                                    : suspension.status === 'lifted'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {suspension.status.toUpperCase()}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-800 mb-2">
+                                <strong>Reason:</strong> {suspension.reason}
+                              </p>
+                              <div className="text-xs text-gray-500 space-y-1">
+                                <p><strong>Started:</strong> {formatDate(suspension.started_at)}</p>
+                                {suspension.ends_at && (
+                                  <p><strong>Ends:</strong> {formatDate(suspension.ends_at)}</p>
+                                )}
+                                <p><strong>Strikes at suspension:</strong> {suspension.strikes_at_suspension}</p>
+                                {suspension.status === 'lifted' && (
+                                  <>
+                                    <p><strong>Lifted:</strong> {formatDate(suspension.lifted_at)}</p>
+                                    <p><strong>Lifted reason:</strong> {suspension.lifted_reason}</p>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end mt-6">
+                <button
+                  onClick={() => setShowUserDetailsModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                >
+                  Close
                 </button>
               </div>
             </div>

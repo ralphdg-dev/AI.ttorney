@@ -958,32 +958,29 @@ router.patch('/legal-seekers/:id/strikes', authenticateAdmin, async (req, res) =
       ? currentStrikes + 1 
       : Math.max(0, currentStrikes - 1);
 
-    // Calculate suspension count (every 3 strikes = 1 suspension)
-    const newSuspensionCount = Math.floor(newStrikeCount / 3);
-    const shouldUpdateSuspension = newSuspensionCount !== (currentUser.suspension_count || 0);
-
-    // Update user strike count and related fields
+    // Check if user reaches 3 strikes (suspension threshold)
     let updateData = {
       strike_count: newStrikeCount,
       last_violation_at: action === 'add' ? new Date().toISOString() : currentUser.last_violation_at
     };
 
-    if (shouldUpdateSuspension) {
-      updateData.suspension_count = newSuspensionCount;
+    // If adding strikes and reaching 3 strikes = trigger suspension
+    if (action === 'add' && newStrikeCount >= 3) {
+      const newSuspensionCount = (currentUser.suspension_count || 0) + 1;
+      const suspensionEnd = new Date();
+      suspensionEnd.setDate(suspensionEnd.getDate() + 7); // 7 days suspension
       
-      // If adding strikes and reaching a new suspension threshold
-      if (action === 'add' && newSuspensionCount > (currentUser.suspension_count || 0)) {
-        // Set suspension end date (e.g., 7 days from now)
-        const suspensionEnd = new Date();
-        suspensionEnd.setDate(suspensionEnd.getDate() + 7);
-        updateData.suspension_end = suspensionEnd.toISOString();
-        updateData.account_status = 'suspended';
-      }
-      // If removing strikes and going below suspension threshold
-      else if (action === 'remove' && newSuspensionCount < (currentUser.suspension_count || 0)) {
-        updateData.suspension_end = null;
-        updateData.account_status = 'active';
-      }
+      updateData = {
+        strike_count: 0, // Reset strikes to 0 after suspension
+        suspension_count: newSuspensionCount,
+        suspension_end: suspensionEnd.toISOString(),
+        account_status: 'suspended',
+        last_violation_at: new Date().toISOString()
+      };
+    }
+    // If removing strikes, just update the count (don't affect suspensions)
+    else if (action === 'remove') {
+      updateData.strike_count = newStrikeCount;
     }
 
     // Update user
@@ -1011,8 +1008,9 @@ router.patch('/legal-seekers/:id/strikes', authenticateAdmin, async (req, res) =
         details: { 
           reason, 
           previous_strikes: currentStrikes,
-          new_strikes: newStrikeCount,
-          suspension_count: newSuspensionCount
+          new_strikes: updateData.strike_count,
+          suspension_triggered: action === 'add' && newStrikeCount >= 3,
+          suspension_count: updateData.suspension_count || currentUser.suspension_count
         }
       });
     } catch (auditError) {
@@ -1024,7 +1022,7 @@ router.patch('/legal-seekers/:id/strikes', authenticateAdmin, async (req, res) =
       message: `Strike ${action}ed successfully`,
       data: {
         ...updatedUser,
-        total_strikes: (updatedUser.strike_count || 0) + (updatedUser.reject_count || 0)
+        total_strikes: updatedUser.strike_count || 0
       }
     });
 
