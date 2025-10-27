@@ -353,6 +353,26 @@ async def ask_legal_question_stream(
                             'message': violation_result['message']
                         }
                         yield format_sse({'type': 'violation', 'violation': violation_metadata})
+                        
+                        # Save violated message to chat history (for audit trail)
+                        try:
+                            await save_chat_interaction(
+                                chat_service=chat_service,
+                                effective_user_id=effective_user_id,
+                                session_id=request.session_id,
+                                question=request.question,
+                                answer=violation_message,
+                                language=language,
+                                metadata={
+                                    "violation": True,
+                                    "action_taken": violation_result['action_taken'],
+                                    "strike_count": violation_result['strike_count'],
+                                    "streaming": True,
+                                    "user_type": "lawyer"
+                                }
+                            )
+                        except Exception as e:
+                            logger.error(f"Failed to save violation to history: {e}")
                     
                     # Done
                     yield format_sse({'done': True})

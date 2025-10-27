@@ -676,6 +676,9 @@ export default function ChatbotScreen() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
+        // Track if this is a violation response
+        let isViolation = false;
+
         try {
           await streamChatResponse({
             endpoint,
@@ -709,11 +712,20 @@ export default function ChatbotScreen() {
               // Violation detected - refresh moderation status to show updated strike count
               console.log('⚠️ Violation metadata received:', violation);
               console.log(`   Action: ${violation.action_taken}, Strikes: ${violation.strike_count}, Suspensions: ${violation.suspension_count}`);
+              
+              // Mark as violation so onComplete knows not to process sources
+              isViolation = true;
+              
+              // Refresh moderation status to update banner
               await refreshStatus();
             },
             onComplete: async () => {
               isStreamingRef.current = false;
-              updateMessageWithSources(streamingMsgId, answer, sources, language);
+              
+              // Only update with sources if this wasn't a violation
+              if (!isViolation) {
+                updateMessageWithSources(streamingMsgId, answer, sources, language);
+              }
               
               setTimeout(() => {
                 shouldAutoScroll.current = true;
