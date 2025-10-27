@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import LawyerNavbar from '../lawyer/LawyerNavbar';
+import LawyerNavbar from '../lawyer/shared/LawyerNavbar';
 import Navbar from '../Navbar';
 
 interface RoleBasedNavigationProps {

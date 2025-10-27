@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import tw from "tailwind-react-native-classnames";
 import Header from "../components/Header";
-import Navbar from "../../client/components/Navbar";
+import Navbar from "../components/Navbar";
 import { SidebarWrapper } from "../components/AppSidebar";
 import Colors from "../constants/Colors";
 import { useAuth } from "../contexts/AuthContext";

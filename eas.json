@@ -9,8 +9,7 @@
       "distribution": "internal",
       "resourceClass": "default",
       "env": {
-        "APP_ENV": "development",
-        "EXPO_PUBLIC_API_URL": "https://your-backend-url.com"
+        "APP_ENV": "development"
       },
       "android": {
         "buildType": "apk",
@@ -20,9 +19,6 @@
     "preview": {
       "distribution": "internal",
       "resourceClass": "default",
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://your-backend-url.com"
-      },
       "android": {
         "buildType": "apk",
         "withoutCredentials": false
@@ -31,8 +27,7 @@
     "production": {
       "channel": "production",
       "env": {
-        "APP_ENV": "production",
-        "EXPO_PUBLIC_API_URL": "https://your-production-backend-url.com"
+        "APP_ENV": "production"
       },
       "android": {
         "buildType": "app-bundle"
