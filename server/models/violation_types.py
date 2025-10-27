@@ -17,6 +17,10 @@ class ViolationType(str, Enum):
     
     Database enum definition:
     CREATE TYPE violation_type AS ENUM ('forum_post', 'chatbot_prompt', 'forum_reply');
+    
+    Note: 'chatbot_prompt' covers ALL chatbot violations including:
+          - Content moderation (profanity, harassment, hate speech, etc.)
+          - Security violations (prompt injection, system hijacking attempts)
     """
     FORUM_POST = "forum_post"
     CHATBOT_PROMPT = "chatbot_prompt"

@@ -1,19 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, FlatList, RefreshControl, Animated, TouchableOpacity, StyleSheet, ListRenderItem, Platform } from 'react-native';
+import { View, Text, FlatList, RefreshControl, Animated, TouchableOpacity, StyleSheet, ListRenderItem } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus } from 'lucide-react-native';
 import Post from './Post';
 import { useAuth } from '../../contexts/AuthContext';
 import { useForumCache } from '../../contexts/ForumCacheContext';
 import Colors from '../../constants/Colors';
-import { LAYOUT } from '../../constants/LayoutConstants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
 import { useList } from '@/hooks/useOptimizedList';
 import { SkeletonList } from '@/components/ui/SkeletonLoader';
-import { shouldUseNativeDriver } from '../../utils/animations';
-import { NetworkConfig } from '../../utils/networkConfig';
 
 interface PostData {
   id: string;
@@ -49,9 +45,8 @@ interface TimelineProps {
 
 const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { session, isAuthenticated, user: currentUser } = useAuth();
-  const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
+  const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, getLastFetchTime, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [optimisticPosts, setOptimisticPosts] = useState<PostData[]>([]);
@@ -66,16 +61,6 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   // Force cache refresh to fix any lingering references
   React.useEffect(() => {
     // This ensures any old references are cleared
-  }, []);
-
-  // Helper function to get initials from name
-  const getInitials = useCallback((name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
   }, []);
 
   const formatTimeAgo = useCallback((isoDate?: string): string => {
@@ -123,7 +108,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         user: isReplyAnon ? undefined : {
           name: replyUserData?.full_name || replyUserData?.username || 'User',
           username: replyUserData?.username || 'user',
-          avatar: replyUserData?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+          avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
           isLawyer: replyUserData?.role === 'verified_lawyer',
           lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
         },
@@ -137,7 +122,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         : { 
             name: userData?.full_name || userData?.username || 'User', 
             username: userData?.username || 'user', 
-            avatar: userData?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Use profile photo or fallback
+            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
             isLawyer: userData?.role === 'verified_lawyer',
             lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
           },
@@ -167,12 +152,16 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     // Use setCachedPost to cache the complete post
     setCachedPost(postData.id, postWithComments as any);
     
+    if (__DEV__) {
+      console.log(`Cached post ${postData.id} with ${mappedReplies.length} comments from Timeline`);
+    }
+    
     return postData;
   }, [formatTimeAgo, setCachedPost]);
 
   // Remove complex batching - bookmark status now comes from API
 
-  // Optimized auth headers helper with improved logging
+  // Optimized auth headers helper with minimal logging
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
     try {
       // First try to get token from AuthContext session
@@ -192,8 +181,10 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         };
       }
       
+      if (__DEV__) console.warn('Timeline: No authentication token available');
       return { 'Content-Type': 'application/json' };
-    } catch {
+    } catch (error) {
+      if (__DEV__) console.error('Timeline auth error:', error);
       return { 'Content-Type': 'application/json' };
     }
   }, [session?.access_token]);
@@ -204,6 +195,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     if (!force && isCacheValid()) {
       const cachedPosts = getCachedPosts();
       if (cachedPosts && cachedPosts.length > 0) {
+        if (__DEV__) console.log('Timeline: Using cached posts, skipping fetch');
         setPosts(cachedPosts);
         setInitialLoading(false);
         return;
@@ -215,14 +207,10 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     setError(null);
     
     if (!isAuthenticated) {
+      if (__DEV__) console.warn('Timeline: User not authenticated, clearing posts');
       setPosts([]);
       setRefreshing(false);
       setInitialLoading(false);
-      
-      // Prompt user to login instead of making API call
-      import('../../utils/authUtils').then(({ checkAuthentication }) => {
-        checkAuthentication();
-      });
       return;
     }
     
@@ -237,7 +225,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     
     try {
       const headers = await getAuthHeaders();
-      const API_BASE_URL = await NetworkConfig.getBestApiUrl();
+      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
@@ -250,18 +238,10 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       
       clearTimeout(timeoutId);
 
-      // Handle session timeout
-      const { handleSessionTimeout } = await import('../../utils/authUtils');
-      const isSessionTimeout = await handleSessionTimeout(response);
-      if (isSessionTimeout) {
-        setRefreshing(false);
-        setInitialLoading(false);
-        return;
-      }
-      
       if (!response.ok) {
         const errorText = await response.text();
         if (response.status === 403) {
+          if (__DEV__) console.error('Timeline: Authentication failed - 403 Forbidden. Check if user is properly authenticated.');
           // Clear posts and show authentication error
           setPosts([]);
           setError('Authentication required. Please log in again.');
@@ -283,6 +263,9 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       if (isComponentMounted.current) {
         setPosts(mapped);
         setCachedPosts(mapped); // Cache the posts
+        if (__DEV__ && mapped.length === 0) {
+          console.log('Timeline: No posts found');
+        }
         
         // Clear any error state on successful load
         setError(null);
@@ -294,6 +277,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       }
       
       const errorMessage = error.message || 'Failed to load posts';
+      if (__DEV__) console.error('Timeline load error:', errorMessage);
       
       if (isComponentMounted.current) {
         setError(errorMessage);
@@ -319,8 +303,10 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     useCallback(() => {
       // Check if cache is invalid or if we should refresh
       if (!isCacheValid()) {
+        if (__DEV__) console.log('📱 Timeline: Screen focused, cache invalid - refreshing');
         loadPosts(true); // Force refresh
       } else {
+        if (__DEV__) console.log('📱 Timeline: Screen focused, cache valid - using cache');
         loadPosts(); // Use cache if valid
       }
     }, [loadPosts, isCacheValid])
@@ -379,6 +365,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
 
   const handleBookmarkPress = useCallback((postId: string) => {
     // The Post component handles the actual bookmark logic
+    if (__DEV__) console.log('Bookmark toggled:', postId);
   }, []);
   
   const handleBookmarkStatusChange = useCallback((postId: string, isBookmarked: boolean) => {
@@ -392,6 +379,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
 
   const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic
+    if (__DEV__) console.log('Report submitted:', postId);
   }, []);
 
   const handleMenuToggle = useCallback((postId: string) => {
@@ -432,7 +420,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         : { 
             name: userName,
             username: userUsername,
-            avatar: (currentUser as any)?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
             isLawyer: isLawyer,
             lawyerBadge: isLawyer ? 'Verified' : undefined
           },
@@ -450,7 +438,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     Animated.timing(animatedOpacity, {
       toValue: 0.7, // Semi-transparent while posting
       duration: 300,
-      useNativeDriver: shouldUseNativeDriver('opacity'),
+      useNativeDriver: true,
     }).start();
     
     return optimisticPost.id;
@@ -465,7 +453,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         Animated.timing(post.animatedOpacity, {
           toValue: 1,
           duration: 200,
-          useNativeDriver: shouldUseNativeDriver('opacity'),
+          useNativeDriver: true,
         }).start();
         
         // Keep optimistic post visible and let duplicate detection handle seamless transition
@@ -488,7 +476,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         Animated.timing(post.animatedOpacity, {
           toValue: 0,
           duration: 200,
-          useNativeDriver: shouldUseNativeDriver('opacity'),
+          useNativeDriver: true,
         }).start(() => {
           setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
         });
@@ -610,41 +598,9 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         />
       )}
 
-      {/* Floating Create Post Button - Responsive positioning */}
-      <TouchableOpacity 
-        style={{
-          position: 'absolute',
-          // Calculate bottom position: navbar height + safe area + spacing
-          bottom: LAYOUT.NAVBAR_HEIGHT + (insets.bottom || 0) + LAYOUT.SPACING.md,
-          right: LAYOUT.SPACING.lg,
-          backgroundColor: Colors.primary.blue,
-          width: LAYOUT.MIN_TOUCH_TARGET + LAYOUT.SPACING.md, // 60px (larger than min)
-          height: LAYOUT.MIN_TOUCH_TARGET + LAYOUT.SPACING.md,
-          borderRadius: (LAYOUT.MIN_TOUCH_TARGET + LAYOUT.SPACING.md) / 2,
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: LAYOUT.Z_INDEX.fixed,
-          ...Platform.select({
-            ios: {
-              shadowColor: Colors.primary.blue,
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 8,
-            },
-            android: {
-              elevation: 8,
-            },
-            web: {
-              boxShadow: `0 4px 12px ${Colors.primary.blue}40`,
-            },
-          }),
-        }}
-        onPress={handleCreatePost} 
-        activeOpacity={0.8}
-        accessibilityLabel="Create new post"
-        accessibilityRole="button"
-      >
-        <Plus size={LAYOUT.SPACING.lg} color="#FFFFFF" strokeWidth={2.5} />
+      {/* Floating Create Post Button */}
+      <TouchableOpacity style={styles.createPostButton} onPress={handleCreatePost} activeOpacity={0.8}>
+        <Plus size={24} color="#FFFFFF" />
       </TouchableOpacity>
     </View>
   );
@@ -669,11 +625,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   bottomSpacer: {
-    height: 20, // Add a spacer at the bottom to prevent content from being hidden
+    height: 80, // Add a spacer at the bottom to prevent content from being hidden
   },
   createPostButton: {
-    // Removed - now using dynamic style
+    position: 'absolute',
+    bottom: 80,
+    right: 20,
+    backgroundColor: Colors.primary.blue,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    boxShadow: `0 4px 8px ${Colors.primary.blue}30`,
+    elevation: 8,
   },
 });
 
-export default Timeline;
+export default Timeline; 

@@ -25,6 +25,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, AsyncGenerator
 import json
+import time
 from qdrant_client import QdrantClient
 from openai import OpenAI
 import os
@@ -68,6 +69,7 @@ from services.chat_history_service import ChatHistoryService, get_chat_history_s
 # Import content moderation and violation tracking
 from services.content_moderation_service import get_moderation_service
 from services.violation_tracking_service import get_violation_tracking_service
+from services.prompt_injection_detector import get_prompt_injection_detector
 from models.violation_types import ViolationType
 
 # Import authentication (optional for chatbot)
@@ -205,17 +207,43 @@ HISTORICAL_KEYWORDS = [
 
 # Initialize Qdrant client with error handling
 try:
+    # Increase timeout to handle slow connections
     qdrant_client = QdrantClient(
         url=QDRANT_URL,
         api_key=QDRANT_API_KEY,
-        timeout=10.0  # 10 second timeout for speed
+        timeout=30.0,  # Increased timeout to 30 seconds
+        prefer_grpc=False  # Use HTTP instead of gRPC for better compatibility
     )
-    # Verify connection
-    qdrant_client.get_collections()
-    logger.info("✅ Qdrant client initialized successfully")
+    
+    # Verify connection with retry logic
+    max_retries = 3
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            qdrant_client.get_collections()
+            logger.info("✅ Qdrant client initialized successfully")
+            break
+        except Exception as retry_error:
+            if attempt < max_retries - 1:
+                logger.warning(f"Qdrant connection attempt {attempt+1} failed: {retry_error}. Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                raise
 except Exception as e:
-    logger.error(f"Failed to initialize Qdrant client: {e}")
-    raise RuntimeError(f"Qdrant initialization failed: {e}")
+    logger.error(f"Failed to initialize Qdrant client after multiple attempts: {e}")
+    # Create a mock client for development/testing that won't block server startup
+    # This allows the server to start even if Qdrant is unavailable
+    class MockQdrantClient:
+        def __getattr__(self, name):
+            def method(*args, **kwargs):
+                logger.warning(f"Using mock Qdrant client. Method {name} called but not implemented.")
+                return None
+            return method
+    
+    qdrant_client = MockQdrantClient()
+    logger.warning("⚠️ Using mock Qdrant client. Vector search functionality will be limited.")
 
 # Initialize OpenAI client with timeout settings (industry standard)
 if not OPENAI_API_KEY:
@@ -1763,6 +1791,78 @@ async def ask_legal_question(
         print(f"⏱️  Prohibited check took: {step_time:.2f}s")
         if is_prohibited:
             raise HTTPException(status_code=400, detail=prohibition_reason)
+        
+        # STEP 4.3: Prompt Injection Detection (NEW - Security Enhancement)
+        # Check for prompt injection/hijacking attempts BEFORE processing
+        # ⚡ CRITICAL: Check for ALL users (authenticated AND guests) to prevent security bypass
+        step_start = time.time()
+        print(f"\n🛡️  [STEP 4.3] Prompt injection detection...")
+        injection_detector = get_prompt_injection_detector()
+        
+        try:
+            injection_result = injection_detector.detect(request.question.strip())
+            step_time = time.time() - step_start
+            print(f"⏱️  Injection detection took: {step_time:.2f}s")
+            
+            # If prompt injection detected, block immediately
+            if injection_result["is_injection"]:
+                logger.warning(
+                    f"🚨 Prompt injection detected for {'user ' + effective_user_id[:8] if effective_user_id else 'guest'}: "
+                    f"category={injection_result['category']}, "
+                    f"severity={injection_result['severity']:.2f}, "
+                    f"risk={injection_result['risk_level']}"
+                )
+                
+                # Record violation ONLY for authenticated users (guests can't be tracked)
+                if effective_user_id:
+                    violation_service = get_violation_tracking_service()
+                    try:
+                        print(f"📝 Recording prompt injection violation for user: {effective_user_id}")
+                        violation_result = await violation_service.record_violation(
+                            user_id=effective_user_id,
+                            violation_type=ViolationType.CHATBOT_PROMPT,
+                            content_text=request.question.strip(),
+                            moderation_result=injection_result,
+                            content_id=None
+                        )
+                        print(f"✅ Prompt injection violation recorded: {violation_result}")
+                        
+                        # Return error message with violation info
+                        language = detect_language(request.question)
+                        if language == "tagalog":
+                            violation_message = (
+                                f"🚨 Labag sa Patakaran ng Seguridad\n\n"
+                                f"{injection_result['description']}\n\n"
+                                f"⚠️ {violation_result['message']}"
+                            )
+                        else:
+                            violation_message = (
+                                f"🚨 Security Policy Violation\n\n"
+                                f"{injection_result['description']}\n\n"
+                                f"⚠️ {violation_result['message']}"
+                            )
+                        
+                        return create_chat_response(
+                            answer=violation_message,
+                            simplified_summary=f"Prompt injection blocked: {injection_result['category']}"
+                        )
+                        
+                    except Exception as violation_error:
+                        logger.error(f"❌ Failed to record prompt injection violation: {str(violation_error)}")
+                        import traceback
+                        print(f"Violation error traceback: {traceback.format_exc()}")
+                
+                # Return generic error message (for guests or if violation recording fails)
+                return create_chat_response(
+                    answer="🚨 Your message was flagged for attempting to manipulate the system. This violates our usage policy. Please use the chatbot for legitimate legal questions only.",
+                    simplified_summary="Prompt injection blocked"
+                )
+            else:
+                print(f"✅ No prompt injection detected")
+                    
+        except Exception as e:
+            logger.error(f"❌ Prompt injection detection error: {str(e)}")
+            # Fail-open: Continue without injection detection if service fails
         
         # OPTIMIZATION: Skip gibberish detection for speed (too complex and slow)
         # The AI will handle unclear questions naturally in its response

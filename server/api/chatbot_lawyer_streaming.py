@@ -64,6 +64,7 @@ from api.chatbot_lawyer import (
 # Import content moderation and violation tracking
 from services.content_moderation_service import get_moderation_service
 from services.violation_tracking_service import get_violation_tracking_service
+from services.prompt_injection_detector import get_prompt_injection_detector
 from models.violation_types import ViolationType
 
 # Create router
@@ -174,9 +175,71 @@ async def ask_legal_question_stream(
                         logger.error(f"Failed to save greeting history: {e}")
                 return
             
-            # Content Moderation using OpenAI omni-moderation-latest
+            # STEP 1: Prompt Injection Detection (Security Enhancement)
+            # Check for prompt injection/hijacking attempts BEFORE content moderation
+            # Only check for authenticated users to track violations
+            if effective_user_id:
+                print(f"\n [STEP 1] Prompt injection detection (streaming)...")
+                injection_detector = get_prompt_injection_detector()
+                violation_service = get_violation_tracking_service()
+                
+                try:
+                    injection_result = injection_detector.detect(request.question.strip())
+                    
+                    # If prompt injection detected, record violation and block
+                    if injection_result["is_injection"]:
+                        logger.warning(
+                            f" Prompt injection detected for lawyer {effective_user_id[:8]}: "
+                            f"category={injection_result['category']}, "
+                            f"severity={injection_result['severity']:.2f}, "
+                            f"risk={injection_result['risk_level']}"
+                        )
+                        
+                        # Record violation and get action taken
+                        try:
+                            print(f"📝 Recording prompt injection violation for lawyer: {effective_user_id}")
+                            violation_result = await violation_service.record_violation(
+                                user_id=effective_user_id,
+                                violation_type=ViolationType.CHATBOT_PROMPT,  
+                                content_text=request.question.strip(),
+                                moderation_result=injection_result,  
+                                content_id=None
+                            )
+                            print(f"✅ Prompt injection violation recorded: {violation_result}")
+                            
+                            # Return formal legal-style error message with violation info
+                            violation_message = (
+                                f"**I. PRELIMINARY STATEMENT**\n\n"
+                                f"This Counsel has detected an attempt to manipulate or compromise the operational parameters of this legal analytical service.\n\n"
+                                f"**II. SECURITY VIOLATION DETECTED**\n\n"
+                                f"{injection_result['description']}\n\n"
+                                f"**III. CONSEQUENCE**\n\n"
+                                f" {violation_result['message']}\n\n"
+                                f"**IV. ADVISORY**\n\n"
+                                f"You are advised to utilize this service solely for legitimate legal research and analysis. Any further attempts to compromise system security may result in permanent account suspension."
+                            )
+                            
+                            yield f"data: {json.dumps({'content': violation_message, 'done': True})}\n\n"
+                            return
+                            
+                        except Exception as violation_error:
+                            logger.error(f" Failed to record prompt injection violation: {str(violation_error)}")
+                            import traceback
+                            print(f"Violation error traceback: {traceback.format_exc()}")
+                            
+                            # Return generic error message if violation recording fails
+                            yield f"data: {json.dumps({'content': 'Your query was flagged for attempting to manipulate the system. This violates our usage policy. Please use this service for legitimate legal research only.', 'done': True})}\n\n"
+                            return
+                    else:
+                        print(f" No prompt injection detected (streaming)")
+                        
+                except Exception as e:
+                    logger.error(f" Prompt injection detection error: {str(e)}")
+                    # Fail-open: Continue without injection detection if service fails
+            
+            # STEP 2: Content Moderation using OpenAI omni-moderation-latest
             # Run moderation on ALL messages before generating any response
-            print(f"\n🔍 Content moderation check (streaming)...")
+            print(f"\n [STEP 2] Content moderation check (streaming)...")
             moderation_service = get_moderation_service()
             violation_service = get_violation_tracking_service()
             

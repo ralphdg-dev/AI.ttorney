@@ -20,12 +20,10 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const segments = useSegments();
 
   useEffect(() => {
-    // Don't run route checks while loading (but allow during sign out for immediate redirect)
-    if (isLoading) return;
-    
-    // During sign out, skip all checks and allow navigation to login
+    // ⚡ OPTIMIZATION: Skip checks during sign out for immediate redirect
     if (isSigningOut) return;
-
+    
+    // ⚡ OPTIMIZATION: Don't block on loading for public routes (login, register)
     const currentPath = `/${segments.join('/')}`;
     const routeConfig = getRouteConfig(currentPath);
     
@@ -35,6 +33,14 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     if (currentPath.includes('/lawyer-status/')) {
       return;
     }
+
+    // ⚡ OPTIMIZATION: Allow public routes to render immediately even while loading
+    if (isLoading && routeConfig.isPublic) {
+      return; // Let public routes render without waiting
+    }
+
+    // Wait for auth to finish loading before checking protected routes
+    if (isLoading) return;
 
     // Handle authenticated users - check both session and user exist
     if (isAuthenticated && user && session) {
@@ -76,7 +82,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       if (!routeConfig.isPublic) {
         const redirectPath = '/login';
         logRouteAccess(currentPath, null, 'denied', 'Authentication required');
-        router.replace(redirectPath as any); // Use replace instead of push for faster redirect
+        router.replace(redirectPath as any);
         return;
       }
 

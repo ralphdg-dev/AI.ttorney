@@ -18,11 +18,15 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
   const pathname = usePathname();
   const [isChecking, setIsChecking] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
+  const [lastUserId, setLastUserId] = useState<string | null>(null);
 
   // Reset hasChecked when user changes (login/logout)
   React.useEffect(() => {
-    setHasChecked(false);
-  }, [user?.id]);
+    if (user?.id !== lastUserId) {
+      setHasChecked(false);
+      setLastUserId(user?.id || null);
+    }
+  }, [user?.id, lastUserId]);
 
   useEffect(() => {
     const checkSuspension = async () => {
@@ -42,8 +46,9 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
       const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route));
       
       if (isPublicRoute || !user || !session || isChecking || isLoading || hasChecked) {
+        // ⚡ OPTIMIZATION: Mark as checked immediately on public routes or when auth is loading
+        // This prevents redundant checks since AuthContext already handles suspension on login
         if (!hasChecked && !isPublicRoute && user && session && !isLoading) {
-          // Only set hasChecked if we have a valid user session
           setHasChecked(true);
         }
         return;
@@ -55,10 +60,8 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
         
         if (suspensionStatus && suspensionStatus.isSuspended) {
           console.log('🚫 User is suspended, redirecting to suspended screen from guard');
-          // User is suspended, redirect to suspended screen
           router.replace('/suspended');
         } else {
-          // User is not suspended, allow access
           setHasChecked(true);
         }
       } catch (error) {
@@ -71,7 +74,7 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     checkSuspension();
-  }, [pathname, user?.id]);
+  }, [pathname, user?.id, hasChecked, isLoading, isSigningOut]);
 
   // Don't show loading if user is signing out
   if (isSigningOut) {

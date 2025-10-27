@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, Animated } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../constants/Colors';
 
-const loadingGif = require('../assets/images/loading-owl.gif');
+const loadingVideo = require('../assets/images/loading-state.mp4');
 
 // Philippine Law Trivia - 25 Random Facts about Philippine Law
 const PH_LAW_TRIVIAS = [
@@ -46,6 +47,7 @@ export const LoadingWithTrivia: React.FC<LoadingWithTriviaProps> = ({
   const displayMessage = message || "LOADING...";
   const [currentTrivia, setCurrentTrivia] = useState('');
   const [fadeAnim] = useState(new Animated.Value(0));
+  const videoRef = useRef<Video>(null);
 
   useEffect(() => {
     // Select random trivia on mount
@@ -62,19 +64,25 @@ export const LoadingWithTrivia: React.FC<LoadingWithTriviaProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Loading GIF */}
-      <Animated.Image
-        source={loadingGif}
-        style={[styles.loadingGif, { opacity: fadeAnim }]}
-        resizeMode="contain"
-      />
+      {/* Loading Video */}
+      <Animated.View style={[styles.videoContainer, { opacity: fadeAnim }]}>
+        <Video
+          ref={videoRef}
+          source={loadingVideo}
+          style={styles.loadingVideo}
+          resizeMode={ResizeMode.CONTAIN}
+          shouldPlay
+          isLooping
+          isMuted
+        />
+      </Animated.View>
 
       {/* Loading Message */}
       <Text style={styles.loadingText}>{displayMessage}</Text>
 
       {/* Trivia Section */}
       {showTrivia && currentTrivia && (
-        <Animated.View style={[styles.triviaContainer, { opacity: fadeAnim }]}>
+        <Animated.View style={{ opacity: fadeAnim }}>
           <Text style={styles.triviaText}>{currentTrivia}</Text>
         </Animated.View>
       )}
@@ -87,13 +95,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: 'white',
     paddingHorizontal: 40,
   },
-  loadingGif: {
-    width: 250,
-    height: 250,
+  videoContainer: {
+    width: 150,
+    height: 150,
     marginBottom: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingVideo: {
+    width: 150,
+    height: 150,
   },
   loadingText: {
     fontSize: 14,
@@ -103,21 +117,14 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 40,
   },
-  triviaContainer: {
-    maxWidth: 400,
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.primary.blue,
-  },
   triviaText: {
     fontSize: 15,
     lineHeight: 24,
     color: Colors.text.primary,
     textAlign: 'center',
     fontWeight: '400',
+    maxWidth: 400,
+    paddingHorizontal: 20,
   },
 });
 
