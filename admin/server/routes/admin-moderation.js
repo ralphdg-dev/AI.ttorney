@@ -63,21 +63,42 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
       content_text, 
       admin_reason, 
       action, 
-      report_id 
+      report_id,
+      duration 
     } = req.body;
     const adminId = req.admin?.id;
 
     console.log('=== ADMIN MODERATION ACTION ===');
     console.log('User ID:', user_id);
     console.log('Action:', action);
+    console.log('Duration:', duration);
     console.log('Admin ID:', adminId);
     console.log('Reason:', admin_reason);
 
+    // Helper function to calculate end date based on duration
+    const calculateEndDate = (duration) => {
+      if (duration === 'permanent') return null;
+      
+      const endDate = new Date();
+      switch (duration) {
+        case '1_day': endDate.setDate(endDate.getDate() + 1); break;
+        case '3_days': endDate.setDate(endDate.getDate() + 3); break;
+        case '1_week': endDate.setDate(endDate.getDate() + 7); break;
+        case '2_weeks': endDate.setDate(endDate.getDate() + 14); break;
+        case '1_month': endDate.setMonth(endDate.getMonth() + 1); break;
+        case '3_months': endDate.setMonth(endDate.getMonth() + 3); break;
+        case '6_months': endDate.setMonth(endDate.getMonth() + 6); break;
+        case '1_year': endDate.setFullYear(endDate.getFullYear() + 1); break;
+        default: return null; // Default to permanent if unknown duration
+      }
+      return endDate.toISOString();
+    };
+
     // Validate input
-    if (!['strike', 'suspend_7days', 'permanent_ban'].includes(action)) {
+    if (!['strike', 'suspend_7days', 'ban', 'restrict', 'unrestrict'].includes(action)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid action. Must be strike, suspend_7days, or permanent_ban'
+        error: 'Invalid action. Must be strike, suspend_7days, ban, restrict, or unrestrict'
       });
     }
 
@@ -189,9 +210,11 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
         ends_at: suspensionEnd.toISOString(),
         status: 'active'
       };
-    } else if (action === 'permanent_ban') {
-      // Force permanent ban
+    } else if (action === 'ban') {
+      // Forum ban (permanent or temporary based on duration)
       const newSuspensionCount = (currentUser.suspension_count || 0) + 1;
+      const endDate = calculateEndDate(duration);
+      const isPermanent = duration === 'permanent' || !endDate;
       
       actionTaken = 'banned';
       strikeCountAfter = 0;
@@ -201,7 +224,7 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
         strike_count: 0,
         suspension_count: newSuspensionCount,
         account_status: 'banned',
-        suspension_end: null,
+        suspension_end: endDate,
         last_violation_at: new Date().toISOString(),
         banned_at: new Date().toISOString(),
         banned_reason: admin_reason
@@ -209,14 +232,55 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
 
       suspensionData = {
         user_id: user_id,
-        suspension_type: 'permanent',
-        reason: `Admin-imposed permanent ban: ${admin_reason}`,
+        suspension_type: isPermanent ? 'permanent' : 'temporary',
+        reason: `Admin-imposed ${isPermanent ? 'permanent' : 'temporary'} ban: ${admin_reason}`,
         suspension_number: newSuspensionCount,
         strikes_at_suspension: currentUser.strike_count || 0,
         started_at: new Date().toISOString(),
-        ends_at: null,
+        ends_at: endDate,
         status: 'active'
       };
+    } else if (action === 'restrict') {
+      // Forum restriction (view-only access, permanent or temporary based on duration)
+      const endDate = calculateEndDate(duration);
+      const isPermanent = duration === 'permanent' || !endDate;
+      
+      actionTaken = 'suspended'; // Use supported enum value (closest semantic match)
+      strikeCountAfter = currentUser.strike_count || 0; // Keep current strikes
+      suspensionCountAfter = currentUser.suspension_count || 0; // Keep current suspension count
+      
+      userUpdateData = {
+        account_status: 'restricted',
+        suspension_end: endDate, // Set end date for temporary restrictions
+        last_violation_at: new Date().toISOString()
+      };
+
+      // Create a restriction record (similar to suspension but for restrictions)
+      if (!isPermanent) {
+        suspensionData = {
+          user_id: user_id,
+          suspension_type: 'restriction',
+          reason: `Admin-imposed temporary forum restriction: ${admin_reason}`,
+          suspension_number: 0, // Restrictions don't count as suspensions
+          strikes_at_suspension: currentUser.strike_count || 0,
+          started_at: new Date().toISOString(),
+          ends_at: endDate,
+          status: 'active'
+        };
+      }
+    } else if (action === 'unrestrict') {
+      // Remove forum restrictions (restore to active status)
+      actionTaken = 'suspended'; // Use supported enum value (for database compatibility)
+      strikeCountAfter = currentUser.strike_count || 0; // Keep current strikes
+      suspensionCountAfter = currentUser.suspension_count || 0; // Keep current suspension count
+      
+      userUpdateData = {
+        account_status: 'active',
+        suspension_end: null, // Clear any restriction end date
+        last_violation_at: new Date().toISOString()
+      };
+
+      // No suspension record needed for unrestrict, just violation record for audit trail
     }
 
     // Create violation record
@@ -336,7 +400,10 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
           reviewed_at: new Date().toISOString(),
           violation_id: violationResult.id,
           action_taken: action === 'strike' ? 'strike' : 
-                       action === 'suspend_7days' ? 'suspended' : 'banned',
+                       action === 'suspend_7days' ? 'suspended' : 
+                       action === 'restrict' ? 'suspended' : 
+                       action === 'ban' ? 'banned' : 
+                       action === 'unrestrict' ? 'suspended' : 'banned',
           admin_notes: admin_reason
         })
         .eq('id', report_id);

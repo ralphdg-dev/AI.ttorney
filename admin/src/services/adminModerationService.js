@@ -111,14 +111,15 @@ class AdminModerationService {
   }
 
   // Helper method to format violation action for API
-  formatModerationAction(action, postContent, adminReason, reportId = null, contentId = null) {
+  formatModerationAction(action, postContent, adminReason, reportId = null, contentId = null, duration = 'permanent') {
     return {
       violation_type: 'forum_post', // Default to forum_post, can be extended
       content_id: contentId,
       content_text: postContent,
       admin_reason: adminReason,
-      action: action, // 'strike', 'suspend_7days', 'permanent_ban'
-      report_id: reportId
+      action: action, // 'strike', 'suspend_7days', 'ban', 'restrict'
+      report_id: reportId,
+      duration: duration
     };
   }
 }

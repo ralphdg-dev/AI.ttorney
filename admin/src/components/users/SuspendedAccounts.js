@@ -3,13 +3,10 @@ import ReactDOM from "react-dom";
 import {
   Search,
   Shield,
-  Ban,
   Clock,
   User,
   Calendar,
   AlertTriangle,
-  Plus,
-  Minus,
   Eye,
   History,
 } from "lucide-react";
@@ -19,7 +16,7 @@ import DataTable from "../ui/DataTable";
 import Pagination from "../ui/Pagination";
 import Tooltip from "../ui/Tooltip";
 
-const BanRestrictUsers = () => {
+const SuspendedAccounts = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,16 +24,13 @@ const BanRestrictUsers = () => {
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [riskFilter, setRiskFilter] = useState("all");
+  const [suspensionFilter, setSuspensionFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Ban/Restrict modal
-  const [showActionModal, setShowActionModal] = useState(false);
+  // Lift suspension modal
+  const [showLiftModal, setShowLiftModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [actionType, setActionType] = useState(""); // 'ban', 'restrict', 'unban', 'unrestrict', 'add_strike', 'remove_strike'
-  const [actionReason, setActionReason] = useState("");
-  const [actionDuration, setActionDuration] = useState("permanent");
+  const [liftReason, setLiftReason] = useState("");
   const [processing, setProcessing] = useState(false);
 
   // User details modal
@@ -45,59 +39,41 @@ const BanRestrictUsers = () => {
   const [userSuspensions, setUserSuspensions] = useState([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
-  const statusOptions = [
-    { value: "all", label: "All Users" },
-    { value: "active", label: "Active Users" },
-    { value: "banned", label: "Banned from Forum" },
-    { value: "restricted", label: "Restricted (View Only)" },
-  ];
-
-  const riskOptions = [
-    { value: "all", label: "All Risk Levels" },
-    { value: "low", label: "Low Risk" },
-    { value: "medium", label: "Medium Risk" },
-    { value: "high", label: "High Risk" },
-  ];
-
-  const durationOptions = [
-    { value: "permanent", label: "Permanent" },
-    { value: "1_day", label: "1 Day" },
-    { value: "3_days", label: "3 Days" },
-    { value: "1_week", label: "1 Week" },
-    { value: "2_weeks", label: "2 Weeks" },
-    { value: "1_month", label: "1 Month" },
-    { value: "3_months", label: "3 Months" },
-    { value: "6_months", label: "6 Months" },
-    { value: "1_year", label: "1 Year" },
+  const suspensionOptions = [
+    { value: "all", label: "All Suspended Users" },
+    { value: "suspended", label: "Currently Suspended" },
+    { value: "banned", label: "Permanently Banned" },
   ];
 
   useEffect(() => {
-    fetchUsers();
-  }, [searchTerm, statusFilter, riskFilter, currentPage]);
+    fetchSuspendedUsers();
+  }, [searchTerm, suspensionFilter, currentPage]);
 
-  const fetchUsers = async () => {
+  const fetchSuspendedUsers = async () => {
     try {
       setLoading(true);
       const response = await usersService.getLegalSeekers({
         page: currentPage,
-        limit: 50, // Increased from 20 to 50 to show more users per page
+        limit: 50,
         search: searchTerm,
-        status: statusFilter === "all" ? "" : statusFilter, // Use empty string instead of "all"
+        status: suspensionFilter === "all" ? "" : suspensionFilter,
         archived: "active",
       });
 
-      let filteredUsers = response.data;
+      // Filter to only show suspended or banned users
+      let filteredUsers = response.data.filter((user) => 
+        user.account_status === 'suspended' || user.account_status === 'banned'
+      );
 
-      // Apply risk-based filtering
-      if (riskFilter !== "all") {
-        filteredUsers = response.data.filter((user) => {
-          const riskLevel = getUserRiskLevel(user);
-          return riskLevel.level.toLowerCase() === riskFilter;
-        });
+      // Apply suspension-specific filtering
+      if (suspensionFilter !== "all") {
+        filteredUsers = filteredUsers.filter((user) => 
+          user.account_status === suspensionFilter
+        );
       }
 
-      console.log("Users API response:", response);
-      console.log("Total users fetched:", filteredUsers.length);
+      console.log("Suspended users API response:", response);
+      console.log("Total suspended users fetched:", filteredUsers.length);
       console.log("Pagination info:", response.pagination);
 
       setUsers(filteredUsers);
@@ -105,66 +81,51 @@ const BanRestrictUsers = () => {
       setError(null);
     } catch (err) {
       setError(err.message);
-      console.error("Error fetching users:", err);
+      console.error("Error fetching suspended users:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUserAction = async () => {
-    if (!selectedUser || !actionType) return;
+  const handleLiftSuspension = async () => {
+    if (!selectedUser) return;
 
     try {
       setProcessing(true);
 
-      console.log("User action:", {
+      console.log("Lifting suspension:", {
         userId: selectedUser.id,
-        action: actionType,
-        reason: actionReason,
-        duration: actionDuration,
+        reason: liftReason,
       });
 
-      // Call the appropriate API endpoint
-      if (actionType === 'add_strike' || actionType === 'remove_strike') {
-        const strikeAction = actionType === 'add_strike' ? 'add' : 'remove';
-        await usersService.updateUserStrikes(
-          selectedUser.id,
-          strikeAction,
-          actionReason
-        );
-      } else {
-        await usersService.moderateUser(
-          selectedUser.id,
-          actionType,
-          actionReason,
-          actionDuration
-        );
-      }
+      await usersService.moderateUser(
+        selectedUser.id,
+        "unban",
+        liftReason,
+        "permanent"
+      );
 
       // Refresh the users list
-      await fetchUsers();
+      await fetchSuspendedUsers();
 
       // Close modal and reset state
-      setShowActionModal(false);
+      setShowLiftModal(false);
       setSelectedUser(null);
-      setActionType("");
-      setActionReason("");
-      setActionDuration("permanent");
+      setLiftReason("");
       
       // Clear any previous errors
       setError(null);
     } catch (err) {
       setError(err.message);
-      console.error("Error performing user action:", err);
+      console.error("Error lifting suspension:", err);
     } finally {
       setProcessing(false);
     }
   };
 
-  const openActionModal = (user, action) => {
+  const openLiftModal = (user) => {
     setSelectedUser(user);
-    setActionType(action);
-    setShowActionModal(true);
+    setShowLiftModal(true);
   };
 
   const openUserDetailsModal = async (user) => {
@@ -212,41 +173,44 @@ const BanRestrictUsers = () => {
     });
   };
 
-  const getUserStatusBadge = (user) => {
-    // Use account_status from the database
+  const getSuspensionStatusBadge = (user) => {
     switch (user.account_status) {
       case 'banned':
         return (
           <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
-            Forum Banned
+            Permanently Banned
           </span>
         );
-      case 'restricted':
+      case 'suspended':
         return (
-          <span className="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
-            Restricted
+          <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+            Suspended
           </span>
         );
-      case 'active':
       default:
         return (
-          <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-            Active
+          <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+            Unknown
           </span>
         );
     }
   };
 
-  const getUserRiskLevel = (user) => {
-    // This would be calculated based on user behavior, reports, etc.
-    // For now, we'll simulate based on reject_count
-    if (user.reject_count >= 3) {
-      return { level: "High", color: "text-red-600" };
+  const getSuspensionDuration = (user) => {
+    // This would calculate remaining suspension time
+    // For now, we'll show basic info
+    const suspensionCount = user.suspension_count || 0;
+    const isPermanentlyBanned = user.account_status === 'banned';
+    
+    if (isPermanentlyBanned) {
+      return "Permanent";
     }
-    if (user.reject_count >= 1) {
-      return { level: "Medium", color: "text-yellow-600" };
+    
+    if (suspensionCount > 0) {
+      return `${suspensionCount} suspension${suspensionCount > 1 ? 's' : ''}`;
     }
-    return { level: "Low", color: "text-green-600" };
+    
+    return "Unknown";
   };
 
   // DataTable columns configuration
@@ -274,115 +238,43 @@ const BanRestrictUsers = () => {
       ),
     },
     {
-      key: "status",
-      header: "STATUS",
-      render: (user) => getUserStatusBadge(user),
+      key: "suspension_status",
+      header: "SUSPENSION STATUS",
+      render: (user) => getSuspensionStatusBadge(user),
     },
     {
-      key: "risk_level",
-      header: "RISK LEVEL",
+      key: "suspension_info",
+      header: "SUSPENSION INFO",
       align: "center",
       render: (user) => {
-        const riskLevel = getUserRiskLevel(user);
+        const suspensionCount = user.suspension_count || 0;
+        const strikes = user.strike_count || 0;
+        
         return (
           <div className="text-center">
-            <span className={`text-sm font-medium ${riskLevel.color}`}>
-              {riskLevel.level}
-            </span>
+            <div className="text-sm font-medium text-gray-900">
+              {getSuspensionDuration(user)}
+            </div>
+            <div className="text-xs text-gray-500">
+              {strikes} strikes • {suspensionCount} suspensions
+            </div>
           </div>
         );
       },
     },
     {
-      key: "strikes",
-      header: "STRIKES",
+      key: "suspension_date",
+      header: "SUSPENDED ON",
       align: "center",
       render: (user) => {
-        // Use only strike_count from database (rejections are separate)
-        const strikes = user.strike_count || 0;
-        const maxStrikes = 3;
-
-        // Use suspension count from database
-        const suspensionCount = user.suspension_count || 0;
-        const isPermanentlyBanned = user.account_status === 'banned';
-
-        // Get strike description
-        const getStrikeDescription = (strikeCount) => {
-          switch (strikeCount) {
-            case 0:
-              return `${strikeCount}/3 Strikes — No violations. User is in good standing.`;
-            case 1:
-              return `${strikeCount}/3 Strikes — Warning issued for guideline violation.`;
-            case 2:
-              return `${strikeCount}/3 Strikes — Second warning. Next violation leads to suspension.`;
-            case 3:
-              return `${strikeCount}/3 Strikes — User is suspended for repeated violations.`;
-            default:
-              return `${strikeCount}/3 Strikes — User has multiple violations and may face escalated disciplinary action.`;
-          }
-        };
-
-        const tooltipContent = getStrikeDescription(strikes);
-
+        // This would show the actual suspension date from the database
+        // For now, using created_at as placeholder
+        const suspensionDate = user.ends_at || user.started_at;
+        
         return (
-          <Tooltip
-            content={tooltipContent}
-            placement="top"
-            className="whitespace-normal"
-          >
-            <div className="flex items-center justify-center cursor-help hover:scale-105 transition-transform duration-200">
-              <div className="flex space-x-1.5 p-1">
-                {Array.from({ length: maxStrikes }, (_, i) => (
-                  <div
-                    key={i}
-                    className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-200 ${
-                      i < strikes
-                        ? strikes >= maxStrikes
-                          ? "bg-red-500 border-red-600 shadow-md shadow-red-200"
-                          : strikes >= 2
-                          ? "bg-yellow-500 border-yellow-600 shadow-md shadow-yellow-200"
-                          : "bg-orange-500 border-orange-600 shadow-md shadow-orange-200"
-                        : "bg-gray-100 border-gray-300 hover:bg-gray-200"
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-          </Tooltip>
-        );
-      },
-    },
-    {
-      key: "suspension_count",
-      header: "SUSPENSION",
-      align: "center",
-      render: (user) => {
-        const strikes = user.strike_count || 0;
-        const suspensionCount = user.suspension_count || 0;
-        const isPermanentlyBanned = user.account_status === 'banned';
-
-        return (
-          <div className="text-center">
-            <span
-              className={`text-sm font-medium ${
-                isPermanentlyBanned
-                  ? "text-red-600"
-                  : suspensionCount > 0
-                  ? "text-orange-600"
-                  : "text-gray-900"
-              }`}
-            >
-              {suspensionCount}
-            </span>
-            {suspensionCount > 0 && (
-              <div className="text-xs text-gray-500">
-                {isPermanentlyBanned
-                  ? "Permanently banned"
-                  : `${suspensionCount} suspension${
-                      suspensionCount > 1 ? "s" : ""
-                    }`}
-              </div>
-            )}
+          <div className="flex items-center justify-center text-sm text-gray-500">
+            <Clock className="w-4 h-4 mr-1" />
+            {formatDate(suspensionDate)}
           </div>
         );
       },
@@ -392,7 +284,6 @@ const BanRestrictUsers = () => {
       header: "JOINED",
       align: "center",
       render: (user) => {
-        // Try different possible date field names
         const joinDate =
           user.created_at ||
           user.createdAt ||
@@ -423,64 +314,11 @@ const BanRestrictUsers = () => {
             </button>
           </Tooltip>
           
-          {/* Strike Management */}
-          <Tooltip content="Add Strike" placement="top">
-            <button
-              onClick={() => openActionModal(user, "add_strike")}
-              className="text-orange-600 hover:text-orange-900 hover:scale-110 transition-all duration-200 p-1 rounded"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </Tooltip>
-          
-          {/* Only show remove strike if user has strikes */}
-          {(user.strike_count || 0) > 0 && (
-            <Tooltip content="Remove Strike" placement="top">
+          {/* Lift Suspension - Only show for suspended/banned users */}
+          {(user.account_status === 'suspended' || user.account_status === 'banned') && (
+            <Tooltip content="Lift Suspension" placement="top">
               <button
-                onClick={() => openActionModal(user, "remove_strike")}
-                className="text-green-600 hover:text-green-900 hover:scale-110 transition-all duration-200 p-1 rounded"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-            </Tooltip>
-          )}
-
-          {user.account_status === 'active' && (
-            <>
-              <Tooltip content="Restrict User (View Only)" placement="top">
-                <button
-                  onClick={() => openActionModal(user, "restrict")}
-                  className="text-yellow-600 hover:text-yellow-900 hover:scale-110 transition-all duration-200 p-1 rounded"
-                >
-                  <Clock className="w-4 h-4" />
-                </button>
-              </Tooltip>
-              <Tooltip content="Ban from Forum" placement="top">
-                <button
-                  onClick={() => openActionModal(user, "ban")}
-                  className="text-red-600 hover:text-red-900 hover:scale-110 transition-all duration-200 p-1 rounded"
-                >
-                  <Ban className="w-4 h-4" />
-                </button>
-              </Tooltip>
-            </>
-          )}
-
-          {user.account_status === 'banned' && (
-            <Tooltip content="Restore Forum Access" placement="top">
-              <button
-                onClick={() => openActionModal(user, "unban")}
-                className="text-green-600 hover:text-green-900 hover:scale-110 transition-all duration-200 p-1 rounded"
-              >
-                <Shield className="w-4 h-4" />
-              </button>
-            </Tooltip>
-          )}
-
-          {user.account_status === 'restricted' && (
-            <Tooltip content="Remove Restrictions" placement="top">
-              <button
-                onClick={() => openActionModal(user, "unrestrict")}
+                onClick={() => openLiftModal(user)}
                 className="text-green-600 hover:text-green-900 hover:scale-110 transition-all duration-200 p-1 rounded"
               >
                 <Shield className="w-4 h-4" />
@@ -498,13 +336,13 @@ const BanRestrictUsers = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Forum Ban & Restrict Management
+            Suspended Accounts
           </h1>
           <p className="text-gray-600">
-            Manage forum access restrictions and user strikes
+            Manage suspended and banned user accounts
             {pagination.total && (
               <span className="ml-2 text-sm font-medium text-blue-600">
-                ({pagination.total} total users)
+                ({users.length} suspended users)
               </span>
             )}
           </p>
@@ -513,41 +351,28 @@ const BanRestrictUsers = () => {
 
       {/* Filters */}
       <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Search users..."
+              placeholder="Search suspended users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
-          {/* Status Filter */}
+          {/* Suspension Status Filter */}
           <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            value={suspensionFilter}
+            onChange={(e) => setSuspensionFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            {statusOptions.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
-
-          {/* Risk Level Filter */}
-          <select
-            value={riskFilter}
-            onChange={(e) => setRiskFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {riskOptions.map((risk) => (
-              <option key={risk.value} value={risk.value}>
-                {risk.label}
+            {suspensionOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>
@@ -561,11 +386,11 @@ const BanRestrictUsers = () => {
         </div>
       )}
 
-      {/* Users Table */}
+      {/* Suspended Users Table */}
       {loading ? (
         <div className="bg-white rounded-lg shadow-sm border p-8 text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading users...</p>
+          <p className="mt-2 text-gray-600">Loading suspended users...</p>
         </div>
       ) : (
         <>
@@ -575,8 +400,8 @@ const BanRestrictUsers = () => {
             keyField="id"
             emptyMessage={
               <div className="text-center text-gray-500 py-8">
-                <User className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p>No users found matching your criteria.</p>
+                <Clock className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>No suspended users found matching your criteria.</p>
               </div>
             }
           />
@@ -586,31 +411,21 @@ const BanRestrictUsers = () => {
               currentPage={currentPage}
               totalPages={pagination.totalPages}
               totalItems={pagination.total}
-              itemsPerPage={20}
+              itemsPerPage={50}
               onPageChange={setCurrentPage}
-              itemName="users"
+              itemName="suspended users"
             />
           )}
         </>
       )}
 
-      {/* Action Modal */}
-      {showActionModal && selectedUser && (
+      {/* Lift Suspension Modal */}
+      {showLiftModal && selectedUser && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                {actionType === "ban"
-                  ? "Ban User from Forum"
-                  : actionType === "restrict"
-                  ? "Restrict User (View Only)"
-                  : actionType === "add_strike"
-                  ? "Add Strike"
-                  : actionType === "remove_strike"
-                  ? "Remove Strike"
-                  : actionType === "unban"
-                  ? "Restore Forum Access"
-                  : "Remove Restrictions"}
+                Lift Suspension
               </h3>
 
               <div className="mb-4">
@@ -620,146 +435,39 @@ const BanRestrictUsers = () => {
                     {selectedUser.full_name || "No name"}
                   </p>
                   <p className="text-sm text-gray-600">{selectedUser.email}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Current Status: {getSuspensionStatusBadge(selectedUser)}
+                  </p>
                 </div>
               </div>
 
-              {(actionType === "ban" || actionType === "restrict") && (
-                <>
-                  <div className="mb-4">
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
-                      <div className="flex items-start">
-                        <AlertTriangle className="w-5 h-5 text-blue-600 mt-0.5 mr-2" />
-                        <div>
-                          <h4 className="text-sm font-medium text-blue-800">
-                            {actionType === "ban" ? "Forum Ban" : "Forum Restriction"}
-                          </h4>
-                          <p className="text-sm text-blue-700 mt-1">
-                            {actionType === "ban" 
-                              ? "User will be completely blocked from accessing the forum (both user and lawyer sides)."
-                              : "User can view forum content but cannot create posts or replies (applies to both user and lawyer accounts)."}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Duration:
-                    </label>
-                    <select
-                      value={actionDuration}
-                      onChange={(e) => setActionDuration(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      {durationOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Reason (Required):
-                    </label>
-                    <textarea
-                      value={actionReason}
-                      onChange={(e) => setActionReason(e.target.value)}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder={`Enter reason for ${actionType === "ban" ? "forum ban" : "forum restriction"}...`}
-                    />
-                  </div>
-                </>
-              )}
-
-              {(actionType === "add_strike" || actionType === "remove_strike") && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Reason (Required):
-                  </label>
-                  <textarea
-                    value={actionReason}
-                    onChange={(e) => setActionReason(e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder={`Enter reason for ${actionType === "add_strike" ? "adding" : "removing"} strike...`}
-                  />
-                </div>
-              )}
-
-              {(actionType === "unban" || actionType === "unrestrict") && (
-                <div className="mb-4">
-                  <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-4">
-                    <div className="flex items-start">
-                      <Shield className="w-5 h-5 text-green-600 mt-0.5 mr-2" />
-                      <div>
-                        <h4 className="text-sm font-medium text-green-800">
-                          {actionType === "unban" ? "Restore Forum Access" : "Remove Forum Restrictions"}
-                        </h4>
-                        <p className="text-sm text-green-700 mt-1">
-                          {actionType === "unban" 
-                            ? "User will regain full access to the forum (both user and lawyer sides)."
-                            : "User will regain ability to create posts and replies on the forum."}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Restoration Notes (Optional):
-                  </label>
-                  <textarea
-                    value={actionReason}
-                    onChange={(e) => setActionReason(e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder={`Enter notes about ${actionType === "unban" ? "restoring forum access" : "removing restrictions"}...`}
-                  />
-                </div>
-              )}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reason for Lifting Suspension (Optional):
+                </label>
+                <textarea
+                  value={liftReason}
+                  onChange={(e) => setLiftReason(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter reason for lifting suspension..."
+                />
+              </div>
 
               <div className="flex justify-end space-x-3">
                 <button
-                  onClick={() => setShowActionModal(false)}
+                  onClick={() => setShowLiftModal(false)}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
                 >
                   Cancel
                 </button>
 
                 <button
-                  onClick={handleUserAction}
-                  disabled={
-                    processing ||
-                    (actionType !== "unban" && actionType !== "unrestrict" && !actionReason.trim())
-                  }
-                  className={`px-4 py-2 text-sm font-medium text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed ${
-                    actionType === "ban"
-                      ? "bg-red-600 hover:bg-red-700"
-                      : actionType === "restrict"
-                      ? "bg-yellow-600 hover:bg-yellow-700"
-                      : actionType === "add_strike"
-                      ? "bg-orange-600 hover:bg-orange-700"
-                      : actionType === "remove_strike"
-                      ? "bg-green-600 hover:bg-green-700"
-                      : "bg-green-600 hover:bg-green-700"
-                  }`}
+                  onClick={handleLiftSuspension}
+                  disabled={processing}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {processing
-                    ? "Processing..."
-                    : actionType === "ban"
-                    ? "Ban from Forum"
-                    : actionType === "restrict"
-                    ? "Restrict User"
-                    : actionType === "add_strike"
-                    ? "Add Strike"
-                    : actionType === "remove_strike"
-                    ? "Remove Strike"
-                    : actionType === "unban"
-                    ? "Restore Access"
-                    : "Remove Restrictions"}
+                  {processing ? "Processing..." : "Lift Suspension"}
                 </button>
               </div>
             </div>
@@ -774,7 +482,7 @@ const BanRestrictUsers = () => {
             <div className="mt-3">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-medium text-gray-900">
-                  User Details
+                  Suspended User Details
                 </h3>
                 <button
                   onClick={() => setShowUserDetailsModal(false)}
@@ -812,15 +520,13 @@ const BanRestrictUsers = () => {
                     </label>
                     <div>
                       <span className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium ${
-                        selectedUser.account_status === 'active' 
-                          ? 'bg-green-100 text-green-800 border border-green-200'
-                          : selectedUser.account_status === 'suspended'
-                          ? 'bg-red-100 text-red-800 border border-red-200'
+                        selectedUser.account_status === 'suspended'
+                          ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
                           : selectedUser.account_status === 'banned'
                           ? 'bg-red-100 text-red-800 border border-red-200'
-                          : 'bg-green-100 text-green-800 border border-green-200'
+                          : 'bg-gray-100 text-gray-800 border border-gray-200'
                       }`}>
-                        {(selectedUser.account_status || 'active').charAt(0).toUpperCase() + (selectedUser.account_status || 'active').slice(1)}
+                        {(selectedUser.account_status || 'unknown').charAt(0).toUpperCase() + (selectedUser.account_status || 'unknown').slice(1)}
                       </span>
                     </div>
                   </div>
@@ -839,7 +545,7 @@ const BanRestrictUsers = () => {
 
                   <div>
                     <label className="block text-[9px] font-medium text-gray-700 mb-1">
-                      Suspensions
+                      Total Suspensions
                     </label>
                     <div className="text-xs text-gray-900">
                       {selectedUser.suspension_count || 0}
@@ -999,4 +705,4 @@ const BanRestrictUsers = () => {
   );
 };
 
-export default BanRestrictUsers;
+export default SuspendedAccounts;
