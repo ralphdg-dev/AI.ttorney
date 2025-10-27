@@ -9,6 +9,7 @@ import Colors from '../../constants/Colors';
 import { LawyerNavbar } from '../../components/lawyer/shared';
 import { ModerationWarningBanner } from '@/components/moderation/ModerationWarningBanner';
 import { useCreatePost } from '@/hooks/useCreatePost';
+import { useModerationStatus } from '@/contexts/ModerationContext';
 
 // Constants
 const MAX_CONTENT_LENGTH = 500;
@@ -19,10 +20,13 @@ const LawyerCreatePost: React.FC = () => {
   const [categoryId, setCategoryId] = useState<string>('');
   
   // Use custom hook for post creation logic
-  const { isPosting, moderationStatus, createPost } = useCreatePost({
+  const { isPosting, createPost } = useCreatePost({
     userType: 'lawyer',
     globalActionsKey: 'forumActions',
   });
+  
+  // Get moderation status from context
+  const { moderationStatus } = useModerationStatus();
 
   // Validation logic
   const isContentValid = useMemo(() => {

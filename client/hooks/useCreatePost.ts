@@ -9,9 +9,10 @@ import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useForumCache } from '@/contexts/ForumCacheContext';
+import { useModerationStatus } from '@/contexts/ModerationContext';
 import { NetworkConfig } from '@/utils/networkConfig';
 import { useToast } from '@/components/ui/toast';
-import { getUserModerationStatus, parseModerationError, type ModerationStatus } from '@/services/moderationService';
+import { parseModerationError } from '@/services/moderationService';
 import { showModerationToast } from '@/utils/moderationToastUtils';
 
 // Constants
@@ -31,7 +32,6 @@ interface UseCreatePostOptions {
 
 interface UseCreatePostReturn {
   isPosting: boolean;
-  moderationStatus: ModerationStatus | null;
   createPost: (content: string, categoryId: string, isAnonymous: boolean) => Promise<void>;
 }
 
@@ -42,24 +42,11 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
   const router = useRouter();
   const { session, isAuthenticated } = useAuth();
   const { clearCache } = useForumCache();
+  const { refreshStatus } = useModerationStatus();
   const toast = useToast();
   
   const [isPosting, setIsPosting] = useState(false);
-  const [moderationStatus, setModerationStatus] = useState<ModerationStatus | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Fetch moderation status on mount
-  useEffect(() => {
-    const fetchModerationStatus = async () => {
-      if (session?.access_token) {
-        const status = await getUserModerationStatus(session.access_token);
-        if (status) {
-          setModerationStatus(status);
-        }
-      }
-    };
-    fetchModerationStatus();
-  }, [session?.access_token]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -115,13 +102,8 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
    * Update moderation status after violation
    */
   const updateModerationStatus = useCallback(async () => {
-    if (session?.access_token) {
-      const newStatus = await getUserModerationStatus(session.access_token);
-      if (newStatus) {
-        setModerationStatus(newStatus);
-      }
-    }
-  }, [session?.access_token]);
+    await refreshStatus();
+  }, [refreshStatus]);
 
   /**
    * Handle 403 Forbidden errors (suspended/banned accounts)
@@ -288,7 +270,6 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
 
   return {
     isPosting,
-    moderationStatus,
     createPost,
   };
 };

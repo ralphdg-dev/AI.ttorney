@@ -24,6 +24,9 @@ import time
 import logging
 from datetime import datetime
 
+# Shared SSE formatter utility (DRY principle)
+from utils.sse_formatter import format_sse
+
 # Import all dependencies from main chatbot_lawyer module
 from api.chatbot_lawyer import (
     # Models
@@ -129,7 +132,7 @@ async def ask_legal_question_stream(
             # ===== INPUT VALIDATION =====
             # Basic validation
             if not request.question or not request.question.strip():
-                yield f"data: {json.dumps({'error': 'Question cannot be empty'})}\n\n"
+                yield format_sse({'error': 'Question cannot be empty'})
                 return
             
             # Initialize security tracking
@@ -144,7 +147,7 @@ async def ask_legal_question_stream(
                     if not input_validation_result.get('is_valid', True):
                         error_message = input_validation_result.get('error', 'Input validation failed')
                         logger.warning(f"Input validation failed: {error_message}")
-                        yield f"data: {json.dumps({'content': error_message, 'done': True})}\n\n"
+                        yield format_sse({'content': error_message, 'done': True})
                         return
                     
                     # Use cleaned input if available
@@ -157,7 +160,7 @@ async def ask_legal_question_stream(
             if is_simple_greeting(request.question):
                 language = detect_language(request.question)
                 greeting_response = generate_ai_response(request.question, language, 'greeting')
-                yield f"data: {json.dumps({'content': greeting_response, 'done': True})}\n\n"
+                yield format_sse({'content': greeting_response, 'done': True})
                 
                 # Save to chat history (async, don't block)
                 if effective_user_id:
@@ -219,7 +222,7 @@ async def ask_legal_question_stream(
                                 f"You are advised to utilize this service solely for legitimate legal research and analysis. Any further attempts to compromise system security may result in permanent account suspension."
                             )
                             
-                            yield f"data: {json.dumps({'content': violation_message, 'done': True})}\n\n"
+                            yield format_sse({'content': violation_message, 'done': True})
                             return
                             
                         except Exception as violation_error:
@@ -228,7 +231,7 @@ async def ask_legal_question_stream(
                             print(f"Violation error traceback: {traceback.format_exc()}")
                             
                             # Return generic error message if violation recording fails
-                            yield f"data: {json.dumps({'content': 'Your query was flagged for attempting to manipulate the system. This violates our usage policy. Please use this service for legitimate legal research only.', 'done': True})}\n\n"
+                            yield format_sse({'content': 'Your query was flagged for attempting to manipulate the system. This violates our usage policy. Please use this service for legitimate legal research only.', 'done': True})
                             return
                     else:
                         print(f" No prompt injection detected (streaming)")
@@ -280,21 +283,79 @@ async def ask_legal_question_stream(
                     # Detect language for appropriate response
                     language = detect_language(request.question)
                     
-                    # Return simplified message to user with violation info
-                    if language == "tagalog":
-                        violation_message = f"""🚨 Labag sa Patakaran
-
-{moderation_service.get_violation_message(moderation_result, context="chatbot")}
-
-⚠️ {violation_result['message']}"""
-                    else:
-                        violation_message = f"""🚨 Content Policy Violation
-
-{moderation_service.get_violation_message(moderation_result, context="chatbot")}
-
-⚠️ {violation_result['message']}"""
+                    # Get contextual warning based on strike count and suspension history
+                    strike_count = violation_result.get('strike_count', 0)
+                    suspension_count = violation_result.get('suspension_count', 0)
+                    action_taken = violation_result.get('action_taken', 'strike_added')
                     
-                    yield f"data: {json.dumps({'content': violation_message, 'done': True})}\n\n"
+                    # Build contextual warning message
+                    if language == "tagalog":
+                        # Tagalog messages
+                        if action_taken == 'banned':
+                            warning = "Ang iyong account ay permanenteng na-ban dahil sa paulit-ulit na paglabag. Hindi ka na makakapag-chat."
+                        elif action_taken == 'suspended':
+                            if suspension_count == 1:
+                                warning = f"Ang iyong account ay na-suspend ng 7 araw. Ito ang iyong unang suspensyon. Dalawa pang suspensyon ay magreresulta sa permanenteng ban."
+                            elif suspension_count == 2:
+                                warning = f"Ang iyong account ay na-suspend ng 7 araw. Ito ang iyong ikalawang suspensyon. Isa pang suspensyon ay magreresulta sa permanenteng ban."
+                            else:
+                                warning = f"Ang iyong account ay na-suspend ng 7 araw dahil sa paulit-ulit na paglabag."
+                        else:
+                            # Strike warnings
+                            if strike_count == 1:
+                                warning = "Mayroon ka nang 1 strike. Dalawa pang paglabag ay magreresulta sa 7-araw na suspensyon."
+                            elif strike_count == 2:
+                                warning = "Mayroon ka nang 2 strikes. Isa pang paglabag ay magreresulta sa 7-araw na suspensyon."
+                            else:
+                                warning = f"Mayroon ka nang {strike_count} strikes. Mangyaring sumunod sa aming mga patakaran."
+                        
+                        violation_message = f"""Content Policy Violation
+
+{moderation_service.get_violation_message(moderation_result, context="chatbot")}
+
+{warning}"""
+                    else:
+                        # English messages
+                        if action_taken == 'banned':
+                            warning = "Your account has been permanently banned due to repeated violations. You can no longer use the chatbot."
+                        elif action_taken == 'suspended':
+                            if suspension_count == 1:
+                                warning = f"Your account has been suspended for 7 days. This is your first suspension. Two more suspensions will result in a permanent ban."
+                            elif suspension_count == 2:
+                                warning = f"Your account has been suspended for 7 days. This is your second suspension. One more suspension will result in a permanent ban."
+                            else:
+                                warning = f"Your account has been suspended for 7 days due to repeated violations."
+                        else:
+                            # Strike warnings
+                            if strike_count == 1:
+                                warning = "You now have 1 strike. Two more violations will result in a 7-day suspension."
+                            elif strike_count == 2:
+                                warning = "You now have 2 strikes. One more violation will result in a 7-day suspension."
+                            else:
+                                warning = f"You now have {strike_count} strikes. Please follow our community guidelines."
+                        
+                        violation_message = f"""Content Policy Violation
+
+{moderation_service.get_violation_message(moderation_result, context="chatbot")}
+
+{warning}"""
+                    
+                    # Send violation message
+                    yield format_sse({'content': violation_message})
+                    
+                    # Send violation metadata so frontend can refresh status
+                    if effective_user_id and violation_result:
+                        violation_metadata = {
+                            'violation_detected': True,
+                            'action_taken': violation_result['action_taken'],
+                            'strike_count': violation_result['strike_count'],
+                            'suspension_count': violation_result['suspension_count'],
+                            'message': violation_result['message']
+                        }
+                        yield format_sse({'type': 'violation', 'violation': violation_metadata})
+                    
+                    # Done
+                    yield format_sse({'done': True})
                     return
                 else:
                     print(f"✅ Content moderation passed (streaming)")
@@ -307,7 +368,7 @@ async def ask_legal_question_stream(
             # Check for prohibited input
             is_prohibited, prohibition_reason = detect_prohibited_input(request.question)
             if is_prohibited:
-                yield f"data: {json.dumps({'error': prohibition_reason, 'done': True})}\n\n"
+                yield format_sse({'error': prohibition_reason, 'done': True})
                 return
             
             # Check for gibberish
@@ -324,14 +385,14 @@ async def ask_legal_question_stream(
                         "I apologize, but I'm having difficulty understanding your question. "
                         "Could you please provide a clearer legal inquiry?"
                     )
-                yield f"data: {json.dumps({'content': clarification, 'done': True})}\n\n"
+                yield format_sse({'content': clarification, 'done': True})
                 return
             
             # Detect language
             language = detect_language(request.question)
             
             # Send initial metadata
-            yield f"data: {json.dumps({'type': 'metadata', 'language': language})}\n\n"
+            yield format_sse({'type': 'metadata', 'language': language})
             
             # Check for unsupported language
             if language == "unsupported":
@@ -344,7 +405,7 @@ async def ask_legal_question_stream(
                     "**III. CONCLUSION**\n"
                     "Regrettably, no substantive analysis can be furnished. You are respectfully advised to re-submit your query in English or Filipino."
                 )
-                yield f"data: {json.dumps({'content': unsupported_response, 'done': True})}\n\n"
+                yield format_sse({'content': unsupported_response, 'done': True})
                 return
             
             # Check for personal advice questions
@@ -359,7 +420,7 @@ async def ask_legal_question_stream(
                         "I understand you need help with a decision, but I cannot provide personal legal advice about what you should do in your specific situation. "
                         "For questions like this, you need a consultation with a licensed lawyer."
                     )
-                yield f"data: {json.dumps({'content': response, 'done': True})}\n\n"
+                yield format_sse({'content': response, 'done': True})
                 return
             
             # Check for out-of-scope topics
@@ -371,13 +432,13 @@ async def ask_legal_question_stream(
                     'out_of_scope',
                     topic_type
                 )
-                yield f"data: {json.dumps({'content': out_of_scope_response, 'done': True})}\n\n"
+                yield format_sse({'content': out_of_scope_response, 'done': True})
                 return
             
             # Check if legal question
             if not is_legal_question(request.question):
                 casual_response = generate_ai_response(request.question, language, 'casual')
-                yield f"data: {json.dumps({'content': casual_response, 'done': True})}\n\n"
+                yield format_sse({'content': casual_response, 'done': True})
                 
                 # Save to chat history
                 if effective_user_id:
@@ -407,7 +468,7 @@ async def ask_legal_question_stream(
                     "Paumanhin po, pero wala akong sapat na impormasyon sa aking database para masagot ito nang tama. "
                     "Inirerekomenda ko pong kumonsulta sa lisensyadong abogado para sa tulong."
                 )
-                yield f"data: {json.dumps({'content': no_context_message, 'done': True})}\n\n"
+                yield format_sse({'content': no_context_message, 'done': True})
                 return
             
             # Send sources
@@ -423,7 +484,7 @@ async def ask_legal_question_stream(
                 }
                 for src in sources
             ]
-            yield f"data: {json.dumps({'type': 'sources', 'sources': source_citations})}\n\n"
+            yield format_sse({'type': 'sources', 'sources': source_citations})
             
             # ===== BUILD MESSAGES FOR STREAMING =====
             # Use hardcore legalese prompts
@@ -470,7 +531,7 @@ Note: No specific context was retrieved from the vector database. Proceed with t
                 if chunk.choices[0].delta.content:
                     content = chunk.choices[0].delta.content
                     full_answer += content
-                    yield f"data: {json.dumps({'content': content})}\n\n"
+                    yield format_sse({'content': content})
             
             # ===== OUTPUT VALIDATION =====
             if guardrails_instance:
@@ -485,13 +546,13 @@ Note: No specific context was retrieved from the vector database. Proceed with t
                         error_message = output_validation_result.get('error', 'Output validation failed')
                         logger.warning(f"Output validation failed: {error_message}")
                         # Note: Output already streamed, so we can only log this
-                        yield f"data: {json.dumps({'warning': 'Response may not meet all safety standards'})}\n\n"
+                        yield format_sse({'warning': 'Response may not meet all safety standards'})
                 except Exception as e:
                     logger.warning(f"Guardrails output validation error: {e}")
             
             # Send completion signal
             total_time = time.time() - perf_start
-            yield f"data: {json.dumps({'done': True, 'total_time': total_time})}\n\n"
+            yield format_sse({'done': True, 'total_time': total_time})
             
             # ===== SAVE TO CHAT HISTORY (async, don't block) =====
             if effective_user_id:
@@ -531,7 +592,7 @@ Note: No specific context was retrieved from the vector database. Proceed with t
             
         except Exception as e:
             logger.error(f"Streaming error: {e}", exc_info=True)
-            yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
+            yield format_sse({'error': str(e), 'done': True})
     
     # Return streaming response with proper headers
     return StreamingResponse(

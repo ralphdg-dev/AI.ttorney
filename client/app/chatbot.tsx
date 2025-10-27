@@ -28,10 +28,12 @@ import { SidebarWrapper } from "../components/AppSidebar";
 import Navbar from "../components/Navbar";
 import { LawyerNavbar } from "../components/lawyer/shared";
 import { useAuth } from "../contexts/AuthContext";
+import { useModerationStatus } from "../contexts/ModerationContext";
 import ChatHistorySidebar, { ChatHistorySidebarRef } from "../components/chatbot/ChatHistorySidebar";
 import { ChatHistoryService } from "../services/chatHistoryService";
 import { Send } from "lucide-react-native";
 import { MarkdownText } from "../components/chatbot/MarkdownText";
+import { ModerationWarningBanner } from "../components/moderation/ModerationWarningBanner";
 import { NetworkConfig } from "../utils/networkConfig";
 import { LAYOUT, getTotalUIHeight } from "../constants/LayoutConstants";
 
@@ -50,6 +52,7 @@ interface StreamChatResponseParams {
   onContent: (content: string) => void;
   onSources: (sources: any[]) => void;
   onMetadata: (metadata: any) => void;
+  onViolation?: (violation: any) => void;
   onComplete: () => void;
   onError: () => void;
   onFinish: () => void;
@@ -63,6 +66,7 @@ const streamChatResponse = (params: StreamChatResponseParams): Promise<void> => 
     onContent,
     onSources,
     onMetadata,
+    onViolation,
     onComplete,
     onError,
     onFinish,
@@ -105,6 +109,11 @@ const streamChatResponse = (params: StreamChatResponseParams): Promise<void> => 
             } else if (data.type === 'metadata') {
               onMetadata(data);
               console.log('📋 Metadata:', { language: data.language });
+            } else if (data.type === 'violation') {
+              if (onViolation) {
+                onViolation(data.violation);
+                console.log('⚠️ Violation detected:', data.violation);
+              }
             } else if (data.content) {
               onContent(data.content);
               
@@ -259,6 +268,7 @@ interface Message {
 
 export default function ChatbotScreen() {
   const { user, session, isLawyer } = useAuth();
+  const { moderationStatus, refreshStatus } = useModerationStatus();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   
@@ -679,6 +689,12 @@ export default function ChatbotScreen() {
             },
             onContent: (content: string) => {
               answer += content;
+              // Real-time UI update: Show message as it streams in
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === streamingMsgId ? { ...msg, text: answer } : msg
+                )
+              );
             },
             onSources: (receivedSources: any[]) => {
               sources = receivedSources;
@@ -689,9 +705,16 @@ export default function ChatbotScreen() {
               userMessageId = metadata.user_message_id;
               assistantMessageId = metadata.assistant_message_id;
             },
-            onComplete: () => {
+            onViolation: async (violation: any) => {
+              // Violation detected - refresh moderation status to show updated strike count
+              console.log('⚠️ Violation metadata received:', violation);
+              console.log(`   Action: ${violation.action_taken}, Strikes: ${violation.strike_count}, Suspensions: ${violation.suspension_count}`);
+              await refreshStatus();
+            },
+            onComplete: async () => {
               isStreamingRef.current = false;
               updateMessageWithSources(streamingMsgId, answer, sources, language);
+              
               setTimeout(() => {
                 shouldAutoScroll.current = true;
                 smoothScrollToBottom();
@@ -763,6 +786,12 @@ export default function ChatbotScreen() {
           sidebarRef.current?.refreshConversations();
         }, 500); // Small delay to let backend finish saving
         isFirstMessageRef.current = false;
+      }
+
+      // Check if response contains violation message and refresh moderation status
+      if (answer.includes('🚨 Content Policy Violation') || answer.includes('🚨 Labag sa Patakaran')) {
+        console.log('⚠️ Violation detected in response, refreshing moderation status...');
+        await refreshStatus();
       }
 
       // Update conversation history
@@ -1131,6 +1160,16 @@ export default function ChatbotScreen() {
         isChatHistoryOpen={sidebarRef.current?.isOpen?.() || false}
         onChatHistoryToggle={() => sidebarRef.current?.toggleSidebar?.()}
       />
+
+      {/* Moderation Warning Banner */}
+      {moderationStatus && (
+        <ModerationWarningBanner
+          strikeCount={moderationStatus.strike_count}
+          suspensionCount={moderationStatus.suspension_count}
+          accountStatus={moderationStatus.account_status}
+          suspensionEnd={moderationStatus.suspension_end}
+        />
+      )}
 
       {/* Messages list or centered placeholder */}
       <View style={tw`flex-1`}>

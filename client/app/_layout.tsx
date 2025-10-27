@@ -13,6 +13,7 @@ import { useEffect } from "react";
 import { AuthProvider } from "../contexts/AuthContext";
 import { FavoritesProvider } from "../contexts/FavoritesContext";
 import { ForumCacheProvider } from "../contexts/ForumCacheContext";
+import { ModerationProvider } from "../contexts/ModerationContext";
 import { SidebarProvider } from "../components/AppSidebar";
 import { AuthGuard } from "../components/AuthGuard";
 import { SuspensionGuard } from "../components/SuspensionGuard";
@@ -42,6 +43,7 @@ export default function RootLayout() {
   return (
     <GluestackUIProvider mode="light">
       <AuthProvider>
+        <ModerationProvider>
           <FavoritesProvider>
             <ForumCacheProvider>
               <AuthGuard>
@@ -162,6 +164,7 @@ export default function RootLayout() {
             </AuthGuard>
             </ForumCacheProvider>
           </FavoritesProvider>
+        </ModerationProvider>
       </AuthProvider>
     </GluestackUIProvider>
   );

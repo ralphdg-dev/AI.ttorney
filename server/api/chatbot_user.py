@@ -1917,6 +1917,8 @@ async def ask_legal_question(
         # STEP 4.5: Content Moderation using OpenAI omni-moderation-latest
         # Run moderation on ALL messages (legal and casual) before generating any response
         # Only moderate for authenticated users to track violations
+        # Content Moderation - Record violations but continue processing (better UX)
+        violation_detected = False
         if effective_user_id:
             step_start = time.time()
             print(f"\n🔍 [STEP 4.5] Content moderation check...")
@@ -1928,9 +1930,10 @@ async def ask_legal_question(
                 step_time = time.time() - step_start
                 print(f"⏱️  Content moderation took: {step_time:.2f}s")
                 
-                # If content is flagged, record violation and apply action
+                # If content is flagged, record violation but continue processing
                 if not moderation_service.is_content_safe(moderation_result):
                     logger.warning(f"⚠️  Chatbot prompt flagged for user {effective_user_id[:8]}: {moderation_result['violation_summary']}")
+                    violation_detected = True
                     
                     # Record violation and get action taken
                     try:
@@ -1943,39 +1946,12 @@ async def ask_legal_question(
                             content_id=None  # No specific content ID for chatbot prompts
                         )
                         print(f"✅ Violation recorded: {violation_result}")
+                        print(f"⚠️  Violation recorded, continuing to process question...")
                     except Exception as violation_error:
                         logger.error(f"❌ Failed to record violation: {str(violation_error)}")
                         import traceback
                         print(f"Violation error traceback: {traceback.format_exc()}")
-                        # Return generic error message if violation recording fails
-                        violation_result = {
-                            "action_taken": "error",
-                            "strike_count": 0,
-                            "suspension_count": 0,
-                            "message": "Your content violated our community guidelines. Please be mindful of your language."
-                        }
-                    
-                    # Detect language for appropriate response
-                    language = detect_language(request.question)
-                    
-                    # Return simplified message to user with violation info
-                    if language == "tagalog":
-                        violation_message = f"""🚨 Labag sa Patakaran
-
-{moderation_service.get_violation_message(moderation_result, context="chatbot")}
-
-⚠️ {violation_result['message']}"""
-                    else:
-                        violation_message = f"""🚨 Content Policy Violation
-
-{moderation_service.get_violation_message(moderation_result, context="chatbot")}
-
-⚠️ {violation_result['message']}"""
-                    
-                    return create_chat_response(
-                        answer=violation_message,
-                        simplified_summary="Content moderation violation detected"
-                    )
+                        # Continue processing even if violation recording fails
                 else:
                     print(f"✅ Content moderation passed")
                     
@@ -2209,222 +2185,6 @@ async def ask_legal_question(
             status_code=500, 
             detail="An unexpected error occurred while processing your question. Please try again."
         )
-
-
-# Helper: Format SSE (Server-Sent Events) message (DRY principle)
-def format_sse(data: dict) -> str:
-    """Format data as Server-Sent Events message for consistent streaming responses"""
-    return f"data: {json.dumps(data)}\n\n"
-
-
-@router.post("/ask/stream")
-async def ask_legal_question_stream(
-    request: ChatRequest,
-    chat_service: ChatHistoryService = Depends(get_chat_history_service),
-    current_user: Optional[dict] = Depends(get_optional_current_user)
-):
-    """
-    STREAMING version - responses appear word-by-word like ChatGPT!
-    Much faster perceived response time.
-    """
-    
-    async def generate_stream() -> AsyncGenerator[str, None]:
-        try:
-            # Extract user_id
-            authenticated_user_id = None
-            if current_user and "user" in current_user:
-                authenticated_user_id = current_user["user"]["id"]
-            effective_user_id = authenticated_user_id or request.user_id
-            
-            # Check if user is allowed to use chatbot (not suspended/banned)
-            if effective_user_id:
-                violation_service = get_violation_tracking_service()
-                user_status = await violation_service.check_user_status(effective_user_id)
-                
-                if not user_status["is_allowed"]:
-                    logger.warning(f"🚫 User {effective_user_id[:8]}... blocked from chatbot: {user_status['account_status']}")
-                    yield format_sse({'content': user_status["reason"], 'done': True})
-                    return
-            
-            # Basic validation
-            if not request.question or not request.question.strip():
-                yield format_sse({'error': 'Question cannot be empty'})
-                return
-            
-            # Toxicity check removed - OpenAI moderation handles this more comprehensively
-            
-            # Detect language first
-            language = detect_language(request.question)
-            yield format_sse({'type': 'metadata', 'language': language})
-            
-            # Content Moderation using OpenAI omni-moderation-latest
-            # Run moderation on ALL messages (legal and casual) before generating any response
-            # Only moderate for authenticated users to track violations
-            if effective_user_id:
-                moderation_service = get_moderation_service()
-                violation_service = get_violation_tracking_service()
-                
-                try:
-                    moderation_result = await moderation_service.moderate_content(request.question.strip())
-                    
-                    # If content is flagged, record violation and apply action
-                    if not moderation_service.is_content_safe(moderation_result):
-                        logger.warning(f"⚠️  Chatbot prompt flagged for user {effective_user_id[:8]}: {moderation_result['violation_summary']}")
-                        
-                        # Record violation and get action taken
-                        try:
-                            print(f"📝 Recording violation for user: {effective_user_id}")
-                            violation_result = await violation_service.record_violation(
-                                user_id=effective_user_id,
-                                violation_type=ViolationType.CHATBOT_PROMPT,
-                                content_text=request.question.strip(),
-                                moderation_result=moderation_result,
-                                content_id=None
-                            )
-                            print(f"✅ Violation recorded: {violation_result}")
-                        except Exception as violation_error:
-                            logger.error(f"❌ Failed to record violation: {str(violation_error)}")
-                            import traceback
-                            print(f"Violation error traceback: {traceback.format_exc()}")
-                            # Return generic error message if violation recording fails
-                            violation_result = {
-                                "action_taken": "error",
-                                "strike_count": 0,
-                                "suspension_count": 0,
-                                "message": "Your content violated our community guidelines. Please be mindful of your language."
-                            }
-                        
-                        # Return simplified message to user with violation info
-                        if language == "tagalog":
-                            violation_message = f"""🚨 Labag sa Patakaran\n\n{moderation_service.get_violation_message(moderation_result, context="chatbot")}\n\n⚠️ {violation_result['message']}"""
-                        else:
-                            violation_message = f"""🚨 Content Policy Violation\n\n{moderation_service.get_violation_message(moderation_result, context="chatbot")}\n\n⚠️ {violation_result['message']}"""
-                        
-                        yield format_sse({'content': violation_message, 'done': True})
-                        return
-                        
-                except Exception as e:
-                    logger.error(f"❌ Content moderation error: {str(e)}")
-                    # Fail-open: Continue without moderation if service fails
-            
-            # Check if legal question
-            if not is_legal_question(request.question):
-                casual_response = generate_ai_response(request.question, language, 'casual')
-                yield format_sse({'content': casual_response, 'done': True})
-                return
-            
-            # Query normalization
-            search_query = request.question
-            informal_patterns = ['tangina', 'puta', 'gago', 'walang dahilan', 'nambabae', 'nanlalaki']
-            if any(pattern in request.question.lower() for pattern in informal_patterns):
-                search_query = normalize_emotional_query(request.question, language)
-            
-            # Vector search
-            context, sources = retrieve_relevant_context(search_query, TOP_K_RESULTS)
-            
-            if not sources:
-                no_context = "I apologize, but I don't have enough information in my database." if language == "english" else "Paumanhin po, pero wala akong sapat na impormasyon."
-                yield format_sse({'content': no_context, 'done': True})
-                return
-            
-            # Send sources with full details
-            source_citations = [{
-                'source': src['source'],
-                'law': src['law'],
-                'article_number': src['article_number'],
-                'article_title': src.get('article_title', ''),
-                'source_url': src.get('source_url', ''),
-                'relevance_score': src.get('relevance_score', 0.0)
-            } for src in sources]
-            yield format_sse({'type': 'sources', 'sources': source_citations})
-            
-            # Build messages
-            system_prompt = ENGLISH_SYSTEM_PROMPT if language == "english" else TAGALOG_SYSTEM_PROMPT
-            messages = [{"role": "system", "content": system_prompt}]
-            for msg in request.conversation_history[-1:]:
-                messages.append(msg)
-            
-            user_message = f"Legal Context:\n{context}\n\nUser Question: {request.question}\n\nProvide an informational response."
-            messages.append({"role": "user", "content": user_message})
-            
-            # STREAMING: Generate with OpenAI (ChatGPT/Claude style)
-            full_answer = ""
-            token_buffer = ""  # Buffer for batching tokens
-            token_count = 0
-            last_send_time = time.time()
-            
-            stream = openai_client.chat.completions.create(
-                model=CHAT_MODEL,
-                messages=messages,
-                max_tokens=request.max_tokens,
-                temperature=0.5,
-                stream=True,  # Enable streaming!
-                timeout=STREAMING_TIMEOUT_SECONDS
-            )
-            
-            # Stream tokens with batching for natural reading speed
-            # Industry standard: 3-5 tokens per batch, 50-80ms intervals (ChatGPT/Claude)
-            for chunk in stream:
-                if chunk.choices[0].delta.content:
-                    content = chunk.choices[0].delta.content
-                    full_answer += content
-                    token_buffer += content
-                    token_count += 1
-                    
-                    current_time = time.time()
-                    time_since_last_send_ms = (current_time - last_send_time) * 1000
-                    
-                    # Send batch when: minimum tokens accumulated OR max interval elapsed
-                    should_send_batch = (
-                        token_count >= STREAMING_TOKEN_BATCH_SIZE or 
-                        time_since_last_send_ms >= STREAMING_MAX_INTERVAL_MS
-                    )
-                    
-                    if should_send_batch and token_buffer:
-                        yield format_sse({'content': token_buffer})
-                        token_buffer = ""
-                        token_count = 0
-                        last_send_time = current_time
-            
-            # Send any remaining tokens in buffer
-            if token_buffer:
-                yield format_sse({'content': token_buffer})
-            
-            # Send legal disclaimer (only if needed for legal questions)
-            legal_disclaimer = get_legal_disclaimer(language, request.question, full_answer)
-            if legal_disclaimer:
-                yield format_sse({'type': 'disclaimer', 'disclaimer': legal_disclaimer})
-            
-            # Done
-            yield format_sse({'done': True})
-            
-            # Save to history (async)
-            if effective_user_id:
-                try:
-                    await save_chat_interaction(
-                        chat_service=chat_service,
-                        effective_user_id=effective_user_id,
-                        session_id=request.session_id,
-                        question=request.question,
-                        answer=full_answer,
-                        language=language,
-                        metadata={"sources": source_citations, "streaming": True}
-                    )
-                except Exception as e:
-                    print(f"Failed to save: {e}")
-            
-        except Exception as e:
-            logger.error(f"Streaming error: {e}")
-            yield format_sse({'error': str(e), 'done': True})
-    
-    return StreamingResponse(
-        generate_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive"
-        }
-    )
 
 
 @router.get("/health")
