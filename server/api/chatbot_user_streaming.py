@@ -12,19 +12,17 @@ import json
 import time
 import logging
 
-from models.chat_models import ChatRequest
-from services.chat_history_service import ChatHistoryService, get_chat_history_service
-from middleware.auth import get_optional_current_user
-from services.violation_tracking_service import get_violation_tracking_service
-from services.content_moderation_service import get_moderation_service
-from models.violation_types import ViolationType
-from utils.language_detection import detect_language
-from utils.legal_question_detection import is_legal_question
-from utils.ai_response_generator import generate_ai_response
-from utils.query_normalization import normalize_emotional_query
-from utils.context_retrieval import retrieve_relevant_context
-from utils.legal_disclaimer import get_legal_disclaimer
-from config.chatbot_config import (
+# Import all dependencies from main chatbot_user module (DRY principle)
+from api.chatbot_user import (
+    # Models
+    ChatRequest,
+    
+    # Services
+    get_optional_current_user,
+    get_chat_history_service,
+    ChatHistoryService,
+    
+    # Configuration
     CHAT_MODEL,
     TOP_K_RESULTS,
     STREAMING_TIMEOUT_SECONDS,
@@ -32,9 +30,24 @@ from config.chatbot_config import (
     STREAMING_MAX_INTERVAL_MS,
     ENGLISH_SYSTEM_PROMPT,
     TAGALOG_SYSTEM_PROMPT,
-    openai_client
+    openai_client,
+    
+    # Utility functions
+    detect_language,
+    is_legal_question,
+    generate_ai_response,
+    normalize_emotional_query,
+    retrieve_relevant_context,
+    get_legal_disclaimer,
+    save_chat_interaction,
+    
+    # Moderation
+    get_moderation_service,
+    get_violation_tracking_service,
+    ViolationType
 )
-from utils.chat_history_utils import save_chat_interaction
+
+# Shared SSE formatter utility (DRY principle)
 from utils.sse_formatter import format_sse
 
 logger = logging.getLogger(__name__)
