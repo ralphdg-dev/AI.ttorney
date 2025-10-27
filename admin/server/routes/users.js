@@ -27,7 +27,14 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
         reject_count,
         last_rejected_at,
         is_blocked_from_applying,
-        archived
+        archived,
+        strike_count,
+        suspension_count,
+        suspension_end,
+        last_violation_at,
+        banned_at,
+        banned_reason,
+        account_status
       `)
       .not('role', 'in', '("verified_lawyer","admin","superadmin")') // Exclude only verified lawyers and admins
       .order('created_at', { ascending: false });
@@ -77,10 +84,19 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
       username: user.username || 'N/A',
       birthdate: user.birthdate || 'N/A',
       registration_date: user.created_at,
-      account_status: user.is_verified ? 'Verified' : 'Unverified',
+      verification_status: user.is_verified ? 'Verified' : 'Unverified',
       has_lawyer_application: user.pending_lawyer ? 'Yes' : 'No',
       role: user.role,
-      archived: user.archived === true || user.archived === 'true'
+      archived: user.archived === true || user.archived === 'true',
+      // Include moderation fields
+      strike_count: user.strike_count || 0,
+      reject_count: user.reject_count || 0,
+      suspension_count: user.suspension_count || 0,
+      suspension_end: user.suspension_end,
+      last_violation_at: user.last_violation_at,
+      banned_at: user.banned_at,
+      banned_reason: user.banned_reason,
+      account_status: user.account_status || 'active'
     }));
 
     // Get total count for pagination with same filters
@@ -901,6 +917,228 @@ router.patch('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Add strike to user
+router.patch('/legal-seekers/:id/strikes', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, reason } = req.body; // action: 'add' | 'remove'
+    const adminId = req.admin?.id;
+
+    if (!action || !['add', 'remove'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid action. Must be add or remove'
+      });
+    }
+
+    // Get current user data
+    const { data: currentUser, error: fetchError } = await supabaseAdmin
+      .from('users')
+      .select('id, full_name, email, strike_count, reject_count, suspension_count')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !currentUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Calculate new strike count
+    const currentStrikes = currentUser.strike_count || 0;
+    const newStrikeCount = action === 'add' 
+      ? currentStrikes + 1 
+      : Math.max(0, currentStrikes - 1);
+
+    // Check if user reaches 3 strikes (suspension threshold)
+    let updateData = {
+      strike_count: newStrikeCount,
+      last_violation_at: action === 'add' ? new Date().toISOString() : currentUser.last_violation_at
+    };
+
+    // If adding strikes and reaching 3 strikes = trigger suspension
+    if (action === 'add' && newStrikeCount >= 3) {
+      const newSuspensionCount = (currentUser.suspension_count || 0) + 1;
+      const suspensionEnd = new Date();
+      suspensionEnd.setDate(suspensionEnd.getDate() + 7); // 7 days suspension
+      
+      updateData = {
+        strike_count: 0, // Reset strikes to 0 after suspension
+        suspension_count: newSuspensionCount,
+        suspension_end: suspensionEnd.toISOString(),
+        account_status: 'suspended',
+        last_violation_at: new Date().toISOString()
+      };
+    }
+    // If removing strikes, just update the count (don't affect suspensions)
+    else if (action === 'remove') {
+      updateData.strike_count = newStrikeCount;
+    }
+
+    // Update user
+    const { data: updatedUser, error: updateError } = await supabaseAdmin
+      .from('users')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update user strikes'
+      });
+    }
+
+    // Log the action
+    try {
+      await supabaseAdmin.from('admin_audit_logs').insert({
+        admin_id: adminId,
+        action: `user_strike_${action}`,
+        target_type: 'user',
+        target_id: id,
+        details: { 
+          reason, 
+          previous_strikes: currentStrikes,
+          new_strikes: updateData.strike_count,
+          suspension_triggered: action === 'add' && newStrikeCount >= 3,
+          suspension_count: updateData.suspension_count || currentUser.suspension_count
+        }
+      });
+    } catch (auditError) {
+      console.warn('Failed to log strike action:', auditError.message);
+    }
+
+    res.json({
+      success: true,
+      message: `Strike ${action}ed successfully`,
+      data: {
+        ...updatedUser,
+        total_strikes: updatedUser.strike_count || 0
+      }
+    });
+
+  } catch (error) {
+    console.error('Update user strikes error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Ban/Restrict user
+router.patch('/legal-seekers/:id/moderation', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, reason, duration } = req.body; // action: 'ban' | 'restrict' | 'unban'
+    const adminId = req.admin?.id;
+
+    if (!action || !['ban', 'restrict', 'unban'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid action. Must be ban, restrict, or unban'
+      });
+    }
+
+    // Calculate end date for temporary actions
+    let endDate = null;
+    if (duration && duration !== 'permanent' && action !== 'unban') {
+      const now = new Date();
+      const [amount, unit] = duration.split('_');
+      const duration_num = parseInt(amount);
+
+      switch (unit) {
+        case 'day':
+        case 'days':
+          endDate = new Date(now.getTime() + duration_num * 24 * 60 * 60 * 1000);
+          break;
+        case 'week':
+        case 'weeks':
+          endDate = new Date(now.getTime() + duration_num * 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'month':
+        case 'months':
+          endDate = new Date(now.setMonth(now.getMonth() + duration_num));
+          break;
+        case 'year':
+          endDate = new Date(now.setFullYear(now.getFullYear() + duration_num));
+          break;
+      }
+    }
+
+    // Update user status
+    let updateData = {};
+    if (action === 'ban') {
+      updateData = {
+        account_status: 'banned',
+        banned_at: new Date().toISOString(),
+        banned_reason: reason,
+        suspension_end: endDate?.toISOString() || null
+      };
+    } else if (action === 'restrict') {
+      // Since your schema doesn't have restriction, we'll use suspension instead
+      updateData = {
+        account_status: 'suspended',
+        suspension_end: endDate?.toISOString() || null,
+        last_violation_at: new Date().toISOString()
+      };
+    } else if (action === 'unban') {
+      updateData = {
+        account_status: 'active',
+        banned_at: null,
+        banned_reason: null,
+        suspension_end: null
+      };
+    }
+
+    const { data: updatedUser, error: updateError } = await supabaseAdmin
+      .from('users')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update user status'
+      });
+    }
+
+    // Log the action
+    try {
+      await supabaseAdmin.from('admin_audit_logs').insert({
+        admin_id: adminId,
+        action: `user_${action}`,
+        target_type: 'user',
+        target_id: id,
+        details: { 
+          reason, 
+          duration,
+          end_date: endDate?.toISOString()
+        }
+      });
+    } catch (auditError) {
+      console.warn('Failed to log moderation action:', auditError.message);
+    }
+
+    res.json({
+      success: true,
+      message: `User ${action}ed successfully`,
+      data: updatedUser
+    });
+
+  } catch (error) {
+    console.error('User moderation error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'

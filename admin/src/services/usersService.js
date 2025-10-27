@@ -240,6 +240,77 @@ class UsersService {
       throw error;
     }
   }
+
+  // Update user strikes (using new admin moderation system)
+  async updateUserStrikes(id, action, reason = '') {
+    try {
+      // Import here to avoid circular dependency
+      const adminModerationService = (await import('./adminModerationService')).default;
+      
+      if (action === 'add') {
+        const actionData = adminModerationService.formatModerationAction(
+          'strike',
+          `Manual strike added by admin: ${reason}`,
+          reason
+        );
+        return await adminModerationService.applyModerationAction(id, actionData);
+      } else {
+        // For remove action, we'll still use the old endpoint for now
+        // since the new system doesn't support removing strikes
+        const response = await fetch(`${API_BASE_URL}/users/legal-seekers/${id}/strikes`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...this.getAuthHeader()
+          },
+          body: JSON.stringify({ action, reason })
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to update user strikes');
+        }
+
+        return data;
+      }
+    } catch (error) {
+      console.error('Update user strikes error:', error);
+      throw error;
+    }
+  }
+
+  // Ban/Restrict/Unban user (using new admin moderation system)
+  async moderateUser(id, action, reason = '', duration = 'permanent') {
+    try {
+      // Import here to avoid circular dependency
+      const adminModerationService = (await import('./adminModerationService')).default;
+      
+      if (action === 'ban') {
+        const actionData = adminModerationService.formatModerationAction(
+          'permanent_ban',
+          `Manual ban by admin: ${reason}`,
+          reason
+        );
+        return await adminModerationService.applyModerationAction(id, actionData);
+      } else if (action === 'restrict') {
+        const actionData = adminModerationService.formatModerationAction(
+          'suspend_7days',
+          `Manual suspension by admin: ${reason}`,
+          reason
+        );
+        return await adminModerationService.applyModerationAction(id, actionData);
+      } else if (action === 'unban') {
+        // For unban, we use the lift suspension endpoint
+        return await adminModerationService.liftSuspension(id, reason);
+      } else {
+        throw new Error(`Unknown action: ${action}`);
+      }
+    } catch (error) {
+      console.error(`User ${action} error:`, error);
+      throw error;
+    }
+  }
 }
 
 const usersService = new UsersService();

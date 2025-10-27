@@ -14,13 +14,15 @@ import ManageLawyerApplications from './pages/users/ManageLawyerApplications';
 import ManageAdminsPage from './pages/admin/ManageAdmins';
 import ManageGlossaryTerms from './pages/legal-resources/ManageGlossaryTerms';
 
+// Forum Management Pages
+import ManageTopicsThreadsPage from './pages/forum/ManageTopicsThreadsPage';
+import ReportedPostsPage from './pages/forum/ReportedPostsPage';
+import BanRestrictUsersPage from './pages/forum/BanRestrictUsersPage';
+
+// Settings Page
+import Settings from './pages/Settings';
+
 // Placeholder components for missing pages
-const Settings = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Settings</h1>
-    <p className="text-gray-600">Settings page coming soon...</p>
-  </div>
-);
 
 const Help = () => (
   <div className="p-6">
@@ -52,26 +54,6 @@ const LegalArticles = () => (
   </div>
 );
 
-const TopicsThreads = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Manage Topics & Threads</h1>
-    <p className="text-gray-600">Forum topics and threads management coming soon...</p>
-  </div>
-);
-
-const ReportedPosts = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Reported Posts</h1>
-    <p className="text-gray-600">Reported posts management coming soon...</p>
-  </div>
-);
-
-const BanRestrictUsers = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Ban/Restrict Users</h1>
-    <p className="text-gray-600">User ban/restriction management coming soon...</p>
-  </div>
-);
 
 const OpenTickets = () => (
   <div className="p-6">
@@ -191,9 +173,9 @@ const AdminDashboard = () => {
               <Route path="/legal-resources/legal-articles" element={<LegalArticles />} />
               
               {/* Forum Routes */}
-              <Route path="/forum/topics-threads" element={<TopicsThreads />} />
-              <Route path="/forum/reported-posts" element={<ReportedPosts />} />
-              <Route path="/forum/ban-restrict-users" element={<BanRestrictUsers />} />
+              <Route path="/forum/topics-threads" element={<ManageTopicsThreadsPage />} />
+              <Route path="/forum/reported-posts" element={<ReportedPostsPage />} />
+              <Route path="/forum/ban-restrict-users" element={<BanRestrictUsersPage />} />
               
               {/* Tickets Routes */}
               <Route path="/tickets/open" element={<OpenTickets />} />
