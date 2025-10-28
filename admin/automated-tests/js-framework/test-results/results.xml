@@ -1,0 +1,794 @@
+<testsuites id="" name="" tests="28" failures="16" skipped="12" errors="0" time="44.96993">
+<testsuite name="lawyer-verification-e2e.spec.ts" timestamp="2025-10-27T14:44:03.392Z" hostname="chromium" tests="7" failures="7" skipped="0" time="56.633" errors="0">
+<testcase name="Lawyer Verification E2E Tests › LV-001-E2E: Lawyer Applications Table Verification" classname="lawyer-verification-e2e.spec.ts" time="8.388">
+<failure message="lawyer-verification-e2e.spec.ts:57:7 LV-001-E2E: Lawyer Applications Table Verification" type="FAILURE">
+<![CDATA[  [chromium] › lawyer-verification-e2e.spec.ts:57:7 › Lawyer Verification E2E Tests › LV-001-E2E: Lawyer Applications Table Verification 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-a5779-ications-Table-Verification-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-a5779-ications-Table-Verification-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-a5779-ications-Table-Verification-chromium/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-a5779-ications-Table-Verification-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-a5779-ications-Table-Verification-chromium/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-a5779-ications-Table-Verification-chromium/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-002-E2E: Admin Dashboard Navigation Test" classname="lawyer-verification-e2e.spec.ts" time="8.306">
+<failure message="lawyer-verification-e2e.spec.ts:104:7 LV-002-E2E: Admin Dashboard Navigation Test" type="FAILURE">
+<![CDATA[  [chromium] › lawyer-verification-e2e.spec.ts:104:7 › Lawyer Verification E2E Tests › LV-002-E2E: Admin Dashboard Navigation Test 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-chromium/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-chromium/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-chromium/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-003-E2E: Admin Authentication Test" classname="lawyer-verification-e2e.spec.ts" time="8.376">
+<failure message="lawyer-verification-e2e.spec.ts:139:7 LV-003-E2E: Admin Authentication Test" type="FAILURE">
+<![CDATA[  [chromium] › lawyer-verification-e2e.spec.ts:139:7 › Lawyer Verification E2E Tests › LV-003-E2E: Admin Authentication Test 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-1c962-E-Admin-Authentication-Test-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-1c962-E-Admin-Authentication-Test-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-1c962-E-Admin-Authentication-Test-chromium/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-1c962-E-Admin-Authentication-Test-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-1c962-E-Admin-Authentication-Test-chromium/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-1c962-E-Admin-Authentication-Test-chromium/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-004-E2E: Admin UI Responsiveness Test" classname="lawyer-verification-e2e.spec.ts" time="8.369">
+<failure message="lawyer-verification-e2e.spec.ts:162:7 LV-004-E2E: Admin UI Responsiveness Test" type="FAILURE">
+<![CDATA[  [chromium] › lawyer-verification-e2e.spec.ts:162:7 › Lawyer Verification E2E Tests › LV-004-E2E: Admin UI Responsiveness Test 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-e49a4-dmin-UI-Responsiveness-Test-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-e49a4-dmin-UI-Responsiveness-Test-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-e49a4-dmin-UI-Responsiveness-Test-chromium/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-e49a4-dmin-UI-Responsiveness-Test-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-e49a4-dmin-UI-Responsiveness-Test-chromium/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-e49a4-dmin-UI-Responsiveness-Test-chromium/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-005-E2E: Page Load Performance Test" classname="lawyer-verification-e2e.spec.ts" time="7.782">
+<failure message="lawyer-verification-e2e.spec.ts:190:7 LV-005-E2E: Page Load Performance Test" type="FAILURE">
+<![CDATA[  [chromium] › lawyer-verification-e2e.spec.ts:190:7 › Lawyer Verification E2E Tests › LV-005-E2E: Page Load Performance Test 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-c78d1--Page-Load-Performance-Test-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-c78d1--Page-Load-Performance-Test-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-c78d1--Page-Load-Performance-Test-chromium/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-c78d1--Page-Load-Performance-Test-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-c78d1--Page-Load-Performance-Test-chromium/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-c78d1--Page-Load-Performance-Test-chromium/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-006-E2E: Basic Error Handling Test" classname="lawyer-verification-e2e.spec.ts" time="7.761">
+<failure message="lawyer-verification-e2e.spec.ts:219:7 LV-006-E2E: Basic Error Handling Test" type="FAILURE">
+<![CDATA[  [chromium] › lawyer-verification-e2e.spec.ts:219:7 › Lawyer Verification E2E Tests › LV-006-E2E: Basic Error Handling Test 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-9b914-E-Basic-Error-Handling-Test-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-9b914-E-Basic-Error-Handling-Test-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-9b914-E-Basic-Error-Handling-Test-chromium/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-9b914-E-Basic-Error-Handling-Test-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-9b914-E-Basic-Error-Handling-Test-chromium/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-9b914-E-Basic-Error-Handling-Test-chromium/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-007-E2E: Accessibility Test" classname="lawyer-verification-e2e.spec.ts" time="7.651">
+<failure message="lawyer-verification-e2e.spec.ts:241:7 LV-007-E2E: Accessibility Test" type="FAILURE">
+<![CDATA[  [chromium] › lawyer-verification-e2e.spec.ts:241:7 › Lawyer Verification E2E Tests › LV-007-E2E: Accessibility Test 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-7be4f--007-E2E-Accessibility-Test-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-7be4f--007-E2E-Accessibility-Test-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-7be4f--007-E2E-Accessibility-Test-chromium/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-7be4f--007-E2E-Accessibility-Test-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-7be4f--007-E2E-Accessibility-Test-chromium/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-7be4f--007-E2E-Accessibility-Test-chromium/error-context.md]]
+]]>
+</system-out>
+</testcase>
+</testsuite>
+<testsuite name="lawyer-verification-e2e.spec.ts" timestamp="2025-10-27T14:44:03.392Z" hostname="firefox" tests="7" failures="7" skipped="0" time="62.029" errors="0">
+<testcase name="Lawyer Verification E2E Tests › LV-001-E2E: Lawyer Applications Table Verification" classname="lawyer-verification-e2e.spec.ts" time="8.172">
+<failure message="lawyer-verification-e2e.spec.ts:57:7 LV-001-E2E: Lawyer Applications Table Verification" type="FAILURE">
+<![CDATA[  [firefox] › lawyer-verification-e2e.spec.ts:57:7 › Lawyer Verification E2E Tests › LV-001-E2E: Lawyer Applications Table Verification 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-a5779-ications-Table-Verification-firefox/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-a5779-ications-Table-Verification-firefox/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-a5779-ications-Table-Verification-firefox/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-a5779-ications-Table-Verification-firefox/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-a5779-ications-Table-Verification-firefox/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-a5779-ications-Table-Verification-firefox/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-002-E2E: Admin Dashboard Navigation Test" classname="lawyer-verification-e2e.spec.ts" time="8.771">
+<failure message="lawyer-verification-e2e.spec.ts:104:7 LV-002-E2E: Admin Dashboard Navigation Test" type="FAILURE">
+<![CDATA[  [firefox] › lawyer-verification-e2e.spec.ts:104:7 › Lawyer Verification E2E Tests › LV-002-E2E: Admin Dashboard Navigation Test 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-firefox/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-firefox/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-firefox/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-firefox/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-firefox/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-firefox/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-003-E2E: Admin Authentication Test" classname="lawyer-verification-e2e.spec.ts" time="8.978">
+<failure message="lawyer-verification-e2e.spec.ts:139:7 LV-003-E2E: Admin Authentication Test" type="FAILURE">
+<![CDATA[  [firefox] › lawyer-verification-e2e.spec.ts:139:7 › Lawyer Verification E2E Tests › LV-003-E2E: Admin Authentication Test 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-1c962-E-Admin-Authentication-Test-firefox/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-1c962-E-Admin-Authentication-Test-firefox/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-1c962-E-Admin-Authentication-Test-firefox/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-1c962-E-Admin-Authentication-Test-firefox/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-1c962-E-Admin-Authentication-Test-firefox/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-1c962-E-Admin-Authentication-Test-firefox/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-004-E2E: Admin UI Responsiveness Test" classname="lawyer-verification-e2e.spec.ts" time="8.893">
+<failure message="lawyer-verification-e2e.spec.ts:162:7 LV-004-E2E: Admin UI Responsiveness Test" type="FAILURE">
+<![CDATA[  [firefox] › lawyer-verification-e2e.spec.ts:162:7 › Lawyer Verification E2E Tests › LV-004-E2E: Admin UI Responsiveness Test 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-e49a4-dmin-UI-Responsiveness-Test-firefox/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-e49a4-dmin-UI-Responsiveness-Test-firefox/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-e49a4-dmin-UI-Responsiveness-Test-firefox/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-e49a4-dmin-UI-Responsiveness-Test-firefox/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-e49a4-dmin-UI-Responsiveness-Test-firefox/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-e49a4-dmin-UI-Responsiveness-Test-firefox/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-005-E2E: Page Load Performance Test" classname="lawyer-verification-e2e.spec.ts" time="8.253">
+<failure message="lawyer-verification-e2e.spec.ts:190:7 LV-005-E2E: Page Load Performance Test" type="FAILURE">
+<![CDATA[  [firefox] › lawyer-verification-e2e.spec.ts:190:7 › Lawyer Verification E2E Tests › LV-005-E2E: Page Load Performance Test 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-c78d1--Page-Load-Performance-Test-firefox/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-c78d1--Page-Load-Performance-Test-firefox/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-c78d1--Page-Load-Performance-Test-firefox/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-c78d1--Page-Load-Performance-Test-firefox/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-c78d1--Page-Load-Performance-Test-firefox/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-c78d1--Page-Load-Performance-Test-firefox/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-006-E2E: Basic Error Handling Test" classname="lawyer-verification-e2e.spec.ts" time="9.392">
+<failure message="lawyer-verification-e2e.spec.ts:219:7 LV-006-E2E: Basic Error Handling Test" type="FAILURE">
+<![CDATA[  [firefox] › lawyer-verification-e2e.spec.ts:219:7 › Lawyer Verification E2E Tests › LV-006-E2E: Basic Error Handling Test 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-9b914-E-Basic-Error-Handling-Test-firefox/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-9b914-E-Basic-Error-Handling-Test-firefox/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-9b914-E-Basic-Error-Handling-Test-firefox/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-9b914-E-Basic-Error-Handling-Test-firefox/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-9b914-E-Basic-Error-Handling-Test-firefox/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-9b914-E-Basic-Error-Handling-Test-firefox/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-007-E2E: Accessibility Test" classname="lawyer-verification-e2e.spec.ts" time="9.57">
+<failure message="lawyer-verification-e2e.spec.ts:241:7 LV-007-E2E: Accessibility Test" type="FAILURE">
+<![CDATA[  [firefox] › lawyer-verification-e2e.spec.ts:241:7 › Lawyer Verification E2E Tests › LV-007-E2E: Accessibility Test 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-7be4f--007-E2E-Accessibility-Test-firefox/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-7be4f--007-E2E-Accessibility-Test-firefox/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-7be4f--007-E2E-Accessibility-Test-firefox/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-7be4f--007-E2E-Accessibility-Test-firefox/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-7be4f--007-E2E-Accessibility-Test-firefox/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-7be4f--007-E2E-Accessibility-Test-firefox/error-context.md]]
+]]>
+</system-out>
+</testcase>
+</testsuite>
+<testsuite name="lawyer-verification-e2e.spec.ts" timestamp="2025-10-27T14:44:03.392Z" hostname="webkit" tests="7" failures="2" skipped="5" time="34.757" errors="0">
+<testcase name="Lawyer Verification E2E Tests › LV-001-E2E: Lawyer Applications Table Verification" classname="lawyer-verification-e2e.spec.ts" time="8.161">
+<failure message="lawyer-verification-e2e.spec.ts:57:7 LV-001-E2E: Lawyer Applications Table Verification" type="FAILURE">
+<![CDATA[  [webkit] › lawyer-verification-e2e.spec.ts:57:7 › Lawyer Verification E2E Tests › LV-001-E2E: Lawyer Applications Table Verification 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-a5779-ications-Table-Verification-webkit/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-a5779-ications-Table-Verification-webkit/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-a5779-ications-Table-Verification-webkit/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-a5779-ications-Table-Verification-webkit/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-a5779-ications-Table-Verification-webkit/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-a5779-ications-Table-Verification-webkit/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-002-E2E: Admin Dashboard Navigation Test" classname="lawyer-verification-e2e.spec.ts" time="8.106">
+<failure message="lawyer-verification-e2e.spec.ts:104:7 LV-002-E2E: Admin Dashboard Navigation Test" type="FAILURE">
+<![CDATA[  [webkit] › lawyer-verification-e2e.spec.ts:104:7 › Lawyer Verification E2E Tests › LV-002-E2E: Admin Dashboard Navigation Test 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('h1:has-text("Manage Lawyer Applications")')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('h1:has-text("Manage Lawyer Applications")')
+
+
+      52 |     await page.waitForTimeout(500); // Wait for submenu to expand
+      53 |     await page.click('text=Lawyer Applications');
+    > 54 |     await expect(page.locator('h1:has-text("Manage Lawyer Applications")')).toBeVisible();
+         |                                                                             ^
+      55 |   });
+      56 |
+      57 |   test('LV-001-E2E: Lawyer Applications Table Verification', async () => {
+        at /Users/ralph/Desktop/AI.ttorney/admin/automated-tests/js-framework/e2e/lawyer-verification-e2e.spec.ts:54:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-webkit/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../test-results/lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-webkit/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../test-results/lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-webkit/error-context.md
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-webkit/test-failed-1.png]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-webkit/video.webm]]
+
+[[ATTACHMENT|lawyer-verification-e2e-La-014ff-n-Dashboard-Navigation-Test-webkit/error-context.md]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-003-E2E: Admin Authentication Test" classname="lawyer-verification-e2e.spec.ts" time="6.06">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-004-E2E: Admin UI Responsiveness Test" classname="lawyer-verification-e2e.spec.ts" time="4.711">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-005-E2E: Page Load Performance Test" classname="lawyer-verification-e2e.spec.ts" time="3.858">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-006-E2E: Basic Error Handling Test" classname="lawyer-verification-e2e.spec.ts" time="3.861">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-007-E2E: Accessibility Test" classname="lawyer-verification-e2e.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="lawyer-verification-e2e.spec.ts" timestamp="2025-10-27T14:44:03.392Z" hostname="Mobile Chrome" tests="7" failures="0" skipped="7" time="0" errors="0">
+<testcase name="Lawyer Verification E2E Tests › LV-001-E2E: Lawyer Applications Table Verification" classname="lawyer-verification-e2e.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-002-E2E: Admin Dashboard Navigation Test" classname="lawyer-verification-e2e.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-003-E2E: Admin Authentication Test" classname="lawyer-verification-e2e.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-004-E2E: Admin UI Responsiveness Test" classname="lawyer-verification-e2e.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-005-E2E: Page Load Performance Test" classname="lawyer-verification-e2e.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-006-E2E: Basic Error Handling Test" classname="lawyer-verification-e2e.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Lawyer Verification E2E Tests › LV-007-E2E: Accessibility Test" classname="lawyer-verification-e2e.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+</testsuites>

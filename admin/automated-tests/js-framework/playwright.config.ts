@@ -38,8 +38,9 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm start',
+    command: 'cd ../../ && npm start',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000,
   },
 });
