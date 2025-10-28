@@ -7,7 +7,7 @@
 import React from 'react';
 import { Toast, ToastTitle, ToastDescription } from '@/components/ui/toast';
 
-type ToastAction = 'error' | 'warning' | 'success' | 'info' | 'attention';
+type ToastAction = 'error' | 'warning' | 'success' | 'info' | 'muted';
 
 interface ToastInstance {
   show: (config: {
@@ -47,24 +47,69 @@ export const showModerationToast = (
 };
 
 /**
- * Show a strike added toast
+ * Show a strike added toast with detailed strike information
  */
-export const showStrikeAddedToast = (toast: ToastInstance, detail: string): void => {
-  showModerationToast(toast, 'warning', 'Content Violation - Strike Added', detail, 5000);
+export const showStrikeAddedToast = (
+  toast: ToastInstance,
+  detail: string,
+  strikeCount?: number,
+  suspensionCount?: number
+): void => {
+  let enhancedMessage = detail;
+  
+  if (strikeCount !== undefined) {
+    enhancedMessage += `\n\n⚠️ Strike ${strikeCount}/3`;
+  }
+  
+  showModerationToast(toast, 'warning', '⚠️ Strike Added', enhancedMessage, 6000);
 };
 
 /**
- * Show an account suspended toast
+ * Show an account suspended toast with suspension details
  */
-export const showSuspendedToast = (toast: ToastInstance, detail: string): void => {
-  showModerationToast(toast, 'error', 'Account Suspended', detail, 7000);
+export const showSuspendedToast = (
+  toast: ToastInstance,
+  detail: string,
+  suspensionCount?: number,
+  suspensionEnd?: string
+): void => {
+  let enhancedMessage = detail;
+  
+  if (suspensionCount !== undefined) {
+    enhancedMessage += `\n\n🚨 Suspension ${suspensionCount}/3`;
+    
+    const remainingSuspensions = 3 - suspensionCount;
+    if (remainingSuspensions > 0) {
+      enhancedMessage += `\n⚠️ ${remainingSuspensions} more suspension${remainingSuspensions > 1 ? 's' : ''} until permanent ban`;
+    }
+  }
+  
+  if (suspensionEnd) {
+    try {
+      const date = new Date(suspensionEnd);
+      const formattedDate = date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+      enhancedMessage += `\n\n⏰ Suspended until: ${formattedDate}`;
+    } catch {
+      // Ignore date formatting errors
+    }
+  }
+  
+  showModerationToast(toast, 'error', '🔒 Account Suspended', enhancedMessage, 10000);
 };
 
 /**
  * Show an account banned toast
  */
 export const showBannedToast = (toast: ToastInstance, detail: string): void => {
-  showModerationToast(toast, 'error', 'Account Permanently Banned', detail, 10000);
+  const enhancedMessage = detail + '\n\n🚫 This is a permanent ban after 3 suspensions.\nContact support if you believe this is an error.';
+  showModerationToast(toast, 'error', '🚫 Permanently Banned', enhancedMessage, 15000);
 };
 
 /**

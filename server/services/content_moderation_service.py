@@ -100,17 +100,17 @@ class ContentModerationService:
         # STRICT THRESHOLDS - Zero tolerance for harmful content
         # Lower values = more sensitive detection
         self.thresholds = {
-            "hate": float(os.getenv("MODERATION_THRESHOLD_HATE", "0.5")),  # Lowered from 0.7
-            "hate/threatening": float(os.getenv("MODERATION_THRESHOLD_HATE_THREATENING", "0.3")),  # Lowered from 0.5
-            "harassment": float(os.getenv("MODERATION_THRESHOLD_HARASSMENT", "0.5")),  # Lowered from 0.7
-            "harassment/threatening": float(os.getenv("MODERATION_THRESHOLD_HARASSMENT_THREATENING", "0.3")),  # Lowered from 0.5
-            "self-harm": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM", "0.3")),  # Lowered from 0.5
-            "self-harm/intent": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM_INTENT", "0.3")),  # Lowered from 0.5
-            "self-harm/instructions": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM_INSTRUCTIONS", "0.3")),  # Lowered from 0.5
-            "sexual": float(os.getenv("MODERATION_THRESHOLD_SEXUAL", "0.5")),  # Lowered from 0.8
+            "hate": float(os.getenv("MODERATION_THRESHOLD_HATE", "0.05")),  # VERY STRICT - catches "I hate all lawyers"
+            "hate/threatening": float(os.getenv("MODERATION_THRESHOLD_HATE_THREATENING", "0.05")),  # VERY STRICT
+            "harassment": float(os.getenv("MODERATION_THRESHOLD_HARASSMENT", "0.3")),  # More sensitive
+            "harassment/threatening": float(os.getenv("MODERATION_THRESHOLD_HARASSMENT_THREATENING", "0.1")),  # Very sensitive
+            "self-harm": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM", "0.1")),  # Very sensitive
+            "self-harm/intent": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM_INTENT", "0.1")),  # Very sensitive
+            "self-harm/instructions": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM_INSTRUCTIONS", "0.1")),  # Very sensitive
+            "sexual": float(os.getenv("MODERATION_THRESHOLD_SEXUAL", "0.25")),  # More sensitive
             "sexual/minors": float(os.getenv("MODERATION_THRESHOLD_SEXUAL_MINORS", "0.01")),  # CRITICAL: Near-zero tolerance
-            "violence": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE", "0.5")),  # Lowered from 0.7
-            "violence/graphic": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE_GRAPHIC", "0.4")),  # Lowered from 0.6
+            "violence": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE", "0.3")),  # More sensitive
+            "violence/graphic": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE_GRAPHIC", "0.2")),  # More sensitive
         }
         
         logger.info(f"✅ Content moderation service initialized with model: {self.model}")
@@ -251,17 +251,28 @@ class ContentModerationService:
             # Extract moderation results
             result = response.results[0]
             
-            # Build detailed response
+            # Apply custom thresholds instead of using OpenAI's default flagged status
+            category_scores = result.category_scores.model_dump()
+            
+            # DEBUG: Log all category scores
+            logger.info(f"📊 Category Scores:")
+            for category, score in category_scores.items():
+                threshold = self.thresholds.get(category, 0.5)
+                logger.info(f"   {category}: {score:.4f} (threshold: {threshold})")
+            
+            custom_flagged = self._apply_custom_thresholds(category_scores)
+            
+            # Build detailed response with custom flagged status
             moderation_result = {
-                "flagged": result.flagged,
+                "flagged": custom_flagged,
                 "categories": result.categories.model_dump(),
-                "category_scores": result.category_scores.model_dump(),
-                "violation_summary": self._generate_violation_summary(result),
+                "category_scores": category_scores,
+                "violation_summary": self._generate_violation_summary_from_dict(category_scores, custom_flagged),
                 "raw_response": result.model_dump()
             }
             
             # Log results
-            if result.flagged:
+            if custom_flagged:
                 logger.warning(f"⚠️  Content flagged: {moderation_result['violation_summary']}")
             else:
                 logger.info("✅ Content passed moderation")
@@ -319,6 +330,52 @@ class ContentModerationService:
         except Exception as e:
             logger.error(f"❌ Batch moderation failed: {str(e)}")
             raise Exception(f"Batch moderation error: {str(e)}")
+    
+    def _apply_custom_thresholds(self, category_scores: Dict[str, float]) -> bool:
+        """
+        Apply custom thresholds to category scores to determine if content should be flagged.
+        
+        Args:
+            category_scores: Dictionary of category scores from OpenAI
+        
+        Returns:
+            True if any category exceeds its threshold, False otherwise
+        """
+        for category, score in category_scores.items():
+            threshold = self.thresholds.get(category, 0.5)
+            if score >= threshold:
+                logger.info(f"🚨 Category '{category}' exceeded threshold: {score:.3f} >= {threshold}")
+                return True
+        return False
+    
+    def _generate_violation_summary_from_dict(self, category_scores: Dict[str, float], is_flagged: bool) -> str:
+        """
+        Generate a human-readable summary of policy violations from category scores.
+        
+        Args:
+            category_scores: Dictionary of category scores
+            is_flagged: Whether content was flagged
+        
+        Returns:
+            String describing which policies were violated
+        """
+        if not is_flagged:
+            return "No violations detected"
+        
+        violations = []
+        
+        # Check each category against thresholds
+        for category, score in category_scores.items():
+            threshold = self.thresholds.get(category, 0.5)
+            if score >= threshold:
+                # Format category name for readability
+                category_name = category.replace("-", " ").replace("/", " - ").title()
+                violations.append(f"{category_name} (score: {score:.2f}, threshold: {threshold})")
+        
+        if violations:
+            return "Violations: " + ", ".join(violations)
+        else:
+            return "Flagged but no specific violations above threshold"
     
     def _generate_violation_summary(self, result) -> str:
         """

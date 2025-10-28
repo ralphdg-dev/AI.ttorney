@@ -16,6 +16,10 @@ import { useForumCache } from '../../../contexts/ForumCacheContext';
 import { createShadowStyle } from '../../../utils/shadowUtils';
 import { shouldUseNativeDriver } from '../../../utils/animations';
 import { NetworkConfig } from '../../../utils/networkConfig';
+import { useModerationStatus } from '../../../contexts/ModerationContext';
+import { useToast } from '../../ui/toast';
+import { parseModerationError } from '../../../services/moderationService';
+import { showStrikeAddedToast, showSuspendedToast, showBannedToast, showAccessDeniedToast } from '../../../utils/moderationToastUtils';
 
 
 interface PostData {
@@ -71,6 +75,8 @@ const ViewPost: React.FC = () => {
   const { postId } = useLocalSearchParams();
   const { user: currentUser, session } = useAuth();
   const { getCachedPost, getCachedPostFromForum, prefetchPost } = useForumCache();
+  const { refreshStatus } = useModerationStatus();
+  const toast = useToast();
   const [showFullContent, setShowFullContent] = useState(false);
   const [post, setPost] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -602,8 +608,49 @@ const ViewPost: React.FC = () => {
       if (response.ok) {
         confirmOptimisticReply(optimisticId, loadFromAPI);
       } else {
+        const errorText = await response.text();
         removeOptimisticReply(optimisticId);
         setReplyText(text);
+        
+        // Handle 403 Forbidden (suspended/banned)
+        if (response.status === 403) {
+          await refreshStatus();
+          try {
+            const parsed = JSON.parse(errorText);
+            const message = parsed.detail || 'Your account is suspended or banned.';
+            showAccessDeniedToast(toast, message);
+          } catch {
+            showAccessDeniedToast(toast, 'Your account is suspended or banned.');
+          }
+          return;
+        }
+        
+        // Handle moderation errors (400 Bad Request)
+        if (response.status === 400) {
+          const moderationError = parseModerationError(errorText);
+          if (moderationError) {
+            await refreshStatus();
+            
+            if (moderationError.action_taken === 'strike_added') {
+              showStrikeAddedToast(
+                toast,
+                moderationError.detail,
+                moderationError.strike_count,
+                moderationError.suspension_count
+              );
+            } else if (moderationError.action_taken === 'suspended') {
+              showSuspendedToast(
+                toast,
+                moderationError.detail,
+                moderationError.suspension_count,
+                moderationError.suspension_end
+              );
+            } else if (moderationError.action_taken === 'banned') {
+              showBannedToast(toast, moderationError.detail);
+            }
+            return;
+          }
+        }
       }
     } catch {
       removeOptimisticReply(optimisticId);
@@ -611,7 +658,7 @@ const ViewPost: React.FC = () => {
     } finally {
       setIsReplying(false);
     }
-  }, [replyText, postId, addOptimisticReply, confirmOptimisticReply, removeOptimisticReply, getAuthHeaders, loadFromAPI]);
+  }, [replyText, postId, addOptimisticReply, confirmOptimisticReply, removeOptimisticReply, getAuthHeaders, loadFromAPI, refreshStatus, toast]);
 
   // Replies are now loaded with the post in loadPost and loadFromAPI
   // No separate loadReplies function needed

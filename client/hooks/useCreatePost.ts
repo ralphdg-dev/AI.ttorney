@@ -13,7 +13,7 @@ import { useModerationStatus } from '@/contexts/ModerationContext';
 import { NetworkConfig } from '@/utils/networkConfig';
 import { useToast } from '@/components/ui/toast';
 import { parseModerationError } from '@/services/moderationService';
-import { showModerationToast } from '@/utils/moderationToastUtils';
+import { showModerationToast, showStrikeAddedToast, showSuspendedToast, showBannedToast } from '@/utils/moderationToastUtils';
 
 // Constants
 const OPTIMISTIC_CONFIRM_DELAY = 500;
@@ -131,34 +131,26 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
     removeOptimisticPost(optimisticId);
     await updateModerationStatus();
 
-    // Show appropriate toast based on action taken
-    const toastConfig: Record<string, {
-      action: 'warning' | 'error';
-      title: string;
-      duration: number;
-    }> = {
-      strike_added: {
-        action: 'warning',
-        title: 'Content Violation - Strike Added',
-        duration: 5000
-      },
-      suspended: {
-        action: 'error',
-        title: 'Account Suspended',
-        duration: 7000
-      },
-      banned: {
-        action: 'error',
-        title: 'Account Permanently Banned',
-        duration: 10000
-      }
-    };
-
-    if (moderationError.action_taken) {
-      const config = toastConfig[moderationError.action_taken];
-      if (config) {
-        showModerationToast(toast, config.action, config.title, moderationError.detail, config.duration);
-      }
+    // Show appropriate toast based on action taken with detailed strike/suspension info
+    if (moderationError.action_taken === 'strike_added') {
+      showStrikeAddedToast(
+        toast,
+        moderationError.detail,
+        moderationError.strike_count,
+        moderationError.suspension_count
+      );
+    } else if (moderationError.action_taken === 'suspended') {
+      showSuspendedToast(
+        toast,
+        moderationError.detail,
+        moderationError.suspension_count,
+        moderationError.suspension_end
+      );
+    } else if (moderationError.action_taken === 'banned') {
+      showBannedToast(toast, moderationError.detail);
+    } else {
+      // Fallback for unknown action types
+      showModerationToast(toast, 'error', 'Content Violation', moderationError.detail, 5000);
     }
 
     return true;

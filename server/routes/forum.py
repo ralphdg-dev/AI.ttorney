@@ -153,23 +153,32 @@ async def create_post(
     """Create a new forum post in Supabase with content moderation and violation tracking."""
     try:
         user_id = current_user["user"]["id"]
+        logger.info(f"📝 Creating forum post for user {user_id[:8]}...")
         
         # STEP 0: Check if user is allowed to post (not suspended/banned)
-        violation_service = get_violation_tracking_service()
-        user_status = await violation_service.check_user_status(user_id)
-        
-        if not user_status["is_allowed"]:
-            logger.warning(f"🚫 User {user_id[:8]}... blocked: {user_status['account_status']}")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=user_status["reason"]
-            )
+        try:
+            violation_service = get_violation_tracking_service()
+            user_status = await violation_service.check_user_status(user_id)
+            
+            if not user_status["is_allowed"]:
+                logger.warning(f"🚫 User {user_id[:8]}... blocked: {user_status['account_status']}")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=user_status["reason"]
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ User status check failed: {str(e)}")
+            # Fail-open: Allow post if status check fails
+            logger.warning("⚠️  Proceeding with post creation (status check failed)")
         
         # STEP 1: Content Moderation using OpenAI omni-moderation-latest
-        logger.info(f"🔍 Moderating forum post from user {user_id[:8]}...")
-        moderation_service = get_moderation_service()
-        
         try:
+            logger.info(f"🔍 Moderating forum post from user {user_id[:8]}...")
+            moderation_service = get_moderation_service()
+            
+            # CRITICAL: Content moderation - MUST block violating posts
             moderation_result = await moderation_service.moderate_content(body.body.strip())
             
             # If content is flagged, record violation and apply action
@@ -198,11 +207,17 @@ async def create_post(
                 )
             
             logger.info(f"✅ Post content passed moderation for user {user_id[:8]}...")
+            
         except HTTPException:
             raise
-        except Exception as mod_error:
-            # Log moderation error but don't block post (fail-open for availability)
-            logger.error(f"⚠️  Moderation service error: {str(mod_error)} - allowing post")
+        except Exception as e:
+            logger.error(f"❌ Content moderation failed: {str(e)}")
+            logger.error(f"❌ Error type: {type(e).__name__}")
+            logger.error(f"❌ Error details: {repr(e)}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            # Fail-open: Allow post if moderation service fails to initialize
+            logger.warning("⚠️  Proceeding with post creation (moderation service failed - fail-open strategy)")
 
         # STEP 2: Prepare row for insertion
         post_row: Dict[str, Any] = {
@@ -715,23 +730,32 @@ async def create_reply(
     """Create a reply to a forum post (lawyers only) with content moderation and violation tracking."""
     try:
         user_id = current_user["user"]["id"]
+        logger.info(f"📝 Creating reply for post {post_id} from lawyer {user_id[:8]}...")
         
         # STEP 0: Check if lawyer is allowed to reply (not suspended/banned)
-        violation_service = get_violation_tracking_service()
-        user_status = await violation_service.check_user_status(user_id)
-        
-        if not user_status["is_allowed"]:
-            logger.warning(f"🚫 Lawyer {user_id[:8]}... blocked: {user_status['account_status']}")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=user_status["reason"]
-            )
+        try:
+            violation_service = get_violation_tracking_service()
+            user_status = await violation_service.check_user_status(user_id)
+            
+            if not user_status["is_allowed"]:
+                logger.warning(f"🚫 Lawyer {user_id[:8]}... blocked: {user_status['account_status']}")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=user_status["reason"]
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ User status check failed: {str(e)}")
+            # Fail-open: Allow reply if status check fails
+            logger.warning("⚠️  Proceeding with reply creation (status check failed)")
         
         # STEP 1: Content Moderation using OpenAI omni-moderation-latest
-        logger.info(f"🔍 Moderating reply from lawyer {user_id[:8]}...")
-        moderation_service = get_moderation_service()
-        
         try:
+            logger.info(f"🔍 Moderating reply from lawyer {user_id[:8]}...")
+            moderation_service = get_moderation_service()
+            
+            # CRITICAL: Content moderation - MUST block violating replies
             moderation_result = await moderation_service.moderate_content(body.body.strip())
             
             # If content is flagged, record violation and apply action
@@ -760,11 +784,17 @@ async def create_reply(
                 )
             
             logger.info(f"✅ Reply content passed moderation for lawyer {user_id[:8]}...")
+            
         except HTTPException:
             raise
-        except Exception as mod_error:
-            # Log moderation error but don't block reply (fail-open for availability)
-            logger.error(f"⚠️  Moderation service error: {str(mod_error)} - allowing reply")
+        except Exception as e:
+            logger.error(f"❌ Content moderation failed: {str(e)}")
+            logger.error(f"❌ Error type: {type(e).__name__}")
+            logger.error(f"❌ Error details: {repr(e)}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            # Fail-open: Allow reply if moderation service fails to initialize
+            logger.warning("⚠️  Proceeding with reply creation (moderation service failed - fail-open strategy)")
         
         # STEP 2: Prepare payload for insertion
         supabase = SupabaseService()

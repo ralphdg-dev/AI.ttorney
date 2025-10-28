@@ -99,8 +99,13 @@ class ViolationTrackingService:
             if not user_data:
                 raise Exception(f"User {user_id} not found")
             
-            current_strikes = user_data.get("strike_count", 0)
-            current_suspensions = user_data.get("suspension_count", 0)
+            # Handle None values explicitly (database may return None instead of 0)
+            current_strikes = user_data.get("strike_count") or 0
+            current_suspensions = user_data.get("suspension_count") or 0
+            
+            # Ensure they are integers
+            current_strikes = int(current_strikes) if current_strikes is not None else 0
+            current_suspensions = int(current_suspensions) if current_suspensions is not None else 0
             
             # Step 2: Increment strike count
             new_strike_count = current_strikes + 1
@@ -489,9 +494,14 @@ class ViolationTrackingService:
             )
         else:
             remaining_strikes = self.STRIKES_FOR_SUSPENSION - strike_count
+            strike_word = "strike" if strike_count == 1 else "strikes"
+            
+            # Convert numbers to words for better readability
+            remaining_text = {1: "One", 2: "Two", 3: "Three"}.get(remaining_strikes, str(remaining_strikes))
+            
             return (
-                f"Your content violated our community guidelines. You now have {strike_count} strike(s). "
-                f"You will be suspended if you receive {remaining_strikes} more strike(s)."
+                f"Community guidelines violation detected.\n"
+                f"You have {strike_count} {strike_word}. {remaining_text} more will lead to suspension."
             )
 
 
