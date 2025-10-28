@@ -46,11 +46,6 @@ const ManageTopicsThreads = () => {
     { value: "criminal", label: "Criminal Law" },
     { value: "civil", label: "Civil Law" },
     { value: "labor", label: "Labor Law" },
-    { value: "corporate", label: "Corporate Law" },
-    { value: "property", label: "Property Law" },
-    { value: "tax", label: "Tax Law" },
-    { value: "constitutional", label: "Constitutional Law" },
-    { value: "administrative", label: "Administrative Law" },
     { value: "other", label: "Other" },
   ];
 
@@ -67,7 +62,12 @@ const ManageTopicsThreads = () => {
   ];
 
   useEffect(() => {
-    fetchPosts();
+    // Debounce search term
+    const timeoutId = setTimeout(() => {
+      fetchPosts();
+    }, searchTerm ? 500 : 0); // 500ms delay for search, immediate for other filters
+
+    return () => clearTimeout(timeoutId);
   }, [
     searchTerm,
     categoryFilter,
@@ -81,7 +81,8 @@ const ManageTopicsThreads = () => {
   const fetchPosts = async () => {
     try {
       setLoading(true);
-      const response = await forumManagementService.getForumPosts({
+      
+      const params = {
         page: currentPage,
         limit: 20,
         search: searchTerm,
@@ -90,6 +91,23 @@ const ManageTopicsThreads = () => {
         reported: reportedFilter,
         sort_by: sortBy,
         sort_order: sortOrder,
+      };
+
+      console.log("=== MANAGE TOPICS & THREADS - FETCHING POSTS ===");
+      console.log("Filter parameters:", params);
+
+      const response = await forumManagementService.getForumPosts(params);
+
+      console.log("Response received:", {
+        success: response.success,
+        dataCount: response.data?.length || 0,
+        pagination: response.pagination,
+        firstPost: response.data?.[0] ? {
+          id: response.data[0].id,
+          content: response.data[0].content?.substring(0, 50) + "...",
+          category: response.data[0].category,
+          is_flagged: response.data[0].is_flagged
+        } : null
       });
 
       setPosts(response.data);
