@@ -32,6 +32,7 @@ export interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signUp: (email: string, password: string, metadata: { username: string; first_name: string; last_name: string; birthdate: string }) => Promise<{ success: boolean; error?: string; user?: any }>;
   signOut: () => Promise<void>;
   setUser: (user: User | null) => void;
   refreshUserData: () => Promise<void>;
@@ -120,6 +121,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleAuthStateChange = React.useCallback(async (session: Session, shouldNavigate = false) => {
     try {
+      console.log('🔐 handleAuthStateChange called:', { shouldNavigate, userId: session.user.id });
+      
       // ⚡ OPTIMIZATION: Run ALL API calls in PARALLEL instead of sequentially
       // This reduces login time from ~3-5 seconds to ~1 second
       const [profileResult, suspensionResult, lawyerStatusResult] = await Promise.allSettled([
@@ -131,19 +134,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         session?.access_token ? checkLawyerApplicationStatus() : Promise.resolve(null)
       ]);
 
-      // Handle profile fetch result
-      if (profileResult.status === 'rejected' || (profileResult.status === 'fulfilled' && profileResult.value.error)) {
-        console.error('Error fetching user profile:', profileResult.status === 'fulfilled' ? profileResult.value.error : profileResult.reason);
+      // Handle profile fetch result with better error recovery
+      if (profileResult.status === 'rejected') {
+        console.error('❌ Profile fetch rejected:', profileResult.reason);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (profileResult.status === 'fulfilled' && profileResult.value.error) {
+        console.error('❌ Profile fetch error:', profileResult.value.error);
         setIsLoading(false);
         return;
       }
 
       const profile = profileResult.value.data;
       if (!profile) {
-        console.error('No profile data returned');
+        console.error('❌ No profile data returned');
         setIsLoading(false);
         return;
       }
+
+      console.log('✅ Profile loaded:', { username: profile.username, role: profile.role });
 
       // Update auth state immediately
       setAuthState({
@@ -199,7 +210,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
       }
     } catch (error) {
-      console.error('Error handling auth state change:', error);
+      console.error('❌ Error handling auth state change:', error);
       setIsLoading(false);
     }
   }, [checkLawyerApplicationStatus, checkSuspensionStatus]);
@@ -274,43 +285,109 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('🔐 signIn called for:', email);
       setIsLoading(true);
       setHasRedirectedToStatus(false);
       
+      // Supabase best practice: Use signInWithPassword for email/password auth
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.toLowerCase().trim(),
         password,
       });
 
       if (error) {
-        console.error('Sign in error:', error.message);
+        console.error('❌ Supabase signIn error:', error.message);
         
-        // Map Supabase errors to user-friendly messages
+        // Map Supabase errors to user-friendly messages (industry standard)
         let errorMessage = 'Invalid email or password';
         if (error.message.includes('Invalid login credentials')) {
           errorMessage = 'Invalid email or password';
         } else if (error.message.includes('Email not confirmed')) {
           errorMessage = 'Please verify your email address';
-        } else if (error.message.includes('network')) {
+        } else if (error.message.includes('email_not_confirmed')) {
+          errorMessage = 'Please verify your email address';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
           errorMessage = 'Network error. Please check your connection';
+        } else if (error.message.includes('rate_limit')) {
+          errorMessage = 'Too many attempts. Please try again later';
         }
         
-        // ⚡ OPTIMIZATION: Set loading false on error
         setIsLoading(false);
         return { success: false, error: errorMessage };
       }
 
       if (data.session) {
-        // ⚡ OPTIMIZATION: handleAuthStateChange will set isLoading to false
-        // No need to set it here - prevents double state updates
+        console.log('✅ Supabase session created, handling auth state...');
+        // handleAuthStateChange will set isLoading to false
         await handleAuthStateChange(data.session, true);
         return { success: true };
       }
 
+      console.error('❌ No session returned from Supabase');
       setIsLoading(false);
       return { success: false, error: 'Login failed. Please try again' };
     } catch (error: any) {
-      console.error('Sign in catch:', error);
+      console.error('❌ signIn exception:', error);
+      setIsLoading(false);
+      return { success: false, error: 'Network error. Please check your connection' };
+    }
+  };
+
+  const signUp = async (
+    email: string, 
+    password: string, 
+    metadata: { username: string; first_name: string; last_name: string; birthdate: string }
+  ) => {
+    try {
+      console.log('📝 signUp called for:', email);
+      setIsLoading(true);
+      
+      // Supabase best practice: Use signUp with email confirmation
+      const { data, error } = await supabase.auth.signUp({
+        email: email.toLowerCase().trim(),
+        password,
+        options: {
+          data: {
+            username: metadata.username,
+            first_name: metadata.first_name,
+            last_name: metadata.last_name,
+            full_name: `${metadata.first_name} ${metadata.last_name}`,
+            birthdate: metadata.birthdate,
+          },
+          emailRedirectTo: undefined, // We handle verification via OTP
+        },
+      });
+
+      if (error) {
+        console.error('❌ Supabase signUp error:', error.message);
+        
+        // Map Supabase errors to user-friendly messages
+        let errorMessage = 'Registration failed. Please try again';
+        if (error.message.includes('already registered') || error.message.includes('already exists')) {
+          errorMessage = 'Email already registered. Please sign in instead';
+        } else if (error.message.includes('rate_limit')) {
+          errorMessage = 'Too many attempts. Please try again later';
+        } else if (error.message.includes('password')) {
+          errorMessage = 'Password does not meet requirements';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection';
+        }
+        
+        setIsLoading(false);
+        return { success: false, error: errorMessage };
+      }
+
+      if (data.user) {
+        console.log('✅ User created:', data.user.id);
+        setIsLoading(false);
+        return { success: true, user: data.user };
+      }
+
+      console.error('❌ No user returned from Supabase');
+      setIsLoading(false);
+      return { success: false, error: 'Registration failed. Please try again' };
+    } catch (error: any) {
+      console.error('❌ signUp exception:', error);
       setIsLoading(false);
       return { success: false, error: 'Network error. Please check your connection' };
     }
@@ -318,6 +395,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
+      console.log('🚪 signOut called');
       // Set signing out flag FIRST so guards know to skip checks
       setIsSigningOut(true);
       
@@ -336,7 +414,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearAuthStorage().catch(() => {});
       supabase.auth.signOut({ scope: 'local' }).catch(() => {});
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error('❌ signOut error:', error);
       
       // Force clear ALL states and redirect immediately
       setIsSigningOut(true);
@@ -397,6 +475,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading,
     isAuthenticated: !!authState.session && !!authState.user,
     signIn,
+    signUp,
     signOut,
     setUser: setUserData,
     refreshUserData,

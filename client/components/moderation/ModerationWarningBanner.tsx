@@ -7,7 +7,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { AlertTriangle, Ban, AlertCircle } from 'lucide-react-native';
-import Colors from '@/constants/Colors';
 
 interface ModerationWarningBannerProps {
   strikeCount: number;
@@ -81,10 +80,12 @@ export const ModerationWarningBanner: React.FC<ModerationWarningBannerProps> = (
           {strikeCount === 2 && `You have 2 strikes. 1 more violation will result in a 7-day suspension.`}
           {strikeCount >= 3 && 'You have reached 3 strikes. Your account may be suspended.'}
         </Text>
+        
+        {/* Show suspension count if any */}
         {suspensionCount > 0 && (
           <Text style={styles.suspensionInfo}>
-            {suspensionCount === 1 && 'Previous suspensions: 1 (2 more = permanent ban)'}
-            {suspensionCount === 2 && 'Previous suspensions: 2 (1 more = permanent ban)'}
+            {suspensionCount === 1 && '2 more suspensions will result in permanent ban'}
+            {suspensionCount === 2 && '1 more suspension will result in permanent ban'}
           </Text>
         )}
       </View>
@@ -175,8 +176,8 @@ const styles = StyleSheet.create({
   },
   suspensionInfo: {
     fontSize: 12,
-    color: '#78350F', // amber-900
-    fontStyle: 'italic',
-    marginTop: 4,
+    color: '#92400E', // amber-800
+    fontWeight: '500',
+    marginTop: 6,
   },
 });

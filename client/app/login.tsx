@@ -10,13 +10,12 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function Login() {
   const toast = useToast();
-  const { signIn } = useAuth();
+  const { signIn, isLoading: authLoading } = useAuth();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   
   // Refs for input fields
   const passwordInputRef = useRef<TextInput>(null);
@@ -67,7 +66,10 @@ export default function Login() {
       return;
     }
 
-    setIsLoading(true);
+    // Prevent double submission
+    if (authLoading) {
+      return;
+    }
     
     try {
       const result = await signIn(email.toLowerCase().trim(), password);
@@ -83,7 +85,7 @@ export default function Login() {
           ),
         });
       } else {
-        // Stay on login page and show error
+        // Show error toast
         toast.show({
           placement: "top",
           render: ({ id }) => (
@@ -93,7 +95,6 @@ export default function Login() {
             </Toast>
           ),
         });
-        setIsLoading(false);
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -106,7 +107,6 @@ export default function Login() {
           </Toast>
         ),
       });
-      setIsLoading(false);
     }
   };
 
@@ -267,15 +267,15 @@ export default function Login() {
             style={[
               tw`py-3 rounded-lg items-center justify-center mb-3`,
               { 
-                backgroundColor: isLoading ? '#9CA3AF' : Colors.primary.blue,
-                opacity: isLoading ? 0.7 : 1
+                backgroundColor: authLoading ? '#9CA3AF' : Colors.primary.blue,
+                opacity: authLoading ? 0.7 : 1
               },
             ]}
             onPress={handleLogin}
-            disabled={isLoading}
+            disabled={authLoading}
           >
             <Text style={tw`text-white font-semibold text-lg`}>
-              {isLoading ? 'Signing In...' : 'Login'}
+              {authLoading ? 'Signing In...' : 'Login'}
             </Text>
           </TouchableOpacity>
 
