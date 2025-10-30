@@ -18,6 +18,7 @@ import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
 import { Input, InputField, InputSlot } from "@/components/ui/input";
 import Navbar from "@/components/Navbar";
+import { GuestNavbar, GuestSidebar } from "@/components/guest";
 import ToggleGroup from "@/components/ui/ToggleGroup";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
@@ -31,12 +32,15 @@ import {
   generateGlossaryCacheKey,
 } from "@/services/cacheService";
 import { NetworkConfig } from "@/utils/networkConfig";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ITEMS_PER_PAGE = 10;
 
 export default function GlossaryScreen() {
   const router = useRouter();
+  const { isGuestMode } = useAuth();
   const [activeTab, setActiveTab] = useState<string>("terms");
+  const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState<boolean>(false);
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -278,7 +282,7 @@ export default function GlossaryScreen() {
   const handleTabChange = useCallback((id: string) => {
     if (id === activeTab) return;
     
-    // Smooth transition animation
+    // Smooth transition animation for both tabs
     fadeOut(fadeAnim, 150).start(() => {
       setActiveTab(id);
       setCurrentPage(1);
@@ -526,6 +530,7 @@ export default function GlossaryScreen() {
         <TermListItem
           item={item}
           onPress={handleItemPress}
+          showFavorite={!isGuestMode}
           containerStyle={{
             width: numColumns > 1 ? (screenWidth - horizontalPadding * 2 - 12) / numColumns : "100%",
             marginBottom: 12,
@@ -546,12 +551,16 @@ export default function GlossaryScreen() {
         />
       );
     }
-  }, [activeTab, handleItemPress, handleToggleBookmark, numColumns, screenWidth, horizontalPadding]);
+  }, [activeTab, handleItemPress, handleToggleBookmark, numColumns, screenWidth, horizontalPadding, isGuestMode]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      <Header title="Know Your Batas" showMenu={true} />
+      <Header 
+        title="Know Your Batas" 
+        showMenu={true}
+        onMenuPress={isGuestMode ? () => setIsGuestSidebarOpen(true) : undefined}
+      />
 
       <ToggleGroup
         options={tabOptions}
@@ -614,8 +623,21 @@ export default function GlossaryScreen() {
         />
       </Animated.View>
 
-      <Navbar activeTab="learn" />
-      <SidebarWrapper />
+      {/* Guest Sidebar */}
+      {isGuestMode && (
+        <GuestSidebar 
+          isOpen={isGuestSidebarOpen} 
+          onClose={() => setIsGuestSidebarOpen(false)} 
+        />
+      )}
+
+      {/* Conditional navbar rendering based on guest mode */}
+      {isGuestMode ? (
+        <GuestNavbar activeTab="learn" />
+      ) : (
+        <Navbar activeTab="learn" />
+      )}
+      {!isGuestMode && <SidebarWrapper />}
     </SafeAreaView>
   );
 }

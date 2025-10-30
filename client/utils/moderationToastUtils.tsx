@@ -58,10 +58,10 @@ export const showStrikeAddedToast = (
   let enhancedMessage = detail;
   
   if (strikeCount !== undefined) {
-    enhancedMessage += `\n\n⚠️ Strike ${strikeCount}/3`;
+    enhancedMessage += `\n\nStrike ${strikeCount}/3`;
   }
   
-  showModerationToast(toast, 'warning', '⚠️ Strike Added', enhancedMessage, 6000);
+  showModerationToast(toast, 'warning', 'Strike Added', enhancedMessage, 6000);
 };
 
 /**
@@ -76,11 +76,11 @@ export const showSuspendedToast = (
   let enhancedMessage = detail;
   
   if (suspensionCount !== undefined) {
-    enhancedMessage += `\n\n🚨 Suspension ${suspensionCount}/3`;
+    enhancedMessage += `\n\nSuspension ${suspensionCount}/3`;
     
     const remainingSuspensions = 3 - suspensionCount;
     if (remainingSuspensions > 0) {
-      enhancedMessage += `\n⚠️ ${remainingSuspensions} more suspension${remainingSuspensions > 1 ? 's' : ''} until permanent ban`;
+      enhancedMessage += `\n${remainingSuspensions} more suspension${remainingSuspensions > 1 ? 's' : ''} until permanent ban`;
     }
   }
   
@@ -95,21 +95,21 @@ export const showSuspendedToast = (
         minute: '2-digit',
         hour12: true,
       });
-      enhancedMessage += `\n\n⏰ Suspended until: ${formattedDate}`;
+      enhancedMessage += `\n\nSuspended until: ${formattedDate}`;
     } catch {
       // Ignore date formatting errors
     }
   }
   
-  showModerationToast(toast, 'error', '🔒 Account Suspended', enhancedMessage, 10000);
+  showModerationToast(toast, 'error', 'Account Suspended', enhancedMessage, 10000);
 };
 
 /**
  * Show an account banned toast
  */
 export const showBannedToast = (toast: ToastInstance, detail: string): void => {
-  const enhancedMessage = detail + '\n\n🚫 This is a permanent ban after 3 suspensions.\nContact support if you believe this is an error.';
-  showModerationToast(toast, 'error', '🚫 Permanently Banned', enhancedMessage, 15000);
+  const enhancedMessage = detail + '\n\nThis is a permanent ban after 3 suspensions.\nContact support if you believe this is an error.';
+  showModerationToast(toast, 'error', 'Permanently Banned', enhancedMessage, 15000);
 };
 
 /**

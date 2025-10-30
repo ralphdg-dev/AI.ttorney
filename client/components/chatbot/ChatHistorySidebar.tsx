@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, Animated, Platform, ActivityI
 import { SafeAreaView } from 'react-native-safe-area-context';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
+import { LAYOUT } from '../../constants/LayoutConstants';
 import { ChatHistoryService, Conversation } from '../../services/chatHistoryService';
 import { MessageSquare, Plus, Trash2, AlertCircle, AlertTriangle } from 'lucide-react-native';
 import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody, ModalFooter } from '../ui/modal';
@@ -262,8 +263,11 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
           activeOpacity={1}
           onPress={() => setIsOpen(false)}
           style={[
-            tw`absolute inset-0 z-40`,
-            { backgroundColor: 'rgba(0, 0, 0, 0.3)' },
+            tw`absolute inset-0`,
+            { 
+              backgroundColor: 'rgba(0, 0, 0, 0.3)',
+              zIndex: LAYOUT.Z_INDEX.overlay,
+            },
           ]}
         />
       )}
@@ -271,12 +275,13 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
       {/* Sidebar */}
       <Animated.View
         style={[
-          tw`absolute top-0 bottom-0 z-50`,
+          tw`absolute top-0 bottom-0`,
           {
             right: 0,
             width: SIDEBAR_WIDTH,
             backgroundColor: Colors.background.primary,
             transform: [{ translateX: slideAnim }],
+            zIndex: LAYOUT.Z_INDEX.drawer,
             ...(Platform.OS === 'web'
               ? { boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.1)' }
               : {

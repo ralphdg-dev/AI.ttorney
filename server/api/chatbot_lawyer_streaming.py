@@ -74,8 +74,8 @@ from models.violation_types import ViolationType
 router = APIRouter(prefix="/api/chatbot/lawyer", tags=["Legal Practice & Research API - Streaming"])
 
 
-@router.post("/ask/stream")
-async def ask_legal_question_stream(
+@router.post("/ask")
+async def ask_legal_question(
     request: ChatRequest,
     chat_service: ChatHistoryService = Depends(get_chat_history_service),
     current_user: Optional[dict] = Depends(get_optional_current_user)

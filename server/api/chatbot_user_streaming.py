@@ -22,6 +22,9 @@ from api.chatbot_user import (
     get_chat_history_service,
     ChatHistoryService,
     
+    # Greeting detection
+    is_simple_greeting,
+    
     # Configuration
     CHAT_MODEL,
     TOP_K_RESULTS,
@@ -51,18 +54,26 @@ from api.chatbot_user import (
 from utils.sse_formatter import format_sse
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/chatbot/user", tags=["User Chatbot Streaming"])
+router = APIRouter(prefix="/api/chatbot/user", tags=["User Chatbot"])
 
 
-@router.post("/ask/stream")
-async def ask_legal_question_stream(
+@router.post("/ask")
+async def ask_legal_question(
     request: ChatRequest,
     chat_service: ChatHistoryService = Depends(get_chat_history_service),
     current_user: Optional[dict] = Depends(get_optional_current_user)
 ):
     """
-    STREAMING version - responses appear word-by-word like ChatGPT!
-    Much faster perceived response time.
+    User chatbot endpoint with Server-Sent Events (SSE) streaming.
+    
+    Industry standard (ChatGPT/Claude pattern):
+    - Real-time word-by-word streaming
+    - Immediate user feedback
+    - Better perceived performance
+    - Modern chat UX
+    
+    Returns:
+        StreamingResponse with text/event-stream content
     """
     
     async def generate_stream() -> AsyncGenerator[str, None]:
@@ -228,6 +239,30 @@ async def ask_legal_question_stream(
                 except Exception as e:
                     logger.error(f"❌ Content moderation error: {str(e)}")
                     # Fail-open: Continue without moderation if service fails
+            
+            # CRITICAL: Check for greeting FIRST (before legal question check)
+            # This ensures "hi", "hello", etc. get friendly responses, not formal rejections
+            if is_simple_greeting(request.question):
+                print(f"✅ Detected as greeting: {request.question}")
+                greeting_response = generate_ai_response(request.question, language, 'greeting')
+                yield format_sse({'content': greeting_response, 'done': True})
+                
+                # Save greeting interaction to chat history
+                if effective_user_id:
+                    try:
+                        await save_chat_interaction(
+                            chat_service=chat_service,
+                            effective_user_id=effective_user_id,
+                            session_id=request.session_id,
+                            question=request.question,
+                            answer=greeting_response,
+                            language=language,
+                            metadata={"type": "greeting", "streaming": True}
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to save greeting to history: {e}")
+                
+                return
             
             # Check if legal question
             if not is_legal_question(request.question):

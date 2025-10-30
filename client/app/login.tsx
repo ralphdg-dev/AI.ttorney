@@ -10,7 +10,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function Login() {
   const toast = useToast();
-  const { signIn, isLoading: authLoading } = useAuth();
+  const { signIn, continueAsGuest, isLoading: authLoading } = useAuth();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -306,10 +306,7 @@ export default function Login() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => {
-              // TODO: Implement guest login logic
-              console.log("Continue as Guest pressed");
-            }}
+            onPress={continueAsGuest}
             style={tw`mt-3`}
             activeOpacity={0.7}
           >

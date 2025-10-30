@@ -84,18 +84,27 @@ export const LAYOUT = {
   },
 
   /**
-   * Z-index scale
-   * Prevents z-index conflicts
+   * Z-index scale (Industry Standard)
+   * Prevents z-index conflicts across the entire app
+   * Based on Material Design and iOS HIG guidelines
+   * 
+   * Rules:
+   * 1. Never use arbitrary z-index values (e.g., 999, 9999)
+   * 2. Always use constants from this scale
+   * 3. Higher values = closer to user
+   * 4. Each layer is 10 units apart for flexibility
    */
   Z_INDEX: {
-    base: 0,
-    dropdown: 10,
-    sticky: 20,
-    fixed: 30,
-    modalBackdrop: 40,
-    modal: 50,
-    popover: 60,
-    tooltip: 70,
+    base: 0,              // Default layer (most content)
+    dropdown: 10,         // Dropdowns, autocomplete
+    sticky: 20,           // Sticky headers, floating buttons
+    fixed: 30,            // Fixed position elements
+    overlay: 40,          // Overlays (dim background)
+    drawer: 50,           // Side drawers, sidebars
+    modal: 60,            // Modals, dialogs
+    popover: 70,          // Popovers, tooltips
+    toast: 80,            // Toast notifications
+    max: 90,              // Absolute top (critical alerts)
   },
 } as const;
 

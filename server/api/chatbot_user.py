@@ -1214,34 +1214,50 @@ def generate_ai_response(question: str, language: str, response_type: str, topic
     # Define prompts based on response type
     prompts = {
         'greeting': {
-            'english': f"""You are Ai.ttorney, a friendly Philippine legal assistant. The user just said: "{question}"
+            'english': f"""You are Ai.ttorney, a super friendly and casual Philippine legal assistant. The user just said: "{question}"
 
-This seems like a greeting or casual message, not a legal question. Respond in a natural, conversational way that:
-1. Matches their energy and language style
-2. Shows personality and warmth
-3. Invites them to ask legal questions if they want
-4. Feels like talking to a knowledgeable friend
-5. Uses the same language they used (English, Tagalog, or Taglish)
+Respond like a cool friend, NOT a formal assistant. Be warm, casual, and inviting.
 
-Keep it brief but engaging - like a real conversation starter.
+RULES:
+- Keep it SHORT (1-2 sentences max)
+- Be CASUAL and fun, not formal
+- DON'T say "I appreciate your greeting" or "feel free to ask" - too robotic
+- DO use casual language like "Hey!", "What's up?", "Kamusta!"
+- Show personality and warmth
+- Invite them to chat about legal stuff naturally
 
-Examples:
-- For "hello": "Hey there! I'm Ai.ttorney, your go-to for Philippine legal questions. What's up?"
-- For "kumusta": "Kumusta kaibigan! Ai.ttorney dito - may legal topics ka bang gustong malaman?"
+GOOD Examples:
+- "Hey! 👋 I'm Ai.ttorney. Got any legal questions? I'm here to help!"
+- "Hi there! What's up? Need help with any Philippine law stuff?"
+- "Hello! 😊 Ai.ttorney here. What can I help you with today?"
 
-Make it varied and natural, not robotic.""",
-            'tagalog': f"""Ikaw si Ai.ttorney, isang mainit na legal assistant sa Pilipinas. Ang user lang ay nag-sabi: "{question}"
+BAD Examples (too formal):
+- "I appreciate your greeting! However, I'm a legal assistant..."
+- "Thank you for reaching out. I can only assist with..."
 
-Ito ay mukhang greeting o casual na mensahe, hindi legal na tanong. Sumagot nang natural at conversational na:
-1. I-match ang kanilang energy at estilo ng lengguwahe
-2. Magpakita ng personalidad at init
-3. Imbitahan silang magtanong tungkol sa legal kung gusto nila
-4. Parang kausap ang taong marunong sa kulturang Pilipino
-5. Gamitin ang parehong lengguwahe nila
+Keep it natural and friendly!""",
+            'tagalog': f"""Ikaw si Ai.ttorney, isang super friendly at casual na legal assistant sa Pilipinas. Ang user ay nag-sabi: "{question}"
 
-Panatilihing maikli pero engaging - parang tunay na conversation starter.
+Sumagot parang cool na kaibigan, HINDI formal na assistant. Maging mainit, casual, at welcoming.
 
-Gawing varied at natural, hindi robotic."""
+MGA PATAKARAN:
+- Panatilihing MAIKLI (1-2 pangungusap lang)
+- Maging CASUAL at masaya, hindi formal
+- HUWAG magsabi ng "Salamat sa iyong greeting" o "huwag mag-atubiling magtanong" - masyadong robotic
+- GAMITIN ang casual language tulad ng "Uy!", "Kamusta!", "Ano meron?"
+- Magpakita ng personality at init
+- Imbitahan silang mag-usap tungkol sa legal naturally
+
+MAGANDANG Examples:
+- "Uy kamusta! 👋 Ai.ttorney ako. May legal questions ka ba? Nandito ako!"
+- "Hello! Ano meron? Need help sa Philippine law?"
+- "Kumusta! 😊 Ai.ttorney here. Ano'ng maitutulong ko today?"
+
+MASAMANG Examples (masyadong formal):
+- "Pinahahalagahan ko ang iyong pagbati! Gayunpaman, ako ay legal assistant..."
+- "Salamat sa pag-abot. Makakatulong lamang ako sa..."
+
+Gawing natural at friendly!"""
         },
         'casual': {
             'english': f"""You are Ai.ttorney, a friendly Philippine legal assistant. The user just said: "{question}"
@@ -1329,9 +1345,9 @@ Gawing varied at natural, hindi robotic."""
         }
     }
     
-    # Fallback responses
+    # Fallback responses (casual and friendly)
     fallbacks = {
-        'greeting': "Hello! I'm Ai.ttorney, your legal assistant for Philippine law. How can I help you today?",
+        'greeting': "Hey! 👋 I'm Ai.ttorney. Got any legal questions? I'm here to help!" if language == "english" else "Uy kamusta! 👋 Ai.ttorney ako. May legal questions ka ba?",
         'casual': "Hey there! I'm Ai.ttorney, your legal assistant for Philippine law. Got any questions?",
         'out_of_scope': "Sorry, I can only help with Civil, Criminal, Consumer, Family, and Labor Law." if language == "english" else "Pasensya na, ang maitutulong ko lang ay tungkol sa Civil, Criminal, Consumer, Family, at Labor Law."
     }
@@ -1641,12 +1657,23 @@ async def save_chat_interaction(
         return (session_id, None, None)
 
 
-@router.post("/ask", response_model=ChatResponse)
-async def ask_legal_question(
+@router.post("/ask/legacy", response_model=ChatResponse, deprecated=True)
+async def ask_legal_question_legacy(
     request: ChatRequest,
     chat_service: ChatHistoryService = Depends(get_chat_history_service),
     current_user: Optional[dict] = Depends(get_optional_current_user)
 ):
+    """
+    DEPRECATED: Legacy non-streaming endpoint.
+    
+    Use POST /api/chatbot/user/ask instead (streaming version).
+    This endpoint is kept for backward compatibility only.
+    
+    Modern clients should use the streaming endpoint for:
+    - Better UX (real-time feedback)
+    - Lower perceived latency
+    - Industry-standard SSE streaming
+    """
     """
     Main endpoint for general public to ask legal questions about Philippine law
     

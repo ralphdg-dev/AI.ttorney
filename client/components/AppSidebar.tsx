@@ -1,5 +1,5 @@
  import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated, ScrollView, StatusBar } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Dimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { shouldUseNativeDriver } from '@/utils/animations';
@@ -22,6 +22,7 @@ import { GlobalStyles } from "../constants/GlobalStyles";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../config/supabase";
 import { createShadowStyle } from "../utils/shadowUtils";
+import { LAYOUT } from "../constants/LayoutConstants";
 
 const { width: screenWidth } = Dimensions.get("window");
 const SIDEBAR_WIDTH = screenWidth * 0.8;
@@ -103,7 +104,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   // INDUSTRY STANDARD: Lazy initialization with useState
   const [slideAnim] = useState(() => new Animated.Value(-SIDEBAR_WIDTH));
-  const [overlayOpacity] = useState(() => new Animated.Value(0));
   const [acceptedConsultationsCount, setAcceptedConsultationsCount] = useState(0);
   const insets = useSafeAreaInsets();
   const { signOut, user } = useAuth();
@@ -154,34 +154,21 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     if (isVisible) {
       // Animate in
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          ...animationConfig,
-        }),
-        Animated.timing(overlayOpacity, {
-          toValue: 0.5,
-          ...animationConfig,
-        }),
-      ]).start();
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        ...animationConfig,
+      }).start();
     } else {
       // Animate out
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: -SIDEBAR_WIDTH,
-          ...animationConfig,
-        }),
-        Animated.timing(overlayOpacity, {
-          toValue: 0,
-          ...animationConfig,
-        }),
-      ]).start();
+      Animated.timing(slideAnim, {
+        toValue: -SIDEBAR_WIDTH,
+        ...animationConfig,
+      }).start();
     }
 
     // Cleanup
     return () => {
       slideAnim.stopAnimation();
-      overlayOpacity.stopAnimation();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible]);
@@ -339,29 +326,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="rgba(0,0,0,0.5)" barStyle="light-content" />
-
-      {/* Overlay */}
-      <Animated.View
-        style={[
-          styles.overlay,
-          {
-            opacity: overlayOpacity,
-          },
-        ]}
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
-      >
-        <TouchableOpacity
-          style={styles.overlayTouchable}
-          onPress={onClose}
-          activeOpacity={1}
-          accessible={true}
-          accessibilityLabel="Close sidebar"
-          accessibilityRole="button"
-        />
-      </Animated.View>
-
       {/* Sidebar */}
       <Animated.View
         style={[
@@ -498,7 +462,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1000,
+    zIndex: LAYOUT.Z_INDEX.drawer,
   },
   overlay: {
     position: "absolute",
@@ -507,6 +471,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: "black",
+    zIndex: LAYOUT.Z_INDEX.overlay,
   },
   overlayTouchable: {
     flex: 1,

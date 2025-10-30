@@ -14,12 +14,15 @@ import Colors from "@/constants/Colors";
 import { LAYOUT } from "@/constants/LayoutConstants";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import Navbar from "@/components/Navbar";
+import { GuestNavbar } from "@/components/guest";
 import { SidebarWrapper } from "@/components/AppSidebar";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import { useLegalArticles } from "@/hooks/useLegalArticles";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function GuidesScreen() {
   const router = useRouter();
+  const { isGuestMode } = useAuth();
   const [activeTab, setActiveTab] = useState<string>("guides");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -142,10 +145,8 @@ export default function GuidesScreen() {
   };
 
   const onToggleChange = (id: string) => {
-    setActiveTab(id);
-    if (id === "terms") {
-      router.push("/glossary");
-    }
+    // Always navigate to glossary page - it has both tabs
+    router.push("/glossary");
   };
 
   const renderListHeader = () => (
@@ -289,7 +290,7 @@ const renderPagination = () => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      <Header title="Know Your Batas" showMenu={true} />
+      <Header title="Know Your Batas" showMenu={!isGuestMode} />
 
         <ToggleGroup options={tabOptions} activeOption={activeTab} onOptionChange={onToggleChange} />
 
@@ -322,7 +323,7 @@ const renderPagination = () => {
             <GSText size="lg" className="text-red-500 text-center mb-4">{error}</GSText>
             <TouchableOpacity 
               style={tw`bg-blue-500 px-4 py-2 rounded-lg`}
-              onPress={refetch}
+              onPress={() => refetch()}
             >
               <GSText size="sm" className="text-white">Retry</GSText>
             </TouchableOpacity>
@@ -371,8 +372,13 @@ const renderPagination = () => {
           </View>
         )}
 
-        <Navbar activeTab="learn" />
-        <SidebarWrapper />
+        {/* Conditional navbar rendering based on guest mode */}
+        {isGuestMode ? (
+          <GuestNavbar activeTab="learn" />
+        ) : (
+          <Navbar activeTab="learn" />
+        )}
+        {!isGuestMode && <SidebarWrapper />}
       </SafeAreaView>
   );
 }

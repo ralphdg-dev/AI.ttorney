@@ -9,8 +9,9 @@ import {
   Inter_700Bold,
 } from "@expo-google-fonts/inter";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
-import { AuthProvider } from "../contexts/AuthContext";
+import React, { useEffect, useState } from "react";
+import { AuthProvider, useAuth } from "../contexts/AuthContext";
+import { GuestProvider } from "../contexts/GuestContext";
 import { FavoritesProvider } from "../contexts/FavoritesContext";
 import { ForumCacheProvider } from "../contexts/ForumCacheContext";
 import { ModerationProvider } from "../contexts/ModerationContext";
@@ -20,7 +21,65 @@ import { SuspensionGuard } from "../components/SuspensionGuard";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 
 // Keep the splash screen visible while we fetch resources
+// This prevents flash of unauthenticated UI during auth check
 SplashScreen.preventAutoHideAsync();
+
+function AppContent() {
+  const { initialAuthCheck } = useAuth();
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    // Only hide splash screen when auth check is complete
+    if (initialAuthCheck) {
+      setIsReady(true);
+      SplashScreen.hideAsync();
+    }
+  }, [initialAuthCheck]);
+
+  // Keep splash screen visible until auth check completes
+  if (!isReady) {
+    return null;
+  }
+
+  return (
+    <GuestProvider>
+      <ModerationProvider>
+        <FavoritesProvider>
+          <ForumCacheProvider>
+            <AuthGuard>
+              <SuspensionGuard>
+                <RouteErrorBoundary>
+                  <SidebarProvider>
+                    <Stack screenOptions={{ headerShown: false }}>
+                      <Stack.Screen name="index" options={{ headerShown: false }} />
+                      <Stack.Screen name="login" options={{ headerShown: false }} />
+                      <Stack.Screen name="role-selection" options={{ headerShown: false }} />
+                      <Stack.Screen name="lawyer/index" options={{ headerShown: false }} />
+                      <Stack.Screen name="lawyer/forum" options={{ headerShown: false }} />
+                      <Stack.Screen name="lawyer/consult" options={{ headerShown: false }} />
+                      <Stack.Screen name="lawyer/profile" options={{ headerShown: false }} />
+                      <Stack.Screen name="directory" options={{ headerShown: false, title: "Find Legal Help" }} />
+                      <Stack.Screen name="article" options={{ headerShown: false, title: "Article" }} />
+                      <Stack.Screen name="guides" options={{ headerShown: false, title: "Guides" }} />
+                      <Stack.Screen name="glossary" options={{ headerShown: false, title: "Glossary" }} />
+                      <Stack.Screen name="glossary/[id]" options={{ headerShown: false, title: "Term Details" }} />
+                      <Stack.Screen name="consultations" options={{ headerShown: false, title: "User Consultations" }} />
+                      <Stack.Screen name="bookmarked-guides" options={{ headerShown: false, title: "Bookmarked Guides" }} />
+                      <Stack.Screen name="favorite-terms" options={{ headerShown: false, title: "Favorite Terms" }} />
+                      <Stack.Screen name="notifications" options={{ headerShown: false, title: "Notifications" }} />
+                      <Stack.Screen name="help" options={{ headerShown: false, title: "Help" }} />
+                      <Stack.Screen name="profile" options={{ headerShown: false, title: "Profile" }} />
+                    </Stack>
+                  </SidebarProvider>
+                </RouteErrorBoundary>
+              </SuspensionGuard>
+            </AuthGuard>
+          </ForumCacheProvider>
+        </FavoritesProvider>
+      </ModerationProvider>
+    </GuestProvider>
+  );
+}
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -30,12 +89,6 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
-  useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded]);
-
   if (!fontsLoaded) {
     return null;
   }
@@ -43,128 +96,7 @@ export default function RootLayout() {
   return (
     <GluestackUIProvider mode="light">
       <AuthProvider>
-        <ModerationProvider>
-          <FavoritesProvider>
-            <ForumCacheProvider>
-              <AuthGuard>
-                <SuspensionGuard>
-                  <RouteErrorBoundary>
-                    <SidebarProvider>
-                    <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen
-                      name="index"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="login"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="role-selection"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="lawyer/index"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="lawyer/forum"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="lawyer/consult"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="lawyer/profile"
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="directory"
-                      options={{
-                        headerShown: false,
-                        title: "Find Legal Help",
-                      }}
-                    />
-                    {/* Hide parent header for the article segment to avoid 'article' title bar */}
-                    <Stack.Screen
-                      name="article"
-                      options={{
-                        headerShown: false,
-                        title: "Article",
-                      }}
-                    />
-                    <Stack.Screen
-                      name="guides"
-                      options={{
-                        headerShown: false,
-                        title: "Guides",
-                      }}
-                    />
-                    <Stack.Screen
-                      name="glossary"
-                      options={{
-                        headerShown: false,
-                        title: "Glossary",
-                      }}
-                    />
-                    <Stack.Screen
-                      name="glossary/[id]"
-                      options={{
-                        headerShown: false,
-                        title: "Term Details",
-                      }}
-                    />
-                    <Stack.Screen
-                      name="consultations"
-                      options={{
-                        headerShown: false,
-                        title: "User Consultations",
-                      }}
-                    />
-                    <Stack.Screen
-                      name="bookmarked-guides"
-                      options={{
-                        headerShown: false,
-                        title: "Bookmarked Guides",
-                      }}
-                    />
-                    <Stack.Screen
-                      name="favorite-terms"
-                      options={{
-                        headerShown: false,
-                        title: "Favorite Terms",
-                      }}
-                    />
-                    <Stack.Screen
-                      name="notifications"
-                      options={{
-                        headerShown: false,
-                        title: "Notifications",
-                      }}
-                    />
-                    <Stack.Screen
-                      name="help"
-                      options={{
-                        headerShown: false,
-                        title: "Help",
-                      }}
-                    />
-                    <Stack.Screen
-                      name="profile"
-                      options={{
-                        headerShown: false,
-                        title: "Profile",
-                      }}
-                    />
-                  </Stack>
-                  </SidebarProvider>
-                </RouteErrorBoundary>
-              </SuspensionGuard>
-            </AuthGuard>
-            </ForumCacheProvider>
-          </FavoritesProvider>
-        </ModerationProvider>
+        <AppContent />
       </AuthProvider>
     </GluestackUIProvider>
   );

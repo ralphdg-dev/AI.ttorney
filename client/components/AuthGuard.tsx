@@ -15,7 +15,7 @@ interface AuthGuardProps {
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
-  const { user, session, isLoading, isAuthenticated, isSigningOut } = useAuth();
+  const { user, session, isLoading, isAuthenticated, isGuestMode, isSigningOut, initialAuthCheck } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
@@ -34,9 +34,14 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       return;
     }
 
-    // ⚡ OPTIMIZATION: Allow public routes to render immediately even while loading
+    // Wait for initial auth check to complete (prevents race condition on hard refresh)
+    if (!initialAuthCheck) {
+      return; // Block ALL routes until we know if user is guest/authenticated/unauthenticated
+    }
+
+    // ⚡ OPTIMIZATION: Allow public routes to render immediately after initial check
     if (isLoading && routeConfig.isPublic) {
-      return; // Let public routes render without waiting
+      return; // Let public routes render without waiting for full auth load
     }
 
     // Wait for auth to finish loading before checking protected routes
@@ -77,6 +82,17 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
 
       // Log successful access
       logRouteAccess(currentPath, user, 'granted');
+    } else if (isGuestMode) {
+      // Handle guest mode users - only allow public routes
+      if (!routeConfig.isPublic) {
+        const redirectPath = '/chatbot'; // Redirect to chatbot (guest index page)
+        logRouteAccess(currentPath, null, 'denied', 'Guest mode restricted');
+        router.replace(redirectPath as any);
+        return;
+      }
+
+      // Log public access
+      logRouteAccess(currentPath, null, 'granted', 'Public route in guest mode');
     } else {
       // Handle unauthenticated users - check if route is public
       if (!routeConfig.isPublic) {
@@ -91,25 +107,16 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     }
   }, [isAuthenticated, user?.id, user?.role, isLoading, isSigningOut, segments.join('/')]);
 
+  // CRITICAL: Show loading until initial auth check completes
+  // This prevents race condition where UI renders before we know if user is guest/authenticated
+  if (!initialAuthCheck) {
+    return <LoadingWithTrivia />;
+  }
+
   // Show loading screen while checking authentication (but NOT during sign out)
   // During sign out, we want immediate redirect without loading screen
   if (isLoading && !isSigningOut) {
     return <LoadingWithTrivia />;
-  }
-
-  // Don't block rendering on login page - let it show immediately
-  const currentPath = `/${segments.join('/')}`;
-  const routeConfig = getRouteConfig(currentPath);
-  
-  // Never block login page rendering
-  if (currentPath === '/login') {
-    return <>{children}</>;
-  }
-  
-  // Only show loading for protected routes when we're clearly unauthenticated
-  if (routeConfig && !routeConfig.isPublic && !isAuthenticated && !user && !session) {
-    // Use a minimal delay to prevent flash but allow quick redirect
-    return null; // Return null instead of loading spinner for faster redirect
   }
 
   return <>{children}</>;

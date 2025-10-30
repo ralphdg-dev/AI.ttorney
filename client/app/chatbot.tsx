@@ -26,13 +26,16 @@ import Colors from "../constants/Colors";
 import Header from "../components/Header";
 import { SidebarWrapper } from "../components/AppSidebar";
 import Navbar from "../components/Navbar";
+import { GuestNavbar, GuestSidebar } from "../components/guest";
 import { LawyerNavbar } from "../components/lawyer/shared";
 import { useAuth } from "../contexts/AuthContext";
+import { useGuest } from "../contexts/GuestContext";
 import { useModerationStatus } from "../contexts/ModerationContext";
 import ChatHistorySidebar, { ChatHistorySidebarRef } from "../components/chatbot/ChatHistorySidebar";
 import { ChatHistoryService } from "../services/chatHistoryService";
 import { Send } from "lucide-react-native";
 import { MarkdownText } from "../components/chatbot/MarkdownText";
+import { GuestLimitBanner } from "../components/chatbot/GuestLimitBanner";
 import { ModerationWarningBanner } from "../components/moderation/ModerationWarningBanner";
 import { NetworkConfig } from "../utils/networkConfig";
 import { LAYOUT, getTotalUIHeight } from "../constants/LayoutConstants";
@@ -152,6 +155,7 @@ const streamChatResponse = (params: StreamChatResponseParams): Promise<void> => 
     xhr.ontimeout = () => {
       console.error('❌ XHR timeout');
       onError();
+      onFinish(); // CRITICAL: Always call onFinish to reset isTyping
       reject(new Error('Request timed out after 60 seconds.'));
     };
     
@@ -267,9 +271,12 @@ interface Message {
 }
 
 export default function ChatbotScreen() {
-  const { user, session, isLawyer } = useAuth();
+  const { user, session, isLawyer, isGuestMode } = useAuth();
+  const { hasReachedLimit, promptsRemaining, incrementPromptCount } = useGuest();
   const { moderationStatus, refreshStatus } = useModerationStatus();
   const insets = useSafeAreaInsets();
+  const [showLimitBanner, setShowLimitBanner] = useState(true);
+  const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   
   // Helper function to update message with sources (DRY principle)
@@ -295,7 +302,9 @@ export default function ChatbotScreen() {
   }, []);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false); // Separate state for AI generation
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null); // Allow canceling requests
   const [conversationHistory, setConversationHistory] = useState<
     { role: string; content: string }[]
   >([]);
@@ -325,6 +334,23 @@ export default function ChatbotScreen() {
 
   // Dynamic greeting that changes per session
   const greeting = useMemo(() => {
+    // Handle guest users differently
+    if (isGuestMode) {
+      const guestGreetings = [
+        "Welcome! May legal puzzle ba tayo ngayon?",
+        "Hello! Ready to decode some laws?",
+        "Uy! Anong legal tanong natin today?",
+        "Welcome! What legal mystery shall we solve?",
+        "Kamusta! May kaso ba o chismis lang? Joke!",
+        "Hey! Let's make Philippine law make sense.",
+        "Welcome! Time for some legal wisdom?",
+        "Mabuhay! Ano'ng legal concern natin?",
+        "Hello! Ready to tackle the law?",
+        "Welcome! Let's navigate some legal waters.",
+      ];
+      return guestGreetings[Math.floor(Math.random() * guestGreetings.length)];
+    }
+    
     const fullName =
       user?.full_name ||
       user?.username ||
@@ -344,7 +370,7 @@ export default function ChatbotScreen() {
       `${firstName} returns! Let's navigate some legal waters.`,
     ];
     return greetings[Math.floor(Math.random() * greetings.length)];
-  }, [user]); // Changes when user changes
+  }, [user, isGuestMode]); // Changes when user or guest mode changes
 
   // OpenAI-style smooth continuous scrolling
   // Automatically keeps bottom visible as content grows, mimicking human scrolling
@@ -373,6 +399,21 @@ export default function ChatbotScreen() {
       }
     };
   }, []);
+
+  // Safety mechanism: Reset generating state if stuck (industry standard)
+  // ChatGPT/Claude pattern: Never leave UI in broken state
+  useEffect(() => {
+    if (!isGenerating) return;
+    
+    const safetyTimeout = setTimeout(() => {
+      console.warn('⚠️ Generation stuck for 60s, force resetting');
+      setIsTyping(false);
+      setIsGenerating(false);
+      abortControllerRef.current = null;
+    }, 60000); // 60 seconds
+    
+    return () => clearTimeout(safetyTimeout);
+  }, [isGenerating]);
 
   useEffect(() => {
     initializeConversation();
@@ -588,8 +629,19 @@ export default function ChatbotScreen() {
   const sendMessage = async () => {
     if (!input.trim()) return;
     
-    // Prevent duplicate sends (important for when Enter key triggers both onSubmitEditing and onPress)
-    if (isTyping || isStreamingRef.current) return;
+    // Industry standard: Allow typing while generating (like ChatGPT)
+    // Only prevent sending if already generating
+    if (isGenerating) {
+      console.log('⏳ Already generating response, please wait');
+      return;
+    }
+
+    // Guest mode: Check prompt limit before sending
+    if (isGuestMode && hasReachedLimit) {
+      console.log('🚫 Guest prompt limit reached');
+      setShowLimitBanner(true);
+      return;
+    }
 
     const userMessage = input.trim();
     const newMsg: Message = {
@@ -598,11 +650,16 @@ export default function ChatbotScreen() {
       fromUser: true,
     };
 
+    // Industry standard: Optimistic UI update (clear input immediately)
     setMessages((prev) => [...prev, newMsg]);
-    setInput("");
-    setIsTyping(true);
+    setInput(""); // Clear input immediately (ChatGPT/Claude pattern)
+    setIsGenerating(true); // Set generating state
+    setIsTyping(true); // Keep for backward compatibility with typing indicator
     setError(null);
     isStreamingRef.current = false; // Reset streaming flag
+    
+    // Create abort controller for this request
+    abortControllerRef.current = new AbortController();
 
     // Enable auto-scroll for new message
     shouldAutoScroll.current = true;
@@ -622,14 +679,17 @@ export default function ChatbotScreen() {
       let endpoint = "";
 
       if (userRole === "verified_lawyer") {
-        // Lawyer endpoint - formal legal analysis with legalese - STREAMING!
-        endpoint = `${apiUrl}/api/chatbot/lawyer/ask/stream`;
+        // Lawyer endpoint - formal legal analysis with legalese
+        endpoint = `${apiUrl}/api/chatbot/lawyer/ask`;
       } else {
-        // General public endpoint (registered_user, guest, etc.) - STREAMING!
-        endpoint = `${apiUrl}/api/chatbot/user/ask/stream`;
+        // General public endpoint (registered_user, guest, etc.)
+        endpoint = `${apiUrl}/api/chatbot/user/ask`;
       }
       
       console.log('📍 Full endpoint URL:', endpoint);
+      console.log('👤 User role:', userRole);
+      console.log('🔐 Is guest mode:', isGuestMode);
+      console.log('🎫 Has auth token:', !!session?.access_token);
 
       // Prepare conversation history in the format expected by backend
       const formattedHistory = conversationHistory.map((msg) => ({
@@ -725,6 +785,15 @@ export default function ChatbotScreen() {
               // Only update with sources if this wasn't a violation
               if (!isViolation) {
                 updateMessageWithSources(streamingMsgId, answer, sources, language);
+                
+                // Guest mode: Increment prompt count after successful response
+                if (isGuestMode) {
+                  const success = await incrementPromptCount();
+                  if (!success) {
+                    console.log('\ud83d\udeab Guest reached prompt limit after this message');
+                    setShowLimitBanner(true);
+                  }
+                }
               }
               
               setTimeout(() => {
@@ -738,12 +807,17 @@ export default function ChatbotScreen() {
             onFinish: () => {
               clearTimeout(timeoutId);
               setIsTyping(false);
+              setIsGenerating(false); // Reset generating state
+              abortControllerRef.current = null; // Clear abort controller
             },
           });
         } catch (streamError: any) {
           clearTimeout(timeoutId);
           console.error('❌ Streaming error:', streamError);
           setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
+          setIsTyping(false); // Reset typing state
+          setIsGenerating(false); // Reset generating state
+          abortControllerRef.current = null; // Clear abort controller
           throw streamError;
         }
       }
@@ -903,6 +977,8 @@ export default function ChatbotScreen() {
       setMessages((prev) => [...prev, errorReply]);
     } finally {
       setIsTyping(false);
+      setIsGenerating(false); // Always reset generating state
+      abortControllerRef.current = null; // Always clear abort controller
     }
   };
 
@@ -1154,24 +1230,41 @@ export default function ChatbotScreen() {
     >
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
-      {/* Chat History Sidebar */}
-      <ChatHistorySidebar
-        ref={sidebarRef}
-        userId={user?.id}
-        sessionToken={session?.access_token}
-        currentConversationId={currentConversationId}
-        onConversationSelect={handleConversationSelect}
-        onNewChat={handleNewChat}
-      />
+      {/* Sidebar - Guest or Regular */}
+      {isGuestMode ? (
+        <GuestSidebar
+          isOpen={isGuestSidebarOpen}
+          onClose={() => setIsGuestSidebarOpen(false)}
+        />
+      ) : (
+        <ChatHistorySidebar
+          ref={sidebarRef}
+          userId={user?.id}
+          sessionToken={session?.access_token}
+          currentConversationId={currentConversationId}
+          onConversationSelect={handleConversationSelect}
+          onNewChat={handleNewChat}
+        />
+      )}
 
       {/* Header */}
       <Header 
         title="AI Legal Assistant" 
         showMenu={true}
-        showChatHistoryToggle={true}
+        onMenuPress={isGuestMode ? () => setIsGuestSidebarOpen(true) : undefined}
+        showChatHistoryToggle={!isGuestMode}
         isChatHistoryOpen={sidebarRef.current?.isOpen?.() || false}
         onChatHistoryToggle={() => sidebarRef.current?.toggleSidebar?.()}
       />
+
+      {/* Guest Limit Banner - Show for guest users */}
+      {isGuestMode && showLimitBanner && (
+        <GuestLimitBanner
+          promptsRemaining={promptsRemaining}
+          hasReachedLimit={hasReachedLimit}
+          onDismiss={() => setShowLimitBanner(false)}
+        />
+      )}
 
       {/* Moderation Warning Banner */}
       {moderationStatus && (
@@ -1481,7 +1574,7 @@ export default function ChatbotScreen() {
 
             <TouchableOpacity
               onPress={sendMessage}
-              disabled={isTyping || !input.trim()}
+              disabled={isGenerating || !input.trim()} // Disable only while generating
               style={[
                 tw`w-12 h-12 rounded-full items-center justify-center`,
                 {
@@ -1506,13 +1599,15 @@ export default function ChatbotScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
-      {/* Conditionally render navbar based on user role */}
-      {user?.role === "verified_lawyer" ? (
+      {/* Conditionally render navbar based on user role and guest mode */}
+      {isGuestMode ? (
+        <GuestNavbar activeTab="ask" />
+      ) : user?.role === "verified_lawyer" ? (
         <LawyerNavbar activeTab="chatbot" />
       ) : (
         <Navbar activeTab="ask" />
       )}
-      <SidebarWrapper />
+      {!isGuestMode && <SidebarWrapper />}
     </SafeAreaView>
   );
 }

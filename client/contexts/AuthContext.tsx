@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, clearAuthStorage } from '../config/supabase';
-import { router, useSegments } from 'expo-router';
+import { router } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GUEST_SESSION_STORAGE_KEY, validateGuestSession, isSessionExpired } from '../config/guestConfig';
 
 // Role hierarchy based on backend schema
 export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
@@ -31,9 +33,11 @@ export interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isGuestMode: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signUp: (email: string, password: string, metadata: { username: string; first_name: string; last_name: string; birthdate: string }) => Promise<{ success: boolean; error?: string; user?: any }>;
   signOut: () => Promise<void>;
+  continueAsGuest: () => void;
   setUser: (user: User | null) => void;
   refreshUserData: () => Promise<void>;
   hasRole: (role: UserRole) => boolean;
@@ -51,7 +55,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const segments = useSegments();
   const [authState, setAuthState] = useState<AuthState>({
     session: null,
     user: null,
@@ -61,6 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [initialAuthCheck, setInitialAuthCheck] = useState(false);
   const [hasRedirectedToStatus, setHasRedirectedToStatus] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isGuestMode, setIsGuestMode] = useState(false);
 
 
   const checkSuspensionStatus = React.useCallback(async (): Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null } | null> => {
@@ -219,6 +223,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Initialize auth state and listen for auth changes
     const initialize = async () => {
       try {
+        // Check for guest session first (before Supabase auth)
+        const guestSessionData = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
+        if (guestSessionData) {
+          const guestSession = JSON.parse(guestSessionData);
+          
+          // Validate session integrity (security check)
+          if (!validateGuestSession(guestSession)) {
+            console.warn('⚠️ Invalid guest session detected on app load, clearing...');
+            await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+            setIsGuestMode(false);
+            setAuthState({ session: null, user: null, supabaseUser: null });
+            setIsLoading(false);
+            setInitialAuthCheck(true);
+            return;
+          }
+          
+          // Check if guest session is still valid
+          if (!isSessionExpired(guestSession.expiresAt)) {
+            console.log('👤 Valid guest session found on app load');
+            console.log('   Session ID:', guestSession.id);
+            console.log('   Prompts used:', guestSession.promptCount, '/ 15');
+            setIsGuestMode(true);
+            setAuthState({ session: null, user: null, supabaseUser: null });
+            setIsLoading(false);
+            setInitialAuthCheck(true);
+            return; // Skip Supabase auth check
+          } else {
+            console.log('⏰ Guest session expired, clearing and redirecting to login...');
+            await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+            setIsGuestMode(false);
+            setAuthState({ session: null, user: null, supabaseUser: null });
+            setIsLoading(false);
+            setInitialAuthCheck(true);
+            // Redirect will happen in index.tsx since no auth and no guest mode
+            return;
+          }
+        }
+
         // Get initial session
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
@@ -467,16 +509,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return hasRole('admin') || hasRole('superadmin');
   };
 
-
+  const continueAsGuest = () => {
+    console.log('👤 Continuing as guest');
+    setIsGuestMode(true);
+    setIsLoading(false);
+    router.replace('/chatbot');
+  };
 
   const value: AuthContextType = React.useMemo(() => ({
     user: authState.user,
     session: authState.session,
     isLoading,
     isAuthenticated: !!authState.session && !!authState.user,
+    isGuestMode,
     signIn,
     signUp,
     signOut,
+    continueAsGuest,
     setUser: setUserData,
     refreshUserData,
     hasRole,
@@ -489,7 +538,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initialAuthCheck,
     isSigningOut,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [authState.user, authState.session, isLoading, hasRedirectedToStatus, isSigningOut, checkLawyerApplicationStatus, checkSuspensionStatus]);
+  }), [authState.user, authState.session, isLoading, isGuestMode, hasRedirectedToStatus, isSigningOut, checkLawyerApplicationStatus, checkSuspensionStatus]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

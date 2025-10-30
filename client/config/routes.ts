@@ -1,4 +1,5 @@
 import { UserRole } from '../contexts/AuthContext';
+import { isPublicRoute, isSensitivePublicRoute } from './publicRoutesSecurity';
 
 export interface RouteConfig {
   path: string;
@@ -106,30 +107,30 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   },
   '/guides': { 
     path: '/guides', 
-    requiredRole: 'registered_user',
+    isPublic: true, // Allow guest access
     redirectTo: 'role-based',
-    serverValidation: true,
+    serverValidation: false,
     errorBoundary: true
   },
   '/glossary': { 
     path: '/glossary', 
-    requiredRole: 'registered_user',
+    isPublic: true, // Allow guest access to legal terms
     redirectTo: 'role-based',
-    serverValidation: true,
+    serverValidation: false,
     errorBoundary: true
   },
   '/article': { 
     path: '/article', 
-    requiredRole: 'registered_user',
+    isPublic: true, // Allow guest access to articles
     redirectTo: 'role-based',
-    serverValidation: true,
+    serverValidation: false,
     errorBoundary: true
   },
   '/chatbot': { 
     path: '/chatbot', 
-    allowedRoles: ['registered_user', 'verified_lawyer'], // Shared chatbot for both users and lawyers
+    isPublic: true, // Allow guest access with 15-prompt limit
     redirectTo: 'role-based',
-    serverValidation: true,
+    serverValidation: false,
     errorBoundary: true
   },
   '/booklawyer': { 
@@ -171,23 +172,37 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   },
   '/settings/privacy-policy': { 
     path: '/settings/privacy-policy', 
-    allowedRoles: ['registered_user', 'verified_lawyer'],
+    isPublic: true, // Allow guest access from GuestSidebar
     redirectTo: 'role-based',
-    serverValidation: true,
+    serverValidation: false,
     errorBoundary: true
   },
   '/settings/terms': { 
     path: '/settings/terms', 
-    allowedRoles: ['registered_user', 'verified_lawyer'],
+    isPublic: true, // Allow guest access from GuestSidebar
     redirectTo: 'role-based',
-    serverValidation: true,
+    serverValidation: false,
     errorBoundary: true
   },
   '/settings/about-us': { 
     path: '/settings/about-us', 
-    allowedRoles: ['registered_user', 'verified_lawyer'],
+    isPublic: true, // Allow guest access from GuestSidebar
     redirectTo: 'role-based',
-    serverValidation: true,
+    serverValidation: false,
+    errorBoundary: true
+  },
+  '/help': { 
+    path: '/help', 
+    isPublic: true, // Allow guest access from GuestSidebar
+    redirectTo: 'role-based',
+    serverValidation: false,
+    errorBoundary: true
+  },
+  '/about': { 
+    path: '/about', 
+    isPublic: true, // Allow guest access from GuestSidebar
+    redirectTo: 'role-based',
+    serverValidation: false,
     errorBoundary: true
   },
 
@@ -468,6 +483,17 @@ export const getRouteConfig = (path: string): RouteConfig | null => {
     }
   }
 
+  // Check if path is in centralized public routes list (DRY principle)
+  if (isPublicRoute(path)) {
+    return {
+      path,
+      isPublic: true,
+      redirectTo: 'role-based',
+      serverValidation: false,
+      errorBoundary: true
+    };
+  }
+
   // Default: protected route requiring authentication
   return {
     path,
@@ -476,4 +502,14 @@ export const getRouteConfig = (path: string): RouteConfig | null => {
     fallbackRoute: '/home',
     errorBoundary: true
   };
+};
+
+/**
+ * Check if route requires rate limiting
+ * Uses centralized security configuration (DRY principle)
+ * @param path - Route path
+ * @returns True if route needs rate limiting
+ */
+export const requiresRateLimiting = (path: string): boolean => {
+  return isSensitivePublicRoute(path);
 };
