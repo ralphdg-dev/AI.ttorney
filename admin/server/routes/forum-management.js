@@ -15,6 +15,7 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
       limit = 50,
       search = "",
       category = "all",
+      status = "all",
       reported = "all",
       sort_by = "created_at",
       sort_order = "desc",
@@ -22,20 +23,78 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
 
     const offset = (page - 1) * limit;
 
-    // Query forum_posts with user information
+    // Build the query with filters
     console.log(
       `Fetching forum posts: page ${page}, limit ${limit}, offset ${offset}`
     );
-    const { data: testPosts, error: testError } = await supabaseAdmin
+    console.log("Applied filters:", { search, category, status, reported });
+
+    let query = supabaseAdmin
       .from("forum_posts")
       .select(
         `
 				*,
 				user:users(id, full_name, email, username, role)
 			`
-      )
-      .range(offset, offset + parseInt(limit) - 1)
-      .order(sort_by, { ascending: sort_order === "asc" });
+      );
+
+    // Apply search filter
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      query = query.or(`body.ilike.%${searchTerm}%,title.ilike.%${searchTerm}%`);
+    }
+
+    // Apply category filter
+    if (category && category !== "all") {
+      query = query.eq("category", category.toLowerCase());
+    }
+
+    // Apply status filter
+    if (status && status !== "all") {
+      if (status === "active") {
+        query = query.eq("is_flagged", false);
+      } else if (status === "deleted") {
+        query = query.eq("is_flagged", true);
+      }
+    }
+
+    // Apply reported filter
+    if (reported && reported !== "all") {
+      if (reported === "reported") {
+        // Get posts that have reports
+        const { data: reportedPostIds } = await supabaseAdmin
+          .from("forum_reports")
+          .select("target_id")
+          .eq("target_type", "post");
+        
+        if (reportedPostIds && reportedPostIds.length > 0) {
+          const postIds = reportedPostIds.map(r => r.target_id);
+          query = query.in("id", postIds);
+        } else {
+          // No reported posts, return empty result
+          query = query.eq("id", "00000000-0000-0000-0000-000000000000"); // Non-existent ID
+        }
+      } else if (reported === "unreported") {
+        // Get posts that don't have reports
+        const { data: reportedPostIds } = await supabaseAdmin
+          .from("forum_reports")
+          .select("target_id")
+          .eq("target_type", "post");
+        
+        if (reportedPostIds && reportedPostIds.length > 0) {
+          const postIds = reportedPostIds.map(r => r.target_id);
+          query = query.not("id", "in", `(${postIds.join(",")})`);
+        }
+        // If no reports exist, all posts are unreported, so no additional filter needed
+      }
+    }
+
+    // Apply sorting and pagination
+    query = query
+      .order(sort_by, { ascending: sort_order === "asc" })
+      .range(offset, offset + parseInt(limit) - 1);
+
+    const { data: testPosts, error: testError } = await query;
 
     console.log("Basic query result:", {
       count: testPosts?.length || 0,
@@ -95,34 +154,19 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
         criminal: "Criminal Law",
         civil: "Civil Law",
         labor: "Labor Law",
-        corporate: "Corporate Law",
-        property: "Property Law",
-        tax: "Tax Law",
-        constitutional: "Constitutional Law",
-        administrative: "Administrative Law",
         other: "Other",
         // Possible variations
         Family: "Family Law",
         Criminal: "Criminal Law",
         Civil: "Civil Law",
         Labor: "Labor Law",
-        Corporate: "Corporate Law",
-        Property: "Property Law",
-        Tax: "Tax Law",
-        Constitutional: "Constitutional Law",
-        Administrative: "Administrative Law",
         Other: "Other",
         // Numeric IDs (if using numbers)
         1: "Family Law",
         2: "Criminal Law",
         3: "Civil Law",
         4: "Labor Law",
-        5: "Corporate Law",
-        6: "Property Law",
-        7: "Tax Law",
-        8: "Constitutional Law",
-        9: "Administrative Law",
-        10: "Other",
+        5: "Other",
       };
 
       console.log(
@@ -186,10 +230,56 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
       };
     });
 
-    // Get total count for pagination
-    const { count, error: countError } = await supabaseAdmin
+    // Get total count for pagination with same filters
+    let countQuery = supabaseAdmin
       .from("forum_posts")
       .select("id", { count: "exact", head: true });
+
+    // Apply the same filters to count query
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      countQuery = countQuery.or(`body.ilike.%${searchTerm}%,title.ilike.%${searchTerm}%`);
+    }
+
+    if (category && category !== "all") {
+      countQuery = countQuery.eq("category", category.toLowerCase());
+    }
+
+    if (status && status !== "all") {
+      if (status === "active") {
+        countQuery = countQuery.eq("is_flagged", false);
+      } else if (status === "deleted") {
+        countQuery = countQuery.eq("is_flagged", true);
+      }
+    }
+
+    if (reported && reported !== "all") {
+      if (reported === "reported") {
+        const { data: reportedPostIds } = await supabaseAdmin
+          .from("forum_reports")
+          .select("target_id")
+          .eq("target_type", "post");
+        
+        if (reportedPostIds && reportedPostIds.length > 0) {
+          const postIds = reportedPostIds.map(r => r.target_id);
+          countQuery = countQuery.in("id", postIds);
+        } else {
+          countQuery = countQuery.eq("id", "00000000-0000-0000-0000-000000000000");
+        }
+      } else if (reported === "unreported") {
+        const { data: reportedPostIds } = await supabaseAdmin
+          .from("forum_reports")
+          .select("target_id")
+          .eq("target_type", "post");
+        
+        if (reportedPostIds && reportedPostIds.length > 0) {
+          const postIds = reportedPostIds.map(r => r.target_id);
+          countQuery = countQuery.not("id", "in", `(${postIds.join(",")})`);
+        }
+      }
+    }
+
+    const { count, error: countError } = await countQuery;
 
     if (countError) {
       console.error("Count query error:", countError);

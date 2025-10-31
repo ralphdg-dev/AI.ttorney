@@ -288,21 +288,38 @@ class UsersService {
       
       if (action === 'ban') {
         const actionData = adminModerationService.formatModerationAction(
-          'permanent_ban',
+          'ban',
           `Manual ban by admin: ${reason}`,
-          reason
+          reason,
+          null, // reportId
+          null, // contentId
+          duration
         );
         return await adminModerationService.applyModerationAction(id, actionData);
       } else if (action === 'restrict') {
         const actionData = adminModerationService.formatModerationAction(
-          'suspend_7days',
-          `Manual suspension by admin: ${reason}`,
-          reason
+          'restrict',
+          `Manual forum restriction by admin: ${reason}`,
+          reason,
+          null, // reportId
+          null, // contentId
+          duration
         );
         return await adminModerationService.applyModerationAction(id, actionData);
       } else if (action === 'unban') {
         // For unban, we use the lift suspension endpoint
         return await adminModerationService.liftSuspension(id, reason);
+      } else if (action === 'unrestrict') {
+        // For unrestrict, we create a special admin action to restore user to active status
+        const actionData = adminModerationService.formatModerationAction(
+          'unrestrict',
+          `Manual removal of forum restrictions by admin: ${reason}`,
+          reason,
+          null, // reportId
+          null, // contentId
+          'permanent' // duration not relevant for unrestrict
+        );
+        return await adminModerationService.applyModerationAction(id, actionData);
       } else {
         throw new Error(`Unknown action: ${action}`);
       }

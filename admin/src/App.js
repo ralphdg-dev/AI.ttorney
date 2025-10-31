@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard';
 import ManageLegalSeekers from './pages/users/ManageLegalSeekers';
 import ManageLawyers from './pages/users/ManageLawyers';
 import ManageLawyerApplications from './pages/users/ManageLawyerApplications';
+import SuspendedAccountsPage from './pages/users/SuspendedAccountsPage';
 import ManageAdminsPage from './pages/admin/ManageAdmins';
 import ManageGlossaryTerms from './pages/legal-resources/ManageGlossaryTerms';
 
@@ -31,12 +32,6 @@ const Help = () => (
   </div>
 );
 
-const SuspendedAccounts = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Suspended Accounts</h1>
-    <p className="text-gray-600">Suspended accounts management coming soon...</p>
-  </div>
-);
 
 
 const AuditLogs = () => (
@@ -162,7 +157,7 @@ const AdminDashboard = () => {
               <Route path="/users/legal-seekers" element={<ManageLegalSeekers />} />
               <Route path="/users/lawyers" element={<ManageLawyers />} />
               <Route path="/users/lawyer-applications" element={<ManageLawyerApplications />} />
-              <Route path="/users/suspended-accounts" element={<SuspendedAccounts />} />
+              <Route path="/users/suspended-accounts" element={<SuspendedAccountsPage />} />
               
               {/* Admin Routes */}
               <Route path="/admin/manage-admins" element={<ManageAdminsPage />} />
