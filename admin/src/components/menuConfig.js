@@ -38,6 +38,7 @@ export const sections = [
         items: [
           { id: 'manage-topics-threads', label: 'Manage Topics & Threads' },
           { id: 'reported-posts', label: 'Reported Posts' },
+          { id: 'reported-replies', label: 'Reported Replies' },
         ],
       },
     ],

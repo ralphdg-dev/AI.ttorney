@@ -221,6 +221,86 @@ class ForumManagementService {
     return this.moderatePost(id, "restore", reason);
   }
 
+  // Get all reported replies
+  async getReportedReplies(params = {}) {
+    try {
+      // First test server connectivity
+      console.log("Testing server connectivity...");
+      const serverOnline = await testServerConnection();
+      if (!serverOnline) {
+        throw new Error(
+          "Server is not running or not accessible at http://localhost:5001"
+        );
+      }
+
+      const {
+        page = 1,
+        limit = 50,
+        status = "all",
+        category = "all",
+        sort_by = "created_at",
+        sort_order = "desc",
+      } = params;
+
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        status,
+        category,
+        sort_by,
+        sort_order,
+      });
+
+      const url = `${API_BASE_URL}/forum/reported-replies?${queryParams}`;
+      const headers = {
+        "Content-Type": "application/json",
+        ...this.getAuthHeader(),
+      };
+
+      console.log("API_BASE_URL:", API_BASE_URL);
+      console.log("Fetching reported replies from:", url);
+      console.log("Request headers:", headers);
+
+      let response;
+      try {
+        response = await fetch(url, {
+          method: "GET",
+          headers,
+        });
+        console.log("Fetch completed successfully");
+      } catch (fetchError) {
+        console.error("Fetch failed:", fetchError);
+        throw new Error(
+          `Network error: ${fetchError.message}. Check if server is running on ${API_BASE_URL}`
+        );
+      }
+
+      console.log("Response status:", response.status);
+      console.log("Response ok:", response.ok);
+
+      let data;
+      try {
+        data = await response.json();
+        console.log("Response data:", data);
+      } catch (jsonError) {
+        console.error("JSON parse error:", jsonError);
+        throw new Error(`Invalid JSON response: ${jsonError.message}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            `HTTP ${response.status}: Failed to fetch reported replies`
+        );
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Get reported replies error:", error);
+      throw error;
+    }
+  }
+
   // Get all reported posts
   async getReportedPosts(params = {}) {
     try {
@@ -326,6 +406,33 @@ class ForumManagementService {
       return data;
     } catch (error) {
       console.error("Resolve report error:", error);
+      throw error;
+    }
+  }
+
+  async resolveReplyReport(id, action) {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/forum/reply-reports/${id}/resolve`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...this.getAuthHeader(),
+          },
+          body: JSON.stringify({ action }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to resolve reply report");
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Resolve reply report error:", error);
       throw error;
     }
   }

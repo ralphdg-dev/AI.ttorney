@@ -17,6 +17,7 @@ import ManageGlossaryTerms from './pages/legal-resources/ManageGlossaryTerms';
 // Forum Management Pages
 import ManageTopicsThreadsPage from './pages/forum/ManageTopicsThreadsPage';
 import ReportedPostsPage from './pages/forum/ReportedPostsPage';
+import ReportedRepliesPage from './pages/forum/ReportedRepliesPage';
 import BanRestrictUsersPage from './pages/forum/BanRestrictUsersPage';
 
 // Settings Page
@@ -85,6 +86,7 @@ const AdminDashboard = () => {
     if (pathname === '/legal-resources/legal-articles') return 'manage-legal-articles';
     if (pathname === '/forum/topics-threads') return 'manage-topics-threads';
     if (pathname === '/forum/reported-posts') return 'reported-posts';
+    if (pathname === '/forum/reported-replies') return 'reported-replies';
     if (pathname === '/users/ban-restrict-users') return 'ban-restrict-users';
     if (pathname === '/settings') return 'settings';
     if (pathname === '/help') return 'help';
@@ -121,6 +123,7 @@ const AdminDashboard = () => {
               {/* Forum Routes */}
               <Route path="/forum/topics-threads" element={<ManageTopicsThreadsPage />} />
               <Route path="/forum/reported-posts" element={<ReportedPostsPage />} />
+              <Route path="/forum/reported-replies" element={<ReportedRepliesPage />} />
               
               
               {/* Other Routes */}
