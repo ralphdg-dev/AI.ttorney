@@ -544,6 +544,7 @@ const ManageLegalSeekers = () => {
       render: (row) => {
         if (!row.birthdate) return 'N/A';
         const date = new Date(row.birthdate);
+        if (isNaN(date.getTime())) return 'Invalid Date';
         return new Intl.DateTimeFormat('en-US', {
           month: 'short',
           day: 'numeric', 
@@ -572,7 +573,9 @@ const ManageLegalSeekers = () => {
         </button>
       ),
       render: (row) => {
+        if (!row.registration_date) return 'N/A';
         const date = new Date(row.registration_date);
+        if (isNaN(date.getTime())) return 'Invalid Date';
         return new Intl.DateTimeFormat('en-US', {
           month: 'short',
           day: 'numeric', 

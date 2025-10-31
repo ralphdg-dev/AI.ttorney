@@ -12,6 +12,7 @@ import ManageLegalSeekers from './pages/users/ManageLegalSeekers';
 import ManageLawyers from './pages/users/ManageLawyers';
 import ManageLawyerApplications from './pages/users/ManageLawyerApplications';
 import ManageAdminsPage from './pages/admin/ManageAdmins';
+import ManageAuditLogs from './pages/system/ManageAuditLogs';
 import ManageGlossaryTerms from './pages/legal-resources/ManageGlossaryTerms';
 
 // Forum Management Pages
@@ -34,12 +35,6 @@ const Help = () => (
 
 
 
-const AuditLogs = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Audit Logs</h1>
-    <p className="text-gray-600">Audit logs coming soon...</p>
-  </div>
-);
 
 
 const LegalArticles = () => (
@@ -114,7 +109,7 @@ const AdminDashboard = () => {
               
               {/* Admin Routes */}
               <Route path="/admin/manage-admins" element={<ManageAdminsPage />} />
-              <Route path="/admin/audit-logs" element={<AuditLogs />} />
+              <Route path="/admin/audit-logs" element={<ManageAuditLogs />} />
               
               {/* Legal Resources Routes */}
               <Route path="/legal-resources/glossary-terms" element={<ManageGlossaryTerms />} />

@@ -140,7 +140,14 @@ const ManageAuditLogs = () => {
 
     } catch (err) {
       console.error('Failed to load audit logs:', err);
-      setError(err.message || 'Failed to load audit logs');
+      
+      // Check if it's a setup issue
+      if (err.message && err.message.includes('table not found')) {
+        setError('Database setup required. Please set up the audit logs table.');
+      } else {
+        setError(err.message || 'Failed to load audit logs');
+      }
+      
       showError('Failed to load audit logs: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
@@ -243,7 +250,7 @@ const ManageAuditLogs = () => {
       render: (log) => (
         <div className="space-y-1">
           <div className="text-xs font-medium text-gray-900">
-            {log.actor_name || 'Unknown'}
+            {log.actor_id || 'Unknown'}
           </div>
           <div className="text-[10px] text-gray-500 capitalize">
             {log.role || 'Unknown Role'}
@@ -391,7 +398,32 @@ const ManageAuditLogs = () => {
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
           <div className="flex items-center gap-2">
             <AlertCircle size={16} />
-            <span className="text-sm">{error}</span>
+            <div className="flex-1">
+              <span className="text-sm font-medium">{error}</span>
+              {error.includes('Database setup required') && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-blue-800 text-sm">
+                  <div className="font-medium mb-2">Setup Instructions:</div>
+                  <ol className="list-decimal list-inside space-y-1 text-xs">
+                    <li>Go to your Supabase Dashboard</li>
+                    <li>Navigate to SQL Editor</li>
+                    <li>Run the following SQL to create the audit_logs table:</li>
+                  </ol>
+                  <div className="mt-2 p-2 bg-gray-100 rounded font-mono text-xs overflow-x-auto">
+                    <pre>{`-- Table admin_audit_logs already exists
+-- Insert sample data to test the functionality
+INSERT INTO admin_audit_logs (action, target_table, target_id, actor_id, role, metadata) VALUES
+('Admin Login', 'admin', '1', gen_random_uuid(), 'admin', '{"ip": "127.0.0.1"}'),
+('View Legal Seekers', 'legal_seekers', null, gen_random_uuid(), 'admin', '{"action_type": "view"}'),
+('Update Lawyer Status', 'lawyers', '123', gen_random_uuid(), 'superadmin', '{"old_status": "pending", "new_status": "active"}'),
+('Export Data', 'admin_audit_logs', null, gen_random_uuid(), 'admin', '{"format": "csv"}'),
+('Create Glossary Term', 'glossary_terms', '456', gen_random_uuid(), 'admin', '{"term": "Legal Term"}')`}</pre>
+                  </div>
+                  <div className="mt-2 text-xs">
+                    <strong>Note:</strong> After running the SQL, refresh this page to see the audit logs.
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -516,8 +548,8 @@ const ManageAuditLogs = () => {
                   Performed By
                 </label>
                 <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
-                  <div className="font-medium">{selectedLog.actor_name || 'Unknown'}</div>
-                  <div className="text-xs text-gray-500 capitalize">{selectedLog.role || 'Unknown Role'}</div>
+                  <div className="font-medium">ID: {selectedLog.actor_id || 'Unknown'}</div>
+                  <div className="text-xs text-gray-500 capitalize">Role: {selectedLog.role || 'Unknown Role'}</div>
                 </div>
               </div>
 

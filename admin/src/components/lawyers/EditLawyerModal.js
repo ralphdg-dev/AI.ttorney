@@ -72,7 +72,6 @@ const EditLawyerModal = ({ open, onClose, lawyer, onSave, loading = false }) => 
   const [formData, setFormData] = useState({
     status: 'active',
     accepting_consultations: true,
-    consultation_rate: '',
     specializations: '',
     bio: '',
     years_of_experience: ''
@@ -92,7 +91,6 @@ const EditLawyerModal = ({ open, onClose, lawyer, onSave, loading = false }) => 
       setFormData({
         status: lawyerData.status || 'active',
         accepting_consultations: lawyerData.accepting_consultations !== false,
-        consultation_rate: lawyerData.consultation_rate || '',
         specializations: Array.isArray(lawyerData.specializations) 
           ? lawyerData.specializations.join(', ') 
           : lawyerData.specializations || '',
@@ -110,7 +108,6 @@ const EditLawyerModal = ({ open, onClose, lawyer, onSave, loading = false }) => 
       setFormData({
         status: 'active',
         accepting_consultations: true,
-        consultation_rate: '',
         specializations: '',
         bio: '',
         years_of_experience: ''
@@ -127,12 +124,6 @@ const EditLawyerModal = ({ open, onClose, lawyer, onSave, loading = false }) => 
   const validateForm = () => {
     const errors = {};
 
-    // Consultation rate validation
-    if (formData.consultation_rate && isNaN(parseFloat(formData.consultation_rate))) {
-      errors.consultation_rate = 'Consultation rate must be a valid number';
-    } else if (formData.consultation_rate && parseFloat(formData.consultation_rate) < 0) {
-      errors.consultation_rate = 'Consultation rate cannot be negative';
-    }
 
     // Years of experience validation
     if (formData.years_of_experience && isNaN(parseInt(formData.years_of_experience))) {
@@ -207,7 +198,6 @@ const EditLawyerModal = ({ open, onClose, lawyer, onSave, loading = false }) => 
       const updateData = {
         status: formData.status,
         accepting_consultations: formData.accepting_consultations,
-        consultation_rate: formData.consultation_rate ? parseFloat(formData.consultation_rate) : null,
         specializations: formData.specializations ? 
           formData.specializations.split(',').map(s => s.trim()).filter(s => s) : [],
         bio: formData.bio.trim() || null,
@@ -277,10 +267,6 @@ const EditLawyerModal = ({ open, onClose, lawyer, onSave, loading = false }) => 
       changes.push(`Accepting Consultations: "${lawyerData.accepting_consultations !== false ? 'Yes' : 'No'}" → "${formData.accepting_consultations ? 'Yes' : 'No'}"`);
     }
     
-    const currentRate = lawyerData.consultation_rate || '';
-    if (formData.consultation_rate !== currentRate.toString()) {
-      changes.push(`Consultation Rate: "${currentRate}" → "${formData.consultation_rate}"`);
-    }
     
     const currentExp = lawyerData.years_of_experience || '';
     if (formData.years_of_experience !== currentExp.toString()) {
@@ -371,28 +357,6 @@ const EditLawyerModal = ({ open, onClose, lawyer, onSave, loading = false }) => 
                 onAcceptingChange={handleAcceptingChange}
                 disabled={isSubmitting}
               />
-            </div>
-            <div>
-              <label htmlFor="consultation_rate" className="block text-[9px] text-gray-500 mb-1">
-                Consultation Rate (PHP)
-              </label>
-              <input
-                type="number"
-                id="consultation_rate"
-                name="consultation_rate"
-                value={formData.consultation_rate}
-                onChange={handleInputChange}
-                min="0"
-                step="0.01"
-                className={`w-full px-2 py-1 border rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-[#023D7B] focus:border-[#023D7B] text-xs ${
-                  validationErrors.consultation_rate ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="0.00"
-                disabled={isSubmitting}
-              />
-              {validationErrors.consultation_rate && (
-                <p className="mt-0.5 text-[10px] text-red-600">{validationErrors.consultation_rate}</p>
-              )}
             </div>
           </div>
         </div>
