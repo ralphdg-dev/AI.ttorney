@@ -11,7 +11,6 @@ import Dashboard from './pages/Dashboard';
 import ManageLegalSeekers from './pages/users/ManageLegalSeekers';
 import ManageLawyers from './pages/users/ManageLawyers';
 import ManageLawyerApplications from './pages/users/ManageLawyerApplications';
-import SuspendedAccountsPage from './pages/users/SuspendedAccountsPage';
 import ManageAdminsPage from './pages/admin/ManageAdmins';
 import ManageGlossaryTerms from './pages/legal-resources/ManageGlossaryTerms';
 
@@ -50,47 +49,6 @@ const LegalArticles = () => (
 );
 
 
-const OpenTickets = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Open Tickets</h1>
-    <p className="text-gray-600">Open tickets management coming soon...</p>
-  </div>
-);
-
-const AssignedTickets = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Assigned Tickets</h1>
-    <p className="text-gray-600">Assigned tickets management coming soon...</p>
-  </div>
-);
-
-const TicketHistory = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Ticket History</h1>
-    <p className="text-gray-600">Ticket history coming soon...</p>
-  </div>
-);
-
-const UserAnalytics = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">User Analytics</h1>
-    <p className="text-gray-600">User analytics coming soon...</p>
-  </div>
-);
-
-const ContentAnalytics = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Content Analytics</h1>
-    <p className="text-gray-600">Content analytics coming soon...</p>
-  </div>
-);
-
-const ForumAnalytics = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Forum Analytics</h1>
-    <p className="text-gray-600">Forum analytics coming soon...</p>
-  </div>
-);
 
 const App = () => {
   return (
@@ -121,20 +79,13 @@ const AdminDashboard = () => {
     if (pathname === '/users/legal-seekers') return 'manage-legal-seekers';
     if (pathname === '/users/lawyers') return 'manage-lawyers';
     if (pathname === '/users/lawyer-applications') return 'lawyer-applications';
-    if (pathname === '/users/suspended-accounts') return 'suspended-accounts';
     if (pathname === '/admin/manage-admins') return 'manage-admins';
     if (pathname === '/admin/audit-logs') return 'audit-logs';
     if (pathname === '/legal-resources/glossary-terms') return 'manage-glossary-terms';
     if (pathname === '/legal-resources/legal-articles') return 'manage-legal-articles';
     if (pathname === '/forum/topics-threads') return 'manage-topics-threads';
     if (pathname === '/forum/reported-posts') return 'reported-posts';
-    if (pathname === '/forum/ban-restrict-users') return 'ban-restrict-users';
-    if (pathname === '/tickets/open') return 'open-tickets';
-    if (pathname === '/tickets/assigned') return 'assigned-tickets';
-    if (pathname === '/tickets/history') return 'ticket-history';
-    if (pathname === '/analytics/users') return 'user-analytics';
-    if (pathname === '/analytics/content') return 'content-analytics';
-    if (pathname === '/analytics/forum') return 'forum-analytics';
+    if (pathname === '/users/ban-restrict-users') return 'ban-restrict-users';
     if (pathname === '/settings') return 'settings';
     if (pathname === '/help') return 'help';
     return 'dashboard';
@@ -157,7 +108,7 @@ const AdminDashboard = () => {
               <Route path="/users/legal-seekers" element={<ManageLegalSeekers />} />
               <Route path="/users/lawyers" element={<ManageLawyers />} />
               <Route path="/users/lawyer-applications" element={<ManageLawyerApplications />} />
-              <Route path="/users/suspended-accounts" element={<SuspendedAccountsPage />} />
+              <Route path="/users/ban-restrict-users" element={<BanRestrictUsersPage />} />
               
               {/* Admin Routes */}
               <Route path="/admin/manage-admins" element={<ManageAdminsPage />} />
@@ -170,17 +121,7 @@ const AdminDashboard = () => {
               {/* Forum Routes */}
               <Route path="/forum/topics-threads" element={<ManageTopicsThreadsPage />} />
               <Route path="/forum/reported-posts" element={<ReportedPostsPage />} />
-              <Route path="/forum/ban-restrict-users" element={<BanRestrictUsersPage />} />
               
-              {/* Tickets Routes */}
-              <Route path="/tickets/open" element={<OpenTickets />} />
-              <Route path="/tickets/assigned" element={<AssignedTickets />} />
-              <Route path="/tickets/history" element={<TicketHistory />} />
-              
-              {/* Analytics Routes */}
-              <Route path="/analytics/users" element={<UserAnalytics />} />
-              <Route path="/analytics/content" element={<ContentAnalytics />} />
-              <Route path="/analytics/forum" element={<ForumAnalytics />} />
               
               {/* Other Routes */}
               <Route path="/settings" element={<Settings />} />

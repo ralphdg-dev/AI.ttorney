@@ -83,18 +83,11 @@ const BanRestrictUsers = () => {
         page: currentPage,
         limit: 50, // Increased from 20 to 50 to show more users per page
         search: searchTerm,
+        status: statusFilter === "all" ? "" : statusFilter, // Use empty string instead of "all"
         archived: "active",
       });
 
       let filteredUsers = response.data;
-
-      // Apply status-based filtering (client-side)
-      if (statusFilter !== "all") {
-        filteredUsers = filteredUsers.filter((user) => {
-          const userStatus = user.account_status || "active";
-          return userStatus === statusFilter;
-        });
-      }
 
       // Apply risk-based filtering
       if (riskFilter !== "all") {
