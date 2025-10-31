@@ -14,6 +14,7 @@ const glossaryTermsRoutes = require('./routes/glossary-terms');
 const forumManagementRoutes = require('./routes/forum-management');
 const adminModerationRoutes = require('./routes/admin-moderation');
 const statsRoutes = require('./routes/stats');
+const legalArticles = require('./routes/legal-articles');
 
 
 const app = express();
@@ -125,6 +126,8 @@ app.use('/api/glossary-terms', glossaryTermsRoutes);
 app.use('/api/forum', forumManagementRoutes);
 app.use('/api/admin/moderation', adminModerationRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/legal-articles', legalArticles);
+
 
 
 // 404 handler

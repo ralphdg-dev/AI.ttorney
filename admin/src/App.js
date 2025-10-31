@@ -14,6 +14,7 @@ import ManageLawyerApplications from './pages/users/ManageLawyerApplications';
 import SuspendedAccountsPage from './pages/users/SuspendedAccountsPage';
 import ManageAdminsPage from './pages/admin/ManageAdmins';
 import ManageGlossaryTerms from './pages/legal-resources/ManageGlossaryTerms';
+import ManageLegalArticles from './pages/legal-resources/ManageLegalArticles';
 
 // Forum Management Pages
 import ManageTopicsThreadsPage from './pages/forum/ManageTopicsThreadsPage';
@@ -38,14 +39,6 @@ const AuditLogs = () => (
   <div className="p-6">
     <h1 className="text-2xl font-bold text-gray-900 mb-4">Audit Logs</h1>
     <p className="text-gray-600">Audit logs coming soon...</p>
-  </div>
-);
-
-
-const LegalArticles = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Manage Legal Articles</h1>
-    <p className="text-gray-600">Legal articles management coming soon...</p>
   </div>
 );
 
@@ -165,7 +158,7 @@ const AdminDashboard = () => {
               
               {/* Legal Resources Routes */}
               <Route path="/legal-resources/glossary-terms" element={<ManageGlossaryTerms />} />
-              <Route path="/legal-resources/legal-articles" element={<LegalArticles />} />
+              <Route path="/legal-resources/legal-articles" element={<ManageLegalArticles />} />
               
               {/* Forum Routes */}
               <Route path="/forum/topics-threads" element={<ManageTopicsThreadsPage />} />
