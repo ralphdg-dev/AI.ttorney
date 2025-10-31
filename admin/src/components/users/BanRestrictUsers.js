@@ -12,12 +12,17 @@ import {
   Minus,
   Eye,
   History,
+  MoreVertical,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import usersService from "../../services/usersService";
 import adminModerationService from "../../services/adminModerationService";
 import DataTable from "../ui/DataTable";
 import Pagination from "../ui/Pagination";
 import Tooltip from "../ui/Tooltip";
+import ListToolbar from "../ui/ListToolbar";
 
 const BanRestrictUsers = () => {
   const [users, setUsers] = useState([]);
@@ -27,8 +32,9 @@ const BanRestrictUsers = () => {
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("All Users");
   const [riskFilter, setRiskFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("Newest");
   const [currentPage, setCurrentPage] = useState(1);
 
   // Ban/Restrict modal
@@ -45,12 +51,14 @@ const BanRestrictUsers = () => {
   const [userSuspensions, setUserSuspensions] = useState([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
+  // Dropdown menu state
+  const [openDropdown, setOpenDropdown] = useState(null);
+
   const statusOptions = [
     { value: "all", label: "All Users" },
     { value: "active", label: "Active Users" },
     { value: "suspended", label: "Suspended Users" },
     { value: "banned", label: "Permanently Banned" },
-    { value: "restricted", label: "Restricted (View Only)" },
   ];
 
   const riskOptions = [
@@ -74,20 +82,70 @@ const BanRestrictUsers = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [searchTerm, statusFilter, riskFilter, currentPage]);
+  }, [searchTerm, statusFilter, riskFilter, sortBy, currentPage]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    }
+  }, [searchTerm, statusFilter, riskFilter, sortBy]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openDropdown && !event.target.closest('.relative')) {
+        setOpenDropdown(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openDropdown]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      
+      // Map status filter values
+      let apiStatusFilter = "";
+      if (statusFilter === "Active" || statusFilter === "Active Users") {
+        apiStatusFilter = ""; // Empty string for all active users
+      } else if (statusFilter === "Suspended Users") {
+        apiStatusFilter = "suspended";
+      } else if (statusFilter === "Permanently Banned") {
+        apiStatusFilter = "banned";
+      }
+      
+      console.log("Filter mapping:", { statusFilter, apiStatusFilter });
+      
       const response = await usersService.getLegalSeekers({
-        page: currentPage,
-        limit: 50, // Increased from 20 to 50 to show more users per page
+        page: 1, // Always fetch from page 1 for client-side filtering
+        limit: 100, // Fetch more records for better filtering
         search: searchTerm,
-        status: statusFilter === "all" ? "" : statusFilter, // Use empty string instead of "all"
+        status: "", // Don't filter on server, do it client-side
         archived: "active",
       });
 
       let filteredUsers = response.data;
+
+      // Apply client-side status filtering to ensure accuracy
+      if (statusFilter === "Active Users") {
+        filteredUsers = filteredUsers.filter((user) => 
+          user.account_status === "active" || !user.account_status
+        );
+      } else if (statusFilter === "Suspended Users") {
+        filteredUsers = filteredUsers.filter((user) => 
+          user.account_status === "suspended"
+        );
+      } else if (statusFilter === "Permanently Banned") {
+        filteredUsers = filteredUsers.filter((user) => 
+          user.account_status === "banned"
+        );
+      }
+      // "All Users" shows all users - no filtering needed
 
       // Apply risk-based filtering
       if (riskFilter !== "all") {
@@ -97,18 +155,120 @@ const BanRestrictUsers = () => {
         });
       }
 
-      console.log("Users API response:", response);
-      console.log("Total users fetched:", filteredUsers.length);
-      console.log("Pagination info:", response.pagination);
+      // Apply sorting
+      filteredUsers = filteredUsers.sort((a, b) => {
+        switch (sortBy) {
+          case "Oldest":
+            const dateA = new Date(a.created_at || a.createdAt || a.date_joined || a.registration_date);
+            const dateB = new Date(b.created_at || b.createdAt || b.date_joined || b.registration_date);
+            
+            // Handle invalid dates
+            if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
+            if (isNaN(dateA.getTime())) return 1;
+            if (isNaN(dateB.getTime())) return -1;
+            
+            return dateA - dateB; // Oldest first (ascending)
+            
+          case "Name A-Z":
+            return (a.full_name || "").localeCompare(b.full_name || "");
+          case "Name Z-A":
+            return (b.full_name || "").localeCompare(a.full_name || "");
+          case "Most Strikes":
+            return (b.strike_count || 0) - (a.strike_count || 0);
+          case "Least Strikes":
+            return (a.strike_count || 0) - (b.strike_count || 0);
+          case "Newest":
+          default:
+            const dateNewestA = new Date(a.created_at || a.createdAt || a.date_joined || a.registration_date);
+            const dateNewestB = new Date(b.created_at || b.createdAt || b.date_joined || b.registration_date);
+            
+            // Handle invalid dates
+            if (isNaN(dateNewestA.getTime()) && isNaN(dateNewestB.getTime())) return 0;
+            if (isNaN(dateNewestA.getTime())) return 1;
+            if (isNaN(dateNewestB.getTime())) return -1;
+            
+            return dateNewestB - dateNewestA; // Newest first (descending)
+        }
+      });
+      
+      console.log("Applied sorting:", sortBy, "- Result count:", filteredUsers.length);
+      
+      if (sortBy === "Oldest" && filteredUsers.length > 1) {
+        console.log("Oldest sorting debug - First 3 users after sort:");
+        filteredUsers.slice(0, 3).forEach((user, index) => {
+          const userDate = new Date(user.created_at || user.createdAt || user.date_joined || user.registration_date);
+          console.log(`User ${index + 1}:`, {
+            id: user.id,
+            name: user.full_name,
+            date: userDate.toISOString(),
+            raw_dates: {
+              created_at: user.created_at,
+              createdAt: user.createdAt,
+              date_joined: user.date_joined,
+              registration_date: user.registration_date
+            }
+          });
+        });
+      }
+      
+      console.log("Sample user data for sorting:", filteredUsers[0] ? {
+        id: filteredUsers[0].id,
+        full_name: filteredUsers[0].full_name,
+        created_at: filteredUsers[0].created_at,
+        createdAt: filteredUsers[0].createdAt,
+        date_joined: filteredUsers[0].date_joined,
+        registration_date: filteredUsers[0].registration_date,
+        strike_count: filteredUsers[0].strike_count
+      } : "No users");
 
-      setUsers(filteredUsers);
-      setPagination(response.pagination);
+      console.log("Users API response:", response);
+      console.log("Raw users from API:", response.data?.length || 0);
+      console.log("User statuses in response:", response.data?.map(u => ({ id: u.id, status: u.account_status })) || []);
+      console.log("After filtering:", filteredUsers.length);
+      console.log("Filter applied:", statusFilter);
+      console.log("Pagination info:", response.pagination);
+      console.log("Current page:", currentPage);
+      console.log("Calculated total pages:", Math.ceil((response.pagination?.total || 0) / 10));
+
+      // Apply client-side pagination
+      const totalFiltered = filteredUsers.length;
+      const startIndex = (currentPage - 1) * 10;
+      const endIndex = startIndex + 10;
+      const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+      
+      setUsers(paginatedUsers);
+      
+      // Calculate proper pagination based on filtered results
+      const totalPages = Math.ceil(totalFiltered / 10);
+      setPagination({
+        page: currentPage,
+        limit: 10,
+        total: totalFiltered,
+        pages: totalPages
+      });
       setError(null);
     } catch (err) {
       setError(err.message);
       console.error("Error fetching users:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle pagination
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+  };
+
+  const handlePrevPage = () => {
+    if (pagination.page > 1) {
+      handlePageChange(pagination.page - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (pagination.page < pagination.pages) {
+      handlePageChange(pagination.page + 1);
     }
   };
 
@@ -226,12 +386,6 @@ const BanRestrictUsers = () => {
         return (
           <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
             Suspended
-          </span>
-        );
-      case "restricted":
-        return (
-          <span className="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
-            Restricted
           </span>
         );
       case "active":
@@ -423,146 +577,167 @@ const BanRestrictUsers = () => {
       header: "ACTIONS",
       align: "center",
       render: (user) => (
-        <div className="flex space-x-1 justify-center">
-          {/* View User Details */}
-          <Tooltip content="View Details" placement="top">
+        <div className="flex justify-center">
+          <div className="relative">
             <button
-              onClick={() => openUserDetailsModal(user)}
-              className="text-blue-600 hover:text-blue-900 hover:scale-110 transition-all duration-200 p-1 rounded"
+              onClick={() => setOpenDropdown(openDropdown === user.id ? null : user.id)}
+              className={`flex items-center justify-center w-8 h-8 text-gray-600 hover:text-gray-900 rounded-full transition-all duration-200 ${
+                openDropdown === user.id ? 'bg-gray-200' : 'hover:bg-gray-100'
+              }`}
             >
-              <Eye className="w-4 h-4" />
+              <MoreVertical className="w-4 h-4" />
             </button>
-          </Tooltip>
 
-          {/* Strike Management */}
-          <Tooltip content="Add Strike" placement="top">
-            <button
-              onClick={() => openActionModal(user, "add_strike")}
-              className="text-orange-600 hover:text-orange-900 hover:scale-110 transition-all duration-200 p-1 rounded"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </Tooltip>
-
-          {/* Only show remove strike if user has strikes */}
-          {(user.strike_count || 0) > 0 && (
-            <Tooltip content="Remove Strike" placement="top">
-              <button
-                onClick={() => openActionModal(user, "remove_strike")}
-                className="text-green-600 hover:text-green-900 hover:scale-110 transition-all duration-200 p-1 rounded"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-            </Tooltip>
-          )}
-
-          {user.account_status === "active" && (
-            <>
-              <Tooltip content="Restrict User (View Only)" placement="top">
+          {/* Dropdown Menu */}
+          {openDropdown === user.id && (
+            <div className="absolute right-full mr-2 top-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+              <div className="py-2">
+                {/* View Details - Always available */}
                 <button
-                  onClick={() => openActionModal(user, "restrict")}
-                  className="text-yellow-600 hover:text-yellow-900 hover:scale-110 transition-all duration-200 p-1 rounded"
+                  onClick={() => {
+                    openUserDetailsModal(user);
+                    setOpenDropdown(null);
+                  }}
+                  className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  <Clock className="w-4 h-4" />
+                  <div className="flex items-center">
+                    <Eye className="w-4 h-4 mr-3 text-gray-500" />
+                    <span>View Details</span>
+                  </div>
                 </button>
-              </Tooltip>
-              <Tooltip content="Permanently Ban from App" placement="top">
+
+                {/* Add Strike - Always available */}
                 <button
-                  onClick={() => openActionModal(user, "ban")}
-                  className="text-red-600 hover:text-red-900 hover:scale-110 transition-all duration-200 p-1 rounded"
+                  onClick={() => {
+                    openActionModal(user, "add_strike");
+                    setOpenDropdown(null);
+                  }}
+                  className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  <Ban className="w-4 h-4" />
+                  <div className="flex items-center">
+                    <Plus className="w-4 h-4 mr-3 text-gray-500" />
+                    <span>Add Strike</span>
+                  </div>
                 </button>
-              </Tooltip>
-            </>
-          )}
 
-          {user.account_status === "banned" && (
-            <Tooltip content="Restore App Access" placement="top">
-              <button
-                onClick={() => openActionModal(user, "unban")}
-                className="text-green-600 hover:text-green-900 hover:scale-110 transition-all duration-200 p-1 rounded"
-              >
-                <Shield className="w-4 h-4" />
-              </button>
-            </Tooltip>
-          )}
+                {/* Remove Strike - Only if user has strikes */}
+                {(user.strike_count || 0) > 0 && (
+                  <button
+                    onClick={() => {
+                      openActionModal(user, "remove_strike");
+                      setOpenDropdown(null);
+                    }}
+                    className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center">
+                      <Minus className="w-4 h-4 mr-3 text-gray-500" />
+                      <span>Remove Strike</span>
+                    </div>
+                  </button>
+                )}
 
-          {user.account_status === "restricted" && (
-            <Tooltip content="Remove Restrictions" placement="top">
-              <button
-                onClick={() => openActionModal(user, "unrestrict")}
-                className="text-green-600 hover:text-green-900 hover:scale-110 transition-all duration-200 p-1 rounded"
-              >
-                <Shield className="w-4 h-4" />
-              </button>
-            </Tooltip>
+                {/* Divider */}
+                <div className="border-t border-gray-200 my-1"></div>
+
+                {/* Status-specific actions */}
+                {user.account_status === "active" && (
+                  <>
+                    <button
+                      onClick={() => {
+                        openActionModal(user, "restrict");
+                        setOpenDropdown(null);
+                      }}
+                      className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center">
+                        <Clock className="w-4 h-4 mr-3 text-gray-500" />
+                        <span>Suspend User</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        openActionModal(user, "ban");
+                        setOpenDropdown(null);
+                      }}
+                      className="flex items-center justify-between w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <div className="flex items-center">
+                        <Ban className="w-4 h-4 mr-3 text-red-500" />
+                        <span>Permanently Ban</span>
+                      </div>
+                    </button>
+                  </>
+                )}
+
+                {user.account_status === "banned" && (
+                  <button
+                    onClick={() => {
+                      openActionModal(user, "unban");
+                      setOpenDropdown(null);
+                    }}
+                    className="flex items-center justify-between w-full px-3 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors"
+                  >
+                    <div className="flex items-center">
+                      <Shield className="w-4 h-4 mr-3 text-green-500" />
+                      <span>Restore Access</span>
+                    </div>
+                  </button>
+                )}
+
+              </div>
+            </div>
           )}
+          </div>
         </div>
       ),
     },
   ];
 
   return (
-    <div className="space-y-6">
+    <div>
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-User Ban & Restrict Management
-          </h1>
-          <p className="text-gray-600">
-Manage app bans, forum restrictions and user strikes
-            {pagination.total && (
-              <span className="ml-2 text-sm font-medium text-blue-600">
-                ({pagination.total} total users)
-              </span>
-            )}
-          </p>
+      <div className="mb-3">
+        <div className="flex items-stretch gap-2">
+          <div className="flex items-center justify-center px-2 rounded-md bg-[#023D7B]/10 text-[#023D7B] self-stretch">
+            <Shield size={14} />
+          </div>
+          <div className="flex flex-col justify-center">
+            <h2 className="text-[12px] font-semibold text-gray-900">Ban/Restrict Users</h2>
+            <p className="text-[10px] text-gray-500 mt-0.5">Manage app bans, forum restrictions and user strikes.</p>
+          </div>
         </div>
+        <div className="mt-2 border-t border-gray-200" />
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {statusOptions.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
-
-          {/* Risk Level Filter */}
-          <select
-            value={riskFilter}
-            onChange={(e) => setRiskFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {riskOptions.map((risk) => (
-              <option key={risk.value} value={risk.value}>
-                {risk.label}
-              </option>
-            ))}
-          </select>
-        </div>
+      {/* Toolbar */}
+      <div className="w-full mb-3">
+        <ListToolbar
+          query={searchTerm}
+          onQueryChange={setSearchTerm}
+          filter={{ 
+            value: statusFilter, 
+            onChange: (value) => {
+              console.log("Filter changed to:", value);
+              setStatusFilter(value);
+            }, 
+            options: [
+              'All Users',
+              'Active Users', 
+              'Suspended Users', 
+              'Permanently Banned'
+            ], 
+            label: 'Filter users' 
+          }}
+          sort={{ 
+            value: sortBy, 
+            onChange: (value) => {
+              console.log("Sort changed to:", value);
+              setSortBy(value);
+            }, 
+            options: ['Newest', 'Oldest', 'Name A-Z', 'Name Z-A', 'Most Strikes', 'Least Strikes'], 
+            label: 'Sort by' 
+          }}
+        />
       </div>
 
       {/* Error Message */}
@@ -574,16 +749,19 @@ Manage app bans, forum restrictions and user strikes
 
       {/* Users Table */}
       {loading ? (
-        <div className="bg-white rounded-lg shadow-sm border p-8 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading users...</p>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#023D7B] mx-auto mb-4"></div>
+            <p className="text-sm text-gray-600">Loading users...</p>
+          </div>
         </div>
       ) : (
         <>
           <DataTable
             columns={columns}
             data={users}
-            keyField="id"
+            rowKey={(row) => row.id}
+            dense
             emptyMessage={
               <div className="text-center text-gray-500 py-8">
                 <User className="w-12 h-12 mx-auto mb-4 text-gray-300" />
@@ -592,23 +770,75 @@ Manage app bans, forum restrictions and user strikes
             }
           />
 
-          {pagination.totalPages > 1 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={pagination.totalPages}
-              totalItems={pagination.total}
-              itemsPerPage={20}
-              onPageChange={setCurrentPage}
-              itemName="users"
-            />
+          {/* Pagination */}
+          {pagination.total > 0 && (
+            <div className="mt-4 flex items-center justify-between">
+              {/* Pagination Info */}
+              <div className="text-xs text-gray-500">
+                Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
+              </div>
+
+              {/* Pagination Buttons */}
+              <div className="flex items-center space-x-2">
+                {/* Previous Button */}
+                <button
+                  onClick={handlePrevPage}
+                  disabled={pagination.page <= 1}
+                  className="flex items-center px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                >
+                  <ChevronLeft size={14} className="mr-1" />
+                  Previous
+                </button>
+
+                {/* Page Numbers */}
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: Math.min(pagination.pages, 5) }, (_, i) => {
+                    let pageNum;
+                    if (pagination.pages <= 5) {
+                      pageNum = i + 1;
+                    } else if (pagination.page <= 3) {
+                      pageNum = i + 1;
+                    } else if (pagination.page >= pagination.pages - 2) {
+                      pageNum = pagination.pages - 4 + i;
+                    } else {
+                      pageNum = pagination.page - 2 + i;
+                    }
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`px-3 py-1.5 text-xs border rounded-md ${
+                          pagination.page === pageNum
+                            ? 'bg-[#023D7B] text-white border-[#023D7B]'
+                            : 'border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Next Button */}
+                <button
+                  onClick={handleNextPage}
+                  disabled={pagination.page >= pagination.pages}
+                  className="flex items-center px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                >
+                  Next
+                  <ChevronRight size={14} className="ml-1" />
+                </button>
+              </div>
+            </div>
           )}
         </>
       )}
 
       {/* Action Modal */}
       {showActionModal && selectedUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 border shadow-lg rounded-lg w-96 max-h-[90vh] overflow-y-auto">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 {actionType === "ban"
@@ -800,7 +1030,7 @@ Manage app bans, forum restrictions and user strikes
                 </div>
 
                 {/* User Basic Info - Two Column Layout */}
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-6 mb-6">
                   {/* Left Column */}
                   <div className="space-y-4">
                     <div>
@@ -825,7 +1055,7 @@ Manage app bans, forum restrictions and user strikes
                       <label className="block text-[9px] font-medium text-gray-700 mb-1">
                         Status
                       </label>
-                      <div>
+                      <div className="mt-1">
                         <span
                           className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium ${
                             selectedUser.account_status === "active"
@@ -880,7 +1110,7 @@ Manage app bans, forum restrictions and user strikes
                 </div>
 
                 {/* Admin History & Audit Trail Section */}
-                <div className="border-t border-gray-200 pt-4">
+                <div className="border-t border-gray-200 pt-6 mt-4">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Violations History Column */}
                     <div>
