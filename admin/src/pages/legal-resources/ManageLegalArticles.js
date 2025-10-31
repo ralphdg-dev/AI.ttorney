@@ -31,6 +31,11 @@ const ManageLegalArticles = () => {
   const [selectedArticle, setSelectedArticle] = React.useState(null);
   const [openMenuId, setOpenMenuId] = React.useState(null);
   const [dropdownPosition, setDropdownPosition] = React.useState(null);
+  const [imageModal, setImageModal] = React.useState({
+    open: false,
+    src: null,
+  });
+  const [showModal, setShowModal] = React.useState(false);
   const [confirmationModal, setConfirmationModal] = React.useState({
     open: false,
     type: "",
@@ -40,6 +45,7 @@ const ManageLegalArticles = () => {
   const [articles, setArticles] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
 
+  // Fetch articles
   React.useEffect(() => {
     const fetchArticles = async () => {
       try {
@@ -59,6 +65,43 @@ const ManageLegalArticles = () => {
 
     fetchArticles();
   }, []);
+
+  // Handle fade-in on modal open
+  React.useEffect(() => {
+    if (imageModal.open) setShowModal(true);
+  }, [imageModal.open]);
+
+  const closeImageModal = () => {
+    setShowModal(false);
+    setTimeout(() => setImageModal({ open: false, src: null }), 300);
+  };
+
+  const handleAddArticle = async (formData) => {
+    try {
+      const data = new FormData();
+      data.append("title_en", formData.enTitle);
+      data.append("title_fil", formData.filTitle);
+      data.append("description_en", formData.enDescription);
+      data.append("description_fil", formData.filDescription);
+      data.append("content_en", formData.content_en);
+      data.append("content_fil", formData.content_fil);
+      data.append("category", formData.category.toLowerCase()); // <-- lowercase
+      if (formData.image) data.append("image", formData.image);
+
+      const res = await fetch("http://localhost:5001/api/legal-articles", {
+        method: "POST",
+        body: data,
+      });
+
+      const json = await res.json();
+      if (!json.success)
+        throw new Error(json.message || "Failed to add article");
+
+      setArticles((prev) => [json.data, ...prev]);
+    } catch (err) {
+      throw err;
+    }
+  };
 
   // Filtering & sorting
   const filteredData = React.useMemo(() => {
@@ -219,6 +262,7 @@ const ManageLegalArticles = () => {
       document.body
     );
   };
+
   const columns = [
     { key: "enTitle", header: "English Title" },
     { key: "filTitle", header: "Filipino Title" },
@@ -251,11 +295,25 @@ const ManageLegalArticles = () => {
       align: "center",
       render: (r) =>
         r.image ? (
-          <img
-            src={r.image}
-            alt="Article thumbnail"
-            className="w-8 h-8 object-cover rounded"
-          />
+          <div className="relative">
+            <img
+              src={r.image}
+              alt="Article thumbnail"
+              className="w-8 h-8 object-cover rounded cursor-pointer"
+              onClick={() => setImageModal({ open: true, src: r.image })}
+              onError={(e) => {
+                e.target.style.display = "none";
+                if (e.target.nextSibling)
+                  e.target.nextSibling.style.display = "block";
+              }}
+            />
+            <span
+              className="text-gray-400 text-[10px] italic hidden"
+              style={{ display: "none" }}
+            >
+              No image
+            </span>
+          </div>
         ) : (
           <span className="text-gray-400 text-[10px] italic">No image</span>
         ),
@@ -438,12 +496,34 @@ const ManageLegalArticles = () => {
       <AddArticleModal
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
+        onSave={handleAddArticle}
       />
+
       <ConfirmationModal
         open={confirmationModal.open}
         onClose={() => setConfirmationModal({ open: false })}
         type={confirmationModal.type}
       />
+
+      {/* Image Modal with fade animation */}
+      {imageModal.open && (
+        <div
+          className={`fixed inset-0 flex items-center justify-center z-50 transition-opacity duration-300 ${
+            showModal ? "opacity-100" : "opacity-0"
+          }`}
+          style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
+          onClick={closeImageModal}
+        >
+          <img
+            src={imageModal.src}
+            alt="Full size"
+            className={`max-w-[90vw] max-h-[90vh] object-contain rounded shadow-lg transition-transform duration-300 ${
+              showModal ? "scale-100" : "scale-90"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };

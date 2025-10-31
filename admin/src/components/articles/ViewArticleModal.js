@@ -94,7 +94,19 @@ const ViewArticleModal = ({ open, onClose, article }) => {
                 src={article.image}
                 alt="Article"
                 className="w-full object-cover rounded-md"
+                onError={(e) => {
+                  e.target.style.display = "none";
+                  if (e.target.nextSibling) {
+                    e.target.nextSibling.style.display = "block";
+                  }
+                }}
               />
+              <div
+                className="px-2 py-1.5 border rounded-md bg-gray-50 text-xs text-gray-500 italic hidden text-center"
+                style={{ display: "none" }}
+              >
+                Image failed to load
+              </div>
             </div>
           ) : (
             <div className="px-2 py-1.5 border rounded-md bg-gray-50 text-xs text-gray-500 italic">
@@ -168,7 +180,6 @@ const ViewArticleModal = ({ open, onClose, article }) => {
             </div>
           </div>
         </div>
-
       </div>
     </Modal>
   );

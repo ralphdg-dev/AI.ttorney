@@ -2,6 +2,8 @@
 const express = require("express");
 const router = express.Router();
 const { supabaseAdmin } = require("../config/supabase");
+const multer = require("multer");
+const upload = multer({ storage: multer.memoryStorage() });
 
 // GET /api/legal-articles — get all articles regardless of verification
 router.get("/", async (req, res) => {
@@ -31,6 +33,27 @@ router.get("/", async (req, res) => {
 
     if (error) throw error;
 
+    // Function to generate proper Supabase Storage URL
+    const getImageUrl = (imagePath) => {
+      if (!imagePath) return "";
+
+      // If it's already a full URL, return as is
+      if (imagePath.startsWith("http")) return imagePath;
+
+      // If it's a storage path, construct the proper URL
+      // Based on your bucket structure: articles-img/arrest.jpg
+      const bucketName = "legal-articles"; // Adjust to your actual bucket name
+
+      // Remove any leading slashes and encode the path
+      const cleanPath = imagePath.replace(/^\//, "");
+      const encodedPath = encodeURIComponent(cleanPath);
+
+      // Construct the Supabase Storage URL
+      const supabaseUrl =
+        process.env.SUPABASE_URL || "https://vmlbrckrlgwlobhnpstx.supabase.co";
+      return `${supabaseUrl}/storage/v1/object/public/${bucketName}/${encodedPath}`;
+    };
+
     // Map is_verified to status for frontend
     const formattedData = data.map((article) => ({
       ...article,
@@ -40,9 +63,11 @@ router.get("/", async (req, res) => {
       filDescription: article.description_fil,
       enContent: article.content_en,
       filContent: article.content_fil,
-      image: article.image_article || "",
+      image: getImageUrl(article.image_article),
       createdAt: article.created_at,
       updatedAt: article.updated_at,
+      verifiedAt: article.verified_at,
+      verifiedBy: article.verified_by,
       status: article.is_verified ? "Published" : "Unpublished",
     }));
 
@@ -50,6 +75,102 @@ router.get("/", async (req, res) => {
   } catch (err) {
     console.error("Error fetching legal articles:", err);
     res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+router.post("/", upload.single("image"), async (req, res) => {
+  try {
+    const {
+      title_en,
+      title_fil,
+      description_en,
+      description_fil,
+      content_en,
+      content_fil,
+      category,
+    } = req.body;
+
+    // Step 1: Insert article WITHOUT image first
+    const { data: article, error: insertError } = await supabaseAdmin
+      .from("legal_articles")
+      .insert([
+        {
+          title_en,
+          title_fil,
+          description_en,
+          description_fil,
+          content_en,
+          content_fil,
+          category,
+          is_verified: false,
+        },
+      ])
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    let imagePath = null;
+
+    // Step 2: If image uploaded, store it with ID in filename
+    if (req.file) {
+      const fileExtension = req.file.originalname.split(".").pop(); // keep extension
+      const fileName = `${article.id}_article-image.${fileExtension}`;
+      const storagePath = `articles-img/${fileName}`;
+
+      const { data: uploadData, error: uploadError } =
+        await supabaseAdmin.storage
+          .from("legal-articles")
+          .upload(storagePath, req.file.buffer, {
+            contentType: req.file.mimetype,
+            upsert: true, // overwrite if exists
+          });
+
+      if (uploadError) throw uploadError;
+      imagePath = storagePath;
+
+      // Step 3: Update article with image path
+      const { error: updateError } = await supabaseAdmin
+        .from("legal_articles")
+        .update({ image_article: imagePath })
+        .eq("id", article.id);
+
+      if (updateError) throw updateError;
+    }
+
+    // Step 4: Construct public URL
+    const supabaseUrl =
+      process.env.SUPABASE_URL || "https://vmlbrckrlgwlobhnpstx.supabase.co";
+    const getImageUrl = (path) =>
+      path
+        ? `${supabaseUrl}/storage/v1/object/public/legal-articles/${encodeURIComponent(
+            path
+          )}`
+        : "";
+
+    // Step 5: Return formatted article
+    const formattedArticle = {
+      ...article,
+      enTitle: article.title_en,
+      filTitle: article.title_fil,
+      enDescription: article.description_en,
+      filDescription: article.description_fil,
+      enContent: article.content_en,
+      filContent: article.content_fil,
+      image: getImageUrl(imagePath),
+      createdAt: article.created_at,
+      updatedAt: article.updated_at,
+      verifiedAt: article.verified_at,
+      verifiedBy: article.verified_by,
+      status: article.is_verified ? "Published" : "Unpublished",
+    };
+
+    res.status(201).json({ success: true, data: formattedArticle });
+  } catch (err) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ success: false, message: err.message || "Server error" });
   }
 });
 

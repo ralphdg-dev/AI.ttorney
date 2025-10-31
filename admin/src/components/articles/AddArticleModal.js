@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import Modal from '../ui/Modal';
-import Select from '../ui/Select';
-import ConfirmationModal from '../ui/ConfirmationModal';
-import { Save } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import Modal from "../ui/Modal";
+import Select from "../ui/Select";
+import ConfirmationModal from "../ui/ConfirmationModal";
+import { Save } from "lucide-react";
 
 const AddArticleModal = ({ open, onClose, onSave }) => {
   const [formData, setFormData] = useState({
-    enTitle: '',
-    filTitle: '',
-    enDescription: '',
-    filDescription: '',
-    content_en: '',
-    content_fil: '',
-    category: '',
+    enTitle: "",
+    filTitle: "",
+    enDescription: "",
+    filDescription: "",
+    content_en: "",
+    content_fil: "",
+    category: "",
     image: null,
     is_published: false,
   });
@@ -22,19 +22,20 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationLoading, setConfirmationLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [translating, setTranslating] = useState(false);
 
-  const categoryOptions = ['Family', 'Criminal', 'Civil', 'Labor', 'Consumer'];
+  const categoryOptions = ["Family", "Criminal", "Civil", "Labor", "Consumer"];
 
   useEffect(() => {
     if (!open) {
       setFormData({
-        enTitle: '',
-        filTitle: '',
-        enDescription: '',
-        filDescription: '',
-        content_en: '',
-        content_fil: '',
-        category: '',
+        enTitle: "",
+        filTitle: "",
+        enDescription: "",
+        filDescription: "",
+        content_en: "",
+        content_fil: "",
+        category: "",
         image: null,
         is_published: false,
       });
@@ -43,18 +44,24 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
       setLoading(false);
       setShowConfirmation(false);
       setConfirmationLoading(false);
+      setTranslating(false);
     }
   }, [open]);
 
   const validateForm = () => {
     const errors = {};
-    if (!formData.enTitle.trim()) errors.enTitle = 'English title is required';
-    if (!formData.filTitle.trim()) errors.filTitle = 'Filipino title is required';
-    if (!formData.enDescription.trim()) errors.enDescription = 'English description is required';
-    if (!formData.filDescription.trim()) errors.filDescription = 'Filipino description is required';
-    if (!formData.content_en.trim()) errors.content_en = 'English content is required';
-    if (!formData.content_fil.trim()) errors.content_fil = 'Filipino content is required';
-    if (!formData.category) errors.category = 'Category is required';
+    if (!formData.enTitle.trim()) errors.enTitle = "English title is required";
+    if (!formData.filTitle.trim())
+      errors.filTitle = "Filipino title is required";
+    if (!formData.enDescription.trim())
+      errors.enDescription = "English description is required";
+    if (!formData.filDescription.trim())
+      errors.filDescription = "Filipino description is required";
+    if (!formData.content_en.trim())
+      errors.content_en = "English content is required";
+    if (!formData.content_fil.trim())
+      errors.content_fil = "Filipino content is required";
+    if (!formData.category) errors.category = "Category is required";
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -66,7 +73,7 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
       [name]: files ? files[0] : value,
     }));
     if (validationErrors[name]) {
-      setValidationErrors((prev) => ({ ...prev, [name]: '' }));
+      setValidationErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
@@ -84,15 +91,79 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
       setShowConfirmation(false);
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to add article');
+      setError(err.message || "Failed to add article");
       setShowConfirmation(false);
     } finally {
       setConfirmationLoading(false);
     }
   };
 
+  const translateText = async (text, targetLang) => {
+    const res = await fetch("http://localhost:5001/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, targetLang }),
+    });
+
+    const data = await res.json();
+    return data.translation;
+  };
+
+  const handleTranslate = async () => {
+    setTranslating(true);
+    try {
+      const newFormData = { ...formData };
+
+      // Titles
+      if (formData.enTitle && !formData.filTitle) {
+        newFormData.filTitle = await translateText(formData.enTitle, "fil");
+      } else if (!formData.enTitle && formData.filTitle) {
+        newFormData.enTitle = await translateText(formData.filTitle, "en");
+      }
+
+      // Descriptions
+      if (formData.enDescription && !formData.filDescription) {
+        newFormData.filDescription = await translateText(
+          formData.enDescription,
+          "fil"
+        );
+      } else if (!formData.enDescription && formData.filDescription) {
+        newFormData.enDescription = await translateText(
+          formData.filDescription,
+          "en"
+        );
+      }
+
+      // Contents
+      if (formData.content_en && !formData.content_fil) {
+        newFormData.content_fil = await translateText(
+          formData.content_en,
+          "fil"
+        );
+      } else if (!formData.content_en && formData.content_fil) {
+        newFormData.content_en = await translateText(
+          formData.content_fil,
+          "en"
+        );
+      }
+
+      setFormData(newFormData);
+    } catch (err) {
+      console.error("Translation failed:", err);
+      setError(err.message);
+    } finally {
+      setTranslating(false);
+    }
+  };
+  // ------------------------------------------------------
+
   return (
-    <Modal open={open} onClose={onClose} title="Add New Legal Article" width="max-w-2xl">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Add New Legal Article"
+      width="max-w-2xl"
+    >
       <form onSubmit={handleSubmit} className="space-y-3">
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-md p-2">
@@ -107,7 +178,9 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
           </label>
           <Select
             value={formData.category}
-            onChange={(value) => setFormData((prev) => ({ ...prev, category: value }))}
+            onChange={(value) =>
+              setFormData((prev) => ({ ...prev, category: value }))
+            }
             options={categoryOptions}
             variant="form"
             error={!!validationErrors.category}
@@ -115,7 +188,9 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
             placeholder="Select article category"
           />
           {validationErrors.category && (
-            <p className="mt-0.5 text-[10px] text-red-600">{validationErrors.category}</p>
+            <p className="mt-0.5 text-[10px] text-red-600">
+              {validationErrors.category}
+            </p>
           )}
         </div>
 
@@ -130,7 +205,7 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
               value={formData.enTitle}
               onChange={handleChange}
               className={`w-full px-2 py-1.5 border rounded-md text-xs focus:ring-1 focus:ring-[#023D7B] ${
-                validationErrors.enTitle ? 'border-red-300' : 'border-gray-300'
+                validationErrors.enTitle ? "border-red-300" : "border-gray-300"
               }`}
               placeholder="Enter English title"
             />
@@ -144,7 +219,7 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
               value={formData.filTitle}
               onChange={handleChange}
               className={`w-full px-2 py-1.5 border rounded-md text-xs focus:ring-1 focus:ring-[#023D7B] ${
-                validationErrors.filTitle ? 'border-red-300' : 'border-gray-300'
+                validationErrors.filTitle ? "border-red-300" : "border-gray-300"
               }`}
               placeholder="Enter Filipino title"
             />
@@ -163,7 +238,9 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
               onChange={handleChange}
               rows={2}
               className={`w-full px-2 py-1.5 border rounded-md text-xs resize-none focus:ring-1 focus:ring-[#023D7B] ${
-                validationErrors.enDescription ? 'border-red-300' : 'border-gray-300'
+                validationErrors.enDescription
+                  ? "border-red-300"
+                  : "border-gray-300"
               }`}
               placeholder="Enter short English description"
             />
@@ -178,7 +255,9 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
               onChange={handleChange}
               rows={2}
               className={`w-full px-2 py-1.5 border rounded-md text-xs resize-none focus:ring-1 focus:ring-[#023D7B] ${
-                validationErrors.filDescription ? 'border-red-300' : 'border-gray-300'
+                validationErrors.filDescription
+                  ? "border-red-300"
+                  : "border-gray-300"
               }`}
               placeholder="Enter short Filipino description"
             />
@@ -211,7 +290,9 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
               onChange={handleChange}
               rows={4}
               className={`w-full px-2 py-1.5 border rounded-md text-xs resize-none focus:ring-1 focus:ring-[#023D7B] ${
-                validationErrors.content_en ? 'border-red-300' : 'border-gray-300'
+                validationErrors.content_en
+                  ? "border-red-300"
+                  : "border-gray-300"
               }`}
               placeholder="Enter English content"
             />
@@ -226,11 +307,25 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
               onChange={handleChange}
               rows={4}
               className={`w-full px-2 py-1.5 border rounded-md text-xs resize-none focus:ring-1 focus:ring-[#023D7B] ${
-                validationErrors.content_fil ? 'border-red-300' : 'border-gray-300'
+                validationErrors.content_fil
+                  ? "border-red-300"
+                  : "border-gray-300"
               }`}
               placeholder="Enter Filipino content"
             />
           </div>
+        </div>
+
+        {/* Translate Button */}
+        <div>
+          <button
+            type="button"
+            onClick={handleTranslate}
+            disabled={translating}
+            className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+          >
+            {translating ? "Translating..." : "Auto Translate"}
+          </button>
         </div>
 
         {/* Buttons */}
