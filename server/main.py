@@ -129,13 +129,25 @@ app.include_router(user_profile_router)
 
 # Import and include chatbot routers (separated for users and lawyers)
 from api.chatbot_user import router as user_chatbot_router
+from api.chatbot_user_streaming import router as user_chatbot_streaming_router
 from api.chatbot_lawyer import router as lawyer_chatbot_router
+from api.chatbot_lawyer_streaming import router as lawyer_chatbot_streaming_router
 app.include_router(user_chatbot_router)
+app.include_router(user_chatbot_streaming_router)
 app.include_router(lawyer_chatbot_router)
+app.include_router(lawyer_chatbot_streaming_router)
 
 # Import and include chat history routes
 from routes.chat_history import router as chat_history_router
 app.include_router(chat_history_router)
+
+# Import and include admin moderation routes
+from routes.admin_moderation import router as admin_moderation_router
+app.include_router(admin_moderation_router, prefix="/api")
+
+# Import and include user moderation routes
+from routes.user_moderation import router as user_moderation_router
+app.include_router(user_moderation_router, prefix="/api")
 
 @app.get("/")
 async def root():

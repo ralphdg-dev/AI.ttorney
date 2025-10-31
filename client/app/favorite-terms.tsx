@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { View, Alert, StatusBar, Animated, RefreshControl } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { shouldUseNativeDriver } from '@/utils/animations';
 import { useRouter } from "expo-router";
 import tw from "tailwind-react-native-classnames";
@@ -137,7 +138,8 @@ export default function FavoritesScreen() {
 
   if (loading) {
     return (
-      <View style={tw`flex-1 bg-gray-50`}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header
           title="Favorite Terms"
           showMenu={true}
@@ -145,13 +147,13 @@ export default function FavoritesScreen() {
         <View style={tw`flex-1 items-center justify-center`}>
           <GSText>Loading your favorite terms...</GSText>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-      <View style={tw`flex-1 bg-gray-100`}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
       {/* Header */}
       <Header
@@ -284,8 +286,8 @@ export default function FavoritesScreen() {
       )}
       
       {/* Bottom Navigation */}
-      <Navbar />
+      <Navbar activeTab="learn" />
       <SidebarWrapper />
-    </View>
+    </SafeAreaView>
   );
 }

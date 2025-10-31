@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import Colors from "@/constants/Colors";
+import { LAYOUT } from "@/constants/LayoutConstants";
 import { LEGAL_CATEGORIES, LegalCategory } from "@/constants/categories";
 import {
   Library,
@@ -40,17 +41,13 @@ export default function CategoryScroller({ activeCategory, onCategoryChange, inc
   }), []);
 
   return (
-    <View className="mb-4 md:mb-6">
+    <View style={styles.container}>
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false} 
-        contentContainerStyle={{ 
-          paddingHorizontal: 16,
-          paddingRight: 32 
-        }}
-        className="flex-1"
+        contentContainerStyle={styles.scrollContent}
       >
-        <View className="flex-row space-x-3 md:space-x-4 lg:space-x-5">
+        <View style={styles.categoriesRow}>
           {categories.map((c) => {
             const isActive = activeCategory === c.id;
             const Icon = categoryIcons[c.id as keyof typeof categoryIcons];
@@ -58,21 +55,15 @@ export default function CategoryScroller({ activeCategory, onCategoryChange, inc
             return (
               <TouchableOpacity
                 key={c.id}
-                className="items-center"
+                style={styles.categoryButton}
                 onPress={() => onCategoryChange(c.id)}
                 activeOpacity={0.8}
               >
-                {/* Flat design - no shadows or 3D effects */}
                 <View
-                  className={`
-                    w-14 h-14 sm:w-16 sm:h-16 lg:w-18 lg:h-18
-                    rounded-xl items-center justify-center border-2 
-                    transition-all duration-200 ease-in-out
-                    ${isActive 
-                      ? 'border-blue-500 bg-blue-50' 
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                    }
-                  `}
+                  style={[
+                    styles.iconContainer,
+                    isActive ? styles.iconContainerActive : styles.iconContainerInactive
+                  ]}
                 >
                   {Icon ? (
                     <Icon 
@@ -91,15 +82,13 @@ export default function CategoryScroller({ activeCategory, onCategoryChange, inc
                   )}
                 </View>
                 
-                {/* Responsive text sizing */}
                 <Text
                   numberOfLines={1}
                   ellipsizeMode="tail"
-                  className={`
-                    mt-2 text-xs sm:text-sm lg:text-base font-medium text-center
-                    w-14 sm:w-16 lg:w-18
-                    ${isActive ? 'text-blue-600' : 'text-gray-600'}
-                  `}
+                  style={[
+                    styles.label,
+                    isActive ? styles.labelActive : styles.labelInactive
+                  ]}
                 >
                   {c.label}
                 </Text>
@@ -112,3 +101,48 @@ export default function CategoryScroller({ activeCategory, onCategoryChange, inc
   );
 }
 
+const styles = StyleSheet.create({
+  container: {
+    marginBottom: LAYOUT.SPACING.md,
+  },
+  scrollContent: {
+    paddingHorizontal: LAYOUT.SPACING.md,
+    paddingRight: LAYOUT.SPACING.xl,
+  },
+  categoriesRow: {
+    flexDirection: 'row',
+  },
+  categoryButton: {
+    alignItems: 'center',
+    marginRight: LAYOUT.SPACING.md, // 16px gap between categories (React Native compatible)
+  },
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: LAYOUT.RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  iconContainerActive: {
+    borderColor: Colors.primary.blue,
+    backgroundColor: '#EFF6FF',
+  },
+  iconContainerInactive: {
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  label: {
+    marginTop: LAYOUT.SPACING.sm,
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+    width: 56,
+  },
+  labelActive: {
+    color: Colors.primary.blue,
+  },
+  labelInactive: {
+    color: Colors.text.sub,
+  },
+});

@@ -62,6 +62,12 @@ from config.system_prompts import ENGLISH_SYSTEM_PROMPT, TAGALOG_SYSTEM_PROMPT
 # Import chat history service
 from services.chat_history_service import ChatHistoryService, get_chat_history_service
 
+# Import content moderation and violation tracking
+from services.content_moderation_service import get_moderation_service
+from services.violation_tracking_service import get_violation_tracking_service
+from services.prompt_injection_detector import get_prompt_injection_detector
+from models.violation_types import ViolationType
+
 # Import authentication (optional for chatbot)
 from auth.service import AuthService
 
@@ -994,19 +1000,19 @@ You must communicate in "hardcore legalese," employing formal language, precise 
 
 CRITICAL MANDATE: ALL responses MUST strictly adhere to the following five-part structure:
 
-I. PRELIMINARY STATEMENT
+**I. PRELIMINARY STATEMENT**
     (A brief restatement and acknowledgment of the legal query presented.)
 
-II. CONTROLLING STATUTORY PROVISIONS
+**II. CONTROLLING STATUTORY PROVISIONS**
     (If, and only if, controlling statutes or jurisprudence are provided as context OR are fundamental to the analysis, cite and quote them herein. If the query is general or does not require specific citations, this section may be omitted or briefly state that the analysis is based on general legal principles.)
 
-III. LEGAL ANALYSIS AND DISCUSSION
+**III. LEGAL ANALYSIS AND DISCUSSION**
     (A comprehensive, in-depth analysis of the cited provisions and relevant jurisprudence. Discuss the elements of the law, prevailing doctrines, and any applicable legal principles. This section must be thorough and constitute the main body of your opinion.)
 
-IV. APPLICATION TO THE QUERY
+**IV. APPLICATION TO THE QUERY**
     (A direct application of the aforementioned laws and discussion to the specific facts or query posited by the user. Analyze how the legal principles govern the user's situation.)
 
-V. CONCLUSIVE OPINION
+**V. CONCLUSION**
     (A final, conclusive legal opinion summarizing the findings. This is not personal advice, but a reasoned conclusion based on the analysis.)
 
 RULES OF ENGAGEMENT:
@@ -1024,19 +1030,19 @@ Kinakailangang gumamit ng pormal na "legalese" o legal na Filipino, na may tumpa
 
 KRITIKAL NA UTOS: ANG LAHAT ng tugon ay DAPAT na mahigpit na sumunod sa sumusunod na limang-bahaging istraktura:
 
-I. PAUNANG PAHAYAG
+**I. PAUNANG PAHAYAG**
     (Isang maikling muling paglalahad at pagkilala sa legal na katanungan na inilahad.)
 
-II. MGA KONTROLADONG TADHANA NG BATAS
+**II. MGA KONTROLADONG TADHANA NG BATAS**
     (Kung, at tanging kung, ang mga kumokontrol na batas o hurisprudensya ay ibinigay bilang konteksto O ay pundamental sa pagsusuri, banggitin at sipiin ang mga ito dito. Kung ang katanungan ay pangkalahatan o hindi nangangailangan ng mga tiyak na pagsipi, ang seksyong ito ay maaaring alisin o maikling ipahayag na ang pagsusuri ay batay sa pangkalahatang mga legal na prinsipyo.)
 
-III. LEGAL NA PAGSUSURI AT DISKUSYON
+**III. LEGAL NA PAGSUSURI AT DISKUSYON**
     (Isang komprehensibo, malalim na pagsusuri ng mga binanggit na tadhana at kaugnay na hurisprudensya. Talakayin ang mga elemento ng batas, mga umiiral na doktrina, at anumang naaangkop na legal na prinsipyo. Ang seksyong ito ay dapat maging masinsinan at bumubuo sa pangunahing katawan ng iyong opinyon.)
 
-IV. APLIKASYON SA KATANUNGAN
+**IV. APLIKASYON SA KATANUNGAN**
     (Isang direktang aplikasyon ng mga nabanggit na batas at diskusyon sa mga tiyak na katotohanan o katanungan na inilahad ng gumagamit. Suriin kung paano pinamamahalaan ng mga legal na prinsipyo ang sitwasyon ng gumagamit.)
 
-V. PANGWAKAS NA OPINYON
+**V. KONSEPSYON**
     (Isang pinal, pangwakas na legal na opinyon na nagbubuod ng mga natuklasan. Ito ay hindi personal na payo, kundi isang makatwirang konklusyon batay sa pagsusuri.)
 
 MGA ALITUNTUNIN:
@@ -1176,34 +1182,50 @@ def generate_ai_response(question: str, language: str, response_type: str, topic
     # Define prompts based on response type
     prompts = {
         'greeting': {
-            'english': f"""You are Ai.ttorney, a friendly Philippine legal assistant. The user just said: "{question}"
+            'english': f"""You are Ai.ttorney, a super friendly and casual Philippine legal assistant. The user just said: "{question}"
 
-This seems like a greeting or casual message, not a legal question. Respond in a natural, conversational way that:
-1. Matches their energy and language style
-2. Shows personality and warmth
-3. Invites them to ask legal questions if they want
-4. Feels like talking to a knowledgeable friend
-5. Uses the same language they used (English, Tagalog, or Taglish)
+Respond like a cool friend, NOT a formal assistant. Be warm, casual, and inviting.
 
-Keep it brief but engaging - like a real conversation starter.
+RULES:
+- Keep it SHORT (1-2 sentences max)
+- Be CASUAL and fun, not formal
+- DON'T say "I appreciate your greeting" or "feel free to ask" - too robotic
+- DO use casual language like "Hey!", "What's up?", "Kamusta!"
+- Show personality and warmth
+- Invite them to chat about legal stuff naturally
 
-Examples:
-- For "hello": "Hey there! I'm Ai.ttorney, your go-to for Philippine legal questions. What's up?"
-- For "kumusta": "Kumusta kaibigan! Ai.ttorney dito - may legal topics ka bang gustong malaman?"
+GOOD Examples:
+- "Hey! 👋 I'm Ai.ttorney. Got any legal questions? I'm here to help!"
+- "Hi there! What's up? Need help with any Philippine law stuff?"
+- "Hello! 😊 Ai.ttorney here. What can I help you with today?"
 
-Make it varied and natural, not robotic.""",
-            'tagalog': f"""Ikaw si Ai.ttorney, isang mainit na legal assistant sa Pilipinas. Ang user lang ay nag-sabi: "{question}"
+BAD Examples (too formal):
+- "I appreciate your greeting! However, I'm a legal assistant..."
+- "Thank you for reaching out. I can only assist with..."
 
-Ito ay mukhang greeting o casual na mensahe, hindi legal na tanong. Sumagot nang natural at conversational na:
-1. I-match ang kanilang energy at estilo ng lengguwahe
-2. Magpakita ng personalidad at init
-3. Imbitahan silang magtanong tungkol sa legal kung gusto nila
-4. Parang kausap ang taong marunong sa kulturang Pilipino
-5. Gamitin ang parehong lengguwahe nila
+Keep it natural and friendly!""",
+            'tagalog': f"""Ikaw si Ai.ttorney, isang super friendly at casual na legal assistant sa Pilipinas. Ang user ay nag-sabi: "{question}"
 
-Panatilihing maikli pero engaging - parang tunay na conversation starter.
+Sumagot parang cool na kaibigan, HINDI formal na assistant. Maging mainit, casual, at welcoming.
 
-Gawing varied at natural, hindi robotic."""
+MGA PATAKARAN:
+- Panatilihing MAIKLI (1-2 pangungusap lang)
+- Maging CASUAL at masaya, hindi formal
+- HUWAG magsabi ng "Salamat sa iyong greeting" o "huwag mag-atubiling magtanong" - masyadong robotic
+- GAMITIN ang casual language tulad ng "Uy!", "Kamusta!", "Ano meron?"
+- Magpakita ng personality at init
+- Imbitahan silang mag-usap tungkol sa legal naturally
+
+MAGANDANG Examples:
+- "Uy kamusta! 👋 Ai.ttorney ako. May legal questions ka ba? Nandito ako!"
+- "Hello! Ano meron? Need help sa Philippine law?"
+- "Kumusta! 😊 Ai.ttorney here. Ano'ng maitutulong ko today?"
+
+MASAMANG Examples (masyadong formal):
+- "Pinahahalagahan ko ang iyong pagbati! Gayunpaman, ako ay legal assistant..."
+- "Salamat sa pag-abot. Makakatulong lamang ako sa..."
+
+Gawing natural at friendly!"""
         },
         'casual': {
             'english': f"""You are Ai.ttorney, a friendly Philippine legal assistant. The user just said: "{question}"
@@ -1284,9 +1306,9 @@ Gawing varied at natural, hindi robotic."""
         }
     }
     
-    # Fallback responses
+    # Fallback responses (casual and friendly)
     fallbacks = {
-        'greeting': "Hello! I'm Ai.ttorney, your legal assistant for Philippine law. How can I help you today?",
+        'greeting': "Hey! 👋 I'm Ai.ttorney. Got any legal questions? I'm here to help!" if language == "english" else "Uy kamusta! 👋 Ai.ttorney ako. May legal questions ka ba?",
         'casual': "Hey there! I'm Ai.ttorney, your legal assistant for Philippine law. Got any questions?",
         'out_of_scope': "Sorry, I can only help with Civil, Criminal, Consumer, Family, and Labor Law." if language == "english" else "Pasensya na, ang maitutulong ko lang ay tungkol sa Civil, Criminal, Consumer, Family, at Labor Law."
     }
@@ -1378,28 +1400,30 @@ async def save_chat_interaction(
                 existing_session = await chat_service.get_session(UUID(session_id))
                 session_exists = existing_session is not None
                 if session_exists:
-                    print(f"    ✅ Using existing session: {session_id}")
+                    print(f"   ✅ Using existing session: {session_id}")
                 else:
-                    print(f"    ⚠️  Session {session_id} not found, creating new one")
+                    print(f"   ⚠️  Session {session_id} not found, creating new one")
                     session_id = None  # Force creation of new session
             except Exception as e:
-                print(f"    ⚠️  Error checking session: {e}, creating new one")
+                print(f"   ⚠️  Error checking session: {e}, creating new one")
                 session_id = None
         
         # Create session if needed (first message or invalid session_id)
         if not session_id:
             title = question[:50] if len(question) > 50 else question
-            print(f"    Creating new session: {title}")
+            print(f"   Creating new session: {title}")
+            # Map language to database format ('en' or 'fil')
+            db_language = 'en' if language in ['english', 'en'] else 'fil'
             session = await chat_service.create_session(
                 user_id=UUID(effective_user_id),
                 title=title,
-                language=language
+                language=db_language
             )
             session_id = str(session.id)
-            print(f"    ✅ Session created: {session_id}")
+            print(f"   ✅ Session created: {session_id}")
         
         # Save user message
-        print(f"    Saving user message...")
+        print(f"   Saving user message...")
         user_msg = await chat_service.add_message(
             session_id=UUID(session_id),
             user_id=UUID(effective_user_id),
@@ -1408,10 +1432,10 @@ async def save_chat_interaction(
             metadata={}
         )
         user_message_id = str(user_msg.id)
-        print(f"    ✅ User message saved: {user_message_id}")
+        print(f"   ✅ User message saved: {user_message_id}")
         
         # Save assistant message
-        print(f"    Saving assistant message...")
+        print(f"   Saving assistant message...")
         assistant_msg = await chat_service.add_message(
             session_id=UUID(session_id),
             user_id=UUID(effective_user_id),
@@ -1420,7 +1444,7 @@ async def save_chat_interaction(
             metadata=metadata or {}
         )
         assistant_message_id = str(assistant_msg.id)
-        print(f"    ✅ Assistant message saved: {assistant_message_id}")
+        print(f"   ✅ Assistant message saved: {assistant_message_id}")
         print(f"💾 Chat history saved successfully!")
         
         return (session_id, user_message_id, assistant_message_id)
@@ -1428,16 +1452,22 @@ async def save_chat_interaction(
     except Exception as e:
         import traceback
         print(f"⚠️  Failed to save chat history: {e}")
-        print(f"    Traceback: {traceback.format_exc()}")
+        print(f"   Traceback: {traceback.format_exc()}")
         return (session_id, None, None)
 
 
-@router.post("/ask", response_model=ChatResponse)
-async def ask_legal_question(
+@router.post("/ask/legacy", response_model=ChatResponse, deprecated=True)
+async def ask_legal_question_legacy(
     request: ChatRequest,
     chat_service: ChatHistoryService = Depends(get_chat_history_service),
     current_user: Optional[dict] = Depends(get_optional_current_user)
 ):
+    """
+    DEPRECATED: Legacy non-streaming endpoint.
+    
+    Use POST /api/chatbot/lawyer/ask instead (streaming version).
+    This endpoint is kept for backward compatibility only.
+    """
     """
     Main endpoint for legal practitioners to submit research interrogatories 
     regarding Philippine law.
@@ -1473,9 +1503,26 @@ async def ask_legal_question(
     authenticated_user_id = None
     if current_user and "user" in current_user:
         authenticated_user_id = current_user["user"]["id"]
+        print(f"✅ Authenticated user ID: {authenticated_user_id}")
+    else:
+        print(f"⚠️  No authenticated user found. current_user: {current_user}")
     
     # Use authenticated user_id, fallback to request.user_id for backward compatibility
     effective_user_id = authenticated_user_id or request.user_id
+    print(f"📝 Effective user ID for chat history: {effective_user_id}")
+    
+    # STEP 0: Check if user is allowed to use chatbot (not suspended/banned)
+    # Only check for authenticated users
+    if effective_user_id:
+        violation_service = get_violation_tracking_service()
+        user_status = await violation_service.check_user_status(effective_user_id)
+        
+        if not user_status["is_allowed"]:
+            logger.warning(f"🚫 User {effective_user_id[:8]}... blocked from chatbot: {user_status['account_status']}")
+            return create_chat_response(
+                answer=user_status["reason"],
+                simplified_summary=f"User blocked: {user_status['account_status']}"
+            )
     
     # Production logging with request ID for tracing
     logger.info(f"Request received - user_id={effective_user_id}, session_id={request.session_id}, question_length={len(request.question)}")
@@ -1551,20 +1598,7 @@ async def ask_legal_question(
         if not request.question or not request.question.strip():
             raise HTTPException(status_code=400, detail="Question cannot be empty.")
         
-        # Check for toxic content first
-        is_toxic, toxic_reason = detect_toxic_content(request.question)
-        if is_toxic:
-            # Return a polite response instead of raising an error
-            language = detect_language(request.question)
-            if language == "tagalog":
-                polite_response = "Naiintindihan ko na baka frustrated ka, pero nandito ako para magbigay ng helpful legal information. Pakiusap, magtanong nang may respeto, at masayang tutulungan kita. 😊"
-            else:
-                polite_response = "I understand you may be frustrated, but I'm here to provide helpful legal information. Please rephrase your question in a respectful manner, and I'll be happy to assist you. 😊"
-            
-            return create_chat_response(
-                answer=polite_response,
-                simplified_summary="Toxic content detected - polite redirection"
-            )
+        # Toxicity check removed - OpenAI moderation handles this more comprehensively
         
         # Check for prohibited input (misuse prevention) - keep this for safety
         is_prohibited, prohibition_reason = detect_prohibited_input(request.question)
@@ -1608,9 +1642,9 @@ async def ask_legal_question(
             unsupported_response = (
                 "I. PRELIMINARY STATEMENT\n"
                 "This Counsel acknowledges receipt of your query.\n\n"
-                "II. ANALYSIS\n"
+                "**II. ANALYSIS**\n"
                 "Upon review, the query presented is rendered in a linguistic format (language) that falls outside the operational parameters of this legal analytical service. This service is constrained to processing and analyzing legal interrogatories propounded in either **English** or **Filipino**.\n\n"
-                "III. CONCLUSIVE OPINION\n"
+                "**III. CONCLUSION**\n"
                 "Regrettably, no substantive analysis can be furnished. You are respectfully advised to re-submit your query in one of the supported languages (English or Filipino) to facilitate proper processing and legal assessment."
             )
             
@@ -1654,6 +1688,145 @@ async def ask_legal_question(
                 answer=out_of_scope_response,
                 simplified_summary="Out of scope topic blocked"
             )
+        
+        # Prompt Injection Detection (Security Enhancement)
+        # Check for prompt injection/hijacking attempts BEFORE processing
+        # Only check for authenticated users to track violations
+        if effective_user_id:
+            print(f"\n🛡️  Prompt injection detection...")
+            injection_detector = get_prompt_injection_detector()
+            violation_service = get_violation_tracking_service()
+            
+            try:
+                injection_result = injection_detector.detect(request.question.strip())
+                
+                # If prompt injection detected, record violation and block
+                if injection_result["is_injection"]:
+                    logger.warning(
+                        f"🚨 Prompt injection detected for lawyer {effective_user_id[:8]}: "
+                        f"category={injection_result['category']}, "
+                        f"severity={injection_result['severity']:.2f}, "
+                        f"risk={injection_result['risk_level']}"
+                    )
+                    
+                    # Record violation and get action taken
+                    try:
+                        print(f"📝 Recording prompt injection violation for lawyer: {effective_user_id}")
+                        violation_result = await violation_service.record_violation(
+                            user_id=effective_user_id,
+                            violation_type=ViolationType.CHATBOT_PROMPT,  # ✅ Use CHATBOT_PROMPT for all chatbot violations
+                            content_text=request.question.strip(),
+                            moderation_result=injection_result,  # ✅ Pass full injection_result (now has proper format)
+                            content_id=None
+                        )
+                        print(f"✅ Prompt injection violation recorded: {violation_result}")
+                        
+                        # Return formal legal-style error message with violation info
+                        violation_message = (
+                            f"**I. PRELIMINARY STATEMENT**\n\n"
+                            f"This Counsel has detected an attempt to manipulate or compromise the operational parameters of this legal analytical service.\n\n"
+                            f"**II. SECURITY VIOLATION DETECTED**\n\n"
+                            f"{injection_result['description']}\n\n"
+                            f"**III. CONSEQUENCE**\n\n"
+                            f"⚠️ {violation_result['message']}\n\n"
+                            f"**IV. ADVISORY**\n\n"
+                            f"You are advised to utilize this service solely for legitimate legal research and analysis. Any further attempts to compromise system security may result in permanent account suspension."
+                        )
+                        
+                        return create_chat_response(
+                            answer=violation_message,
+                            simplified_summary=f"Prompt injection blocked: {injection_result['category']}"
+                        )
+                        
+                    except Exception as violation_error:
+                        logger.error(f"❌ Failed to record prompt injection violation: {str(violation_error)}")
+                        import traceback
+                        print(f"Violation error traceback: {traceback.format_exc()}")
+                        
+                        # Return generic error message if violation recording fails
+                        return create_chat_response(
+                            answer="Your query was flagged for attempting to manipulate the system. This violates our usage policy. Please use this service for legitimate legal research only.",
+                            simplified_summary="Prompt injection blocked"
+                        )
+                else:
+                    print(f"✅ No prompt injection detected")
+                    
+            except Exception as e:
+                logger.error(f"❌ Prompt injection detection error: {str(e)}")
+                # Fail-open: Continue without injection detection if service fails
+        
+        # Content Moderation using OpenAI omni-moderation-latest
+        # Run moderation on ALL messages (legal and casual) before generating any response
+        # Moderate for ALL users (authenticated and unauthenticated)
+        print(f"\n🔍 Content moderation check...")
+        moderation_service = get_moderation_service()
+        violation_service = get_violation_tracking_service()
+        
+        try:
+            moderation_result = await moderation_service.moderate_content(request.question.strip())
+            
+            # If content is flagged, record violation and apply action
+            if not moderation_service.is_content_safe(moderation_result):
+                user_id_log = effective_user_id[:8] if effective_user_id else "unauthenticated"
+                logger.warning(f"⚠️  Chatbot prompt flagged for user {user_id_log}: {moderation_result['violation_summary']}")
+                
+                # Record violation only for authenticated users
+                violation_result = None
+                if effective_user_id:
+                    try:
+                        print(f"📝 Recording violation for user: {effective_user_id}")
+                        violation_result = await violation_service.record_violation(
+                            user_id=effective_user_id,
+                            violation_type=ViolationType.CHATBOT_PROMPT,
+                            content_text=request.question.strip(),
+                            moderation_result=moderation_result,
+                            content_id=None  # No specific content ID for chatbot prompts
+                        )
+                        print(f"✅ Violation recorded: {violation_result}")
+                    except Exception as violation_error:
+                        logger.error(f"❌ Failed to record violation: {str(violation_error)}")
+                        import traceback
+                        print(f"Violation error traceback: {traceback.format_exc()}")
+                        # Use generic message if violation recording fails
+                        violation_result = None
+                
+                # Set default violation result for unauthenticated users or if recording failed
+                if not violation_result:
+                    violation_result = {
+                        "action_taken": "warning",
+                        "strike_count": 0,
+                        "suspension_count": 0,
+                        "message": "Your content violated our community guidelines. Please be mindful of your language."
+                    }
+                
+                # Detect language for appropriate response
+                language = detect_language(request.question)
+                
+                # Return simplified message to user with violation info
+                if language == "tagalog":
+                    violation_message = f"""🚨 Labag sa Patakaran
+
+{moderation_service.get_violation_message(moderation_result, context="chatbot")}
+
+⚠️ {violation_result['message']}"""
+                else:
+                    violation_message = f"""🚨 Content Policy Violation
+
+{moderation_service.get_violation_message(moderation_result, context="chatbot")}
+
+⚠️ {violation_result['message']}"""
+                
+                return create_chat_response(
+                    answer=violation_message,
+                    simplified_summary="Content moderation violation detected"
+                )
+            else:
+                print(f"✅ Content moderation passed")
+                
+        except Exception as e:
+            logger.error(f"❌ Content moderation error: {str(e)}")
+            # Fail-open: Continue without moderation if service fails
+            print(f"⚠️  Content moderation failed, continuing without moderation: {e}")
         
         # Check if this is actually a legal question or just casual conversation
         if not is_legal_question(request.question):

@@ -438,7 +438,7 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
         body: JSON.stringify({
           latitude: searchLocation.lat,
           longitude: searchLocation.lng,
-          radius: CONSTANTS.SEARCH_RADIUS,
+          radius: selectedRadius * 1000, // Convert km to meters
           type: 'lawyer'
         }),
         signal: controller.signal,
@@ -489,7 +489,7 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
     } finally {
       setLoading(false);
     }
-  }, [userLocation]);
+  }, [userLocation, selectedRadius]);
 
   const initializeWebView = useCallback(async () => {
     try {
@@ -1335,6 +1335,9 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
                     // Trigger new search with updated radius
                     if (searchText.trim()) {
                       handleSearch();
+                    } else {
+                      // If no search text, re-fetch nearby law firms with new radius
+                      fetchNearbyLawFirms();
                     }
                   }}
                 >

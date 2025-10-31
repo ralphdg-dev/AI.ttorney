@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { Menu, Search, Bell, ArrowLeft, Settings } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Platform, useWindowDimensions } from 'react-native';
+import { Menu, Search, Bell, ArrowLeft, Settings, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useSidebar } from './AppSidebar';
 import { useRouter } from 'expo-router';
 import Colors from '../constants/Colors';
-import { GlobalStyles } from '../constants/GlobalStyles';
+import { LAYOUT } from '../constants/LayoutConstants';
 
 interface HeaderProps {
   title?: string;
@@ -13,13 +13,17 @@ interface HeaderProps {
   showSearch?: boolean;
   showNotifications?: boolean;
   showSettings?: boolean;
+  showChatHistoryToggle?: boolean;
+  isChatHistoryOpen?: boolean;
   onBackPress?: () => void;
   onMenuPress?: () => void;
   onSearchPress?: () => void;
   onNotificationPress?: () => void;
   onSettingsPress?: () => void;
+  onChatHistoryToggle?: () => void;
   variant?: 'home' | 'minimal';
   rightComponent?: React.ReactNode;
+  backgroundColor?: string; // Allow custom background color
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -28,17 +32,28 @@ const Header: React.FC<HeaderProps> = ({
   showMenu = true,
   showSearch = false,
   showNotifications = false,
+  backgroundColor = Colors.background.primary,
   showSettings = false,
+  showChatHistoryToggle = false,
+  isChatHistoryOpen = false,
   onBackPress,
   onMenuPress,
   onSearchPress,
   onNotificationPress,
   onSettingsPress,
+  onChatHistoryToggle,
   variant = 'default',
   rightComponent,
 }) => {
   const { openSidebar } = useSidebar();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  
+  // Dynamic sizing based on screen width (responsive)
+  const isSmallScreen = width < 375;
+  const iconSize = isSmallScreen ? 22 : 24;
+  const logoWidth = isSmallScreen ? 120 : Math.min(width * 0.35, 160);
+  const logoHeight = logoWidth * 0.25; // Maintain aspect ratio
 
   const handleMenuPress = () => {
     if (onMenuPress) {
@@ -72,7 +87,7 @@ const Header: React.FC<HeaderProps> = ({
           onPress={onBackPress || (() => router.back())}
           activeOpacity={0.7}
         >
-          <ArrowLeft size={24} color={Colors.primary.blue} strokeWidth={1.5} />
+          <ArrowLeft size={iconSize} color={Colors.primary.blue} strokeWidth={1.5} />
         </TouchableOpacity>
       );
     }
@@ -84,7 +99,7 @@ const Header: React.FC<HeaderProps> = ({
           onPress={handleMenuPress}
           activeOpacity={0.7}
         >
-          <Menu size={24} color={Colors.primary.blue} strokeWidth={1.5} />
+          <Menu size={iconSize} color={Colors.primary.blue} strokeWidth={1.5} />
         </TouchableOpacity>
       );
     }
@@ -99,7 +114,7 @@ const Header: React.FC<HeaderProps> = ({
         <View style={styles.titleContainer}>
           <Image 
             source={require('../assets/images/logo.png')} 
-            style={styles.logo}
+            style={{ width: logoWidth, height: logoHeight }}
             resizeMode="contain"
           />
         </View>
@@ -124,7 +139,7 @@ const Header: React.FC<HeaderProps> = ({
       return rightComponent;
     }
 
-    if (showSearch || showNotifications || showSettings) {
+    if (showSearch || showNotifications || showSettings || showChatHistoryToggle) {
       return (
         <View style={styles.rightActions}>
           {showSearch && (
@@ -133,7 +148,7 @@ const Header: React.FC<HeaderProps> = ({
               onPress={handleSearchPress}
               activeOpacity={0.7}
             >
-              <Search size={22} color={Colors.text.sub} strokeWidth={1.5} />
+              <Search size={iconSize - 2} color={Colors.text.sub} strokeWidth={1.5} />
             </TouchableOpacity>
           )}
           
@@ -143,11 +158,27 @@ const Header: React.FC<HeaderProps> = ({
               onPress={handleNotificationPress}
               activeOpacity={0.7}
             >
-              <Bell size={22} color={Colors.text.sub} strokeWidth={1.5} />
+              <Bell size={iconSize - 2} color={Colors.text.sub} strokeWidth={1.5} />
               {/* Notification badge */}
               <View style={styles.notificationBadge}>
                 <Text style={styles.badgeText}>3</Text>
               </View>
+            </TouchableOpacity>
+          )}
+
+          {showChatHistoryToggle && (
+            <TouchableOpacity
+              style={styles.chatHistoryButton}
+              onPress={onChatHistoryToggle}
+              activeOpacity={0.7}
+              accessibilityLabel={isChatHistoryOpen ? "Close chat history" : "Open chat history"}
+              accessibilityRole="button"
+            >
+              {isChatHistoryOpen ? (
+                <ChevronRight size={LAYOUT.SPACING.lg} color={Colors.text.primary} strokeWidth={2.5} />
+              ) : (
+                <ChevronLeft size={LAYOUT.SPACING.lg} color={Colors.text.primary} strokeWidth={2.5} />
+              )}
             </TouchableOpacity>
           )}
 
@@ -157,7 +188,7 @@ const Header: React.FC<HeaderProps> = ({
               onPress={onSettingsPress}
               activeOpacity={0.7}
             >
-              <Settings size={22} color={Colors.text.sub} strokeWidth={1.5} />
+              <Settings size={iconSize - 2} color={Colors.text.sub} strokeWidth={1.5} />
             </TouchableOpacity>
           )}
         </View>
@@ -170,7 +201,8 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <View style={[
       styles.container,
-      variant === 'minimal' && styles.minimalContainer
+      variant === 'minimal' && styles.minimalContainer,
+      { backgroundColor } // Apply custom background color
     ]}>
       <View style={styles.content}>
         {renderLeftSection()}
@@ -183,28 +215,38 @@ const Header: React.FC<HeaderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    backgroundColor: Colors.background.primary,
+    borderBottomWidth: 0, // Remove border for seamless look
+    ...Platform.select({
+      ios: { shadowOpacity: 0 },
+      android: { elevation: 0 },
+      web: { boxShadow: 'none' },
+    }),
   },
   minimalContainer: {
     borderBottomWidth: 0,
-    boxShadow: 'none',
-    elevation: 0,
+    ...Platform.select({
+      ios: { shadowOpacity: 0 },
+      android: { elevation: 0 },
+      web: { boxShadow: 'none' },
+    }),
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    height: LAYOUT.HEADER_HEIGHT,
+    paddingHorizontal: LAYOUT.SPACING.md,
   },
   iconButton: {
-    padding: 8,
-    borderRadius: 8,
+    minWidth: LAYOUT.MIN_TOUCH_TARGET,
+    minHeight: LAYOUT.MIN_TOUCH_TARGET,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: LAYOUT.MIN_TOUCH_TARGET / 2,
   },
   spacer: {
-    width: 40,
+    minWidth: LAYOUT.MIN_TOUCH_TARGET,
   },
   titleContainer: {
     position: 'absolute',
@@ -215,16 +257,13 @@ const styles = StyleSheet.create({
     zIndex: 0,
     pointerEvents: 'none',
   },
-  logo: {
-    width: 160,
-    height: 40,
-  },
   title: {
-    fontSize: 18,
+    fontSize: Platform.select({ ios: 17, android: 18, default: 17 }),
+    fontWeight: '600',
     color: Colors.primary.blue,
     textAlign: 'center',
     flex: 1,
-    ...GlobalStyles.textBold,
+    letterSpacing: Platform.select({ ios: -0.2, default: 0 }),
   },
   rightActions: {
     flexDirection: 'row',
@@ -232,24 +271,37 @@ const styles = StyleSheet.create({
   },
   notificationButton: {
     position: 'relative',
-    marginLeft: 4,
+    marginLeft: 8,
   },
   notificationBadge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: '15%',
+    right: '15%',
     backgroundColor: '#EF4444',
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
+    borderRadius: 10,
+    minWidth: 20,
+    minHeight: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: 11,
+    fontWeight: '700',
     color: '#FFFFFF',
-    ...GlobalStyles.textSemiBold,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  chatHistoryButton: {
+    width: LAYOUT.MIN_TOUCH_TARGET,
+    height: LAYOUT.MIN_TOUCH_TARGET,
+    borderRadius: LAYOUT.MIN_TOUCH_TARGET / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.background.secondary,
+    marginLeft: LAYOUT.SPACING.sm,
   },
 });
 

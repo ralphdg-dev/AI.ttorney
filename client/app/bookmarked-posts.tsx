@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, FlatList, RefreshControl, StyleSheet, TouchableOpacity, TextInput, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Bookmark, Filter, SortAsc, Search, X } from 'lucide-react-native';
 import Post from '../components/home/Post';
@@ -33,6 +34,110 @@ interface PostData {
   is_flagged?: boolean;
   users?: any;
 }
+
+// Styles defined before component (FAANG best practice - hoisting)
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background.primary, // Match header
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: Colors.text.sub,
+    ...GlobalStyles.text,
+  },
+  listContent: {
+    paddingVertical: 10,
+    paddingBottom: 100,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statsText: {
+    fontSize: 14,
+    color: Colors.text.sub,
+    ...GlobalStyles.text,
+  },
+  sortBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  sortText: {
+    fontSize: 12,
+    color: Colors.text.sub,
+    ...GlobalStyles.text,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    color: Colors.text.head,
+    marginTop: 16,
+    marginBottom: 8,
+    ...GlobalStyles.textSemiBold,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: Colors.text.sub,
+    textAlign: 'center',
+    marginBottom: 24,
+    ...GlobalStyles.text,
+  },
+  browseButton: {
+    backgroundColor: Colors.primary.blue,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  browseButtonText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    ...GlobalStyles.textSemiBold,
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+    backgroundColor: Colors.background.primary,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.text.head,
+    marginLeft: 12,
+    ...GlobalStyles.text,
+  },
+  clearButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+});
 
 export default function BookmarkedPostsScreen() {
   const router = useRouter();
@@ -259,161 +364,59 @@ export default function BookmarkedPostsScreen() {
   ), [handleCommentPress, handleBookmarkPress, handleReportPress, handlePostPress, handleMenuToggle, openMenuPostId, handleBookmarkStatusChange]);
 
   return (
-      <View style={styles.container}>
-        <Header title="Bookmarked Posts" showMenu={true} />
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <Header title="Bookmarked Posts" showMenu={true} />
 
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading bookmarked posts...</Text>
-          </View>
-        ) : posts.length === 0 ? (
-          renderEmptyState()
-        ) : (
-          <>
-            {renderSearchBar()}
-            {filteredPosts.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Filter size={48} color={Colors.text.sub} strokeWidth={1.5} />
-                <Text style={styles.emptyTitle}>No Posts Found</Text>
-                <Text style={styles.emptySubtitle}>
-                  No bookmarked posts match your search &quot;{searchQuery}&quot;
-                </Text>
-                <TouchableOpacity 
-                  style={styles.browseButton}
-                  onPress={clearSearch}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.browseButtonText}>Clear Search</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <FlatList
-                data={filteredPosts}
-                keyExtractor={keyExtractor}
-                renderItem={renderItem}
-                ListHeaderComponent={renderHeader}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                onScroll={() => setOpenMenuPostId(null)}
-                scrollEventThrottle={16}
-                refreshControl={
-                  <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={handleRefresh}
-                    colors={[Colors.primary.blue]}
-                    tintColor={Colors.primary.blue}
-                  />
-                }
-              />
-            )}
-          </>
-        )}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading bookmarked posts...</Text>
+        </View>
+      ) : posts.length === 0 ? (
+        renderEmptyState()
+      ) : (
+        <>
+          {renderSearchBar()}
+          {filteredPosts.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Filter size={48} color={Colors.text.sub} strokeWidth={1.5} />
+              <Text style={styles.emptyTitle}>No Posts Found</Text>
+              <Text style={styles.emptySubtitle}>
+                No bookmarked posts match your search &quot;{searchQuery}&quot;
+              </Text>
+              <TouchableOpacity 
+                style={styles.browseButton}
+                onPress={clearSearch}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.browseButtonText}>Clear Search</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredPosts}
+              keyExtractor={keyExtractor}
+              renderItem={renderItem}
+              ListHeaderComponent={renderHeader}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              onScroll={() => setOpenMenuPostId(null)}
+              scrollEventThrottle={16}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={[Colors.primary.blue]}
+                  tintColor={Colors.primary.blue}
+                />
+              }
+            />
+          )}
+        </>
+      )}
 
-        <Navbar />
-        <SidebarWrapper />
-      </View>
+      <Navbar activeTab="home" />
+      <SidebarWrapper />
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background.primary,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 14,
-    color: Colors.text.sub,
-    ...GlobalStyles.text,
-  },
-  listContent: {
-    paddingVertical: 10,
-    paddingBottom: 100,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  statsText: {
-    fontSize: 14,
-    color: Colors.text.sub,
-    ...GlobalStyles.text,
-  },
-  sortBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  sortText: {
-    fontSize: 12,
-    color: Colors.text.sub,
-    ...GlobalStyles.text,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    color: Colors.text.head,
-    marginTop: 16,
-    marginBottom: 8,
-    ...GlobalStyles.textSemiBold,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: Colors.text.sub,
-    textAlign: 'center',
-    marginBottom: 24,
-    ...GlobalStyles.text,
-  },
-  browseButton: {
-    backgroundColor: Colors.primary.blue,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  browseButtonText: {
-    fontSize: 14,
-    color: '#FFFFFF',
-    ...GlobalStyles.textSemiBold,
-  },
-  searchContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
-    backgroundColor: Colors.background.primary,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: Colors.text.head,
-    marginLeft: 12,
-    ...GlobalStyles.text,
-  },
-  clearButton: {
-    padding: 4,
-    marginLeft: 8,
-  },
-});

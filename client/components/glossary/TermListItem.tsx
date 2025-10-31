@@ -23,9 +23,10 @@ interface TermListItemProps {
   item: TermItem;
   onPress?: (item: TermItem) => void;
   containerStyle?: StyleProp<ViewStyle>;
+  showFavorite?: boolean; // Hide favorite icon for guests
 }
 
-export default function TermListItem({ item, onPress, containerStyle }: TermListItemProps) {
+export default function TermListItem({ item, onPress, containerStyle, showFavorite = true }: TermListItemProps) {
   const { isFavorite, toggleFavorite } = useFavorites();
   const isTermFavorite = isFavorite(item.id);
 
@@ -60,15 +61,17 @@ export default function TermListItem({ item, onPress, containerStyle }: TermList
       onPress={() => onPress && onPress(item)}
     >
       <Card className="flex-row items-start px-5 py-5 bg-white rounded-2xl border border-gray-200">
-        <TouchableOpacity style={tw`mt-1 mr-4`} onPress={handleFavoritePress}>
-          <Star
-            size={18}
-            color={isTermFavorite ? "#f59e0b" : "#9ca3af"}
-            strokeWidth={2}
-            // Fill when favorited; outline when not
-            fill={isTermFavorite ? "#f59e0b" : "none"}
-          />
-        </TouchableOpacity>
+        {showFavorite && (
+          <TouchableOpacity style={tw`mt-1 mr-4`} onPress={handleFavoritePress}>
+            <Star
+              size={18}
+              color={isTermFavorite ? "#f59e0b" : "#9ca3af"}
+              strokeWidth={2}
+              // Fill when favorited; outline when not
+              fill={isTermFavorite ? "#f59e0b" : "none"}
+            />
+          </TouchableOpacity>
+        )}
         <View style={tw`flex-1`}>
           <View style={tw`flex-row items-center justify-between mb-2`}>
             <Text

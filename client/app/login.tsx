@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
@@ -10,13 +10,15 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function Login() {
   const toast = useToast();
-  const { signIn } = useAuth();
+  const { signIn, continueAsGuest, isLoading: authLoading } = useAuth();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  
+  // Refs for input fields
+  const passwordInputRef = useRef<TextInput>(null);
   
   // Validation states
   const [emailError, setEmailError] = useState("");
@@ -64,7 +66,10 @@ export default function Login() {
       return;
     }
 
-    setIsLoading(true);
+    // Prevent double submission
+    if (authLoading) {
+      return;
+    }
     
     try {
       const result = await signIn(email.toLowerCase().trim(), password);
@@ -80,7 +85,7 @@ export default function Login() {
           ),
         });
       } else {
-        // Stay on login page and show error
+        // Show error toast
         toast.show({
           placement: "top",
           render: ({ id }) => (
@@ -90,7 +95,6 @@ export default function Login() {
             </Toast>
           ),
         });
-        setIsLoading(false);
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -103,7 +107,6 @@ export default function Login() {
           </Toast>
         ),
       });
-      setIsLoading(false);
     }
   };
 
@@ -165,6 +168,8 @@ export default function Login() {
                 if (emailError) setEmailError("");
               }}
               onBlur={() => email && validateEmail(email, true)}
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+              returnKeyType="next"
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -183,6 +188,7 @@ export default function Login() {
             </Text>
             <View style={tw`relative`}>
               <TextInput
+                ref={passwordInputRef}
                 style={[
                   tw`border rounded-lg px-4 py-3 bg-white pr-12`,
                   {
@@ -199,6 +205,8 @@ export default function Login() {
                   if (passwordError) setPasswordError("");
                 }}
                 onBlur={() => password && validatePassword(password, true)}
+                onSubmitEditing={handleLogin}
+                returnKeyType="go"
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -259,15 +267,15 @@ export default function Login() {
             style={[
               tw`py-3 rounded-lg items-center justify-center mb-3`,
               { 
-                backgroundColor: isLoading ? '#9CA3AF' : Colors.primary.blue,
-                opacity: isLoading ? 0.7 : 1
+                backgroundColor: authLoading ? '#9CA3AF' : Colors.primary.blue,
+                opacity: authLoading ? 0.7 : 1
               },
             ]}
             onPress={handleLogin}
-            disabled={isLoading}
+            disabled={authLoading}
           >
             <Text style={tw`text-white font-semibold text-lg`}>
-              {isLoading ? 'Signing In...' : 'Login'}
+              {authLoading ? 'Signing In...' : 'Login'}
             </Text>
           </TouchableOpacity>
 
@@ -298,10 +306,7 @@ export default function Login() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => {
-              // TODO: Implement guest login logic
-              console.log("Continue as Guest pressed");
-            }}
+            onPress={continueAsGuest}
             style={tw`mt-3`}
             activeOpacity={0.7}
           >

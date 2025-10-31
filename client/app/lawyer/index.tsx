@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, memo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import tw from 'tailwind-react-native-classnames';
@@ -85,7 +85,8 @@ const LawyerDashboard: React.FC = () => {
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header 
           variant="home"
           showMenu={true}
@@ -103,8 +104,9 @@ const LawyerDashboard: React.FC = () => {
   }
 
   return (
-      <SafeAreaView style={tw`flex-1 bg-white`} edges={['top', 'left', 'right']}>
-        <Header 
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <Header 
           variant="home"
           showMenu={true}
           showNotifications={true}

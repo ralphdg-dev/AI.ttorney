@@ -1,9 +1,11 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated, Platform, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
+import { LAYOUT } from '../../constants/LayoutConstants';
 import { ChatHistoryService, Conversation } from '../../services/chatHistoryService';
-import { MessageSquare, Plus, Trash2, ChevronLeft, ChevronRight, AlertCircle, AlertTriangle } from 'lucide-react-native';
+import { MessageSquare, Plus, Trash2, AlertCircle, AlertTriangle } from 'lucide-react-native';
 import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody, ModalFooter } from '../ui/modal';
 import { Button, ButtonText } from '../ui/button/index';
 import { Heading } from '../ui/heading';
@@ -23,6 +25,8 @@ export interface ChatHistorySidebarRef {
   refreshConversations: () => Promise<void>;
   addNewConversation: (conversationId: string, title: string) => void;
   updateConversationTitle: (conversationId: string, title: string) => void;
+  toggleSidebar: () => void;
+  isOpen: () => boolean;
 }
 
 const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarProps>((
@@ -46,8 +50,10 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
     new Animated.Value(SIDEBAR_POSITION === 'right' ? SIDEBAR_WIDTH : -SIDEBAR_WIDTH)
   );
 
+  // Load conversations immediately when component mounts and when userId/sessionToken change
   useEffect(() => {
     if (userId && sessionToken) {
+      console.log('🔄 ChatHistorySidebar: Auto-loading conversations on mount/change');
       loadConversations();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -121,7 +127,15 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
       );
       console.log('✅ Optimistically updated title:', conversationId);
     },
-  }), [loadConversations]);
+    
+    // Toggle sidebar open/close
+    toggleSidebar: () => {
+      setIsOpen(prev => !prev);
+    },
+    
+    // Get sidebar open state
+    isOpen: () => isOpen,
+  }), [loadConversations, isOpen]);
 
   const handleNewChat = async () => {
     await onNewChat();
@@ -243,41 +257,17 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
 
   return (
     <>
-      {/* Toggle Button */}
-      <TouchableOpacity
-        onPress={() => setIsOpen(!isOpen)}
-        style={[
-          tw`absolute top-4 z-50 p-2 rounded-full`,
-          {
-            right: isOpen ? SIDEBAR_WIDTH + 8 : 8,
-            backgroundColor: Colors.background.secondary,
-            ...(Platform.OS === 'web'
-              ? { boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }
-              : {
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 4,
-                  elevation: 3,
-                }),
-          },
-        ]}
-      >
-        {isOpen ? (
-          <ChevronRight size={24} color={Colors.text.primary} />
-        ) : (
-          <ChevronLeft size={24} color={Colors.text.primary} />
-        )}
-      </TouchableOpacity>
-
       {/* Overlay */}
       {isOpen && (
         <TouchableOpacity
           activeOpacity={1}
           onPress={() => setIsOpen(false)}
           style={[
-            tw`absolute inset-0 z-40`,
-            { backgroundColor: 'rgba(0, 0, 0, 0.3)' },
+            tw`absolute inset-0`,
+            { 
+              backgroundColor: 'rgba(0, 0, 0, 0.3)',
+              zIndex: LAYOUT.Z_INDEX.overlay,
+            },
           ]}
         />
       )}
@@ -285,12 +275,13 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
       {/* Sidebar */}
       <Animated.View
         style={[
-          tw`absolute top-0 bottom-0 z-50`,
+          tw`absolute top-0 bottom-0`,
           {
             right: 0,
             width: SIDEBAR_WIDTH,
             backgroundColor: Colors.background.primary,
             transform: [{ translateX: slideAnim }],
+            zIndex: LAYOUT.Z_INDEX.drawer,
             ...(Platform.OS === 'web'
               ? { boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.1)' }
               : {
@@ -303,13 +294,14 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
           },
         ]}
       >
-        {/* Header */}
-        <View
-          style={[
-            tw`px-4 py-4 border-b`,
-            { borderBottomColor: Colors.border.light },
-          ]}
-        >
+        <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+          {/* Header */}
+          <View
+            style={[
+              tw`px-4 py-4 border-b`,
+              { borderBottomColor: Colors.border.light },
+            ]}
+          >
           <TouchableOpacity
             onPress={handleNewChat}
             disabled={isLoading}
@@ -340,13 +332,42 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
           showsVerticalScrollIndicator={false}
           contentContainerStyle={tw`pb-4`}
         >
-          {/* Loading indicator */}
+          {/* Loading skeleton - shows while loading */}
           {isLoading && conversations.length === 0 && (
-            <View style={tw`px-4 py-8 items-center`}>
-              <ActivityIndicator size="large" color={Colors.primary.blue} />
-              <Text style={[tw`text-center mt-4 text-sm`, { color: Colors.text.tertiary }]}>
-                Loading conversations...
+            <View style={tw`mt-4`}>
+              <Text
+                style={[
+                  tw`px-4 py-2 text-xs font-semibold`,
+                  { color: Colors.text.tertiary },
+                ]}
+              >
+                Recent
               </Text>
+              {/* Skeleton items - fill entire sidebar */}
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map((i) => (
+                <View
+                  key={i}
+                  style={[
+                    tw`px-4 py-3 mx-2 rounded-lg mb-2`,
+                    { backgroundColor: Colors.secondary.lightGray, opacity: 0.5 }
+                  ]}
+                >
+                  <View style={tw`flex-row items-center mb-1`}>
+                    <View
+                      style={[
+                        tw`w-4 h-4 rounded mr-2`,
+                        { backgroundColor: Colors.border.medium }
+                      ]}
+                    />
+                    <View
+                      style={[
+                        tw`h-3 rounded flex-1`,
+                        { backgroundColor: Colors.border.medium }
+                      ]}
+                    />
+                  </View>
+                </View>
+              ))}
             </View>
           )}
           {Object.entries(groupedConversations).map(([group, convos]) => {
@@ -422,6 +443,7 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
             </View>
           )}
         </ScrollView>
+        </SafeAreaView>
       </Animated.View>
 
       {/* Delete Confirmation Modal */}

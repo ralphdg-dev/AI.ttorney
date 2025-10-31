@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, ScrollView, TouchableOpacity } from "react-native";
+import { View, ScrollView, TouchableOpacity, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
@@ -10,6 +10,7 @@ import { Box } from "@/components/ui/box";
 import { Text as GSText } from "@/components/ui/text";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarImage, AvatarFallbackText } from "@/components/ui/avatar";
+import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import { LawyerNavbar } from "@/components/lawyer/shared";
 import Colors from "@/constants/Colors";
@@ -143,22 +144,16 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-gray-50`} edges={['top', 'left', 'right']}>
-      {/* Back Button Header */}
-      <View style={[tw`bg-white p-4 flex-row items-center`, { borderBottomColor: Colors.border.light, borderBottomWidth: 1 }]}>
-        <TouchableOpacity 
-          onPress={() => router.back()}
-          style={[tw`p-2 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}
-          activeOpacity={0.7}
-        >
-          <View style={{ transform: [{ rotate: '180deg' }] }}>
-            <ChevronRight 
-              size={24} 
-              color={Colors.text.secondary}
-            />
-          </View>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      
+      {/* Header with back button */}
+      <Header 
+        title="Settings" 
+        showBackButton={true}
+        showMenu={false}
+        onBackPress={() => router.back()}
+      />
 
       <ScrollView
         style={tw`flex-1`}

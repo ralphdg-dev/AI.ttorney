@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
 import { 
@@ -10,7 +10,7 @@ import {
   User 
 } from 'lucide-react-native';
 import Colors from '../constants/Colors';
-import { GlobalStyles } from '../constants/GlobalStyles';
+import { LAYOUT } from '../constants/LayoutConstants';
 
 interface NavbarProps {
   activeTab?: 'home' | 'learn' | 'ask' | 'find' | 'profile';
@@ -24,6 +24,12 @@ const Navbar: React.FC<NavbarProps> = ({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
+  const { width } = useWindowDimensions();
+  
+  // Dynamic sizing based on screen width
+  const isSmallScreen = width < 375;
+  const iconSize = isSmallScreen ? 20 : 22;
+  const fontSize = isSmallScreen ? 10 : 11;
 
   // Auto-detect active tab based on current route if not provided
   const getActiveTab = () => {
@@ -126,13 +132,14 @@ const Navbar: React.FC<NavbarProps> = ({
               activeOpacity={0.7}
             >
               <IconComponent
-                size={22}
-                color={tab.active ? '#023D7B' : '#6B6B6B'} // Dark blue for active, darker gray for inactive
+                size={iconSize}
+                color={tab.active ? '#023D7B' : '#6B6B6B'}
                 strokeWidth={2.2}
               />
               <Text
                 style={[
                   styles.tabLabel,
+                  { fontSize },
                   tab.active ? [styles.activeLabel, { color: '#023D7B' }] : [styles.inactiveLabel, { color: '#6B6B6B' }]
                 ]}
               >
@@ -153,40 +160,54 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E5E7EB',
-    boxShadow: '0 -2px 3px rgba(0, 0, 0, 0.1)',
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.08)',
+      },
+    }),
   },
   navbar: {
     flexDirection: 'row',
-    height: 60,
+    height: LAYOUT.NAVBAR_HEIGHT,
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 8,
+    paddingHorizontal: LAYOUT.SPACING.xs,
+    paddingVertical: LAYOUT.SPACING.xs,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 16,
-    marginHorizontal: 3,
+    minHeight: LAYOUT.MIN_TOUCH_TARGET,
+    paddingVertical: LAYOUT.SPACING.xs - 2,
+    paddingHorizontal: LAYOUT.SPACING.xs,
+    borderRadius: LAYOUT.RADIUS.md,
+    marginHorizontal: LAYOUT.SPACING.xxs,
   },
   tabLabel: {
-    fontSize: 10,
-    marginTop: 4,
+    marginTop: 2,
     textAlign: 'center',
-    ...GlobalStyles.text,
+    fontWeight: '500',
+    letterSpacing: Platform.select({ ios: -0.1, default: 0 }),
   },
   activeLabel: {
     color: Colors.primary.blue,
-    ...GlobalStyles.textSemiBold,
+    fontWeight: '600',
   },
   inactiveLabel: {
-    color: Colors.primary.blue,
-    opacity: 0.6,
+    color: '#6B7280',
+    fontWeight: '500',
   },
 });
 

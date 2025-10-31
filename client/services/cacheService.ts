@@ -103,3 +103,7 @@ export const generateGlossaryCacheKey = (
 ): string => {
   return `glossary_${category}_${search}_${page}`;
 };
+
+export const generateTermCacheKey = (termId: string): string => {
+  return `glossary_term_${termId}`;
+};

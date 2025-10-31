@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, StatusBar, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Shield, ArrowLeft } from 'lucide-react-native';
@@ -7,158 +7,61 @@ import { Ionicons } from '@expo/vector-icons';
 import CategoryScroller from '@/components/glossary/CategoryScroller';
 import Colors from '../../constants/Colors';
 import { LawyerNavbar } from '../../components/lawyer/shared';
-import { useAuth } from '@/contexts/AuthContext';
-import { useForumCache } from '../../contexts/ForumCacheContext';
-import { NetworkConfig } from '../../utils/networkConfig';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ModerationWarningBanner } from '@/components/moderation/ModerationWarningBanner';
+import { useCreatePost } from '@/hooks/useCreatePost';
+import { useModerationStatus } from '@/contexts/ModerationContext';
 
+// Constants
+const MAX_CONTENT_LENGTH = 500;
 
 const LawyerCreatePost: React.FC = () => {
   const router = useRouter();
-  const { session, isAuthenticated } = useAuth();
-  const { clearCache } = useForumCache();
   const [content, setContent] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
-  const [isPosting, setIsPosting] = useState(false);
-  const MAX_LEN = 500;
+  
+  // Use custom hook for post creation logic
+  const { isPosting, createPost } = useCreatePost({
+    userType: 'lawyer',
+    globalActionsKey: 'forumActions',
+  });
+  
+  // Get moderation status from context
+  const { moderationStatus } = useModerationStatus();
 
-  // Helper function to get auth headers using AuthContext
-  const getAuthHeaders = async (): Promise<HeadersInit> => {
-    try {
-      // First try to get token from AuthContext session
-      if (session?.access_token) {
-        console.log(`[LawyerCreatePost] Using session token from AuthContext`);
-        return {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        };
-      }
-      
-      // Fallback to AsyncStorage
-      const token = await AsyncStorage.getItem('access_token');
-      if (token) {
-        console.log(`[LawyerCreatePost] Using token from AsyncStorage`);
-        return {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        };
-      }
-      
-      console.log(`[LawyerCreatePost] No authentication token available`);
-      return { 'Content-Type': 'application/json' };
-    } catch (error) {
-      console.error('Error getting auth token:', error);
-      return { 'Content-Type': 'application/json' };
-    }
-  };
+  // Validation logic
+  const isContentValid = useMemo(() => {
+    const trimmed = content.trim();
+    return trimmed.length > 0 && trimmed.length <= MAX_CONTENT_LENGTH;
+  }, [content]);
 
   const isPostDisabled = useMemo(() => {
-    const len = content.length;
-    return content.trim().length === 0 || len > MAX_LEN || !categoryId || isPosting;
-  }, [content, categoryId, isPosting]);
+    return !isContentValid || !categoryId || isPosting;
+  }, [isContentValid, categoryId, isPosting]);
 
-  const onPressPost = async () => {
-    if (isPostDisabled || isPosting) return;
-    
-    // Check authentication first
-    if (!isAuthenticated) {
-      Alert.alert(
-        'Authentication Required',
-        'Please log in to create a post.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-    
-    setIsPosting(true);
-    
-    const payload = {
-      body: content.trim(),
-      category: categoryId || undefined,
-      is_anonymous: false, // Lawyers always post non-anonymously
-    };
-
-    // Add optimistic post immediately
-    const optimisticId = (global as any).forumActions?.addOptimisticPost({
-      body: payload.body,
-      category: payload.category
-    });
-
-    // Navigate back immediately to show the optimistic post
-    router.back();
-    
-    try {
-      // Use direct API call with authentication
-      const headers = await getAuthHeaders();
-      const API_BASE_URL = await NetworkConfig.getBestApiUrl();
-      
-      if (__DEV__) {
-        console.log(`[LawyerCreatePost] Creating post at ${API_BASE_URL}/api/forum/posts`);
-      }
-      const response = await fetch(`${API_BASE_URL}/api/forum/posts`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[LawyerCreatePost] Failed to create post: ${response.status}`, errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-      
-      const resp = await response.json();
-      console.log(`[LawyerCreatePost] Post created successfully:`, resp);
-      if (!resp.success) {
-        console.error('Failed to create post', resp.error);
-        // Remove the optimistic post on failure
-        if (optimisticId) {
-          (global as any).forumActions?.removeOptimisticPost(optimisticId);
-        }
-        Alert.alert(
-          'Error',
-          'Failed to create post. Please try again.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-      
-      // Clear the forum cache so new post appears when user navigates back
-      clearCache();
-      console.log(`[LawyerCreatePost] Cleared forum cache to show new post`);
-      
-      // Wait a bit for smooth transition, then confirm the optimistic post
-      setTimeout(() => {
-        if (optimisticId) {
-          (global as any).forumActions?.confirmOptimisticPost(optimisticId);
-        }
-      }, 500); // 500ms delay for smooth transition
-      
-    } catch (e) {
-      console.error('Create post error', e);
-      // Remove the optimistic post on error
-      if (optimisticId) {
-        (global as any).forumActions?.removeOptimisticPost(optimisticId);
-      }
-      // Also clear cache on error to ensure fresh data on next load
-      clearCache();
-      Alert.alert(
-        'Error',
-        'Something went wrong. Please try again.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setIsPosting(false);
-    }
+  const handlePostSubmit = async () => {
+    if (isPostDisabled) return;
+    // Lawyers always post non-anonymously
+    await createPost(content, categoryId, false);
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={{ flex: 1 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
+          {/* Moderation Warning Banner */}
+          {moderationStatus && (
+            <ModerationWarningBanner
+              strikeCount={moderationStatus.strike_count}
+              suspensionCount={moderationStatus.suspension_count}
+              accountStatus={moderationStatus.account_status}
+              suspensionEnd={moderationStatus.suspension_end}
+            />
+          )}
+
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -166,7 +69,7 @@ const LawyerCreatePost: React.FC = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.postButton, isPostDisabled && styles.postButtonDisabled]}
-              onPress={onPressPost}
+              onPress={handlePostSubmit}
               activeOpacity={isPostDisabled ? 1 : 0.8}
               disabled={isPostDisabled}
             >
@@ -213,12 +116,12 @@ const LawyerCreatePost: React.FC = () => {
               textAlignVertical="top"
             />
             <View style={styles.counterRow}>
-              <Text style={[styles.counterText, content.length > MAX_LEN && styles.counterTextExceeded]}>
-                {content.length}/{MAX_LEN}
+              <Text style={[styles.counterText, content.length > MAX_CONTENT_LENGTH && styles.counterTextExceeded]}>
+                {content.length}/{MAX_CONTENT_LENGTH}
               </Text>
             </View>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
       
       <LawyerNavbar activeTab="forum" />
@@ -226,7 +129,7 @@ const LawyerCreatePost: React.FC = () => {
   );
 };
 
-const styles = {
+const styles = StyleSheet.create({
   header: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
@@ -335,6 +238,6 @@ const styles = {
   counterTextExceeded: {
     color: '#DC2626',
   },
-};
+});
 
 export default LawyerCreatePost;

@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Navbar from '../../components/Navbar';
 import Timeline from '../../components/home/Timeline';
 import Header from '../../components/Header';
 import { SidebarWrapper } from '../../components/AppSidebar';
+import Colors from '../../constants/Colors';
 
 const HomePage: React.FC = () => {
   const router = useRouter();
@@ -19,8 +20,9 @@ const HomePage: React.FC = () => {
   };
 
   return (
-      <SafeAreaView style={styles.container}>
-        <Header 
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <Header 
           variant="home"
           showSearch={true}
           showNotifications={true}
@@ -41,11 +43,11 @@ const HomePage: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.background.primary, // Match chatbot exact color
   },
   content: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.background.secondary, // Content area gray
   },
 });
 

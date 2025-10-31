@@ -7,6 +7,7 @@ import Colors from '@/constants/Colors';
 import { Badge, BadgeText } from '@/components/ui/badge';
 import LegalDisclaimer from '@/components/guides/LegalDisclaimer';
 import { articleCache } from '@/services/articleCache';
+import { NetworkConfig } from '@/utils/networkConfig';
 
 // Database article shape (subset)
 interface DbArticleRow {
@@ -71,8 +72,6 @@ export default function ArticleViewScreen() {
   }, [id]);
 
   const fetchArticle = async () => {
-    const SERVER_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
-    
     try {
       setLoading(true);
       setError(null);
@@ -106,7 +105,8 @@ export default function ArticleViewScreen() {
       
       try {
         // Use server API (faster and more reliable)
-        const response = await fetch(`${SERVER_API_URL}/api/legal/articles/${articleId}`, {
+        const apiUrl = await NetworkConfig.getBestApiUrl();
+        const response = await fetch(`${apiUrl}/api/legal/articles/${articleId}`, {
           signal: controller.signal,
           headers: {
             'Accept': 'application/json',

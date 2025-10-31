@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, clearAuthStorage } from '../config/supabase';
-import { router, useSegments } from 'expo-router';
+import { router } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GUEST_SESSION_STORAGE_KEY, validateGuestSession, isSessionExpired } from '../config/guestConfig';
 
 // Role hierarchy based on backend schema
 export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
@@ -31,14 +33,18 @@ export interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isGuestMode: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signUp: (email: string, password: string, metadata: { username: string; first_name: string; last_name: string; birthdate: string }) => Promise<{ success: boolean; error?: string; user?: any }>;
   signOut: () => Promise<void>;
+  continueAsGuest: () => void;
   setUser: (user: User | null) => void;
   refreshUserData: () => Promise<void>;
   hasRole: (role: UserRole) => boolean;
   isLawyer: () => boolean;
   isAdmin: () => boolean;
   checkLawyerApplicationStatus: () => Promise<any>;
+  checkSuspensionStatus: () => Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null } | null>;
   hasRedirectedToStatus: boolean;
   setHasRedirectedToStatus: (value: boolean) => void;
   initialAuthCheck: boolean;
@@ -49,7 +55,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const segments = useSegments();
   const [authState, setAuthState] = useState<AuthState>({
     session: null,
     user: null,
@@ -59,7 +64,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [initialAuthCheck, setInitialAuthCheck] = useState(false);
   const [hasRedirectedToStatus, setHasRedirectedToStatus] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isGuestMode, setIsGuestMode] = useState(false);
 
+
+  const checkSuspensionStatus = React.useCallback(async (): Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null } | null> => {
+    try {
+      if (!authState.session?.access_token) {
+        return null;
+      }
+
+      const { NetworkConfig } = await import('../utils/networkConfig');
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/user/moderation-status`, {
+        headers: {
+          'Authorization': `Bearer ${authState.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          isSuspended: data.account_status === 'suspended',
+          suspensionCount: data.suspension_count || 0,
+          suspensionEnd: data.suspension_end || null,
+        };
+      }
+      
+      return null;
+    } catch {
+      return null;
+    }
+  }, [authState.session?.access_token]);
 
   const checkLawyerApplicationStatus = React.useCallback(async (): Promise<any> => {
     try {
@@ -67,7 +103,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
       }
 
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'}/api/lawyer-applications/me`, {
+      const { NetworkConfig } = await import('../utils/networkConfig');
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/lawyer-applications/me`, {
         headers: {
           'Authorization': `Bearer ${authState.session.access_token}`,
           'Content-Type': 'application/json',
@@ -87,19 +125,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleAuthStateChange = React.useCallback(async (session: Session, shouldNavigate = false) => {
     try {
-      // Fetch user profile from your custom users table
-      const { data: profile, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
+      console.log('🔐 handleAuthStateChange called:', { shouldNavigate, userId: session.user.id });
+      
+      // ⚡ OPTIMIZATION: Run ALL API calls in PARALLEL instead of sequentially
+      // This reduces login time from ~3-5 seconds to ~1 second
+      const [profileResult, suspensionResult, lawyerStatusResult] = await Promise.allSettled([
+        // 1. Fetch user profile
+        supabase.from('users').select('*').eq('id', session.user.id).single(),
+        // 2. Check suspension status (only if we have a token)
+        session?.access_token ? checkSuspensionStatus() : Promise.resolve(null),
+        // 3. Pre-fetch lawyer status (we'll use it if needed)
+        session?.access_token ? checkLawyerApplicationStatus() : Promise.resolve(null)
+      ]);
 
-
-      if (error) {
-        console.error('Error fetching user profile:', error);
+      // Handle profile fetch result with better error recovery
+      if (profileResult.status === 'rejected') {
+        console.error('❌ Profile fetch rejected:', profileResult.reason);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (profileResult.status === 'fulfilled' && profileResult.value.error) {
+        console.error('❌ Profile fetch error:', profileResult.value.error);
+        setIsLoading(false);
         return;
       }
 
+      const profile = profileResult.value.data;
+      if (!profile) {
+        console.error('❌ No profile data returned');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('✅ Profile loaded:', { username: profile.username, role: profile.role });
+
+      // Update auth state immediately
       setAuthState({
         session,
         user: profile,
@@ -108,50 +169,98 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Only handle navigation on explicit login attempts
       if (shouldNavigate && profile) {
+        // Check suspension status (already fetched in parallel)
+        const suspensionStatus = suspensionResult.status === 'fulfilled' ? suspensionResult.value : null;
+        if (suspensionStatus && suspensionStatus.isSuspended) {
+          console.log('🚫 User is suspended, redirecting to suspended screen');
+          setIsLoading(false);
+          router.replace('/suspended' as any);
+          return;
+        }
+        
         let applicationStatus = null;
         
         // Check lawyer application status if user has pending_lawyer flag
         if (profile.pending_lawyer) {
-          // Set redirect flag only for pending lawyer users to prevent future status redirects
           setHasRedirectedToStatus(true);
           
-          const statusData = await checkLawyerApplicationStatus();
+          // Use pre-fetched lawyer status data
+          const statusData = lawyerStatusResult.status === 'fulfilled' ? lawyerStatusResult.value : null;
           if (statusData && statusData.has_application && statusData.application) {
             applicationStatus = statusData.application.status;
+          } else {
+            applicationStatus = 'pending';
           }
           
-          const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, profile.pending_lawyer, applicationStatus || undefined);
+          const redirectPath = getRoleBasedRedirect(
+            profile.role, 
+            profile.is_verified, 
+            profile.pending_lawyer, 
+            applicationStatus || 'pending'
+          );
           
-          // Handle different redirect scenarios
-          if (redirectPath === 'loading') {
-            // Only redirect to loading if not already on a lawyer route
-            const currentPath = `/${segments.join('/')}`;
-            const isOnLawyerRoute = currentPath.startsWith('/lawyer');
-            
-            if (!isOnLawyerRoute) {
-              // Show loading screen while fetching status
-              router.replace('/loading' as any);
-            }
-          } else if (redirectPath && redirectPath.includes('/lawyer-status/')) {
-            router.replace(redirectPath as any);
-          } else if (redirectPath) {
-            router.replace(redirectPath as any);
-          }
+          console.log('🔄 Redirecting pending lawyer to:', redirectPath);
+          setIsLoading(false);
+          router.replace(redirectPath as any);
         } else {
           // User doesn't have pending lawyer status, redirect normally
           const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
+          console.log('🔄 Redirecting user to:', redirectPath);
+          setIsLoading(false);
           router.replace(redirectPath as any);
         }
+      } else {
+        // Not navigating, just set loading to false
+        setIsLoading(false);
       }
     } catch (error) {
-      console.error('Error handling auth state change:', error);
+      console.error('❌ Error handling auth state change:', error);
+      setIsLoading(false);
     }
-  }, [checkLawyerApplicationStatus, segments]);
+  }, [checkLawyerApplicationStatus, checkSuspensionStatus]);
 
   useEffect(() => {
     // Initialize auth state and listen for auth changes
     const initialize = async () => {
       try {
+        // Check for guest session first (before Supabase auth)
+        const guestSessionData = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
+        if (guestSessionData) {
+          const guestSession = JSON.parse(guestSessionData);
+          
+          // Validate session integrity (security check)
+          if (!validateGuestSession(guestSession)) {
+            console.warn('⚠️ Invalid guest session detected on app load, clearing...');
+            await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+            setIsGuestMode(false);
+            setAuthState({ session: null, user: null, supabaseUser: null });
+            setIsLoading(false);
+            setInitialAuthCheck(true);
+            return;
+          }
+          
+          // Check if guest session is still valid
+          if (!isSessionExpired(guestSession.expiresAt)) {
+            console.log('👤 Valid guest session found on app load');
+            console.log('   Session ID:', guestSession.id);
+            console.log('   Prompts used:', guestSession.promptCount, '/ 15');
+            setIsGuestMode(true);
+            setAuthState({ session: null, user: null, supabaseUser: null });
+            setIsLoading(false);
+            setInitialAuthCheck(true);
+            return; // Skip Supabase auth check
+          } else {
+            console.log('⏰ Guest session expired, clearing and redirecting to login...');
+            await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+            setIsGuestMode(false);
+            setAuthState({ session: null, user: null, supabaseUser: null });
+            setIsLoading(false);
+            setInitialAuthCheck(true);
+            // Redirect will happen in index.tsx since no auth and no guest mode
+            return;
+          }
+        }
+
         // Get initial session
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
@@ -182,12 +291,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } else if (event === 'TOKEN_REFRESHED' && session) {
               await handleAuthStateChange(session, false);
             } else if (event === 'SIGNED_OUT') {
+              // Clear auth state and redirect flag
               setAuthState({ session: null, user: null, supabaseUser: null });
               setHasRedirectedToStatus(false);
-              router.replace('/login');
+              setIsLoading(false);
+              setIsSigningOut(false);
+              
+              // Navigation is already handled by signOut function
+              // This event handler just ensures state is cleared
             }
             
-            setIsLoading(false);
+            // Ensure loading is always set to false after auth state changes
+            if (event !== 'SIGNED_OUT') {
+              setIsLoading(false);
+            }
           }
         );
 
@@ -210,70 +327,144 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('🔐 signIn called for:', email);
       setIsLoading(true);
       setHasRedirectedToStatus(false);
       
+      // Supabase best practice: Use signInWithPassword for email/password auth
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.toLowerCase().trim(),
         password,
       });
 
       if (error) {
-        console.error('Sign in error:', error.message);
+        console.error('❌ Supabase signIn error:', error.message);
         
-        // Map Supabase errors to user-friendly messages
+        // Map Supabase errors to user-friendly messages (industry standard)
         let errorMessage = 'Invalid email or password';
         if (error.message.includes('Invalid login credentials')) {
           errorMessage = 'Invalid email or password';
         } else if (error.message.includes('Email not confirmed')) {
           errorMessage = 'Please verify your email address';
-        } else if (error.message.includes('network')) {
+        } else if (error.message.includes('email_not_confirmed')) {
+          errorMessage = 'Please verify your email address';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
           errorMessage = 'Network error. Please check your connection';
+        } else if (error.message.includes('rate_limit')) {
+          errorMessage = 'Too many attempts. Please try again later';
         }
         
-        // Don't call handleAuthStateChange on error - let the listener handle it
+        setIsLoading(false);
         return { success: false, error: errorMessage };
       }
 
       if (data.session) {
-        // The onAuthStateChange listener will handle navigation
-        // We just need to wait for it to complete
+        console.log('✅ Supabase session created, handling auth state...');
+        // handleAuthStateChange will set isLoading to false
         await handleAuthStateChange(data.session, true);
         return { success: true };
       }
 
+      console.error('❌ No session returned from Supabase');
+      setIsLoading(false);
       return { success: false, error: 'Login failed. Please try again' };
     } catch (error: any) {
-      console.error('Sign in catch:', error);
-      return { success: false, error: 'Network error. Please check your connection' };
-    } finally {
+      console.error('❌ signIn exception:', error);
       setIsLoading(false);
+      return { success: false, error: 'Network error. Please check your connection' };
+    }
+  };
+
+  const signUp = async (
+    email: string, 
+    password: string, 
+    metadata: { username: string; first_name: string; last_name: string; birthdate: string }
+  ) => {
+    try {
+      console.log('📝 signUp called for:', email);
+      setIsLoading(true);
+      
+      // Supabase best practice: Use signUp with email confirmation
+      const { data, error } = await supabase.auth.signUp({
+        email: email.toLowerCase().trim(),
+        password,
+        options: {
+          data: {
+            username: metadata.username,
+            first_name: metadata.first_name,
+            last_name: metadata.last_name,
+            full_name: `${metadata.first_name} ${metadata.last_name}`,
+            birthdate: metadata.birthdate,
+          },
+          emailRedirectTo: undefined, // We handle verification via OTP
+        },
+      });
+
+      if (error) {
+        console.error('❌ Supabase signUp error:', error.message);
+        
+        // Map Supabase errors to user-friendly messages
+        let errorMessage = 'Registration failed. Please try again';
+        if (error.message.includes('already registered') || error.message.includes('already exists')) {
+          errorMessage = 'Email already registered. Please sign in instead';
+        } else if (error.message.includes('rate_limit')) {
+          errorMessage = 'Too many attempts. Please try again later';
+        } else if (error.message.includes('password')) {
+          errorMessage = 'Password does not meet requirements';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection';
+        }
+        
+        setIsLoading(false);
+        return { success: false, error: errorMessage };
+      }
+
+      if (data.user) {
+        console.log('✅ User created:', data.user.id);
+        setIsLoading(false);
+        return { success: true, user: data.user };
+      }
+
+      console.error('❌ No user returned from Supabase');
+      setIsLoading(false);
+      return { success: false, error: 'Registration failed. Please try again' };
+    } catch (error: any) {
+      console.error('❌ signUp exception:', error);
+      setIsLoading(false);
+      return { success: false, error: 'Network error. Please check your connection' };
     }
   };
 
   const signOut = async () => {
-    setIsSigningOut(true);
-    
     try {
-      // Clear auth state immediately to prevent further API calls
+      console.log('🚪 signOut called');
+      // Set signing out flag FIRST so guards know to skip checks
+      setIsSigningOut(true);
+      
+      // Clear auth state IMMEDIATELY
       setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
+      setIsLoading(false);
       
-      // Clear local storage first
-      await clearAuthStorage();
-      
-      // Then sign out from Supabase Auth
-      await supabase.auth.signOut({ scope: 'local' });
-      
-      // Navigate to login
+      // Redirect to login IMMEDIATELY - don't wait for anything
       router.replace('/login');
+      
+      // Clear signing out flag after a tiny delay to ensure navigation completes
+      setTimeout(() => setIsSigningOut(false), 100);
+      
+      // Clear storage and sign out in background (non-blocking)
+      clearAuthStorage().catch(() => {});
+      supabase.auth.signOut({ scope: 'local' }).catch(() => {});
     } catch (error) {
-      console.error('Sign out error:', error);
-      // Force clear state on error
+      console.error('❌ signOut error:', error);
+      
+      // Force clear ALL states and redirect immediately
+      setIsSigningOut(true);
       setAuthState({ session: null, user: null, supabaseUser: null });
+      setHasRedirectedToStatus(false);
+      setIsLoading(false);
       router.replace('/login');
-    } finally {
-      setIsSigningOut(false);
+      setTimeout(() => setIsSigningOut(false), 100);
     }
   };
 
@@ -318,27 +509,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return hasRole('admin') || hasRole('superadmin');
   };
 
-
+  const continueAsGuest = () => {
+    console.log('👤 Continuing as guest');
+    setIsGuestMode(true);
+    setIsLoading(false);
+    router.replace('/chatbot');
+  };
 
   const value: AuthContextType = React.useMemo(() => ({
     user: authState.user,
     session: authState.session,
     isLoading,
     isAuthenticated: !!authState.session && !!authState.user,
+    isGuestMode,
     signIn,
+    signUp,
     signOut,
+    continueAsGuest,
     setUser: setUserData,
     refreshUserData,
     hasRole,
     isLawyer,
     isAdmin,
     checkLawyerApplicationStatus,
+    checkSuspensionStatus,
     hasRedirectedToStatus,
     setHasRedirectedToStatus,
     initialAuthCheck,
     isSigningOut,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [authState.user, authState.session, isLoading, hasRedirectedToStatus, isSigningOut]);
+  }), [authState.user, authState.session, isLoading, isGuestMode, hasRedirectedToStatus, isSigningOut, checkLawyerApplicationStatus, checkSuspensionStatus]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

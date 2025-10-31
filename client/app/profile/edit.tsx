@@ -1,13 +1,5 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  TextInput,
-  ActivityIndicator,
-} from "react-native";
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, StatusBar } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Save,
@@ -24,6 +16,7 @@ import { useToast, Toast, ToastTitle, ToastDescription } from "../../components/
 import { Avatar, AvatarImage, AvatarFallbackText } from "../../components/ui/avatar";
 import { VStack } from "../../components/ui/vstack";
 import { createShadowStyle } from "../../utils/shadowUtils";
+import { NetworkConfig } from "../../utils/networkConfig";
 
 interface UserProfileData {
   full_name: string;
@@ -47,7 +40,6 @@ interface ApiRequestOptions {
 }
 
 // Constants
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 const DEFAULT_PROFILE_PHOTO = "";
 const DEFAULT_TIMEOUT_MS = 10000; // 10 seconds default
 const EMAIL_TIMEOUT_MS = 20000; // 20 seconds for email operations
@@ -77,7 +69,8 @@ const makeApiRequest = async ({ method, endpoint, body, timeout = DEFAULT_TIMEOU
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const apiUrl = await NetworkConfig.getBestApiUrl();
+    const response = await fetch(`${apiUrl}${endpoint}`, {
       method,
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
@@ -535,7 +528,8 @@ export default function EditProfilePage() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[tw`flex-1 justify-center items-center`, { backgroundColor: Colors.background.secondary }]}>
+      <SafeAreaView style={[tw`flex-1 justify-center items-center`, { backgroundColor: Colors.background.primary }]}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <ActivityIndicator size="large" color={Colors.primary.blue} />
         <Text style={[tw`mt-4 text-base`, { color: Colors.text.secondary }]}>Loading profile...</Text>
       </SafeAreaView>
@@ -543,7 +537,8 @@ export default function EditProfilePage() {
   }
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]}>
+    <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.primary }]}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       {/* Back Button Header */}
       <View style={[tw`bg-white p-4 flex-row items-center justify-between`, { borderBottomColor: Colors.border.light, borderBottomWidth: 1 }]}>
         <TouchableOpacity

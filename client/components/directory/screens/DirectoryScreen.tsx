@@ -6,8 +6,11 @@ import {
   RefreshControl,
   Animated,
   Easing,
+  StatusBar,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { LawyerListSkeleton } from "../components/LawyerListSkeleton";
+import Colors from "@/constants/Colors";
 
 import FilterModal from "../components/FilterModal";
 import { useRouter } from "expo-router";
@@ -22,7 +25,6 @@ import LawyerCard from "../components/LawyerCard";
 import Navbar from "../../Navbar";
 import { SidebarWrapper } from "../../AppSidebar";
 import { Ionicons } from "@expo/vector-icons";
-import Colors from "../../../constants/Colors";
 import { useAuth } from "../../../contexts/AuthContext";
 import SearchBarWithFilter from "../../common/SearchBarWithFilter";
 
@@ -111,9 +113,11 @@ export default function DirectoryScreen() {
         return;
       }
 
+      const { NetworkConfig } = await import('@/utils/networkConfig');
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const url = forceRefresh
-        ? "http://localhost:8000/legal-consultations/lawyers?refresh=true"
-        : "http://localhost:8000/legal-consultations/lawyers";
+        ? `${apiUrl}/legal-consultations/lawyers?refresh=true`
+        : `${apiUrl}/legal-consultations/lawyers`;
 
       const response = await fetch(url);
       const result = await response.json();
@@ -261,8 +265,9 @@ export default function DirectoryScreen() {
     selectedDays.length > 0 || selectedSpecialization !== "All";
 
   return (
-      <View style={tw`flex-1 bg-gray-50`}>
-        <Header title="Find Legal Help" showMenu={true} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <Header title="Find Legal Help" showMenu={true} />
 
         <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -363,8 +368,8 @@ export default function DirectoryScreen() {
           </>
         )}
 
-        <Navbar activeTab="find" />
-        <SidebarWrapper />
-      </View>
+      <Navbar activeTab="find" />
+      <SidebarWrapper />
+    </SafeAreaView>
   );
 }

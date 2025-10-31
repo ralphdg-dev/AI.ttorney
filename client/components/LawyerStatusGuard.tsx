@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, Text } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { lawyerApplicationService } from '../services/lawyerApplicationService';
 import { useStatusPolling } from '../hooks/useStatusPolling';
+import { LoadingWithTrivia } from './LoadingWithTrivia';
 
 interface LawyerStatusGuardProps {
   children: React.ReactNode;
@@ -128,14 +129,7 @@ export default function LawyerStatusGuard({ children, requiredStatus }: LawyerSt
   };
 
   if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text style={{ marginTop: 16, color: '#4B5563' }}>
-          Verifying access...
-        </Text>
-      </View>
-    );
+    return <LoadingWithTrivia />;
   }
 
   if (!hasAccess) {

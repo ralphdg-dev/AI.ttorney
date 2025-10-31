@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { View, ScrollView, TouchableOpacity, LayoutAnimation, Platform, UIManager } from "react-native";
+import { View, ScrollView, TouchableOpacity, LayoutAnimation, Platform, UIManager, StatusBar } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
@@ -112,8 +113,9 @@ export default function HelpSupportScreen() {
   const router = useRouter();
 
   return (
-    <View style={tw`flex-1 bg-gray-50`}>
-      <Header title="" showBackButton={true} showMenu={false} onBackPress={() => router.back()} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <Header title="Help & Support" showBackButton={true} showMenu={false} onBackPress={() => router.back()} />
 
       <ScrollView
         style={tw`flex-1`}
@@ -195,8 +197,7 @@ export default function HelpSupportScreen() {
           </GSText>
         </View>
       </ScrollView>
-
-      <Navbar />
-    </View>
+      <Navbar activeTab="profile" />
+    </SafeAreaView>
   );
 }

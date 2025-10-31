@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, Image, SafeAreaView, TextInput, Animated } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, Animated, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { User, Bookmark, MoreHorizontal, Flag, Send, Shield } from 'lucide-react-native';
 import ReportModal from '../../common/ReportModal';
@@ -15,6 +16,10 @@ import { useForumCache } from '../../../contexts/ForumCacheContext';
 import { createShadowStyle } from '../../../utils/shadowUtils';
 import { shouldUseNativeDriver } from '../../../utils/animations';
 import { NetworkConfig } from '../../../utils/networkConfig';
+import { useModerationStatus } from '../../../contexts/ModerationContext';
+import { useToast } from '../../ui/toast';
+import { parseModerationError } from '../../../services/moderationService';
+import { showStrikeAddedToast, showSuspendedToast, showBannedToast, showAccessDeniedToast } from '../../../utils/moderationToastUtils';
 
 
 interface PostData {
@@ -70,6 +75,8 @@ const ViewPost: React.FC = () => {
   const { postId } = useLocalSearchParams();
   const { user: currentUser, session } = useAuth();
   const { getCachedPost, getCachedPostFromForum, prefetchPost } = useForumCache();
+  const { refreshStatus } = useModerationStatus();
+  const toast = useToast();
   const [showFullContent, setShowFullContent] = useState(false);
   const [post, setPost] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -427,12 +434,12 @@ const ViewPost: React.FC = () => {
     
     try {
       const headers = await getAuthHeaders();
-      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000);
       
-      const postResponse = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}`, {
+      const postResponse = await fetch(`${apiUrl}/api/forum/posts/${postId}`, {
         method: 'GET',
         headers,
         signal: controller.signal,
@@ -492,7 +499,7 @@ const ViewPost: React.FC = () => {
         
         // Fetch replies immediately after post
         try {
-          const repliesResponse = await fetch(`${API_BASE_URL}/api/forum/posts/${postId}/replies`, {
+          const repliesResponse = await fetch(`${apiUrl}/api/forum/posts/${postId}/replies`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json', ...headers } as HeadersInit,
             signal: controller.signal,
@@ -601,8 +608,49 @@ const ViewPost: React.FC = () => {
       if (response.ok) {
         confirmOptimisticReply(optimisticId, loadFromAPI);
       } else {
+        const errorText = await response.text();
         removeOptimisticReply(optimisticId);
         setReplyText(text);
+        
+        // Handle 403 Forbidden (suspended/banned)
+        if (response.status === 403) {
+          await refreshStatus();
+          try {
+            const parsed = JSON.parse(errorText);
+            const message = parsed.detail || 'Your account is suspended or banned.';
+            showAccessDeniedToast(toast, message);
+          } catch {
+            showAccessDeniedToast(toast, 'Your account is suspended or banned.');
+          }
+          return;
+        }
+        
+        // Handle moderation errors (400 Bad Request)
+        if (response.status === 400) {
+          const moderationError = parseModerationError(errorText);
+          if (moderationError) {
+            await refreshStatus();
+            
+            if (moderationError.action_taken === 'strike_added') {
+              showStrikeAddedToast(
+                toast,
+                moderationError.detail,
+                moderationError.strike_count,
+                moderationError.suspension_count
+              );
+            } else if (moderationError.action_taken === 'suspended') {
+              showSuspendedToast(
+                toast,
+                moderationError.detail,
+                moderationError.suspension_count,
+                moderationError.suspension_end
+              );
+            } else if (moderationError.action_taken === 'banned') {
+              showBannedToast(toast, moderationError.detail);
+            }
+            return;
+          }
+        }
       }
     } catch {
       removeOptimisticReply(optimisticId);
@@ -610,7 +658,7 @@ const ViewPost: React.FC = () => {
     } finally {
       setIsReplying(false);
     }
-  }, [replyText, postId, addOptimisticReply, confirmOptimisticReply, removeOptimisticReply, getAuthHeaders, loadFromAPI]);
+  }, [replyText, postId, addOptimisticReply, confirmOptimisticReply, removeOptimisticReply, getAuthHeaders, loadFromAPI, refreshStatus, toast]);
 
   // Replies are now loaded with the post in loadPost and loadFromAPI
   // No separate loadReplies function needed
@@ -650,7 +698,8 @@ const ViewPost: React.FC = () => {
   const shouldShowReadMore = displayContent.length > 280;
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { position: 'relative', zIndex: 1, backgroundColor: 'transparent' }]}>
+    <SafeAreaView style={[tw`flex-1`, { position: 'relative', zIndex: 1, backgroundColor: Colors.background.primary }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       {/* Loading Overlay - Covers any parent loading indicators */}
       {(loading || !postReady) && (
         <View style={{

@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
-import { View, FlatList, useWindowDimensions } from "react-native";
+import { View, FlatList, useWindowDimensions, StatusBar } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
@@ -116,7 +117,8 @@ export default function BookmarkedGuidesScreen() {
   );
 
   return (
-    <View style={tw`flex-1 bg-gray-50`}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header title="Bookmarked Guides" showMenu={true} />
 
       <Box className="px-6 pt-6 mb-4">
@@ -174,8 +176,8 @@ export default function BookmarkedGuidesScreen() {
         />
       )}
 
-      <Navbar />
+      <Navbar activeTab="learn" />
       <SidebarWrapper />
-    </View>
+    </SafeAreaView>
   );
 }

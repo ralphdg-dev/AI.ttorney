@@ -9,9 +9,8 @@ import { VStack } from "@/components/ui/vstack";
 import { Divider } from "@/components/ui/divider";
 import { Accordion, AccordionContent, AccordionHeader, AccordionIcon, AccordionItem, AccordionTitleText, AccordionTrigger, AccordionContentText } from "@/components/ui/accordion";
 import { Star, Languages, BookText, Quote } from "lucide-react-native";
-import { CacheService, generateTermCacheKey } from "@/lib/glossary/cacheService";
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
+import { CacheService, generateTermCacheKey } from "@/services/cacheService";
+import { NetworkConfig } from "@/utils/networkConfig";
 
 export interface TermDetailData {
   id: string;
@@ -82,7 +81,8 @@ export default function TermDetail({ termId }: TermDetailProps) {
         throw new Error("No internet connection and no cached data available");
       }
 
-      const response = await fetch(`${API_BASE_URL}/glossary/terms/${termId}`);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/glossary/terms/${termId}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

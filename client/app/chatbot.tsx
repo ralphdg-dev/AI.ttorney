@@ -14,25 +14,159 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   Linking,
   Image,
   Animated,
+  StatusBar,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../constants/Colors";
 import Header from "../components/Header";
 import { SidebarWrapper } from "../components/AppSidebar";
 import Navbar from "../components/Navbar";
+import { GuestNavbar, GuestSidebar } from "../components/guest";
 import { LawyerNavbar } from "../components/lawyer/shared";
 import { useAuth } from "../contexts/AuthContext";
-import axios from "axios";
+import { useGuest } from "../contexts/GuestContext";
+import { useModerationStatus } from "../contexts/ModerationContext";
 import ChatHistorySidebar, { ChatHistorySidebarRef } from "../components/chatbot/ChatHistorySidebar";
 import { ChatHistoryService } from "../services/chatHistoryService";
 import { Send } from "lucide-react-native";
 import { MarkdownText } from "../components/chatbot/MarkdownText";
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
+import { GuestLimitBanner } from "../components/chatbot/GuestLimitBanner";
+import { ModerationWarningBanner } from "../components/moderation/ModerationWarningBanner";
+import { NetworkConfig } from "../utils/networkConfig";
+import { LAYOUT, getTotalUIHeight } from "../constants/LayoutConstants";
+
+// ============================================================================
+// HELPER FUNCTIONS - DRY Principle
+// ============================================================================
+
+/**
+ * Stream chat response using XMLHttpRequest (React Native compatible)
+ * Follows clean code principles with single responsibility
+ */
+interface StreamChatResponseParams {
+  endpoint: string;
+  headers: Record<string, string>;
+  requestBody: any;
+  onContent: (content: string) => void;
+  onSources: (sources: any[]) => void;
+  onMetadata: (metadata: any) => void;
+  onViolation?: (violation: any) => void;
+  onComplete: () => void;
+  onError: () => void;
+  onFinish: () => void;
+}
+
+const streamChatResponse = (params: StreamChatResponseParams): Promise<void> => {
+  const {
+    endpoint,
+    headers,
+    requestBody,
+    onContent,
+    onSources,
+    onMetadata,
+    onViolation,
+    onComplete,
+    onError,
+    onFinish,
+  } = params;
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    
+    console.log('📤 Opening XHR connection to:', endpoint);
+    xhr.open('POST', endpoint, true);
+    
+    // Set headers
+    Object.keys(headers).forEach(key => {
+      xhr.setRequestHeader(key, headers[key]);
+    });
+    
+    let buffer = '';
+    let lastUpdateTime = 0;
+    const UPDATE_INTERVAL = 50; // Smooth 20fps updates
+    
+    // Handle streaming data
+    xhr.onprogress = () => {
+      const responseText = xhr.responseText;
+      const newData = responseText.substring(buffer.length);
+      buffer = responseText;
+      
+      if (!newData) return;
+      
+      // Process Server-Sent Events (SSE)
+      const lines = newData.split('\n');
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.substring(6));
+            
+            // Handle different message types
+            if (data.type === 'sources') {
+              onSources(data.sources || []);
+              console.log('📚 Received sources:', data.sources?.length || 0);
+            } else if (data.type === 'metadata') {
+              onMetadata(data);
+              console.log('📋 Metadata:', { language: data.language });
+            } else if (data.type === 'violation') {
+              if (onViolation) {
+                onViolation(data.violation);
+                console.log('⚠️ Violation detected:', data.violation);
+              }
+            } else if (data.content) {
+              onContent(data.content);
+              
+              // Throttled UI updates for smooth rendering
+              const now = Date.now();
+              if (now - lastUpdateTime >= UPDATE_INTERVAL) {
+                // UI update handled by parent component
+                lastUpdateTime = now;
+              }
+            } else if (data.done) {
+              console.log('✅ Stream completed');
+              onComplete();
+            }
+          } catch (e) {
+            console.error('❌ Error parsing SSE data:', e);
+          }
+        }
+      }
+    };
+    
+    // Handle completion
+    xhr.onload = () => {
+      console.log('✅ XHR completed');
+      onFinish();
+      resolve();
+    };
+    
+    // Handle errors
+    xhr.onerror = () => {
+      console.error('❌ XHR error');
+      onError();
+      onFinish();
+      reject(new Error('Network error. Please check your connection.'));
+    };
+    
+    xhr.ontimeout = () => {
+      console.error('❌ XHR timeout');
+      onError();
+      onFinish(); // CRITICAL: Always call onFinish to reset isTyping
+      reject(new Error('Request timed out after 60 seconds.'));
+    };
+    
+    // Send request
+    xhr.send(JSON.stringify(requestBody));
+  });
+};
+
+// ============================================================================
+// COMPONENTS
+// ============================================================================
 
 // ChatGPT-style animated thinking indicator
 const ThinkingIndicator = () => {
@@ -62,7 +196,7 @@ const ThinkingIndicator = () => {
     animateDot(dot1, 0);
     animateDot(dot2, 200);
     animateDot(dot3, 400);
-  }, []);
+  }, [dot1, dot2, dot3]);
 
   const dotStyle = (animatedValue: Animated.Value) => ({
     opacity: animatedValue.interpolate({
@@ -137,22 +271,86 @@ interface Message {
 }
 
 export default function ChatbotScreen() {
-  const { user, session, isLawyer } = useAuth();
+  const { user, session, isLawyer, isGuestMode } = useAuth();
+  const { hasReachedLimit, promptsRemaining, incrementPromptCount } = useGuest();
+  const { moderationStatus, refreshStatus } = useModerationStatus();
+  const insets = useSafeAreaInsets();
+  const [showLimitBanner, setShowLimitBanner] = useState(true);
+  const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  
+  // Helper function to update message with sources (DRY principle)
+  const updateMessageWithSources = useCallback((
+    msgId: string,
+    text: string,
+    sources: any[],
+    language: string
+  ) => {
+    setMessages((prev) => {
+      const newMessages = [...prev];
+      const msgIndex = newMessages.findIndex(m => m.id === msgId);
+      if (msgIndex !== -1) {
+        newMessages[msgIndex] = { 
+          ...newMessages[msgIndex], 
+          text,
+          sources,
+          language
+        };
+      }
+      return newMessages;
+    });
+  }, []);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false); // Separate state for AI generation
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null); // Allow canceling requests
   const [conversationHistory, setConversationHistory] = useState<
     { role: string; content: string }[]
   >([]);
   const [currentConversationId, setCurrentConversationId] =
     useState<string>("");
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false); // Track if loading a conversation
+  const [isScrolledToBottom, setIsScrolledToBottom] = useState(true); // Track if scrolled to bottom to prevent flash
   const flatRef = useRef<FlatList>(null);
   const sidebarRef = useRef<ChatHistorySidebarRef>(null);
   const isFirstMessageRef = useRef<boolean>(true); // Track if this is the first message in conversation
+  const isStreamingRef = useRef<boolean>(false); // Track if currently streaming
+  const lastContentHeight = useRef<number>(0); // Track content height for smooth scrolling
+  const shouldAutoScroll = useRef<boolean>(true); // Track if we should auto-scroll (user hasn't scrolled up)
+  const scrollAnimationFrame = useRef<number | null>(null); // Animation frame for smooth scrolling
+  const inputContainerHeight = useRef<number>(0); // Measured height of input container
+  const navbarHeight = useRef<number>(60); // Navbar height (fixed)
+  
+  // Calculate bottom padding based on actual measured UI elements
+  // This is more accurate than percentage-based guessing
+  const getBottomPadding = useCallback(() => {
+    // Real measurements: navbar + input container + comfortable spacing
+    const totalUIHeight = navbarHeight.current + inputContainerHeight.current;
+    const breathingRoom = 20; // Small fixed spacing for comfort
+    
+    return totalUIHeight + breathingRoom;
+  }, []);
 
   // Dynamic greeting that changes per session
   const greeting = useMemo(() => {
+    // Handle guest users differently
+    if (isGuestMode) {
+      const guestGreetings = [
+        "Welcome! May legal puzzle ba tayo ngayon?",
+        "Hello! Ready to decode some laws?",
+        "Uy! Anong legal tanong natin today?",
+        "Welcome! What legal mystery shall we solve?",
+        "Kamusta! May kaso ba o chismis lang? Joke!",
+        "Hey! Let's make Philippine law make sense.",
+        "Welcome! Time for some legal wisdom?",
+        "Mabuhay! Ano'ng legal concern natin?",
+        "Hello! Ready to tackle the law?",
+        "Welcome! Let's navigate some legal waters.",
+      ];
+      return guestGreetings[Math.floor(Math.random() * guestGreetings.length)];
+    }
+    
     const fullName =
       user?.full_name ||
       user?.username ||
@@ -172,13 +370,50 @@ export default function ChatbotScreen() {
       `${firstName} returns! Let's navigate some legal waters.`,
     ];
     return greetings[Math.floor(Math.random() * greetings.length)];
-  }, [user]); // Changes when user changes
+  }, [user, isGuestMode]); // Changes when user or guest mode changes
 
-  useEffect(() => {
-    if (messages.length) {
-      flatRef.current?.scrollToEnd({ animated: true });
+  // OpenAI-style smooth continuous scrolling
+  // Automatically keeps bottom visible as content grows, mimicking human scrolling
+  const smoothScrollToBottom = useCallback(() => {
+    if (!shouldAutoScroll.current) return;
+    
+    // Cancel any pending scroll animation
+    if (scrollAnimationFrame.current) {
+      cancelAnimationFrame(scrollAnimationFrame.current);
     }
-  }, [messages]);
+    
+    // Scroll to absolute bottom with large offset to ensure complete visibility
+    // This ensures the entire chat bubble (including sources) is visible
+    flatRef.current?.scrollToOffset({ 
+      offset: 999999, // Large number ensures we reach absolute bottom
+      animated: true 
+    });
+  }, []);
+
+  // Cleanup animation frames on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollAnimationFrame.current) {
+        cancelAnimationFrame(scrollAnimationFrame.current);
+        scrollAnimationFrame.current = null;
+      }
+    };
+  }, []);
+
+  // Safety mechanism: Reset generating state if stuck (industry standard)
+  // ChatGPT/Claude pattern: Never leave UI in broken state
+  useEffect(() => {
+    if (!isGenerating) return;
+    
+    const safetyTimeout = setTimeout(() => {
+      console.warn('⚠️ Generation stuck for 60s, force resetting');
+      setIsTyping(false);
+      setIsGenerating(false);
+      abortControllerRef.current = null;
+    }, 60000); // 60 seconds
+    
+    return () => clearTimeout(safetyTimeout);
+  }, [isGenerating]);
 
   useEffect(() => {
     initializeConversation();
@@ -187,21 +422,16 @@ export default function ChatbotScreen() {
 
   const initializeConversation = useCallback(async () => {
     try {
-      console.log('🔄 Initializing conversation for user:', user?.id);
-      const convId = await ChatHistoryService.getCurrentConversationId(user?.id);
+      console.log('🔄 Initializing conversation - always starting fresh');
+      // Always start with greeting screen, don't auto-load last conversation
+      setCurrentConversationId("");
+      isFirstMessageRef.current = true; // New conversation
+      setMessages([]);
+      setConversationHistory([]);
       
-      if (convId) {
-        console.log('📂 Found existing conversation:', convId);
-        setCurrentConversationId(convId);
-        isFirstMessageRef.current = false; // Existing conversation
-        await loadConversation(convId);
-      } else {
-        console.log('✨ No existing conversation, starting fresh');
-        // No current conversation - start fresh (will create session on first message)
-        setCurrentConversationId("");
-        isFirstMessageRef.current = true; // New conversation
-        setMessages([]);
-        setConversationHistory([]);
+      // Clear any stored conversation ID so we start fresh
+      if (user?.id) {
+        await ChatHistoryService.setCurrentConversationId("", user.id);
       }
     } catch (error) {
       console.error('❌ Error initializing conversation:', error);
@@ -210,8 +440,7 @@ export default function ChatbotScreen() {
       setMessages([]);
       setConversationHistory([]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, session?.access_token]);
+  }, [user?.id]);
 
   const loadConversation = async (conversationId: string) => {
     if (!conversationId) {
@@ -221,6 +450,8 @@ export default function ChatbotScreen() {
 
     console.log("📥 Loading conversation:", conversationId);
     console.log("   User ID:", user?.id);
+
+    setIsLoadingConversation(true); // Start loading
 
     try {
       const loadedMessages = await ChatHistoryService.loadConversation(
@@ -239,9 +470,6 @@ export default function ChatbotScreen() {
         );
       }
 
-      // ALWAYS set messages, even if empty
-      setMessages(loadedMessages as Message[]);
-
       // Rebuild conversation history for context
       const history = loadedMessages.map((msg) => ({
         role: msg.fromUser ? "user" : "assistant",
@@ -254,10 +482,8 @@ export default function ChatbotScreen() {
         await ChatHistoryService.setCurrentConversationId(conversationId, user.id);
       }
 
-      // Scroll to bottom after messages are set (ChatGPT behavior)
-      setTimeout(() => {
-        flatRef.current?.scrollToEnd({ animated: false });
-      }, 300);
+      // Set messages - FlatList will automatically position at bottom via onContentSizeChange
+      setMessages(loadedMessages as Message[]);
     } catch (error) {
       console.error("❌ Error loading conversation:", error);
       // Clear invalid conversation ID and start fresh
@@ -266,6 +492,8 @@ export default function ChatbotScreen() {
       setConversationHistory([]);
       setError("Failed to load conversation. Starting a new chat.");
       throw error;
+    } finally {
+      setIsLoadingConversation(false); // Done loading
     }
   };
 
@@ -306,6 +534,7 @@ export default function ChatbotScreen() {
     setMessages([]);
     setConversationHistory([]);
     setError(null);
+    setIsScrolledToBottom(false); // Hide content until scrolled to bottom
 
     // Load the conversation
     try {
@@ -399,6 +628,20 @@ export default function ChatbotScreen() {
 
   const sendMessage = async () => {
     if (!input.trim()) return;
+    
+    // Industry standard: Allow typing while generating (like ChatGPT)
+    // Only prevent sending if already generating
+    if (isGenerating) {
+      console.log('⏳ Already generating response, please wait');
+      return;
+    }
+
+    // Guest mode: Check prompt limit before sending
+    if (isGuestMode && hasReachedLimit) {
+      console.log('🚫 Guest prompt limit reached');
+      setShowLimitBanner(true);
+      return;
+    }
 
     const userMessage = input.trim();
     const newMsg: Message = {
@@ -407,32 +650,46 @@ export default function ChatbotScreen() {
       fromUser: true,
     };
 
+    // Industry standard: Optimistic UI update (clear input immediately)
     setMessages((prev) => [...prev, newMsg]);
-    setInput("");
-    setIsTyping(true);
+    setInput(""); // Clear input immediately (ChatGPT/Claude pattern)
+    setIsGenerating(true); // Set generating state
+    setIsTyping(true); // Keep for backward compatibility with typing indicator
     setError(null);
+    isStreamingRef.current = false; // Reset streaming flag
+    
+    // Create abort controller for this request
+    abortControllerRef.current = new AbortController();
 
-    // Scroll to show the user's message immediately (like ChatGPT)
-    setTimeout(() => {
-      flatRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    // Enable auto-scroll for new message
+    shouldAutoScroll.current = true;
+    smoothScrollToBottom();
 
     // Don't create session here - let backend create it on first message
     // This is the industry-standard approach (ChatGPT/Claude)
     let sessionId = currentConversationId;
 
     try {
+      // Get API URL dynamically using NetworkConfig
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      console.log('🌐 API URL detected:', apiUrl);
+      
       // Determine endpoint based on user role
       const userRole = user?.role || "guest";
       let endpoint = "";
 
       if (userRole === "verified_lawyer") {
         // Lawyer endpoint - formal legal analysis with legalese
-        endpoint = `${API_URL}/api/chatbot/lawyer/ask`;
+        endpoint = `${apiUrl}/api/chatbot/lawyer/ask`;
       } else {
-        // General public endpoint (registered_user, guest, etc.) - STREAMING!
-        endpoint = `${API_URL}/api/chatbot/user/ask/stream`;
+        // General public endpoint (registered_user, guest, etc.)
+        endpoint = `${apiUrl}/api/chatbot/user/ask`;
       }
+      
+      console.log('📍 Full endpoint URL:', endpoint);
+      console.log('👤 User role:', userRole);
+      console.log('🔐 Is guest mode:', isGuestMode);
+      console.log('🎫 Has auth token:', !!session?.access_token);
 
       // Prepare conversation history in the format expected by backend
       const formattedHistory = conversationHistory.map((msg) => ({
@@ -455,41 +712,16 @@ export default function ChatbotScreen() {
       let confidence = "";
       let language = "";
       let legal_disclaimer = "";
-      let fallback_suggestions = null;
+      let fallback_suggestions: any = undefined;
       let normalized_query = "";
       let is_complex_query = false;
-      let returnedSessionId = null;
-      let assistantMessageId = null;
-      let userMessageId = null;
+      let returnedSessionId: string | null = null;
+      let assistantMessageId: string | null = null;
+      let userMessageId: string | null = null;
 
-      if (userRole === "verified_lawyer") {
-        // Lawyers use regular non-streaming endpoint
-        const response = await axios.post(
-          endpoint,
-          {
-            question: userMessage,
-            conversation_history: formattedHistory,
-            max_tokens: 2000,
-            user_id: user?.id || null,
-            session_id: sessionId || null,
-          },
-          { headers }
-        );
-
-        const data = response.data;
-        answer = data.answer;
-        sources = data.sources;
-        confidence = data.confidence;
-        language = data.language;
-        legal_disclaimer = data.legal_disclaimer;
-        fallback_suggestions = data.fallback_suggestions;
-        normalized_query = data.normalized_query;
-        is_complex_query = data.is_complex_query;
-        returnedSessionId = data.session_id;
-        assistantMessageId = data.message_id;
-        userMessageId = data.user_message_id;
-      } else {
-        // General users get STREAMING responses!
+      // Both lawyers and general users get STREAMING responses!
+      if (true) {
+        console.log('📤 Sending request to streaming endpoint:', endpoint);
         const streamingMsgId = (Date.now() + 1).toString();
         const streamingMsg: Message = {
           id: streamingMsgId,
@@ -498,92 +730,96 @@ export default function ChatbotScreen() {
           sources: [],
         };
         setMessages((prev) => [...prev, streamingMsg]);
+        isStreamingRef.current = true; // Mark as streaming
 
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            question: userMessage,
-            conversation_history: formattedHistory,
-            max_tokens: 400,
-            user_id: user?.id || null,
-            session_id: sessionId || null,
-          }),
-        });
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        let lastUpdateTime = 0;
+        // Track if this is a violation response
+        let isViolation = false;
 
-        if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const data = JSON.parse(line.slice(6));
-
-                  if (data.content) {
-                    answer += data.content;
-                    const now = Date.now();
-                    if (now - lastUpdateTime > 100) {
-                      lastUpdateTime = now;
-                      setMessages((prev) => {
-                        const newMessages = [...prev];
-                        const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
-                        if (msgIndex !== -1) {
-                          newMessages[msgIndex] = { ...newMessages[msgIndex], text: answer };
-                        }
-                        return newMessages;
-                      });
-                    }
+        try {
+          await streamChatResponse({
+            endpoint,
+            headers,
+            requestBody: {
+              question: userMessage,
+              conversation_history: formattedHistory,
+              max_tokens: userRole === "verified_lawyer" ? 1500 : 400,
+              user_id: user?.id || null,
+              session_id: sessionId || null,
+            },
+            onContent: (content: string) => {
+              answer += content;
+              // Real-time UI update: Show message as it streams in
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === streamingMsgId ? { ...msg, text: answer } : msg
+                )
+              );
+            },
+            onSources: (receivedSources: any[]) => {
+              sources = receivedSources;
+            },
+            onMetadata: (metadata: any) => {
+              language = metadata.language;
+              returnedSessionId = metadata.session_id;
+              userMessageId = metadata.user_message_id;
+              assistantMessageId = metadata.assistant_message_id;
+            },
+            onViolation: async (violation: any) => {
+              // Violation detected - refresh moderation status to show updated strike count
+              console.log('⚠️ Violation metadata received:', violation);
+              console.log(`   Action: ${violation.action_taken}, Strikes: ${violation.strike_count}, Suspensions: ${violation.suspension_count}`);
+              
+              // Mark as violation so onComplete knows not to process sources
+              isViolation = true;
+              
+              // Refresh moderation status to update banner
+              await refreshStatus();
+            },
+            onComplete: async () => {
+              isStreamingRef.current = false;
+              
+              // Only update with sources if this wasn't a violation
+              if (!isViolation) {
+                updateMessageWithSources(streamingMsgId, answer, sources, language);
+                
+                // Guest mode: Increment prompt count after successful response
+                if (isGuestMode) {
+                  const success = await incrementPromptCount();
+                  if (!success) {
+                    console.log('\ud83d\udeab Guest reached prompt limit after this message');
+                    setShowLimitBanner(true);
                   }
-
-                  if (data.sources) {
-                    sources = data.sources;
-                    setMessages((prev) => {
-                      const newMessages = [...prev];
-                      const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
-                      if (msgIndex !== -1) {
-                        newMessages[msgIndex] = { ...newMessages[msgIndex], sources: data.sources };
-                      }
-                      return newMessages;
-                    });
-                  }
-
-                  if (data.type === 'metadata') {
-                    language = data.language;
-                  }
-                } catch (e) {
-                  console.error('Error parsing stream data:', e);
                 }
               }
-            }
-          }
+              
+              setTimeout(() => {
+                shouldAutoScroll.current = true;
+                smoothScrollToBottom();
+              }, 100);
+            },
+            onError: () => {
+              setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
+            },
+            onFinish: () => {
+              clearTimeout(timeoutId);
+              setIsTyping(false);
+              setIsGenerating(false); // Reset generating state
+              abortControllerRef.current = null; // Clear abort controller
+            },
+          });
+        } catch (streamError: any) {
+          clearTimeout(timeoutId);
+          console.error('❌ Streaming error:', streamError);
+          setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
+          setIsTyping(false); // Reset typing state
+          setIsGenerating(false); // Reset generating state
+          abortControllerRef.current = null; // Clear abort controller
+          throw streamError;
         }
-
-        // Final update
-        setMessages((prev) => {
-          const newMessages = [...prev];
-          const msgIndex = newMessages.findIndex(m => m.id === streamingMsgId);
-          if (msgIndex !== -1) {
-            newMessages[msgIndex] = {
-              ...newMessages[msgIndex],
-              text: answer,
-              sources: sources,
-              confidence: confidence,
-              language: language,
-            };
-          }
-          return newMessages;
-        });
-
-        assistantMessageId = streamingMsgId;
       }
 
       console.log("📨 Backend response:", {
@@ -638,6 +874,12 @@ export default function ChatbotScreen() {
         isFirstMessageRef.current = false;
       }
 
+      // Check if response contains violation message and refresh moderation status
+      if (answer.includes('🚨 Content Policy Violation') || answer.includes('🚨 Labag sa Patakaran')) {
+        console.log('⚠️ Violation detected in response, refreshing moderation status...');
+        await refreshStatus();
+      }
+
       // Update conversation history
       setConversationHistory((prev) => [
         ...prev,
@@ -647,15 +889,17 @@ export default function ChatbotScreen() {
 
       // Update the user message with the real ID from backend
       if (userMessageId) {
+        const messageId = userMessageId; // Type narrowing: now TypeScript knows it's string, not null
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === newMsg.id ? { ...msg, id: userMessageId } : msg
+            msg.id === newMsg.id ? { ...msg, id: messageId } : msg
           )
         );
       }
 
-      // For non-streaming (lawyers), add bot reply with all enhanced data
-      if (userRole === "verified_lawyer") {
+      // NOTE: Streaming already adds the message, so we don't need to add it again here
+      // This code block is no longer needed since both lawyers and users use streaming
+      if (false) { // Disabled - streaming handles message display
         const reply: Message = {
           id: assistantMessageId || (Date.now() + 1).toString(),
           text: answer,
@@ -670,13 +914,14 @@ export default function ChatbotScreen() {
         };
 
         setMessages((prev) => [...prev, reply]);
+        
+        // Scroll to show lawyer response
+        setTimeout(() => {
+          shouldAutoScroll.current = true;
+          smoothScrollToBottom();
+        }, 100);
       }
-      // For streaming users, the message already exists and was updated in real-time
-
-      // Scroll to show the bot's response (like ChatGPT)
-      setTimeout(() => {
-        flatRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      // For streaming users, sources are already added in the final update
 
       console.log("✅ Messages saved to database:", {
         session: sessionId,
@@ -684,23 +929,44 @@ export default function ChatbotScreen() {
         assistantMsg: assistantMessageId,
       });
     } catch (err: any) {
-      console.error("Chat error:", err);
+      console.error("❌ Chat error:", err);
+      console.error("   Error type:", err.name);
+      console.error("   Error message:", err.message);
+      if (err.response) {
+        console.error("   Response status:", err.response.status);
+        console.error("   Response data:", err.response.data);
+      }
 
       let errorMessage = "Sorry, I encountered an error. Please try again.";
 
-      if (err.response?.status === 400) {
-        // Handle prohibited input or validation errors
+      // Network errors
+      if (err.message?.includes('Network') || err.code === 'ECONNABORTED') {
+        errorMessage = "Network error. Please check your connection and try again.";
+      }
+      // Timeout errors
+      else if (err.message?.includes('timeout') || err.message?.includes('timed out')) {
+        errorMessage = "Request timed out. The server is taking too long to respond. Please try again.";
+      }
+      // HTTP errors
+      else if (err.response?.status === 400) {
         errorMessage =
           err.response.data.detail ||
           "Invalid question. Please rephrase your query.";
       } else if (err.response?.status === 503) {
         errorMessage =
           "The legal knowledge base is not yet initialized. Please contact support.";
+      } else if (err.response?.status === 500) {
+        errorMessage = "Server error. Please try again in a moment.";
       } else if (err.response?.data?.detail) {
         errorMessage = err.response.data.detail;
       }
+      // Use error message if available
+      else if (err.message && !err.message.includes('undefined')) {
+        errorMessage = err.message;
+      }
 
       setError(errorMessage);
+      console.error("   Showing error to user:", errorMessage);
 
       const errorReply: Message = {
         id: (Date.now() + 1).toString(),
@@ -711,11 +977,19 @@ export default function ChatbotScreen() {
       setMessages((prev) => [...prev, errorReply]);
     } finally {
       setIsTyping(false);
+      setIsGenerating(false); // Always reset generating state
+      abortControllerRef.current = null; // Always clear abort controller
     }
   };
 
   const renderItem = ({ item }: { item: Message }) => {
     const isUser = item.fromUser;
+    
+    // Don't render empty bot messages (streaming placeholder)
+    if (!isUser && !item.text?.trim()) {
+      return null;
+    }
+    
     return (
       <View style={tw`px-4 py-1.5`}>
         <View style={isUser ? tw`items-end` : tw`items-start flex-row`}>
@@ -788,7 +1062,7 @@ export default function ChatbotScreen() {
             <MarkdownText
               text={item.text || ""}
               isUserMessage={isUser}
-              style={[tw`text-base`, { lineHeight: 22}]}
+              style={[tw`text-base`, { lineHeight: 22, maxWidth: 600 }]}
             />
 
             {/* Show sources with URLs */}
@@ -947,146 +1221,239 @@ export default function ChatbotScreen() {
   };
 
   return (
-    <View
+    <SafeAreaView
       style={[
         tw`flex-1`,
-        { backgroundColor: Colors.background.primary, overflow: "hidden" },
+        { backgroundColor: Colors.background.primary },
       ]}
+      edges={['top', 'left', 'right']}
     >
-      {/* Chat History Sidebar */}
-      <ChatHistorySidebar
-        ref={sidebarRef}
-        userId={user?.id}
-        sessionToken={session?.access_token}
-        currentConversationId={currentConversationId}
-        onConversationSelect={handleConversationSelect}
-        onNewChat={handleNewChat}
-      />
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      
+      {/* Sidebar - Guest or Regular */}
+      {isGuestMode ? (
+        <GuestSidebar
+          isOpen={isGuestSidebarOpen}
+          onClose={() => setIsGuestSidebarOpen(false)}
+        />
+      ) : (
+        <ChatHistorySidebar
+          ref={sidebarRef}
+          userId={user?.id}
+          sessionToken={session?.access_token}
+          currentConversationId={currentConversationId}
+          onConversationSelect={handleConversationSelect}
+          onNewChat={handleNewChat}
+        />
+      )}
 
       {/* Header */}
-      <Header title="AI Legal Assistant" showMenu={true} />
+      <Header 
+        title="AI Legal Assistant" 
+        showMenu={true}
+        onMenuPress={isGuestMode ? () => setIsGuestSidebarOpen(true) : undefined}
+        showChatHistoryToggle={!isGuestMode}
+        isChatHistoryOpen={sidebarRef.current?.isOpen?.() || false}
+        onChatHistoryToggle={() => sidebarRef.current?.toggleSidebar?.()}
+      />
+
+      {/* Guest Limit Banner - Show for guest users */}
+      {isGuestMode && showLimitBanner && (
+        <GuestLimitBanner
+          promptsRemaining={promptsRemaining}
+          hasReachedLimit={hasReachedLimit}
+          onDismiss={() => setShowLimitBanner(false)}
+        />
+      )}
+
+      {/* Moderation Warning Banner */}
+      {moderationStatus && (
+        <ModerationWarningBanner
+          strikeCount={moderationStatus.strike_count}
+          suspensionCount={moderationStatus.suspension_count}
+          accountStatus={moderationStatus.account_status}
+          suspensionEnd={moderationStatus.suspension_end}
+        />
+      )}
 
       {/* Messages list or centered placeholder */}
       <View style={tw`flex-1`}>
         {messages.length === 0 ? (
-          <ScrollView
-            contentContainerStyle={tw`items-center px-6 pt-12 pb-48`}
-            showsVerticalScrollIndicator={false}
-            style={tw`flex-1`}
-          >
-            {/* Logo */}
-            <View style={tw`mb-6`}>
-              <Image
-                source={require("../assets/images/logo.png")}
-                style={{ width: 88, height: 88 }}
-                resizeMode="contain"
-              />
-            </View>
-
-            {/* Greeting */}
-            <Text
-              style={[
-                tw`text-3xl font-bold text-center mb-2`,
-                { color: Colors.text.primary },
-              ]}
+          isLoadingConversation ? (
+            // Show blank screen when loading a conversation from history
+            <View style={tw`flex-1`} />
+          ) : (
+            // Show greeting screen only for new conversations
+            <ScrollView
+              contentContainerStyle={tw`items-center px-6 pt-12 pb-48`}
+              showsVerticalScrollIndicator={false}
+              style={tw`flex-1`}
             >
-              {greeting}
-            </Text>
+              {/* Logo */}
+              <View style={tw`mb-6`}>
+                <Image
+                  source={require("../assets/images/logo.png")}
+                  style={{ width: 88, height: 88 }}
+                  resizeMode="contain"
+                />
+              </View>
 
-            {/* Subtitle */}
-            <Text
-              style={[
-                tw`text-base text-center mb-10 px-4`,
-                { color: Colors.text.secondary, lineHeight: 24 },
-              ]}
-            >
-              I specialize in Civil, Criminal, Consumer, Family, and Labor Law.
-              Ask away!
-            </Text>
-
-            {/* Suggestions */}
-            <View style={tw`w-full px-2`}>
+              {/* Greeting */}
               <Text
                 style={[
-                  tw`text-sm font-semibold mb-4 px-2`,
-                  { color: Colors.text.secondary },
+                  tw`text-2xl font-bold text-center mb-2`,
+                  { color: Colors.text.primary },
                 ]}
               >
-                Quick start prompts:
+                {greeting}
               </Text>
-              {(isLawyer() ? [
-                "Analyze the elements of estafa under Article 315 RPC",
-                "Compare grounds for annulment vs legal separation",
-                "Summarize employer obligations under DOLE DO 174",
-              ] : [
-                "What are my rights as a tenant?",
-                "How do I file a small claims case?",
-                "What is the legal age of consent?",
-              ]).map((suggestion, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  onPress={() => setInput(suggestion)}
+
+              {/* Subtitle */}
+              <Text
+                style={[
+                  tw`text-base text-center mb-10 px-4`,
+                  { color: Colors.text.secondary, lineHeight: 24 },
+                ]}
+              >
+                I specialize in Civil, Criminal, Consumer, Family, and Labor Law.
+                Ask away!
+              </Text>
+
+              {/* Suggestions */}
+              <View style={tw`w-full px-2`}>
+                <Text
                   style={[
-                    tw`p-4 mb-3 rounded-2xl flex-row items-center`,
-                    {
-                      backgroundColor: Colors.background.secondary,
-                      borderWidth: 1,
-                      borderColor: Colors.border.light,
-                      ...(Platform.OS === "web"
-                        ? { boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)" }
-                        : {
-                            shadowColor: "#000",
-                            shadowOffset: { width: 0, height: 1 },
-                            shadowOpacity: 0.05,
-                            shadowRadius: 3,
-                            elevation: 1,
-                          }),
-                    },
+                    tw`text-sm font-semibold mb-4 px-2`,
+                    { color: Colors.text.secondary },
                   ]}
                 >
-                  <View
+                  Quick start prompts:
+                </Text>
+                {(isLawyer() ? [
+                  "Analyze the elements of estafa under Article 315 RPC",
+                  "Compare grounds for annulment vs legal separation",
+                  "Summarize employer obligations under DOLE DO 174",
+                ] : [
+                  "What are my rights as a tenant?",
+                  "How do I file a small claims case?",
+                  "What is the legal age of consent?",
+                ]).map((suggestion, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => setInput(suggestion)}
                     style={[
-                      tw`w-8 h-8 rounded-full items-center justify-center mr-3`,
-                      { backgroundColor: Colors.primary.blue + "15" },
+                      tw`p-4 mb-3 rounded-2xl flex-row items-center`,
+                      {
+                        backgroundColor: Colors.background.secondary,
+                        borderWidth: 1,
+                        borderColor: Colors.border.light,
+                        ...(Platform.OS === "web"
+                          ? { boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)" }
+                          : {
+                              shadowColor: "#000",
+                              shadowOffset: { width: 0, height: 1 },
+                              shadowOpacity: 0.05,
+                              shadowRadius: 3,
+                              elevation: 1,
+                            }),
+                      },
                     ]}
                   >
+                    <View
+                      style={[
+                        tw`w-8 h-8 rounded-full items-center justify-center mr-3`,
+                        { backgroundColor: Colors.primary.blue + "15" },
+                      ]}
+                    >
+                      <Ionicons
+                        name="chatbubble-outline"
+                        size={16}
+                        color={Colors.primary.blue}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        tw`text-sm flex-1`,
+                        { color: Colors.text.primary, lineHeight: 20 },
+                      ]}
+                    >
+                      {suggestion}
+                    </Text>
                     <Ionicons
-                      name="chatbubble-outline"
+                      name="arrow-forward"
                       size={16}
-                      color={Colors.primary.blue}
+                      color={Colors.text.tertiary}
                     />
-                  </View>
-                  <Text
-                    style={[
-                      tw`text-sm flex-1`,
-                      { color: Colors.text.primary, lineHeight: 20 },
-                    ]}
-                  >
-                    {suggestion}
-                  </Text>
-                  <Ionicons
-                    name="arrow-forward"
-                    size={16}
-                    color={Colors.text.tertiary}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          )
         ) : (
           <FlatList
             ref={flatRef}
             data={messages}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={tw`pb-48 pt-2`}
+            contentContainerStyle={[
+              tw`pt-2`,
+              { 
+                // Padding based on actual measured UI elements (navbar + input)
+                // More accurate than percentage-based calculations
+                paddingBottom: getBottomPadding()
+              }
+            ]}
             showsVerticalScrollIndicator={false}
-            style={tw`flex-1`}
+            onLayout={() => {
+              // Initial scroll when conversation loads - scroll to absolute bottom
+              if (messages.length > 0 && !isTyping) {
+                setTimeout(() => {
+                  shouldAutoScroll.current = true;
+                  flatRef.current?.scrollToOffset({ offset: 999999, animated: false });
+                  setTimeout(() => setIsScrolledToBottom(true), 50);
+                }, 50);
+              }
+            }}
+            onContentSizeChange={(width: number, height: number) => {
+              // OpenAI-style: Smooth continuous scroll as content grows
+              // This is the key - it scrolls automatically as new content appears
+              const heightIncreased = height > lastContentHeight.current;
+              lastContentHeight.current = height;
+              
+              if (!isScrolledToBottom) {
+                // Initial load: instant scroll to absolute bottom
+                shouldAutoScroll.current = true;
+                flatRef.current?.scrollToOffset({ offset: 999999, animated: false });
+                setTimeout(() => setIsScrolledToBottom(true), 100);
+              } else if (heightIncreased && shouldAutoScroll.current) {
+                // Content grew: smoothly scroll to show ALL content including sources
+                // Using scrollToOffset with large value ensures we reach absolute bottom
+                smoothScrollToBottom();
+              }
+            }}
+            maintainVisibleContentPosition={{
+              minIndexForVisible: 0,
+              autoscrollToTopThreshold: 10,
+            }}
+            onScroll={(event) => {
+              // Detect if user manually scrolled up
+              // If they did, stop auto-scrolling until new message
+              const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+              // More lenient threshold (100px) to account for chat bubble height
+              const isAtBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
+              
+              // Only disable auto-scroll if user actively scrolled up (not at bottom)
+              if (!isAtBottom && !isStreamingRef.current) {
+                shouldAutoScroll.current = false;
+              }
+            }}
+            scrollEventThrottle={16} // 60fps scroll event handling
+            style={[tw`flex-1`, { opacity: isScrolledToBottom ? 1 : 0 }]}
             ListFooterComponent={
               <>
-                {/* Typing indicator */}
+                {/* Typing indicator - only show when actively typing */}
                 {isTyping && (
-        <View style={tw`px-4 pb-3`}>
+        <View style={tw`px-4 py-1.5`}>
           <View style={tw`flex-row items-start`}>
             <View style={tw`mr-2.5`}>
               <Image
@@ -1137,17 +1504,22 @@ export default function ChatbotScreen() {
       {/* Composer - Fixed at bottom */}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
         style={{
           position: 'absolute',
-          bottom: 60,
+          bottom: getTotalUIHeight(insets.bottom),
           left: 0,
           right: 0,
-          zIndex: 10,
+          zIndex: LAYOUT.Z_INDEX.fixed,
           backgroundColor: '#FFFFFF',
         }}
       >
         <View
+          onLayout={(event) => {
+            // Measure actual input container height for accurate padding
+            const { height } = event.nativeEvent.layout;
+            inputContainerHeight.current = height;
+          }}
           style={[
             tw`px-4 pt-3 pb-4 border-t border-b`,
             {
@@ -1202,7 +1574,7 @@ export default function ChatbotScreen() {
 
             <TouchableOpacity
               onPress={sendMessage}
-              disabled={isTyping || !input.trim()}
+              disabled={isGenerating || !input.trim()} // Disable only while generating
               style={[
                 tw`w-12 h-12 rounded-full items-center justify-center`,
                 {
@@ -1227,13 +1599,15 @@ export default function ChatbotScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
-      {/* Conditionally render navbar based on user role */}
-      {user?.role === "verified_lawyer" ? (
+      {/* Conditionally render navbar based on user role and guest mode */}
+      {isGuestMode ? (
+        <GuestNavbar activeTab="ask" />
+      ) : user?.role === "verified_lawyer" ? (
         <LawyerNavbar activeTab="chatbot" />
       ) : (
         <Navbar activeTab="ask" />
       )}
-      <SidebarWrapper />
-    </View>
+      {!isGuestMode && <SidebarWrapper />}
+    </SafeAreaView>
   );
 }

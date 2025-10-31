@@ -11,6 +11,7 @@ import ForumLoadingAnimation from '../../ui/ForumLoadingAnimation';
 import { useAuth } from '@/contexts/AuthContext';
 import { createShadowStyle } from '../../../utils/shadowUtils';
 import { shouldUseNativeDriver } from '../../../utils/animations';
+import { NetworkConfig } from '../../../utils/networkConfig';
 
 type ForumPost = Database['public']['Tables']['forum_posts']['Row'];
 type User = Database['public']['Tables']['users']['Row'];
@@ -98,12 +99,12 @@ const LawyerTimeline: React.FC = React.memo(() => {
     
     try {
       const headers = await getAuthHeaders();
-      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
       
-      const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`, {
+      const response = await fetch(`${apiUrl}/api/forum/posts/recent`, {
         method: 'GET',
         headers,
         signal: controller.signal,

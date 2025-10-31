@@ -7,7 +7,9 @@ import {
   ActivityIndicator,
   Alert,
   useWindowDimensions,
+  StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { fadeIn, fadeOut } from '@/utils/animations';
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
@@ -16,6 +18,7 @@ import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
 import { Input, InputField, InputSlot } from "@/components/ui/input";
 import Navbar from "@/components/Navbar";
+import { GuestNavbar, GuestSidebar } from "@/components/guest";
 import ToggleGroup from "@/components/ui/ToggleGroup";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
@@ -28,13 +31,16 @@ import {
   CacheService,
   generateGlossaryCacheKey,
 } from "@/services/cacheService";
+import { NetworkConfig } from "@/utils/networkConfig";
+import { useAuth } from "@/contexts/AuthContext";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 const ITEMS_PER_PAGE = 10;
 
 export default function GlossaryScreen() {
   const router = useRouter();
+  const { isGuestMode } = useAuth();
   const [activeTab, setActiveTab] = useState<string>("terms");
+  const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState<boolean>(false);
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -158,7 +164,8 @@ export default function GlossaryScreen() {
         params.append("search", search.trim());
       }
 
-      const response = await fetch(`${API_BASE_URL}/glossary/terms?${params}`);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/glossary/terms?${params}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -275,7 +282,7 @@ export default function GlossaryScreen() {
   const handleTabChange = useCallback((id: string) => {
     if (id === activeTab) return;
     
-    // Smooth transition animation
+    // Smooth transition animation for both tabs
     fadeOut(fadeAnim, 150).start(() => {
       setActiveTab(id);
       setCurrentPage(1);
@@ -523,6 +530,7 @@ export default function GlossaryScreen() {
         <TermListItem
           item={item}
           onPress={handleItemPress}
+          showFavorite={!isGuestMode}
           containerStyle={{
             width: numColumns > 1 ? (screenWidth - horizontalPadding * 2 - 12) / numColumns : "100%",
             marginBottom: 12,
@@ -543,74 +551,93 @@ export default function GlossaryScreen() {
         />
       );
     }
-  }, [activeTab, handleItemPress, handleToggleBookmark, numColumns, screenWidth, horizontalPadding]);
+  }, [activeTab, handleItemPress, handleToggleBookmark, numColumns, screenWidth, horizontalPadding, isGuestMode]);
 
   return (
-      <View className="flex-1 bg-gray-50">
-        <Header title="Know Your Batas" showMenu={true} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <Header 
+        title="Know Your Batas" 
+        showMenu={true}
+        onMenuPress={isGuestMode ? () => setIsGuestSidebarOpen(true) : undefined}
+      />
 
-        <ToggleGroup
-          options={tabOptions}
-          activeOption={activeTab}
-          onOptionChange={handleTabChange}
-        />
+      <ToggleGroup
+        options={tabOptions}
+        activeOption={activeTab}
+        onOptionChange={handleTabChange}
+      />
 
-        <Box className={`px-${horizontalPadding / 4} pt-6 pb-4`}>
-          <Input
-            variant="outline"
-            size="lg"
-            className="bg-white rounded-lg border border-gray-300"
-          >
-            <InputSlot className="pl-4">
-              <Ionicons name="search" size={20} color="#9CA3AF" />
-            </InputSlot>
-            <InputField
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
-              placeholderTextColor="#9CA3AF"
-              className="text-gray-800 text-base"
-              editable={!termsLoading && !articlesLoading}
-            />
-            <InputSlot className="pr-4">
-              <Ionicons name="options" size={20} color={Colors.text.sub} />
-            </InputSlot>
-          </Input>
-        </Box>
-
-        <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-          <FlatList
-            ref={flatListRef}
-            data={paginatedData}
-            key={`${numColumns}-${activeCategory}-${currentPage}-${activeTab}`}
-            keyExtractor={(item) => item.id}
-            numColumns={numColumns}
-            ListHeaderComponent={renderListHeader}
-            ListFooterComponent={renderPaginationControls}
-            ListEmptyComponent={renderEmptyState}
-            contentContainerStyle={{
-              paddingHorizontal: horizontalPadding,
-              paddingBottom: 100,
-              flexGrow: 1,
-            }}
-            columnWrapperStyle={
-              numColumns > 1
-                ? { justifyContent: "space-between", marginBottom: 0 }
-                : undefined
-            }
-            renderItem={renderItem}
-            showsVerticalScrollIndicator={false}
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={10}
-            initialNumToRender={8}
-            windowSize={10}
-            refreshing={termsLoading || articlesLoading}
-            onRefresh={() => activeTab === "terms" ? fetchLegalTerms(currentPage) : refetch()}
+      <Box className={`px-${horizontalPadding / 4} pt-6 pb-4`}>
+        <Input
+          variant="outline"
+          size="lg"
+          className="bg-white rounded-lg border border-gray-300"
+        >
+          <InputSlot className="pl-4">
+            <Ionicons name="search" size={20} color="#9CA3AF" />
+          </InputSlot>
+          <InputField
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
+            placeholderTextColor="#9CA3AF"
+            className="text-gray-800 text-base"
+            editable={!termsLoading && !articlesLoading}
           />
-        </Animated.View>
+          <InputSlot className="pr-4">
+            <Ionicons name="options" size={20} color={Colors.text.sub} />
+          </InputSlot>
+        </Input>
+      </Box>
 
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <FlatList
+          ref={flatListRef}
+          data={paginatedData}
+          key={`glossary-${numColumns}-${activeCategory}-${currentPage}-${activeTab}-${screenWidth}`}
+          keyExtractor={(item) => item.id}
+          numColumns={numColumns}
+          extraData={screenWidth}
+          ListHeaderComponent={renderListHeader}
+          ListFooterComponent={renderPaginationControls}
+          ListEmptyComponent={renderEmptyState}
+          contentContainerStyle={{
+            paddingHorizontal: horizontalPadding,
+            paddingBottom: 100,
+            flexGrow: 1,
+          }}
+          columnWrapperStyle={
+            numColumns > 1
+              ? { justifyContent: "space-between", marginBottom: 0 }
+              : undefined
+          }
+          renderItem={renderItem}
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          initialNumToRender={8}
+          windowSize={10}
+          refreshing={termsLoading || articlesLoading}
+          onRefresh={() => activeTab === "terms" ? fetchLegalTerms(currentPage) : refetch()}
+        />
+      </Animated.View>
+
+      {/* Guest Sidebar */}
+      {isGuestMode && (
+        <GuestSidebar 
+          isOpen={isGuestSidebarOpen} 
+          onClose={() => setIsGuestSidebarOpen(false)} 
+        />
+      )}
+
+      {/* Conditional navbar rendering based on guest mode */}
+      {isGuestMode ? (
+        <GuestNavbar activeTab="learn" />
+      ) : (
         <Navbar activeTab="learn" />
-        <SidebarWrapper />
-      </View>
+      )}
+      {!isGuestMode && <SidebarWrapper />}
+    </SafeAreaView>
   );
 }

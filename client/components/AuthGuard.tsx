@@ -8,23 +8,44 @@ import {
   logRouteAccess,
   getRoleBasedRedirect 
 } from '../config/routes';
+import { LoadingWithTrivia } from './LoadingWithTrivia';
 
 interface AuthGuardProps {
   children: React.ReactNode;
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
-  const { user, session, isLoading, isAuthenticated } = useAuth();
+  const { user, session, isLoading, isAuthenticated, isGuestMode, isSigningOut, initialAuthCheck } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
   useEffect(() => {
-    if (isLoading) return;
-
+    // ⚡ OPTIMIZATION: Skip checks during sign out for immediate redirect
+    if (isSigningOut) return;
+    
+    // ⚡ OPTIMIZATION: Don't block on loading for public routes (login, register)
     const currentPath = `/${segments.join('/')}`;
     const routeConfig = getRouteConfig(currentPath);
     
     if (!routeConfig) return;
+
+    // Skip checks for lawyer status screens to prevent redirect loops
+    if (currentPath.includes('/lawyer-status/')) {
+      return;
+    }
+
+    // Wait for initial auth check to complete (prevents race condition on hard refresh)
+    if (!initialAuthCheck) {
+      return; // Block ALL routes until we know if user is guest/authenticated/unauthenticated
+    }
+
+    // ⚡ OPTIMIZATION: Allow public routes to render immediately after initial check
+    if (isLoading && routeConfig.isPublic) {
+      return; // Let public routes render without waiting for full auth load
+    }
+
+    // Wait for auth to finish loading before checking protected routes
+    if (isLoading) return;
 
     // Handle authenticated users - check both session and user exist
     if (isAuthenticated && user && session) {
@@ -61,42 +82,41 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
 
       // Log successful access
       logRouteAccess(currentPath, user, 'granted');
+    } else if (isGuestMode) {
+      // Handle guest mode users - only allow public routes
+      if (!routeConfig.isPublic) {
+        const redirectPath = '/chatbot'; // Redirect to chatbot (guest index page)
+        logRouteAccess(currentPath, null, 'denied', 'Guest mode restricted');
+        router.replace(redirectPath as any);
+        return;
+      }
+
+      // Log public access
+      logRouteAccess(currentPath, null, 'granted', 'Public route in guest mode');
     } else {
       // Handle unauthenticated users - check if route is public
       if (!routeConfig.isPublic) {
         const redirectPath = '/login';
         logRouteAccess(currentPath, null, 'denied', 'Authentication required');
-        router.replace(redirectPath as any); // Use replace instead of push for faster redirect
+        router.replace(redirectPath as any);
         return;
       }
 
       // Log public access
       logRouteAccess(currentPath, null, 'granted', 'Public route');
     }
-  }, [isAuthenticated, user, session, isLoading, segments, router]);
+  }, [isAuthenticated, user?.id, user?.role, isLoading, isSigningOut, segments.join('/')]);
 
-  // Show loading screen while checking authentication OR if we need to redirect
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#023D7B" />
-      </View>
-    );
+  // CRITICAL: Show loading until initial auth check completes
+  // This prevents race condition where UI renders before we know if user is guest/authenticated
+  if (!initialAuthCheck) {
+    return <LoadingWithTrivia />;
   }
 
-  // Don't block rendering on login page - let it show immediately
-  const currentPath = `/${segments.join('/')}`;
-  const routeConfig = getRouteConfig(currentPath);
-  
-  // Never block login page rendering
-  if (currentPath === '/login') {
-    return <>{children}</>;
-  }
-  
-  // Only show loading for protected routes when we're clearly unauthenticated
-  if (routeConfig && !routeConfig.isPublic && !isAuthenticated && !user && !session) {
-    // Use a minimal delay to prevent flash but allow quick redirect
-    return null; // Return null instead of loading spinner for faster redirect
+  // Show loading screen while checking authentication (but NOT during sign out)
+  // During sign out, we want immediate redirect without loading screen
+  if (isLoading && !isSigningOut) {
+    return <LoadingWithTrivia />;
   }
 
   return <>{children}</>;

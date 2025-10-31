@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+import { NetworkConfig } from '../utils/networkConfig';
 
 export class ReportService {
   private static async getAuthHeaders(session?: any): Promise<HeadersInit> {
@@ -40,8 +39,9 @@ export class ReportService {
     session?: any
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const headers = await this.getAuthHeaders(session);
-      const response = await fetch(`${API_BASE_URL}/api/forum/reports`, {
+      const response = await fetch(`${apiUrl}/api/forum/reports`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -74,8 +74,9 @@ export class ReportService {
     session?: any
   ): Promise<{ success: boolean; hasReported: boolean; error?: string }> {
     try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const headers = await this.getAuthHeaders(session);
-      const response = await fetch(`${API_BASE_URL}/api/forum/reports/check/${targetId}/${targetType}`, {
+      const response = await fetch(`${apiUrl}/api/forum/reports/check/${targetId}/${targetType}`, {
         method: 'GET',
         headers,
       });
@@ -100,8 +101,9 @@ export class ReportService {
     targetType: 'post' | 'comment'
   ): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const headers = await this.getAuthHeaders();
-      const response = await fetch(`${API_BASE_URL}/api/forum/reports/target/${targetId}/${targetType}`, {
+      const response = await fetch(`${apiUrl}/api/forum/reports/target/${targetId}/${targetType}`, {
         method: 'GET',
         headers,
       });
@@ -125,8 +127,9 @@ export class ReportService {
     reporterId: string
   ): Promise<{ success: boolean; data?: any[]; error?: string }> {
     try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const headers = await this.getAuthHeaders();
-      const response = await fetch(`${API_BASE_URL}/api/forum/reports/user`, {
+      const response = await fetch(`${apiUrl}/api/forum/reports/user`, {
         method: 'GET',
         headers,
       });

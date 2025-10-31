@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { View, FlatList, Pressable } from "react-native";
+import { View, FlatList, Pressable, StatusBar } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import Header from "@/components/Header";
 import { Box } from "@/components/ui/box";
@@ -128,8 +129,9 @@ export default function NotificationsScreen() {
   );
 
   return (
-      <View style={[tw`flex-1 bg-gray-50`, { position: "relative" }]}>
-        <Header title="Notifications" showMenu={true} />
+    <SafeAreaView style={[{ flex: 1, backgroundColor: Colors.background.primary, position: "relative" }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <Header title="Notifications" showMenu={true} />
 
       {/* Inbox filter row */}
       <Box className="px-6 pt-4 pb-2" style={{ zIndex: menuOpen ? 100 : 1, position: "relative", elevation: menuOpen ? 12 : 0, overflow: 'visible' }}>
@@ -192,8 +194,8 @@ export default function NotificationsScreen() {
         />
       )}
 
-      <Navbar />
+      <Navbar activeTab="profile" />
       <SidebarWrapper />
-    </View>
+    </SafeAreaView>
   );
 }

@@ -7,9 +7,11 @@ import PrimaryButton from '../../components/ui/PrimaryButton';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../lib/api-client';
 import { useToast, Toast, ToastTitle, ToastDescription } from '../../components/ui/toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function UserRegistration() {
   const toast = useToast();
+  const { signUp } = useAuth();
   
   // Screen dimensions for responsive design
   const { width: screenWidth } = Dimensions.get('window');
@@ -569,45 +571,29 @@ export default function UserRegistration() {
             
             setLoading(true);
             try {
-              // Step 1: Create user account first
-              const signUpResult = await apiClient.signUp({
-                email,
-                password,
+              // Step 1: Create user account with Supabase (industry standard)
+              const signUpResult = await signUp(email, password, {
                 username,
                 first_name: firstName,
                 last_name: lastName,
                 birthdate: birthdate?.toISOString().split('T')[0] || '',
-                role: 'registered_user'
               });
               
-              // Handle rate limiting or existing user
-              if (signUpResult.error && 
-                  !signUpResult.error.includes('rate_limit') && 
-                  !signUpResult.error.includes('already registered') &&
-                  !signUpResult.error.includes('security purposes') &&
-                  !signUpResult.error.includes('after') &&
-                  !signUpResult.error.includes('seconds')) {
+              if (!signUpResult.success) {
                 toast.show({
                   placement: "top",
                   render: ({ id }) => (
                     <Toast nativeID={id} action="error" variant="solid" className="mt-12">
                       <ToastTitle size="md">Registration Failed</ToastTitle>
-                      <ToastDescription size="sm">{signUpResult.error}</ToastDescription>
+                      <ToastDescription size="sm">{signUpResult.error || 'Failed to create account'}</ToastDescription>
                     </Toast>
                   ),
                 });
+                setLoading(false);
                 return;
               }
               
-              // Show rate limit message but continue to OTP
-              if (signUpResult.error && (
-                  signUpResult.error.includes('rate_limit') || 
-                  signUpResult.error.includes('security purposes') ||
-                  signUpResult.error.includes('seconds'))) {
-                console.log('Rate limited, continuing to OTP step for existing user');
-              }
-              
-              // Step 2: Send OTP for email verification (even if signup was rate limited)
+              // Step 2: Send OTP for email verification
               const otpResult = await apiClient.sendOTP({
                 email,
                 otp_type: 'email_verification'
@@ -618,11 +604,12 @@ export default function UserRegistration() {
                   placement: "top",
                   render: ({ id }) => (
                     <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-                      <ToastTitle size="md">OTP Failed</ToastTitle>
+                      <ToastTitle size="md">Verification Email Failed</ToastTitle>
                       <ToastDescription size="sm">{otpResult.error}</ToastDescription>
                     </Toast>
                   ),
                 });
+                setLoading(false);
                 return;
               }
               
@@ -631,7 +618,7 @@ export default function UserRegistration() {
                 placement: "top",
                 render: ({ id }) => (
                   <Toast nativeID={id} action="success" variant="solid" className="mt-12">
-                    <ToastTitle size="md">Registered Successfully!</ToastTitle>
+                    <ToastTitle size="md">Account Created!</ToastTitle>
                     <ToastDescription size="sm">Please check your email for the verification code.</ToastDescription>
                   </Toast>
                 ),
@@ -643,13 +630,14 @@ export default function UserRegistration() {
               // Step 4: Navigate to verify-otp with the email
               router.push(`./verify-otp?email=${encodeURIComponent(email)}` as any);
               
-            } catch {
+            } catch (error) {
+              console.error('Registration error:', error);
               toast.show({
                 placement: "top",
                 render: ({ id }) => (
                   <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-                    <ToastTitle size="md">Error</ToastTitle>
-                    <ToastDescription size="sm">Failed to create account. Please try again.</ToastDescription>
+                    <ToastTitle size="md">Connection Error</ToastTitle>
+                    <ToastDescription size="sm">Please check your internet connection and try again.</ToastDescription>
                   </Toast>
                 ),
               });

@@ -30,7 +30,21 @@ class AuthService:
     async def sign_up(self, user_data: UserSignUp) -> Dict[str, Any]:
         """Register a new user in both auth.users and public.users tables"""
         try:
-            # Create user in Supabase Auth (auth.users table)
+            # STEP 1: Check for orphaned auth users and clean them up
+            check_result = await self.supabase.check_user_exists("email", user_data.email)
+            if check_result.get("success") and check_result.get("found_in_auth") and not check_result.get("found_in_public"):
+                # Orphaned auth user exists - clean it up
+                logger.warning(f"Found orphaned auth user for email {user_data.email}, cleaning up...")
+                auth_users = check_result.get("data", {}).get("auth", [])
+                if auth_users:
+                    orphaned_user_id = auth_users[0].get("id")
+                    try:
+                        await self.supabase.delete_auth_user(orphaned_user_id)
+                        logger.info(f"Successfully cleaned up orphaned auth user: {orphaned_user_id}")
+                    except Exception as cleanup_error:
+                        logger.error(f"Failed to cleanup orphaned auth user: {cleanup_error}")
+            
+            # STEP 2: Create user in Supabase Auth (auth.users table)
             auth_response = await self.supabase.sign_up(
                 email=user_data.email,
                 password=user_data.password,
@@ -58,29 +72,58 @@ class AuthService:
                 logger.error(f"No user ID in Supabase response: {response_data}")
                 return {"success": False, "error": "User creation failed - no user ID returned"}
             
-            # Create user profile in public.users table (match actual schema)
-            profile_data = {
-                "id": auth_user["id"],  # Use same UUID from auth.users
-                "email": user_data.email,
-                "username": user_data.username,
-                "full_name": user_data.full_name,
-                "birthdate": user_data.birthdate.isoformat(),
-                "role": "guest",  # Always start as guest until verified
-                "is_verified": False
-            }
+            # STEP 3: Check if profile already exists (may be created by database trigger)
+            existing_profile = await self.supabase.get_user_profile(auth_user["id"])
             
-            profile_response = await self.supabase.insert_user_profile(profile_data)
+            if existing_profile["success"] and existing_profile.get("data"):
+                # Profile already exists (created by trigger), just update it with our data
+                logger.info(f"Profile already exists for user {auth_user['id']}, updating instead of inserting")
+                profile_data = {
+                    "username": user_data.username,
+                    "full_name": user_data.full_name,
+                    "birthdate": user_data.birthdate.isoformat(),
+                    "role": "guest",  # Always start as guest until verified
+                    "is_verified": False
+                }
+                profile_response = await self.supabase.update_user_profile(
+                    profile_data,
+                    {"id": auth_user["id"]}
+                )
+            else:
+                # Profile doesn't exist, create it
+                logger.info(f"Creating new profile for user {auth_user['id']}")
+                profile_data = {
+                    "id": auth_user["id"],  # Use same UUID from auth.users
+                    "email": user_data.email,
+                    "username": user_data.username,
+                    "full_name": user_data.full_name,
+                    "birthdate": user_data.birthdate.isoformat(),
+                    "role": "guest",  # Always start as guest until verified
+                    "is_verified": False
+                }
+                profile_response = await self.supabase.insert_user_profile(profile_data)
             
             if not profile_response["success"]:
-                logger.error(f"Profile creation failed: {profile_response['error']}")
-                # TODO: Consider rolling back auth.users creation here
+                logger.error(f"Profile creation/update failed: {profile_response['error']}")
+                
+                # CRITICAL: Rollback auth user creation to prevent orphaned records
+                try:
+                    logger.warning(f"Rolling back auth user creation for ID: {auth_user['id']}")
+                    await self.supabase.delete_auth_user(auth_user["id"])
+                    logger.info(f"Successfully rolled back auth user: {auth_user['id']}")
+                except Exception as rollback_error:
+                    logger.error(f"Failed to rollback auth user: {rollback_error}")
+                
                 return {"success": False, "error": f"Failed to create user profile: {profile_response['error']}"}
+            
+            # Get the final profile data
+            final_profile = await self.supabase.get_user_profile(auth_user["id"])
             
             return {
                 "success": True,
                 "user": auth_user,
                 "session": auth_response["data"].get("session"),
-                "profile": profile_data
+                "profile": final_profile.get("data") if final_profile["success"] else None
             }
             
         except Exception as e:

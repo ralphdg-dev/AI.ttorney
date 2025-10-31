@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ArticleItem } from '@/components/guides/ArticleCard';
 import { supabase } from '../config/supabase';
+import { NetworkConfig } from '../utils/networkConfig';
 
 export interface LegalArticle {
   id: string;
@@ -19,7 +20,6 @@ export interface LegalArticle {
 
 // Configuration to choose between direct Supabase or server API
 const USE_SERVER_API = true; // Always use server API instead of direct Supabase calls
-const SERVER_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Helper function to get full Supabase Storage URL
 const getStorageUrl = (path: string | null | undefined): string | undefined => {
@@ -50,9 +50,10 @@ export const useLegalArticles = () => {
 
   const fetchArticlesFromServer = async (searchQuery?: string) => {
     try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const url = searchQuery 
-        ? `${SERVER_API_URL}/api/legal/articles?search=${encodeURIComponent(searchQuery)}`
-        : `${SERVER_API_URL}/api/legal/articles`;
+        ? `${apiUrl}/api/legal/articles?search=${encodeURIComponent(searchQuery)}`
+        : `${apiUrl}/api/legal/articles`;
       
       console.log('Fetching from URL:', url);
       const response = await fetch(url);
@@ -86,7 +87,8 @@ export const useLegalArticles = () => {
       searchParams.append('q', query);
       if (category) searchParams.append('category', category);
       
-      const response = await fetch(`${SERVER_API_URL}/api/legal/search?${searchParams.toString()}`);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/legal/search?${searchParams.toString()}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -198,7 +200,8 @@ export const useLegalArticles = () => {
       let data: LegalArticle | null = null;
       
       // Use server API
-      const response = await fetch(`${SERVER_API_URL}/api/legal/articles/${id}`);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/legal/articles/${id}`);
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -250,7 +253,8 @@ export const useLegalArticles = () => {
       
       // Use server API (send category; server supports it)
       const dbCategory = category === 'work' ? 'labor' : category;
-      const response = await fetch(`${SERVER_API_URL}/api/legal/articles?category=${encodeURIComponent(dbCategory)}`);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/legal/articles?category=${encodeURIComponent(dbCategory)}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
