@@ -15,6 +15,7 @@ import Pagination from "../../components/ui/Pagination";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
 import ViewArticleModal from "../../components/articles/ViewArticleModal";
 import AddArticleModal from "../../components/articles/AddArticleModal";
+import EditArticleModal from "../../components/articles/EditArticleModal";
 import { useToast } from "../../components/ui/Toast";
 
 const categories = ["All", "Family", "Criminal", "Civil", "Labor", "Consumer"];
@@ -31,6 +32,8 @@ const ManageLegalArticles = () => {
   const [selectedArticle, setSelectedArticle] = React.useState(null);
   const [openMenuId, setOpenMenuId] = React.useState(null);
   const [dropdownPosition, setDropdownPosition] = React.useState(null);
+  const [editModalOpen, setEditModalOpen] = React.useState(false);
+  const [articleToEdit, setArticleToEdit] = React.useState(null);
   const [imageModal, setImageModal] = React.useState({
     open: false,
     src: null,
@@ -215,7 +218,8 @@ const ManageLegalArticles = () => {
         <button
           className="flex items-center w-full px-3 py-1.5 text-gray-700 hover:bg-gray-50"
           onClick={() => {
-            console.log("Edit article", row.id);
+            setArticleToEdit(row);
+            setEditModalOpen(true);
             setOpenMenuId(null);
           }}
         >
@@ -264,8 +268,24 @@ const ManageLegalArticles = () => {
   };
 
   const columns = [
-    { key: "enTitle", header: "English Title" },
-    { key: "filTitle", header: "Filipino Title" },
+    {
+      key: "enTitle",
+      header: "English Title",
+      render: (r) => (
+        <div className="line-clamp-1 text-sm text-gray-700" title={r.enTitle}>
+          {r.enTitle}
+        </div>
+      ),
+    },
+    {
+      key: "filTitle",
+      header: "Filipino Title",
+      render: (r) => (
+        <div className="line-clamp-1 text-sm text-gray-700" title={r.filTitle}>
+          {r.filTitle}
+        </div>
+      ),
+    },
     {
       key: "enDescription",
       header: "English Description",
@@ -503,6 +523,18 @@ const ManageLegalArticles = () => {
         open={confirmationModal.open}
         onClose={() => setConfirmationModal({ open: false })}
         type={confirmationModal.type}
+      />
+
+      <EditArticleModal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        article={articleToEdit}
+        onUpdate={(updatedArticle) => {
+          // Update the article in the table
+          setArticles((prev) =>
+            prev.map((a) => (a.id === updatedArticle.id ? updatedArticle : a))
+          );
+        }}
       />
 
       {/* Image Modal with fade animation */}

@@ -174,4 +174,97 @@ router.post("/", upload.single("image"), async (req, res) => {
   }
 });
 
+// PUT /api/legal-articles/:id — update article
+router.put("/:id", upload.single("image"), async (req, res) => {
+  const { id } = req.params;
+  const {
+    title_en,
+    title_fil,
+    description_en,
+    description_fil,
+    content_en,
+    content_fil,
+    category,
+  } = req.body;
+
+  try {
+    // Step 1: Update fields
+    const { data: updatedArticle, error: updateError } = await supabaseAdmin
+      .from("legal_articles")
+      .update({
+        title_en,
+        title_fil,
+        description_en,
+        description_fil,
+        content_en,
+        content_fil,
+        category,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    // Step 2: If image uploaded, save to storage
+    let imagePath = updatedArticle.image_article || null;
+    if (req.file) {
+      const fileExtension = req.file.originalname.split(".").pop();
+      const fileName = `${id}_article-image.${fileExtension}`;
+      const storagePath = `articles-img/${fileName}`;
+
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from("legal-articles")
+        .upload(storagePath, req.file.buffer, {
+          contentType: req.file.mimetype,
+          upsert: true,
+        });
+      if (uploadError) throw uploadError;
+
+      imagePath = storagePath;
+
+      // Update article with new image path
+      const { error: imageUpdateError } = await supabaseAdmin
+        .from("legal_articles")
+        .update({ image_article: imagePath })
+        .eq("id", id);
+
+      if (imageUpdateError) throw imageUpdateError;
+    }
+
+    const supabaseUrl =
+      process.env.SUPABASE_URL || "https://vmlbrckrlgwlobhnpstx.supabase.co";
+    const getImageUrl = (path) =>
+      path
+        ? `${supabaseUrl}/storage/v1/object/public/legal-articles/${encodeURIComponent(
+            path
+          )}`
+        : "";
+
+    // Return formatted article
+    const formattedArticle = {
+      ...updatedArticle,
+      enTitle: updatedArticle.title_en,
+      filTitle: updatedArticle.title_fil,
+      enDescription: updatedArticle.description_en,
+      filDescription: updatedArticle.description_fil,
+      enContent: updatedArticle.content_en,
+      filContent: updatedArticle.content_fil,
+      image: getImageUrl(imagePath),
+      createdAt: updatedArticle.created_at,
+      updatedAt: updatedArticle.updated_at,
+      verifiedAt: updatedArticle.verified_at,
+      verifiedBy: updatedArticle.verified_by,
+      status: updatedArticle.is_verified ? "Published" : "Unpublished",
+    };
+
+    res.status(200).json({ success: true, data: formattedArticle });
+  } catch (err) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ success: false, message: err.message || "Server error" });
+  }
+});
+
 module.exports = router;
