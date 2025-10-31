@@ -13,6 +13,8 @@ const adminManagementRoutes = require('./routes/admin-management');
 const glossaryTermsRoutes = require('./routes/glossary-terms');
 const forumManagementRoutes = require('./routes/forum-management');
 const adminModerationRoutes = require('./routes/admin-moderation');
+const statsRoutes = require('./routes/stats');
+
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -122,6 +124,8 @@ app.use('/api/admin', adminManagementRoutes);
 app.use('/api/glossary-terms', glossaryTermsRoutes);
 app.use('/api/forum', forumManagementRoutes);
 app.use('/api/admin/moderation', adminModerationRoutes);
+app.use('/api/stats', statsRoutes);
+
 
 // 404 handler
 app.use('*', (req, res) => {
