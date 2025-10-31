@@ -17,6 +17,7 @@ import ViewArticleModal from "../../components/articles/ViewArticleModal";
 import AddArticleModal from "../../components/articles/AddArticleModal";
 import EditArticleModal from "../../components/articles/EditArticleModal";
 import { useToast } from "../../components/ui/Toast";
+import PublishModal from "./components/PublishModal";
 
 const categories = ["All", "Family", "Criminal", "Civil", "Labor", "Consumer"];
 
@@ -41,10 +42,15 @@ const ManageLegalArticles = () => {
   const [showModal, setShowModal] = React.useState(false);
   const [confirmationModal, setConfirmationModal] = React.useState({
     open: false,
-    type: "",
+    type: "", // "archive" | "publish" | "unpublish"
     articleId: null,
     articleTitle: "",
   });
+  const [publishModal, setPublishModal] = React.useState({
+    open: false,
+    article: null,
+  });
+
   const [articles, setArticles] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -107,16 +113,26 @@ const ManageLegalArticles = () => {
   };
 
   // Filtering & sorting
+  // Filtering & sorting
   const filteredData = React.useMemo(() => {
     let rows = [...articles];
+
+    // Search query filter
     if (query.trim()) {
       const q = query.toLowerCase();
       rows = rows.filter((r) =>
         Object.values(r).some((v) => String(v).toLowerCase().includes(q))
       );
     }
-    if (category !== "All") rows = rows.filter((r) => r.category === category);
 
+    // Category filter (case-insensitive)
+    if (category !== "All") {
+      rows = rows.filter(
+        (r) => (r.category || "").toLowerCase() === category.toLowerCase()
+      );
+    }
+
+    // Sorting
     const byDate = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
     const byDateAsc = (a, b) => new Date(a.createdAt) - new Date(b.createdAt);
     const byTitle = (a, b) => a.enTitle.localeCompare(b.enTitle);
@@ -229,22 +245,16 @@ const ManageLegalArticles = () => {
         {row.status === "Unpublished" ? (
           <button
             className="flex items-center w-full px-3 py-1.5 text-emerald-600 hover:bg-emerald-50"
-            onClick={() => {
-              console.log("Publish article", row.id);
-              setOpenMenuId(null);
-            }}
+            onClick={() => setPublishModal({ open: true, article: row })}
           >
             <Upload size={12} className="mr-2 text-emerald-500" /> Publish
           </button>
         ) : (
           <button
-            className="flex items-center w-full px-3 py-1.5 text-yellow-600 hover:bg-yellow-50"
-            onClick={() => {
-              console.log("Unpublish article", row.id);
-              setOpenMenuId(null);
-            }}
+            className="flex items-center w-full px-3 py-1.5 text-gray-600 hover:bg-gray-50"
+            onClick={() => setPublishModal({ open: true, article: row })}
           >
-            <Download size={12} className="mr-2 text-yellow-500" /> Unpublish
+            <Download size={12} className="mr-2 text-gray-500" /> Unpublish
           </button>
         )}
 
@@ -534,6 +544,38 @@ const ManageLegalArticles = () => {
           setArticles((prev) =>
             prev.map((a) => (a.id === updatedArticle.id ? updatedArticle : a))
           );
+        }}
+      />
+      <PublishModal
+        open={publishModal.open}
+        article={publishModal.article}
+        onClose={() => setPublishModal({ open: false, article: null })}
+        onConfirm={async () => {
+          const articleId = publishModal.article.id;
+          const publish = publishModal.article.status === "Unpublished";
+          try {
+            const res = await fetch(
+              `http://localhost:5001/api/legal-articles/${articleId}/publish`,
+              {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ publish }),
+              }
+            );
+            const json = await res.json();
+            if (json.success) {
+              setArticles((prev) =>
+                prev.map((a) => (a.id === articleId ? json.data : a))
+              );
+            } else {
+              throw new Error(json.message);
+            }
+          } catch (err) {
+            console.error(err);
+            alert("Failed to update article status");
+          } finally {
+            setPublishModal({ open: false, article: null });
+          }
         }}
       />
 

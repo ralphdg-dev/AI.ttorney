@@ -267,4 +267,56 @@ router.put("/:id", upload.single("image"), async (req, res) => {
   }
 });
 
+// PATCH /api/legal-articles/:id/publish
+router.patch("/:id/publish", async (req, res) => {
+  const { id } = req.params;
+  const { publish } = req.body; // boolean: true = publish, false = unpublish
+
+  try {
+    const { data: updatedArticle, error } = await supabaseAdmin
+      .from("legal_articles")
+      .update({
+        is_verified: publish,
+        verified_at: publish ? new Date().toISOString() : null,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    const supabaseUrl =
+      process.env.SUPABASE_URL || "https://vmlbrckrlgwlobhnpstx.supabase.co";
+    const getImageUrl = (path) =>
+      path
+        ? `${supabaseUrl}/storage/v1/object/public/legal-articles/${encodeURIComponent(
+            path
+          )}`
+        : "";
+
+    const formattedArticle = {
+      ...updatedArticle,
+      enTitle: updatedArticle.title_en,
+      filTitle: updatedArticle.title_fil,
+      enDescription: updatedArticle.description_en,
+      filDescription: updatedArticle.description_fil,
+      enContent: updatedArticle.content_en,
+      filContent: updatedArticle.content_fil,
+      image: getImageUrl(updatedArticle.image_article),
+      createdAt: updatedArticle.created_at,
+      updatedAt: updatedArticle.updated_at,
+      verifiedAt: updatedArticle.verified_at,
+      verifiedBy: updatedArticle.verified_by,
+      status: updatedArticle.is_verified ? "Published" : "Unpublished",
+    };
+
+    res.status(200).json({ success: true, data: formattedArticle });
+  } catch (err) {
+    console.error("Publish/Unpublish error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: err.message || "Server error" });
+  }
+});
+
 module.exports = router;
