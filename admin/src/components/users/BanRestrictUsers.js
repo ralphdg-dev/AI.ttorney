@@ -50,6 +50,8 @@ const BanRestrictUsers = () => {
   const [userViolations, setUserViolations] = useState([]);
   const [userSuspensions, setUserSuspensions] = useState([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [showViolationModal, setShowViolationModal] = useState(false);
+  const [selectedViolation, setSelectedViolation] = useState(null);
 
   // Dropdown menu state
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -1207,10 +1209,7 @@ const BanRestrictUsers = () => {
         selectedUser &&
         ReactDOM.createPortal(
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-            <div
-              className="bg-white rounded-md shadow-lg border p-5 mx-4 max-h-[90vh] overflow-y-auto"
-              style={{ width: "900px", maxWidth: "95vw" }}
-            >
+            <div className="bg-white rounded-md shadow-lg border p-5 mx-4 max-h-[90vh] overflow-y-auto" style={{ width: '600px' }}>
               <div className="mt-3">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-medium text-gray-900">
@@ -1224,243 +1223,274 @@ const BanRestrictUsers = () => {
                   </button>
                 </div>
 
-                {/* User Basic Info - Two Column Layout */}
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  {/* Left Column */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-[9px] font-medium text-gray-700 mb-1">
-                        Full Name
-                      </label>
-                      <div className="text-xs text-gray-900">
-                        {selectedUser.full_name || "N/A"}
+                {/* User Basic Info - Enhanced Layout */}
+                <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* Left Column */}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Full Name
+                        </label>
+                        <div className="text-sm font-medium text-gray-900">
+                          {selectedUser.full_name || 'N/A'}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Current Strikes
+                        </label>
+                        <div className="text-sm text-gray-900">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            (selectedUser.strike_count || 0) === 0 
+                              ? 'bg-green-100 text-green-800'
+                              : (selectedUser.strike_count || 0) < 3
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {selectedUser.strike_count || 0} strikes
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Account Status
+                        </label>
+                        <div className="mt-1">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                            selectedUser.account_status === 'active'
+                              ? 'bg-green-100 text-green-800 border border-green-200'
+                              : selectedUser.account_status === 'suspended'
+                              ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                              : selectedUser.account_status === 'banned'
+                              ? 'bg-red-100 text-red-800 border border-red-200'
+                              : 'bg-gray-100 text-gray-800 border border-gray-200'
+                          }`}>
+                            {(selectedUser.account_status || 'unknown').charAt(0).toUpperCase() + (selectedUser.account_status || 'unknown').slice(1)}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-[9px] font-medium text-gray-700 mb-1">
-                        Current Strikes
-                      </label>
-                      <div className="text-xs text-gray-900">
-                        {selectedUser.strike_count || 0}
+                    {/* Right Column */}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Email Address
+                        </label>
+                        <div className="text-sm text-gray-900 font-mono bg-white px-2 py-1 rounded border">
+                          {selectedUser.email}
+                        </div>
                       </div>
-                    </div>
 
-                    <div>
-                      <label className="block text-[9px] font-medium text-gray-700 mb-1">
-                        Status
-                      </label>
-                      <div className="mt-1">
-                        <span
-                          className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium ${
-                            selectedUser.account_status === "active"
-                              ? "bg-green-100 text-green-800 border border-green-200"
-                              : selectedUser.account_status === "suspended"
-                              ? "bg-red-100 text-red-800 border border-red-200"
-                              : selectedUser.account_status === "banned"
-                              ? "bg-red-100 text-red-800 border border-red-200"
-                              : "bg-green-100 text-green-800 border border-green-200"
-                          }`}
-                        >
-                          {(selectedUser.account_status || "active")
-                            .charAt(0)
-                            .toUpperCase() +
-                            (selectedUser.account_status || "active").slice(1)}
-                        </span>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Total Suspensions
+                        </label>
+                        <div className="text-sm text-gray-900">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            (selectedUser.suspension_count || 0) === 0 
+                              ? 'bg-green-100 text-green-800'
+                              : (selectedUser.suspension_count || 0) < 3
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {selectedUser.suspension_count || 0} suspensions
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Right Column */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-[9px] font-medium text-gray-700 mb-1">
-                        Email
-                      </label>
-                      <div className="text-xs text-gray-900">
-                        {selectedUser.email}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[9px] font-medium text-gray-700 mb-1">
-                        Suspensions
-                      </label>
-                      <div className="text-xs text-gray-900">
-                        {selectedUser.suspension_count || 0}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[9px] font-medium text-gray-700 mb-1">
-                        Last Login
-                      </label>
-                      <div className="text-xs text-gray-900">
-                        {selectedUser.last_login
-                          ? formatDate(selectedUser.last_login)
-                          : "Never"}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Last Login
+                        </label>
+                        <div className="text-sm text-gray-900">
+                          {selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never logged in'}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Admin History & Audit Trail Section */}
-                <div className="border-t border-gray-200 pt-6 mt-4">
+                <div className="border-t border-gray-200 pt-4">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Violations History Column */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle className="h-3 w-3 text-gray-600" />
-                          <h4 className="text-xs font-medium text-gray-900">
-                            Violations History
-                          </h4>
-                          <span className="text-[10px] text-gray-500">
-                            ({userViolations.length} entries)
-                          </span>
+                      
+                      {/* Violations History Column */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-3 w-3 text-gray-600" />
+                            <h4 className="text-xs font-medium text-gray-900">Violations History</h4>
+                            <span className="text-[10px] text-gray-500">({userViolations.length} entries)</span>
+                          </div>
                         </div>
+
+                        {userViolations.length > 0 ? (
+                          <div className="border border-gray-200 rounded-lg overflow-hidden">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                    Action
+                                  </th>
+                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                    Date
+                                  </th>
+                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                    Details
+                                  </th>
+                                </tr>
+                              </thead>
+                            </table>
+                            <div className="max-h-32 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                              <table className="min-w-full">
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                  {userViolations.map((violation) => (
+                                    <tr key={violation.id} className="hover:bg-gray-50">
+                                      <td className="px-2 py-1.5">
+                                        <div className="text-[9px] font-medium text-gray-900">
+                                          {violation.action_taken.replace('_', ' ')}
+                                        </div>
+                                      </td>
+                                      <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
+                                        {formatDate(violation.created_at)}
+                                      </td>
+                                      <td className="px-2 py-1.5 max-w-32">
+                                        <div
+                                          onClick={() => {
+                                            setSelectedViolation(violation);
+                                            setShowViolationModal(true);
+                                          }}
+                                          className="text-[9px] text-gray-700 hover:text-gray-900 hover:bg-gray-100 cursor-pointer p-1 rounded truncate"
+                                          title="Click to view full details"
+                                        >
+                                          {violation.violation_summary || violation.violation_type.replace('_', ' ')}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-6">
+                            <AlertTriangle className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                            <p className="text-[10px] text-gray-500">No violations found</p>
+                          </div>
+                        )}
                       </div>
 
-                      {userViolations.length > 0 ? (
-                        <div className="space-y-2">
-                          {userViolations.map((violation) => (
-                            <div
-                              key={violation.id}
-                              className="bg-gray-50 rounded-lg p-3 border border-gray-200"
-                            >
-                              <div className="flex justify-between items-start mb-2">
-                                <div className="flex-1">
-                                  <div className="text-xs font-medium text-gray-900 mb-1">
-                                    {violation.action_taken.replace("_", " ").toUpperCase()}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    {formatDate(violation.created_at)}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="text-xs text-gray-700">
-                                {violation.violation_summary ||
-                                  violation.violation_type.replace("_", " ")}
-                              </div>
-                            </div>
-                          ))}
+                      {/* Suspensions History Column */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <History className="h-3 w-3 text-gray-600" />
+                            <h4 className="text-xs font-medium text-gray-900">Suspensions History</h4>
+                            <span className="text-[10px] text-gray-500">({userSuspensions.length} entries)</span>
+                          </div>
                         </div>
-                      ) : (
-                        <div className="text-center py-6">
-                          <AlertTriangle className="h-6 w-6 text-gray-400 mx-auto mb-1" />
-                          <p className="text-[10px] text-gray-500">
-                            No violations found
-                          </p>
-                        </div>
-                      )}
-                    </div>
 
-                    {/* Suspensions History Column */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <History className="h-3 w-3 text-gray-600" />
-                          <h4 className="text-xs font-medium text-gray-900">
-                            Suspensions History
-                          </h4>
-                          <span className="text-[10px] text-gray-500">
-                            ({userSuspensions.length} entries)
-                          </span>
-                        </div>
+                        {userSuspensions.length > 0 ? (
+                          <div className="border border-gray-200 rounded-lg overflow-hidden">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                    Type
+                                  </th>
+                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                    Status
+                                  </th>
+                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                    Dates
+                                  </th>
+                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                    Action
+                                  </th>
+                                </tr>
+                              </thead>
+                            </table>
+                            <div className="max-h-32 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                              <table className="min-w-full">
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                  {userSuspensions.map((suspension) => (
+                                    <tr key={suspension.id} className="hover:bg-gray-50">
+                                      <td className="px-2 py-1.5">
+                                        <div className="text-[9px] font-medium text-gray-900">
+                                          {suspension.suspension_type} #{suspension.suspension_number}
+                                        </div>
+                                      </td>
+                                      <td className="px-2 py-1.5">
+                                        <div className="space-y-1">
+                                          <div className={`inline-flex px-1.5 py-0.5 text-[8px] font-medium rounded-full ${
+                                            suspension.status === 'active' ? 'bg-red-100 text-red-700' :
+                                            suspension.status === 'lifted' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                                          }`}>
+                                            {suspension.status}
+                                          </div>
+                                          {suspension.status === 'lifted' && (
+                                            <div className="flex items-center gap-1">
+                                              <div className={`w-2 h-2 rounded-full ${
+                                                suspension.lifted_acknowledged === true 
+                                                  ? 'bg-green-500' 
+                                                  : suspension.lifted_acknowledged === false
+                                                  ? 'bg-yellow-500'
+                                                  : 'bg-gray-300'
+                                              }`}></div>
+                                              <span className="text-[8px] text-gray-600">
+                                                {suspension.lifted_acknowledged === true 
+                                                  ? 'Ack ✓' 
+                                                  : suspension.lifted_acknowledged === false
+                                                  ? 'Pending'
+                                                  : 'N/A'}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="px-2 py-1.5 text-[9px] text-gray-500">
+                                        <div className="space-y-0.5">
+                                          <div>Start: {formatDate(suspension.started_at).split(',')[0]}</div>
+                                          {suspension.ends_at && (
+                                            <div>End: {formatDate(suspension.ends_at).split(',')[0]}</div>
+                                          )}
+                                          {suspension.lifted_at && (
+                                            <div className="text-green-600">Lifted: {formatDate(suspension.lifted_at).split(',')[0]}</div>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="px-2 py-1.5 text-center">
+                                        {suspension.lifted_acknowledged === false && (
+                                          <button
+                                            onClick={() => handleAcknowledgeLift(suspension.id)}
+                                            className="px-2 py-1 text-[8px] bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors font-medium"
+                                            title="Mark as acknowledged by user"
+                                          >
+                                            Mark Ack
+                                          </button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-6">
+                            <History className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                            <p className="text-[10px] text-gray-500">No suspensions found</p>
+                          </div>
+                        )}
                       </div>
-
-                      {userSuspensions.length > 0 ? (
-                        <div className="space-y-3">
-                          {userSuspensions.map((suspension) => (
-                            <div
-                              key={suspension.id}
-                              className="bg-gray-50 rounded-lg p-4 border border-gray-200"
-                            >
-                              <div className="flex justify-between items-start mb-3">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-sm font-medium text-gray-900">
-                                      {suspension.suspension_type.charAt(0).toUpperCase() + suspension.suspension_type.slice(1)} #{suspension.suspension_number}
-                                    </span>
-                                    <span
-                                      className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                        suspension.status === "active"
-                                          ? "bg-red-100 text-red-700"
-                                          : suspension.status === "lifted"
-                                          ? "bg-green-100 text-green-700"
-                                          : "bg-gray-100 text-gray-700"
-                                      }`}
-                                    >
-                                      {suspension.status.charAt(0).toUpperCase() + suspension.status.slice(1)}
-                                    </span>
-                                  </div>
-                                  <div className="text-xs text-gray-500 mb-2">
-                                    Started: {formatDate(suspension.started_at)}
-                                  </div>
-                                  {suspension.ends_at && (
-                                    <div className="text-xs text-gray-500 mb-2">
-                                      Ends: {formatDate(suspension.ends_at)}
-                                    </div>
-                                  )}
-                                  {suspension.lifted_at && (
-                                    <div className="text-xs text-gray-500 mb-2">
-                                      Lifted: {formatDate(suspension.lifted_at)}
-                                    </div>
-                                  )}
-                                  {suspension.lifted_reason && (
-                                    <div className="text-xs text-gray-700 mb-2">
-                                      Lift Reason: {suspension.lifted_reason}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              {suspension.status === 'lifted' && (
-                                <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-                                  <div className="flex items-center gap-2">
-                                    <div className={`w-3 h-3 rounded-full ${
-                                      suspension.lifted_acknowledged === true 
-                                        ? 'bg-green-500' 
-                                        : suspension.lifted_acknowledged === false
-                                        ? 'bg-yellow-500'
-                                        : 'bg-gray-300'
-                                    }`}></div>
-                                    <span className="text-xs text-gray-600">
-                                      {suspension.lifted_acknowledged === true 
-                                        ? 'User acknowledged lift ✓' 
-                                        : suspension.lifted_acknowledged === false
-                                        ? 'Awaiting user acknowledgment ⏳'
-                                        : 'No acknowledgment data'}
-                                    </span>
-                                  </div>
-                                  
-                                  {suspension.lifted_acknowledged === false && (
-                                    <button
-                                      onClick={() => handleAcknowledgeLift(suspension.id)}
-                                      className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-md transition-colors font-medium"
-                                      title="Mark as acknowledged by user"
-                                    >
-                                      Mark as Acknowledged
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-6">
-                          <History className="h-6 w-6 text-gray-400 mx-auto mb-1" />
-                          <p className="text-[10px] text-gray-500">
-                            No suspensions found
-                          </p>
-                        </div>
-                      )}
                     </div>
-                  </div>
                 </div>
 
-                <div className="flex justify-end pt-6 border-t border-gray-200">
+                <div className="flex justify-end pt-6 mt-6 border-t border-gray-200">
                   <button
                     onClick={() => setShowUserDetailsModal(false)}
                     className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
@@ -1473,6 +1503,82 @@ const BanRestrictUsers = () => {
           </div>,
           document.body
         )}
+
+      {/* Violation Details Modal */}
+      {showViolationModal && selectedViolation && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
+          <div className="bg-white rounded-lg shadow-xl border p-6 mx-4 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                Violation Details
+              </h3>
+              <button
+                onClick={() => setShowViolationModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Action Taken
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
+                  {selectedViolation.action_taken.replace('_', ' ')}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Date & Time
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
+                  {formatDate(selectedViolation.created_at)}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Violation Type
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
+                  {selectedViolation.violation_type.replace('_', ' ')}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Summary
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-2 rounded min-h-[60px]">
+                  {selectedViolation.violation_summary || 'No summary available'}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Admin
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
+                  {selectedViolation.admin_name || 'System'}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-gray-200 mt-4">
+              <button
+                onClick={() => setShowViolationModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
