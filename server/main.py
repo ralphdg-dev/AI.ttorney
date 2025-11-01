@@ -153,6 +153,11 @@ app.include_router(user_moderation_router, prefix="/api")
 from routes.suspension_appeals import user_router as appeals_user_router, admin_router as appeals_admin_router
 app.include_router(appeals_user_router, prefix="/api")
 app.include_router(appeals_admin_router, prefix="/api")
+# Import and include appeal routes (user and admin)
+from routes.user_appeals import router as user_appeals_router
+from routes.admin_appeals import router as admin_appeals_router
+app.include_router(user_appeals_router)
+app.include_router(admin_appeals_router)
 
 @app.get("/")
 async def root():
