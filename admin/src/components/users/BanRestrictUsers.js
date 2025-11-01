@@ -293,6 +293,16 @@ const BanRestrictUsers = () => {
           strikeAction,
           actionReason
         );
+      } else if (actionType === "lift_suspension") {
+        await adminModerationService.liftSuspension(
+          selectedUser.id,
+          actionReason
+        );
+      } else if (actionType === "lift_ban") {
+        await adminModerationService.liftBan(
+          selectedUser.id,
+          actionReason
+        );
       } else {
         await usersService.moderateUser(
           selectedUser.id,
@@ -669,17 +679,32 @@ const BanRestrictUsers = () => {
                   </>
                 )}
 
-                {user.account_status === "banned" && (
+                {user.account_status === "suspended" && (
                   <button
                     onClick={() => {
-                      openActionModal(user, "unban");
+                      openActionModal(user, "lift_suspension");
                       setOpenDropdown(null);
                     }}
                     className="flex items-center justify-between w-full px-3 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors"
                   >
                     <div className="flex items-center">
                       <Shield className="w-4 h-4 mr-3 text-green-500" />
-                      <span>Restore Access</span>
+                      <span>Lift Suspension</span>
+                    </div>
+                  </button>
+                )}
+
+                {user.account_status === "banned" && (
+                  <button
+                    onClick={() => {
+                      openActionModal(user, "lift_ban");
+                      setOpenDropdown(null);
+                    }}
+                    className="flex items-center justify-between w-full px-3 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors"
+                  >
+                    <div className="flex items-center">
+                      <Shield className="w-4 h-4 mr-3 text-green-500" />
+                      <span>Lift Ban</span>
                     </div>
                   </button>
                 )}
@@ -851,6 +876,10 @@ const BanRestrictUsers = () => {
                   ? "Remove Strike"
                   : actionType === "unban"
                   ? "Restore App Access"
+                  : actionType === "lift_suspension"
+                  ? "Lift Suspension"
+                  : actionType === "lift_ban"
+                  ? "Lift Ban"
                   : "Remove Restrictions"}
               </h3>
 
@@ -959,6 +988,41 @@ const BanRestrictUsers = () => {
                 </div>
               )}
 
+              {(actionType === "lift_suspension" || actionType === "lift_ban") && (
+                <div className="mb-4">
+                  <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-4">
+                    <div className="flex items-start">
+                      <Shield className="w-5 h-5 text-green-600 mt-0.5 mr-2" />
+                      <div>
+                        <h4 className="text-sm font-medium text-green-800">
+                          {actionType === "lift_suspension"
+                            ? "Lift User Suspension"
+                            : "Lift User Ban"}
+                        </h4>
+                        <p className="text-sm text-green-700 mt-1">
+                          {actionType === "lift_suspension"
+                            ? "User will be restored to active status and regain full access to the application."
+                            : "User will be restored to active status and regain full access to the application. All ban records will be cleared."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Reason for Lifting {actionType === "lift_suspension" ? "Suspension" : "Ban"} (Required):
+                  </label>
+                  <textarea
+                    value={actionReason}
+                    onChange={(e) => setActionReason(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={`Enter reason for lifting ${
+                      actionType === "lift_suspension" ? "suspension" : "ban"
+                    }...`}
+                  />
+                </div>
+              )}
+
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowActionModal(false)}
@@ -973,6 +1037,10 @@ const BanRestrictUsers = () => {
                     processing ||
                     (actionType !== "unban" &&
                       actionType !== "unrestrict" &&
+                      actionType !== "lift_suspension" &&
+                      actionType !== "lift_ban" &&
+                      !actionReason.trim()) ||
+                    ((actionType === "lift_suspension" || actionType === "lift_ban") &&
                       !actionReason.trim())
                   }
                   className={`px-4 py-2 text-sm font-medium text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed ${
@@ -999,6 +1067,10 @@ const BanRestrictUsers = () => {
                     ? "Remove Strike"
                     : actionType === "unban"
                     ? "Restore App Access"
+                    : actionType === "lift_suspension"
+                    ? "Lift Suspension"
+                    : actionType === "lift_ban"
+                    ? "Lift Ban"
                     : "Remove Restrictions"}
                 </button>
               </div>

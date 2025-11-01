@@ -82,7 +82,7 @@ const AdminDashboard = () => {
     if (pathname === '/forum/topics-threads') return 'manage-topics-threads';
     if (pathname === '/forum/reported-posts') return 'reported-posts';
     if (pathname === '/forum/reported-replies') return 'reported-replies';
-    if (pathname === '/users/ban-restrict-users') return 'ban-restrict-users';
+    if (pathname === '/appeals/ban-restrict-users') return 'ban-restrict-users';
     if (pathname === '/settings') return 'settings';
     if (pathname === '/help') return 'help';
     return 'dashboard';
@@ -105,7 +105,6 @@ const AdminDashboard = () => {
               <Route path="/users/legal-seekers" element={<ManageLegalSeekers />} />
               <Route path="/users/lawyers" element={<ManageLawyers />} />
               <Route path="/users/lawyer-applications" element={<ManageLawyerApplications />} />
-              <Route path="/users/ban-restrict-users" element={<BanRestrictUsersPage />} />
               
               {/* Admin Routes */}
               <Route path="/admin/manage-admins" element={<ManageAdminsPage />} />
@@ -120,6 +119,8 @@ const AdminDashboard = () => {
               <Route path="/forum/reported-posts" element={<ReportedPostsPage />} />
               <Route path="/forum/reported-replies" element={<ReportedRepliesPage />} />
               
+              {/* Appeals Routes */}
+              <Route path="/appeals/ban-restrict-users" element={<BanRestrictUsersPage />} />
               
               {/* Other Routes */}
               <Route path="/settings" element={<Settings />} />

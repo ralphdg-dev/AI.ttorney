@@ -1,4 +1,4 @@
-import { Users, Shield, BookOpen, MessageSquare } from 'lucide-react';
+import { Users, Shield, BookOpen, MessageSquare, Scale } from 'lucide-react';
 
 // Centralized menu configuration used by Sidebar and Header
 export const sections = [
@@ -13,7 +13,6 @@ export const sections = [
           { id: 'manage-legal-seekers', label: 'Manage Legal Seekers' },
           { id: 'manage-lawyers', label: 'Manage Lawyers' },
           { id: 'lawyer-applications', label: 'Lawyer Applications' },
-          { id: 'ban-restrict-users', label: 'Ban/Restrict Users' },
         ],
       },
       {
@@ -39,6 +38,13 @@ export const sections = [
           { id: 'manage-topics-threads', label: 'Manage Topics & Threads' },
           { id: 'reported-posts', label: 'Reported Posts' },
           { id: 'reported-replies', label: 'Reported Replies' },
+        ],
+      },
+      {
+        icon: Scale,
+        label: 'Appeals',
+        items: [
+          { id: 'ban-restrict-users', label: 'Ban/Restrict Users' },
         ],
       },
     ],

@@ -702,4 +702,107 @@ router.post('/lift-suspension/:user_id', authenticateAdmin, async (req, res) => 
   }
 });
 
+// Lift ban (admin override)
+router.post('/lift-ban/:user_id', authenticateAdmin, async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    const { reason } = req.body;
+    const adminId = req.admin?.id;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Reason is required'
+      });
+    }
+
+    // Get current user status
+    const { data: currentUser, error: fetchError } = await supabaseAdmin
+      .from('users')
+      .select('account_status, suspension_count, banned_at, banned_reason')
+      .eq('id', user_id)
+      .single();
+
+    if (fetchError || !currentUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    if (currentUser.account_status !== 'banned') {
+      return res.status(400).json({
+        success: false,
+        error: 'User is not currently banned'
+      });
+    }
+
+    // Update user status
+    const { error: userUpdateError } = await supabaseAdmin
+      .from('users')
+      .update({
+        account_status: 'active',
+        suspension_end: null,
+        banned_at: null,
+        banned_reason: null
+      })
+      .eq('id', user_id);
+
+    if (userUpdateError) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update user status'
+      });
+    }
+
+    // Update suspension record (bans are stored as permanent suspensions)
+    const { error: suspensionUpdateError } = await supabaseAdmin
+      .from('user_suspensions')
+      .update({
+        status: 'lifted',
+        lifted_at: new Date().toISOString(),
+        lifted_by: adminId,
+        lifted_reason: reason
+      })
+      .eq('user_id', user_id)
+      .eq('status', 'active')
+      .eq('suspension_type', 'permanent');
+
+    if (suspensionUpdateError) {
+      console.error('Error updating ban record:', suspensionUpdateError);
+      // Don't fail the request
+    }
+
+    // Log admin action
+    try {
+      await supabaseAdmin.from('admin_audit_logs').insert({
+        admin_id: adminId,
+        action: 'admin_lift_ban',
+        target_type: 'user',
+        target_id: user_id,
+        details: {
+          reason: reason,
+          suspension_count: currentUser.suspension_count,
+          previous_ban_reason: currentUser.banned_reason,
+          banned_at: currentUser.banned_at
+        }
+      });
+    } catch (auditError) {
+      console.warn('Failed to log admin action:', auditError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Ban lifted successfully'
+    });
+
+  } catch (error) {
+    console.error('Lift ban error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 module.exports = router;
