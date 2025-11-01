@@ -53,6 +53,7 @@ const BanRestrictUsers = () => {
 
   // Dropdown menu state
   const [openDropdown, setOpenDropdown] = useState(null);
+  const [dropdownPosition, setDropdownPosition] = useState({});
 
   const statusOptions = [
     { value: "all", label: "All Users" },
@@ -96,6 +97,7 @@ const BanRestrictUsers = () => {
     const handleClickOutside = (event) => {
       if (openDropdown && !event.target.closest('.relative')) {
         setOpenDropdown(null);
+        setDropdownPosition({});
       }
     };
 
@@ -339,6 +341,46 @@ const BanRestrictUsers = () => {
     setShowActionModal(true);
   };
 
+  // Smart dropdown positioning to prevent off-screen dropdowns
+  const handleDropdownToggle = (userId, event) => {
+    if (openDropdown === userId) {
+      setOpenDropdown(null);
+      setDropdownPosition({});
+      return;
+    }
+
+    const button = event.currentTarget;
+    const rect = button.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const dropdownHeight = 280; // Approximate height of dropdown menu
+    
+    // Calculate if dropdown would go off-screen
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    
+    let position = {};
+    
+    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+      // Position above the button
+      position = {
+        bottom: '100%',
+        marginBottom: '8px',
+        right: '100%',
+        marginRight: '8px'
+      };
+    } else {
+      // Default position (below/beside the button)
+      position = {
+        top: '0',
+        right: '100%',
+        marginRight: '8px'
+      };
+    }
+    
+    setDropdownPosition(position);
+    setOpenDropdown(userId);
+  };
+
   const openUserDetailsModal = async (user) => {
     setSelectedUser(user);
     setShowUserDetailsModal(true);
@@ -358,6 +400,31 @@ const BanRestrictUsers = () => {
     } catch (error) {
       console.error("Error fetching user details:", error);
       setError("Failed to load user details");
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  const handleAcknowledgeLift = async (suspensionId) => {
+    if (!selectedUser) return;
+
+    try {
+      setLoadingDetails(true);
+      
+      // Call the acknowledgment API
+      await adminModerationService.acknowledgeLift(selectedUser.id, suspensionId);
+      
+      // Refresh the suspensions data
+      const suspensionsResponse = await adminModerationService.getUserSuspensions(selectedUser.id);
+      setUserSuspensions(suspensionsResponse.data || []);
+      
+      // Clear any previous errors
+      setError(null);
+      
+      console.log('Suspension lift acknowledged successfully');
+    } catch (error) {
+      console.error("Error acknowledging lift:", error);
+      setError("Failed to acknowledge suspension lift: " + error.message);
     } finally {
       setLoadingDetails(false);
     }
@@ -636,7 +703,7 @@ const BanRestrictUsers = () => {
         <div className="flex justify-center">
           <div className="relative">
             <button
-              onClick={() => setOpenDropdown(openDropdown === user.id ? null : user.id)}
+              onClick={(e) => handleDropdownToggle(user.id, e)}
               className={`flex items-center justify-center w-8 h-8 text-gray-600 hover:text-gray-900 rounded-full transition-all duration-200 ${
                 openDropdown === user.id ? 'bg-gray-200' : 'hover:bg-gray-100'
               }`}
@@ -646,13 +713,17 @@ const BanRestrictUsers = () => {
 
           {/* Dropdown Menu */}
           {openDropdown === user.id && (
-            <div className="absolute right-full mr-2 top-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+            <div 
+              className="absolute w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+              style={dropdownPosition}
+            >
               <div className="py-2">
                 {/* View Details - Always available */}
                 <button
                   onClick={() => {
                     openUserDetailsModal(user);
                     setOpenDropdown(null);
+                    setDropdownPosition({});
                   }}
                   className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                 >
@@ -667,6 +738,7 @@ const BanRestrictUsers = () => {
                   onClick={() => {
                     openActionModal(user, "add_strike");
                     setOpenDropdown(null);
+                    setDropdownPosition({});
                   }}
                   className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                 >
@@ -682,6 +754,7 @@ const BanRestrictUsers = () => {
                     onClick={() => {
                       openActionModal(user, "remove_strike");
                       setOpenDropdown(null);
+                      setDropdownPosition({});
                     }}
                     className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
@@ -702,6 +775,7 @@ const BanRestrictUsers = () => {
                       onClick={() => {
                         openActionModal(user, "suspend_7days");
                         setOpenDropdown(null);
+                        setDropdownPosition({});
                       }}
                       className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                     >
@@ -714,6 +788,7 @@ const BanRestrictUsers = () => {
                       onClick={() => {
                         openActionModal(user, "ban");
                         setOpenDropdown(null);
+                        setDropdownPosition({});
                       }}
                       className="flex items-center justify-between w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     >
@@ -730,6 +805,7 @@ const BanRestrictUsers = () => {
                     onClick={() => {
                       openActionModal(user, "lift_suspension");
                       setOpenDropdown(null);
+                      setDropdownPosition({});
                     }}
                     className="flex items-center justify-between w-full px-3 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors"
                   >
@@ -745,6 +821,7 @@ const BanRestrictUsers = () => {
                     onClick={() => {
                       openActionModal(user, "lift_ban");
                       setOpenDropdown(null);
+                      setDropdownPosition({});
                     }}
                     className="flex items-center justify-between w-full px-3 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors"
                   >
@@ -1132,7 +1209,7 @@ const BanRestrictUsers = () => {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
             <div
               className="bg-white rounded-md shadow-lg border p-5 mx-4 max-h-[90vh] overflow-y-auto"
-              style={{ width: "600px" }}
+              style={{ width: "900px", maxWidth: "95vw" }}
             >
               <div className="mt-3">
                 <div className="flex justify-between items-center mb-6">
@@ -1245,56 +1322,28 @@ const BanRestrictUsers = () => {
                       </div>
 
                       {userViolations.length > 0 ? (
-                        <div className="overflow-hidden border border-gray-200 rounded-lg">
-                          <div className="max-h-32 overflow-y-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50 sticky top-0">
-                                <tr>
-                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                    Action
-                                  </th>
-                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                    Date
-                                  </th>
-                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                    Details
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                {userViolations.map((violation) => (
-                                  <tr
-                                    key={violation.id}
-                                    className="hover:bg-gray-50"
-                                  >
-                                    <td className="px-2 py-1.5">
-                                      <div className="text-[9px] font-medium text-gray-900">
-                                        {violation.action_taken.replace(
-                                          "_",
-                                          " "
-                                        )}
-                                      </div>
-                                    </td>
-                                    <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
-                                      {formatDate(violation.created_at)}
-                                    </td>
-                                    <td className="px-2 py-1.5 max-w-32">
-                                      <div
-                                        className="text-[9px] text-gray-700 truncate"
-                                        title={violation.violation_summary}
-                                      >
-                                        {violation.violation_summary ||
-                                          violation.violation_type.replace(
-                                            "_",
-                                            " "
-                                          )}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                        <div className="space-y-2">
+                          {userViolations.map((violation) => (
+                            <div
+                              key={violation.id}
+                              className="bg-gray-50 rounded-lg p-3 border border-gray-200"
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex-1">
+                                  <div className="text-xs font-medium text-gray-900 mb-1">
+                                    {violation.action_taken.replace("_", " ").toUpperCase()}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {formatDate(violation.created_at)}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-xs text-gray-700">
+                                {violation.violation_summary ||
+                                  violation.violation_type.replace("_", " ")}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : (
                         <div className="text-center py-6">
@@ -1321,57 +1370,83 @@ const BanRestrictUsers = () => {
                       </div>
 
                       {userSuspensions.length > 0 ? (
-                        <div className="overflow-hidden border border-gray-200 rounded-lg">
-                          <div className="max-h-32 overflow-y-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50 sticky top-0">
-                                <tr>
-                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                    Type
-                                  </th>
-                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                    Status
-                                  </th>
-                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                    Date
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                {userSuspensions.map((suspension) => (
-                                  <tr
-                                    key={suspension.id}
-                                    className="hover:bg-gray-50"
-                                  >
-                                    <td className="px-2 py-1.5">
-                                      <div className="text-[9px] font-medium text-gray-900">
-                                        {suspension.suspension_type} #
-                                        {suspension.suspension_number}
-                                      </div>
-                                    </td>
-                                    <td className="px-2 py-1.5">
-                                      <div className="text-[9px]">
-                                        <div
-                                          className={`font-medium ${
-                                            suspension.status === "active"
-                                              ? "text-red-600"
-                                              : suspension.status === "lifted"
-                                              ? "text-green-600"
-                                              : "text-gray-600"
-                                          }`}
-                                        >
-                                          {suspension.status}
-                                        </div>
-                                      </div>
-                                    </td>
-                                    <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
-                                      {formatDate(suspension.started_at)}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                        <div className="space-y-3">
+                          {userSuspensions.map((suspension) => (
+                            <div
+                              key={suspension.id}
+                              className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                            >
+                              <div className="flex justify-between items-start mb-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-sm font-medium text-gray-900">
+                                      {suspension.suspension_type.charAt(0).toUpperCase() + suspension.suspension_type.slice(1)} #{suspension.suspension_number}
+                                    </span>
+                                    <span
+                                      className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                        suspension.status === "active"
+                                          ? "bg-red-100 text-red-700"
+                                          : suspension.status === "lifted"
+                                          ? "bg-green-100 text-green-700"
+                                          : "bg-gray-100 text-gray-700"
+                                      }`}
+                                    >
+                                      {suspension.status.charAt(0).toUpperCase() + suspension.status.slice(1)}
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-gray-500 mb-2">
+                                    Started: {formatDate(suspension.started_at)}
+                                  </div>
+                                  {suspension.ends_at && (
+                                    <div className="text-xs text-gray-500 mb-2">
+                                      Ends: {formatDate(suspension.ends_at)}
+                                    </div>
+                                  )}
+                                  {suspension.lifted_at && (
+                                    <div className="text-xs text-gray-500 mb-2">
+                                      Lifted: {formatDate(suspension.lifted_at)}
+                                    </div>
+                                  )}
+                                  {suspension.lifted_reason && (
+                                    <div className="text-xs text-gray-700 mb-2">
+                                      Lift Reason: {suspension.lifted_reason}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {suspension.status === 'lifted' && (
+                                <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-3 h-3 rounded-full ${
+                                      suspension.lifted_acknowledged === true 
+                                        ? 'bg-green-500' 
+                                        : suspension.lifted_acknowledged === false
+                                        ? 'bg-yellow-500'
+                                        : 'bg-gray-300'
+                                    }`}></div>
+                                    <span className="text-xs text-gray-600">
+                                      {suspension.lifted_acknowledged === true 
+                                        ? 'User acknowledged lift ✓' 
+                                        : suspension.lifted_acknowledged === false
+                                        ? 'Awaiting user acknowledgment ⏳'
+                                        : 'No acknowledgment data'}
+                                    </span>
+                                  </div>
+                                  
+                                  {suspension.lifted_acknowledged === false && (
+                                    <button
+                                      onClick={() => handleAcknowledgeLift(suspension.id)}
+                                      className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-md transition-colors font-medium"
+                                      title="Mark as acknowledged by user"
+                                    >
+                                      Mark as Acknowledged
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       ) : (
                         <div className="text-center py-6">

@@ -135,6 +135,54 @@ class AdminModerationService {
     }
   }
 
+  // Mark lifted suspension as acknowledged
+  async acknowledgeLift(userId, suspensionId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/moderation/acknowledge-lift/${userId}/${suspensionId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to acknowledge lift');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Acknowledge lift error:', error);
+      throw error;
+    }
+  }
+
+  // Get unacknowledged lifted suspensions for user notifications
+  async getUnacknowledgedLifts(userId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/moderation/unacknowledged-lifts/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch unacknowledged lifts');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Get unacknowledged lifts error:', error);
+      throw error;
+    }
+  }
+
   // Helper method to format violation action for API
   formatModerationAction(action, postContent, adminReason, reportId = null, contentId = null, duration = 'permanent') {
     return {
