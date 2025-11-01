@@ -44,7 +44,7 @@ export const sections = [
         icon: Scale,
         label: 'Appeals',
         items: [
-          { id: 'ban-restrict-users', label: 'Ban/Restrict Users' },
+          { id: 'ban-restrict-users', label: 'User Sanctions' },
         ],
       },
     ],

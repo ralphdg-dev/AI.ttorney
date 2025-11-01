@@ -224,6 +224,7 @@ const BanRestrictUsers = () => {
       console.log("Users API response:", response);
       console.log("Raw users from API:", response.data?.length || 0);
       console.log("User statuses in response:", response.data?.map(u => ({ id: u.id, status: u.account_status })) || []);
+      console.log("Suspension data:", response.data?.map(u => ({ id: u.id, status: u.account_status, suspension_end: u.suspension_end })) || []);
       console.log("After filtering:", filteredUsers.length);
       console.log("Filter applied:", statusFilter);
       console.log("Pagination info:", response.pagination);
@@ -555,7 +556,52 @@ const BanRestrictUsers = () => {
                   ? "3 suspensions - eligible for permanent ban"
                   : `${suspensionCount} suspension${
                       suspensionCount > 1 ? "s" : ""
-                    } (7 days each)`}
+                    }`}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "suspension_ends",
+      header: "SUSPENSION ENDS",
+      align: "center",
+      render: (user) => {
+        // Check if user is currently suspended
+        if (user.account_status !== "suspended") {
+          return (
+            <div className="text-center text-sm text-gray-400">
+              N/A
+            </div>
+          );
+        }
+
+        // Get suspension end date from user data
+        const suspensionEndDate = user.suspension_end;
+        
+        if (!suspensionEndDate) {
+          return (
+            <div className="text-center text-sm text-gray-500">
+              Unknown
+            </div>
+          );
+        }
+
+        const endDate = new Date(suspensionEndDate);
+        const now = new Date();
+        const isExpired = endDate <= now;
+
+        return (
+          <div className="text-center">
+            <div className={`text-sm font-medium ${
+              isExpired ? "text-green-600" : "text-orange-600"
+            }`}>
+              {formatDate(suspensionEndDate)}
+            </div>
+            {isExpired && (
+              <div className="text-xs text-green-500 mt-1">
+                Expired
               </div>
             )}
           </div>
@@ -727,7 +773,7 @@ const BanRestrictUsers = () => {
             <Shield size={14} />
           </div>
           <div className="flex flex-col justify-center">
-            <h2 className="text-[12px] font-semibold text-gray-900">Ban/Restrict Users</h2>
+            <h2 className="text-[12px] font-semibold text-gray-900">User Sanctions</h2>
             <p className="text-[10px] text-gray-500 mt-0.5">Manage app bans, forum restrictions and user strikes.</p>
           </div>
         </div>
