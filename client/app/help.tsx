@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -6,16 +6,20 @@ import {
   TouchableOpacity,
   TextInput,
   Linking,
-  Image,
   Platform,
   KeyboardAvoidingView,
   Animated,
+  Modal,
+  Alert,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../constants/Colors";
 import Header from "@/components/Header";
+
+const { width, height } = Dimensions.get("window");
 
 // Skeleton Loading Component
 const SkeletonLoader = () => {
@@ -45,17 +49,12 @@ const SkeletonLoader = () => {
 
   return (
     <View style={tw`px-6`}>
-      {/* Search Bar Skeleton */}
       <Animated.View
         style={[tw`h-12 bg-gray-200 rounded-xl mb-6`, { opacity }]}
       />
-
-      {/* FAQ Title Skeleton */}
       <Animated.View
         style={[tw`h-5 w-48 bg-gray-200 rounded mb-3`, { opacity }]}
       />
-
-      {/* FAQ Items Skeleton */}
       {[1, 2, 3, 4].map((item) => (
         <Animated.View
           key={item}
@@ -68,12 +67,9 @@ const SkeletonLoader = () => {
           <View style={tw`h-4 bg-gray-200 rounded w-1/2`} />
         </Animated.View>
       ))}
-
-      {/* Contact Section Skeleton */}
       <Animated.View
         style={[tw`h-5 w-32 bg-gray-200 rounded mt-8 mb-3`, { opacity }]}
       />
-
       <View style={tw`flex-row justify-between`}>
         {[1, 2].map((item) => (
           <Animated.View
@@ -99,6 +95,32 @@ export default function HelpAndSupport() {
   const [search, setSearch] = useState("");
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+
+  // Email form states
+  const [emailName, setEmailName] = useState("");
+  const [emailAddress, setEmailAddress] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+
+  // Fade animation for modal
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (showEmailForm) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showEmailForm]);
 
   const faqs = [
     {
@@ -114,81 +136,27 @@ export default function HelpAndSupport() {
     {
       question: "What legal topics does Ai.ttorney cover?",
       answer:
-        "The platform focuses on five key areas: Family Law (marriage, annulment, custody), Civil Law (contracts, property), Criminal Law (theft, estafa, self-defense), Labor Law (termination, benefits), and Consumer Law (consumer rights, warranties).",
+        "The platform focuses on five key areas: Family Law, Civil Law, Criminal Law, Labor Law, and Consumer Law.",
     },
     {
       question: "Is the chatbot's advice legally binding?",
       answer:
-        "No. The chatbot provides educational information based on Philippine law, but it does not constitute legal advice or create a lawyer-client relationship. For specific cases, consult a verified lawyer through our Legal Aid Directory.",
+        "No. The chatbot provides educational information based on Philippine law, but it does not constitute legal advice or create a lawyer-client relationship.",
     },
     {
       question: "How do I find a lawyer near me?",
       answer:
-        "Go to the Legal Aid Directory and use the filters to search by location, specialization, and consultation mode (online or onsite). You can also view law firms on the map based on your current location.",
+        "Go to the Legal Aid Directory and use the filters to search by location, specialization, and consultation mode.",
     },
     {
       question: "How does lawyer verification work?",
       answer:
-        "All lawyers are verified through the Supreme Court Roll of Attorneys or IBP QR code validation. Only verified lawyers can respond in the Community Forum and appear in the Legal Aid Directory.",
-    },
-    {
-      question: "Can I request a consultation with a lawyer?",
-      answer:
-        "Yes. Browse verified lawyer profiles in the Legal Aid Directory and submit a consultation request. You can only have one active request at a time. If rejected, you may submit another.",
-    },
-    {
-      question: "What languages does the app support?",
-      answer:
-        "Ai.ttorney is fully bilingual, offering content in both English and Filipino. The chatbot can understand Taglish queries and respond in your preferred language.",
-    },
-    {
-      question: "How do I post a question in the Community Forum?",
-      answer:
-        "Navigate to the Community Forum, select a legal category (Family, Civil, Labor, Criminal, or Consumer), and post your question. Only verified lawyers can respond to maintain quality and accuracy.",
-    },
-    {
-      question: "What happens if I post inappropriate content?",
-      answer:
-        "All posts are screened for inappropriate content. Users who violate community guidelines receive warning strikes. After three strikes, you will be banned from the forum.",
-    },
-    {
-      question: "Can I save my favorite articles or terms?",
-      answer:
-        "Yes! Registered users can bookmark articles, favorite glossary terms, and save chatbot conversations to their personalized dashboard for easy reference.",
-    },
-    {
-      question: "How can I contact support?",
-      answer:
-        "You can contact us directly by email or through our in-app chat support available from 9am to 6pm.",
-    },
-    {
-      question: "Why can't I log in?",
-      answer:
-        "Ensure your credentials are correct and your internet connection is stable. If the issue persists, contact support.",
-    },
-    {
-      question: "Can I use the app offline?",
-      answer:
-        "Some features like saved articles and glossary terms are available offline, but you'll need internet access for the chatbot, forum, and Legal Aid Directory.",
-    },
-    {
-      question: "How do I update my profile information?",
-      answer:
-        "Navigate to Settings > Profile and tap on any field to edit. Don't forget to save your changes.",
-    },
-    {
-      question: "Is my data secure?",
-      answer:
-        "Yes, we use industry-standard encryption and security measures to protect your personal information. All data handling complies with the Data Privacy Act of 2012.",
+        "All lawyers are verified through the Supreme Court Roll of Attorneys or IBP QR code validation.",
     },
   ];
 
-  // Simulate loading data
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 2000);
-
+    const timer = setTimeout(() => setIsLoading(false), 2000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -200,8 +168,56 @@ export default function HelpAndSupport() {
     setExpandedIndex(expandedIndex === index ? null : index);
   };
 
-  const handleEmailSupport = () => {
-    Linking.openURL("mailto:support@example.com?subject=App Support Request");
+  const handleEmailSupport = () => setShowEmailForm(true);
+
+  const handleCloseEmailForm = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowEmailForm(false);
+      setEmailName("");
+      setEmailAddress("");
+      setEmailSubject("");
+      setEmailMessage("");
+    });
+  };
+
+  const handleSendEmail = () => {
+    if (
+      !emailName.trim() ||
+      !emailAddress.trim() ||
+      !emailSubject.trim() ||
+      !emailMessage.trim()
+    ) {
+      Alert.alert(
+        "Missing Information",
+        "Please fill in all fields before sending."
+      );
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailAddress)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      return;
+    }
+
+    const subject = encodeURIComponent(emailSubject);
+    const body = encodeURIComponent(
+      `Name: ${emailName}\nEmail: ${emailAddress}\n\nMessage:\n${emailMessage}`
+    );
+
+    Linking.openURL(
+      `mailto:support@example.com?subject=${subject}&body=${body}`
+    );
+
+    Alert.alert(
+      "Success",
+      "Your email client will open. Please send the email to complete your request."
+    );
+    handleCloseEmailForm();
   };
 
   const handleCallSupport = () => {
@@ -262,6 +278,7 @@ export default function HelpAndSupport() {
                 >
                   Frequently Asked Questions
                 </Text>
+
                 {filteredFaqs.length > 0 ? (
                   filteredFaqs.map((item, index) => (
                     <View
@@ -274,17 +291,11 @@ export default function HelpAndSupport() {
                               ? Colors.primary.blue
                               : "#E5E7EB",
                           backgroundColor: "#F9FAFB",
-                          shadowColor: "#000",
-                          shadowOffset: { width: 0, height: 1 },
-                          shadowOpacity: 0.05,
-                          shadowRadius: 2,
-                          elevation: 1,
                         },
                       ]}
                     >
                       <TouchableOpacity
                         onPress={() => handleExpand(index)}
-                        activeOpacity={0.7}
                         style={tw`flex-row justify-between items-center`}
                       >
                         <Text
@@ -339,22 +350,15 @@ export default function HelpAndSupport() {
                 </Text>
 
                 <View style={tw`flex-row justify-between`}>
-                  {/* Email */}
                   <TouchableOpacity
                     style={[
                       tw`flex-1 items-center p-4 mr-2 rounded-xl border`,
                       {
                         borderColor: "#E5E7EB",
                         backgroundColor: "#F9FAFB",
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.05,
-                        shadowRadius: 3,
-                        elevation: 2,
                       },
                     ]}
                     onPress={handleEmailSupport}
-                    activeOpacity={0.7}
                   >
                     <View
                       style={[
@@ -383,22 +387,15 @@ export default function HelpAndSupport() {
                     </Text>
                   </TouchableOpacity>
 
-                  {/* Call */}
                   <TouchableOpacity
                     style={[
                       tw`flex-1 items-center p-4 ml-2 rounded-xl border`,
                       {
                         borderColor: "#E5E7EB",
                         backgroundColor: "#F9FAFB",
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.05,
-                        shadowRadius: 3,
-                        elevation: 2,
                       },
                     ]}
                     onPress={handleCallSupport}
-                    activeOpacity={0.7}
                   >
                     <View
                       style={[
@@ -428,42 +425,184 @@ export default function HelpAndSupport() {
                   </TouchableOpacity>
                 </View>
               </View>
-
-              {/* Additional Help Section */}
-              <View style={tw`px-6 mt-6`}>
-                <View
-                  style={[
-                    tw`p-4 rounded-xl`,
-                    { backgroundColor: Colors.primary.blue + "10" },
-                  ]}
-                >
-                  <View style={tw`flex-row items-center mb-2`}>
-                    <Ionicons
-                      name="information-circle"
-                      size={20}
-                      color={Colors.primary.blue}
-                    />
-                    <Text
-                      style={[
-                        tw`text-sm font-semibold ml-2`,
-                        { color: Colors.text.head },
-                      ]}
-                    >
-                      Need More Help?
-                    </Text>
-                  </View>
-                  <Text
-                    style={[tw`text-xs leading-5`, { color: Colors.text.sub }]}
-                  >
-                    Our support team is available Monday to Friday, 9am to 6pm.
-                    We typically respond within 24 hours.
-                  </Text>
-                </View>
-              </View>
             </>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Responsive Email Form Modal */}
+      {showEmailForm && (
+        <Modal
+          visible={showEmailForm}
+          transparent={true}
+          animationType="none"
+          onRequestClose={handleCloseEmailForm}
+        >
+          <Animated.View
+            style={[
+              tw`flex-1 bg-black bg-opacity-50 justify-center items-center`,
+              { opacity: fadeAnim },
+            ]}
+          >
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={[
+                tw`bg-white rounded-2xl p-6`,
+                {
+                  width: Math.min(width * 0.9, 600),
+                  maxHeight: height * 0.85,
+                },
+              ]}
+            >
+              {/* Header */}
+              <View style={tw`flex-row items-center justify-between mb-4`}>
+                <Text
+                  style={[tw`text-xl font-bold`, { color: Colors.text.head }]}
+                >
+                  Contact Support
+                </Text>
+                <TouchableOpacity onPress={handleCloseEmailForm}>
+                  <Ionicons name="close" size={28} color={Colors.text.head} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={tw`pb-4`}
+              >
+                {/* Name Input */}
+                <View style={tw`mb-4`}>
+                  <Text
+                    style={[
+                      tw`text-sm font-semibold mb-2`,
+                      { color: Colors.text.head },
+                    ]}
+                  >
+                    Your Name
+                  </Text>
+                  <TextInput
+                    style={[
+                      tw`border rounded-xl px-4 py-3 text-base`,
+                      { borderColor: "#E5E7EB", color: Colors.text.head },
+                    ]}
+                    placeholder="Enter your name"
+                    placeholderTextColor="#9CA3AF"
+                    value={emailName}
+                    onChangeText={setEmailName}
+                  />
+                </View>
+
+                {/* Email Input */}
+                <View style={tw`mb-4`}>
+                  <Text
+                    style={[
+                      tw`text-sm font-semibold mb-2`,
+                      { color: Colors.text.head },
+                    ]}
+                  >
+                    Your Email
+                  </Text>
+                  <TextInput
+                    style={[
+                      tw`border rounded-xl px-4 py-3 text-base`,
+                      { borderColor: "#E5E7EB", color: Colors.text.head },
+                    ]}
+                    placeholder="Enter your email"
+                    placeholderTextColor="#9CA3AF"
+                    value={emailAddress}
+                    onChangeText={setEmailAddress}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                {/* Subject Input */}
+                <View style={tw`mb-4`}>
+                  <Text
+                    style={[
+                      tw`text-sm font-semibold mb-2`,
+                      { color: Colors.text.head },
+                    ]}
+                  >
+                    Subject
+                  </Text>
+                  <TextInput
+                    style={[
+                      tw`border rounded-xl px-4 py-3 text-base`,
+                      { borderColor: "#E5E7EB", color: Colors.text.head },
+                    ]}
+                    placeholder="Brief description of your issue"
+                    placeholderTextColor="#9CA3AF"
+                    value={emailSubject}
+                    onChangeText={setEmailSubject}
+                  />
+                </View>
+
+                {/* Message Input */}
+                <View style={tw`mb-4`}>
+                  <Text
+                    style={[
+                      tw`text-sm font-semibold mb-2`,
+                      { color: Colors.text.head },
+                    ]}
+                  >
+                    Message
+                  </Text>
+                  <TextInput
+                    style={[
+                      tw`border rounded-xl px-4 py-3 text-base`,
+                      {
+                        borderColor: "#E5E7EB",
+                        color: Colors.text.head,
+                        minHeight: 120,
+                        textAlignVertical: "top",
+                      },
+                    ]}
+                    placeholder="Describe your issue or question in detail"
+                    placeholderTextColor="#9CA3AF"
+                    value={emailMessage}
+                    onChangeText={setEmailMessage}
+                    multiline
+                    numberOfLines={5}
+                  />
+                </View>
+
+                {/* Buttons */}
+                <View style={tw`flex-row justify-between mt-4 mb-2`}>
+                  <TouchableOpacity
+                    style={[
+                      tw`flex-1 py-3 rounded-xl mr-2 border`,
+                      { borderColor: Colors.primary.blue },
+                    ]}
+                    onPress={handleCloseEmailForm}
+                  >
+                    <Text
+                      style={[
+                        tw`text-center font-semibold`,
+                        { color: Colors.primary.blue },
+                      ]}
+                    >
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      tw`flex-1 py-3 rounded-xl ml-2`,
+                      { backgroundColor: Colors.primary.blue },
+                    ]}
+                    onPress={handleSendEmail}
+                  >
+                    <Text style={tw`text-center text-white font-semibold`}>
+                      Send Email
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </Animated.View>
+        </Modal>
+      )}
     </View>
   );
 }
