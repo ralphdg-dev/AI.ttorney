@@ -332,7 +332,7 @@ export default function HelpAndSupport() {
                   <View style={tw`items-center py-8`}>
                     <Ionicons name="search-outline" size={48} color="#D1D5DB" />
                     <Text style={[tw`text-sm text-gray-500 mt-3`]}>
-                      No results found for "{search}"
+                      No results found for &quot;{search}&quot;
                     </Text>
                   </View>
                 )}
