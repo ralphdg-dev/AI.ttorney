@@ -296,10 +296,10 @@ class UsersService {
           duration
         );
         return await adminModerationService.applyModerationAction(id, actionData);
-      } else if (action === 'restrict') {
+      } else if (action === 'suspend_7days') {
         const actionData = adminModerationService.formatModerationAction(
-          'restrict',
-          `Manual forum restriction by admin: ${reason}`,
+          'suspend_7days',
+          `Manual 7-day suspension by admin: ${reason}`,
           reason,
           null, // reportId
           null, // contentId

@@ -700,7 +700,7 @@ const BanRestrictUsers = () => {
                   <>
                     <button
                       onClick={() => {
-                        openActionModal(user, "restrict");
+                        openActionModal(user, "suspend_7days");
                         setOpenDropdown(null);
                       }}
                       className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
@@ -914,8 +914,8 @@ const BanRestrictUsers = () => {
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 {actionType === "ban"
                   ? "Permanently Ban User from App"
-                  : actionType === "restrict"
-                  ? "Restrict User (View Only)"
+                  : actionType === "suspend_7days"
+                  ? "Suspend User (7 Days)"
                   : actionType === "add_strike"
                   ? "Add Strike"
                   : actionType === "remove_strike"
@@ -939,7 +939,7 @@ const BanRestrictUsers = () => {
                 </div>
               </div>
 
-              {(actionType === "ban" || actionType === "restrict") && (
+              {(actionType === "ban" || actionType === "suspend_7days") && (
                 <>
                   <div className="mb-4">
                     <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
@@ -949,12 +949,12 @@ const BanRestrictUsers = () => {
                           <h4 className="text-sm font-medium text-blue-800">
                             {actionType === "ban"
                               ? "Permanent App Ban"
-                              : "Forum Restriction"}
+                              : "7-Day Suspension"}
                           </h4>
                           <p className="text-sm text-blue-700 mt-1">
                             {actionType === "ban"
                               ? "User will be permanently banned from the entire application and cannot access any features."
-                              : "User can view forum content but cannot create posts or replies (applies to both user and lawyer accounts)."}
+                              : "User will be suspended for 7 days and cannot access the application during this period."}
                           </p>
                         </div>
                       </div>
@@ -972,7 +972,7 @@ const BanRestrictUsers = () => {
                       rows={3}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder={`Enter reason for ${
-                        actionType === "ban" ? "permanent app ban" : "forum restriction"
+                        actionType === "ban" ? "permanent app ban" : "7-day suspension"
                       }...`}
                     />
                   </div>
@@ -1092,7 +1092,7 @@ const BanRestrictUsers = () => {
                   className={`px-4 py-2 text-sm font-medium text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed ${
                     actionType === "ban"
                       ? "bg-red-600 hover:bg-red-700"
-                      : actionType === "restrict"
+                      : actionType === "suspend_7days"
                       ? "bg-yellow-600 hover:bg-yellow-700"
                       : actionType === "add_strike"
                       ? "bg-orange-600 hover:bg-orange-700"
@@ -1105,8 +1105,8 @@ const BanRestrictUsers = () => {
                     ? "Processing..."
                     : actionType === "ban"
                     ? "Permanently Ban from App"
-                    : actionType === "restrict"
-                    ? "Restrict User"
+                    : actionType === "suspend_7days"
+                    ? "Suspend User (7 Days)"
                     : actionType === "add_strike"
                     ? "Add Strike"
                     : actionType === "remove_strike"
