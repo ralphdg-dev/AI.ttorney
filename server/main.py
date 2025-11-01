@@ -149,6 +149,11 @@ app.include_router(admin_moderation_router, prefix="/api")
 from routes.user_moderation import router as user_moderation_router
 app.include_router(user_moderation_router, prefix="/api")
 
+# Import and include suspension appeals routes
+from routes.suspension_appeals import user_router as appeals_user_router, admin_router as appeals_admin_router
+app.include_router(appeals_user_router, prefix="/api")
+app.include_router(appeals_admin_router, prefix="/api")
+
 @app.get("/")
 async def root():
     """Health check endpoint"""

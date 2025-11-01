@@ -14,6 +14,7 @@ import ManageLawyerApplications from './pages/users/ManageLawyerApplications';
 import SuspendedAccountsPage from './pages/users/SuspendedAccountsPage';
 import ManageAdminsPage from './pages/admin/ManageAdmins';
 import ManageGlossaryTerms from './pages/legal-resources/ManageGlossaryTerms';
+import ManageAppeals from './pages/moderation/ManageAppeals';
 
 // Forum Management Pages
 import ManageTopicsThreadsPage from './pages/forum/ManageTopicsThreadsPage';
@@ -122,6 +123,7 @@ const AdminDashboard = () => {
     if (pathname === '/users/lawyers') return 'manage-lawyers';
     if (pathname === '/users/lawyer-applications') return 'lawyer-applications';
     if (pathname === '/users/suspended-accounts') return 'suspended-accounts';
+    if (pathname === '/moderation/appeals') return 'manage-appeals';
     if (pathname === '/admin/manage-admins') return 'manage-admins';
     if (pathname === '/admin/audit-logs') return 'audit-logs';
     if (pathname === '/legal-resources/glossary-terms') return 'manage-glossary-terms';
@@ -158,6 +160,9 @@ const AdminDashboard = () => {
               <Route path="/users/lawyers" element={<ManageLawyers />} />
               <Route path="/users/lawyer-applications" element={<ManageLawyerApplications />} />
               <Route path="/users/suspended-accounts" element={<SuspendedAccountsPage />} />
+              
+              {/* Moderation Routes */}
+              <Route path="/moderation/appeals" element={<ManageAppeals />} />
               
               {/* Admin Routes */}
               <Route path="/admin/manage-admins" element={<ManageAdminsPage />} />
