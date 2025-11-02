@@ -25,7 +25,7 @@ import { createShadowStyle } from "../utils/shadowUtils";
 import { LAYOUT } from "../constants/LayoutConstants";
 
 const { width: screenWidth } = Dimensions.get("window");
-const SIDEBAR_WIDTH = screenWidth * 0.8;
+const SIDEBAR_WIDTH = Math.min(screenWidth * 0.75, 320);
 const ANIMATION_DURATION = 280;
 
 // Types

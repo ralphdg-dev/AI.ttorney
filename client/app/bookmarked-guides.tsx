@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import { View, FlatList, useWindowDimensions, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
@@ -14,14 +14,22 @@ import CategoryScroller from "@/components/glossary/CategoryScroller";
 import Navbar from "@/components/Navbar";
 import { SidebarWrapper } from "@/components/AppSidebar";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
-import { useLegalArticles } from "@/hooks/useLegalArticles";
+import { useBookmarks } from "@/contexts/BookmarksContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { NetworkConfig } from '@/utils/networkConfig';
 import Button from "@/components/ui/Button";
 import { Filter, SortAsc } from "lucide-react-native";
 
+const API_BASE_URL = NetworkConfig.getApiUrl();
+
 export default function BookmarkedGuidesScreen() {
   const router = useRouter();
+  const { session } = useAuth();
+  const { bookmarkedGuideIds } = useBookmarks();
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [bookmarkedArticles, setBookmarkedArticles] = useState<ArticleItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const flatListRef = useRef<FlatList>(null);
   const { width } = useWindowDimensions();
 
@@ -29,34 +37,71 @@ export default function BookmarkedGuidesScreen() {
   const minCardWidth = 320;
   const numColumns = Math.max(1, Math.min(3, Math.floor((width - horizontalPadding * 2) / minCardWidth)));
 
-  // Use real articles from the hook instead of placeholders
-  const { articles: realArticles } = useLegalArticles();
-  
-  // For now, simulate a set of bookmarked IDs. Later, wire this to persisted user data.
-  const bookmarkedIds = useMemo(() => new Set<string>([]), []); // Empty for now - no placeholders
+  // Load bookmarked articles
+  useEffect(() => {
+    const loadBookmarkedArticles = async () => {
+      if (!session?.access_token) {
+        setBookmarkedArticles([]);
+        setLoading(false);
+        return;
+      }
 
-  // All bookmarked guides regardless of category/search
-  const allBookmarkedArticles: ArticleItem[] = useMemo(() => {
-    return realArticles
-      .filter((a: ArticleItem) => bookmarkedIds.has(a.id))
-      .map((a: ArticleItem) => ({ ...a, isBookmarked: true }));
-  }, [realArticles, bookmarkedIds]);
+      if (bookmarkedGuideIds.size === 0) {
+        setBookmarkedArticles([]);
+        setLoading(false);
+        return;
+      }
 
-  // Narrow to current category from already-bookmarked
-  const filteredByCategory = useMemo(() => {
-    return allBookmarkedArticles.filter((a) =>
-      activeCategory === "all" ? true : a.category?.toLowerCase() === activeCategory
-    );
-  }, [allBookmarkedArticles, activeCategory]);
+      try {
+        setLoading(true);
+        
+        const response = await fetch(`${API_BASE_URL}/api/legal/articles`);
 
-  // Apply search on top of category
-  const bookmarkedArticles: ArticleItem[] = useMemo(() => {
+        if (response.ok) {
+          const data = await response.json();
+          const articles = data.data || [];
+          
+          const bookmarked: ArticleItem[] = articles
+            .filter((article: any) => bookmarkedGuideIds.has(article.id))
+            .map((article: any) => ({
+              id: article.id,
+              title: article.title_en || article.title,
+              summary: article.description_en || article.description,
+              category: article.category,
+              isBookmarked: true,
+            }));
+          
+          setBookmarkedArticles(bookmarked);
+        }
+      } catch (error) {
+        console.error("Error loading bookmarked articles:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadBookmarkedArticles();
+  }, [bookmarkedGuideIds, session?.access_token]);
+
+  // Filter bookmarked articles by category and search
+  const filteredArticles = useMemo(() => {
+    let filtered = bookmarkedArticles;
+
+    // Filter by category
+    if (activeCategory !== "all") {
+      filtered = filtered.filter((a) => a.category?.toLowerCase() === activeCategory);
+    }
+
+    // Filter by search query
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return filteredByCategory;
-    return filteredByCategory.filter((a) =>
-      `${a.title}`.toLowerCase().includes(query) || `${a.summary}`.toLowerCase().includes(query)
-    );
-  }, [filteredByCategory, searchQuery]);
+    if (query) {
+      filtered = filtered.filter((a) =>
+        `${a.title}`.toLowerCase().includes(query) || `${a.summary}`.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [bookmarkedArticles, activeCategory, searchQuery]);
 
   const handleCategoryChange = (categoryId: string): void => {
     setActiveCategory(categoryId);
@@ -83,11 +128,11 @@ export default function BookmarkedGuidesScreen() {
       <View style={tw`px-5 mb-3`}>
         <HStack className="items-center justify-between">
           <GSText size="sm" style={{ color: Colors.text.sub }}>
-            {bookmarkedArticles.length} {bookmarkedArticles.length === 1 ? 'result' : 'results'}
+            {filteredArticles.length} {filteredArticles.length === 1 ? 'result' : 'results'}
             {activeCategory !== "all" && ` in ${activeCategory}`}
             {searchQuery && ` for "${searchQuery}"`}
           </GSText>
-          {bookmarkedArticles.length > 1 && (
+          {filteredArticles.length > 1 && (
             <HStack className="items-center">
               <SortAsc size={14} color={Colors.text.sub} />
               <GSText size="xs" className="ml-1" style={{ color: Colors.text.sub }}>
@@ -136,12 +181,16 @@ export default function BookmarkedGuidesScreen() {
         </Input>
       </Box>
 
-      {allBookmarkedArticles.length === 0 ? (
+      {loading ? (
+        <View style={tw`flex-1 items-center justify-center`}>
+          <GSText>Loading bookmarked guides...</GSText>
+        </View>
+      ) : bookmarkedArticles.length === 0 ? (
         renderEmptyState()
       ) : (
         <FlatList
           ref={flatListRef}
-          data={bookmarkedArticles}
+          data={filteredArticles}
           key={`${numColumns}-${activeCategory}`}
           keyExtractor={(item) => item.id}
           numColumns={numColumns}

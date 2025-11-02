@@ -33,6 +33,7 @@ import {
 } from "@/services/cacheService";
 import { NetworkConfig } from "@/utils/networkConfig";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBookmarks } from "@/contexts/BookmarksContext";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -64,7 +65,7 @@ export default function GlossaryScreen() {
   } = useLegalArticles();
   const [displayArticles, setDisplayArticles] = useState<ArticleItem[]>([]);
   const [isSearchingArticles, setIsSearchingArticles] = useState<boolean>(false);
-  const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
+  const { isBookmarked, toggleBookmark } = useBookmarks();
   
   // Animation and layout
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -258,10 +259,9 @@ export default function GlossaryScreen() {
       // For terms, return the data as-is since pagination is handled server-side
       return terms;
     } else {
-      // For articles, apply client-side filtering
-      return displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
+      return displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: isBookmarked(a.id) }));
     }
-  }, [activeTab, terms, displayArticles, bookmarks]);
+  }, [activeTab, terms, displayArticles, isBookmarked]);
 
   // Calculate pagination info based on tab
   const totalPages = activeTab === "terms" ? termsTotalPages : Math.ceil(currentData.length / ITEMS_PER_PAGE);
@@ -324,9 +324,9 @@ export default function GlossaryScreen() {
     }
   }, [activeTab, router]);
 
-  const handleToggleBookmark = useCallback((item: ArticleItem) => {
-    setBookmarks(prev => ({ ...prev, [item.id]: !prev[item.id] }));
-  }, []);
+  const handleToggleBookmark = useCallback(async (item: ArticleItem) => {
+    await toggleBookmark(item.id, item.title);
+  }, [toggleBookmark]);
 
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);

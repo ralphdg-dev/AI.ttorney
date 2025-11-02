@@ -160,6 +160,10 @@ from routes.admin_appeals import router as admin_appeals_router
 app.include_router(user_appeals_router)
 app.include_router(admin_appeals_router)
 
+# Import and include user favorites/bookmarks routes
+from routes.user_favorites import router as user_favorites_router
+app.include_router(user_favorites_router)
+
 @app.get("/")
 async def root():
     """Health check endpoint"""

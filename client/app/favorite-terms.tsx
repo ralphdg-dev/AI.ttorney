@@ -20,54 +20,16 @@ import { Star, Filter, SortAsc } from "lucide-react-native";
 import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import { useFavorites } from "@/contexts/FavoritesContext";
+import { NetworkConfig } from '@/utils/networkConfig';
+import { useAuth } from '@/contexts/AuthContext';
 
-// Sample favorite terms data - replace with actual API call
-const sampleFavoriteTerms: TermItem[] = [
-  {
-    id: "1",
-    title: "Annulment",
-    definition: "A court declaration that a marriage is invalid from the start, as if it never existed. Unlike divorce, which ends a valid marriage, annulment treats the marriage as if it was never legally valid.",
-    isFavorite: true,
-    filipinoTerm: "Pagpapawalang-bisa",
-    category: "Family"
-  },
-  {
-    id: "2",
-    title: "Employment Contract",
-    definition: "A legal agreement between a landlord and tenant that outlines the terms and conditions for renting a property.",
-    isFavorite: true,
-    filipinoTerm: "Kontrata sa Trabaho",
-    category: "Work"
-  },
-  {
-    id: "3",
-    title: "Habeas Corpus",
-    definition: "A legal writ requiring law enforcement to bring a prisoner before the court to determine if the person's imprisonment or detention is lawful.",
-    isFavorite: true,
-    filipinoTerm: "Habeas Corpus",
-    category: "Criminal"
-  },
-  {
-    id: "4",
-    title: "Power of Attorney",
-    definition: "A legal document that allows someone to make decisions on behalf of another person when they become unable to make decisions for themselves.",
-    isFavorite: true,
-    filipinoTerm: "Kapangyarihan ng Abogado",
-    category: "Civil"
-  },
-  {
-    id: "5",
-    title: "Consumer Protection",
-    definition: "Laws and regulations designed to protect buyers of goods and services from unfair business practices and defective products.",
-    isFavorite: true,
-    filipinoTerm: "Proteksyon sa Mamimili",
-    category: "Consumer"
-  }
-];
+const API_BASE_URL = NetworkConfig.getApiUrl();
 
 export default function FavoritesScreen() {
   const router = useRouter();
-  const { favoriteTermIds, loadFavorites } = useFavorites();
+  const { loadFavorites } = useFavorites();
+  const { session } = useAuth();
+  const [favoriteTerms, setFavoriteTerms] = useState<TermItem[]>([]);
   const [filteredTerms, setFilteredTerms] = useState<TermItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -75,24 +37,45 @@ export default function FavoritesScreen() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [scrollY] = useState(new Animated.Value(0));
 
-  // Get favorite terms from sample data based on favoriteTermIds - MEMOIZED to prevent infinite loop
-  const favoriteTerms = React.useMemo(() => 
-    sampleFavoriteTerms.filter(term => favoriteTermIds.has(term.id)),
-    [favoriteTermIds]
-  );
-
   const loadFavoriteTerms = useCallback(async () => {
+    if (!session?.access_token) {
+      setFavoriteTerms([]);
+      return;
+    }
+
     try {
       setLoading(true);
-      await loadFavorites();
+      
+      const response = await fetch(`${API_BASE_URL}/api/user/favorites/terms`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch favorites');
+
+      const data = await response.json();
+      
+      const terms: TermItem[] = data
+        .filter((fav: any) => fav.term)
+        .map((fav: any) => ({
+          id: fav.term.id.toString(),
+          title: fav.term.term_en,
+          definition: fav.term.definition_en,
+          filipinoTerm: fav.term.term_fil,
+          category: fav.term.category,
+          isFavorite: true,
+        }));
+      
+      setFavoriteTerms(terms);
+      await loadFavorites(); // Sync context
     } catch (error) {
-      console.error("Error loading favorite terms:", error);
-      Alert.alert("Error", "Failed to load favorite terms");
+      console.error("Error loading favorites:", error);
+      Alert.alert("Error", "Failed to load favorites");
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // loadFavorites is stable, no need in deps
+  }, [session, loadFavorites]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -102,8 +85,7 @@ export default function FavoritesScreen() {
 
   useEffect(() => {
     loadFavoriteTerms();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  }, [loadFavoriteTerms]);
 
   // Filter terms based on search query and category
   useEffect(() => {

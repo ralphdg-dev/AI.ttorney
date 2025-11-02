@@ -14,6 +14,7 @@ import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { GuestProvider } from "../contexts/GuestContext";
 import { GuestChatProvider } from "../contexts/GuestChatContext";
 import { FavoritesProvider } from "../contexts/FavoritesContext";
+import { BookmarksProvider } from "../contexts/BookmarksContext";
 import { ForumCacheProvider } from "../contexts/ForumCacheContext";
 import { ModerationProvider } from "../contexts/ModerationContext";
 import { SidebarProvider } from "../components/AppSidebar";
@@ -47,11 +48,12 @@ function AppContent() {
       <GuestChatProvider>
         <ModerationProvider>
         <FavoritesProvider>
-          <ForumCacheProvider>
-            <AuthGuard>
-              <SuspensionGuard>
-                <RouteErrorBoundary>
-                  <SidebarProvider>
+          <BookmarksProvider>
+            <ForumCacheProvider>
+              <AuthGuard>
+                <SuspensionGuard>
+                  <RouteErrorBoundary>
+                    <SidebarProvider>
                     <Stack screenOptions={{ headerShown: false }}>
                       <Stack.Screen name="index" options={{ headerShown: false }} />
                       <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -77,6 +79,7 @@ function AppContent() {
               </SuspensionGuard>
             </AuthGuard>
           </ForumCacheProvider>
+          </BookmarksProvider>
         </FavoritesProvider>
         </ModerationProvider>
       </GuestChatProvider>

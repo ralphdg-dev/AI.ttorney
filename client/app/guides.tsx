@@ -19,10 +19,13 @@ import { SidebarWrapper } from "@/components/AppSidebar";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import { useLegalArticles } from "@/hooks/useLegalArticles";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBookmarks } from "@/contexts/BookmarksContext";
 
 export default function GuidesScreen() {
   const router = useRouter();
   const { isGuestMode } = useAuth();
+  const { articles: legalArticles, loading, error, refetch, getArticlesByCategory, searchArticles } = useLegalArticles();
+  const { isBookmarked, toggleBookmark } = useBookmarks();
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -38,19 +41,10 @@ export default function GuidesScreen() {
   // FAANG approach: Always 1 column on mobile for better UX
   const numColumns = 1;
   const cardWidth = width - (horizontalPadding * 2);
-
-  // Fetch articles
-  const { articles: legalArticles, loading, error, refetch, getArticlesByCategory, searchArticles } = useLegalArticles();
-  console.log('Legal articles from hook:', { legalArticles, loading, error });
-
+  
   const [displayArticles, setDisplayArticles] = useState<ArticleItem[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const previousSearchRef = useRef<string>("");
-  
-  // Debug effect to track displayArticles changes
-  useEffect(() => {
-    console.log('Display articles updated:', displayArticles);
-  }, [displayArticles]);
 
   useEffect(() => {
     if (activeCategory === "all" && !searchQuery.trim()) {
@@ -62,8 +56,6 @@ export default function GuidesScreen() {
     { id: "guides", label: "Legal Guides" },
     { id: "terms", label: "Legal Terms" },
   ];
-
-  const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
 
   // Search debounce
   useEffect(() => {
@@ -107,8 +99,8 @@ export default function GuidesScreen() {
   }, [searchQuery, activeCategory, legalArticles, searchArticles, getArticlesByCategory]);
 
   const articlesToRender: ArticleItem[] = useMemo(() => {
-    return displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
-  }, [displayArticles, bookmarks]);
+    return displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: isBookmarked(a.id) }));
+  }, [displayArticles, isBookmarked]);
 
   // Pagination
   const totalArticles = articlesToRender.length;
@@ -140,8 +132,8 @@ export default function GuidesScreen() {
     router.push(`/article/${item.id}` as any);
   };
 
-  const handleToggleBookmark = (item: ArticleItem): void => {
-    setBookmarks((prev) => ({ ...prev, [item.id]: !prev[item.id] }));
+  const handleToggleBookmark = async (item: ArticleItem): Promise<void> => {
+    await toggleBookmark(item.id, item.title);
   };
 
   const onToggleChange = useCallback((id: string) => {
