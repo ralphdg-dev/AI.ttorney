@@ -13,6 +13,7 @@ import {
   Alert,
   Dimensions,
 } from "react-native";
+import axios from "axios";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
@@ -184,7 +185,7 @@ export default function HelpAndSupport() {
     });
   };
 
-  const handleSendEmail = () => {
+  const handleSendEmail = async () => {
     if (
       !emailName.trim() ||
       !emailAddress.trim() ||
@@ -204,20 +205,31 @@ export default function HelpAndSupport() {
       return;
     }
 
-    const subject = encodeURIComponent(emailSubject);
-    const body = encodeURIComponent(
-      `Name: ${emailName}\nEmail: ${emailAddress}\n\nMessage:\n${emailMessage}`
-    );
+    try {
+      const response = await axios.post(
+        "http://localhost:8000/api/support/email",
+        {
+          name: emailName,
+          email: emailAddress,
+          subject: emailSubject,
+          message: emailMessage,
+        }
+      );
 
-    Linking.openURL(
-      `mailto:support@example.com?subject=${subject}&body=${body}`
-    );
-
-    Alert.alert(
-      "Success",
-      "Your email client will open. Please send the email to complete your request."
-    );
-    handleCloseEmailForm();
+      if (response.data.success) {
+        Alert.alert("Success", response.data.message);
+        handleCloseEmailForm();
+      } else {
+        Alert.alert("Error", response.data.error || "Failed to send message.");
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.detail ||
+          "An error occurred while sending the request."
+      );
+    }
   };
 
   const handleCallSupport = () => {
