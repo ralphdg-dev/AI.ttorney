@@ -57,6 +57,21 @@ const BanRestrictUsers = () => {
   const [openDropdown, setOpenDropdown] = useState(null);
   const [dropdownPosition, setDropdownPosition] = useState({});
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openDropdown && !event.target.closest('.dropdown-container')) {
+        setOpenDropdown(null);
+        setDropdownPosition({});
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openDropdown]);
+
   const statusOptions = [
     { value: "all", label: "All Users" },
     { value: "active", label: "Active Users" },
@@ -353,30 +368,78 @@ const BanRestrictUsers = () => {
 
     const button = event.currentTarget;
     const rect = button.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
     const dropdownHeight = 280; // Approximate height of dropdown menu
+    const dropdownWidth = 192; // 48 * 4 = 192px (w-48)
     
-    // Calculate if dropdown would go off-screen
-    const spaceBelow = viewportHeight - rect.bottom;
-    const spaceAbove = rect.top;
+    // Find pagination controls and table container to avoid overlap
+    const paginationElement = document.querySelector('.flex.items-center.justify-between') || 
+                              document.querySelector('[class*="pagination"]');
+    const tableContainer = button.closest('.bg-white.rounded-lg') || button.closest('table');
+    
+    let spaceBelow, spaceAbove;
+    
+    if (paginationElement && tableContainer) {
+      const paginationRect = paginationElement.getBoundingClientRect();
+      const tableRect = tableContainer.getBoundingClientRect();
+      
+      // Calculate space between button and pagination
+      spaceBelow = paginationRect.top - rect.bottom - 16; // 16px buffer
+      spaceAbove = rect.top - tableRect.top;
+      
+      // If table is very short (like 1 row), force upward positioning
+      const tableHeight = tableRect.height;
+      if (tableHeight < dropdownHeight + 100) { // 100px buffer
+        spaceBelow = 0; // Force upward positioning
+      }
+    } else {
+      // Fallback to viewport calculation
+      const viewportHeight = window.innerHeight;
+      spaceBelow = viewportHeight - rect.bottom - 100; // 100px buffer for pagination
+      spaceAbove = rect.top;
+    }
+    
+    // Calculate horizontal space
+    const spaceLeft = rect.left;
+    const spaceRight = window.innerWidth - rect.right;
     
     let position = {};
     
-    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-      // Position above the button
-      position = {
-        bottom: '100%',
-        marginBottom: '8px',
-        right: '100%',
-        marginRight: '8px'
-      };
+    // Determine horizontal positioning
+    const useLeftSide = spaceLeft > dropdownWidth + 8; // 8px buffer
+    
+    // Determine vertical positioning
+    const useTopPosition = spaceBelow >= dropdownHeight || spaceAbove <= dropdownHeight;
+    
+    if (useLeftSide) {
+      // Position to the left of button
+      if (useTopPosition) {
+        position = {
+          top: '0',
+          right: '100%',
+          marginRight: '4px'
+        };
+      } else {
+        position = {
+          bottom: '0',
+          right: '100%',
+          marginRight: '4px'
+        };
+      }
     } else {
-      // Default position (below/beside the button)
-      position = {
-        top: '0',
-        right: '100%',
-        marginRight: '8px'
-      };
+      // Position to the right of button
+      if (useTopPosition) {
+        position = {
+          top: '0',
+          left: '100%',
+          marginLeft: '4px'
+        };
+      } else {
+        position = {
+          bottom: '0',
+          left: '100%',
+          marginLeft: '4px'
+        };
+      }
     }
     
     setDropdownPosition(position);
@@ -693,7 +756,7 @@ const BanRestrictUsers = () => {
       align: "center",
       render: (user) => (
         <div className="flex justify-center">
-          <div className="relative">
+          <div className="relative dropdown-container">
             <button
               onClick={(e) => handleDropdownToggle(user.id, e)}
               className={`flex items-center justify-center w-8 h-8 text-gray-600 hover:text-gray-900 rounded-full transition-all duration-200 ${
@@ -706,7 +769,7 @@ const BanRestrictUsers = () => {
           {/* Dropdown Menu */}
           {openDropdown === user.id && (
             <div 
-              className="absolute w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+              className="absolute w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-[9999]"
               style={dropdownPosition}
             >
               <div className="py-2">
