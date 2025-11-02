@@ -407,30 +407,6 @@ const BanRestrictUsers = () => {
     }
   };
 
-  const handleAcknowledgeLift = async (suspensionId) => {
-    if (!selectedUser) return;
-
-    try {
-      setLoadingDetails(true);
-      
-      // Call the acknowledgment API
-      await adminModerationService.acknowledgeLift(selectedUser.id, suspensionId);
-      
-      // Refresh the suspensions data
-      const suspensionsResponse = await adminModerationService.getUserSuspensions(selectedUser.id);
-      setUserSuspensions(suspensionsResponse.data || []);
-      
-      // Clear any previous errors
-      setError(null);
-      
-      console.log('Suspension lift acknowledged successfully');
-    } catch (error) {
-      console.error("Error acknowledging lift:", error);
-      setError("Failed to acknowledge suspension lift: " + error.message);
-    } finally {
-      setLoadingDetails(false);
-    }
-  };
 
   const formatDate = (dateString) => {
     if (!dateString) {
@@ -1408,9 +1384,6 @@ const BanRestrictUsers = () => {
                                   <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
                                     Dates
                                   </th>
-                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                    Action
-                                  </th>
                                 </tr>
                               </thead>
                             </table>
@@ -1425,31 +1398,11 @@ const BanRestrictUsers = () => {
                                         </div>
                                       </td>
                                       <td className="px-2 py-1.5">
-                                        <div className="space-y-1">
-                                          <div className={`inline-flex px-1.5 py-0.5 text-[8px] font-medium rounded-full ${
-                                            suspension.status === 'active' ? 'bg-red-100 text-red-700' :
-                                            suspension.status === 'lifted' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                                          }`}>
-                                            {suspension.status}
-                                          </div>
-                                          {suspension.status === 'lifted' && (
-                                            <div className="flex items-center gap-1">
-                                              <div className={`w-2 h-2 rounded-full ${
-                                                suspension.lifted_acknowledged === true 
-                                                  ? 'bg-green-500' 
-                                                  : suspension.lifted_acknowledged === false
-                                                  ? 'bg-yellow-500'
-                                                  : 'bg-gray-300'
-                                              }`}></div>
-                                              <span className="text-[8px] text-gray-600">
-                                                {suspension.lifted_acknowledged === true 
-                                                  ? 'Ack ✓' 
-                                                  : suspension.lifted_acknowledged === false
-                                                  ? 'Pending'
-                                                  : 'N/A'}
-                                              </span>
-                                            </div>
-                                          )}
+                                        <div className={`inline-flex px-1.5 py-0.5 text-[8px] font-medium rounded-full ${
+                                          suspension.status === 'active' ? 'bg-red-100 text-red-700' :
+                                          suspension.status === 'lifted' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                                        }`}>
+                                          {suspension.status}
                                         </div>
                                       </td>
                                       <td className="px-2 py-1.5 text-[9px] text-gray-500">
@@ -1462,17 +1415,6 @@ const BanRestrictUsers = () => {
                                             <div className="text-green-600">Lifted: {formatDate(suspension.lifted_at).split(',')[0]}</div>
                                           )}
                                         </div>
-                                      </td>
-                                      <td className="px-2 py-1.5 text-center">
-                                        {suspension.lifted_acknowledged === false && (
-                                          <button
-                                            onClick={() => handleAcknowledgeLift(suspension.id)}
-                                            className="px-2 py-1 text-[8px] bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors font-medium"
-                                            title="Mark as acknowledged by user"
-                                          >
-                                            Mark Ack
-                                          </button>
-                                        )}
                                       </td>
                                     </tr>
                                   ))}
