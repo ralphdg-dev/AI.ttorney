@@ -288,16 +288,22 @@ export default function ChatbotScreen() {
   // Unified setMessages that works for both guests and authenticated users
   const setMessages = useCallback((update: Message[] | ((prev: Message[]) => Message[])) => {
     if (isGuestMode) {
-      // For guests: Get current messages and apply update
+      // For guests: Apply update function to get new messages
       const currentMsgs = guestChat.messages;
       const newMsgs = typeof update === 'function' ? update(currentMsgs) : update;
       
-      // Check if we're adding new messages or replacing all
+      // CRITICAL FIX: Handle both new messages AND updates to existing messages
       const currentIds = new Set(currentMsgs.map(m => m.id));
-      const newMessages = newMsgs.filter(m => !currentIds.has(m.id));
       
-      // Add only new messages
-      newMessages.forEach(msg => guestChat.addMessage(msg));
+      newMsgs.forEach(msg => {
+        if (currentIds.has(msg.id)) {
+          // Update existing message (for streaming)
+          guestChat.updateMessage(msg.id, msg);
+        } else {
+          // Add new message
+          guestChat.addMessage(msg);
+        }
+      });
       
       // Update conversation history
       guestChat.setConversationHistory(newMsgs.map(m => ({
