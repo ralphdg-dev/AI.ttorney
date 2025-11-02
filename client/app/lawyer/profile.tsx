@@ -51,7 +51,7 @@ interface LawyerContactInfo {
   bio: string;
   specializations: string;
   days: string;
-  hours_available: string;
+  hours_available: string | Record<string, string[]>; // JSONB or legacy string
 }
 
 const DAYS_OF_WEEK = [
@@ -186,23 +186,40 @@ const LawyerProfilePage: React.FC = () => {
 
     if (lawyerContactInfo.hours_available) {
       try {
-        const dayEntries = lawyerContactInfo.hours_available.split(";");
-
-        dayEntries.forEach((entry) => {
-          if (entry.trim()) {
-            const parts = entry.split("=");
-            if (parts.length >= 2) {
-              const dayName = parts[0].trim();
-              const timesString = parts.slice(1).join(":").trim();
-              if (DAYS_OF_WEEK.includes(dayName)) {
-                const timeStrings = timesString
-                  .split(",")
-                  .map((time) => time.trim());
-                dayTimeSlots[dayName] = timeStrings;
+        // Handle JSONB format: {"Monday": ["09:00", "11:00"]}
+        if (typeof lawyerContactInfo.hours_available === 'object') {
+          Object.entries(lawyerContactInfo.hours_available).forEach(([day, times]) => {
+            if (DAYS_OF_WEEK.includes(day)) {
+              // Convert 24h to 12h format for display
+              dayTimeSlots[day] = times.map(time => {
+                const [hour, minute] = time.split(':');
+                const hourNum = parseInt(hour);
+                const ampm = hourNum >= 12 ? 'PM' : 'AM';
+                const displayHour = hourNum === 0 ? 12 : hourNum > 12 ? hourNum - 12 : hourNum;
+                return `${displayHour}:${minute} ${ampm}`;
+              });
+            }
+          });
+        } 
+        // Legacy string format: "Monday= 9:00 AM, 11:00 AM"
+        else if (typeof lawyerContactInfo.hours_available === 'string') {
+          const dayEntries = lawyerContactInfo.hours_available.split(";");
+          dayEntries.forEach((entry) => {
+            if (entry.trim()) {
+              const parts = entry.split("=");
+              if (parts.length >= 2) {
+                const dayName = parts[0].trim();
+                const timesString = parts.slice(1).join(":").trim();
+                if (DAYS_OF_WEEK.includes(dayName)) {
+                  const timeStrings = timesString
+                    .split(",")
+                    .map((time) => time.trim());
+                  dayTimeSlots[dayName] = timeStrings;
+                }
               }
             }
-          }
-        });
+          });
+        }
       } catch (error) {
         console.log("Error parsing availability data:", error);
       }

@@ -1,272 +1,150 @@
 from fastapi import APIRouter, HTTPException, Depends, status
-from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict, Any
 import logging
-from datetime import datetime
-from services.consultation_request_service import ConsultationRequestService
+from supabase import Client
+from config.dependencies import get_current_user, get_supabase
+from services.consultation_service import ConsultationService, ConsultationError
+from models.consultation_models import ConsultationRequestCreate, ConsultationStatusUpdate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/consultation-requests", tags=["consultation-requests"])
 
-# Initialize the service
-consultation_service = ConsultationRequestService()
 
-# Pydantic models for request/response
-class ConsultationRequestCreate(BaseModel):
-    user_id: str
-    lawyer_id: str
-    message: str
-    email: EmailStr
-    mobile_number: str
-    consultation_date: str
-    consultation_time: str
-    consultation_mode: str
+def get_consultation_service(supabase: Client = Depends(get_supabase)) -> ConsultationService:
+    """Dependency injection for ConsultationService"""
+    return ConsultationService(supabase)
 
-class ConsultationRequestUpdate(BaseModel):
-    status: str  # pending, accepted, rejected
-
-class ConsultationRequestResponse(BaseModel):
-    success: bool
-    data: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    message: Optional[str] = None
-
-@router.post("/", response_model=ConsultationRequestResponse)
-async def create_consultation_request(request: ConsultationRequestCreate):
-    """Create a new consultation request"""
+@router.post("/")
+async def create_consultation_request(
+    request: ConsultationRequestCreate,
+    service: ConsultationService = Depends(get_consultation_service)
+):
+    """Create a new consultation request with validation"""
     try:
-        # Convert request to dictionary
-        request_data = request.dict()
-        
-        logger.info(f"Creating consultation request: {request_data}")
-        
-        # Call the service to create the consultation request
-        result = await consultation_service.create_consultation_request(request_data)
-        
-        if result["success"]:
-            return ConsultationRequestResponse(
-                success=True,
-                data=result["data"],
-                message="Consultation request created successfully"
-            )
-        else:
-            # Provide more specific error messages
-            error_msg = result["error"]
-            status_code = status.HTTP_400_BAD_REQUEST
-            
-            if "not found" in error_msg.lower():
-                status_code = status.HTTP_404_NOT_FOUND
-            elif "foreign key constraint" in error_msg.lower():
-                status_code = status.HTTP_400_BAD_REQUEST
-                error_msg = "Invalid lawyer ID provided"
-            
-            raise HTTPException(
-                status_code=status_code,
-                detail=error_msg
-            )
-            
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
-    except Exception as e:
-        logger.error(f"Error creating consultation request: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+        logger.info(f"📝 Creating consultation request: user={request.user_id}, lawyer={request.lawyer_id}, mode={request.consultation_mode}")
+        result = await service.create_consultation_request(
+            user_id=request.user_id,
+            lawyer_id=request.lawyer_id,
+            message=request.message,
+            email=request.email,
+            mobile_number=request.mobile_number,
+            consultation_date=str(request.consultation_date),
+            consultation_time=request.consultation_time,
+            consultation_mode=request.consultation_mode
         )
+        return result
+    except ConsultationError as e:
+        logger.error(f"❌ Consultation error: {e.code} - {e.message}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"❌ Error creating consultation: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@router.get("/user/{user_id}", response_model=ConsultationRequestResponse)
-async def get_user_consultation_requests(user_id: str):
-    """Get all consultation requests for a specific user"""
+@router.get("/user/{user_id}")
+async def get_user_consultation_requests(
+    user_id: str,
+    status_filter: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+    service: ConsultationService = Depends(get_consultation_service)
+):
+    """Get consultation requests for a user with pagination"""
     try:
-        result = await consultation_service.get_consultation_requests_by_user(user_id)
-        
-        if result["success"]:
-            return ConsultationRequestResponse(
-                success=True,
-                data=result["data"]
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=result["error"]
-            )
-            
-    except Exception as e:
-        logger.error(f"Error getting user consultation requests: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+        result = await service.get_user_consultations(
+            user_id=user_id,
+            status_filter=status_filter,
+            page=page,
+            page_size=page_size
         )
+        return result
+    except ConsultationError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Error fetching user consultations: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.get("/lawyer/{lawyer_id}", response_model=ConsultationRequestResponse)
-async def get_lawyer_consultation_requests(lawyer_id: str):
-    """Get all consultation requests for a specific lawyer"""
+@router.get("/lawyer/{lawyer_id}")
+async def get_lawyer_consultation_requests(
+    lawyer_id: str,
+    status_filter: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+    service: ConsultationService = Depends(get_consultation_service)
+):
+    """Get consultation requests for a lawyer with pagination"""
     try:
-        result = await consultation_service.get_consultation_requests_by_lawyer(lawyer_id)
-        
-        if result["success"]:
-            return ConsultationRequestResponse(
-                success=True,
-                data=result["data"]
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=result["error"]
-            )
-            
-    except Exception as e:
-        logger.error(f"Error getting lawyer consultation requests: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+        result = await service.get_lawyer_consultations(
+            lawyer_id=lawyer_id,
+            status_filter=status_filter,
+            page=page,
+            page_size=page_size
         )
+        return result
+    except ConsultationError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Error fetching lawyer consultations: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.get("/{request_id}", response_model=ConsultationRequestResponse)
-async def get_consultation_request(request_id: str):
+@router.get("/{request_id}")
+async def get_consultation_request(
+    request_id: str,
+    current_user = Depends(get_current_user),
+    service: ConsultationService = Depends(get_consultation_service)
+):
     """Get a specific consultation request by ID"""
     try:
-        result = await consultation_service.get_consultation_request_by_id(request_id)
-        
-        if result["success"]:
-            return ConsultationRequestResponse(
-                success=True,
-                data=result["data"]
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=result["error"]
-            )
-            
+        # Note: Add ownership validation in service if needed
+        result = await service.get_consultation_by_id(request_id)
+        return result
+    except ConsultationError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        logger.error(f"Error getting consultation request: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
-        )
+        logger.error(f"Error fetching consultation: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.patch("/{request_id}/status", response_model=ConsultationRequestResponse)
-async def update_consultation_request_status(request_id: str, request: ConsultationRequestUpdate):
-    """Update consultation request status (accept/reject)"""
+@router.patch("/{request_id}/status")
+async def update_consultation_request_status(
+    request_id: str,
+    request: ConsultationStatusUpdate,
+    current_user = Depends(get_current_user),
+    service: ConsultationService = Depends(get_consultation_service)
+):
+    """Update consultation request status (lawyer only)"""
     try:
-        result = await consultation_service.update_consultation_request_status(
-            request_id=request_id,
-            status=request.status
+        result = await service.update_consultation_status(
+            consultation_id=request_id,
+            new_status=request.status,
+            user_id=current_user.id,
+            is_lawyer=True
         )
-        
-        if result["success"]:
-            return ConsultationRequestResponse(
-                success=True,
-                message=result["message"]
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=result["error"]
-            )
-            
+        return result
+    except ConsultationError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        logger.error(f"Error updating consultation request status: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
-        )
+        logger.error(f"Error updating status: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.delete("/{request_id}/user/{user_id}", response_model=ConsultationRequestResponse)
-async def delete_consultation_request(request_id: str, user_id: str):
-    """Delete a consultation request (only by the user who created it)"""
+@router.delete("/{request_id}")
+async def delete_consultation_request(
+    request_id: str,
+    current_user = Depends(get_current_user),
+    service: ConsultationService = Depends(get_consultation_service)
+):
+    """Soft delete a consultation request (user only)"""
     try:
-        result = await consultation_service.delete_consultation_request(request_id, user_id)
-        
-        if result["success"]:
-            return ConsultationRequestResponse(
-                success=True,
-                message=result["message"]
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=result["error"]
-            )
-            
-    except Exception as e:
-        logger.error(f"Error deleting consultation request: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+        result = await service.soft_delete_consultation(
+            consultation_id=request_id,
+            user_id=current_user.id
         )
+        return result
+    except ConsultationError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Error deleting consultation: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.get("/statistics/user/{user_id}", response_model=ConsultationRequestResponse)
-async def get_user_consultation_statistics(user_id: str):
-    """Get consultation request statistics for a specific user"""
-    try:
-        result = await consultation_service.get_consultation_requests_statistics(user_id=user_id)
-        
-        if result["success"]:
-            return ConsultationRequestResponse(
-                success=True,
-                data=result["data"]
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=result["error"]
-            )
-            
-    except Exception as e:
-        logger.error(f"Error getting user consultation statistics: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
-        )
+# Statistics endpoints removed - use pagination metadata instead
+# Total counts available in pagination response
 
-@router.get("/statistics/lawyer/{lawyer_id}", response_model=ConsultationRequestResponse)
-async def get_lawyer_consultation_statistics(lawyer_id: str):
-    """Get consultation request statistics for a specific lawyer"""
-    try:
-        result = await consultation_service.get_consultation_requests_statistics(lawyer_id=lawyer_id)
-        
-        if result["success"]:
-            return ConsultationRequestResponse(
-                success=True,
-                data=result["data"]
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=result["error"]
-            )
-            
-    except Exception as e:
-        logger.error(f"Error getting lawyer consultation statistics: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
-        )
-
-@router.get("/test-connection", response_model=ConsultationRequestResponse)
-async def test_consultation_service_connection():
-    """Test the consultation service database connection"""
-    try:
-        result = await consultation_service.test_connection()
-        
-        if result["success"]:
-            return ConsultationRequestResponse(
-                success=True,
-                message=result["message"]
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=result["error"]
-            )
-            
-    except Exception as e:
-        logger.error(f"Error testing consultation service connection: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
-        )
 

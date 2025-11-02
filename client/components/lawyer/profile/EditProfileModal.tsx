@@ -34,7 +34,7 @@ interface ProfileData {
   rollNumber: string;
   rollSigningDate: string;
   days: string;
-  hours_available: string;
+  hours_available: string | Record<string, string[]>; // JSONB or legacy string
 }
 
 interface EditProfileModalProps {
@@ -161,6 +161,23 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       try {
         const hoursData: Record<string, string[]> = {};
 
+        // Handle JSONB format
+        if (typeof profileData.hours_available === 'object') {
+          Object.entries(profileData.hours_available).forEach(([day, times]) => {
+            hoursData[day] = times.map(time => {
+              // Convert 24h to 12h format for display
+              const [hour, minute] = time.split(':');
+              const hourNum = parseInt(hour);
+              const ampm = hourNum >= 12 ? 'PM' : 'AM';
+              const displayHour = hourNum === 0 ? 12 : hourNum > 12 ? hourNum - 12 : hourNum;
+              return `${displayHour}:${minute} ${ampm}`;
+            });
+          });
+          setDayTimeSlots(hoursData);
+          return;
+        }
+
+        // Legacy string format
         const dayEntries = profileData.hours_available.split(";");
 
         dayEntries.forEach((entry) => {
@@ -397,8 +414,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     return Object.keys(errors).length === 0;
   };
 
-  const formatHoursAvailable = (): string => {
-    const formattedEntries: string[] = [];
+  const formatHoursAvailable = (): Record<string, string[]> => {
+    const jsonbFormat: Record<string, string[]> = {};
 
     const sortedDays = DAYS_OF_WEEK.filter(
       (day) =>
@@ -410,15 +427,34 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     sortedDays.forEach((day) => {
       const times = dayTimeSlots[day] || [];
       if (times.length > 0) {
-        const formattedTimes = times.map((time) => {
+        // Convert 12h format to 24h format for JSONB storage
+        const times24h = times.map((time) => {
           const timeOption = TIME_OPTIONS.find((opt) => opt.value === time);
-          return timeOption ? timeOption.label : time;
+          const timeStr = timeOption ? timeOption.label : time;
+          
+          // Parse 12h format (e.g., "9:00 AM") to 24h format (e.g., "09:00")
+          const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+          if (match) {
+            let hour = parseInt(match[1]);
+            const minute = match[2];
+            const period = match[3].toUpperCase();
+            
+            if (period === 'PM' && hour !== 12) {
+              hour += 12;
+            } else if (period === 'AM' && hour === 12) {
+              hour = 0;
+            }
+            
+            return `${hour.toString().padStart(2, '0')}:${minute}`;
+          }
+          return timeStr; // Fallback if parsing fails
         });
-        formattedEntries.push(`${day}= ${formattedTimes.join(", ")}`);
+        
+        jsonbFormat[day] = times24h;
       }
     });
 
-    return formattedEntries.join("; ");
+    return jsonbFormat;
   };
 
   const handleSave = async () => {
@@ -428,14 +464,15 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     }
 
     const formattedDays = selectedDays.join(", ");
-    const formattedHoursAvailable = formatHoursAvailable();
+    const hoursAvailableJsonb = formatHoursAvailable();
 
     const updatedFormData = {
       ...editFormData,
       days: formattedDays,
-      hours_available: formattedHoursAvailable,
+      hours_available: hoursAvailableJsonb, // Now a JSONB object
     };
 
+    console.log("Saving with JSONB format:", hoursAvailableJsonb);
     setEditFormData(updatedFormData);
     setShowConfirmModal(true);
   };
@@ -444,14 +481,15 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setIsSaving(true);
     try {
       const formattedDays = selectedDays.join(", ");
-      const formattedHoursAvailable = formatHoursAvailable();
+      const hoursAvailableJsonb = formatHoursAvailable();
 
       const updatedFormData = {
         ...editFormData,
         days: formattedDays,
-        hours_available: formattedHoursAvailable,
+        hours_available: hoursAvailableJsonb, // JSONB format
       };
 
+      console.log("Confirming save with JSONB:", hoursAvailableJsonb);
       await onSave(updatedFormData);
       setShowConfirmModal(false);
       onClose();
@@ -485,8 +523,14 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
     if (profileData.hours_available) {
       try {
-        const hoursData = JSON.parse(profileData.hours_available);
-        setDayTimeSlots(hoursData);
+        // If already object, use as-is
+        if (typeof profileData.hours_available === 'object') {
+          setDayTimeSlots(profileData.hours_available);
+        } else {
+          // Try to parse string
+          const hoursData = JSON.parse(profileData.hours_available);
+          setDayTimeSlots(hoursData);
+        }
       } catch {
         setDayTimeSlots({});
       }

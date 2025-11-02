@@ -17,7 +17,7 @@ interface Lawyer {
   location: string;
   days: string;
   available: boolean;
-  hours_available: string[];
+  hours_available: Record<string, string[]> | string[]; // JSONB: {"Monday": ["09:00"]} or legacy string[]
 }
 
 interface LawyerCardProps {
@@ -41,21 +41,34 @@ export default function LawyerCard({
   const getTodayAvailableTimes = (): string[] => {
     const today = new Date().toLocaleString("en-US", { weekday: "long" });
 
-    if (!lawyer.hours_available || lawyer.hours_available.length === 0) {
+    if (!lawyer.hours_available) {
       return [];
     }
 
-    // Parse the hours_available string
-    for (const daySchedule of lawyer.hours_available) {
-      if (daySchedule.includes("=")) {
-        const [day, times] = daySchedule.split("=").map((s) => s.trim());
+    // Handle JSONB format: {"Monday": ["09:00", "11:00"]}
+    if (typeof lawyer.hours_available === 'object' && !Array.isArray(lawyer.hours_available)) {
+      const times = lawyer.hours_available[today] || [];
+      return times.map(time => {
+        // Convert 24h to 12h format for display
+        const [hour, minute] = time.split(':');
+        const hourNum = parseInt(hour);
+        const ampm = hourNum >= 12 ? 'PM' : 'AM';
+        const displayHour = hourNum === 0 ? 12 : hourNum > 12 ? hourNum - 12 : hourNum;
+        return `${displayHour}:${minute} ${ampm}`;
+      });
+    }
 
-        if (day.toLowerCase() === today.toLowerCase()) {
-          // Split times by comma and clean them up
-          return times
-            .split(",")
-            .map((time) => time.trim())
-            .filter((time) => time);
+    // Legacy format: ["Monday= 9:00 AM, 11:00 AM"]
+    if (Array.isArray(lawyer.hours_available)) {
+      for (const daySchedule of lawyer.hours_available) {
+        if (typeof daySchedule === 'string' && daySchedule.includes("=")) {
+          const [day, times] = daySchedule.split("=").map((s) => s.trim());
+          if (day.toLowerCase() === today.toLowerCase()) {
+            return times
+              .split(",")
+              .map((time) => time.trim())
+              .filter((time) => time);
+          }
         }
       }
     }
@@ -113,8 +126,10 @@ export default function LawyerCard({
     : "Book Consultation";
 
   const hasAvailableDays = lawyer.days && lawyer.days.trim() !== "";
-  const hasAvailableHours =
-    lawyer.hours_available && lawyer.hours_available.length > 0;
+  const hasAvailableHours = lawyer.hours_available && 
+    (typeof lawyer.hours_available === 'object' && !Array.isArray(lawyer.hours_available)
+      ? Object.keys(lawyer.hours_available).length > 0
+      : Array.isArray(lawyer.hours_available) && lawyer.hours_available.length > 0);
 
   return (
     <Box

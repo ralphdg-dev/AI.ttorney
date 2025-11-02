@@ -1,37 +1,34 @@
-# C:\Users\Mikko\Desktop\AI.ttorney\server\routes\lawyerInfo.py
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import logging
 from supabase import Client
 from config.dependencies import get_current_user, get_supabase
+from services.lawyer_profile_service import LawyerProfileService
+from services.lawyer_availability_service import LawyerAvailabilityService
+from models.consultation_models import LawyerProfileUpdate, AcceptingConsultationsUpdate
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-class LawyerProfile(BaseModel):
-    name: str
-    specialization: str  # Changed from specializations to specialization
-    location: str
-    days: Optional[str] = None
-    hours_available: Optional[str] = None
-    phone_number: Optional[str] = None
-    bio: str
 
-class AcceptingConsultationsUpdate(BaseModel):
-    accepting_consultations: bool
+def get_lawyer_service(supabase: Client = Depends(get_supabase)) -> LawyerProfileService:
+    """Dependency injection for LawyerProfileService"""
+    return LawyerProfileService(supabase)
 
-class AvailabilitySlot(BaseModel):
-    id: str
+def get_availability_service(supabase: Client = Depends(get_supabase)) -> LawyerAvailabilityService:
+    """Dependency injection for LawyerAvailabilityService"""
+    return LawyerAvailabilityService(supabase)
+
+class AvailabilityUpdate(BaseModel):
+    """Model for updating lawyer availability"""
+    availability: Dict[str, List[str]]  # {"Monday": ["09:00", "11:00"]}
+
+class TimeSlotUpdate(BaseModel):
+    """Model for adding/removing a single time slot"""
     day: str
-    startTime: str
-    endTime: str
-    isActive: bool
-
-class LawyerProfileUpdate(BaseModel):
-    profile_data: LawyerProfile
-    availability_slots: List[AvailabilitySlot]
+    time_slot: str
 
 def format_time_12h(time_24h: str) -> str:
     """Convert 24h time (09:00) to 12h format (9:00 AM)"""
@@ -99,214 +96,58 @@ def generate_time_slots(start_time: str, end_time: str) -> str:
 @router.post("/api/lawyer/profile")
 async def save_lawyer_profile(
     profile_data: LawyerProfileUpdate,
-    supabase: Client = Depends(get_supabase),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
+    service: LawyerProfileService = Depends(get_lawyer_service)
 ):
+    """Save or update lawyer profile using service layer"""
     try:
-        # Group days by similar hours to match your format
-        day_groups = {}
-        
-        for slot in profile_data.availability_slots:
-            if slot.isActive:
-                time_range = f"{format_time_12h(slot.startTime)}-{format_time_12h(slot.endTime)}"
-                if time_range not in day_groups:
-                    day_groups[time_range] = []
-                day_groups[time_range].append(slot.day)
-        
-        # Format hours and days according to your table format
-        hours_entries = []
-        days_entries = []
-        hours_available_entries = []
-        
-        for time_range, days_list in day_groups.items():
-            if days_list:
-                # Format like "9AM-5PM"
-                hours_entries.append(time_range)
-                
-                # Format days like "Monday Wednesday Friday" or "Tuesday Thursday"
-                days_str = ', '.join([day for day in days_list])
-                days_entries.append(days_str)
-                
-                # Generate time slots like "9:00AM, 11:00AM, 1:00PM, 3:00PM"
-                start_time_12h = time_range.split('-')[0]
-                end_time_12h = time_range.split('-')[1]
-                time_slots = generate_time_slots(start_time_12h, end_time_12h)
-                hours_available_entries.append(time_slots)
-        
-        # Join multiple entries with semicolons if needed
-        hours = ', '.join(hours_entries) if hours_entries else None
-        days = ', '.join(days_entries) if days_entries else None
-        hours_available = ', '.join(hours_available_entries) if hours_available_entries else None
-        
-        lawyer_info_data = {
-            "lawyer_id": user.id,
-            "name": profile_data.profile_data.name,
-            "specialization": profile_data.profile_data.specialization,
-            "location": profile_data.profile_data.location,
-            "days": profile_data.profile_data.days,  # Use directly from frontend
-            "hours_available": profile_data.profile_data.hours_available,  # Use directly from frontend
-            "phone_number": profile_data.profile_data.phone_number,
-            "bio": profile_data.profile_data.bio
-        }
-        
-        # Check if profile already exists
-        existing_profile = supabase.table("lawyer_info")\
-            .select("*")\
-            .eq("lawyer_id", user.id)\
-            .execute()
-        
-        # Start a transaction-like process (Supabase doesn't have true transactions, so we'll handle sequentially)
-        if existing_profile.data:
-            # Check if name has changed
-            old_name = existing_profile.data[0].get('name', '')
-            new_name = profile_data.profile_data.name
-            
-            # Update existing profile
-            result = supabase.table("lawyer_info")\
-                .update(lawyer_info_data)\
-                .eq("lawyer_id", user.id)\
-                .execute()
-            
-            # If name changed, update users table
-            if old_name != new_name:
-                update_user_result = supabase.table("users")\
-                    .update({"full_name": new_name})\
-                    .eq("id", user.id)\
-                    .execute()
-                
-                if update_user_result.error:
-                    logger.error(f"Error updating user full_name: {update_user_result.error}")
-                    # Don't raise error here, but log it - the lawyer profile was still updated
-        else:
-            # Insert new profile
-            result = supabase.table("lawyer_info")\
-                .insert(lawyer_info_data)\
-                .execute()
-            
-            # For new profiles, also update the users table with the name
-            if result.data:
-                update_user_result = supabase.table("users")\
-                    .update({"full_name": profile_data.profile_data.name})\
-                    .eq("id", user.id)\
-                    .execute()
-                
-                if update_user_result.error:
-                    logger.error(f"Error updating user full_name: {update_user_result.error}")
-        
-        if result.error:
-            logger.error(f"Error saving lawyer profile: {result.error}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to save profile"
-            )
-        
-        return {
-            "success": True,
-            "message": "Profile saved successfully",
-            "data": result.data[0] if result.data else None
-        }
-        
+        result = await service.upsert_profile(
+            user_id=user.id,
+            profile_data=profile_data.dict(),
+            availability_slots=[]  # Simplified for <5000 users
+        )
+        return result
     except Exception as e:
-        logger.error(f"Error in save_lawyer_profile: {str(e)}")
+        logger.error(f"Error saving lawyer profile: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+            detail="Failed to save profile"
         )
 
 @router.get("/api/lawyer/profile")
 async def get_lawyer_profile(
-    supabase: Client = Depends(get_supabase),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
+    service: LawyerProfileService = Depends(get_lawyer_service)
 ):
+    """Get lawyer profile with caching"""
     try:
-        # Get lawyer info
-        lawyer_result = supabase.table("lawyer_info")\
-            .select("*")\
-            .eq("lawyer_id", user.id)\
-            .execute()
-        
-        if lawyer_result.error:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to fetch profile"
-            )
-        
-        # Get professional info too for consistency
-        professional_result = supabase.table("lawyer_applications")\
-            .select("roll_number, roll_signing_date")\
-            .eq("user_id", user.id)\
-            .execute()
-        
-        profile_data = lawyer_result.data[0] if lawyer_result.data else None
-        professional_data = professional_result.data[0] if professional_result.data else None
-        
+        profile_data = await service.get_profile(user.id, use_cache=True)
         return {
             "success": True,
-            "data": {
-                "lawyer_info": profile_data,
-                "professional_info": professional_data
-            }
+            "data": profile_data
         }
-        
     except Exception as e:
-        logger.error(f"Error fetching lawyer profile: {str(e)}")
+        logger.error(f"Error fetching lawyer profile: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+            detail="Failed to fetch profile"
         )
 
 @router.post("/api/lawyer/accepting-consultations")
 async def update_accepting_consultations(
     payload: AcceptingConsultationsUpdate,
-    supabase: Client = Depends(get_supabase),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
+    service: LawyerProfileService = Depends(get_lawyer_service)
 ):
-    """
-    Update lawyer's accepting_consultations status
-    """
+    """Update lawyer's accepting_consultations status"""
     try:
-        logger.info(f"Updating accepting_consultations for lawyer {user.id} to {payload.accepting_consultations}")
-        
-        # Check if lawyer_info record exists
-        existing = supabase.table("lawyer_info")\
-            .select("lawyer_id")\
-            .eq("lawyer_id", user.id)\
-            .execute()
-        
-        if not existing.data:
-            # Create lawyer_info record if it doesn't exist
-            result = supabase.table("lawyer_info")\
-                .insert({
-                    "lawyer_id": user.id,
-                    "accepting_consultations": payload.accepting_consultations
-                })\
-                .execute()
-        else:
-            # Update existing record
-            result = supabase.table("lawyer_info")\
-                .update({"accepting_consultations": payload.accepting_consultations})\
-                .eq("lawyer_id", user.id)\
-                .execute()
-
-        if result.error:
-            logger.error(f"Database error: {result.error}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error: {result.error}"
-            )
-
-        logger.info(f"Successfully updated accepting_consultations for lawyer {user.id}")
-        
-        return {
-            "success": True,
-            "message": "Consultation status updated successfully",
-            "accepting_consultations": payload.accepting_consultations
-        }
-
-    except HTTPException:
-        raise
+        result = await service.update_accepting_consultations(
+            lawyer_id=user.id,
+            accepting=payload.accepting_consultations
+        )
+        return result
     except Exception as e:
-        logger.error(f"Error updating accepting consultations: {str(e)}", exc_info=True)
+        logger.error(f"Error updating accepting consultations: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update consultation status"
@@ -315,36 +156,149 @@ async def update_accepting_consultations(
 
 @router.get("/api/lawyer/accepting-consultations")
 async def get_accepting_consultations(
-    supabase: Client = Depends(get_supabase),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
+    service: LawyerProfileService = Depends(get_lawyer_service)
 ):
-    """
-    Get lawyer's current accepting_consultations status
-    """
+    """Get lawyer's current accepting_consultations status with caching"""
     try:
-        result = supabase.table("lawyer_info")\
-            .select("accepting_consultations")\
-            .eq("lawyer_id", user.id)\
-            .execute()
-        
-        if result.error:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to fetch consultation status"
-            )
-        
+        profile_data = await service.get_profile(user.id, use_cache=True)
         accepting = False
-        if result.data and len(result.data) > 0:
-            accepting = result.data[0].get("accepting_consultations", False)
+        
+        if profile_data.get("lawyer_info"):
+            accepting = profile_data["lawyer_info"].get("accepting_consultations", False)
         
         return {
             "success": True,
             "accepting_consultations": accepting
         }
-        
     except Exception as e:
-        logger.error(f"Error fetching accepting consultations: {str(e)}")
+        logger.error(f"Error fetching accepting consultations: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch consultation status"
+        )
+
+
+# ============================================================================
+# AVAILABILITY MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@router.get("/api/lawyer/availability")
+async def get_availability(
+    day: Optional[str] = None,
+    user=Depends(get_current_user),
+    service: LawyerAvailabilityService = Depends(get_availability_service)
+):
+    """Get lawyer's availability schedule"""
+    try:
+        result = await service.get_availability(user.id, day)
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching availability: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch availability"
+        )
+
+
+@router.post("/api/lawyer/availability")
+async def set_availability(
+    payload: AvailabilityUpdate,
+    user=Depends(get_current_user),
+    service: LawyerAvailabilityService = Depends(get_availability_service),
+    profile_service: LawyerProfileService = Depends(get_lawyer_service)
+):
+    """Set lawyer's complete availability schedule"""
+    try:
+        result = await service.set_availability(user.id, payload.availability)
+        
+        # Invalidate profile cache since availability changed
+        profile_service.invalidate_cache(user.id)
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error setting availability: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to set availability"
+        )
+
+
+@router.post("/api/lawyer/availability/add-slot")
+async def add_time_slot(
+    payload: TimeSlotUpdate,
+    user=Depends(get_current_user),
+    service: LawyerAvailabilityService = Depends(get_availability_service),
+    profile_service: LawyerProfileService = Depends(get_lawyer_service)
+):
+    """Add a single time slot to availability"""
+    try:
+        result = await service.add_time_slot(user.id, payload.day, payload.time_slot)
+        
+        # Invalidate profile cache
+        profile_service.invalidate_cache(user.id)
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error adding time slot: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to add time slot"
+        )
+
+
+@router.post("/api/lawyer/availability/remove-slot")
+async def remove_time_slot(
+    payload: TimeSlotUpdate,
+    user=Depends(get_current_user),
+    service: LawyerAvailabilityService = Depends(get_availability_service),
+    profile_service: LawyerProfileService = Depends(get_lawyer_service)
+):
+    """Remove a single time slot from availability"""
+    try:
+        result = await service.remove_time_slot(user.id, payload.day, payload.time_slot)
+        
+        # Invalidate profile cache
+        profile_service.invalidate_cache(user.id)
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error removing time slot: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to remove time slot"
+        )
+
+
+@router.get("/api/lawyer/availability/bookable-slots")
+async def get_bookable_slots(
+    day: str,
+    date: Optional[str] = None,
+    user=Depends(get_current_user),
+    service: LawyerAvailabilityService = Depends(get_availability_service)
+):
+    """Get bookable time slots for a specific day (excludes already booked slots)"""
+    try:
+        slots = await service.get_bookable_slots(user.id, day, date)
+        return {
+            "success": True,
+            "day": day,
+            "date": date,
+            "slots": slots
+        }
+    except Exception as e:
+        logger.error(f"Error fetching bookable slots: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch bookable slots"
         )

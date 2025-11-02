@@ -37,12 +37,13 @@ interface DayAvailability {
 
 interface LawyerData {
   id: string;
+  lawyer_id: string; // Foreign key to users table
   name: string;
   specialization: string[];
   hours: string;
   days: string;
   bio: string;
-  hours_available: DayAvailability[];
+  hours_available: DayAvailability[] | Record<string, string[]>; // Legacy or JSONB format
 }
 
 interface ValidationErrors {
@@ -104,19 +105,24 @@ export default function LawyerBookingView() {
   const isMediumScreen = width >= 375 && width < 768;
   const isLargeScreen = width >= 768;
 
-  const parseHoursAvailable = (hoursAvailable: string[]): DayAvailability[] => {
-    const dayAvailability: DayAvailability[] = [];
+  const parseHoursAvailable = (hoursData: any): DayAvailability[] | Record<string, string[]> => {
+    if (!hoursData) return [];
 
-    hoursAvailable.forEach((daySchedule) => {
-      const [dayPart, timesPart] = daySchedule.split("=");
-      if (dayPart && timesPart) {
-        const day = dayPart.trim();
-        const times = timesPart.split(",").map((time) => time.trim());
-        dayAvailability.push({ day, times });
-      }
+    // If already JSONB object, return as-is
+    if (typeof hoursData === 'object' && !Array.isArray(hoursData)) {
+      return hoursData;
+    }
+
+    // Legacy array format
+    if (Array.isArray(hoursData) && hoursData.length === 0) return [];
+
+    return hoursData.map((daySchedule: string) => {
+      const [day, timesStr] = daySchedule.split("=");
+      const times = timesStr
+        ? timesStr.split(",").map((t: string) => t.trim())
+        : [];
+      return { day: day.trim(), times };
     });
-
-    return dayAvailability;
   };
 
   const getTimeSlotsForSelectedDay = (): TimeSlot[] => {
@@ -127,20 +133,41 @@ export default function LawyerBookingView() {
       weekday: "long",
     });
 
-    const dayAvailability = lawyerData.hours_available.find(
-      (availability) =>
-        availability.day.toLowerCase() === selectedDayName.toLowerCase()
-    );
+    // Handle JSONB format: {"Monday": ["09:00", "11:00"]}
+    if (typeof lawyerData.hours_available === 'object' && !Array.isArray(lawyerData.hours_available)) {
+      const times = lawyerData.hours_available[selectedDayName] || [];
+      return times.map((time, index) => {
+        // Convert 24h to 12h format for display
+        const [hour, minute] = time.split(':');
+        const hourNum = parseInt(hour);
+        const ampm = hourNum >= 12 ? 'PM' : 'AM';
+        const displayHour = hourNum === 0 ? 12 : hourNum > 12 ? hourNum - 12 : hourNum;
+        return {
+          id: `${selectedDayName}-${time}-${index}`,
+          time: `${displayHour}:${minute} ${ampm}`,
+          available: true,
+        };
+      });
+    }
 
-    if (!dayAvailability) return [];
+    // Legacy format: DayAvailability[]
+    if (Array.isArray(lawyerData.hours_available)) {
+      const dayAvailability = lawyerData.hours_available.find(
+        (availability) =>
+          availability.day.toLowerCase() === selectedDayName.toLowerCase()
+      );
 
-    return dayAvailability.times.map((time, index) => ({
-      id: `slot-${selectedDayName}-${index}`,
-      time: time,
-      available: true,
-    }));
+      if (!dayAvailability) return [];
+
+      return dayAvailability.times.map((time, index) => ({
+        id: `${dayAvailability.day}-${time}-${index}`,
+        time,
+        available: true,
+      }));
+    }
+
+    return [];
   };
-
   const timeSlots: TimeSlot[] = getTimeSlotsForSelectedDay();
 
   const validateEmail = (email: string): boolean => {
@@ -212,7 +239,8 @@ export default function LawyerBookingView() {
         : [];
 
       const lawyerInfo: LawyerData = {
-        id: params.lawyerId as string,
+        id: params.id as string, // lawyer_info.id (primary key)
+        lawyer_id: params.lawyerId as string, // lawyer_info.lawyer_id (foreign key to users)
         name: params.lawyerName as string,
         specialization: specialization,
         hours: params.lawyerHours as string,
@@ -226,7 +254,8 @@ export default function LawyerBookingView() {
       console.error("Error parsing lawyer data from params:", error);
       // Fallback to basic data
       setLawyerData({
-        id: params.lawyerId as string,
+        id: params.id as string, // lawyer_info.id (primary key)
+        lawyer_id: params.lawyerId as string, // lawyer_info.lawyer_id (foreign key to users)
         name: params.lawyerName as string,
         specialization: ["General Law"],
         hours: params.lawyerHours as string,
@@ -376,7 +405,7 @@ export default function LawyerBookingView() {
     try {
       const consultationRequestData = {
         user_id: user?.id || "anonymous",
-        lawyer_id: lawyerData?.id,
+        lawyer_id: lawyerData?.id, // Use lawyer_info.id (the foreign key references lawyer_info.id, not lawyer_info.lawyer_id)
         message: concern.trim(),
         email: email.trim(),
         mobile_number: mobileNumber.trim(),
@@ -401,6 +430,9 @@ export default function LawyerBookingView() {
       );
 
       const result = await response.json();
+      
+      console.log("Response status:", response.status);
+      console.log("Response data:", result);
 
       if (response.ok && result.success) {
         Alert.alert(
@@ -414,9 +446,14 @@ export default function LawyerBookingView() {
           ]
         );
       } else {
-        throw new Error(
-          result.error || result.detail || "Failed to book consultation"
-        );
+        // Better error handling for validation errors
+        const errorMessage = result.detail 
+          ? (typeof result.detail === 'string' 
+              ? result.detail 
+              : JSON.stringify(result.detail))
+          : result.error || "Failed to book consultation";
+        
+        throw new Error(errorMessage);
       }
     } catch (error) {
       console.error("Booking error:", error);

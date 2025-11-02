@@ -1,0 +1,453 @@
+"""
+Consultation Service - Centralized business logic for consultation management
+Follows DRY principles and FAANG best practices for <5000 users
+"""
+from typing import Dict, Any, Optional, List
+from datetime import datetime, date, time
+from supabase import Client
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class ConsultationError(Exception):
+    """Base exception for consultation errors"""
+    def __init__(self, message: str, code: str, status_code: int = 400):
+        self.message = message
+        self.code = code
+        self.status_code = status_code
+        super().__init__(self.message)
+
+
+class BookingConflictError(ConsultationError):
+    """Raised when attempting to book an already-taken time slot"""
+    def __init__(self, lawyer_name: str, time_slot: str):
+        super().__init__(
+            message=f"{lawyer_name} is already booked for {time_slot}. Please select another time.",
+            code="BOOKING_CONFLICT",
+            status_code=409
+        )
+
+
+class InvalidDateError(ConsultationError):
+    """Raised when consultation date is in the past"""
+    def __init__(self):
+        super().__init__(
+            message="Consultation date must be in the future",
+            code="INVALID_DATE",
+            status_code=400
+        )
+
+
+class ConsultationService:
+    """
+    Service layer for consultation operations.
+    Handles business logic, validation, and database operations.
+    """
+    
+    def __init__(self, supabase: Client):
+        self.supabase = supabase
+    
+    async def check_booking_conflict(
+        self, 
+        lawyer_id: str, 
+        consultation_date: str, 
+        consultation_time: str
+    ) -> bool:
+        """
+        Check if lawyer already has a booking at this date/time.
+        
+        Returns:
+            True if conflict exists, False otherwise
+        """
+        try:
+            # lawyer_id in consultation_requests references lawyer_info.id (primary key)
+            result = self.supabase.table("consultation_requests")\
+                .select("id")\
+                .eq("lawyer_id", lawyer_id)\
+                .eq("consultation_date", consultation_date)\
+                .eq("consultation_time", consultation_time)\
+                .in_("status", ["pending", "accepted"])\
+                .execute()
+            
+            return len(result.data) > 0 if result.data else False
+        except Exception as e:
+            logger.error(f"Error checking booking conflict: {e}")
+            return False  # Fail open - allow booking if check fails
+    
+    async def create_consultation_request(
+        self, 
+        user_id: str,
+        lawyer_id: str,
+        message: str,
+        email: str,
+        mobile_number: str,
+        consultation_date: str,
+        consultation_time: str,
+        consultation_mode: str
+    ) -> Dict[str, Any]:
+        """
+        Create a new consultation request with validation.
+        
+        Validates:
+        - Date is in the future
+        - Lawyer exists and is accepting consultations
+        - No booking conflict exists
+        
+        Returns:
+            Dict with success status and data/error
+        """
+        try:
+            # 1. Validate date is in the future
+            consultation_date_obj = date.fromisoformat(consultation_date)
+            if consultation_date_obj < date.today():
+                raise InvalidDateError()
+            
+            # 2. Verify lawyer exists and is accepting consultations
+            logger.info(f"🔍 Checking if lawyer exists: {lawyer_id}")
+            lawyer_result = self.supabase.table("lawyer_info")\
+                .select("name, accepting_consultations")\
+                .eq("id", lawyer_id)\
+                .execute()
+            
+            logger.info(f"🔍 Query result: {lawyer_result.data}")
+            
+            if not lawyer_result.data:
+                logger.error(f"❌ Lawyer not found in lawyer_info table: {lawyer_id}")
+                raise ConsultationError(
+                    "This lawyer profile does not exist or is not available for consultations",
+                    "LAWYER_NOT_FOUND",
+                    404
+                )
+            
+            lawyer_name = lawyer_result.data[0]["name"]
+            accepting_consultations = lawyer_result.data[0].get("accepting_consultations", False)
+            
+            if not accepting_consultations:
+                raise ConsultationError(
+                    f"{lawyer_name} is not currently accepting consultations",
+                    "LAWYER_NOT_ACCEPTING",
+                    400
+                )
+            
+            # 3. Check for booking conflict
+            has_conflict = await self.check_booking_conflict(
+                lawyer_id, consultation_date, consultation_time
+            )
+            
+            if has_conflict:
+                raise BookingConflictError(lawyer_name, consultation_time)
+            
+            # 3. Create consultation request
+            consultation_data = {
+                "user_id": user_id,
+                "lawyer_id": lawyer_id,
+                "message": message,
+                "email": email,
+                "mobile_number": mobile_number,
+                "status": "pending",
+                "consultation_date": consultation_date,
+                "consultation_time": consultation_time,
+                "consultation_mode": consultation_mode
+                # Note: created_at and updated_at are auto-generated by database
+            }
+            
+            result = self.supabase.table("consultation_requests")\
+                .insert(consultation_data)\
+                .execute()
+            
+            if result.data:
+                logger.info(f"Consultation created: {result.data[0]['id']} for lawyer {lawyer_id}")
+                return {
+                    "success": True,
+                    "data": result.data[0]
+                }
+            else:
+                raise ConsultationError(
+                    "Failed to create consultation request",
+                    "CREATE_FAILED",
+                    500
+                )
+        
+        except (BookingConflictError, InvalidDateError, ConsultationError):
+            raise  # Re-raise custom errors
+        except Exception as e:
+            logger.error(f"Error creating consultation: {e}")
+            raise ConsultationError(
+                f"Internal server error: {str(e)}",
+                "INTERNAL_ERROR",
+                500
+            )
+    
+    async def get_user_consultations(
+        self, 
+        user_id: str, 
+        status_filter: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20
+    ) -> Dict[str, Any]:
+        """
+        Get consultations for a user with pagination.
+        
+        Args:
+            user_id: User ID
+            status_filter: Optional status filter (pending, accepted, etc.)
+            page: Page number (1-indexed)
+            page_size: Items per page (max 100)
+        
+        Returns:
+            Dict with consultations and pagination info
+        """
+        try:
+            # Limit page size to prevent abuse
+            page_size = min(page_size, 100)
+            offset = (page - 1) * page_size
+            
+            # Build query
+            query = self.supabase.table("consultation_requests")\
+                .select("""
+                    *,
+                    lawyer_info:lawyer_id (
+                        name,
+                        specialization
+                    )
+                """, count="exact")\
+                .eq("user_id", user_id)\
+                .is_("deleted_at", None)  # Exclude soft-deleted
+            
+            if status_filter and status_filter != "all":
+                query = query.eq("status", status_filter)
+            
+            # Execute with pagination
+            result = query.order("created_at", desc=True)\
+                .range(offset, offset + page_size - 1)\
+                .execute()
+            
+            total = result.count if hasattr(result, 'count') else len(result.data)
+            
+            return {
+                "success": True,
+                "data": result.data,
+                "pagination": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total": total,
+                    "total_pages": (total + page_size - 1) // page_size
+                }
+            }
+        
+        except Exception as e:
+            logger.error(f"Error fetching user consultations: {e}")
+            raise ConsultationError(
+                "Failed to fetch consultations",
+                "FETCH_FAILED",
+                500
+            )
+    
+    async def get_lawyer_consultations(
+        self, 
+        lawyer_id: str, 
+        status_filter: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20
+    ) -> Dict[str, Any]:
+        """Get consultations for a lawyer with pagination"""
+        try:
+            page_size = min(page_size, 100)
+            offset = (page - 1) * page_size
+            
+            query = self.supabase.table("consultation_requests")\
+                .select("""
+                    *,
+                    users!consultation_requests_user_id_fkey(
+                        full_name,
+                        email,
+                        username
+                    )
+                """, count="exact")\
+                .eq("lawyer_id", lawyer_id)\
+                .is_("deleted_at", None)
+            
+            if status_filter and status_filter != "all":
+                query = query.eq("status", status_filter)
+            
+            result = query.order("created_at", desc=True)\
+                .range(offset, offset + page_size - 1)\
+                .execute()
+            
+            total = result.count if hasattr(result, 'count') else len(result.data)
+            
+            return {
+                "success": True,
+                "data": result.data,
+                "pagination": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total": total,
+                    "total_pages": (total + page_size - 1) // page_size
+                }
+            }
+        
+        except Exception as e:
+            logger.error(f"Error fetching lawyer consultations: {e}")
+            raise ConsultationError(
+                "Failed to fetch consultations",
+                "FETCH_FAILED",
+                500
+            )
+    
+    async def update_consultation_status(
+        self,
+        consultation_id: str,
+        new_status: str,
+        user_id: str,
+        is_lawyer: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Update consultation status with ownership validation.
+        
+        Args:
+            consultation_id: Consultation ID
+            new_status: New status (accepted, rejected, completed, cancelled)
+            user_id: User making the change
+            is_lawyer: True if lawyer is updating, False if user
+        """
+        try:
+            # Validate status
+            valid_statuses = ["pending", "accepted", "rejected", "completed", "cancelled"]
+            if new_status not in valid_statuses:
+                raise ConsultationError(
+                    f"Invalid status. Must be one of: {', '.join(valid_statuses)}",
+                    "INVALID_STATUS",
+                    400
+                )
+            
+            # Verify ownership
+            field = "lawyer_id" if is_lawyer else "user_id"
+            consultation = self.supabase.table("consultation_requests")\
+                .select("*")\
+                .eq("id", consultation_id)\
+                .eq(field, user_id)\
+                .execute()
+            
+            if not consultation.data:
+                raise ConsultationError(
+                    "Consultation not found or access denied",
+                    "NOT_FOUND",
+                    404
+                )
+            
+            # Update status (updated_at is auto-generated by trigger)
+            update_data = {
+                "status": new_status
+            }
+            
+            # Set responded_at for first response (if column exists)
+            if new_status in ["accepted", "rejected"] and not consultation.data[0].get("responded_at"):
+                update_data["responded_at"] = datetime.utcnow().isoformat()
+            
+            result = self.supabase.table("consultation_requests")\
+                .update(update_data)\
+                .eq("id", consultation_id)\
+                .execute()
+            
+            logger.info(f"Consultation {consultation_id} status updated to {new_status}")
+            
+            return {
+                "success": True,
+                "message": f"Consultation {new_status} successfully"
+            }
+        
+        except ConsultationError:
+            raise
+        except Exception as e:
+            logger.error(f"Error updating consultation status: {e}")
+            raise ConsultationError(
+                "Failed to update consultation",
+                "UPDATE_FAILED",
+                500
+            )
+    
+    async def get_consultation_by_id(
+        self,
+        consultation_id: str
+    ) -> Dict[str, Any]:
+        """Get a single consultation by ID"""
+        try:
+            result = self.supabase.table("consultation_requests")\
+                .select("""
+                    *,
+                    lawyer_info:lawyer_id (
+                        name,
+                        specialization
+                    ),
+                    users!consultation_requests_user_id_fkey(
+                        full_name,
+                        email,
+                        username
+                    )
+                """)\
+                .eq("id", consultation_id)\
+                .is_("deleted_at", None)\
+                .execute()
+            
+            if result.data:
+                return {
+                    "success": True,
+                    "data": result.data[0]
+                }
+            else:
+                raise ConsultationError(
+                    "Consultation not found",
+                    "NOT_FOUND",
+                    404
+                )
+        
+        except ConsultationError:
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching consultation: {e}")
+            raise ConsultationError(
+                "Failed to fetch consultation",
+                "FETCH_FAILED",
+                500
+            )
+    
+    async def soft_delete_consultation(
+        self,
+        consultation_id: str,
+        user_id: str
+    ) -> Dict[str, Any]:
+        """Soft delete a consultation (user can only delete their own)"""
+        try:
+            result = self.supabase.table("consultation_requests")\
+                .update({
+                    "deleted_at": datetime.utcnow().isoformat(),
+                    "deleted_by": user_id
+                })\
+                .eq("id", consultation_id)\
+                .eq("user_id", user_id)\
+                .execute()
+            
+            if result.data:
+                logger.info(f"Consultation {consultation_id} soft deleted by {user_id}")
+                return {
+                    "success": True,
+                    "message": "Consultation deleted successfully"
+                }
+            else:
+                raise ConsultationError(
+                    "Consultation not found or access denied",
+                    "NOT_FOUND",
+                    404
+                )
+        
+        except ConsultationError:
+            raise
+        except Exception as e:
+            logger.error(f"Error deleting consultation: {e}")
+            raise ConsultationError(
+                "Failed to delete consultation",
+                "DELETE_FAILED",
+                500
+            )

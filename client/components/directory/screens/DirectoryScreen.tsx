@@ -38,7 +38,7 @@ interface Lawyer {
   bio: string;
   days: string;
   available: boolean;
-  hours_available: string | string[];
+  hours_available: string | string[] | Record<string, string[]>; // JSONB or legacy formats
   created_at: string;
 }
 
@@ -180,11 +180,14 @@ export default function DirectoryScreen() {
         : typeof lawyer.specialization === 'string' && lawyer.specialization
         ? lawyer.specialization.split(",").map((s: string) => s.trim())
         : [],
-      hours_available: Array.isArray(lawyer.hours_available)
-        ? lawyer.hours_available
+      // hours_available can be JSONB object or legacy string array
+      hours_available: typeof lawyer.hours_available === 'object' && !Array.isArray(lawyer.hours_available)
+        ? lawyer.hours_available // JSONB format: {"Monday": ["09:00"]}
+        : Array.isArray(lawyer.hours_available)
+        ? lawyer.hours_available // Already array
         : typeof lawyer.hours_available === 'string' && lawyer.hours_available
-        ? lawyer.hours_available.split(";").map((h: string) => h.trim())
-        : [],
+        ? lawyer.hours_available.split(";").map((h: string) => h.trim()) // Legacy string
+        : [] as string[],
     }));
   }, [lawyersData, getDayAbbreviations]);
 
@@ -346,7 +349,9 @@ export default function DirectoryScreen() {
                         lawyer.days &&
                         lawyer.days.trim() !== "" &&
                         lawyer.hours_available &&
-                        lawyer.hours_available.length > 0
+                        (typeof lawyer.hours_available === 'object' && !Array.isArray(lawyer.hours_available)
+                          ? Object.keys(lawyer.hours_available).length > 0
+                          : Array.isArray(lawyer.hours_available) && lawyer.hours_available.length > 0)
                     )
                     .map((lawyer) => (
                       <LawyerCard
