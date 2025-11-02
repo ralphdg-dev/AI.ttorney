@@ -287,7 +287,7 @@ class EmailSupportService:
                 <!-- Header -->
                 <div style="background: linear-gradient(135deg, #023D7B 0%, #0353A4 100%); padding: 30px; text-align: center;">
                     <div style="background-color: #ffffff; width: 60px; height: 60px; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center;">
-                        <span style="font-size: 32px; color: #023D7B;">✓</span>
+                        <span style="font-size: 32px; color: #023D7B; margin-left: 17px; margin-top: 4px;">✓</span>
                     </div>
                     <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Request Received!</h1>
                 </div>
