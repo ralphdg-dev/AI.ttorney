@@ -570,40 +570,74 @@ const BanRestrictUsers = () => {
       },
     },
     {
-      key: "suspension_count",
-      header: "SUSPENSION",
+      key: "suspension_starts",
+      header: "SUSPENSION STARTS",
       align: "center",
       render: (user) => {
-        const strikes = user.strike_count || 0;
-        const suspensionCount = user.suspension_count || 0;
-        const isPermanentlyBanned = user.account_status === "banned";
+        // Debug: Log user data for suspended users to see available fields
+        if (user.account_status === "suspended") {
+          console.log('Suspended user data:', {
+            id: user.id,
+            email: user.email,
+            account_status: user.account_status,
+            suspension_end: user.suspension_end,
+            suspension_start: user.suspension_start,
+            suspended_at: user.suspended_at,
+            suspension_started_at: user.suspension_started_at,
+            last_violation_at: user.last_violation_at,
+            created_at: user.created_at,
+            updated_at: user.updated_at,
+            allFields: Object.keys(user)
+          });
+        }
+
+        // Check if user is currently suspended
+        if (user.account_status !== "suspended") {
+          return (
+            <div className="text-center text-sm text-gray-400">
+              N/A
+            </div>
+          );
+        }
+
+        // Get suspension start date from user data
+        // Try multiple possible field names for suspension start
+        const suspensionStartDate = user.suspension_start || 
+                                   user.suspended_at || 
+                                   user.suspension_started_at ||
+                                   user.last_violation_at;
+        
+        if (!suspensionStartDate) {
+          // If no start date available, show when the suspension ends minus 7 days (typical suspension length)
+          if (user.suspension_end) {
+            const endDate = new Date(user.suspension_end);
+            const startDate = new Date(endDate);
+            startDate.setDate(startDate.getDate() - 7); // Assume 7-day suspension
+            
+            return (
+              <div className="text-center">
+                <div className="text-sm font-medium text-orange-600">
+                  ~{formatDate(startDate.toISOString())}
+                </div>
+                <div className="text-xs text-gray-500">
+                  (estimated)
+                </div>
+              </div>
+            );
+          }
+          
+          return (
+            <div className="text-center text-sm text-gray-500">
+              Unknown
+            </div>
+          );
+        }
 
         return (
           <div className="text-center">
-            <span
-              className={`text-sm font-medium ${
-                isPermanentlyBanned
-                  ? "text-red-600"
-                  : suspensionCount >= 3
-                  ? "text-red-600"
-                  : suspensionCount > 0
-                  ? "text-orange-600"
-                  : "text-gray-900"
-              }`}
-            >
-              {suspensionCount}
-            </span>
-            {suspensionCount > 0 && (
-              <div className="text-xs text-gray-500">
-                {isPermanentlyBanned
-                  ? "Permanently banned from app"
-                  : suspensionCount >= 3
-                  ? "3 suspensions - eligible for permanent ban"
-                  : `${suspensionCount} suspension${
-                      suspensionCount > 1 ? "s" : ""
-                    }`}
-              </div>
-            )}
+            <div className="text-sm font-medium text-orange-600">
+              {formatDate(suspensionStartDate)}
+            </div>
           </div>
         );
       },
@@ -649,26 +683,6 @@ const BanRestrictUsers = () => {
                 Expired
               </div>
             )}
-          </div>
-        );
-      },
-    },
-    {
-      key: "joined",
-      header: "JOINED",
-      align: "center",
-      render: (user) => {
-        // Try different possible date field names
-        const joinDate =
-          user.created_at ||
-          user.createdAt ||
-          user.date_joined ||
-          user.registration_date;
-
-        return (
-          <div className="flex items-center justify-center text-sm text-gray-500">
-            <Calendar className="w-4 h-4 mr-1" />
-            {formatDate(joinDate)}
           </div>
         );
       },
