@@ -1,23 +1,38 @@
-import React from "react";
-import { ScrollView, StatusBar } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import tw from "tailwind-react-native-classnames";
-import { useRouter } from "expo-router";
-import Header from "@/components/Header";
-import { Box } from "@/components/ui/box";
-import { VStack } from "@/components/ui/vstack";
-import { Text as GSText } from "@/components/ui/text";
+import React, { useCallback } from 'react';
+import { ScrollView, StatusBar } from 'react-native';
+import tw from 'tailwind-react-native-classnames';
+import { useRouter, usePathname } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Header from '@/components/Header';
+import { Box } from '@/components/ui/box';
+import { VStack } from '@/components/ui/vstack';
+import { Text as GSText } from '@/components/ui/text';
+import Colors from '@/constants/Colors';
+import { useAuth } from '@/contexts/AuthContext';
+import { safeGoBack } from '@/utils/navigationHelper';
 import Navbar from "@/components/Navbar";
-import Colors from "@/constants/Colors";
+import { GuestNavbar } from "@/components/guest";
 
 export default function PrivacyPolicyScreen() {
   const router = useRouter();
+  const pathname = usePathname();
+  const { isGuestMode, isAuthenticated, user } = useAuth();
+
+  // Intelligent back navigation handler (FAANG best practice)
+  const handleBackPress = useCallback(() => {
+    safeGoBack(router, {
+      isGuestMode,
+      isAuthenticated,
+      userRole: user?.role,
+      currentPath: pathname,
+    });
+  }, [router, isGuestMode, isAuthenticated, user?.role, pathname]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <Box className="flex-1 bg-white">
-      <Header showBackButton={true} showMenu={false} onBackPress={() => router.back()} />
+      <Header showBackButton={true} showMenu={false} onBackPress={handleBackPress} />
 
       <ScrollView
         style={tw`flex-1`}
@@ -118,7 +133,11 @@ export default function PrivacyPolicyScreen() {
           </VStack>
         </VStack>
       </ScrollView>
-      <Navbar />
+      {isGuestMode ? (
+        <GuestNavbar activeTab="learn" />
+      ) : (
+        <Navbar activeTab="profile" />
+      )}
     </Box>
     </SafeAreaView>
   );

@@ -331,6 +331,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       setHasRedirectedToStatus(false);
       
+      // CRITICAL: Clear any existing guest session before login
+      // This prevents guest mode from persisting after successful authentication
+      const guestSessionData = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
+      if (guestSessionData) {
+        console.log('🗑️ Clearing guest session before login');
+        await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+        setIsGuestMode(false);
+      }
+      
       // Supabase best practice: Use signInWithPassword for email/password auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
@@ -383,6 +392,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('📝 signUp called for:', email);
       setIsLoading(true);
+      
+      // CRITICAL: Clear any existing guest session before signup
+      // This prevents guest mode from persisting after successful registration
+      const guestSessionData = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
+      if (guestSessionData) {
+        console.log('🗑️ Clearing guest session before signup');
+        await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+        setIsGuestMode(false);
+      }
       
       // Supabase best practice: Use signUp with email confirmation
       const { data, error } = await supabase.auth.signUp({

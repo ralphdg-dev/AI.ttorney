@@ -20,7 +20,7 @@ conversational answers grounded in Philippine law with proper citations.
 Endpoint: POST /api/chatbot/user/ask
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, AsyncGenerator
@@ -71,6 +71,9 @@ from services.content_moderation_service import get_moderation_service
 from services.violation_tracking_service import get_violation_tracking_service
 from services.prompt_injection_detector import get_prompt_injection_detector
 from models.violation_types import ViolationType
+
+# Import guest rate limiting (OpenAI/Anthropic security pattern)
+from middleware.guest_rate_limiter import GuestRateLimiter
 
 # Import authentication (optional for chatbot)
 from auth.service import AuthService
@@ -282,8 +285,10 @@ class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=500, description="User's legal question or greeting")
     conversation_history: Optional[List[Dict[str, str]]] = Field(default=[], max_items=10, description="Previous conversation (max 10 messages)")
     max_tokens: Optional[int] = Field(default=400, ge=100, le=1500, description="Max response tokens (reduced for speed)")
-    user_id: Optional[str] = Field(default=None, description="User ID for logging")
-    session_id: Optional[str] = Field(default=None, description="Chat session ID for history tracking")
+    user_id: Optional[str] = Field(default=None, description="User ID for authenticated users")
+    session_id: Optional[str] = Field(default=None, description="Session ID for conversation tracking")
+    guest_session_id: Optional[str] = Field(default=None, description="Cryptographic guest session token")
+    guest_prompt_count: Optional[int] = Field(default=None, description="Client-reported prompt count (advisory only)")
     
     class Config:
         # Production: Add example for API documentation
@@ -323,6 +328,7 @@ class ChatResponse(BaseModel):
     session_id: Optional[str] = Field(default=None, description="Chat session ID for tracking conversation")
     message_id: Optional[str] = Field(default=None, description="Message ID for the assistant's response")
     user_message_id: Optional[str] = Field(default=None, description="Message ID for the user's question")
+    metadata: Optional[Dict] = Field(default=None, description="Additional metadata (guest tokens, rate limits, etc)")
 
 
 def detect_toxic_content(text: str) -> tuple[bool, Optional[str]]:
@@ -1502,29 +1508,42 @@ def create_chat_response(
     sources: List[SourceCitation] = None,
     confidence: str = None,
     simplified_summary: str = None,
-    legal_disclaimer: str = "",
+    legal_disclaimer: str = None,
     fallback_suggestions: List[FallbackSuggestion] = None,
     security_report: Dict = None,
     session_id: str = None,
     message_id: str = None,
-    user_message_id: str = None
+    user_message_id: str = None,
+    metadata: Dict = None,
+    guest_session_token: str = None  # OpenAI/Anthropic pattern: return server token
 ) -> ChatResponse:
     """
     Helper function to create standardized ChatResponse objects.
     Reduces code duplication across the endpoint.
     """
-    return ChatResponse(
+    # Add guest session token to metadata if present
+    response_metadata = metadata or {}
+    if guest_session_token:
+        response_metadata["guest_session_token"] = guest_session_token
+    
+    response = ChatResponse(
         answer=answer,
         sources=sources or [],
         confidence=confidence,
         simplified_summary=simplified_summary,
-        legal_disclaimer=legal_disclaimer,
+        legal_disclaimer=legal_disclaimer or get_legal_disclaimer("en"),
         fallback_suggestions=fallback_suggestions,
         security_report=security_report,
         session_id=session_id,
         message_id=message_id,
         user_message_id=user_message_id
     )
+    
+    # Attach metadata if present
+    if response_metadata:
+        response.metadata = response_metadata
+    
+    return response
 
 
 def get_fallback_suggestions(language: str, is_complex: bool = False) -> List[FallbackSuggestion]:
@@ -1657,23 +1676,13 @@ async def save_chat_interaction(
         return (session_id, None, None)
 
 
-@router.post("/ask/legacy", response_model=ChatResponse, deprecated=True)
-async def ask_legal_question_legacy(
+@router.post("/ask", response_model=ChatResponse)
+async def ask_legal_question(
     request: ChatRequest,
-    chat_service: ChatHistoryService = Depends(get_chat_history_service),
-    current_user: Optional[dict] = Depends(get_optional_current_user)
-):
-    """
-    DEPRECATED: Legacy non-streaming endpoint.
-    
-    Use POST /api/chatbot/user/ask instead (streaming version).
-    This endpoint is kept for backward compatibility only.
-    
-    Modern clients should use the streaming endpoint for:
-    - Better UX (real-time feedback)
-    - Lower perceived latency
-    - Industry-standard SSE streaming
-    """
+    fastapi_request: Request,
+    current_user: Optional[dict] = Depends(get_optional_current_user),
+    chat_history_service: ChatHistoryService = Depends(get_chat_history_service)
+) -> ChatResponse:
     """
     Main endpoint for general public to ask legal questions about Philippine law
     
@@ -1714,6 +1723,50 @@ async def ask_legal_question_legacy(
     # Use authenticated user_id, fallback to request.user_id for backward compatibility
     effective_user_id = authenticated_user_id or request.user_id
     print(f"📝 Effective user ID for chat history: {effective_user_id}")
+    
+    # ============================================================================
+    # GUEST RATE LIMITING - OpenAI/Anthropic Security Pattern
+    # ============================================================================
+    # CRITICAL: Server-side validation for guest users
+    # Never trust client-side data - validate everything on server
+    if not effective_user_id:  # Guest user (no authentication)
+        print("\n🛡️  [GUEST SECURITY] Validating guest rate limit...")
+        
+        # Pass actual FastAPI request for IP-based rate limiting
+        rate_limit_result = await GuestRateLimiter.validate_guest_request(
+            request=fastapi_request,
+            session_id=request.guest_session_id,
+            client_prompt_count=request.guest_prompt_count
+        )
+        
+        if not rate_limit_result["allowed"]:
+            logger.warning(
+                f"🚫 Guest rate limit exceeded: {rate_limit_result['reason']} - "
+                f"Message: {rate_limit_result.get('message', 'Rate limit reached')}"
+            )
+            
+            # Return rate limit error with countdown
+            return create_chat_response(
+                answer=rate_limit_result["message"],
+                simplified_summary="Rate limit reached",
+                metadata={
+                    "rate_limit_exceeded": True,
+                    "reason": rate_limit_result["reason"],
+                    "reset_seconds": rate_limit_result.get("reset_seconds", 0)
+                }
+            )
+        
+        # Rate limit passed - log server-side count
+        print(f"✅ Guest rate limit check passed")
+        print(f"   Server count: {rate_limit_result['server_count']}/{15}")
+        print(f"   Remaining: {rate_limit_result['remaining']}")
+        print(f"   Session ID: {rate_limit_result.get('session_id', 'N/A')[:16]}...")
+        
+        # Store session_id for response (client needs this for next request)
+        guest_session_token = rate_limit_result.get("session_id")
+    else:
+        guest_session_token = None
+    # ============================================================================
     
     # STEP 0: Check if user is allowed to use chatbot (not suspended/banned)
     # Only check for authenticated users
@@ -1787,7 +1840,7 @@ async def ask_legal_question_legacy(
             
             # Save greeting interaction to chat history
             session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
-                chat_service=chat_service,
+                chat_service=chat_history_service,
                 effective_user_id=effective_user_id,
                 session_id=request.session_id,
                 question=request.question,
@@ -1994,7 +2047,7 @@ async def ask_legal_question_legacy(
             
             # Save casual interaction to chat history
             session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
-                chat_service=chat_service,
+                chat_service=chat_history_service,
                 effective_user_id=effective_user_id,
                 session_id=request.session_id,
                 question=request.question,
@@ -2144,7 +2197,7 @@ async def ask_legal_question_legacy(
         save_start = time.time()
         print(f"\n💾 [STEP 10] Saving to database...")
         session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
-            chat_service=chat_service,
+            chat_service=chat_history_service,
             effective_user_id=effective_user_id,
             session_id=request.session_id,
             question=request.question,

@@ -40,11 +40,11 @@ export default function GlossaryScreen() {
   const router = useRouter();
   const { isGuestMode } = useAuth();
   const [activeTab, setActiveTab] = useState<string>("terms");
-  const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState<boolean>(false);
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
-  
+  const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
+
   // Terms state
   const [terms, setTerms] = useState<TermItem[]>([]);
   const [termsLoading, setTermsLoading] = useState<boolean>(true);
@@ -543,6 +543,7 @@ export default function GlossaryScreen() {
           item={item}
           onPress={handleItemPress}
           onToggleBookmark={handleToggleBookmark}
+          showBookmark={!isGuestMode}
           containerStyle={{
             width: numColumns > 1 ? (screenWidth - horizontalPadding * 2 - 12) / numColumns : "100%",
             marginHorizontal: 0,
@@ -553,12 +554,14 @@ export default function GlossaryScreen() {
     }
   }, [activeTab, handleItemPress, handleToggleBookmark, numColumns, screenWidth, horizontalPadding, isGuestMode]);
 
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header 
-        title="Know Your Batas" 
-        showMenu={true}
+        title="Legal Glossary" 
+        showBackButton={false}
+        showMenu={isGuestMode}
         onMenuPress={isGuestMode ? () => setIsGuestSidebarOpen(true) : undefined}
       />
 
@@ -637,7 +640,16 @@ export default function GlossaryScreen() {
       ) : (
         <Navbar activeTab="learn" />
       )}
-      {!isGuestMode && <SidebarWrapper />}
+      
+      {/* Sidebar - Guest or Authenticated */}
+      {isGuestMode ? (
+        <GuestSidebar 
+          isOpen={isGuestSidebarOpen} 
+          onClose={() => setIsGuestSidebarOpen(false)} 
+        />
+      ) : (
+        <SidebarWrapper />
+      )}
     </SafeAreaView>
   );
 }

@@ -1,19 +1,34 @@
-import React from "react";
-import { View, ScrollView } from "react-native";
-import tw from "tailwind-react-native-classnames";
-import { useRouter } from "expo-router";
-import Header from "@/components/Header";
+import React, { useCallback } from 'react';
+import { View, ScrollView } from 'react-native';
+import tw from 'tailwind-react-native-classnames';
+import { useRouter, usePathname } from 'expo-router';
+import Header from '@/components/Header';
 import { VStack } from "@/components/ui/vstack";
-import { Text as GSText } from "@/components/ui/text";
+import { Text as GSText } from '@/components/ui/text';
+import Colors from '@/constants/Colors';
+import { useAuth } from '@/contexts/AuthContext';
+import { safeGoBack } from '@/utils/navigationHelper';
 import Navbar from "@/components/Navbar";
-import Colors from "@/constants/Colors";
+import { GuestNavbar } from "@/components/guest";
 
 export default function AboutScreen() {
   const router = useRouter();
+  const pathname = usePathname();
+  const { isGuestMode, isAuthenticated, user } = useAuth();
+
+  // Intelligent back navigation handler (FAANG best practice)
+  const handleBackPress = useCallback(() => {
+    safeGoBack(router, {
+      isGuestMode,
+      isAuthenticated,
+      userRole: user?.role,
+      currentPath: pathname,
+    });
+  }, [router, isGuestMode, isAuthenticated, user?.role, pathname]);
 
   return (
     <View style={tw`flex-1 bg-white`}>
-      <Header showBackButton={true} showMenu={false} onBackPress={() => router.back()} />
+      <Header showBackButton={true} showMenu={false} onBackPress={handleBackPress} />
 
       <ScrollView
         style={tw`flex-1`}
@@ -82,7 +97,11 @@ export default function AboutScreen() {
         </VStack>
       </ScrollView>
       
-      <Navbar />
+      {isGuestMode ? (
+        <GuestNavbar activeTab="learn" />
+      ) : (
+        <Navbar activeTab="profile" />
+      )}
     </View>
   );
 }

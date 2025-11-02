@@ -1,15 +1,18 @@
-import React, { useState } from "react";
-import { View, ScrollView, TouchableOpacity, LayoutAnimation, Platform, UIManager, StatusBar } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import tw from "tailwind-react-native-classnames";
-import { useRouter } from "expo-router";
-import Header from "@/components/Header";
+import React, { useCallback } from 'react';
+import { View, ScrollView, TouchableOpacity, StatusBar, Platform, UIManager, LayoutAnimation } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import tw from 'tailwind-react-native-classnames';
+import { useRouter, usePathname } from 'expo-router';
+import Header from '@/components/Header';
+import { Text as GSText } from '@/components/ui/text';
+import Colors from '@/constants/Colors';
+import { useAuth } from '@/contexts/AuthContext';
+import { safeGoBack } from '@/utils/navigationHelper';
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
-import { Text as GSText } from "@/components/ui/text";
-import Colors from "@/constants/Colors";
 import Navbar from "@/components/Navbar";
+import { GuestNavbar } from "@/components/guest";
 import { Search, HelpCircle, BookOpen, CreditCard, Minus, Plus } from "lucide-react-native";
 import { Input, InputField } from "@/components/ui/input";
 
@@ -74,7 +77,7 @@ function CategoryCard({ item }: { item: Category }) {
 }
 
 function FAQItem({ q, a }: { q: string; a: string }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = React.useState(false);
 
   const toggle = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -109,13 +112,25 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   );
 }
 
-export default function HelpSupportScreen() {
+export default function HelpScreen() {
   const router = useRouter();
+  const pathname = usePathname();
+  const { isGuestMode, isAuthenticated, user } = useAuth();
+
+  // Intelligent back navigation handler (FAANG best practice)
+  const handleBackPress = useCallback(() => {
+    safeGoBack(router, {
+      isGuestMode,
+      isAuthenticated,
+      userRole: user?.role,
+      currentPath: pathname,
+    });
+  }, [router, isGuestMode, isAuthenticated, user?.role, pathname]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      <Header title="Help & Support" showBackButton={true} showMenu={false} onBackPress={() => router.back()} />
+      <Header title="Help & Support" showBackButton={true} showMenu={false} onBackPress={handleBackPress} />
 
       <ScrollView
         style={tw`flex-1`}
@@ -197,7 +212,11 @@ export default function HelpSupportScreen() {
           </GSText>
         </View>
       </ScrollView>
-      <Navbar activeTab="profile" />
+      {isGuestMode ? (
+        <GuestNavbar activeTab="learn" />
+      ) : (
+        <Navbar activeTab="profile" />
+      )}
     </SafeAreaView>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { View, FlatList, useWindowDimensions, TouchableOpacity, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
@@ -14,7 +14,7 @@ import Colors from "@/constants/Colors";
 import { LAYOUT } from "@/constants/LayoutConstants";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import Navbar from "@/components/Navbar";
-import { GuestNavbar } from "@/components/guest";
+import { GuestNavbar, GuestSidebar } from "@/components/guest";
 import { SidebarWrapper } from "@/components/AppSidebar";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import { useLegalArticles } from "@/hooks/useLegalArticles";
@@ -23,10 +23,10 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function GuidesScreen() {
   const router = useRouter();
   const { isGuestMode } = useAuth();
-  const [activeTab, setActiveTab] = useState<string>("guides");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const { width } = useWindowDimensions();
   
@@ -144,10 +144,11 @@ export default function GuidesScreen() {
     setBookmarks((prev) => ({ ...prev, [item.id]: !prev[item.id] }));
   };
 
-  const onToggleChange = (id: string) => {
+  const onToggleChange = useCallback((id: string) => {
     // Always navigate to glossary page - it has both tabs
     router.push("/glossary");
-  };
+  }, [router]);
+
 
   const renderListHeader = () => (
     <View>
@@ -290,9 +291,14 @@ const renderPagination = () => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      <Header title="Know Your Batas" showMenu={!isGuestMode} />
+      <Header 
+        title="Know Your Batas" 
+        showBackButton={false}
+        showMenu={isGuestMode}
+        onMenuPress={isGuestMode ? () => setIsGuestSidebarOpen(true) : undefined}
+      />
 
-        <ToggleGroup options={tabOptions} activeOption={activeTab} onOptionChange={onToggleChange} />
+        <ToggleGroup options={tabOptions} activeOption="guides" onOptionChange={onToggleChange} />
 
         <Box className="px-6 pt-6 mb-4">
           <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
@@ -350,6 +356,7 @@ const renderPagination = () => {
                   item={item}
                   onPress={handleArticlePress}
                   onToggleBookmark={handleToggleBookmark}
+                  showBookmark={!isGuestMode}
                   containerStyle={{
                     width: cardWidth,
                     marginBottom: cardGap,
@@ -378,7 +385,16 @@ const renderPagination = () => {
         ) : (
           <Navbar activeTab="learn" />
         )}
-        {!isGuestMode && <SidebarWrapper />}
+        
+        {/* Sidebar - Guest or Authenticated */}
+        {isGuestMode ? (
+          <GuestSidebar 
+            isOpen={isGuestSidebarOpen} 
+            onClose={() => setIsGuestSidebarOpen(false)} 
+          />
+        ) : (
+          <SidebarWrapper />
+        )}
       </SafeAreaView>
   );
 }

@@ -16,9 +16,11 @@ import { Badge, BadgeText } from "@/components/ui/badge";
 import { shouldUseNativeDriver } from '@/utils/animations';
 import BackButton from "@/components/ui/BackButton";
 import Navbar from "@/components/Navbar";
+import { GuestNavbar } from "@/components/guest";
 import Colors from "@/constants/Colors";
 import { Star, BookOpen, Globe } from "lucide-react-native";
 import { useFavorites } from "@/contexts/FavoritesContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { NetworkConfig } from "@/utils/networkConfig";
 
 interface GlossaryTerm {
@@ -36,6 +38,7 @@ interface GlossaryTerm {
 export default function TermDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { isGuestMode } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const [term, setTerm] = useState<GlossaryTerm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -203,13 +206,16 @@ export default function TermDetailScreen() {
         >
           {term?.term_en || "Legal Term"}
         </GSText>
-        <Pressable onPress={handleToggleFavorite} className="p-2">
-          <Star
-            size={22}
-            color={isTermFavorite ? "#F59E0B" : "#9CA3AF"}
-            fill={isTermFavorite ? "#F59E0B" : "none"}
-          />
-        </Pressable>
+        {!isGuestMode && (
+          <Pressable onPress={handleToggleFavorite} className="p-2">
+            <Star
+              size={22}
+              color={isTermFavorite ? "#F59E0B" : "#9CA3AF"}
+              fill={isTermFavorite ? "#F59E0B" : "none"}
+            />
+          </Pressable>
+        )}
+        {isGuestMode && <View style={{ width: 38 }} />}
       </View>
 
       <Animated.ScrollView
@@ -369,7 +375,11 @@ export default function TermDetailScreen() {
         </View>
       </Animated.ScrollView>
 
-      <Navbar activeTab="learn" />
+      {isGuestMode ? (
+        <GuestNavbar activeTab="learn" />
+      ) : (
+        <Navbar activeTab="learn" />
+      )}
     </View>
   );
 }

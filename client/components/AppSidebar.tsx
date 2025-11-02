@@ -326,6 +326,12 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <View style={styles.container}>
+      {/* Backdrop - Click to close */}
+      <TouchableOpacity
+        style={styles.backdrop}
+        activeOpacity={1}
+        onPress={onClose}
+      />
       {/* Sidebar */}
       <Animated.View
         style={[
@@ -600,6 +606,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontStyle: "italic",
     ...GlobalStyles.text,
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
 });
 

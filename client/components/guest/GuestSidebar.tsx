@@ -9,7 +9,9 @@ import {
   Info,
   HelpCircle,
   UserCircle,
-  X
+  X,
+  LogIn,
+  UserPlus
 } from 'lucide-react-native';
 import { shouldUseNativeDriver } from '@/utils/animations';
 import { createShadowStyle } from '@/utils/shadowUtils';
@@ -76,6 +78,16 @@ export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) =
     onClose();
     // Clear guest session and redirect to login
     router.replace('/login');
+  };
+
+  const handleLogin = () => {
+    onClose();
+    router.push('/login');
+  };
+
+  const handleSignUp = () => {
+    onClose();
+    router.push('/onboarding/registration');
   };
 
   const menuItems: MenuItem[] = [
@@ -158,6 +170,12 @@ export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) =
 
   return (
     <View style={styles.container}>
+      {/* Backdrop - Click to close */}
+      <TouchableOpacity
+        style={styles.backdrop}
+        activeOpacity={1}
+        onPress={onClose}
+      />
       {/* Sidebar */}
       <Animated.View
         style={[
@@ -194,6 +212,26 @@ export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) =
           {/* Guest Disclaimer */}
           <View style={styles.disclaimerContainer}>
             <GuestDisclaimer variant="inline" showCTA={false} />
+          </View>
+
+          {/* Auth Actions */}
+          <View style={styles.authActionsContainer}>
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={handleLogin}
+              activeOpacity={0.7}
+            >
+              <LogIn size={18} color={Colors.primary.blue} strokeWidth={2} />
+              <Text style={styles.loginButtonText}>Login</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.signUpButton}
+              onPress={handleSignUp}
+              activeOpacity={0.7}
+            >
+              <UserPlus size={18} color="#FFFFFF" strokeWidth={2} />
+              <Text style={styles.signUpButtonText}>Sign Up</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Menu Items */}
@@ -321,6 +359,58 @@ const styles = StyleSheet.create({
   },
   exitText: {
     color: '#EF4444',
+  },
+  authActionsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  loginButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: Colors.primary.blue,
+    gap: 8,
+  },
+  loginButtonText: {
+    fontSize: 14,
+    color: Colors.primary.blue,
+    fontWeight: '600',
+    ...GlobalStyles.textSemiBold,
+  },
+  signUpButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: Colors.primary.blue,
+    gap: 8,
+  },
+  signUpButtonText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    ...GlobalStyles.textSemiBold,
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   divider: {
     height: 1,

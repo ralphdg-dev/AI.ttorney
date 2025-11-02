@@ -12,6 +12,7 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { GuestProvider } from "../contexts/GuestContext";
+import { GuestChatProvider } from "../contexts/GuestChatContext";
 import { FavoritesProvider } from "../contexts/FavoritesContext";
 import { ForumCacheProvider } from "../contexts/ForumCacheContext";
 import { ModerationProvider } from "../contexts/ModerationContext";
@@ -43,7 +44,8 @@ function AppContent() {
 
   return (
     <GuestProvider>
-      <ModerationProvider>
+      <GuestChatProvider>
+        <ModerationProvider>
         <FavoritesProvider>
           <ForumCacheProvider>
             <AuthGuard>
@@ -76,7 +78,8 @@ function AppContent() {
             </AuthGuard>
           </ForumCacheProvider>
         </FavoritesProvider>
-      </ModerationProvider>
+        </ModerationProvider>
+      </GuestChatProvider>
     </GuestProvider>
   );
 }

@@ -29,6 +29,7 @@ const GuestContext = createContext<GuestContextType | undefined>(undefined);
 export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [guestSession, setGuestSession] = useState<GuestSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [, forceUpdate] = useState(0); // Force re-render trigger
 
   // Define clearGuestSession first (no dependencies)
   const clearGuestSession = useCallback(async () => {
@@ -101,9 +102,11 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [clearGuestSession]);
 
   // Load guest session from storage on mount
+  // FAANG Best Practice: Load once on mount, no dependencies to avoid re-loads
   useEffect(() => {
     loadGuestSession();
-  }, [loadGuestSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Define incrementPromptCount (depends on guestSession and startGuestSession)
   const incrementPromptCount = useCallback(async (): Promise<boolean> => {
@@ -140,13 +143,12 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
 
       await AsyncStorage.setItem(GUEST_SESSION_STORAGE_KEY, JSON.stringify(updatedSession));
-      setGuestSession(updatedSession);
-      
-      console.log('📊 Guest prompt count:', {
-        count: updatedSession.promptCount,
-        remaining: calculateRemainingPrompts(updatedSession.promptCount),
-        limit: GUEST_PROMPT_LIMIT
-      });
+      setGuestSession(updatedSession); // This triggers re-render
+      forceUpdate(prev => prev + 1); // Force banner to re-render
+
+      const newCount = updatedSession.promptCount;
+      console.log(`📊 Guest prompt count updated: ${newCount}/${GUEST_PROMPT_LIMIT}`);
+      console.log(`📊 Prompts remaining: ${GUEST_PROMPT_LIMIT - newCount}`);
 
       return true;
     } catch (error) {
@@ -155,7 +157,8 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [guestSession, startGuestSession, clearGuestSession]);
 
-  const value: GuestContextType = {
+  // FAANG Best Practice: Memoize context value to prevent unnecessary re-renders
+  const value: GuestContextType = React.useMemo(() => ({
     isGuestMode: !!guestSession && !isSessionExpired(guestSession?.expiresAt || 0),
     guestSession,
     promptCount: guestSession?.promptCount || 0,
@@ -165,7 +168,7 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     incrementPromptCount,
     clearGuestSession,
     isLoading,
-  };
+  }), [guestSession, isLoading, startGuestSession, incrementPromptCount, clearGuestSession]);
 
   return <GuestContext.Provider value={value}>{children}</GuestContext.Provider>;
 };

@@ -32,6 +32,7 @@ interface ArticleCardProps {
   onPress?: (item: ArticleItem) => void;
   containerStyle?: StyleProp<ViewStyle>;
   onToggleBookmark?: (item: ArticleItem) => void;
+  showBookmark?: boolean; // Control bookmark visibility
 }
 
 function getCategoryBadgeClasses(
@@ -64,6 +65,7 @@ export const ArticleCard = ({
   onPress,
   containerStyle,
   onToggleBookmark,
+  showBookmark = true, // Default to true for backward compatibility
 }: ArticleCardProps) => {
   const noImageUri =
     "https://placehold.co/1200x800/png?text=No+Image+Available";
@@ -104,27 +106,29 @@ export const ArticleCard = ({
           </View>
         </TouchableOpacity>
 
-        {/* Bookmark */}
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => onToggleBookmark && onToggleBookmark(item)}
-          style={{
-            position: "absolute",
-            top: 10,
-            right: 10,
-            padding: 6,
-            borderRadius: 9999,
-            backgroundColor: "rgba(255,255,255,0.9)",
-            zIndex: 10,
-          }}
-        >
-          <Bookmark
-            size={18}
-            color={item.isBookmarked ? "#f59e0b" : "#9ca3af"}
-            strokeWidth={2}
-            fill={item.isBookmarked ? "#f59e0b" : "none"}
-          />
-        </TouchableOpacity>
+        {/* Bookmark - Only show if not in guest mode */}
+        {showBookmark && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => onToggleBookmark && onToggleBookmark(item)}
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              padding: 6,
+              borderRadius: 9999,
+              backgroundColor: "rgba(255,255,255,0.9)",
+              zIndex: 10,
+            }}
+          >
+            <Bookmark
+              size={18}
+              color={item.isBookmarked ? "#f59e0b" : "#9ca3af"}
+              strokeWidth={2}
+              fill={item.isBookmarked ? "#f59e0b" : "none"}
+            />
+          </TouchableOpacity>
+        )}
 
         {/* Content */}
         <TouchableOpacity
