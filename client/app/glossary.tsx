@@ -10,7 +10,6 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { fadeIn, fadeOut } from '@/utils/animations';
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
 import { Box } from "@/components/ui/box";
@@ -25,7 +24,7 @@ import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
-import { SidebarWrapper } from "@/components/AppSidebar";
+import { SidebarWrapper, useSidebar } from "@/components/AppSidebar";
 import { useLegalArticles } from "@/hooks/useLegalArticles";
 import {
   CacheService,
@@ -40,6 +39,7 @@ const ITEMS_PER_PAGE = 10;
 export default function GlossaryScreen() {
   const router = useRouter();
   const { isGuestMode } = useAuth();
+  const { openSidebar } = useSidebar();
   const [activeTab, setActiveTab] = useState<string>("terms");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -279,19 +279,21 @@ export default function GlossaryScreen() {
   }, [activeTab, currentData, currentPage]);
 
   // Handlers
-  const handleTabChange = useCallback((id: string) => {
-    if (id === activeTab) return;
-    
-    // Smooth transition animation for both tabs
-    fadeOut(fadeAnim, 150).start(() => {
-      setActiveTab(id);
-      setCurrentPage(1);
-      setSearchQuery("");
-      setActiveCategory("all");
-      
-      fadeIn(fadeAnim, 150).start();
-    });
-  }, [activeTab, fadeAnim]);
+  const handleTabChange = (tabId: string) => {
+    // ⚡ FAANG OPTIMIZATION: State-based tabs - no navigation, no page reload
+    setActiveTab(tabId);
+    setCurrentPage(1);
+    setActiveCategory("all");
+    setSearchQuery("");
+  };
+
+  const handleMenuPress = useCallback(() => {
+    if (isGuestMode) {
+      setIsGuestSidebarOpen(true);
+    } else {
+      openSidebar();
+    }
+  }, [isGuestMode, openSidebar]);
 
   const handleCategoryChange = useCallback((categoryId: string) => {
     setActiveCategory(categoryId);
@@ -561,8 +563,8 @@ export default function GlossaryScreen() {
       <Header 
         title="Legal Glossary" 
         showBackButton={false}
-        showMenu={isGuestMode}
-        onMenuPress={isGuestMode ? () => setIsGuestSidebarOpen(true) : undefined}
+        showMenu={true}
+        onMenuPress={handleMenuPress}
       />
 
       <ToggleGroup

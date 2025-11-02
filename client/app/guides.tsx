@@ -15,7 +15,7 @@ import { LAYOUT } from "@/constants/LayoutConstants";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import Navbar from "@/components/Navbar";
 import { GuestNavbar, GuestSidebar } from "@/components/guest";
-import { SidebarWrapper } from "@/components/AppSidebar";
+import { SidebarWrapper, useSidebar } from "@/components/AppSidebar";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import { useLegalArticles } from "@/hooks/useLegalArticles";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,6 +24,7 @@ import { useBookmarks } from "@/contexts/BookmarksContext";
 export default function GuidesScreen() {
   const router = useRouter();
   const { isGuestMode } = useAuth();
+  const { openSidebar } = useSidebar();
   const { articles: legalArticles, loading, error, refetch, getArticlesByCategory, searchArticles } = useLegalArticles();
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -137,9 +138,17 @@ export default function GuidesScreen() {
   };
 
   const onToggleChange = useCallback((id: string) => {
-    // Always navigate to glossary page - it has both tabs
+    // ⚡ FAANG OPTIMIZATION: Navigate to glossary with terms tab active
     router.push("/glossary");
   }, [router]);
+
+  const handleMenuPress = useCallback(() => {
+    if (isGuestMode) {
+      setIsGuestSidebarOpen(true);
+    } else {
+      openSidebar();
+    }
+  }, [isGuestMode, openSidebar]);
 
 
   const renderListHeader = () => (
@@ -286,8 +295,8 @@ const renderPagination = () => {
       <Header 
         title="Know Your Batas" 
         showBackButton={false}
-        showMenu={isGuestMode}
-        onMenuPress={isGuestMode ? () => setIsGuestSidebarOpen(true) : undefined}
+        showMenu={true}
+        onMenuPress={handleMenuPress}
       />
 
         <ToggleGroup options={tabOptions} activeOption="guides" onOptionChange={onToggleChange} />

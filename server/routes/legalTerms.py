@@ -33,7 +33,8 @@ async def get_glossary_terms(
         
         # Add search filter if provided
         if search and search.strip():
-            search_param = f"or(term_en.ilike.%{search}%,term_fil.ilike.%{search}%,definition_en.ilike.%{search}%,definition_fil.ilike.%{search}%)"
+            search_term = search.strip()
+            search_param = f"(term_en.ilike.*{search_term}*,term_fil.ilike.*{search_term}*,definition_en.ilike.*{search_term}*,definition_fil.ilike.*{search_term}*)"
             params["or"] = search_param
         
         # Execute the query
