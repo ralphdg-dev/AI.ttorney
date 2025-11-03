@@ -101,7 +101,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         </ModalHeader>
         
         <ModalBody className="px-4 py-3">
-          <Text className="text-gray-600 text-center text-sm" style={{ lineHeight: 20 }}>
+          <Text className="text-gray-600 text-center text-sm">
             {config.message}
           </Text>
         </ModalBody>

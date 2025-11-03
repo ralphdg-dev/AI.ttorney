@@ -1,8 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const API_BASE_URL = __DEV__ 
-  ? 'http://localhost:8000' 
-  : 'https://your-production-api.com';
+import { NetworkConfig } from '../utils/networkConfig';
 
 interface ApiResponse<T = any> {
   data?: T;
@@ -15,10 +12,11 @@ interface ApiResponse<T = any> {
 }
 
 class ApiClient {
-  private baseUrl: string;
-
-  constructor(baseUrl: string = API_BASE_URL) {
-    this.baseUrl = baseUrl;
+  private async getBaseUrl(): Promise<string> {
+    if (__DEV__) {
+      return await NetworkConfig.getBestApiUrl();
+    }
+    return 'https://your-production-api.com';
   }
 
   private async getAuthHeaders(): Promise<Record<string, string>> {
@@ -34,9 +32,10 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
+      const baseUrl = await this.getBaseUrl();
       const headers = await this.getAuthHeaders();
       
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      const response = await fetch(`${baseUrl}${endpoint}`, {
         ...options,
         headers: {
           ...headers,

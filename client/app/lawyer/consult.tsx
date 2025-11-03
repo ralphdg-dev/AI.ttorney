@@ -28,6 +28,7 @@ import tw from "tailwind-react-native-classnames";
 import Colors from "../../constants/Colors";
 import { shouldUseNativeDriver } from "../../utils/animations";
 import { NetworkConfig } from "../../utils/networkConfig";
+import { supabase } from "../../config/supabase";
 
 interface ConsultationRequest {
   id: string;
@@ -155,48 +156,55 @@ const LawyerConsultPage: React.FC = () => {
   };
 
   // Fetch consultation requests
-  const fetchConsultationRequests = async () => {
-    if (!user?.id) return;
+  const fetchConsultationRequests = React.useCallback(async () => {
+    if (!user?.id) {
+      console.log("❌ No user ID, skipping fetch");
+      return;
+    }
 
     try {
       setLoading(true);
+      console.log("🔄 Fetching consultations for lawyer:", user.id, "Filter:", filter);
 
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      const response = await fetch(
-        `${apiUrl}/api/consult-actions/my-consultations${
-          filter !== "all" ? `?status_filter=${filter}` : ""
-        }`,
-        {
-          headers: {
-            Authorization: `Bearer ${session?.access_token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const url = `${apiUrl}/api/consult-actions/my-consultations${
+        filter !== "all" ? `?status_filter=${filter}` : ""
+      }`;
+      console.log("📡 API URL:", url);
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      console.log("📥 Response status:", response.status);
 
       if (response.ok) {
         const data = await response.json();
+        console.log("✅ Received consultations:", data.length, "items");
+        console.log("📋 Consultation data:", JSON.stringify(data, null, 2));
         setConsultationRequests(data);
 
         // Calculate accurate stats from the fetched data
         const calculatedStats = calculateStats(data);
         setStats(calculatedStats);
       } else {
-        console.error("Failed to fetch consultation requests");
+        const errorData = await response.text();
+        console.error("❌ Failed to fetch:", response.status, errorData);
         Alert.alert("Error", "Failed to load consultation requests");
       }
     } catch (error) {
-      if (__DEV__) {
-        console.error("Error fetching consultation requests:", error);
-      }
+      console.error("❌ Error fetching consultation requests:", error);
       Alert.alert("Error", "Failed to load consultations. Please check your connection.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, filter, session?.access_token]);
 
   // Fetch statistics (fallback to API if needed)
-  const fetchStats = async () => {
+  const fetchStats = React.useCallback(async () => {
     if (!user?.id) return;
 
     try {
@@ -224,18 +232,44 @@ const LawyerConsultPage: React.FC = () => {
       }
       // If API fails, we'll rely on the calculated stats
     }
-  };
+  }, [user?.id, session?.access_token]);
+
+  useEffect(() => {
+    fetchConsultationRequests();
+  }, [filter, fetchConsultationRequests]);
 
   useEffect(() => {
     if (user?.id && session?.access_token) {
-      // Wrap in async IIFE to handle promises properly
-      (async () => {
-        await fetchConsultationRequests();
-        await fetchStats();
-      })();
+      fetchStats();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, session?.access_token, filter]);
+  }, [user?.id, session?.access_token, fetchStats]);
+
+  // Real-time subscription for consultation updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('lawyer_consultation_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'consultation_requests',
+          filter: `lawyer_id=eq.${user.id}`,
+        },
+        (payload: any) => {
+          console.log('Lawyer consultation change detected:', payload);
+          // Refresh consultations when any change occurs
+          fetchConsultationRequests();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, fetchConsultationRequests]);
 
   const getModeIcon = (mode: string | null) => {
     switch (mode) {

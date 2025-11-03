@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl, Animated, TouchableOpacity, StyleSheet, ListRenderItem } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, Text, FlatList, RefreshControl, ActivityIndicator, TouchableOpacity, Alert, Animated, StyleSheet, ListRenderItem } from 'react-native';
+import { NetworkConfig } from '../../utils/networkConfig';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import Post from './Post';
@@ -225,7 +226,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     
     try {
       const headers = await getAuthHeaders();
-      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_BASE_URL = await NetworkConfig.getBestApiUrl();
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { fetchLawyerDashboardData, DashboardStats, ConsultationRequest } from '../services/lawyerDashboardService';
+import { supabase } from '../config/supabase';
 
 // Cache configuration
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
@@ -116,6 +117,34 @@ export const useLawyerDashboard = (accessToken: string | undefined) => {
     };
 
     loadDashboardData();
+
+    // Real-time subscription for consultation updates on dashboard
+    if (!accessToken) return;
+
+    console.log('📡 Setting up real-time subscription for dashboard');
+    const channel = supabase
+      .channel('dashboard_consultation_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'consultation_requests',
+        },
+        (payload: any) => {
+          console.log('🔔 Dashboard: Consultation change detected:', payload);
+          // Invalidate cache and refresh data
+          dashboardCache.data = null;
+          dashboardCache.timestamp = null;
+          loadDashboardData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔌 Cleaning up dashboard subscription');
+      supabase.removeChannel(channel);
+    };
   }, [accessToken]);
 
   // Manual refresh function to force cache invalidation

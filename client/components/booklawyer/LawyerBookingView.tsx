@@ -142,9 +142,10 @@ export default function LawyerBookingView() {
         const hourNum = parseInt(hour);
         const ampm = hourNum >= 12 ? 'PM' : 'AM';
         const displayHour = hourNum === 0 ? 12 : hourNum > 12 ? hourNum - 12 : hourNum;
+        
         return {
-          id: `${selectedDayName}-${time}-${index}`,
-          time: `${displayHour}:${minute} ${ampm}`,
+          id: time, // Store "09:00" format (24-hour) for API
+          time: `${displayHour}:${minute} ${ampm}`, // Display "9:00 AM" format
           available: true,
         };
       });
@@ -217,8 +218,9 @@ export default function LawyerBookingView() {
   };
 
   const getSelectedTimeSlotText = (): string => {
-    const slot = timeSlots.find((slot) => slot.id === selectedTimeSlot);
-    return slot ? slot.time : selectedTimeSlot;
+    // selectedTimeSlot is now the time in "09:00" format (from slot.id)
+    // Just return it directly
+    return selectedTimeSlot;
   };
 
   const getFormattedDateForAPI = (): string => {
@@ -405,7 +407,7 @@ export default function LawyerBookingView() {
     try {
       const consultationRequestData = {
         user_id: user?.id || "anonymous",
-        lawyer_id: lawyerData?.id, // Use lawyer_info.id (the foreign key references lawyer_info.id, not lawyer_info.lawyer_id)
+        lawyer_id: lawyerData?.id, // Use lawyer_info.id (the primary key that consultation_requests references)
         message: concern.trim(),
         email: email.trim(),
         mobile_number: mobileNumber.trim(),
@@ -415,6 +417,11 @@ export default function LawyerBookingView() {
       };
 
       console.log("Sending consultation request:", consultationRequestData);
+      console.log("📊 Lawyer Data:", {
+        id: lawyerData?.id,
+        lawyer_id: lawyerData?.lawyer_id,
+        name: lawyerData?.name
+      });
 
       const { NetworkConfig } = await import('@/utils/networkConfig');
       const apiUrl = await NetworkConfig.getBestApiUrl();
@@ -768,25 +775,15 @@ export default function LawyerBookingView() {
                   let isPastTime = false;
 
                   if (isTodaySelected) {
-                    // Extract time from slot.time (like "9:00AM-10:00AM")
-                    const [start] = slot.time.split("-");
-                    const timeStr = start.trim().toUpperCase();
-                    const match = timeStr.match(
-                      /(\d{1,2}):?(\d{0,2})?\s?(AM|PM)/i
-                    );
+                    // slot.id contains 24-hour format "09:00"
+                    const [hour, minute] = slot.id.split(":");
+                    const h = parseInt(hour);
+                    const m = parseInt(minute);
 
-                    if (match) {
-                      let [, hour, minute, period] = match;
-                      let h = parseInt(hour);
-                      const m = minute ? parseInt(minute) : 0;
-                      if (period.toUpperCase() === "PM" && h < 12) h += 12;
-                      if (period.toUpperCase() === "AM" && h === 12) h = 0;
+                    const slotTime = new Date();
+                    slotTime.setHours(h, m, 0, 0);
 
-                      const slotTime = new Date();
-                      slotTime.setHours(h, m, 0, 0);
-
-                      isPastTime = slotTime.getTime() < today.getTime();
-                    }
+                    isPastTime = slotTime.getTime() < today.getTime();
                   }
 
                   const isDisabled = isPastTime || !slot.available;
