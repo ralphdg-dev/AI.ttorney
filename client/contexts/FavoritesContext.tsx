@@ -9,7 +9,6 @@ interface FavoritesContextType {
   favoriteTermIds: Set<string>;
   toggleFavorite: (termId: string, termTitle?: string) => Promise<void>;
   isFavorite: (termId: string) => boolean;
-  getFavoriteCount: () => number;
   loadFavorites: () => Promise<void>;
 }
 
@@ -130,10 +129,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
     return favoriteTermIds.has(termId);
   }, [favoriteTermIds]);
 
-  const getFavoriteCount = useCallback((): number => {
-    return favoriteTermIds.size;
-  }, [favoriteTermIds]);
-
   useEffect(() => {
     loadFavorites();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -143,10 +138,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
     favoriteTermIds,
     toggleFavorite,
     isFavorite,
-    getFavoriteCount,
     loadFavorites,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [favoriteTermIds, toggleFavorite, isFavorite, getFavoriteCount]);
+  }), [favoriteTermIds, toggleFavorite, isFavorite, loadFavorites]);
 
   return (
     <FavoritesContext.Provider value={value}>

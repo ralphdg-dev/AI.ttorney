@@ -272,36 +272,36 @@ export default function DirectoryScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header title="Find Legal Help" showMenu={true} />
 
-        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {/* Conditionally render based on active tab */}
-        {activeTab === "law-firms" ? (
-          // Law Firms Tab - Google Law Firms Finder
-          <GoogleLawFirmsFinder searchQuery={searchQuery} />
-        ) : (
-          // Lawyers Tab - Using SearchBarWithFilter component
-          <>
-            <SearchBarWithFilter
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              onFilterPress={() => setFilterVisible(true)}
-              placeholder="Search lawyers..."
-              loading={loading}
-              editable={true}
-              maxLength={100}
-              hasActiveFilters={hasActiveFilters}
-            />
+      {/* Conditionally render based on active tab */}
+      {activeTab === "law-firms" ? (
+        // Law Firms Tab - Google Law Firms Finder
+        <GoogleLawFirmsFinder searchQuery={searchQuery} />
+      ) : (
+        // Lawyers Tab - Using SearchBarWithFilter component
+        <View style={{ flex: 1 }}>
+          <SearchBarWithFilter
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onFilterPress={() => setFilterVisible(true)}
+            placeholder="Search lawyers..."
+            loading={loading}
+            editable={true}
+            maxLength={100}
+            hasActiveFilters={hasActiveFilters}
+          />
 
-            <FilterModal
-              visible={filterVisible}
-              onClose={() => setFilterVisible(false)}
-              selectedDays={selectedDays}
-              setSelectedDays={setSelectedDays}
-              selectedSpecialization={selectedSpecialization}
-              setSelectedSpecialization={setSelectedSpecialization}
-            />
+          <FilterModal
+            visible={filterVisible}
+            onClose={() => setFilterVisible(false)}
+            selectedDays={selectedDays}
+            setSelectedDays={setSelectedDays}
+            selectedSpecialization={selectedSpecialization}
+            setSelectedSpecialization={setSelectedSpecialization}
+          />
 
-            <ScrollView
+          <ScrollView
               style={tw`flex-1 bg-gray-50`}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: 60, paddingHorizontal: 8, paddingTop: 12 }}
@@ -368,10 +368,10 @@ export default function DirectoryScreen() {
                 </>
               )}
 
-              <View style={tw`h-4`} />
-            </ScrollView>
-          </>
-        )}
+            <View style={tw`h-4`} />
+          </ScrollView>
+        </View>
+      )}
 
       <Navbar activeTab="find" />
       <SidebarWrapper />

@@ -34,11 +34,13 @@ export default function ConsultationsScreen() {
 
   const fetchConsultations = useCallback(async () => {
     if (!user?.id) {
+      console.log("❌ No user ID, skipping fetch");
       return;
     }
 
     try {
       setLoading(true);
+      console.log("🔄 Fetching consultations for user:", user.id);
 
       const { data, error } = await supabase
         .from("consultation_requests")
@@ -53,6 +55,7 @@ export default function ConsultationsScreen() {
           email,
           mobile_number,
           responded_at,
+          lawyer_id,
           lawyer_info:lawyer_id (
             name,
             specialization
@@ -63,29 +66,47 @@ export default function ConsultationsScreen() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("Error fetching consultations:", error);
+        console.error("❌ Error fetching consultations:", error);
+        setLoading(false);
         return;
       }
 
-      const transformedData: Consultation[] = (data || []).map((item: any) => ({
-        id: item.id,
-        lawyer_name: (item.lawyer_info as any)?.name || "Unknown Lawyer",
-        specialization: (item.lawyer_info as any)?.specialization || "General Law",
-        consultation_date: item.consultation_date || "",
-        consultation_time: item.consultation_time || "",
-        status: item.status || "pending",
-        created_at: item.created_at,
-        message: item.message,
-        email: item.email,
-        mobile_number: item.mobile_number,
-        responded_at: item.responded_at,
-      }));
+      console.log("✅ Fetched consultations raw data:", JSON.stringify(data, null, 2));
+      console.log("📊 Total consultations found:", data?.length || 0);
 
+      if (!data || data.length === 0) {
+        console.log("⚠️  No consultations found for user");
+        setConsultations([]);
+        setLoading(false);
+        return;
+      }
+
+      const transformedData: Consultation[] = data.map((item: any) => {
+        const lawyerInfo = item.lawyer_info;
+        const transformed = {
+          id: item.id,
+          lawyer_name: lawyerInfo?.name || "Pending Assignment",
+          specialization: lawyerInfo?.specialization || "Awaiting Lawyer",
+          consultation_date: item.consultation_date || "",
+          consultation_time: item.consultation_time || "",
+          status: item.status || "pending",
+          created_at: item.created_at,
+          message: item.message,
+          email: item.email,
+          mobile_number: item.mobile_number,
+          responded_at: item.responded_at,
+        };
+        console.log("🔄 Transformed consultation:", transformed);
+        return transformed;
+      });
+
+      console.log("✅ Setting consultations state with", transformedData.length, "items");
       setConsultations(transformedData);
     } catch (error) {
-      console.error("Error in fetchConsultations:", error);
+      console.error("❌ Exception in fetchConsultations:", error);
     } finally {
       setLoading(false);
+      console.log("✅ Loading complete");
     }
   }, [user?.id]);
 
@@ -120,6 +141,33 @@ export default function ConsultationsScreen() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [authLoading, isAuthenticated, user?.id]) // fetchConsultations is stable
   );
+
+  // Real-time subscription for consultation updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('consultation_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'consultation_requests',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload: any) => {
+          console.log('Consultation change detected:', payload);
+          // Refresh consultations when any change occurs
+          fetchConsultations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, fetchConsultations]);
 
   const openDetailsModal = (consultation: Consultation) => {
     setSelectedConsultation(consultation);
@@ -178,17 +226,19 @@ export default function ConsultationsScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header title="My Consultations" showMenu={true} />
-        
-        <SearchBarWithFilter
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          onFilterPress={() => setFilterModalVisible(true)}
-          placeholder="Search consultations..."
-          loading={authLoading || loading}
-          editable={true}
-          maxLength={100}
-          hasActiveFilters={activeFilter !== "all"}
-        />
+      
+      <SearchBarWithFilter
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onFilterPress={() => setFilterModalVisible(true)}
+        placeholder="Search consultations..."
+        loading={authLoading || loading}
+        editable={true}
+        maxLength={100}
+        hasActiveFilters={activeFilter !== "all"}
+      />
+      
+      <View style={{ flex: 1 }}>
         
         <ScrollView
           style={tw`flex-1`}
@@ -240,6 +290,7 @@ export default function ConsultationsScreen() {
           selectedStatus={activeFilter}
           setSelectedStatus={setActiveFilter}
         />
+      </View>
 
       <Navbar activeTab="profile" />
       <SidebarWrapper />

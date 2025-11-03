@@ -9,7 +9,6 @@ interface BookmarksContextType {
   bookmarkedGuideIds: Set<string>;
   toggleBookmark: (guideId: string, guideTitle?: string) => Promise<void>;
   isBookmarked: (guideId: string) => boolean;
-  getBookmarkCount: () => number;
   loadBookmarks: () => Promise<void>;
 }
 
@@ -128,10 +127,6 @@ export const BookmarksProvider: React.FC<BookmarksProviderProps> = ({ children }
     return bookmarkedGuideIds.has(guideId);
   }, [bookmarkedGuideIds]);
 
-  const getBookmarkCount = useCallback((): number => {
-    return bookmarkedGuideIds.size;
-  }, [bookmarkedGuideIds]);
-
   useEffect(() => {
     loadBookmarks();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -141,10 +136,8 @@ export const BookmarksProvider: React.FC<BookmarksProviderProps> = ({ children }
     bookmarkedGuideIds,
     toggleBookmark,
     isBookmarked,
-    getBookmarkCount,
     loadBookmarks,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [bookmarkedGuideIds, toggleBookmark, isBookmarked, getBookmarkCount]);
+  }), [bookmarkedGuideIds, toggleBookmark, isBookmarked, loadBookmarks]);
 
   return (
     <BookmarksContext.Provider value={value}>

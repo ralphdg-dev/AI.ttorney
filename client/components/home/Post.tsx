@@ -7,6 +7,7 @@ import Colors from '@/constants/Colors';
 import { createShadowStyle } from '@/utils/shadowUtils';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePostBookmarks } from '../../contexts/PostBookmarksContext';
 import FadeInView from '../ui/FadeInView';
 
 interface PostProps {
@@ -55,6 +56,7 @@ const Post: React.FC<PostProps> = React.memo(({
   onBookmarkStatusChange,
 }) => {
   const { user: currentUser, session } = useAuth();
+  const { loadBookmarks: refreshBookmarkContext } = usePostBookmarks();
   const [isBookmarked, setIsBookmarked] = useState(propIsBookmarked || false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
 
@@ -109,6 +111,8 @@ const Post: React.FC<PostProps> = React.memo(({
           setIsBookmarked(result.isBookmarked);
           onBookmarkStatusChange?.(id, result.isBookmarked);
         }
+        // Refresh context to update sidebar badge count
+        setTimeout(() => refreshBookmarkContext(), 100);
       } else {
         // Revert optimistic update on failure
         setIsBookmarked(previousBookmarkState);
@@ -119,7 +123,7 @@ const Post: React.FC<PostProps> = React.memo(({
       setIsBookmarked(previousBookmarkState);
       onBookmarkStatusChange?.(id, previousBookmarkState);
     }
-  }, [currentUser?.id, id, onBookmarkPress, onBookmarkStatusChange, session, isBookmarked]);
+  }, [currentUser?.id, id, onBookmarkPress, onBookmarkStatusChange, session, isBookmarked, refreshBookmarkContext]);
 
   const handleMorePress = useCallback(() => {
     onMenuToggle?.(id);

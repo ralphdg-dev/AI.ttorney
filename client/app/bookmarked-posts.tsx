@@ -8,6 +8,7 @@ import Header from '../components/Header';
 import Navbar from '../components/Navbar';
 import { SidebarWrapper } from '../components/AppSidebar';
 import { useAuth } from '../contexts/AuthContext';
+import { usePostBookmarks } from '../contexts/PostBookmarksContext';
 import { BookmarkService } from '../services/bookmarkService';
 import Colors from '../constants/Colors';
 import { GlobalStyles } from '../constants/GlobalStyles';
@@ -142,6 +143,7 @@ const styles = StyleSheet.create({
 export default function BookmarkedPostsScreen() {
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
+  const { loadBookmarks: refreshBookmarkContext } = usePostBookmarks();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -258,8 +260,10 @@ export default function BookmarkedPostsScreen() {
   const handleBookmarkStatusChange = useCallback((postId: string, isBookmarked: boolean) => {
     if (!isBookmarked) {
       setPosts(prev => prev.filter(post => post.id !== postId));
+      // Refresh the context to update sidebar badge count
+      setTimeout(() => refreshBookmarkContext(), 100);
     }
-  }, []);
+  }, [refreshBookmarkContext]);
 
   const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic

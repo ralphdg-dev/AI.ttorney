@@ -458,11 +458,12 @@ const LawyerConsultPage: React.FC = () => {
           title="Consultations"
           showSearch={false}
         />
-        <ScrollView
-          style={tw`flex-1`}
-          contentContainerStyle={tw`pb-24`}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            style={tw`flex-1`}
+            contentContainerStyle={tw`pb-24`}
+            showsVerticalScrollIndicator={false}
+          >
           {/* Stats Grid Skeleton */}
           <View style={tw`px-4 pt-6 pb-2`}>
             <SkeletonBox width="30%" height={24} style={{ marginBottom: 16 }} />
@@ -508,6 +509,7 @@ const LawyerConsultPage: React.FC = () => {
             <ConsultationListSkeleton count={3} />
           </View>
         </ScrollView>
+        </View>
       </SafeAreaView>
     );
   }
@@ -520,11 +522,12 @@ const LawyerConsultPage: React.FC = () => {
         showSearch={false}
       />
 
-      <ScrollView
-        style={tw`flex-1`}
-        contentContainerStyle={tw`pb-24`}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={{ flex: 1 }}>
+        <ScrollView
+          style={tw`flex-1`}
+          contentContainerStyle={tw`pb-24`}
+          showsVerticalScrollIndicator={false}
+        >
         {/* Enhanced Stats Grid */}
         <View style={tw`px-4 pt-6 pb-2`}>
           <Text style={tw`text-xl font-bold text-gray-900 mb-4`}>Overview</Text>
@@ -993,6 +996,7 @@ const LawyerConsultPage: React.FC = () => {
           )}
         </View>
       </ScrollView>
+      </View>
 
       <LawyerNavbar activeTab="consult" />
 

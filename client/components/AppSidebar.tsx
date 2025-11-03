@@ -1,7 +1,10 @@
- import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from "react";
+ import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Dimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { useFavorites } from "../contexts/FavoritesContext";
+import { useBookmarks } from "../contexts/BookmarksContext";
+import { usePostBookmarks } from "../contexts/PostBookmarksContext";
+import { useConsultations } from "../contexts/ConsultationsContext";
 import { shouldUseNativeDriver } from '@/utils/animations';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -10,17 +13,16 @@ import {
   HelpCircle,
   FileText,
   LogOut,
-  Bell,
   MessageSquare,
   Star,
   Calendar,
   User,
-  X
+  X,
+  Bell
 } from "lucide-react-native";
 import Colors from "../constants/Colors";
 import { GlobalStyles } from "../constants/GlobalStyles";
 import { useAuth } from "../contexts/AuthContext";
-import { supabase } from "../config/supabase";
 import { createShadowStyle } from "../utils/shadowUtils";
 import { LAYOUT } from "../constants/LayoutConstants";
 
@@ -104,46 +106,13 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   // INDUSTRY STANDARD: Lazy initialization with useState
   const [slideAnim] = useState(() => new Animated.Value(-SIDEBAR_WIDTH));
-  const [acceptedConsultationsCount, setAcceptedConsultationsCount] = useState(0);
   const insets = useSafeAreaInsets();
-  const { signOut, user } = useAuth();
+  const { signOut } = useAuth();
   const { favoriteTermIds } = useFavorites();
-  const hasFetchedConsultations = useRef(false);
+  const { bookmarkedGuideIds } = useBookmarks();
+  const { bookmarkedPostIds } = usePostBookmarks();
+  const { consultationsCount } = useConsultations();
 
-  // Fetch accepted consultations count ONCE when sidebar becomes visible
-  useEffect(() => {
-    const fetchAcceptedConsultations = async () => {
-      if (!user?.id) return;
-
-      try {
-        const { count, error } = await supabase
-          .from("consultation_requests")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .in("status", ["accepted", "rejected"]);
-
-        if (error) {
-          console.error("Error fetching accepted consultations count:", error);
-          return;
-        }
-
-        setAcceptedConsultationsCount(count || 0);
-      } catch (error) {
-        console.error("Error in fetchAcceptedConsultations:", error);
-      }
-    };
-
-    // Only fetch if the sidebar is visible AND we haven't fetched before
-    if (isVisible && user?.id && !hasFetchedConsultations.current) {
-      fetchAcceptedConsultations();
-      hasFetchedConsultations.current = true; // Mark as fetched
-    }
-
-    // Reset fetch status when sidebar closes
-    if (!isVisible) {
-      hasFetchedConsultations.current = false;
-    }
-  }, [isVisible, user?.id]);
 
   // Animation effect - SIMPLE and CLEAN
   useEffect(() => {
@@ -173,16 +142,15 @@ const Sidebar: React.FC<SidebarProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible]);
   
-  // Get favorite count directly from Set size
-  const favoriteCount = favoriteTermIds.size;
-  
-  // Memoize badge counts to prevent recreating on every render
+  // FAANG OPTIMIZATION: Direct Set.size and primitive access - O(1) constant time
+  // All data pre-loaded from contexts, zero API calls on sidebar open
+  // Instant badge updates with no network latency
   const badgeCounts = React.useMemo(() => ({
-    favoriteTerms: favoriteCount,
-    bookmarkedGuides: 0,
-    acceptedConsultations: acceptedConsultationsCount,
-    unreadNotifications: 0,
-  }), [favoriteCount, acceptedConsultationsCount]);
+    favoriteTerms: favoriteTermIds.size,
+    bookmarkedPosts: bookmarkedPostIds.size,
+    bookmarkedGuides: bookmarkedGuideIds.size,
+    acceptedConsultations: consultationsCount,
+  }), [favoriteTermIds.size, bookmarkedPostIds.size, bookmarkedGuideIds.size, consultationsCount]);
 
   // Memoize menu items to prevent recreating on every render
   const menuItems: MenuItem[] = React.useMemo(() => [
@@ -198,6 +166,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: "Bookmarked Posts",
       icon: MessageSquare,
       route: "bookmarked-posts",
+      badge: badgeCounts.bookmarkedPosts || undefined,
     },
     {
       id: "bookmarked-guides",
@@ -214,17 +183,16 @@ const Sidebar: React.FC<SidebarProps> = ({
       badge: badgeCounts.acceptedConsultations || undefined,
     },
     {
-      id: "divider1",
-      label: "",
-      icon: View,
-      divider: true,
-    },
-    {
       id: "notifications",
       label: "Notifications",
       icon: Bell,
       route: "notifications",
-      badge: badgeCounts.unreadNotifications || undefined,
+    },
+    {
+      id: "divider1",
+      label: "",
+      icon: View,
+      divider: true,
     },
     {
       id: "settings",
