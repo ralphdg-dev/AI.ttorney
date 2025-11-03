@@ -17,6 +17,7 @@ import { useBookmarks } from "@/contexts/BookmarksContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { NetworkConfig } from '@/utils/networkConfig';
 import Button from "@/components/ui/Button";
+import { ArticleCardSkeletonList } from "@/components/guides/ArticleCardSkeleton";
 import { Filter, SortAsc } from "lucide-react-native";
 
 const API_BASE_URL = NetworkConfig.getApiUrl();
@@ -173,9 +174,7 @@ export default function BookmarkedGuidesScreen() {
       />
 
       {loading ? (
-        <View style={tw`flex-1 items-center justify-center`}>
-          <GSText>Loading bookmarked guides...</GSText>
-        </View>
+        <ArticleCardSkeletonList count={3} containerStyle={{ width: "100%", marginHorizontal: 0 }} />
       ) : bookmarkedArticles.length === 0 ? (
         renderEmptyState()
       ) : (
@@ -197,7 +196,7 @@ export default function BookmarkedGuidesScreen() {
               </GSText>
             </View>
           }
-          contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
+          contentContainerStyle={{ paddingBottom: 80, paddingHorizontal: 16, flexGrow: 1 }}
           columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
           renderItem={({ item }) => (
             <ArticleCard
@@ -206,7 +205,7 @@ export default function BookmarkedGuidesScreen() {
               onToggleBookmark={() => {}}
               containerStyle={{ 
                 width: numColumns > 1 ? (width - horizontalPadding * 2 - 12) / numColumns : "100%", 
-                marginHorizontal: numColumns > 1 ? 6 : 16,
+                marginHorizontal: 0,
               }}
             />
           )}

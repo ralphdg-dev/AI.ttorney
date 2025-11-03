@@ -4,7 +4,6 @@ import {
   TouchableOpacity,
   FlatList,
   Animated,
-  ActivityIndicator,
   Alert,
   useWindowDimensions,
   StatusBar,
@@ -20,6 +19,7 @@ import ToggleGroup from "@/components/ui/ToggleGroup";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
+import { ArticleCardSkeletonList } from "@/components/guides/ArticleCardSkeleton";
 import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import { SidebarWrapper, useSidebar } from "@/components/AppSidebar";
@@ -501,12 +501,7 @@ export default function GlossaryScreen() {
 
     if (isLoading) {
       return (
-        <View className="flex-1 justify-center items-center py-20">
-          <ActivityIndicator size="large" color={Colors.primary.blue} />
-          <GSText className="mt-4 text-center text-gray-600">
-            {isOffline ? "Loading cached data..." : `Loading ${activeTab}...`}
-          </GSText>
-        </View>
+        <ArticleCardSkeletonList count={3} containerStyle={{ width: "100%", marginHorizontal: 0 }} />
       );
     }
 

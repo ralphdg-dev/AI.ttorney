@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Bookmark, Filter, SortAsc } from 'lucide-react-native';
 import UnifiedSearchBar from '@/components/common/UnifiedSearchBar';
+import { PostSkeletonList } from '@/components/home/PostSkeleton';
 import Post from '../components/home/Post';
 import Header from '../components/Header';
 import Navbar from '../components/Navbar';
@@ -363,9 +364,7 @@ export default function BookmarkedPostsScreen() {
       <Header title="Bookmarked Posts" showMenu={true} />
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading bookmarked posts...</Text>
-        </View>
+        <PostSkeletonList count={3} />
       ) : posts.length === 0 ? (
         renderEmptyState()
       ) : (

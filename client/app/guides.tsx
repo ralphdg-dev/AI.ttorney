@@ -17,6 +17,7 @@ import Navbar from "@/components/Navbar";
 import { GuestNavbar, GuestSidebar } from "@/components/guest";
 import { SidebarWrapper, useSidebar } from "@/components/AppSidebar";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
+import { ArticleCardSkeletonList } from "@/components/guides/ArticleCardSkeleton";
 import { useLegalArticles } from "@/hooks/useLegalArticles";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBookmarks } from "@/contexts/BookmarksContext";
@@ -35,16 +36,12 @@ export default function GuidesScreen() {
   const { width } = useWindowDimensions();
   
   const ARTICLES_PER_PAGE = 12;
-
-  const horizontalPadding = LAYOUT.SPACING.lg; // 24
   const cardGap = LAYOUT.SPACING.md; // 16
   
   // FAANG approach: Always 1 column on mobile for better UX
   const numColumns = 1;
-  const cardWidth = width - (horizontalPadding * 2);
   
   const [displayArticles, setDisplayArticles] = useState<ArticleItem[]>([]);
-  const [isSearching, setIsSearching] = useState<boolean>(false);
   const previousSearchRef = useRef<string>("");
 
   useEffect(() => {
@@ -69,19 +66,15 @@ export default function GuidesScreen() {
       
       if (trimmedQuery) {
         if (trimmedQuery.length >= 2) {
-          setIsSearching(true);
           try {
             const searchResults = await searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
             setDisplayArticles(searchResults);
           } catch (err) {
             console.error("Search error:", err);
             setDisplayArticles([]);
-          } finally {
-            setIsSearching(false);
           }
         }
       } else {
-        setIsSearching(false);
         if (activeCategory === "all") {
           setDisplayArticles(legalArticles);
         } else {
@@ -319,13 +312,9 @@ const renderPagination = () => {
           </Input>
         </Box>
 
-        {loading || isSearching ? (
-          <View style={tw`flex-1 justify-center items-center`}>
-            <GSText size="lg" className="text-gray-500">
-              {isSearching ? "Searching articles..." : "Loading articles..."}
-            </GSText>
-          </View>
-        ) : error ? (
+        {loading ? (
+        <ArticleCardSkeletonList count={3} containerStyle={{ width: "100%", marginHorizontal: 0 }} />
+      ) : error ? (
           <View style={tw`flex-1 justify-center items-center px-6`}>
             <GSText size="lg" className="text-red-500 text-center mb-4">{error}</GSText>
             <TouchableOpacity 
@@ -346,12 +335,12 @@ const renderPagination = () => {
               extraData={width}
               ListHeaderComponent={renderListHeader}
               ListFooterComponent={renderPagination}
-              contentContainerStyle={{ 
-                paddingHorizontal: horizontalPadding,
+              contentContainerStyle={{
+                paddingHorizontal: 16,
                 paddingBottom: 100,  
                 flexGrow: 1 
               }}
-              columnWrapperStyle={undefined}
+              columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
               renderItem={({ item }) => (
                 <ArticleCard
                   item={item}
@@ -359,7 +348,8 @@ const renderPagination = () => {
                   onToggleBookmark={handleToggleBookmark}
                   showBookmark={!isGuestMode}
                   containerStyle={{
-                    width: cardWidth,
+                    width: numColumns > 1 ? (width - 32 - 12) / numColumns : "100%",
+                    marginHorizontal: 0,
                     marginBottom: cardGap,
                   }}
                 />
