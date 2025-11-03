@@ -12,10 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
-import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
-import { Input, InputField, InputSlot } from "@/components/ui/input";
 import Navbar from "@/components/Navbar";
 import { GuestNavbar, GuestSidebar } from "@/components/guest";
 import ToggleGroup from "@/components/ui/ToggleGroup";
@@ -33,6 +31,7 @@ import {
 import { NetworkConfig } from "@/utils/networkConfig";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBookmarks } from "@/contexts/BookmarksContext";
+import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -343,8 +342,8 @@ export default function GlossaryScreen() {
 
   // Render functions
   const renderListHeader = useCallback(() => (
-    <View className="mb-6">
-      <HStack className="items-center mb-4">
+    <View style={{ marginBottom: isDesktop ? 28 : isTablet ? 24 : 20 }}>
+      <HStack className="items-center" style={{ marginBottom: isDesktop ? 16 : 12 }}>
         <Ionicons name="pricetags" size={16} color={Colors.text.sub} />
         <GSText size="sm" className="ml-2 font-semibold text-gray-600">
           Choose Category
@@ -355,7 +354,7 @@ export default function GlossaryScreen() {
         onCategoryChange={handleCategoryChange}
       />
     </View>
-  ), [activeCategory, handleCategoryChange]);
+  ), [activeCategory, handleCategoryChange, isDesktop, isTablet]);
 
   const renderPaginationControls = useCallback(() => {
     // Show pagination if there are multiple pages
@@ -380,46 +379,77 @@ export default function GlossaryScreen() {
     const visiblePages = getVisiblePages();
 
     return (
-      <View className="py-6 bg-gray-50">
+      <View style={{ 
+        paddingTop: isDesktop ? 32 : isTablet ? 24 : 20,
+        paddingBottom: isDesktop ? 24 : isTablet ? 20 : 16,
+        paddingHorizontal: horizontalPadding,
+        backgroundColor: '#f9fafb',
+        marginTop: 8,
+      }}>
         <View className="flex-col items-center">
-          <View className="flex-row justify-center items-center mb-4">
+          <View className="flex-row justify-center items-center flex-wrap" style={{ marginBottom: isDesktop ? 16 : 12 }}>
             <TouchableOpacity
               onPress={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className={`w-10 h-10 mx-1 rounded-full justify-center items-center ${
-                currentPage === 1
-                  ? "bg-gray-200 opacity-50"
-                  : "bg-white border border-gray-300"
-              }`}
+              style={{
+                width: isDesktop ? 44 : 40,
+                height: isDesktop ? 44 : 40,
+                marginHorizontal: isDesktop ? 6 : 4,
+                marginVertical: 4,
+                borderRadius: 9999,
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: currentPage === 1 ? '#E5E7EB' : 'white',
+                borderWidth: currentPage === 1 ? 0 : 1,
+                borderColor: '#D1D5DB',
+                opacity: currentPage === 1 ? 0.5 : 1,
+              }}
             >
               <Ionicons
                 name="chevron-back"
-                size={18}
+                size={isDesktop ? 20 : 18}
                 color={currentPage === 1 ? "#9CA3AF" : Colors.primary.blue}
               />
             </TouchableOpacity>
 
             {visiblePages.map((page, index) =>
               page === "..." ? (
-                <View key={`ellipsis-${index}`} className="w-10 h-10 mx-1 justify-center items-center">
-                  <GSText className="text-gray-500">...</GSText>
+                <View 
+                  key={`ellipsis-${index}`} 
+                  style={{
+                    width: isDesktop ? 44 : 40,
+                    height: isDesktop ? 44 : 40,
+                    marginHorizontal: isDesktop ? 6 : 4,
+                    marginVertical: 4,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <GSText className="text-gray-500" style={{ fontSize: isDesktop ? 16 : 14 }}>...</GSText>
                 </View>
               ) : (
                 <TouchableOpacity
                   key={page}
                   onPress={() => handlePageChange(page as number)}
-                  className={`w-10 h-10 mx-1 rounded-lg justify-center items-center border ${
-                    currentPage === page
-                      ? "bg-blue-100 border-blue-300"
-                      : "bg-white border-gray-300"
-                  }`}
+                  style={{
+                    width: isDesktop ? 44 : 40,
+                    height: isDesktop ? 44 : 40,
+                    marginHorizontal: isDesktop ? 6 : 4,
+                    marginVertical: 4,
+                    borderRadius: 8,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: currentPage === page ? '#DBEAFE' : 'white',
+                    borderWidth: 1,
+                    borderColor: currentPage === page ? '#93C5FD' : '#D1D5DB',
+                  }}
                 >
                   <GSText
-                    className={
-                      currentPage === page
-                        ? "text-blue-700 font-bold"
-                        : "text-gray-700"
-                    }
+                    style={{
+                      fontSize: isDesktop ? 15 : 14,
+                      fontWeight: currentPage === page ? '700' : '500',
+                      color: currentPage === page ? '#1E40AF' : '#374151',
+                    }}
                   >
                     {page}
                   </GSText>
@@ -430,27 +460,40 @@ export default function GlossaryScreen() {
             <TouchableOpacity
               onPress={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className={`w-10 h-10 mx-1 rounded-full justify-center items-center ${
-                currentPage === totalPages
-                  ? "bg-gray-200 opacity-50"
-                  : "bg-white border border-gray-300"
-              }`}
+              style={{
+                width: isDesktop ? 44 : 40,
+                height: isDesktop ? 44 : 40,
+                marginHorizontal: isDesktop ? 6 : 4,
+                marginVertical: 4,
+                borderRadius: 9999,
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: currentPage === totalPages ? '#E5E7EB' : 'white',
+                borderWidth: currentPage === totalPages ? 0 : 1,
+                borderColor: '#D1D5DB',
+                opacity: currentPage === totalPages ? 0.5 : 1,
+              }}
             >
               <Ionicons
                 name="chevron-forward"
-                size={18}
+                size={isDesktop ? 20 : 18}
                 color={currentPage === totalPages ? "#9CA3AF" : Colors.primary.blue}
               />
             </TouchableOpacity>
           </View>
 
-          <GSText className="text-sm text-gray-600">
+          <GSText 
+            style={{ 
+              fontSize: isDesktop ? 14 : 13,
+              color: '#6B7280',
+            }}
+          >
             Showing {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount} results
           </GSText>
         </View>
       </View>
     );
-  }, [totalCount, totalPages, currentPage, handlePageChange]);
+  }, [totalCount, totalPages, currentPage, handlePageChange, isDesktop, isTablet, horizontalPadding]);
 
   const renderEmptyState = useCallback(() => {
     const isLoading = activeTab === "terms" ? termsLoading : (articlesLoading || isSearchingArticles);
@@ -527,6 +570,8 @@ export default function GlossaryScreen() {
   }, [activeTab, termsLoading, articlesLoading, isSearchingArticles, termsError, articlesError, isOffline, currentData.length, searchQuery, currentPage, fetchLegalTerms, refetch]);
 
   const renderItem = useCallback(({ item }: { item: any }) => {
+    const itemMarginBottom = isDesktop ? 16 : isTablet ? 14 : 12;
+    
     if (activeTab === "terms") {
       return (
         <TermListItem
@@ -535,7 +580,7 @@ export default function GlossaryScreen() {
           showFavorite={!isGuestMode}
           containerStyle={{
             width: numColumns > 1 ? (screenWidth - horizontalPadding * 2 - 12) / numColumns : "100%",
-            marginBottom: 12,
+            marginBottom: itemMarginBottom,
           }}
         />
       );
@@ -549,12 +594,12 @@ export default function GlossaryScreen() {
           containerStyle={{
             width: numColumns > 1 ? (screenWidth - horizontalPadding * 2 - 12) / numColumns : "100%",
             marginHorizontal: 0,
-            marginBottom: 12,
+            marginBottom: itemMarginBottom,
           }}
         />
       );
     }
-  }, [activeTab, handleItemPress, handleToggleBookmark, numColumns, screenWidth, horizontalPadding, isGuestMode]);
+  }, [activeTab, handleItemPress, handleToggleBookmark, numColumns, screenWidth, horizontalPadding, isGuestMode, isDesktop, isTablet]);
 
 
   return (
@@ -573,28 +618,13 @@ export default function GlossaryScreen() {
         onOptionChange={handleTabChange}
       />
 
-      <Box className={`px-${horizontalPadding / 4} pt-6 pb-4`}>
-        <Input
-          variant="outline"
-          size="lg"
-          className="bg-white rounded-lg border border-gray-300"
-        >
-          <InputSlot className="pl-4">
-            <Ionicons name="search" size={20} color="#9CA3AF" />
-          </InputSlot>
-          <InputField
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
-            placeholderTextColor="#9CA3AF"
-            className="text-gray-800 text-base"
-            editable={!termsLoading && !articlesLoading}
-          />
-          <InputSlot className="pr-4">
-            <Ionicons name="options" size={20} color={Colors.text.sub} />
-          </InputSlot>
-        </Input>
-      </Box>
+      <UnifiedSearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
+        loading={termsLoading || articlesLoading}
+        showFilterIcon={true}
+      />
 
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <FlatList
@@ -609,7 +639,8 @@ export default function GlossaryScreen() {
           ListEmptyComponent={renderEmptyState}
           contentContainerStyle={{
             paddingHorizontal: horizontalPadding,
-            paddingBottom: 100,
+            paddingBottom: isDesktop ? 120 : isTablet ? 110 : 100,
+            paddingTop: isDesktop ? 8 : isTablet ? 6 : 4,
             flexGrow: 1,
           }}
           columnWrapperStyle={

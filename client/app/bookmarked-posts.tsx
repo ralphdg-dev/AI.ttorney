@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl, StyleSheet, TouchableOpacity, TextInput, StatusBar } from 'react-native';
+import { View, Text, FlatList, RefreshControl, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bookmark, Filter, SortAsc, Search, X } from 'lucide-react-native';
+import { Bookmark, Filter, SortAsc } from 'lucide-react-native';
+import UnifiedSearchBar from '@/components/common/UnifiedSearchBar';
 import Post from '../components/home/Post';
 import Header from '../components/Header';
 import Navbar from '../components/Navbar';
@@ -308,23 +309,12 @@ export default function BookmarkedPostsScreen() {
   );
 
   const renderSearchBar = () => (
-    <View style={styles.searchContainer}>
-      <View style={styles.searchBar}>
-        <Search size={18} color={Colors.text.sub} strokeWidth={2} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search bookmarked posts..."
-          placeholderTextColor={Colors.text.sub}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-            <X size={18} color={Colors.text.sub} strokeWidth={2} />
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
+    <UnifiedSearchBar
+      value={searchQuery}
+      onChangeText={setSearchQuery}
+      placeholder="Search bookmarked posts..."
+      loading={loading}
+    />
   );
 
   const renderHeader = () => (
@@ -419,7 +409,7 @@ export default function BookmarkedPostsScreen() {
         </>
       )}
 
-      <Navbar activeTab="home" />
+      <Navbar />
       <SidebarWrapper />
     </SafeAreaView>
   );

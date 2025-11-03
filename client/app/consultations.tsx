@@ -379,7 +379,7 @@ export default function ConsultationsScreen() {
         />
       </View>
 
-      <Navbar activeTab="profile" />
+      <Navbar />
       <SidebarWrapper />
     </SafeAreaView>
   );

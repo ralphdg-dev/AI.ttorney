@@ -1146,7 +1146,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
   // Clean Search Header Component - no memoization needed
   const renderSearchHeader = () => (
-    <VStack space="md" className="px-4 py-4 bg-white" style={{ zIndex: 1000 }}>
+    <VStack space="md" className="px-4 py-3 bg-white" style={{ zIndex: 1000 }}>
       <Box className="relative" style={{ zIndex: 1000 }}>
         <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ 
           minHeight: 48,

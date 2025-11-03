@@ -4,10 +4,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
-import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
-import { Input, InputField, InputSlot } from "@/components/ui/input";
+import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
@@ -166,20 +165,12 @@ export default function BookmarkedGuidesScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header title="Bookmarked Guides" showMenu={true} />
 
-      <Box className="px-4 pt-4 mb-4">
-        <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
-          <InputSlot className="pl-3">
-            <Ionicons name="search" size={20} color="#9CA3AF" />
-          </InputSlot>
-          <InputField
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search your bookmarked guides"
-            placeholderTextColor="#9CA3AF"
-            className="text-[#313131]"
-          />
-        </Input>
-      </Box>
+      <UnifiedSearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Search your bookmarked guides"
+        loading={loading}
+      />
 
       {loading ? (
         <View style={tw`flex-1 items-center justify-center`}>
@@ -228,7 +219,7 @@ export default function BookmarkedGuidesScreen() {
         />
       )}
 
-      <Navbar activeTab="learn" />
+      <Navbar />
       <SidebarWrapper />
     </SafeAreaView>
   );
