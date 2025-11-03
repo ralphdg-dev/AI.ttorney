@@ -15,46 +15,14 @@ import { Text as UIText } from "@/components/ui/text";
 import { Pressable as UIPressable } from "@/components/ui/pressable";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
-import type { Consultation } from "./ConsultationCard";
+import { ConsultationWithLawyer } from "@/types/consultation.types";
+import { getStatusColor, formatConsultationDate, formatConsultationTime } from "@/utils/consultationUtils";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
-const STATUS_CONFIG = {
-  pending: {
-    color: "#F59E0B",
-    bgColor: "#FEF3C7",
-    icon: "time-outline" as const,
-    label: "Pending",
-  },
-  accepted: {
-    color: "#10B981",
-    bgColor: "#D1FAE5",
-    icon: "checkmark-circle-outline" as const,
-    label: "Accepted",
-  },
-  rejected: {
-    color: "#EF4444",
-    bgColor: "#FEE2E2",
-    icon: "close-circle-outline" as const,
-    label: "Rejected",
-  },
-  completed: {
-    color: "#6B7280",
-    bgColor: "#F3F4F6",
-    icon: "checkmark-done-outline" as const,
-    label: "Completed",
-  },
-  cancelled: {
-    color: "#EF4444",
-    bgColor: "#FEE2E2",
-    icon: "close-circle-outline" as const,
-    label: "Cancelled",
-  },
-};
-
 interface ConsultationDetailModalProps {
   visible: boolean;
-  consultation: Consultation | null;
+  consultation: ConsultationWithLawyer | null;
   fadeAnim: Animated.Value;
   scaleAnim: Animated.Value;
   onClose: () => void;
@@ -75,17 +43,6 @@ const formatDateTime = (dateString: string) => {
   return date.toLocaleDateString("en-US", options);
 };
 
-const formatDate = (dateString: string) => {
-  if (!dateString) return "Not scheduled";
-
-  const date = new Date(dateString);
-  const options: Intl.DateTimeFormatOptions = {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  };
-  return date.toLocaleDateString("en-US", options);
-};
 
 export default function ConsultationDetailModal({
   visible,
@@ -104,7 +61,7 @@ export default function ConsultationDetailModal({
       visible={visible}
       onRequestClose={onClose}
     >
-      <View style={tw`flex-1 justify-center items-center`}>
+      <View style={tw`flex-1 justify-center items-center`} pointerEvents="box-none">
         {/* Backdrop */}
         <TouchableOpacity
           style={tw`absolute inset-0 bg-black bg-opacity-50`}
@@ -122,13 +79,14 @@ export default function ConsultationDetailModal({
               maxHeight: screenHeight * 0.8,
             },
           ]}
+          pointerEvents="auto"
         >
           {/* Header */}
-          <HStack className="justify-between items-center p-4 md:p-6 border-b border-gray-200">
+          <HStack className="justify-between items-center p-4 border-b border-gray-200">
             <UIText
               className="font-bold"
               style={{
-                fontSize: screenWidth < 768 ? 18 : 20,
+                fontSize: 16,
                 color: Colors.text.head,
               }}
             >
@@ -137,7 +95,7 @@ export default function ConsultationDetailModal({
             <TouchableOpacity onPress={onClose}>
               <Ionicons
                 name="close"
-                size={24}
+                size={22}
                 color={Colors.text.sub}
               />
             </TouchableOpacity>
@@ -145,127 +103,85 @@ export default function ConsultationDetailModal({
 
           {/* Content */}
           <ScrollView
-            style={tw`max-h-96`}
-            showsVerticalScrollIndicator={true}
+            style={{ maxHeight: 400 }}
+            showsVerticalScrollIndicator={false}
           >
-            <VStack className="p-4 md:p-6" space="md">
-              {/* Lawyer Info */}
-              <VStack space="sm">
-                <UIText
-                  className="font-semibold text-gray-500"
-                  style={{ fontSize: screenWidth < 768 ? 12 : 14 }}
-                >
-                  LAWYER INFORMATION
-                </UIText>
-                <HStack className="justify-between items-start">
+            <VStack className="p-4" space="md">
+              {/* Lawyer Info Card */}
+              <Box
+                className="p-3 rounded-lg"
+                style={{
+                  backgroundColor: "#F9FAFB",
+                  borderWidth: 1,
+                  borderColor: "#E5E7EB",
+                }}
+              >
+                <HStack className="justify-between items-start mb-2">
                   <VStack className="flex-1 mr-2">
                     <UIText
                       className="font-bold"
                       style={{
-                        fontSize: screenWidth < 768 ? 16 : 18,
+                        fontSize: 15,
                         color: Colors.text.head,
                       }}
                     >
-                      {consultation.lawyer_name}
+                      {consultation.lawyer_info?.name || "Pending Assignment"}
                     </UIText>
                     <UIText
-                      className="text-sm"
-                      style={{ color: Colors.text.sub }}
+                      style={{ fontSize: 13, color: Colors.text.sub, marginTop: 2 }}
                     >
-                      {consultation.specialization}
+                      {consultation.lawyer_info?.specialization || "Awaiting Lawyer"}
                     </UIText>
                   </VStack>
                   <Box
-                    className="px-2 md:px-3 py-1 rounded-full"
+                    className="px-2.5 py-1 rounded-full"
                     style={{
-                      backgroundColor: STATUS_CONFIG[consultation.status].bgColor,
+                      backgroundColor: getStatusColor(consultation.status).bg,
+                      borderColor: getStatusColor(consultation.status).border,
+                      borderWidth: 1,
                     }}
                   >
                     <UIText
                       className="font-semibold"
                       style={{
-                        fontSize: screenWidth < 768 ? 10 : 12,
-                        color: STATUS_CONFIG[consultation.status].color,
+                        fontSize: 10,
+                        color: getStatusColor(consultation.status).text,
                       }}
                     >
-                      {STATUS_CONFIG[consultation.status].label}
+                      {getStatusColor(consultation.status).label}
                     </UIText>
                   </Box>
                 </HStack>
-              </VStack>
+              </Box>
 
               {/* Consultation Details */}
-              <VStack space="sm">
-                <UIText
-                  className="font-semibold text-gray-500"
-                  style={{ fontSize: screenWidth < 768 ? 12 : 14 }}
-                >
-                  CONSULTATION DETAILS
-                </UIText>
-
-                <HStack className="justify-between">
-                  <UIText
-                    className="font-medium"
-                    style={{
-                      fontSize: screenWidth < 768 ? 13 : 14,
-                      color: Colors.text.head,
-                    }}
-                  >
-                    Request Date:
-                  </UIText>
-                  <UIText
-                    className="text-right flex-1 ml-2"
-                    style={{
-                      fontSize: screenWidth < 768 ? 13 : 14,
-                      color: Colors.text.sub,
-                    }}
-                  >
-                    {formatDateTime(consultation.created_at)}
-                  </UIText>
-                </HStack>
-
+              <VStack space="xs">
                 {consultation.consultation_date && (
-                  <HStack className="justify-between">
+                  <HStack className="items-center py-2">
+                    <Ionicons name="calendar-outline" size={16} color={Colors.text.sub} />
                     <UIText
-                      className="font-medium"
+                      className="ml-2 flex-1"
                       style={{
-                        fontSize: screenWidth < 768 ? 13 : 14,
+                        fontSize: 13,
                         color: Colors.text.head,
                       }}
                     >
-                      Scheduled Date:
-                    </UIText>
-                    <UIText
-                      className="text-right flex-1 ml-2"
-                      style={{
-                        fontSize: screenWidth < 768 ? 13 : 14,
-                        color: Colors.text.sub,
-                      }}
-                    >
-                      {formatDate(consultation.consultation_date)}
+                      {formatConsultationDate(consultation.consultation_date)}
                     </UIText>
                   </HStack>
                 )}
 
                 {consultation.consultation_time && (
-                  <HStack className="justify-between">
+                  <HStack className="items-center py-2">
+                    <Ionicons name="time-outline" size={16} color={Colors.text.sub} />
                     <UIText
-                      className="font-medium"
+                      className="ml-2 flex-1"
                       style={{
-                        fontSize: screenWidth < 768 ? 13 : 14,
+                        fontSize: 13,
                         color: Colors.text.head,
                       }}
                     >
-                      Scheduled Time:
-                    </UIText>
-                    <UIText
-                      className="text-right flex-1 ml-2"
-                      style={{
-                        fontSize: screenWidth < 768 ? 13 : 14,
-                        color: Colors.text.sub,
-                      }}
-                    >
-                      {consultation.consultation_time}
+                      {formatConsultationTime(consultation.consultation_time)}
                     </UIText>
                   </HStack>
                 )}
@@ -296,30 +212,15 @@ export default function ConsultationDetailModal({
 
               {/* Contact Information */}
               {(consultation.email || consultation.mobile_number) && (
-                <VStack space="sm">
-                  <UIText
-                    className="font-semibold text-gray-500"
-                    style={{ fontSize: screenWidth < 768 ? 12 : 14 }}
-                  >
-                    CONTACT INFORMATION
-                  </UIText>
-
+                <VStack space="xs">
                   {consultation.email && (
-                    <HStack className="justify-between">
+                    <HStack className="items-center py-2">
+                      <Ionicons name="mail-outline" size={16} color={Colors.text.sub} />
                       <UIText
-                        className="font-medium"
+                        className="ml-2 flex-1"
                         style={{
-                          fontSize: screenWidth < 768 ? 13 : 14,
+                          fontSize: 13,
                           color: Colors.text.head,
-                        }}
-                      >
-                        Email:
-                      </UIText>
-                      <UIText
-                        className="text-right flex-1 ml-2"
-                        style={{
-                          fontSize: screenWidth < 768 ? 13 : 14,
-                          color: Colors.text.sub,
                         }}
                       >
                         {consultation.email}
@@ -328,21 +229,13 @@ export default function ConsultationDetailModal({
                   )}
 
                   {consultation.mobile_number && (
-                    <HStack className="justify-between">
+                    <HStack className="items-center py-2">
+                      <Ionicons name="call-outline" size={16} color={Colors.text.sub} />
                       <UIText
-                        className="font-medium"
+                        className="ml-2 flex-1"
                         style={{
-                          fontSize: screenWidth < 768 ? 13 : 14,
+                          fontSize: 13,
                           color: Colors.text.head,
-                        }}
-                      >
-                        Mobile:
-                      </UIText>
-                      <UIText
-                        className="text-right flex-1 ml-2"
-                        style={{
-                          fontSize: screenWidth < 768 ? 13 : 14,
-                          color: Colors.text.sub,
                         }}
                       >
                         {consultation.mobile_number}
@@ -354,52 +247,58 @@ export default function ConsultationDetailModal({
 
               {/* Message */}
               {consultation.message && (
-                <VStack space="sm">
+                <Box
+                  className="p-3 rounded-lg"
+                  style={{
+                    backgroundColor: "#F9FAFB",
+                    borderLeftWidth: 3,
+                    borderLeftColor: "#9CA3AF",
+                  }}
+                >
                   <UIText
-                    className="font-semibold text-gray-500"
-                    style={{ fontSize: screenWidth < 768 ? 12 : 14 }}
-                  >
-                    MESSAGE
-                  </UIText>
-                  <UIText
+                    className="italic"
                     style={{
-                      fontSize: screenWidth < 768 ? 13 : 14,
+                      fontSize: 13,
                       color: Colors.text.sub,
-                      lineHeight: screenWidth < 768 ? 18 : 20,
                     }}
                   >
-                    {consultation.message}
+                    &ldquo;{consultation.message}&rdquo;
                   </UIText>
-                </VStack>
+                </Box>
               )}
             </VStack>
           </ScrollView>
 
           {/* Action Buttons */}
           {consultation.status === "pending" && (
-            <View style={tw`p-4 md:p-6 border-t border-gray-200`}>
-              <HStack space="md">
+            <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: "#E5E7EB" }}>
+              <HStack space="sm">
                 <UIPressable
-                  className="flex-1 py-3 rounded-lg items-center justify-center border"
+                  className="flex-1 py-2.5 rounded-lg items-center justify-center border"
                   style={{
                     borderColor: Colors.primary.blue,
                     backgroundColor: "white",
                   }}
                   onPress={onClose}
                 >
-                  <UIText className="font-semibold" style={{ color: Colors.primary.blue }}>
+                  <UIText className="font-semibold" style={{ fontSize: 13, color: Colors.primary.blue }}>
                     Close
                   </UIText>
                 </UIPressable>
 
                 <UIPressable
-                  className="flex-1 py-3 rounded-lg items-center justify-center"
+                  className="flex-1 py-2.5 rounded-lg items-center justify-center"
                   style={{
                     backgroundColor: "#EF4444",
                   }}
-                  onPress={() => onCancel(consultation.id)}
+                  onPress={() => {
+                    console.log("🟢 Cancel button pressed in modal");
+                    console.log("🟢 Consultation ID:", consultation.id);
+                    console.log("🟢 onCancel function exists:", typeof onCancel);
+                    onCancel(consultation.id);
+                  }}
                 >
-                  <UIText className="font-semibold text-white">
+                  <UIText className="font-semibold" style={{ fontSize: 13, color: "white" }}>
                     Cancel Consultation
                   </UIText>
                 </UIPressable>

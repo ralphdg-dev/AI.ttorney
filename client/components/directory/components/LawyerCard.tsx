@@ -133,7 +133,7 @@ export default function LawyerCard({
 
   return (
     <Box
-      className="mx-2 mb-3 bg-white rounded-lg border border-gray-200 overflow-hidden"
+      className="mx-4 mb-3 bg-white rounded-lg border border-gray-200 overflow-hidden"
       style={shadowPresets.light}
     >
       {/* Header Section */}

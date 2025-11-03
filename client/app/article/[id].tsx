@@ -227,7 +227,7 @@ export default function ArticleViewScreen() {
         <Image 
           source={{ 
             uri: ((article as any).image_article 
-              ? `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/legal-articles/${(article as any).image_article}`
+              ? `https://vmlbrckrlgwlobhnpstx.supabase.co/storage/v1/object/public/legal-articles/${(article as any).image_article}`
               : noImageUri
             ) as string 
           }}

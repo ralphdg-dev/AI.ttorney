@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { View, RefreshControl, ScrollView, Animated, StatusBar } from 'react-native';
+import { View, RefreshControl, ScrollView, Animated, StatusBar, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import tw from "tailwind-react-native-classnames";
@@ -11,8 +11,11 @@ import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../config/supabase";
 import { shouldUseNativeDriver } from "@/utils/animations";
 
+// Import consultation types and utilities
+import { ConsultationWithLawyer, ConsultationStatus, canCancelConsultation } from "@/types/consultation.types";
+
 // Import consultation components
-import ConsultationCard, { type Consultation } from "@/components/sidebar/consultations/ConsultationCard";
+import ConsultationCard from "@/components/sidebar/consultations/ConsultationCard";
 import ConsultationSkeleton from "@/components/sidebar/consultations/ConsultationSkeleton";
 import ConsultationEmptyState from "@/components/sidebar/consultations/ConsultationEmptyState";
 import ConsultationDetailModal from "@/components/sidebar/consultations/ConsultationDetailModal";
@@ -20,12 +23,12 @@ import SearchBarWithFilter from "../components/common/SearchBarWithFilter";
 import ConsultationFilterModal from "../components/sidebar/consultations/ConsultationFilterModal";
 
 export default function ConsultationsScreen() {
-  const [consultations, setConsultations] = useState<Consultation[]>([]);
+  const [consultations, setConsultations] = useState<ConsultationWithLawyer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [selectedConsultation, setSelectedConsultation] = useState<Consultation | null>(null);
+  const [selectedConsultation, setSelectedConsultation] = useState<ConsultationWithLawyer | null>(null);
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [filterModalVisible, setFilterModalVisible] = useState<boolean>(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -46,23 +49,16 @@ export default function ConsultationsScreen() {
         .from("consultation_requests")
         .select(
           `
-          id,
-          status,
-          consultation_date,
-          consultation_time,
-          created_at,
-          message,
-          email,
-          mobile_number,
-          responded_at,
-          lawyer_id,
+          *,
           lawyer_info:lawyer_id (
             name,
-            specialization
+            specialization,
+            location
           )
         `
         )
         .eq("user_id", user.id)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -81,24 +77,7 @@ export default function ConsultationsScreen() {
         return;
       }
 
-      const transformedData: Consultation[] = data.map((item: any) => {
-        const lawyerInfo = item.lawyer_info;
-        const transformed = {
-          id: item.id,
-          lawyer_name: lawyerInfo?.name || "Pending Assignment",
-          specialization: lawyerInfo?.specialization || "Awaiting Lawyer",
-          consultation_date: item.consultation_date || "",
-          consultation_time: item.consultation_time || "",
-          status: item.status || "pending",
-          created_at: item.created_at,
-          message: item.message,
-          email: item.email,
-          mobile_number: item.mobile_number,
-          responded_at: item.responded_at,
-        };
-        console.log("🔄 Transformed consultation:", transformed);
-        return transformed;
-      });
+      const transformedData: ConsultationWithLawyer[] = data as ConsultationWithLawyer[];
 
       console.log("✅ Setting consultations state with", transformedData.length, "items");
       setConsultations(transformedData);
@@ -169,7 +148,133 @@ export default function ConsultationsScreen() {
     };
   }, [user?.id, fetchConsultations]);
 
-  const openDetailsModal = (consultation: Consultation) => {
+  const closeDetailsModal = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: shouldUseNativeDriver('opacity'),
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.8,
+        duration: 200,
+        useNativeDriver: shouldUseNativeDriver('transform'),
+      }),
+    ]).start(() => {
+      setModalVisible(false);
+      setSelectedConsultation(null);
+    });
+  }, [fadeAnim, scaleAnim]);
+
+  const handleCancelConsultation = useCallback(async (consultationId: string) => {
+    console.log("🔴 handleCancelConsultation called with ID:", consultationId);
+    console.log("🔴 Current consultations:", consultations.length);
+    console.log("🔴 User ID:", user?.id);
+    
+    const consultation = consultations.find(c => c.id === consultationId);
+    console.log("🔴 Found consultation:", consultation);
+    
+    if (!consultation) {
+      console.log("❌ Consultation not found");
+      Alert.alert("Error", "Consultation not found");
+      return;
+    }
+    
+    if (!canCancelConsultation(consultation)) {
+      console.log("❌ Cannot cancel - status:", consultation.status);
+      Alert.alert(
+        "Cannot Cancel",
+        "This consultation cannot be cancelled. Only pending consultations can be cancelled.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
+    console.log("✅ Showing confirmation dialog");
+    
+    // Handle web vs native confirmation
+    const performCancellation = async () => {
+      console.log("🔄 Starting cancellation process...");
+      try {
+        console.log("📡 Updating database...");
+        console.log("📡 Consultation ID:", consultationId);
+        console.log("📡 User ID:", user?.id);
+        
+        const { data, error } = await supabase
+          .from("consultation_requests")
+          .update({ status: "cancelled" })
+          .eq("id", consultationId)
+          .single();
+
+        console.log("📡 Database response:", { data, error });
+
+        if (error) {
+          console.error("❌ Database error:", error);
+          throw error;
+        }
+
+        console.log("✅ Database updated successfully");
+
+        // Optimistic update
+        setConsultations(prev =>
+          prev.map(c =>
+            c.id === consultationId
+              ? { ...c, status: "cancelled" as ConsultationStatus }
+              : c
+          )
+        );
+        console.log("✅ Local state updated");
+
+        // Close the modal
+        closeDetailsModal();
+        console.log("✅ Modal closed");
+
+        // Show success message
+        if (Platform.OS === 'web') {
+          alert("Consultation cancelled successfully");
+        } else {
+          Alert.alert("Success", "Consultation cancelled successfully");
+        }
+        console.log("✅ Success message shown");
+      } catch (error) {
+        console.error("❌ Error cancelling consultation:", error);
+        if (Platform.OS === 'web') {
+          alert("Failed to cancel consultation. Please try again.");
+        } else {
+          Alert.alert("Error", "Failed to cancel consultation. Please try again.");
+        }
+      }
+    };
+    
+    // Show confirmation dialog (web vs native)
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm("Are you sure you want to cancel this consultation? This action cannot be undone.");
+      if (confirmed) {
+        await performCancellation();
+      } else {
+        console.log("❌ User cancelled the action");
+      }
+    } else {
+      Alert.alert(
+        "Cancel Consultation",
+        "Are you sure you want to cancel this consultation? This action cannot be undone.",
+        [
+          { 
+            text: "No", 
+            style: "cancel",
+            onPress: () => console.log("❌ User cancelled the action")
+          },
+          {
+            text: "Yes, Cancel",
+            style: "destructive",
+            onPress: performCancellation,
+          },
+        ]
+      );
+    }
+  }, [consultations, user?.id, closeDetailsModal]);
+
+  const openDetailsModal = (consultation: ConsultationWithLawyer) => {
     setSelectedConsultation(consultation);
     setModalVisible(true);
     Animated.parallel([
@@ -186,24 +291,6 @@ export default function ConsultationsScreen() {
     ]).start();
   };
 
-  const closeDetailsModal = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: shouldUseNativeDriver('opacity'),
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 0.8,
-        duration: 200,
-        useNativeDriver: shouldUseNativeDriver('transform'),
-      }),
-    ]).start(() => {
-      setModalVisible(false);
-      setSelectedConsultation(null);
-    });
-  };
-
   const filteredConsultations = useMemo(() => {
     let filtered = consultations;
 
@@ -215,8 +302,8 @@ export default function ConsultationsScreen() {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (c) =>
-          c.lawyer_name.toLowerCase().includes(query) ||
-          c.specialization.toLowerCase().includes(query)
+          c.lawyer_info?.name?.toLowerCase().includes(query) ||
+          c.lawyer_info?.specialization?.toLowerCase().includes(query)
       );
     }
 
@@ -281,7 +368,7 @@ export default function ConsultationsScreen() {
           fadeAnim={fadeAnim}
           scaleAnim={scaleAnim}
           onClose={closeDetailsModal}
-          onCancel={() => {}} // Add cancel functionality if needed
+          onCancel={handleCancelConsultation}
         />
 
         <ConsultationFilterModal

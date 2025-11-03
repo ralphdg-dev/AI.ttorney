@@ -3,9 +3,10 @@ Consultation Service - Centralized business logic for consultation management
 Follows DRY principles and FAANG best practices for <5000 users
 """
 from typing import Dict, Any, Optional, List
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timedelta
 from supabase import Client
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,26 @@ class InvalidDateError(ConsultationError):
             message="Consultation date must be in the future",
             code="INVALID_DATE",
             status_code=400
+        )
+
+
+class InvalidTimeError(ConsultationError):
+    """Raised when consultation time is invalid"""
+    def __init__(self, message: str = "Invalid consultation time format. Use HH:MM (24-hour format)"):
+        super().__init__(
+            message=message,
+            code="INVALID_TIME",
+            status_code=400
+        )
+
+
+class DuplicatePendingError(ConsultationError):
+    """Raised when user already has pending consultation with same lawyer"""
+    def __init__(self, lawyer_name: str):
+        super().__init__(
+            message=f"You already have a pending consultation with {lawyer_name}. Please wait for a response before requesting another.",
+            code="DUPLICATE_PENDING",
+            status_code=409
         )
 
 
@@ -75,6 +96,38 @@ class ConsultationService:
             logger.error(f"Error checking booking conflict: {e}")
             return False  # Fail open - allow booking if check fails
     
+    def _validate_time_format(self, time_str: str) -> bool:
+        """Validate time is in HH:MM format (24-hour)"""
+        time_pattern = re.compile(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$')
+        return bool(time_pattern.match(time_str))
+    
+    def _validate_business_hours(self, time_str: str) -> bool:
+        """Validate time is within business hours (8 AM - 8 PM)"""
+        try:
+            hour = int(time_str.split(':')[0])
+            return 8 <= hour < 20  # 8 AM to 8 PM
+        except:
+            return False
+    
+    async def check_duplicate_pending(self, user_id: str, lawyer_id: str) -> bool:
+        """
+        Check if user already has a pending consultation with this lawyer.
+        Prevents spam and ensures orderly processing.
+        """
+        try:
+            result = self.supabase.table("consultation_requests")\
+                .select("id")\
+                .eq("user_id", user_id)\
+                .eq("lawyer_id", lawyer_id)\
+                .eq("status", "pending")\
+                .is_("deleted_at", None)\
+                .execute()
+            
+            return len(result.data) > 0 if result.data else False
+        except Exception as e:
+            logger.error(f"Error checking duplicate pending: {e}")
+            return False  # Fail open
+    
     async def create_consultation_request(
         self, 
         user_id: str,
@@ -87,23 +140,38 @@ class ConsultationService:
         consultation_mode: str
     ) -> Dict[str, Any]:
         """
-        Create a new consultation request with validation.
+        Create a new consultation request with comprehensive validation.
         
         Validates:
-        - Date is in the future
+        - Date is in the future (not today, must be at least tomorrow)
+        - Time format is valid (HH:MM, 24-hour)
+        - Time is within business hours (8 AM - 8 PM)
         - Lawyer exists and is accepting consultations
-        - No booking conflict exists
+        - No booking conflict exists (same lawyer, date, time)
+        - User doesn't have duplicate pending consultation with same lawyer
         
         Returns:
             Dict with success status and data/error
         """
         try:
-            # 1. Validate date is in the future
+            # 1. Validate date is in the future (at least tomorrow)
             consultation_date_obj = date.fromisoformat(consultation_date)
-            if consultation_date_obj < date.today():
+            tomorrow = date.today() + timedelta(days=1)
+            
+            if consultation_date_obj < tomorrow:
                 raise InvalidDateError()
             
-            # 2. Verify lawyer exists and is accepting consultations
+            # 2. Validate time format
+            if not self._validate_time_format(consultation_time):
+                raise InvalidTimeError()
+            
+            # 3. Validate business hours
+            if not self._validate_business_hours(consultation_time):
+                raise InvalidTimeError(
+                    "Consultation time must be between 8:00 AM and 8:00 PM"
+                )
+            
+            # 4. Verify lawyer exists and is accepting consultations
             logger.info(f"🔍 Checking if lawyer exists: {lawyer_id}")
             lawyer_result = self.supabase.table("lawyer_info")\
                 .select("name, accepting_consultations")\
@@ -130,7 +198,13 @@ class ConsultationService:
                     400
                 )
             
-            # 3. Check for booking conflict
+            # 5. Check for duplicate pending consultation
+            has_duplicate = await self.check_duplicate_pending(user_id, lawyer_id)
+            
+            if has_duplicate:
+                raise DuplicatePendingError(lawyer_name)
+            
+            # 6. Check for booking conflict (overlapping time slots)
             has_conflict = await self.check_booking_conflict(
                 lawyer_id, consultation_date, consultation_time
             )
@@ -138,7 +212,7 @@ class ConsultationService:
             if has_conflict:
                 raise BookingConflictError(lawyer_name, consultation_time)
             
-            # 3. Create consultation request
+            # 7. Create consultation request
             consultation_data = {
                 "user_id": user_id,
                 "lawyer_id": lawyer_id,
@@ -157,7 +231,18 @@ class ConsultationService:
                 .execute()
             
             if result.data:
-                logger.info(f"Consultation created: {result.data[0]['id']} for lawyer {lawyer_id}")
+                consultation_id = result.data[0]['id']
+                logger.info(f"Consultation created: {consultation_id} for lawyer {lawyer_id}")
+                
+                # Send real-time notification to lawyer
+                await self._notify_lawyer_new_consultation(
+                    lawyer_id=lawyer_id,
+                    consultation_id=consultation_id,
+                    consultation_date=consultation_date,
+                    consultation_time=consultation_time,
+                    user_id=user_id
+                )
+                
                 return {
                     "success": True,
                     "data": result.data[0]
@@ -169,7 +254,7 @@ class ConsultationService:
                     500
                 )
         
-        except (BookingConflictError, InvalidDateError, ConsultationError):
+        except (BookingConflictError, InvalidDateError, InvalidTimeError, DuplicatePendingError, ConsultationError):
             raise  # Re-raise custom errors
         except Exception as e:
             logger.error(f"Error creating consultation: {e}")
@@ -178,6 +263,50 @@ class ConsultationService:
                 "INTERNAL_ERROR",
                 500
             )
+    
+    async def _notify_lawyer_new_consultation(
+        self,
+        lawyer_id: str,
+        consultation_id: str,
+        consultation_date: str,
+        consultation_time: str,
+        user_id: str
+    ):
+        """
+        Send real-time notification to lawyer about new consultation request.
+        Uses Supabase notifications table for real-time updates.
+        """
+        try:
+            # Get user's name for notification
+            user_result = self.supabase.table("users")\
+                .select("full_name")\
+                .eq("id", user_id)\
+                .execute()
+            
+            user_name = user_result.data[0]["full_name"] if user_result.data else "A user"
+            
+            # Create notification
+            notification_data = {
+                "user_id": lawyer_id,
+                "type": "new_consultation",
+                "title": "New Consultation Request",
+                "message": f"{user_name} has requested a consultation on {consultation_date} at {consultation_time}",
+                "data": {
+                    "consultation_id": consultation_id,
+                    "consultation_date": consultation_date,
+                    "consultation_time": consultation_time
+                },
+                "read": False
+            }
+            
+            self.supabase.table("notifications")\
+                .insert(notification_data)\
+                .execute()
+            
+            logger.info(f"✅ Notification sent to lawyer {lawyer_id} for consultation {consultation_id}")
+        except Exception as e:
+            # Don't fail the consultation creation if notification fails
+            logger.error(f"⚠️ Failed to send notification to lawyer: {e}")
     
     async def get_user_consultations(
         self, 

@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 12,
   },
   statsRow: {
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 16,
   },
   emptyTitle: {
     fontSize: 18,
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     ...GlobalStyles.textSemiBold,
   },
   searchContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 8,
     backgroundColor: Colors.background.primary,

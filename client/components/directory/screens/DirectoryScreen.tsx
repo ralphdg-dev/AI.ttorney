@@ -304,7 +304,7 @@ export default function DirectoryScreen() {
           <ScrollView
               style={tw`flex-1 bg-gray-50`}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 60, paddingHorizontal: 8, paddingTop: 12 }}
+              contentContainerStyle={{ paddingBottom: 60, paddingTop: 12 }}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}

@@ -32,7 +32,7 @@ export default function SearchBarWithFilter({
 }: SearchBarWithFilterProps) {
   return (
     <Box className="bg-white border-b border-gray-200" style={{ zIndex: 100 }}>
-      <VStack space="md" className="px-4 py-4 bg-white" style={{ zIndex: 1000 }}>
+      <VStack space="md" className="px-4 py-3 bg-white" style={{ zIndex: 1000 }}>
         <HStack space="sm" className="items-center">
           <Box className="flex-1 relative" style={{ zIndex: 1000 }}>
             <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ 

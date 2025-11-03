@@ -33,7 +33,7 @@ export default function BookmarkedGuidesScreen() {
   const flatListRef = useRef<FlatList>(null);
   const { width } = useWindowDimensions();
 
-  const horizontalPadding = 24;
+  const horizontalPadding = 16;
   const minCardWidth = 320;
   const numColumns = Math.max(1, Math.min(3, Math.floor((width - horizontalPadding * 2) / minCardWidth)));
 
@@ -116,7 +116,7 @@ export default function BookmarkedGuidesScreen() {
 
   const renderListHeader = () => (
     <View>
-      <HStack className="items-center mb-4">
+      <HStack className="items-center mb-4 px-4">
         <Ionicons name="bookmarks" size={16} color={Colors.text.sub} />
         <GSText size="sm" bold className="ml-2" style={{ color: Colors.text.sub }}>
           Filter by Category
@@ -125,7 +125,7 @@ export default function BookmarkedGuidesScreen() {
       <CategoryScroller activeCategory={activeCategory} onCategoryChange={handleCategoryChange} includeAllOption />
 
       {/* Results Info (match Favorite Terms) */}
-      <View style={tw`px-5 mb-3`}>
+      <View style={tw`px-4 mb-3`}>
         <HStack className="items-center justify-between">
           <GSText size="sm" style={{ color: Colors.text.sub }}>
             {filteredArticles.length} {filteredArticles.length === 1 ? 'result' : 'results'}
@@ -146,7 +146,7 @@ export default function BookmarkedGuidesScreen() {
   );
 
   const renderEmptyState = () => (
-    <View style={[tw`flex-1 items-center justify-center`, { paddingHorizontal: 24 }]}> 
+    <View style={[tw`flex-1 items-center justify-center`, { paddingHorizontal: 16 }]}> 
       <GSText size="lg" bold className="mb-2" style={{ color: Colors.text.head }}>
         No Bookmarked Guides Yet
       </GSText>
@@ -166,7 +166,7 @@ export default function BookmarkedGuidesScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header title="Bookmarked Guides" showMenu={true} />
 
-      <Box className="px-6 pt-6 mb-4">
+      <Box className="px-4 pt-4 mb-4">
         <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
           <InputSlot className="pl-3">
             <Ionicons name="search" size={20} color="#9CA3AF" />
@@ -196,7 +196,7 @@ export default function BookmarkedGuidesScreen() {
           numColumns={numColumns}
           ListHeaderComponent={renderListHeader}
           ListEmptyComponent={
-            <View style={[tw`items-center py-12`, { paddingHorizontal: 24 }]}> 
+            <View style={[tw`items-center py-12`, { paddingHorizontal: 16 }]}> 
               <Filter size={32} color={Colors.text.sub} strokeWidth={1.5} />
               <GSText size="md" className="mt-4 text-center" style={{ color: Colors.text.sub }}>
                 No guides match your current filters
@@ -206,14 +206,17 @@ export default function BookmarkedGuidesScreen() {
               </GSText>
             </View>
           }
-          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 80, flexGrow: 1 }}
+          contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
           columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
           renderItem={({ item }) => (
             <ArticleCard
               item={item}
               onPress={handleArticlePress}
               onToggleBookmark={() => {}}
-              containerStyle={{ width: numColumns > 1 ? (width - horizontalPadding * 2 - 12) / numColumns : "100%", marginHorizontal: 0 }}
+              containerStyle={{ 
+                width: numColumns > 1 ? (width - horizontalPadding * 2 - 12) / numColumns : "100%", 
+                marginHorizontal: numColumns > 1 ? 6 : 16,
+              }}
             />
           )}
           showsVerticalScrollIndicator={false}

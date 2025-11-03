@@ -940,7 +940,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   }, [sortedLawFirms, mapCenter, userLocation, selectedFirmId]);
 
   const renderLawFirmCard = useCallback((firm: LawFirm) => (
-    <Box key={firm.id} className="mx-2 mb-3 bg-white rounded-lg border border-gray-200">
+    <Box key={firm.id} className="mx-4 mb-3 bg-white rounded-lg border border-gray-200">
       <VStack space="sm" className="p-4">
         <HStack space="sm" className="items-start">
           <Box className="p-2 bg-blue-50 rounded-lg">
@@ -1487,7 +1487,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       keyboardShouldPersistTaps="handled"
     >
       {sortedLawFirms.length > 0 ? (
-        <VStack space="xs" style={{ paddingTop: 12, paddingHorizontal: 8 }}>
+        <VStack space="xs" style={{ paddingTop: 12 }}>
           {sortedLawFirms.map(renderLawFirmCard)}
         </VStack>
       ) : error ? (
