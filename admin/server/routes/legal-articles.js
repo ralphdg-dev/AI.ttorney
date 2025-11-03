@@ -5,7 +5,7 @@ const { supabaseAdmin } = require("../config/supabase");
 const multer = require("multer");
 const upload = multer({ storage: multer.memoryStorage() });
 
-// GET /api/legal-articles — get all articles regardless of verification
+// GET /api/legal-articles — get all articles (excluding soft-deleted)
 router.get("/", async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin
@@ -26,9 +26,11 @@ router.get("/", async (req, res) => {
         created_by,
         verified_by,
         verified_at,
-        is_verified
+        is_verified,
+        deleted_at
       `
       )
+      .is("deleted_at", null) // Only get non-deleted articles
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -41,8 +43,7 @@ router.get("/", async (req, res) => {
       if (imagePath.startsWith("http")) return imagePath;
 
       // If it's a storage path, construct the proper URL
-      // Based on your bucket structure: articles-img/arrest.jpg
-      const bucketName = "legal-articles"; // Adjust to your actual bucket name
+      const bucketName = "legal-articles";
 
       // Remove any leading slashes and encode the path
       const cleanPath = imagePath.replace(/^\//, "");
@@ -114,7 +115,7 @@ router.post("/", upload.single("image"), async (req, res) => {
 
     // Step 2: If image uploaded, store it with ID in filename
     if (req.file) {
-      const fileExtension = req.file.originalname.split(".").pop(); // keep extension
+      const fileExtension = req.file.originalname.split(".").pop();
       const fileName = `${article.id}_article-image.${fileExtension}`;
       const storagePath = `articles-img/${fileName}`;
 
@@ -123,7 +124,7 @@ router.post("/", upload.single("image"), async (req, res) => {
           .from("legal-articles")
           .upload(storagePath, req.file.buffer, {
             contentType: req.file.mimetype,
-            upsert: true, // overwrite if exists
+            upsert: true,
           });
 
       if (uploadError) throw uploadError;
@@ -313,6 +314,35 @@ router.patch("/:id/publish", async (req, res) => {
     res.status(200).json({ success: true, data: formattedArticle });
   } catch (err) {
     console.error("Publish/Unpublish error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: err.message || "Server error" });
+  }
+});
+
+// PATCH /api/legal-articles/:id/archive — Soft delete
+router.patch("/:id/archive", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { data: updatedArticle, error } = await supabaseAdmin
+      .from("legal_articles")
+      .update({
+        deleted_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json({
+      success: true,
+      message: "Article archived successfully",
+      data: updatedArticle,
+    });
+  } catch (err) {
+    console.error("Archive error:", err);
     res
       .status(500)
       .json({ success: false, message: err.message || "Server error" });

@@ -16,14 +16,11 @@ import ConfirmationModal from "../../components/ui/ConfirmationModal";
 import ViewArticleModal from "../../components/articles/ViewArticleModal";
 import AddArticleModal from "../../components/articles/AddArticleModal";
 import EditArticleModal from "../../components/articles/EditArticleModal";
-import { useToast } from "../../components/ui/Toast";
 import PublishModal from "./components/PublishModal";
 
 const categories = ["All", "Family", "Criminal", "Civil", "Labor", "Consumer"];
 
 const ManageLegalArticles = () => {
-  const { ToastContainer } = useToast();
-
   // States
   const [query, setQuery] = React.useState("");
   const [category, setCategory] = React.useState("All");
@@ -42,7 +39,7 @@ const ManageLegalArticles = () => {
   const [showModal, setShowModal] = React.useState(false);
   const [confirmationModal, setConfirmationModal] = React.useState({
     open: false,
-    type: "", // "archive" | "publish" | "unpublish"
+    type: "",
     articleId: null,
     articleTitle: "",
   });
@@ -94,7 +91,7 @@ const ManageLegalArticles = () => {
       data.append("description_fil", formData.filDescription);
       data.append("content_en", formData.content_en);
       data.append("content_fil", formData.content_fil);
-      data.append("category", formData.category.toLowerCase()); // <-- lowercase
+      data.append("category", formData.category.toLowerCase());
       if (formData.image) data.append("image", formData.image);
 
       const res = await fetch("http://localhost:5001/api/legal-articles", {
@@ -108,11 +105,34 @@ const ManageLegalArticles = () => {
 
       setArticles((prev) => [json.data, ...prev]);
     } catch (err) {
+      console.error("Failed to add article:", err);
       throw err;
     }
   };
 
-  // Filtering & sorting
+  // Handle archive
+  const handleArchive = async (articleId) => {
+    try {
+      const res = await fetch(
+        `http://localhost:5001/api/legal-articles/${articleId}/archive`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(json.message || "Failed to archive article");
+      }
+
+      // Remove the archived article from the list
+      setArticles((prev) => prev.filter((a) => a.id !== articleId));
+    } catch (err) {
+      console.error("Archive error:", err);
+    }
+  };
+
   // Filtering & sorting
   const filteredData = React.useMemo(() => {
     let rows = [...articles];
@@ -245,14 +265,20 @@ const ManageLegalArticles = () => {
         {row.status === "Unpublished" ? (
           <button
             className="flex items-center w-full px-3 py-1.5 text-emerald-600 hover:bg-emerald-50"
-            onClick={() => setPublishModal({ open: true, article: row })}
+            onClick={() => {
+              setPublishModal({ open: true, article: row });
+              setOpenMenuId(null);
+            }}
           >
             <Upload size={12} className="mr-2 text-emerald-500" /> Publish
           </button>
         ) : (
           <button
             className="flex items-center w-full px-3 py-1.5 text-gray-600 hover:bg-gray-50"
-            onClick={() => setPublishModal({ open: true, article: row })}
+            onClick={() => {
+              setPublishModal({ open: true, article: row });
+              setOpenMenuId(null);
+            }}
           >
             <Download size={12} className="mr-2 text-gray-500" /> Unpublish
           </button>
@@ -399,8 +425,6 @@ const ManageLegalArticles = () => {
 
   return (
     <div>
-      <ToastContainer />
-
       {/* Header */}
       <div className="mb-3">
         <div className="flex items-stretch gap-2">
@@ -533,6 +557,22 @@ const ManageLegalArticles = () => {
         open={confirmationModal.open}
         onClose={() => setConfirmationModal({ open: false })}
         type={confirmationModal.type}
+        onConfirm={() => {
+          if (confirmationModal.type === "archive") {
+            handleArchive(confirmationModal.articleId);
+          }
+          setConfirmationModal({ open: false });
+        }}
+        title={
+          confirmationModal.type === "archive"
+            ? "Archive Article"
+            : "Confirm Action"
+        }
+        message={
+          confirmationModal.type === "archive"
+            ? `Are you sure you want to archive "${confirmationModal.articleTitle}"? This article will be hidden from the list.`
+            : "Are you sure you want to proceed?"
+        }
       />
 
       <EditArticleModal
@@ -540,7 +580,6 @@ const ManageLegalArticles = () => {
         onClose={() => setEditModalOpen(false)}
         article={articleToEdit}
         onUpdate={(updatedArticle) => {
-          // Update the article in the table
           setArticles((prev) =>
             prev.map((a) => (a.id === updatedArticle.id ? updatedArticle : a))
           );
@@ -572,7 +611,6 @@ const ManageLegalArticles = () => {
             }
           } catch (err) {
             console.error(err);
-            alert("Failed to update article status");
           } finally {
             setPublishModal({ open: false, article: null });
           }
