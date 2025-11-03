@@ -23,6 +23,7 @@ import {
 import { LawyerNavbar } from "../../components/lawyer/shared";
 import Header from "../../components/Header";
 import { EditProfileModal } from "../../components/lawyer/profile";
+import { SidebarWrapper } from "../../components/AppSidebar";
 import Colors from "../../constants/Colors";
 import { useAuth } from "../../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
@@ -642,7 +643,7 @@ const LawyerProfilePage: React.FC = () => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      <Header title="Profile" showSettings={false} />
+      <Header title="Profile" showMenu={true} />
       <ScrollView
         style={tw`flex-1`}
         showsVerticalScrollIndicator={false}
@@ -992,6 +993,7 @@ const LawyerProfilePage: React.FC = () => {
         onAvailabilityChange={(slots) => setAvailabilitySlots(slots)}
       />
       <LawyerNavbar activeTab="profile" />
+      <SidebarWrapper />
     </SafeAreaView>
   );
 };

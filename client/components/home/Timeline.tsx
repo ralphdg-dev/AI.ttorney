@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, FlatList, RefreshControl, ActivityIndicator, TouchableOpacity, Alert, Animated, StyleSheet, ListRenderItem } from 'react-native';
+import { View, FlatList, RefreshControl, TouchableOpacity, Animated, StyleSheet, ListRenderItem } from 'react-native';
 import { NetworkConfig } from '../../utils/networkConfig';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Plus } from 'lucide-react-native';
@@ -47,7 +47,7 @@ interface TimelineProps {
 const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
-  const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, getLastFetchTime, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
+  const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [optimisticPosts, setOptimisticPosts] = useState<PostData[]>([]);

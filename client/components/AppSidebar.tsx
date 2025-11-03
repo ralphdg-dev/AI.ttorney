@@ -152,15 +152,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     acceptedConsultations: consultationsCount,
   }), [favoriteTermIds.size, bookmarkedPostIds.size, bookmarkedGuideIds.size, consultationsCount]);
 
+  const { user } = useAuth();
+  const isLawyer = user?.role === 'verified_lawyer';
+
   // Memoize menu items to prevent recreating on every render
   const menuItems: MenuItem[] = React.useMemo(() => [
-    {
-      id: "bookmarks",
-      label: "Favorite Terms",
-      icon: Star,
-      route: "favorite-terms",
-      badge: badgeCounts.favoriteTerms || undefined,
-    },
+    // Bookmarked Posts - Available for both users and lawyers (same page)
     {
       id: "bookmarked-posts",
       label: "Bookmarked Posts",
@@ -168,18 +165,28 @@ const Sidebar: React.FC<SidebarProps> = ({
       route: "bookmarked-posts",
       badge: badgeCounts.bookmarkedPosts || undefined,
     },
-    {
+    // Favorite Terms - Only for regular users
+    ...(!isLawyer ? [{
+      id: "bookmarks",
+      label: "Favorite Terms",
+      icon: Star,
+      route: "favorite-terms",
+      badge: badgeCounts.favoriteTerms || undefined,
+    }] : []),
+    // Bookmarked Guides - Only for regular users
+    ...(!isLawyer ? [{
       id: "bookmarked-guides",
       label: "Bookmarked Guides",
       icon: Bookmark,
       route: "bookmarked-guides",
       badge: badgeCounts.bookmarkedGuides || undefined,
-    },
+    }] : []),
+    // Consultations - Different routes for users vs lawyers
     {
       id: "consultations",
-      label: "Consultations",
+      label: isLawyer ? "Consultation Requests" : "Consultations",
       icon: Calendar,
-      route: "consultations",
+      route: isLawyer ? "lawyer/consult" : "consultations",
       badge: badgeCounts.acceptedConsultations || undefined,
     },
     {
@@ -242,7 +249,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         }
       },
     },
-  ], [badgeCounts, signOut]);
+  ], [badgeCounts, signOut, isLawyer]);
 
   const handleMenuItemPress = (item: MenuItem) => {
     if (item.action) {
@@ -388,6 +395,9 @@ export const SidebarWrapper: React.FC<{
         break;
       case "consultations":
         router.push("/consultations");
+        break;
+      case "lawyer/consult":
+        router.push("/lawyer/consult");
         break;
       case "bookmarked-guides":
         router.push("/bookmarked-guides");
