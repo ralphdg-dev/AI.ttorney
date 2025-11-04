@@ -73,7 +73,15 @@ const SkeletonLoader = () => {
 
 export default function HelpAndSupport() {
   const [search, setSearch] = useState("");
+  const [errors, setErrors] = useState({
+    name: "",
+    email: "",
+    subject: "",
+    message: "",
+  });
+
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [showEmailSentModal, setShowEmailSentModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -164,21 +172,37 @@ export default function HelpAndSupport() {
   };
 
   const validateEmailFields = () => {
-    if (
-      !emailName.trim() ||
-      !emailAddress.trim() ||
-      !emailSubject.trim() ||
-      !emailMessage.trim()
-    ) {
-      Alert.alert("Missing Information", "Please fill in all fields.");
-      return false;
+    let valid = true;
+    const newErrors = { name: "", email: "", subject: "", message: "" };
+
+    if (!emailName.trim()) {
+      newErrors.name = "Name is required";
+      valid = false;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailAddress)) {
-      Alert.alert("Invalid Email", "Please enter a valid email address.");
-      return false;
+
+    if (!emailAddress.trim()) {
+      newErrors.email = "Email is required";
+      valid = false;
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailAddress)) {
+        newErrors.email = "Please enter a valid email address";
+        valid = false;
+      }
     }
-    return true;
+
+    if (!emailSubject.trim()) {
+      newErrors.subject = "Subject is required";
+      valid = false;
+    }
+
+    if (!emailMessage.trim()) {
+      newErrors.message = "Message is required";
+      valid = false;
+    }
+
+    setErrors(newErrors);
+    return valid;
   };
 
   const handleConfirmSend = () => {
@@ -187,11 +211,15 @@ export default function HelpAndSupport() {
   };
 
   const handleSendEmail = async () => {
-    // Close all modals first
+    // Close confirmation modal and email form immediately
     setShowConfirmModal(false);
     setShowEmailForm(false);
 
+    // Show "Email Sent" modal immediately
+    setShowEmailSentModal(true);
+
     try {
+      // Send email in the background
       const response = await axios.post(
         "http://localhost:8000/api/support/email",
         {
@@ -202,22 +230,17 @@ export default function HelpAndSupport() {
         }
       );
 
-      if (response.data.success) {
-        Alert.alert("Success", response.data.message);
-        setEmailName("");
-        setEmailAddress("");
-        setEmailSubject("");
-        setEmailMessage("");
-      } else {
-        Alert.alert("Error", response.data.error || "Failed to send message.");
+      // Clear input fields
+      setEmailName("");
+      setEmailAddress("");
+      setEmailSubject("");
+      setEmailMessage("");
+
+      if (!response.data.success) {
+        console.error("Failed to send email:", response.data.error);
       }
     } catch (error) {
-      console.error(error);
-      Alert.alert(
-        "Error",
-        error.response?.data?.detail ||
-          "An error occurred while sending the request."
-      );
+      console.error("Error sending email:", error);
     }
   };
 
@@ -458,17 +481,20 @@ export default function HelpAndSupport() {
                 label="Your Name"
                 value={emailName}
                 setValue={setEmailName}
+                error={errors.name}
               />
               <Input
                 label="Your Email"
                 value={emailAddress}
                 setValue={setEmailAddress}
                 keyboardType="email-address"
+                error={errors.email}
               />
               <Input
                 label="Subject"
                 value={emailSubject}
                 setValue={setEmailSubject}
+                error={errors.subject}
               />
               <Input
                 label="Message"
@@ -476,6 +502,7 @@ export default function HelpAndSupport() {
                 setValue={setEmailMessage}
                 multiline
                 numberOfLines={5}
+                error={errors.message}
               />
 
               <View style={tw`flex-row justify-between mt-4 mb-2`}>
@@ -511,6 +538,51 @@ export default function HelpAndSupport() {
             </ScrollView>
           </KeyboardAvoidingView>
         </Animated.View>
+      </Modal>
+
+      <Modal
+        visible={showEmailSentModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEmailSentModal(false)}
+      >
+        <View
+          style={[
+            tw`flex-1 bg-black bg-opacity-50 justify-center items-center`,
+            { zIndex: 999, elevation: 999 },
+          ]}
+        >
+          <View
+            style={[
+              tw`bg-white rounded-2xl p-6`,
+              { width: Math.min(width * 0.85, 400) },
+            ]}
+          >
+            <Text
+              style={[
+                tw`text-lg font-semibold mb-4 text-center`,
+                { color: Colors.text.head },
+              ]}
+            >
+              Email Sent!
+            </Text>
+            <Text
+              style={[tw`text-sm text-center mb-4`, { color: Colors.text.sub }]}
+            >
+              Thank you for reaching out. Our support team will get back to you
+              soon.
+            </Text>
+            <TouchableOpacity
+              style={[
+                tw`py-3 rounded-xl`,
+                { backgroundColor: Colors.primary.blue },
+              ]}
+              onPress={() => setShowEmailSentModal(false)}
+            >
+              <Text style={tw`text-center text-white font-semibold`}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       {/* CONFIRMATION MODAL */}
@@ -576,7 +648,7 @@ export default function HelpAndSupport() {
   );
 }
 
-/** Reusable Input **/
+/** Reusable Input with validation **/
 const Input = ({
   label,
   value,
@@ -584,6 +656,7 @@ const Input = ({
   keyboardType = "default",
   multiline = false,
   numberOfLines = 1,
+  error = "",
 }: any) => (
   <View style={tw`mb-4`}>
     <Text style={[tw`text-sm font-semibold mb-2`, { color: Colors.text.head }]}>
@@ -593,7 +666,7 @@ const Input = ({
       style={[
         tw`border rounded-xl px-4 py-3 text-base`,
         {
-          borderColor: "#E5E7EB",
+          borderColor: error ? "red" : "#E5E7EB",
           color: Colors.text.head,
           minHeight: multiline ? 120 : undefined,
           textAlignVertical: multiline ? "top" : "center",
@@ -607,5 +680,6 @@ const Input = ({
       multiline={multiline}
       numberOfLines={numberOfLines}
     />
+    {error ? <Text style={tw`text-red-500 text-xs mt-1`}>{error}</Text> : null}
   </View>
 );
