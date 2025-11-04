@@ -309,14 +309,31 @@ router.patch("/:id/archive", async (req, res) => {
   const { id } = req.params;
 
   try {
-    const { data: updatedArticle, error } = await supabaseAdmin
+    // Fetch current article
+    const { data: article, error: fetchError } = await supabaseAdmin
       .from("legal_articles")
-      .update({ deleted_at: new Date().toISOString() })
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !article)
+      throw fetchError || new Error("Article not found");
+
+    // If article is published, unpublish it
+    let updateData = { deleted_at: new Date().toISOString() };
+    if (article.is_verified) {
+      updateData.is_verified = false;
+      updateData.verified_at = null;
+    }
+
+    const { data: updatedArticle, error: updateError } = await supabaseAdmin
+      .from("legal_articles")
+      .update(updateData)
       .eq("id", id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
     res.status(200).json({
       success: true,

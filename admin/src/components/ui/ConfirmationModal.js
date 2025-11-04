@@ -86,7 +86,7 @@ const ConfirmationModal = ({
       case 'resubmission':
         return 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500';
       default:
-        return 'bg-blue-900 hover:bg-blue-700 focus:ring-blue-500';
+        return 'bg-blue-900 hover:bg-blue-900 focus:ring-blue-500';
     }
   };
 
