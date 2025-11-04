@@ -371,30 +371,28 @@ const BanRestrictUsers = () => {
     const dropdownHeight = 280; // Approximate height of dropdown menu
     const dropdownWidth = 192; // 48 * 4 = 192px (w-48)
     
-    // Find pagination controls and table container to avoid overlap
+    // Check if this is the last row in the table
+    const tableRow = button.closest('tr');
+    const tableBody = tableRow?.closest('tbody');
+    const allRows = tableBody?.querySelectorAll('tr') || [];
+    const isLastRow = tableRow && allRows.length > 0 && tableRow === allRows[allRows.length - 1];
+    
+    // Find pagination controls for more accurate detection
     const paginationElement = document.querySelector('.flex.items-center.justify-between') || 
+                              document.querySelector('.flex.items-center.space-x-2') ||
                               document.querySelector('[class*="pagination"]');
-    const tableContainer = button.closest('.bg-white.rounded-lg') || button.closest('table');
     
     let spaceBelow, spaceAbove;
     
-    if (paginationElement && tableContainer) {
+    if (paginationElement) {
       const paginationRect = paginationElement.getBoundingClientRect();
-      const tableRect = tableContainer.getBoundingClientRect();
-      
-      // Calculate space between button and pagination
-      spaceBelow = paginationRect.top - rect.bottom - 16; // 16px buffer
-      spaceAbove = rect.top - tableRect.top;
-      
-      // If table is very short (like 1 row), force upward positioning
-      const tableHeight = tableRect.height;
-      if (tableHeight < dropdownHeight + 100) { // 100px buffer
-        spaceBelow = 0; // Force upward positioning
-      }
+      // Calculate space between button and pagination with larger buffer
+      spaceBelow = paginationRect.top - rect.bottom - 32; // Increased buffer
+      spaceAbove = rect.top - 50;
     } else {
-      // Fallback to viewport calculation
+      // Fallback to viewport calculation with conservative buffer
       const viewportHeight = window.innerHeight;
-      spaceBelow = viewportHeight - rect.bottom - 100; // 100px buffer for pagination
+      spaceBelow = viewportHeight - rect.bottom - 150; // Conservative buffer
       spaceAbove = rect.top;
     }
     
@@ -407,8 +405,10 @@ const BanRestrictUsers = () => {
     // Determine horizontal positioning
     const useLeftSide = spaceLeft > dropdownWidth + 8; // 8px buffer
     
-    // Determine vertical positioning
-    const useTopPosition = spaceBelow >= dropdownHeight || spaceAbove <= dropdownHeight;
+    // Determine vertical positioning - be more conservative
+    // Force upward positioning if it's the last row OR if space is insufficient
+    const forceUpward = isLastRow || spaceBelow < dropdownHeight;
+    const useTopPosition = !forceUpward && spaceBelow >= dropdownHeight;
     
     if (useLeftSide) {
       // Position to the left of button
