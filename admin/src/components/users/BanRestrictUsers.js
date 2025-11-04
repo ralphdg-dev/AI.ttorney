@@ -1242,9 +1242,10 @@ const BanRestrictUsers = () => {
       {/* User Details Modal */}
       <Modal 
         open={showUserDetailsModal} 
-        onClose={() => setShowUserDetailsModal(false)} 
+        onClose={() => {}} 
         title="User Details" 
         width="max-w-4xl"
+        showCloseButton={false}
       >
           {selectedUser && (
             <div className="space-y-4">
@@ -1344,9 +1345,6 @@ const BanRestrictUsers = () => {
                                     <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
                                       Details
                                     </th>
-                                    <th className="px-2 py-1.5 text-right text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                      Actions
-                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1357,7 +1355,7 @@ const BanRestrictUsers = () => {
                                     }}>
                                       <td className="px-2 py-1.5">
                                         <div className="text-[9px] font-medium text-gray-900">
-                                          {violation.action_taken.replace('_', ' ')}
+                                          {violation.action_taken.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                                         </div>
                                       </td>
                                       <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
@@ -1367,20 +1365,6 @@ const BanRestrictUsers = () => {
                                         <div className="text-[9px] text-gray-700 truncate" title={violation.violation_summary || violation.violation_type.replace('_', ' ')}>
                                           {violation.violation_summary || violation.violation_type.replace('_', ' ')}
                                         </div>
-                                      </td>
-                                      <td className="px-2 py-1.5 text-right">
-                                        <Tooltip content="View Details">
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setSelectedViolation(violation);
-                                              setShowViolationModal(true);
-                                            }}
-                                            className="p-1 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-800"
-                                          >
-                                            <Eye size={12} />
-                                          </button>
-                                        </Tooltip>
                                       </td>
                                     </tr>
                                   ))}
@@ -1407,38 +1391,39 @@ const BanRestrictUsers = () => {
                         </div>
 
                         {userSuspensions.length > 0 ? (
-                          <div className="border border-gray-200 rounded-lg overflow-hidden">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                    Type
-                                  </th>
-                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                    Status
-                                  </th>
-                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                    Dates
-                                  </th>
-                                </tr>
-                              </thead>
-                            </table>
-                            <div className="max-h-32 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                              <table className="min-w-full">
+                          <div className="overflow-hidden border border-gray-200 rounded-lg">
+                            <div className="max-h-40 overflow-y-auto">
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50 sticky top-0">
+                                  <tr>
+                                    <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                      Type
+                                    </th>
+                                    <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                      Status
+                                    </th>
+                                    <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                      Dates
+                                    </th>
+                                  </tr>
+                                </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                   {userSuspensions.map((suspension) => (
                                     <tr key={suspension.id} className="hover:bg-gray-50">
                                       <td className="px-2 py-1.5">
                                         <div className="text-[9px] font-medium text-gray-900">
-                                          {suspension.suspension_type} #{suspension.suspension_number}
+                                          {suspension.suspension_type ? suspension.suspension_type.charAt(0).toUpperCase() + suspension.suspension_type.slice(1) : 'Unknown'} #{suspension.suspension_number}
                                         </div>
                                       </td>
-                                      <td className="px-2 py-1.5">
-                                        <div className={`inline-flex px-1.5 py-0.5 text-[8px] font-medium rounded-full ${
+                                      <td className="px-2 py-1.5 align-middle">
+                                        <div className={`inline-flex items-center px-1.5 py-0.5 text-[8px] font-medium rounded-full ${
                                           suspension.status === 'active' ? 'bg-red-100 text-red-700' :
                                           suspension.status === 'lifted' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
                                         }`}>
-                                          {suspension.status}
+                                          {suspension.status === 'temporary' ? 'Temporary' : 
+                                           suspension.status === 'active' ? 'Active' :
+                                           suspension.status === 'lifted' ? 'Lifted' :
+                                           suspension.status ? suspension.status.charAt(0).toUpperCase() + suspension.status.slice(1) : 'Unknown'}
                                         </div>
                                       </td>
                                       <td className="px-2 py-1.5 text-[9px] text-gray-500">
@@ -1466,6 +1451,16 @@ const BanRestrictUsers = () => {
                         )}
                       </div>
                     </div>
+                </div>
+
+                {/* Close Button */}
+                <div className="flex justify-end pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => setShowUserDetailsModal(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#023D7B]"
+                  >
+                    Close
+                  </button>
                 </div>
             </div>
           )}
