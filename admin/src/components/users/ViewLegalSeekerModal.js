@@ -279,11 +279,11 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
     };
   }, [userData]);
 
-  if (!user && !loading) return <Modal open={open} onClose={onClose} title="Legal Seeker Details" />;
+  if (!user && !loading) return <Modal open={open} onClose={() => {}} title="Legal Seeker Details" showCloseButton={false} />;
   
   if (loading) {
     return (
-      <Modal open={open} onClose={onClose} title="Legal Seeker Details" width="max-w-4xl">
+      <Modal open={open} onClose={() => {}} title="Legal Seeker Details" width="max-w-4xl" showCloseButton={false}>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#023D7B] mx-auto mb-4"></div>
@@ -332,9 +332,10 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
   return (
     <Modal 
       open={open} 
-      onClose={onClose} 
+      onClose={() => {}} 
       title="Legal Seeker Details" 
       width="max-w-4xl"
+      showCloseButton={false}
     >
       <div className="space-y-4">
         {/* Account Information */}
@@ -576,6 +577,15 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
           </div>
         </div>
 
+        {/* Close Button */}
+        <div className="flex justify-end pt-4 border-t border-gray-200">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#023D7B]"
+          >
+            Close
+          </button>
+        </div>
       </div>
 
       {/* Activity Detail Modal */}

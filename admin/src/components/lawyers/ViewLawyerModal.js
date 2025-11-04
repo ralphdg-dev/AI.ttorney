@@ -73,7 +73,7 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
 
   if (!lawyerData && !loading) {
     return (
-      <Modal open={open} onClose={onClose} title="View Lawyer Details">
+      <Modal open={open} onClose={() => {}} title="View Lawyer Details" showCloseButton={false}>
         <div className="text-center py-8">
           <p className="text-gray-500">No lawyer data available</p>
         </div>
@@ -83,7 +83,7 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
   
   if (loading) {
     return (
-      <Modal open={open} onClose={onClose} title="View Lawyer Details" width="max-w-4xl">
+      <Modal open={open} onClose={() => {}} title="View Lawyer Details" width="max-w-4xl" showCloseButton={false}>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#023D7B] mx-auto mb-4"></div>
@@ -97,9 +97,10 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
   return (
     <Modal 
       open={open} 
-      onClose={onClose} 
+      onClose={() => {}} 
       title="Lawyer Details"
       width="max-w-4xl"
+      showCloseButton={false}
     >
       <div className="space-y-6">
         {/* Header with Status */}

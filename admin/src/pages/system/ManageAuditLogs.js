@@ -520,9 +520,10 @@ INSERT INTO admin_audit_logs (action, target_table, target_id, actor_id, role, m
       {showDetailsModal && selectedLog && (
         <Modal
           open={showDetailsModal}
-          onClose={() => setShowDetailsModal(false)}
+          onClose={() => {}}
           title="Audit Log Details"
           width="max-w-3xl"
+          showCloseButton={false}
         >
           <div className="space-y-4">
             {/* Log Header */}
