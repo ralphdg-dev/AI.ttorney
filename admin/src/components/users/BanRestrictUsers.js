@@ -371,30 +371,15 @@ const BanRestrictUsers = () => {
     const dropdownHeight = 280; // Approximate height of dropdown menu
     const dropdownWidth = 192; // 48 * 4 = 192px (w-48)
     
-    // Check if this is the last row in the table
+    // Check row position in the table
     const tableRow = button.closest('tr');
     const tableBody = tableRow?.closest('tbody');
     const allRows = tableBody?.querySelectorAll('tr') || [];
-    const isLastRow = tableRow && allRows.length > 0 && tableRow === allRows[allRows.length - 1];
+    const rowIndex = Array.from(allRows).indexOf(tableRow);
+    const totalRows = allRows.length;
     
-    // Find pagination controls for more accurate detection
-    const paginationElement = document.querySelector('.flex.items-center.justify-between') || 
-                              document.querySelector('.flex.items-center.space-x-2') ||
-                              document.querySelector('[class*="pagination"]');
-    
-    let spaceBelow, spaceAbove;
-    
-    if (paginationElement) {
-      const paginationRect = paginationElement.getBoundingClientRect();
-      // Calculate space between button and pagination with larger buffer
-      spaceBelow = paginationRect.top - rect.bottom - 32; // Increased buffer
-      spaceAbove = rect.top - 50;
-    } else {
-      // Fallback to viewport calculation with conservative buffer
-      const viewportHeight = window.innerHeight;
-      spaceBelow = viewportHeight - rect.bottom - 150; // Conservative buffer
-      spaceAbove = rect.top;
-    }
+    // Simple rule: bottom 2 rows go up, rest go down
+    const isBottomTwoRows = rowIndex >= totalRows - 2;
     
     // Calculate horizontal space
     const spaceLeft = rect.left;
@@ -405,10 +390,8 @@ const BanRestrictUsers = () => {
     // Determine horizontal positioning
     const useLeftSide = spaceLeft > dropdownWidth + 8; // 8px buffer
     
-    // Determine vertical positioning - be more conservative
-    // Force upward positioning if it's the last row OR if space is insufficient
-    const forceUpward = isLastRow || spaceBelow < dropdownHeight;
-    const useTopPosition = !forceUpward && spaceBelow >= dropdownHeight;
+    // Simple vertical positioning: bottom 2 rows up, others down
+    const useTopPosition = !isBottomTwoRows;
     
     if (useLeftSide) {
       // Position to the left of button
