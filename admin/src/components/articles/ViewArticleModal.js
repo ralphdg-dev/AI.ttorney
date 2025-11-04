@@ -1,30 +1,38 @@
 import React from "react";
 import Modal from "../ui/Modal";
-import { CheckCircle, XCircle, Calendar, UserCheck } from "lucide-react";
+import { CheckCircle, XCircle } from "lucide-react";
 
-const ViewArticleModal = ({ open, onClose, article }) => {
+const ViewArticleModal = ({ open, onClose, article, loading = false }) => {
   const formatCategory = (category) =>
     category ? category.charAt(0).toUpperCase() + category.slice(1) : "N/A";
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleString("en-PH", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const formatDate = (dateString, includeTime = true) => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    const options = { month: "short", day: "numeric", year: "numeric" };
+    if (includeTime) {
+      options.hour = "2-digit";
+      options.minute = "2-digit";
+    }
+    return date.toLocaleDateString("en-US", options);
   };
+
+  if (loading) {
+    return (
+      <Modal open={open} onClose={onClose} title="View Legal Article" width="max-w-4xl">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#023D7B] mx-auto mb-4"></div>
+            <p className="text-sm text-gray-600">Loading article details...</p>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
 
   if (!article) {
     return (
-      <Modal
-        open={open}
-        onClose={onClose}
-        title="View Legal Article"
-        width="max-w-3xl"
-      >
+      <Modal open={open} onClose={onClose} title="View Legal Article" width="max-w-4xl">
         <div className="flex items-center justify-center h-32">
           <p className="text-sm text-gray-600">Article not found</p>
         </div>
@@ -32,64 +40,124 @@ const ViewArticleModal = ({ open, onClose, article }) => {
     );
   }
 
-  const renderScrollableField = (label, content) => (
-    <div>
-      <label className="block text-xs font-medium text-gray-700 mb-1">
-        {label}
-      </label>
-      <div className="px-2 py-1.5 border rounded-md bg-gray-50 text-xs text-gray-900 whitespace-pre-line max-h-40 overflow-y-auto">
-        {content || "N/A"}
-      </div>
-    </div>
-  );
-
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="View Legal Article"
-      width="max-w-5xl"
-    >
-      {/* Modal body scrollable */}
-      <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-2">
-        {/* Category */}
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
-            Category
-          </label>
-          <div className="px-2 py-1.5 border rounded-md bg-gray-50 text-xs text-gray-900">
-            {formatCategory(article.category)}
+    <Modal open={open} onClose={onClose} title="Legal Article Details" width="max-w-4xl">
+      <div className="space-y-4">
+        {/* Basic Info */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <div className="text-[9px] text-gray-500">Category</div>
+            <div className="text-xs font-medium text-gray-900">
+              {formatCategory(article.category)}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[9px] text-gray-500">Publication Status</div>
+            <div className="flex items-center gap-2">
+              {article.status === "Published" ? (
+                <>
+                  <CheckCircle size={12} className="text-emerald-600" />
+                  <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Published
+                  </span>
+                </>
+              ) : (
+                <>
+                  <XCircle size={12} className="text-gray-500" />
+                  <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-700 border border-gray-200">
+                    Unpublished
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[9px] text-gray-500">Verified By</div>
+            <div className="text-xs font-medium text-gray-900">
+              {article.verifiedBy || "Not yet verified"}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[9px] text-gray-500">Verified At</div>
+            <div className="text-xs font-medium text-gray-900">
+              {article.verifiedAt ? formatDate(article.verifiedAt) : "Not yet verified"}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[9px] text-gray-500">Created At</div>
+            <div className="text-xs font-medium text-gray-900">
+              {formatDate(article.createdAt)}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[9px] text-gray-500">Updated At</div>
+            <div className="text-xs font-medium text-gray-900">
+              {formatDate(article.updatedAt)}
+            </div>
           </div>
         </div>
 
         {/* Titles */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {renderScrollableField("English Title", article.enTitle)}
-          {renderScrollableField("Filipino Title", article.filTitle)}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <div className="text-[9px] text-gray-500">English Title</div>
+            <div className="text-xs font-medium text-gray-900 overflow-y-auto max-h-20">
+              {article.enTitle || "N/A"}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[9px] text-gray-500">Filipino Title</div>
+            <div className="text-xs font-medium text-gray-900 overflow-y-auto max-h-20">
+              {article.filTitle || "N/A"}
+            </div>
+          </div>
         </div>
 
         {/* Descriptions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {renderScrollableField("English Description", article.enDescription)}
-          {renderScrollableField(
-            "Filipino Description",
-            article.filDescription
-          )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <div className="text-[9px] text-gray-500">English Description</div>
+            <div className="text-xs font-medium text-gray-900 overflow-y-auto max-h-28 whitespace-pre-line">
+              {article.enDescription || "N/A"}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[9px] text-gray-500">Filipino Description</div>
+            <div className="text-xs font-medium text-gray-900 overflow-y-auto max-h-28 whitespace-pre-line">
+              {article.filDescription || "N/A"}
+            </div>
+          </div>
         </div>
 
         {/* Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {renderScrollableField("English Content", article.enContent)}
-          {renderScrollableField("Filipino Content", article.filContent)}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <div className="text-[9px] text-gray-500">English Content</div>
+            <div className="text-xs font-medium text-gray-900 overflow-y-auto max-h-40 whitespace-pre-line">
+              {article.enContent || "N/A"}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[9px] text-gray-500">Filipino Content</div>
+            <div className="text-xs font-medium text-gray-900 overflow-y-auto max-h-40 whitespace-pre-line">
+              {article.filContent || "N/A"}
+            </div>
+          </div>
         </div>
 
         {/* Image */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
-            Image
-          </label>
+          <div className="text-[9px] font-medium text-gray-700 mb-1">Image</div>
           {article.image ? (
-            <div className="max-h-60 overflow-y-auto border rounded-md">
+            <div className="border border-gray-200 rounded-md overflow-y-auto max-h-60 bg-gray-50">
               <img
                 src={article.image}
                 alt="Article"
@@ -102,83 +170,17 @@ const ViewArticleModal = ({ open, onClose, article }) => {
                 }}
               />
               <div
-                className="px-2 py-1.5 border rounded-md bg-gray-50 text-xs text-gray-500 italic hidden text-center"
+                className="text-xs text-gray-500 italic hidden text-center py-2 bg-gray-50"
                 style={{ display: "none" }}
               >
                 Image failed to load
               </div>
             </div>
           ) : (
-            <div className="px-2 py-1.5 border rounded-md bg-gray-50 text-xs text-gray-500 italic">
+            <div className="text-xs text-gray-500 italic border border-gray-200 rounded-md p-2 bg-gray-50">
               No image provided
             </div>
           )}
-        </div>
-
-        {/* Status */}
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
-            Publication Status
-          </label>
-          <div className="flex items-center gap-2">
-            {article.status === "Published" ? (
-              <>
-                <CheckCircle size={16} className="text-emerald-600" />
-                <span className="px-2 py-1 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Published
-                </span>
-              </>
-            ) : (
-              <>
-                <XCircle size={16} className="text-gray-500" />
-                <span className="px-2 py-1 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200">
-                  Unpublished
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Metadata */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-2">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Created At
-            </label>
-            <div className="flex items-center gap-1 px-2 py-1.5 border rounded-md bg-gray-50 text-xs text-gray-900">
-              <Calendar size={12} className="text-gray-500" />
-              {formatDate(article.createdAt)}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Updated At
-            </label>
-            <div className="flex items-center gap-1 px-2 py-1.5 border rounded-md bg-gray-50 text-xs text-gray-900">
-              <Calendar size={12} className="text-gray-500" />
-              {formatDate(article.updatedAt)}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Verified By
-            </label>
-            <div className="flex items-center gap-1 px-2 py-1.5 border rounded-md bg-gray-50 text-xs text-gray-900">
-              <UserCheck size={12} className="text-gray-500" />
-              {article.verifiedBy || "Not yet verified"}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Verified At
-            </label>
-            <div className="flex items-center gap-1 px-2 py-1.5 border rounded-md bg-gray-50 text-xs text-gray-900">
-              <Calendar size={12} className="text-gray-500" />
-              {article.verifiedAt
-                ? formatDate(article.verifiedAt)
-                : "Not yet verified"}
-            </div>
-          </div>
         </div>
       </div>
     </Modal>
