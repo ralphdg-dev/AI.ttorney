@@ -57,14 +57,12 @@ const ViewArticleModal = ({ open, onClose, article, loading = false }) => {
             <div className="flex items-center gap-2">
               {article.status === "Published" ? (
                 <>
-                  <CheckCircle size={12} className="text-emerald-600" />
                   <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Published
                   </span>
                 </>
               ) : (
                 <>
-                  <XCircle size={12} className="text-gray-500" />
                   <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-700 border border-gray-200">
                     Unpublished
                   </span>

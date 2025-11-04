@@ -1,14 +1,14 @@
-// routes/legalArticles.js
 const express = require("express");
 const router = express.Router();
 const { supabaseAdmin } = require("../config/supabase");
 const multer = require("multer");
 const upload = multer({ storage: multer.memoryStorage() });
 
-// GET /api/legal-articles — get all articles (excluding soft-deleted)
+// GET /api/legal-articles — get all articles (optional archive filter)
 router.get("/", async (req, res) => {
+  const { archived } = req.query; // archived=true to fetch soft-deleted
   try {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("legal_articles")
       .select(
         `
@@ -30,32 +30,28 @@ router.get("/", async (req, res) => {
         deleted_at
       `
       )
-      .is("deleted_at", null) // Only get non-deleted articles
       .order("created_at", { ascending: false });
 
+    if (archived === "true") {
+      query = query.not("deleted_at", "is", null); // Only soft-deleted
+    } else {
+      query = query.is("deleted_at", null); // Only active
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
 
-    // Function to generate proper Supabase Storage URL
     const getImageUrl = (imagePath) => {
       if (!imagePath) return "";
-
-      // If it's already a full URL, return as is
       if (imagePath.startsWith("http")) return imagePath;
-
-      // If it's a storage path, construct the proper URL
       const bucketName = "legal-articles";
-
-      // Remove any leading slashes and encode the path
       const cleanPath = imagePath.replace(/^\//, "");
       const encodedPath = encodeURIComponent(cleanPath);
-
-      // Construct the Supabase Storage URL
       const supabaseUrl =
         process.env.SUPABASE_URL || "https://vmlbrckrlgwlobhnpstx.supabase.co";
       return `${supabaseUrl}/storage/v1/object/public/${bucketName}/${encodedPath}`;
     };
 
-    // Map is_verified to status for frontend
     const formattedData = data.map((article) => ({
       ...article,
       enTitle: article.title_en,
@@ -79,6 +75,7 @@ router.get("/", async (req, res) => {
   }
 });
 
+// POST /api/legal-articles — add new article
 router.post("/", upload.single("image"), async (req, res) => {
   try {
     const {
@@ -91,7 +88,6 @@ router.post("/", upload.single("image"), async (req, res) => {
       category,
     } = req.body;
 
-    // Step 1: Insert article WITHOUT image first
     const { data: article, error: insertError } = await supabaseAdmin
       .from("legal_articles")
       .insert([
@@ -113,33 +109,28 @@ router.post("/", upload.single("image"), async (req, res) => {
 
     let imagePath = null;
 
-    // Step 2: If image uploaded, store it with ID in filename
     if (req.file) {
       const fileExtension = req.file.originalname.split(".").pop();
       const fileName = `${article.id}_article-image.${fileExtension}`;
       const storagePath = `articles-img/${fileName}`;
 
-      const { data: uploadData, error: uploadError } =
-        await supabaseAdmin.storage
-          .from("legal-articles")
-          .upload(storagePath, req.file.buffer, {
-            contentType: req.file.mimetype,
-            upsert: true,
-          });
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from("legal-articles")
+        .upload(storagePath, req.file.buffer, {
+          contentType: req.file.mimetype,
+          upsert: true,
+        });
 
       if (uploadError) throw uploadError;
       imagePath = storagePath;
 
-      // Step 3: Update article with image path
       const { error: updateError } = await supabaseAdmin
         .from("legal_articles")
         .update({ image_article: imagePath })
         .eq("id", article.id);
-
       if (updateError) throw updateError;
     }
 
-    // Step 4: Construct public URL
     const supabaseUrl =
       process.env.SUPABASE_URL || "https://vmlbrckrlgwlobhnpstx.supabase.co";
     const getImageUrl = (path) =>
@@ -149,7 +140,6 @@ router.post("/", upload.single("image"), async (req, res) => {
           )}`
         : "";
 
-    // Step 5: Return formatted article
     const formattedArticle = {
       ...article,
       enTitle: article.title_en,
@@ -189,7 +179,6 @@ router.put("/:id", upload.single("image"), async (req, res) => {
   } = req.body;
 
   try {
-    // Step 1: Update fields
     const { data: updatedArticle, error: updateError } = await supabaseAdmin
       .from("legal_articles")
       .update({
@@ -207,7 +196,6 @@ router.put("/:id", upload.single("image"), async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // Step 2: If image uploaded, save to storage
     let imagePath = updatedArticle.image_article || null;
     if (req.file) {
       const fileExtension = req.file.originalname.split(".").pop();
@@ -221,15 +209,12 @@ router.put("/:id", upload.single("image"), async (req, res) => {
           upsert: true,
         });
       if (uploadError) throw uploadError;
-
       imagePath = storagePath;
 
-      // Update article with new image path
       const { error: imageUpdateError } = await supabaseAdmin
         .from("legal_articles")
         .update({ image_article: imagePath })
         .eq("id", id);
-
       if (imageUpdateError) throw imageUpdateError;
     }
 
@@ -242,7 +227,6 @@ router.put("/:id", upload.single("image"), async (req, res) => {
           )}`
         : "";
 
-    // Return formatted article
     const formattedArticle = {
       ...updatedArticle,
       enTitle: updatedArticle.title_en,
@@ -271,7 +255,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
 // PATCH /api/legal-articles/:id/publish
 router.patch("/:id/publish", async (req, res) => {
   const { id } = req.params;
-  const { publish } = req.body; // boolean: true = publish, false = unpublish
+  const { publish } = req.body;
 
   try {
     const { data: updatedArticle, error } = await supabaseAdmin
@@ -320,16 +304,14 @@ router.patch("/:id/publish", async (req, res) => {
   }
 });
 
-// PATCH /api/legal-articles/:id/archive — Soft delete
+// PATCH /api/legal-articles/:id/archive
 router.patch("/:id/archive", async (req, res) => {
   const { id } = req.params;
 
   try {
     const { data: updatedArticle, error } = await supabaseAdmin
       .from("legal_articles")
-      .update({
-        deleted_at: new Date().toISOString(),
-      })
+      .update({ deleted_at: new Date().toISOString() })
       .eq("id", id)
       .select()
       .single();
@@ -343,6 +325,33 @@ router.patch("/:id/archive", async (req, res) => {
     });
   } catch (err) {
     console.error("Archive error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: err.message || "Server error" });
+  }
+});
+
+// PATCH /api/legal-articles/:id/restore
+router.patch("/:id/restore", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { data: restoredArticle, error } = await supabaseAdmin
+      .from("legal_articles")
+      .update({ deleted_at: null })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json({
+      success: true,
+      message: "Article restored successfully",
+      data: restoredArticle,
+    });
+  } catch (err) {
+    console.error("Restore error:", err);
     res
       .status(500)
       .json({ success: false, message: err.message || "Server error" });

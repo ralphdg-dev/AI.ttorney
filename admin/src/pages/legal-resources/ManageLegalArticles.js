@@ -50,27 +50,35 @@ const ManageLegalArticles = () => {
 
   const [articles, setArticles] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [showArchives, setShowArchives] = React.useState(false);
 
-  // Fetch articles
-  React.useEffect(() => {
-    const fetchArticles = async () => {
-      try {
-        const res = await fetch("http://localhost:5001/api/legal-articles");
-        const json = await res.json();
-        if (json.success) {
-          setArticles(json.data);
-        } else {
-          console.error("Failed to fetch articles");
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
+  const fetchArticles = async (archives = false) => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `http://localhost:5001/api/legal-articles?archived=${archives}`
+      );
+      const json = await res.json();
+      if (json.success) {
+        setArticles(json.data);
+      } else {
+        console.error("Failed to fetch articles");
       }
-    };
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchArticles();
-  }, []);
+  React.useEffect(() => {
+    fetchArticles(showArchives);
+  }, [showArchives]);
+
+  // Toggle Archives button
+  const toggleArchives = () => {
+    setShowArchives((prev) => !prev);
+  };
 
   // Handle fade-in on modal open
   React.useEffect(() => {
@@ -251,6 +259,7 @@ const ManageLegalArticles = () => {
         >
           <Eye size={12} className="mr-2 text-gray-500" /> View
         </button>
+
         <button
           className="flex items-center w-full px-3 py-1.5 text-gray-700 hover:bg-gray-50"
           onClick={() => {
@@ -262,42 +271,61 @@ const ManageLegalArticles = () => {
           <Pencil size={12} className="mr-2 text-gray-500" /> Edit
         </button>
 
-        {row.status === "Unpublished" ? (
+        {showArchives ? (
           <button
             className="flex items-center w-full px-3 py-1.5 text-emerald-600 hover:bg-emerald-50"
             onClick={() => {
-              setPublishModal({ open: true, article: row });
+              setConfirmationModal({
+                open: true,
+                type: "restore",
+                articleId: row.id,
+                articleTitle: row.enTitle,
+              });
               setOpenMenuId(null);
             }}
           >
-            <Upload size={12} className="mr-2 text-emerald-500" /> Publish
+            <Upload size={12} className="mr-2 text-emerald-500" /> Restore
           </button>
         ) : (
-          <button
-            className="flex items-center w-full px-3 py-1.5 text-gray-600 hover:bg-gray-50"
-            onClick={() => {
-              setPublishModal({ open: true, article: row });
-              setOpenMenuId(null);
-            }}
-          >
-            <Download size={12} className="mr-2 text-gray-500" /> Unpublish
-          </button>
-        )}
+          <>
+            {row.status === "Unpublished" ? (
+              <button
+                className="flex items-center w-full px-3 py-1.5 text-emerald-600 hover:bg-emerald-50"
+                onClick={() => {
+                  setPublishModal({ open: true, article: row });
+                  setOpenMenuId(null);
+                }}
+              >
+                <Upload size={12} className="mr-2 text-emerald-500" /> Publish
+              </button>
+            ) : (
+              <button
+                className="flex items-center w-full px-3 py-1.5 text-gray-600 hover:bg-gray-50"
+                onClick={() => {
+                  setPublishModal({ open: true, article: row });
+                  setOpenMenuId(null);
+                }}
+              >
+                <Download size={12} className="mr-2 text-gray-500" /> Unpublish
+              </button>
+            )}
 
-        <button
-          className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-red-50"
-          onClick={() => {
-            setConfirmationModal({
-              open: true,
-              type: "archive",
-              articleId: row.id,
-              articleTitle: row.enTitle,
-            });
-            setOpenMenuId(null);
-          }}
-        >
-          <Archive size={12} className="mr-2 text-red-500" /> Archive
-        </button>
+            <button
+              className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-red-50"
+              onClick={() => {
+                setConfirmationModal({
+                  open: true,
+                  type: "archive",
+                  articleId: row.id,
+                  articleTitle: row.enTitle,
+                });
+                setOpenMenuId(null);
+              }}
+            >
+              <Archive size={12} className="mr-2 text-red-500" /> Archive
+            </button>
+          </>
+        )}
       </div>,
       document.body
     );
@@ -469,6 +497,13 @@ const ManageLegalArticles = () => {
         >
           Add New
         </button>
+
+        <button
+          onClick={toggleArchives}
+          className="inline-flex items-center gap-1.5  border border-gray-200 text-gray-700 text-[11px] px-3 py-1.5 rounded-md hover:bg-gray-100"
+        >
+          {showArchives ? "Back" : "Archives"}
+        </button>
       </div>
 
       {/* Table */}
@@ -557,21 +592,37 @@ const ManageLegalArticles = () => {
         open={confirmationModal.open}
         onClose={() => setConfirmationModal({ open: false })}
         type={confirmationModal.type}
-        onConfirm={() => {
-          if (confirmationModal.type === "archive") {
-            handleArchive(confirmationModal.articleId);
+        onConfirm={async () => {
+          try {
+            if (confirmationModal.type === "archive") {
+              await handleArchive(confirmationModal.articleId);
+            } else if (confirmationModal.type === "restore") {
+              const res = await fetch(
+                `http://localhost:5001/api/legal-articles/${confirmationModal.articleId}/restore`,
+                { method: "PATCH" }
+              );
+              const json = await res.json();
+              if (json.success) {
+                setArticles((prev) =>
+                  prev.filter((a) => a.id !== confirmationModal.articleId)
+                );
+              } else throw new Error(json.message);
+            }
+          } catch (err) {
+            console.error(err);
+          } finally {
+            setConfirmationModal({ open: false });
           }
-          setConfirmationModal({ open: false });
         }}
         title={
           confirmationModal.type === "archive"
             ? "Archive Article"
-            : "Confirm Action"
+            : "Restore Article"
         }
         message={
           confirmationModal.type === "archive"
             ? `Are you sure you want to archive "${confirmationModal.articleTitle}"? This article will be hidden from the list.`
-            : "Are you sure you want to proceed?"
+            : `Are you sure you want to restore "${confirmationModal.articleTitle}"? This article will be visible in the main list.`
         }
       />
 
