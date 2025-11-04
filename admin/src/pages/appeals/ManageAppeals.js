@@ -42,7 +42,7 @@ const ManageAppeals = () => {
     fetchData();
   }, []);
 
-  // 🔹 Filtering logic
+  // 🔹 Filtering and sorting logic
   React.useEffect(() => {
     let data = [...appeals];
     if (query.trim()) {
@@ -88,37 +88,45 @@ const ManageAppeals = () => {
         <button className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-red-50">
           <XCircle size={12} className="mr-2 text-red-500" /> Reject
         </button>
-        <button className="flex items-center w-full px-3 py-1.5 text-gray-600 hover:bg-gray-50">
-          <Archive size={12} className="mr-2 text-gray-500" /> Archive
-        </button>
-        <button className="flex items-center w-full px-3 py-1.5 text-blue-600 hover:bg-blue-50">
-          <Upload size={12} className="mr-2 text-blue-500" /> Restore
-        </button>
       </div>
     );
   };
 
+  // 🔹 Helper to safely display data or fallback
+  const displayValue = (value) => {
+    if (value === null || value === undefined || value === "") return "N/A";
+    return value;
+  };
+
   const columns = [
-    { key: "user_id", header: "User ID" },
+    { key: "user_full_name", header: "User Name" },
     { key: "suspension_id", header: "Suspension ID" },
+    { key: "suspension_reason", header: "Suspension Reason" },
     { key: "appeal_reason", header: "Appeal Reason" },
     { key: "additional_context", header: "Additional Context" },
     {
       key: "status",
       header: "Status",
-      render: (r) => (
-        <span
-          className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-semibold border ${
-            r.status === "Approved"
-              ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-              : r.status === "Rejected"
-              ? "bg-red-50 border-red-200 text-red-600"
-              : "bg-yellow-50 border-yellow-200 text-yellow-700"
-          }`}
-        >
-          {r.status}
-        </span>
-      ),
+      render: (r) => {
+        const statusRaw = r.status || "pending";
+        const status =
+          statusRaw.charAt(0).toUpperCase() + statusRaw.slice(1).toLowerCase();
+
+        let badgeStyle = "bg-yellow-50 border-yellow-200 text-yellow-700"; // default pending
+
+        if (status === "Approved")
+          badgeStyle = "bg-emerald-50 border-emerald-200 text-emerald-700";
+        else if (status === "Rejected")
+          badgeStyle = "bg-red-50 border-red-200 text-red-600";
+
+        return (
+          <span
+            className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-semibold border ${badgeStyle}`}
+          >
+            {status}
+          </span>
+        );
+      },
     },
     { key: "reviewed_by", header: "Reviewed By" },
     { key: "reviewed_at", header: "Reviewed At" },
@@ -231,7 +239,9 @@ const ManageAppeals = () => {
                               : ""
                           }`}
                         >
-                          {col.render ? col.render(row) : row[col.key]}
+                          {col.render
+                            ? col.render(row)
+                            : displayValue(row[col.key])}
                         </td>
                       ))}
                     </tr>
