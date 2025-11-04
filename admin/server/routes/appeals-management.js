@@ -1,5 +1,4 @@
 const express = require("express");
-const { authenticateAdmin } = require("../middleware/auth");
 const { supabaseAdmin } = require("../config/supabase");
 
 const router = express.Router();
@@ -102,7 +101,7 @@ router.get("/", async (req, res) => {
  * Fetch single appeal joined with user's name
  * ================================
  */
-router.get("/:id", authenticateAdmin, async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -144,7 +143,7 @@ router.get("/:id", authenticateAdmin, async (req, res) => {
  * Update appeal status or admin notes
  * ================================
  */
-router.patch("/:id", authenticateAdmin, async (req, res) => {
+router.patch("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { status, reviewed_by, reviewed_at, admin_notes, rejection_reason } =
@@ -205,7 +204,7 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
  * Delete appeal
  * ================================
  */
-router.delete("/:id", authenticateAdmin, async (req, res) => {
+router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 

@@ -11,6 +11,7 @@ import {
 import Tooltip from "../../components/ui/Tooltip";
 import ListToolbar from "../../components/ui/ListToolbar";
 import Pagination from "../../components/ui/Pagination";
+import ViewAppealModal from "../../components/appeals/ViewAppealModal";
 
 const ManageAppeals = () => {
   const [appeals, setAppeals] = React.useState([]);
@@ -20,6 +21,8 @@ const ManageAppeals = () => {
   const [filteredData, setFilteredData] = React.useState([]);
   const [openMenuId, setOpenMenuId] = React.useState(null);
   const [dropdownPosition, setDropdownPosition] = React.useState(null);
+  const [viewModalOpen, setViewModalOpen] = React.useState(false);
+  const [selectedAppeal, setSelectedAppeal] = React.useState(null);
 
   // 🔹 Fetch data from Supabase API
   React.useEffect(() => {
@@ -68,6 +71,41 @@ const ManageAppeals = () => {
     setOpenMenuId(id);
   };
 
+  // 🔹 Approve or reject appeal
+  const handleUpdateStatus = async (id, newStatus) => {
+    try {
+      const res = await fetch(
+        `http://localhost:5001/api/appeals-management/${id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`, // if auth required
+          },
+          body: JSON.stringify({
+            status: newStatus,
+            reviewed_at: new Date().toISOString(),
+          }),
+        }
+      );
+
+      const json = await res.json();
+
+      if (json.success) {
+        // ✅ Update UI instantly
+        setAppeals((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a))
+        );
+      } else {
+        console.error("Failed to update:", json.error);
+        alert("Failed to update appeal status.");
+      }
+    } catch (error) {
+      console.error("Error updating status:", error);
+      alert("An error occurred while updating status.");
+    }
+  };
+
   const renderDropdown = (row) => {
     if (openMenuId !== row.id) return null;
     return (
@@ -79,13 +117,34 @@ const ManageAppeals = () => {
           left: dropdownPosition?.left ?? 0,
         }}
       >
-        <button className="flex items-center w-full px-3 py-1.5 text-gray-700 hover:bg-gray-50">
+        <button
+          onClick={() => {
+            setSelectedAppeal(row);
+            setViewModalOpen(true);
+            setOpenMenuId(null);
+          }}
+          className="flex items-center w-full px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+        >
           <Eye size={12} className="mr-2 text-gray-500" /> View
         </button>
-        <button className="flex items-center w-full px-3 py-1.5 text-emerald-600 hover:bg-emerald-50">
+
+        <button
+          onClick={() => {
+            handleUpdateStatus(row.id, "approved");
+            setOpenMenuId(null);
+          }}
+          className="flex items-center w-full px-3 py-1.5 text-emerald-600 hover:bg-emerald-50"
+        >
           <CheckCircle size={12} className="mr-2 text-emerald-500" /> Approve
         </button>
-        <button className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-red-50">
+
+        <button
+          onClick={() => {
+            handleUpdateStatus(row.id, "rejected");
+            setOpenMenuId(null);
+          }}
+          className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-red-50"
+        >
           <XCircle size={12} className="mr-2 text-red-500" /> Reject
         </button>
       </div>
@@ -252,6 +311,11 @@ const ManageAppeals = () => {
           </div>
         )}
       </div>
+      <ViewAppealModal
+        open={viewModalOpen}
+        onClose={() => setViewModalOpen(false)}
+        appeal={selectedAppeal}
+      />
 
       <Pagination
         currentPage={1}
