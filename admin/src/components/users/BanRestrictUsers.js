@@ -1,27 +1,26 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import ReactDOM from "react-dom";
-import {
-  Search,
-  Shield,
-  Ban,
-  Clock,
-  User,
-  Calendar,
-  AlertTriangle,
-  Plus,
-  Minus,
-  Eye,
+import Modal from '../ui/Modal';
+import Tooltip from '../ui/Tooltip';
+import { 
+  User, 
+  MoreVertical, 
+  ChevronLeft, 
+  ChevronRight, 
+  Plus, 
+  Eye, 
+  Clock, 
+  Ban, 
+  AlertTriangle, 
   History,
-  MoreVertical,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
+  Calendar,
+  Minus,
+  Shield
 } from "lucide-react";
 import usersService from "../../services/usersService";
 import adminModerationService from "../../services/adminModerationService";
 import DataTable from "../ui/DataTable";
 import Pagination from "../ui/Pagination";
-import Tooltip from "../ui/Tooltip";
 import ListToolbar from "../ui/ListToolbar";
 
 const BanRestrictUsers = () => {
@@ -1241,114 +1240,80 @@ const BanRestrictUsers = () => {
       )}
 
       {/* User Details Modal */}
-      {showUserDetailsModal &&
-        selectedUser &&
-        ReactDOM.createPortal(
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-            <div className="bg-white rounded-md shadow-lg border p-5 mx-4 max-h-[90vh] overflow-y-auto" style={{ width: '600px' }}>
-              <div className="mt-3">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-medium text-gray-900">
-                    User Details
-                  </h3>
-                  <button
-                    onClick={() => setShowUserDetailsModal(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* User Basic Info - Enhanced Layout */}
-                <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                  <div className="grid grid-cols-2 gap-6">
-                    {/* Left Column */}
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Full Name
-                        </label>
-                        <div className="text-sm font-medium text-gray-900">
-                          {selectedUser.full_name || 'N/A'}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Current Strikes
-                        </label>
-                        <div className="text-sm text-gray-900">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            (selectedUser.strike_count || 0) === 0 
-                              ? 'bg-green-100 text-green-800'
-                              : (selectedUser.strike_count || 0) < 3
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {selectedUser.strike_count || 0} strikes
-                          </span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Account Status
-                        </label>
-                        <div className="mt-1">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                            selectedUser.account_status === 'active'
-                              ? 'bg-green-100 text-green-800 border border-green-200'
-                              : selectedUser.account_status === 'suspended'
-                              ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                              : selectedUser.account_status === 'banned'
-                              ? 'bg-red-100 text-red-800 border border-red-200'
-                              : 'bg-gray-100 text-gray-800 border border-gray-200'
-                          }`}>
-                            {(selectedUser.account_status || 'unknown').charAt(0).toUpperCase() + (selectedUser.account_status || 'unknown').slice(1)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right Column */}
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Email Address
-                        </label>
-                        <div className="text-sm text-gray-900 font-mono bg-white px-2 py-1 rounded border">
-                          {selectedUser.email}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Total Suspensions
-                        </label>
-                        <div className="text-sm text-gray-900">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            (selectedUser.suspension_count || 0) === 0 
-                              ? 'bg-green-100 text-green-800'
-                              : (selectedUser.suspension_count || 0) < 3
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {selectedUser.suspension_count || 0} suspensions
-                          </span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Last Login
-                        </label>
-                        <div className="text-sm text-gray-900">
-                          {selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never logged in'}
-                        </div>
-                      </div>
+      <Modal 
+        open={showUserDetailsModal} 
+        onClose={() => setShowUserDetailsModal(false)} 
+        title="User Details" 
+        width="max-w-4xl"
+      >
+          {selectedUser && (
+            <div className="space-y-4">
+              {/* Account Information */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Account Information</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <div className="text-[9px] text-gray-500">Full Name</div>
+                    <div className="text-xs font-medium text-gray-900">{selectedUser.full_name || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-gray-500">Email</div>
+                    <div className="text-xs font-medium text-gray-900">{selectedUser.email || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-gray-500">Username</div>
+                    <div className="text-xs font-medium text-gray-900">{selectedUser.username || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-gray-500">Current Strikes</div>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        (selectedUser.strike_count || 0) === 0 
+                          ? 'bg-green-50 text-green-700 border border-green-200'
+                          : (selectedUser.strike_count || 0) < 3
+                          ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                          : 'bg-red-50 text-red-700 border border-red-200'
+                      }`}>
+                        {selectedUser.strike_count || 0} strikes
+                      </span>
                     </div>
                   </div>
+                  <div>
+                    <div className="text-[9px] text-gray-500">Total Suspensions</div>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        (selectedUser.suspension_count || 0) === 0 
+                          ? 'bg-green-50 text-green-700 border border-green-200'
+                          : (selectedUser.suspension_count || 0) < 3
+                          ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                          : 'bg-red-50 text-red-700 border border-red-200'
+                      }`}>
+                        {selectedUser.suspension_count || 0} suspensions
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-gray-500">Account Status</div>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        selectedUser.account_status === 'active'
+                          ? 'bg-green-50 text-green-700 border border-green-200'
+                          : selectedUser.account_status === 'suspended'
+                          ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                          : selectedUser.account_status === 'banned'
+                          ? 'bg-red-50 text-red-700 border border-red-200'
+                          : 'bg-gray-50 text-gray-700 border border-gray-200'
+                      }`}>
+                        {(selectedUser.account_status || 'unknown').charAt(0).toUpperCase() + (selectedUser.account_status || 'unknown').slice(1)}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-gray-500">Last Login</div>
+                    <div className="text-xs text-gray-700">{selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never logged in'}</div>
+                  </div>
                 </div>
+              </div>
 
                 {/* Admin History & Audit Trail Section */}
                 <div className="border-t border-gray-200 pt-4">
@@ -1365,27 +1330,31 @@ const BanRestrictUsers = () => {
                         </div>
 
                         {userViolations.length > 0 ? (
-                          <div className="border border-gray-200 rounded-lg overflow-hidden">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                    Action
-                                  </th>
-                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                    Date
-                                  </th>
-                                  <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                                    Details
-                                  </th>
-                                </tr>
-                              </thead>
-                            </table>
-                            <div className="max-h-32 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                              <table className="min-w-full">
+                          <div className="overflow-hidden border border-gray-200 rounded-lg">
+                            <div className="max-h-32 overflow-y-auto">
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50 sticky top-0">
+                                  <tr>
+                                    <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                      Action
+                                    </th>
+                                    <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                      Date
+                                    </th>
+                                    <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                      Details
+                                    </th>
+                                    <th className="px-2 py-1.5 text-right text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                                      Actions
+                                    </th>
+                                  </tr>
+                                </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                   {userViolations.map((violation) => (
-                                    <tr key={violation.id} className="hover:bg-gray-50">
+                                    <tr key={violation.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => {
+                                      setSelectedViolation(violation);
+                                      setShowViolationModal(true);
+                                    }}>
                                       <td className="px-2 py-1.5">
                                         <div className="text-[9px] font-medium text-gray-900">
                                           {violation.action_taken.replace('_', ' ')}
@@ -1395,16 +1364,23 @@ const BanRestrictUsers = () => {
                                         {formatDate(violation.created_at)}
                                       </td>
                                       <td className="px-2 py-1.5 max-w-32">
-                                        <div
-                                          onClick={() => {
-                                            setSelectedViolation(violation);
-                                            setShowViolationModal(true);
-                                          }}
-                                          className="text-[9px] text-gray-700 hover:text-gray-900 hover:bg-gray-100 cursor-pointer p-1 rounded truncate"
-                                          title="Click to view full details"
-                                        >
+                                        <div className="text-[9px] text-gray-700 truncate" title={violation.violation_summary || violation.violation_type.replace('_', ' ')}>
                                           {violation.violation_summary || violation.violation_type.replace('_', ' ')}
                                         </div>
+                                      </td>
+                                      <td className="px-2 py-1.5 text-right">
+                                        <Tooltip content="View Details">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedViolation(violation);
+                                              setShowViolationModal(true);
+                                            }}
+                                            className="p-1 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-800"
+                                          >
+                                            <Eye size={12} />
+                                          </button>
+                                        </Tooltip>
                                       </td>
                                     </tr>
                                   ))}
@@ -1491,96 +1467,81 @@ const BanRestrictUsers = () => {
                       </div>
                     </div>
                 </div>
-
-                <div className="flex justify-end pt-6 mt-6 border-t border-gray-200">
-                  <button
-                    onClick={() => setShowUserDetailsModal(false)}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
             </div>
-          </div>,
-          document.body
-        )}
+          )}
+      </Modal>
 
       {/* Violation Details Modal */}
-      {showViolationModal && selectedViolation && ReactDOM.createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
-          <div className="bg-white rounded-lg shadow-xl border p-6 mx-4 max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-gray-900">
-                Violation Details
-              </h3>
-              <button
-                onClick={() => setShowViolationModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                ✕
-              </button>
+      <Modal
+        open={showViolationModal}
+        onClose={() => setShowViolationModal(false)}
+        title="Violation Details"
+        width="max-w-2xl"
+      >
+        {selectedViolation && (
+          <div className="space-y-4">
+            {/* Violation Header */}
+            <div className="border-b border-gray-200 pb-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-900">
+                  {selectedViolation.action_taken.replace('_', ' ')}
+                </h3>
+                <span className="text-xs text-gray-500">
+                  {formatDate(selectedViolation.created_at)}
+                </span>
+              </div>
             </div>
 
-            <div className="space-y-3">
+            {/* Violation Details */}
+            <div className="grid grid-cols-1 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Action Taken
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Action Type
                 </label>
-                <div className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
+                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
                   {selectedViolation.action_taken.replace('_', ' ')}
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Date & Time
-                </label>
-                <div className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                  {formatDate(selectedViolation.created_at)}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 mb-2">
                   Violation Type
                 </label>
-                <div className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
+                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
                   {selectedViolation.violation_type.replace('_', ' ')}
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 mb-2">
                   Summary
                 </label>
-                <div className="text-sm text-gray-900 bg-gray-50 p-2 rounded min-h-[60px]">
+                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
                   {selectedViolation.violation_summary || 'No summary available'}
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 mb-2">
                   Admin
                 </label>
-                <div className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
+                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
                   {selectedViolation.admin_name || 'System'}
                 </div>
               </div>
-            </div>
 
-            <div className="flex justify-end pt-4 border-t border-gray-200 mt-4">
-              <button
-                onClick={() => setShowViolationModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
-              >
-                Close
-              </button>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Timestamp
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
+                  {formatDate(selectedViolation.created_at, true)}
+                </div>
+              </div>
             </div>
           </div>
-        </div>,
-        document.body
-      )}
+        )}
+      </Modal>
     </div>
   );
 };
