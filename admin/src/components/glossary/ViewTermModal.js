@@ -115,6 +115,9 @@ const ViewTermModal = ({ open, onClose, term, loading = false }) => {
             {term.is_verified ? (
               <>
                 <CheckCircle size={16} className="text-emerald-600" />
+                {term.verified_by && (
+                  <span className="text-xs text-gray-700 font-medium">{term.verified_by}</span>
+                )}
                 <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Verified
                 </span>
