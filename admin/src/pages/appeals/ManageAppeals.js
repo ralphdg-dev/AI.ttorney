@@ -12,10 +12,15 @@ import Tooltip from "../../components/ui/Tooltip";
 import ListToolbar from "../../components/ui/ListToolbar";
 import Pagination from "../../components/ui/Pagination";
 import ViewAppealModal from "../../components/appeals/ViewAppealModal";
+import ActionAppealModal from "../../components/appeals/ActionAppealModal";
+import SuccessModal from "../../components/appeals/SuccessModal";
 
 const ManageAppeals = () => {
   const [appeals, setAppeals] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [actionModalOpen, setActionModalOpen] = React.useState(false);
+  const [actionType, setActionType] = React.useState(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [sortBy, setSortBy] = React.useState("Newest");
   const [filteredData, setFilteredData] = React.useState([]);
@@ -23,6 +28,9 @@ const ManageAppeals = () => {
   const [dropdownPosition, setDropdownPosition] = React.useState(null);
   const [viewModalOpen, setViewModalOpen] = React.useState(false);
   const [selectedAppeal, setSelectedAppeal] = React.useState(null);
+  const [successModalOpen, setSuccessModalOpen] = React.useState(false);
+  const [successMessage, setSuccessMessage] = React.useState("");
+  const [successType, setSuccessType] = React.useState("success");
 
   // 🔹 Fetch data from Supabase API
   React.useEffect(() => {
@@ -71,20 +79,22 @@ const ManageAppeals = () => {
     setOpenMenuId(id);
   };
 
-  // 🔹 Approve or reject appeal
-  const handleUpdateStatus = async (id, newStatus) => {
+  const handleUpdateStatus = async (id, newStatus, extraData) => {
     try {
+      setActionLoading(true);
+
       const res = await fetch(
         `http://localhost:5001/api/appeals-management/${id}`,
         {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`, // if auth required
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({
             status: newStatus,
             reviewed_at: new Date().toISOString(),
+            ...extraData,
           }),
         }
       );
@@ -92,22 +102,37 @@ const ManageAppeals = () => {
       const json = await res.json();
 
       if (json.success) {
-        // ✅ Update UI instantly
         setAppeals((prev) =>
-          prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a))
+          prev.map((a) => (a.id === id ? { ...a, ...json.data } : a))
         );
+        setActionModalOpen(false);
+
+        setSuccessType("success");
+        setSuccessMessage(`Appeal ${newStatus} successfully.`);
+        setSuccessModalOpen(true);
       } else {
-        console.error("Failed to update:", json.error);
-        alert("Failed to update appeal status.");
+        setSuccessType("error");
+        setSuccessMessage("Failed to update appeal.");
+        setSuccessModalOpen(true);
       }
     } catch (error) {
       console.error("Error updating status:", error);
-      alert("An error occurred while updating status.");
+      setSuccessType("error");
+      setSuccessMessage("Error updating appeal status.");
+      setSuccessModalOpen(true);
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const renderDropdown = (row) => {
     if (openMenuId !== row.id) return null;
+
+    // ✅ Only show Approve/Reject if status is NOT approved/rejected
+    const isFinalized =
+      row.status?.toLowerCase() === "approved" ||
+      row.status?.toLowerCase() === "rejected";
+
     return (
       <div
         className="absolute z-50 bg-white border border-gray-200 rounded-md shadow-md w-36 text-[11px]"
@@ -128,25 +153,35 @@ const ManageAppeals = () => {
           <Eye size={12} className="mr-2 text-gray-500" /> View
         </button>
 
-        <button
-          onClick={() => {
-            handleUpdateStatus(row.id, "approved");
-            setOpenMenuId(null);
-          }}
-          className="flex items-center w-full px-3 py-1.5 text-emerald-600 hover:bg-emerald-50"
-        >
-          <CheckCircle size={12} className="mr-2 text-emerald-500" /> Approve
-        </button>
+        {/* ✅ Only render if status is pending */}
+        {!isFinalized && (
+          <>
+            <button
+              onClick={() => {
+                setSelectedAppeal(row);
+                setActionType("approved");
+                setActionModalOpen(true);
+                setOpenMenuId(null);
+              }}
+              className="flex items-center w-full px-3 py-1.5 text-emerald-600 hover:bg-emerald-50"
+            >
+              <CheckCircle size={12} className="mr-2 text-emerald-500" />{" "}
+              Approve
+            </button>
 
-        <button
-          onClick={() => {
-            handleUpdateStatus(row.id, "rejected");
-            setOpenMenuId(null);
-          }}
-          className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-red-50"
-        >
-          <XCircle size={12} className="mr-2 text-red-500" /> Reject
-        </button>
+            <button
+              onClick={() => {
+                setSelectedAppeal(row);
+                setActionType("rejected");
+                setActionModalOpen(true);
+                setOpenMenuId(null);
+              }}
+              className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-red-50"
+            >
+              <XCircle size={12} className="mr-2 text-red-500" /> Reject
+            </button>
+          </>
+        )}
       </div>
     );
   };
@@ -315,6 +350,24 @@ const ManageAppeals = () => {
         open={viewModalOpen}
         onClose={() => setViewModalOpen(false)}
         appeal={selectedAppeal}
+      />
+
+      <ActionAppealModal
+        open={actionModalOpen}
+        onClose={() => setActionModalOpen(false)}
+        type={actionType}
+        appeal={selectedAppeal}
+        loading={actionLoading}
+        onSubmit={(formData) =>
+          handleUpdateStatus(selectedAppeal.id, actionType, formData)
+        }
+      />
+
+      <SuccessModal
+        open={successModalOpen}
+        onClose={() => setSuccessModalOpen(false)}
+        message={successMessage}
+        type={successType}
       />
 
       <Pagination
