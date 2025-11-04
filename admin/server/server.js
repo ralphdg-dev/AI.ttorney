@@ -14,6 +14,7 @@ const auditLogsRoutes = require('./routes/audit-logs');
 const glossaryTermsRoutes = require('./routes/glossary-terms');
 const forumManagementRoutes = require('./routes/forum-management');
 const adminModerationRoutes = require('./routes/admin-moderation');
+const manageAppeals = require('./routes/appeals-management')
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -124,6 +125,8 @@ app.use('/api/audit-logs', auditLogsRoutes);
 app.use('/api/glossary-terms', glossaryTermsRoutes);
 app.use('/api/forum', forumManagementRoutes);
 app.use('/api/admin/moderation', adminModerationRoutes);
+app.use('/api/appeals-management', manageAppeals);
+
 
 // 404 handler
 app.use('*', (req, res) => {
