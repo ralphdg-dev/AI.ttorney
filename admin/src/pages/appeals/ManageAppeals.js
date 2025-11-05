@@ -14,6 +14,7 @@ import Pagination from "../../components/ui/Pagination";
 import ViewAppealModal from "../../components/appeals/ViewAppealModal";
 import ActionAppealModal from "../../components/appeals/ActionAppealModal";
 import SuccessModal from "../../components/appeals/SuccessModal";
+import { format } from "date-fns";
 
 const ManageAppeals = () => {
   const [appeals, setAppeals] = React.useState([]);
@@ -223,7 +224,18 @@ const ManageAppeals = () => {
       },
     },
     { key: "reviewed_by", header: "Reviewed By" },
-    { key: "reviewed_at", header: "Reviewed At" },
+    {
+      key: "reviewed_at",
+      header: "Reviewed At",
+      render: (row) => {
+        if (!row.reviewed_at) return "N/A";
+        try {
+          return format(new Date(row.reviewed_at), "MMM d, yyyy");
+        } catch (err) {
+          return row.reviewed_at;
+        }
+      },
+    },
     { key: "admin_notes", header: "Admin Notes" },
     { key: "rejection_reason", header: "Rejection Reason" },
     {
