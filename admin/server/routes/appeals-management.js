@@ -1,5 +1,6 @@
 const express = require("express");
 const { supabaseAdmin } = require("../config/supabase");
+const { authenticateAdmin } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -15,7 +16,6 @@ router.get("/", async (req, res) => {
 
     const offset = (page - 1) * limit;
 
-    // ✅ Explicitly join using the correct foreign key
     const { data: appeals, error: appealsError } = await supabaseAdmin
       .from("suspension_appeals")
       .select(
@@ -28,6 +28,10 @@ router.get("/", async (req, res) => {
     suspension:user_suspensions!suspension_appeals_suspension_id_fkey (
       id,
       reason
+    ),
+    reviewer:admin!suspension_appeals_reviewed_by_fkey1 (
+      id,
+      full_name
     )
   `
       )
@@ -52,11 +56,11 @@ router.get("/", async (req, res) => {
         .json({ success: false, error: countError.message });
     }
 
-    // 🔹 Map data
     let formatted = (appeals || []).map((a) => ({
       ...a,
       user_full_name: a.user?.full_name || "Unknown User",
       suspension_reason: a.suspension?.reason || "No reason specified",
+      reviewed_by: a.reviewer?.full_name || "N/A",
     }));
 
     // 🔹 Filtering
@@ -109,26 +113,27 @@ router.get("/:id", async (req, res) => {
       .from("suspension_appeals")
       .select(
         `
-        *,
-        user:users!suspension_appeals_user_id_fkey (
-          id,
-          full_name
-        )
-      `
+    *,
+    user:users!suspension_appeals_user_id_fkey (
+      id,
+      full_name
+    ),
+    reviewer:admin!suspension_appeals_reviewed_by_fkey1 (
+      id,
+      full_name
+    )
+  `
       )
       .eq("id", id)
       .single();
 
     if (error) {
-      if (error.code === "PGRST116") {
-        return res
-          .status(404)
-          .json({ success: false, error: "Appeal not found" });
-      }
-      throw error;
+      console.error("Error fetching appeal:", error);
+      return res.status(500).json({ success: false, error: error.message });
     }
 
     data.user_full_name = data.user?.full_name || "Unknown User";
+    data.reviewed_by = data.reviewer?.full_name || "N/A";
 
     res.json({ success: true, data });
   } catch (error) {
@@ -143,11 +148,10 @@ router.get("/:id", async (req, res) => {
  * Update appeal status or admin notes
  * ================================
  */
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, reviewed_by, reviewed_at, admin_notes, rejection_reason } =
-      req.body;
+    const { status, admin_notes, rejection_reason } = req.body;
 
     const { data: existing, error: fetchError } = await supabaseAdmin
       .from("suspension_appeals")
@@ -166,13 +170,11 @@ router.patch("/:id", async (req, res) => {
 
     const updateData = {
       updated_at: new Date().toISOString(),
+      reviewed_by: req.admin.id, // ✅ automatically set admin ID
+      reviewed_at: new Date().toISOString(),
     };
 
     if (status !== undefined) updateData.status = status.toLowerCase();
-    if (reviewed_by !== undefined)
-      updateData.reviewed_by = reviewed_by?.trim() || null;
-    if (reviewed_at !== undefined)
-      updateData.reviewed_at = reviewed_at || new Date().toISOString();
     if (admin_notes !== undefined)
       updateData.admin_notes = admin_notes?.trim() || null;
     if (rejection_reason !== undefined)
