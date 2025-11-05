@@ -2,11 +2,12 @@ const express = require("express");
 const router = express.Router();
 const { supabaseAdmin } = require("../config/supabase");
 const multer = require("multer");
+const { authenticateAdmin } = require("../middleware/auth");
 const upload = multer({ storage: multer.memoryStorage() });
 
-// GET /api/legal-articles — get all articles (optional archive filter)
+// GET /api/legal-articles — get all articles with admin full_name
 router.get("/", async (req, res) => {
-  const { archived } = req.query; // archived=true to fetch soft-deleted
+  const { archived } = req.query;
   try {
     let query = supabaseAdmin
       .from("legal_articles")
@@ -27,15 +28,18 @@ router.get("/", async (req, res) => {
         verified_by,
         verified_at,
         is_verified,
-        deleted_at
+        deleted_at,
+        admin:verified_by (
+          full_name
+        )
       `
       )
       .order("created_at", { ascending: false });
 
     if (archived === "true") {
-      query = query.not("deleted_at", "is", null); // Only soft-deleted
+      query = query.not("deleted_at", "is", null);
     } else {
-      query = query.is("deleted_at", null); // Only active
+      query = query.is("deleted_at", null);
     }
 
     const { data, error } = await query;
@@ -65,6 +69,7 @@ router.get("/", async (req, res) => {
       updatedAt: article.updated_at,
       verifiedAt: article.verified_at,
       verifiedBy: article.verified_by,
+      verifiedByName: article.admin?.full_name || null,
       status: article.is_verified ? "Published" : "Unpublished",
     }));
 
@@ -153,6 +158,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       updatedAt: article.updated_at,
       verifiedAt: article.verified_at,
       verifiedBy: article.verified_by,
+      verifiedByName: null,
       status: article.is_verified ? "Published" : "Unpublished",
     };
 
@@ -240,6 +246,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       updatedAt: updatedArticle.updated_at,
       verifiedAt: updatedArticle.verified_at,
       verifiedBy: updatedArticle.verified_by,
+      verifiedByName: null,
       status: updatedArticle.is_verified ? "Published" : "Unpublished",
     };
 
@@ -252,20 +259,32 @@ router.put("/:id", upload.single("image"), async (req, res) => {
   }
 });
 
-// PATCH /api/legal-articles/:id/publish
-router.patch("/:id/publish", async (req, res) => {
+// PATCH /api/legal-articles/:id/publish - NOW WITH AUTH
+router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
   const { id } = req.params;
   const { publish } = req.body;
+  const adminId = req.admin.id; // Get logged-in admin ID from middleware
 
   try {
+    // Prepare update data
+    const updateData = {
+      is_verified: publish,
+      verified_at: publish ? new Date().toISOString() : null,
+      verified_by: publish ? adminId : null, // Set verified_by to admin ID
+    };
+
     const { data: updatedArticle, error } = await supabaseAdmin
       .from("legal_articles")
-      .update({
-        is_verified: publish,
-        verified_at: publish ? new Date().toISOString() : null,
-      })
+      .update(updateData)
       .eq("id", id)
-      .select()
+      .select(
+        `
+        *,
+        admin:verified_by (
+          full_name
+        )
+      `
+      )
       .single();
 
     if (error) throw error;
@@ -292,6 +311,7 @@ router.patch("/:id/publish", async (req, res) => {
       updatedAt: updatedArticle.updated_at,
       verifiedAt: updatedArticle.verified_at,
       verifiedBy: updatedArticle.verified_by,
+      verifiedByName: updatedArticle.admin?.full_name || null,
       status: updatedArticle.is_verified ? "Published" : "Unpublished",
     };
 
@@ -309,7 +329,6 @@ router.patch("/:id/archive", async (req, res) => {
   const { id } = req.params;
 
   try {
-    // Fetch current article
     const { data: article, error: fetchError } = await supabaseAdmin
       .from("legal_articles")
       .select("*")
@@ -319,11 +338,11 @@ router.patch("/:id/archive", async (req, res) => {
     if (fetchError || !article)
       throw fetchError || new Error("Article not found");
 
-    // If article is published, unpublish it
     let updateData = { deleted_at: new Date().toISOString() };
     if (article.is_verified) {
       updateData.is_verified = false;
       updateData.verified_at = null;
+      updateData.verified_by = null;
     }
 
     const { data: updatedArticle, error: updateError } = await supabaseAdmin

@@ -1,3 +1,5 @@
+//ViewArticleModal.js
+
 import React from "react";
 import Modal from "../ui/Modal";
 import { CheckCircle, XCircle } from "lucide-react";
@@ -91,7 +93,7 @@ const ViewArticleModal = ({ open, onClose, article, loading = false }) => {
             <div>
               <div className="text-[9px] text-gray-500">Verified By</div>
               <div className="text-xs font-medium text-gray-900">
-                {article.verifiedBy || "Not yet verified"}
+                {article.verifiedByName || "Not yet verified"}
               </div>
             </div>
 

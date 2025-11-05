@@ -1,3 +1,5 @@
+// ManageLegalArticles.js
+
 import React from "react";
 import ReactDOM from "react-dom";
 import {
@@ -51,6 +53,18 @@ const ManageLegalArticles = () => {
   const [articles, setArticles] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [showArchives, setShowArchives] = React.useState(false);
+
+  // Get auth token from localStorage
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("admin_token");
+    if (token) {
+      return {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+    }
+    return { "Content-Type": "application/json" };
+  };
 
   const fetchArticles = async (archives = false) => {
     setLoading(true);
@@ -648,7 +662,7 @@ const ManageLegalArticles = () => {
               `http://localhost:5001/api/legal-articles/${articleId}/publish`,
               {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({ publish }),
               }
             );
