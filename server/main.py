@@ -164,6 +164,10 @@ app.include_router(admin_appeals_router)
 from routes.user_favorites import router as user_favorites_router
 app.include_router(user_favorites_router)
 
+# Import and include notifications routes
+from routes.notifications import router as notifications_router
+app.include_router(notifications_router)
+
 @app.get("/")
 async def root():
     """Health check endpoint"""

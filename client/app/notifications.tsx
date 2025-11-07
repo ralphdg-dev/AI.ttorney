@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { View, FlatList, Pressable, StatusBar } from "react-native";
+import { View, FlatList, Pressable, StatusBar, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import Header from "@/components/Header";
@@ -12,47 +12,17 @@ import { SidebarWrapper } from "@/components/AppSidebar";
 import Colors from "@/constants/Colors";
 import { Bell, MessageSquare, Calendar, CheckCircle, ChevronRight, ChevronDown } from "lucide-react-native";
 import DropdownMenu from "@/components/common/DropdownMenu";
-
-type NotificationItem = {
-  id: string;
-  title: string;
-  body: string;
-  createdAt: string; // ISO or human-readable
-  type: "consultation" | "reply" | "system";
-  unread?: boolean;
-};
+import { useNotifications } from "@/contexts/NotificationContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { LawyerNavbar } from "@/components/lawyer/shared";
 
 export default function NotificationsScreen() {
-  const [notifications, setNotifications] = useState<NotificationItem[]>(
-    () => [
-      {
-        id: "n1",
-        title: "Consultation Approved",
-        body: "Your consultation booking for Atty. Joaquin has been approved for Sep 20, 3:00 PM.",
-        createdAt: "2h ago",
-        type: "consultation",
-        unread: true,
-      },
-      {
-        id: "n2",
-        title: "New Reply",
-        body: "Atty. Dela Cruz replied to your post in Legal Q&A.",
-        createdAt: "5h ago",
-        type: "reply",
-        unread: true,
-      },
-      {
-        id: "n3",
-        title: "System Update",
-        body: "We added new Family Law guides to help you navigate annulment and custody.",
-        createdAt: "Yesterday",
-        type: "system",
-        unread: false,
-      },
-    ]
-  );
+  const { user } = useAuth();
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead, fetchNotifications } = useNotifications();
 
-  const unreadCount = useMemo(() => notifications.filter(n => n.unread).length, [notifications]);
+  React.useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   // Inbox filter state
   const [inboxFilter, setInboxFilter] = useState<"all" | "unread" | "read">("all");
@@ -61,60 +31,75 @@ export default function NotificationsScreen() {
   const filteredNotifications = useMemo(() => {
     switch (inboxFilter) {
       case "unread":
-        return notifications.filter(n => n.unread);
+        return notifications.filter(n => !n.read);
       case "read":
-        return notifications.filter(n => !n.unread);
+        return notifications.filter(n => n.read);
       default:
         return notifications;
     }
   }, [notifications, inboxFilter]);
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
-  };
-
-  const renderIcon = (type: NotificationItem["type"], color: string) => {
-    switch (type) {
-      case "consultation":
-        return <Calendar size={18} color={color} strokeWidth={1.7} />;
-      case "reply":
-        return <MessageSquare size={18} color={color} strokeWidth={1.7} />;
-      default:
-        return <Bell size={18} color={color} strokeWidth={1.7} />;
+  const renderIcon = (type: string, color: string) => {
+    if (type.includes('consultation')) {
+      return <Calendar size={18} color={color} strokeWidth={1.7} />;
+    } else if (type.includes('reply')) {
+      return <MessageSquare size={18} color={color} strokeWidth={1.7} />;
     }
+    return <Bell size={18} color={color} strokeWidth={1.7} />;
   };
 
-  const renderItem = ({ item }: { item: NotificationItem }) => {
-    // Use a lighter blue for unread borders to soften the outline
-    const borderColor = item.unread ? "#BFDBFE" : "#E5E7EB"; // unread: blue-200, read: gray-200
-    const titleColor = item.unread ? Colors.text.head : Colors.text.head;
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const renderItem = ({ item }: { item: any }) => {
+    const isUnread = !item.read;
+    const borderColor = isUnread ? "#BFDBFE" : "#E5E7EB";
+    const titleColor = Colors.text.head;
     const subColor = Colors.text.sub;
 
     return (
-      <View style={[tw`rounded-xl mb-3`, { backgroundColor: item.unread ? '#F0F9FF' : '#FFFFFF', padding: 14, borderWidth: 1, borderColor, position: 'relative' }]}> 
+      <Pressable
+        onPress={() => {
+          if (isUnread) {
+            markAsRead(item.id);
+          }
+        }}
+        style={[tw`rounded-xl mb-3`, { backgroundColor: isUnread ? '#F0F9FF' : '#FFFFFF', padding: 14, borderWidth: 1, borderColor, position: 'relative' }]}
+      >
         <HStack className="items-start">
           <View style={[tw`mr-3`, { marginTop: 2 }]}>
-            {renderIcon(item.type, item.unread ? Colors.primary.blue : subColor)}
+            {renderIcon(item.type, isUnread ? Colors.primary.blue : subColor)}
           </View>
           <View style={tw`flex-1`}>
             <GSText size="sm" bold style={{ color: titleColor }}>{item.title}</GSText>
-            <GSText size="sm" className="mt-1" style={{ color: Colors.text.head }}>{item.body}</GSText>
+            <GSText size="sm" className="mt-1" style={{ color: Colors.text.head }}>{item.message}</GSText>
             <HStack className="items-center mt-2">
-              <GSText size="xs" style={{ color: subColor }}>{item.createdAt}</GSText>
-              {item.unread && (
+              <GSText size="xs" style={{ color: subColor }}>{formatTime(item.created_at)}</GSText>
+              {isUnread && (
                 <View style={[tw`ml-2`, { backgroundColor: Colors.primary.blue, height: 6, width: 6, borderRadius: 3 }]} />
               )}
             </HStack>
           </View>
-          {!item.unread && (
+          {!isUnread && (
             <CheckCircle size={16} color={subColor} strokeWidth={1.7} />
           )}
         </HStack>
-        {/* Chevron indicator (design only) */}
         <View style={{ position: 'absolute', right: 12, bottom: 10 }}>
           <ChevronRight size={18} color={Colors.text.sub} strokeWidth={1.7} />
         </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -181,7 +166,11 @@ export default function NotificationsScreen() {
         />
       )}
 
-      {filteredNotifications.length === 0 ? (
+      {loading ? (
+        <View style={[tw`flex-1 items-center justify-center`]}>
+          <ActivityIndicator size="large" color={Colors.primary.blue} />
+        </View>
+      ) : filteredNotifications.length === 0 ? (
         renderEmpty()
       ) : (
         <FlatList
@@ -194,7 +183,11 @@ export default function NotificationsScreen() {
         />
       )}
 
-      <Navbar activeTab="profile" />
+      {user?.role === 'verified_lawyer' ? (
+        <LawyerNavbar />
+      ) : (
+        <Navbar />
+      )}
       <SidebarWrapper />
     </SafeAreaView>
   );

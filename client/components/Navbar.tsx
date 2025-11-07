@@ -33,7 +33,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
   // Auto-detect active tab based on current route if not provided
   const getActiveTab = () => {
-    if (activeTab) return activeTab;
+    if (activeTab !== undefined) return activeTab;
     
     // Check sidebar routes first - these should NOT highlight any navbar tab
     if (pathname.includes('/consultations')) return null;

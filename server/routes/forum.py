@@ -7,6 +7,7 @@ from services.bookmark_service import BookmarkService
 from services.report_service import ReportService
 from services.content_moderation_service import get_moderation_service
 from services.violation_tracking_service import get_violation_tracking_service
+from services.notification_service import NotificationService
 from models.violation_types import ViolationType
 import httpx
 import logging
@@ -837,10 +838,10 @@ async def create_reply(
         if isinstance(created, list) and created:
             reply_id = str(created[0].get("id"))
 
-        # Clear posts cache since we added a new reply
         clear_posts_cache()
-        # Clear reply counts cache to ensure fresh reply counts
         clear_reply_counts_cache()
+        
+        await _send_forum_reply_notifications(supabase, post_id, user_id, reply_id)
 
         return CreateReplyResponse(success=True, message="Reply created", reply_id=reply_id)
     except HTTPException:
@@ -848,6 +849,55 @@ async def create_reply(
     except Exception as e:
         logger.error(f"Create reply error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+async def _send_forum_reply_notifications(supabase_service: SupabaseService, post_id: str, replier_id: str, reply_id: str):
+    """Send notifications to post author and other commenters"""
+    try:
+        from supabase import create_client
+        supabase = create_client(supabase_service.url, supabase_service.service_key)
+        notification_service = NotificationService(supabase)
+        
+        post_result = supabase.table("forum_posts").select("user_id, title").eq("id", post_id).execute()
+        if not post_result.data:
+            return
+        
+        post_author_id = post_result.data[0]["user_id"]
+        post_title = post_result.data[0]["title"]
+        
+        replier_result = supabase.table("users").select("full_name, username").eq("id", replier_id).execute()
+        replier_name = "A lawyer"
+        if replier_result.data:
+            replier_name = replier_result.data[0].get("full_name") or replier_result.data[0].get("username") or "A lawyer"
+        
+        notified_users = set()
+        
+        if post_author_id != replier_id:
+            await notification_service.notify_forum_reply(
+                user_id=post_author_id,
+                commenter_name=replier_name,
+                post_title=post_title,
+                post_id=post_id,
+                reply_id=reply_id
+            )
+            notified_users.add(post_author_id)
+        
+        replies_result = supabase.table("forum_replies").select("user_id").eq("post_id", post_id).neq("user_id", replier_id).execute()
+        if replies_result.data:
+            for reply in replies_result.data:
+                commenter_id = reply["user_id"]
+                if commenter_id not in notified_users and commenter_id != replier_id:
+                    await notification_service.notify_forum_reply(
+                        user_id=commenter_id,
+                        commenter_name=replier_name,
+                        post_title=post_title,
+                        post_id=post_id,
+                        reply_id=reply_id
+                    )
+                    notified_users.add(commenter_id)
+        
+        logger.info(f"✅ Sent {len(notified_users)} forum reply notifications for post {post_id}")
+    except Exception as e:
+        logger.error(f"Failed to send forum reply notifications: {e}")
 
 
 # Bookmark endpoints

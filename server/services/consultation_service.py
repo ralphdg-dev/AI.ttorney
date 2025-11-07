@@ -5,6 +5,7 @@ Follows DRY principles and FAANG best practices for <5000 users
 from typing import Dict, Any, Optional, List
 from datetime import datetime, date, time, timedelta
 from supabase import Client
+from services.notification_service import NotificationService
 import logging
 import re
 
@@ -276,41 +277,36 @@ class ConsultationService:
         consultation_time: str,
         user_id: str
     ):
-        """
-        Send real-time notification to lawyer about new consultation request.
-        Uses Supabase notifications table for real-time updates.
-        """
+        """Send notification to lawyer about new consultation"""
         try:
-            # Get user's name for notification
+            logger.info(f"📬 Attempting to send notification to lawyer {lawyer_id[:8]}...")
+            
             user_result = self.supabase.table("users")\
                 .select("full_name")\
                 .eq("id", user_id)\
                 .execute()
             
             user_name = user_result.data[0]["full_name"] if user_result.data else "A user"
+            logger.info(f"👤 User name: {user_name}")
             
-            # Create notification
-            notification_data = {
-                "user_id": lawyer_id,
-                "type": "new_consultation",
-                "title": "New Consultation Request",
-                "message": f"{user_name} has requested a consultation on {consultation_date} at {consultation_time}",
-                "data": {
-                    "consultation_id": consultation_id,
-                    "consultation_date": consultation_date,
-                    "consultation_time": consultation_time
-                },
-                "read": False
-            }
+            notification_service = NotificationService(self.supabase)
+            result = await notification_service.notify_consultation_booked(
+                lawyer_id=lawyer_id,
+                user_name=user_name,
+                consultation_date=consultation_date,
+                consultation_time=consultation_time,
+                consultation_id=consultation_id
+            )
             
-            self.supabase.table("notifications")\
-                .insert(notification_data)\
-                .execute()
-            
-            logger.info(f"✅ Notification sent to lawyer {lawyer_id} for consultation {consultation_id}")
+            if result:
+                logger.info(f"✅ Notification sent successfully to lawyer {lawyer_id[:8]}...")
+            else:
+                logger.error(f"❌ Notification failed - no result returned")
+                
         except Exception as e:
-            # Don't fail the consultation creation if notification fails
-            logger.error(f"⚠️ Failed to send notification to lawyer: {e}")
+            logger.error(f"⚠️ Failed to send notification: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
     
     async def get_user_consultations(
         self, 

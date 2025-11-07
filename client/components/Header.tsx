@@ -4,6 +4,7 @@ import { Menu, Search, Bell, ArrowLeft, Settings, ChevronLeft, ChevronRight } fr
 import { useSidebar } from './AppSidebar';
 import { useRouter } from 'expo-router';
 import Colors from '../constants/Colors';
+import { useNotifications } from '../contexts/NotificationContext';
 import { LAYOUT } from '../constants/LayoutConstants';
 
 interface HeaderProps {
@@ -48,6 +49,7 @@ const Header: React.FC<HeaderProps> = ({
   const { openSidebar } = useSidebar();
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const { unreadCount } = useNotifications();
   
   // Dynamic sizing based on screen width (responsive)
   const isSmallScreen = width < 375;
@@ -160,9 +162,11 @@ const Header: React.FC<HeaderProps> = ({
             >
               <Bell size={iconSize - 2} color={Colors.text.sub} strokeWidth={1.5} />
               {/* Notification badge */}
-              <View style={styles.notificationBadge}>
-                <Text style={styles.badgeText}>3</Text>
-              </View>
+              {unreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
 

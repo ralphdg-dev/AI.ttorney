@@ -1,5 +1,8 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from services.legal_article_service import LegalArticleService
+from services.notification_service import NotificationService
+from config.dependencies import get_supabase
+from supabase import Client
 from models.legal_article import (
     LegalArticleResponse, 
     LegalArticleSearchResponse, 

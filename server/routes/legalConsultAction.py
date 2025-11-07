@@ -5,6 +5,7 @@ import logging
 from pydantic import BaseModel
 from datetime import datetime, date
 from config.dependencies import get_current_user as get_auth_user, get_supabase
+from services.notification_service import NotificationService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -387,6 +388,8 @@ async def update_consultation_status(
             logger.error(f"Supabase update error: {update_response.error}")
             raise HTTPException(status_code=500, detail="Database error")
         
+        await _send_consultation_notification(supabase, consultations[0], new_status)
+        
         return SuccessResponse(success=True, message=f"Consultation {new_status} successfully")
         
     except HTTPException:
@@ -442,6 +445,8 @@ async def cancel_consultation(
             logger.error(f"Supabase update error: {update_response.error}")
             raise HTTPException(status_code=500, detail="Database error")
         
+        await _send_consultation_notification(supabase, consultations[0], "cancelled")
+        
         return SuccessResponse(success=True, message="Consultation cancelled successfully")
         
     except HTTPException:
@@ -449,3 +454,49 @@ async def cancel_consultation(
     except Exception as e:
         logger.error(f"Error cancelling consultation: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+async def _send_consultation_notification(supabase: Client, consultation: Dict[str, Any], status: str):
+    """Send notification based on consultation status change"""
+    try:
+        notification_service = NotificationService(supabase)
+        
+        lawyer_result = supabase.table("lawyer_info").select("name, lawyer_id").eq("id", consultation["lawyer_id"]).execute()
+        if not lawyer_result.data:
+            return
+        
+        lawyer_name = lawyer_result.data[0]["name"]
+        lawyer_user_id = lawyer_result.data[0]["lawyer_id"]
+        user_id = consultation["user_id"]
+        consultation_id = consultation["id"]
+        
+        if status == "accepted":
+            await notification_service.notify_consultation_accepted(
+                user_id=user_id,
+                lawyer_name=lawyer_name,
+                consultation_date=consultation.get("consultation_date", "TBD"),
+                consultation_time=consultation.get("consultation_time", "TBD"),
+                consultation_id=consultation_id
+            )
+        elif status == "rejected":
+            await notification_service.notify_consultation_rejected(
+                user_id=user_id,
+                lawyer_name=lawyer_name,
+                consultation_id=consultation_id
+            )
+        elif status == "completed":
+            await notification_service.notify_consultation_completed(
+                user_id=user_id,
+                lawyer_name=lawyer_name,
+                consultation_id=consultation_id
+            )
+        elif status == "cancelled":
+            user_result = supabase.table("users").select("full_name").eq("id", user_id).execute()
+            user_name = user_result.data[0]["full_name"] if user_result.data else "A user"
+            
+            await notification_service.notify_consultation_cancelled(
+                lawyer_id=lawyer_user_id,
+                user_name=user_name,
+                consultation_id=consultation_id
+            )
+    except Exception as e:
+        logger.error(f"Failed to send consultation notification: {e}")
