@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { WebView as RNWebView } from 'react-native-webview';
 import * as Location from 'expo-location';
+import { filterByRadius } from '@/utils/distanceCalculator';
 import { VStack } from '@/components/ui/vstack';
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
@@ -81,7 +82,29 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   // Radius filter states
   const [selectedRadius, setSelectedRadius] = useState(5); // Default 5km
   const [showRadiusFilter, setShowRadiusFilter] = useState(false);
-  const radiusOptions = [5, 10, 15, 25]; // km options (limited to 25km max)
+  const radiusOptions = [5, 10, 15, 25, 50]; // km options
+  
+  // Store all fetched firms for client-side filtering
+  const [allFetchedFirms, setAllFetchedFirms] = useState<LawFirm[]>([]);
+  const [searchCenter, setSearchCenter] = useState<{ lat: number; lng: number } | null>(null);
+  
+  // Client-side filtering with memoization (FAANG pattern - instant, no API calls)
+  const filteredLawFirms = useMemo(() => {
+    if (!searchCenter || allFetchedFirms.length === 0) {
+      return lawFirms;
+    }
+    
+    // Filter by radius using client-side distance calculation
+    const filtered = filterByRadius(
+      allFetchedFirms,
+      searchCenter.lat,
+      searchCenter.lng,
+      selectedRadius
+    );
+    
+    console.log(`📍 Client-side filter: ${filtered.length}/${allFetchedFirms.length} firms within ${selectedRadius}km`);
+    return filtered;
+  }, [allFetchedFirms, searchCenter, selectedRadius, lawFirms]);
   
   // View states - Two dedicated views approach
   const [currentView, setCurrentView] = useState<'list' | 'map'>('list'); // Default to List View
@@ -255,6 +278,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           place_id: place.place_id
         }));
 
+        // Set initial display (will be filtered by useMemo)
         setLawFirms(firms);
         setCurrentLocationName(locationName);
         setRetryCount(0);
@@ -306,15 +330,20 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           address: place.vicinity || place.formatted_address || 'Address not available',
           phone: place.formatted_phone_number,
           rating: place.rating,
-          user_ratings_total: place.user_ratings_total, // Real review count from Google
+          user_ratings_total: place.user_ratings_total,
           types: place.types || [],
           latitude: place.geometry.location.lat,
           longitude: place.geometry.location.lng,
           place_id: place.place_id,
-          distance_km: place.distance_km // Include distance from API
+          distance_km: place.distance_km
         }));
 
-        setLawFirms(firms);
+        // Store all firms and search center for client-side filtering
+        setAllFetchedFirms(firms);
+        setSearchCenter({
+          lat: data.location.latitude,
+          lng: data.location.longitude
+        });
         setCurrentLocationName(data.location.formatted_address);
         setMapCenter({
           lat: data.location.latitude,
@@ -347,7 +376,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     } finally {
       setLoading(false);
     }
-  }, [selectedRadius]); // Include selectedRadius dependency
+  }, []); // Removed selectedRadius - we filter client-side now
 
   // Optimized prediction selection with session token renewal
   const handlePredictionSelectUpdated = useCallback(async (prediction: AutocompletePrediction) => {
@@ -1395,10 +1424,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                 onPress={() => {
                   setSelectedRadius(radius);
                   setShowRadiusFilter(false);
-                  // Trigger new search with updated radius
-                  if (searchText.trim()) {
-                    handleSearch();
-                  }
+                  // No API call needed - client-side filtering is instant
                 }}
               >
                 <HStack className="justify-between items-center">
@@ -1429,9 +1455,12 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         </Box>
       )}
 
-      {lawFirms.length > 0 && (
+      {filteredLawFirms.length > 0 && (
         <Text className="px-1 text-sm font-medium" style={{ color: Colors.text.sub }}>
-          {lawFirms.length} law firms found in {currentLocationName}
+          {filteredLawFirms.length} law firms found in {currentLocationName}
+          {allFetchedFirms.length > filteredLawFirms.length && (
+            <Text style={{ color: '#9CA3AF' }}> (filtered from {allFetchedFirms.length})</Text>
+          )}
         </Text>
       )}
     </VStack>
@@ -1504,7 +1533,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     >
       {sortedLawFirms.length > 0 ? (
         <VStack space="xs" style={{ paddingTop: 12 }}>
-          {sortedLawFirms.map(renderLawFirmCard)}
+          {filteredLawFirms.map(renderLawFirmCard)}
         </VStack>
       ) : error ? (
         <Box className="px-4">
