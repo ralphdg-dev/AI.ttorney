@@ -279,6 +279,8 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         }));
 
         // Set initial display (will be filtered by useMemo)
+        setAllFetchedFirms(firms);
+        setSearchCenter({ lat: latitude, lng: longitude });
         setLawFirms(firms);
         setCurrentLocationName(locationName);
         setRetryCount(0);
@@ -1175,18 +1177,276 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     handleSearchTextChangeWithAutocomplete(text);
   };
 
-  // Clean Search Header Component - no memoization needed
+  // Search header with autocomplete dropdown
   const renderSearchHeader = () => (
-    <View style={{ paddingHorizontal: 20, backgroundColor: 'white', zIndex: 1000 }}>
-      <UnifiedSearchBar
-        value={searchText}
-        onChangeText={handleSearchTextChange}
-        placeholder="Search by street, barangay, or city"
-        loading={searching}
-        showFilterIcon={false}
-        containerClassName="pt-6 pb-4"
-      />
-    </View>
+    <VStack space="md" className="px-5 py-3 bg-white" style={{ zIndex: 999 }}>
+      <Box className="relative" style={{ zIndex: 1000 }}>
+        <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ 
+          minHeight: 48,
+          maxHeight: 48,
+          height: 48
+        }}>
+          <HStack style={{ 
+            height: 48, 
+            alignItems: 'center', 
+            paddingLeft: 20,
+            paddingRight: 16
+          }}>
+            <Ionicons name="search" size={20} color="#9CA3AF" style={{ marginRight: 14 }} />
+            
+            <TextInput
+              className="flex-1 text-base"
+              placeholder="Search by street, barangay, or city"
+              placeholderTextColor="#9CA3AF"
+              value={searchText}
+              onChangeText={handleSearchTextChange}
+              onSubmitEditing={handleSearch}
+              onFocus={handleSearchFocus}
+              onBlur={handleSearchBlur}
+              returnKeyType="search"
+              editable={!searching}
+              style={{ 
+                color: Colors.text.head,
+                height: 48,
+                fontSize: 16,
+                lineHeight: 20,
+                textAlignVertical: 'center',
+                includeFontPadding: false
+              }}
+              autoCorrect={false}
+              autoCapitalize="words"
+              blurOnSubmit={false}
+              maxLength={100}
+              multiline={false}
+              numberOfLines={1}
+            />
+            
+            <Box style={{ 
+              width: 24, 
+              height: 48, 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              flexShrink: 0 
+            }}>
+              {searchText.length > 0 && !searching && (
+                <Pressable 
+                  onPress={() => {
+                    setSearchText('');
+                    searchTextRef.current = '';
+                    setShowPredictions(false);
+                    setPredictions([]);
+                  }}
+                  style={{ 
+                    width: 24, 
+                    height: 24, 
+                    justifyContent: 'center', 
+                    alignItems: 'center',
+                    borderRadius: 12
+                  }}
+                >
+                  <Ionicons name="close" size={18} color="#6B7280" />
+                </Pressable>
+              )}
+              {searching && (
+                <Box style={{ 
+                  width: 18, 
+                  height: 18, 
+                  justifyContent: 'center', 
+                  alignItems: 'center' 
+                }}>
+                  <Spinner size="small" color={Colors.primary.blue} />
+                </Box>
+              )}
+            </Box>
+          </HStack>
+        </Box>
+        
+        {/* Autocomplete Dropdown */}
+        {showPredictions && predictions.length > 0 && (
+          <Box
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              backgroundColor: 'white',
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: '#E5E7EB',
+              ...shadowPresets.medium,
+              zIndex: 9999,
+              maxHeight: 250,
+              overflow: 'hidden',
+            }}
+          >
+            <ScrollView 
+              style={{ maxHeight: 250 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={true}
+            >
+              {loadingPredictions && predictions.length === 0 ? (
+                <HStack space="sm" style={{ padding: 16, justifyContent: 'center', alignItems: 'center' }}>
+                  <Spinner size="small" color={Colors.primary.blue} />
+                  <Text size="sm" style={{ color: '#6B7280' }}>Searching...</Text>
+                </HStack>
+              ) : (
+                predictions.map((item, index) => (
+                  <Pressable
+                    key={item.place_id}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      borderBottomWidth: index < predictions.length - 1 ? 0.5 : 0,
+                      borderBottomColor: '#F3F4F6',
+                    }}
+                    onPress={() => handlePredictionSelectUpdated(item)}
+                  >
+                    <MapPin size={16} color="#9CA3AF" style={{ marginRight: 12 }} />
+                    <VStack space="xs" style={{ flex: 1, minWidth: 0 }}>
+                      <Text 
+                        size="sm" 
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={{ 
+                          color: '#111827',
+                          fontWeight: '400',
+                        }}
+                      >
+                        {item.main_text}
+                      </Text>
+                      {item.secondary_text && (
+                        <Text 
+                          size="xs" 
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                          style={{ 
+                            color: '#6B7280',
+                          }}
+                        >
+                          {item.secondary_text}
+                        </Text>
+                      )}
+                    </VStack>
+                  </Pressable>
+                ))
+              )}
+              {loadingPredictions && predictions.length > 0 && (
+                <HStack space="sm" style={{ padding: 12, justifyContent: 'center' }}>
+                  <Spinner size="small" color={Colors.primary.blue} />
+                  <Text size="xs" style={{ color: '#6B7280' }}>Loading more...</Text>
+                </HStack>
+              )}
+            </ScrollView>
+          </Box>
+        )}
+      </Box>
+
+      <HStack space="sm" className="items-center">
+        <Pressable
+          className="flex-1 px-3 py-2 bg-gray-100 rounded-lg active:bg-gray-200"
+          onPress={handleUseMyLocation}
+          disabled={searching}
+          accessibilityLabel="Use current location"
+        >
+          <HStack space="xs" className="justify-center items-center">
+            <Locate size={16} color={Colors.primary.blue} />
+            <Text className="text-sm font-medium" style={{ color: Colors.primary.blue }}>
+              Use My Location
+            </Text>
+          </HStack>
+        </Pressable>
+        
+        <Pressable
+          className="px-3 py-2 bg-white rounded-lg border border-gray-300 active:bg-gray-50"
+          onPress={() => setShowRadiusFilter(!showRadiusFilter)}
+        >
+          <HStack space="xs" className="items-center">
+            <Text className="text-sm font-medium" style={{ color: Colors.text.head }}>
+              {selectedRadius}km
+            </Text>
+            <Text className="text-xs" style={{ color: '#9CA3AF' }}>▼</Text>
+          </HStack>
+        </Pressable>
+      </HStack>
+      
+      {showRadiusFilter && (
+        <Box 
+          style={{
+            position: 'absolute',
+            top: 110,
+            right: 16,
+            backgroundColor: 'white',
+            borderWidth: 1,
+            borderColor: '#E5E7EB',
+            borderRadius: 8,
+            ...createShadowStyle({
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              elevation: 10,
+            }),
+            zIndex: 9999,
+            minWidth: 120,
+          }}
+        >
+          <VStack space="xs" style={{ padding: 8 }}>
+            <Text style={{ fontSize: 12, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 4, color: '#6B7280' }}>
+              Search radius
+            </Text>
+            {radiusOptions.map((radius) => (
+              <Pressable
+                key={radius}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 4,
+                  backgroundColor: selectedRadius === radius ? '#EFF6FF' : 'transparent',
+                }}
+                onPress={() => {
+                  setSelectedRadius(radius);
+                  setShowRadiusFilter(false);
+                }}
+              >
+                <HStack className="justify-between items-center">
+                  <Text 
+                    style={{ 
+                      fontSize: 14,
+                      color: selectedRadius === radius ? Colors.primary.blue : Colors.text.head,
+                      fontWeight: selectedRadius === radius ? '500' : '400'
+                    }}
+                  >
+                    {radius} km
+                  </Text>
+                  {selectedRadius === radius && (
+                    <Check size={14} color={Colors.primary.blue} />
+                  )}
+                </HStack>
+              </Pressable>
+            ))}
+          </VStack>
+        </Box>
+      )}
+
+      {error && (
+        <Box className="p-3 bg-red-50 rounded-lg border border-red-200">
+          <Text className="text-sm" style={{ color: '#DC2626' }}>
+            {error}
+          </Text>
+        </Box>
+      )}
+
+      {filteredLawFirms.length > 0 && (
+        <Box className="px-1 pb-2">
+          <Text className="text-sm" style={{ color: Colors.text.sub }}>
+            {filteredLawFirms.length} {filteredLawFirms.length === 1 ? 'law firm' : 'law firms'} found in {currentLocationName}
+          </Text>
+        </Box>
+      )}
+    </VStack>
   );
 
   // Radius filter and other controls
@@ -1531,7 +1791,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 20 }}
       keyboardShouldPersistTaps="handled"
     >
-      {sortedLawFirms.length > 0 ? (
+      {filteredLawFirms.length > 0 ? (
         <VStack space="xs" style={{ paddingTop: 12 }}>
           {filteredLawFirms.map(renderLawFirmCard)}
         </VStack>

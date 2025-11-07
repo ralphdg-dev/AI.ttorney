@@ -510,8 +510,7 @@ export default function LawyerBookingView() {
       console.log("👨‍⚖️ Lawyer Data:", {
         id: lawyerData?.id,
         lawyer_id: lawyerData?.lawyer_id,
-        name: lawyerData?.name,
-        accepting_consultations: lawyerData?.accepting_consultations
+        name: lawyerData?.name
       });
       
       // Validate lawyer_id exists
