@@ -30,6 +30,7 @@ import Colors from "../../constants/Colors";
 import { shouldUseNativeDriver } from "../../utils/animations";
 import { NetworkConfig } from "../../utils/networkConfig";
 import { formatConsultationTime } from "../../utils/consultationUtils";
+import { useToast, Toast, ToastTitle, ToastDescription } from "../../components/ui/toast";
 
 interface ConsultationRequest {
   id: string;
@@ -54,6 +55,7 @@ interface ConsultationRequest {
 const LawyerConsultPage: React.FC = () => {
   const router = useRouter();
   const { user, session } = useAuth();
+  const toast = useToast();
   const [filter, setFilter] = useState<
     "all" | "pending" | "accepted" | "completed"
   >("all");
@@ -417,22 +419,51 @@ const LawyerConsultPage: React.FC = () => {
         // Refresh the data
         await fetchConsultationRequests();
         await fetchStats();
-        Alert.alert(
-          "Success",
-          `Consultation ${confirmationModal.actionType}ed successfully`
-        );
+        
+        // Show success toast
+        toast.show({
+          placement: 'top',
+          duration: 3000,
+          render: ({ id }) => (
+            <Toast nativeID={id} action="success" variant="solid">
+              <ToastTitle>Success!</ToastTitle>
+              <ToastDescription>
+                Consultation {confirmationModal.actionType}ed successfully
+              </ToastDescription>
+            </Toast>
+          ),
+        });
       } else {
-        Alert.alert(
-          "Error",
-          `Failed to ${confirmationModal.actionType} consultation`
-        );
+        // Show error toast
+        toast.show({
+          placement: 'top',
+          duration: 4000,
+          render: ({ id }) => (
+            <Toast nativeID={id} action="error" variant="solid">
+              <ToastTitle>Error</ToastTitle>
+              <ToastDescription>
+                Failed to {confirmationModal.actionType} consultation
+              </ToastDescription>
+            </Toast>
+          ),
+        });
       }
     } catch (error) {
       console.error("Error updating consultation:", error);
-      Alert.alert(
-        "Error",
-        `Failed to ${confirmationModal.actionType} consultation`
-      );
+      
+      // Show error toast
+      toast.show({
+        placement: 'top',
+        duration: 4000,
+        render: ({ id }) => (
+          <Toast nativeID={id} action="error" variant="solid">
+            <ToastTitle>Error</ToastTitle>
+            <ToastDescription>
+              Failed to {confirmationModal.actionType} consultation. Please try again.
+            </ToastDescription>
+          </Toast>
+        ),
+      });
     } finally {
       setConfirmationModal({
         isOpen: false,

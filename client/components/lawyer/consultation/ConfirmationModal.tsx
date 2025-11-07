@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody, ModalFooter } from '../../ui/modal';
 import { VStack } from '../../ui/vstack';
+import { HStack } from '../../ui/hstack';
 import { Text } from '../../ui/text';
 import { Heading } from '../../ui/heading';
 import { Button, ButtonText } from '../../ui/button/';
@@ -107,26 +108,26 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         </ModalBody>
         
         <ModalFooter className="p-4 pt-1">
-          <VStack className="gap-2 w-full">
-            <Button 
-              variant={config.confirmVariant}
-              className={`w-full py-3 rounded-lg ${config.confirmClass}`}
-              onPress={onConfirm}
-            >
-              <ButtonText className="text-white font-semibold text-sm">
-                {config.confirmText}
-              </ButtonText>
-            </Button>
+          <HStack className="gap-2 w-full">
             <Button 
               variant="outline" 
-              className="w-full py-3 rounded-lg border-gray-300 bg-transparent"
+              className="flex-1 py-3 rounded-lg border-gray-300 bg-transparent"
               onPress={onClose}
             >
               <ButtonText className="text-gray-700 font-medium text-sm">
                 {config.cancelText}
               </ButtonText>
             </Button>
-          </VStack>
+            <Button 
+              variant={config.confirmVariant}
+              className={`flex-1 py-3 rounded-lg ${config.confirmClass}`}
+              onPress={onConfirm}
+            >
+              <ButtonText className="text-white font-semibold text-sm">
+                {config.confirmText}
+              </ButtonText>
+            </Button>
+          </HStack>
         </ModalFooter>
       </ModalContent>
     </Modal>

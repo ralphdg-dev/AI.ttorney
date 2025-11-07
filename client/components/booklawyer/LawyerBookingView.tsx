@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Alert, useWindowDimensions, Modal, SafeAreaView, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
+import { Alert, useWindowDimensions, SafeAreaView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { Calendar, Clock, Mail, Phone, MessageSquare, Video, MapPin, User, Check, ChevronLeft, ChevronRight, X, AlertCircle, CheckCircle2 } from "lucide-react-native";
+import { Calendar, Clock, Mail, Phone, MessageSquare, Video, MapPin, User, Check, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2 } from "lucide-react-native";
 import Colors from "../../constants/Colors";
 import Navbar from "@/components/Navbar";
 import { LawyerNavbar } from "@/components/lawyer/shared";
@@ -14,6 +14,11 @@ import { Box } from "@/components/ui/box";
 import { Text } from "@/components/ui/text";
 import { ScrollView } from "@/components/ui/scroll-view";
 import { Pressable } from "@/components/ui/pressable";
+import { useToast, Toast, ToastTitle, ToastDescription } from '@/components/ui/toast';
+import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/modal';
+import { Heading } from '@/components/ui/heading';
+import { Icon } from '@/components/ui/icon';
+import { Button, ButtonText } from '@/components/ui/button/';
 
 interface TimeSlot {
   id: string;
@@ -60,12 +65,13 @@ export default function LawyerBookingView() {
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 375;
   const { user } = useAuth();
+  const toast = useToast();
 
   const [lawyerData, setLawyerData] = useState<LawyerData | null>(null);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState("9:00AM-10:00AM");
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [email, setEmail] = useState(user?.email || "");
   const [mobileNumber, setMobileNumber] = useState("");
-  const [communicationMode, setCommunicationMode] = useState("Online");
+  const [communicationMode, setCommunicationMode] = useState<string>('Online');
   const [concern, setConcern] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showFullBio, setShowFullBio] = useState(false);
@@ -264,9 +270,14 @@ export default function LawyerBookingView() {
   };
 
   const getSelectedTimeSlotText = (): string => {
-    // selectedTimeSlot is now the time in "09:00" format (from slot.id)
-    // Just return it directly
-    return selectedTimeSlot;
+    // Convert 24-hour format to 12-hour format with AM/PM
+    if (!selectedTimeSlot) return '';
+    
+    const [hours, minutes] = selectedTimeSlot.split(':').map(Number);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHour = hours % 12 || 12;
+    
+    return `${displayHour}:${minutes.toString().padStart(2, '0')} ${ampm}`;
   };
 
   const getFormattedDateForAPI = (): string => {
@@ -416,7 +427,7 @@ export default function LawyerBookingView() {
     const newDate = new Date(selectedYear, selectedMonth - 1, 1);
     const firstAvailableDay = newDate < today ? today.getDate() : 1;
     setSelectedDay(firstAvailableDay);
-    setSelectedTimeSlot("");
+    setSelectedTimeSlot(null);
   };
 
   const navigateToNextMonth = () => {
@@ -427,7 +438,7 @@ export default function LawyerBookingView() {
       setSelectedMonth(selectedMonth + 1);
     }
     setSelectedDay(1);
-    setSelectedTimeSlot("");
+    setSelectedTimeSlot(null);
   };
 
   const handleDaySelect = (day: CalendarDay) => {
@@ -440,7 +451,7 @@ export default function LawyerBookingView() {
     }
     setSelectedDay(day.date);
 
-    setSelectedTimeSlot("");
+    setSelectedTimeSlot(null);
 
     if (validationErrors.timeSlot) {
       setValidationErrors((prev) => ({ ...prev, timeSlot: undefined }));
@@ -485,7 +496,7 @@ export default function LawyerBookingView() {
       };
 
       console.log("Sending consultation request:", consultationRequestData);
-      console.log("📊 Lawyer Data:", {
+      console.log(" Lawyer Data:", {
         id: lawyerData?.id,
         lawyer_id: lawyerData?.lawyer_id,
         name: lawyerData?.name
@@ -507,37 +518,42 @@ export default function LawyerBookingView() {
       const result = await response.json();
       
       console.log("Response status:", response.status);
-      console.log("Response data:", result);
-
-      if (response.ok && result.success) {
-        Alert.alert(
-          "Success",
-          `Consultation request sent to ${lawyerData?.name}!\n\nYou will receive a confirmation email shortly.`,
-          [
-            {
-              text: "OK",
-              onPress: () => router.back(),
-            },
-          ]
-        );
-      } else {
-        // Better error handling for validation errors
-        const errorMessage = result.detail 
-          ? (typeof result.detail === 'string' 
-              ? result.detail 
-              : JSON.stringify(result.detail))
-          : result.error || "Failed to book consultation";
-        
-        throw new Error(errorMessage);
-      }
-    } catch (error) {
-      console.error("Booking error:", error);
-      Alert.alert(
-        "Error",
-        error instanceof Error
-          ? error.message
-          : "Failed to book consultation. Please try again."
-      );
+      console.log(' Consultation request submitted successfully:', result.data);
+      
+      // Show success toast
+      toast.show({
+        placement: 'top',
+        duration: 4000,
+        render: ({ id }) => (
+          <Toast nativeID={id} action="success" variant="solid">
+            <ToastTitle>Request Sent!</ToastTitle>
+            <ToastDescription>
+              Your consultation request has been submitted. The lawyer will review it shortly.
+            </ToastDescription>
+          </Toast>
+        ),
+      });
+      
+      // Navigate back after a short delay
+      setTimeout(() => {
+        router.back();
+      }, 500);
+    } catch (error: any) {
+      console.error(' Error submitting consultation request:', error);
+      
+      // Show error toast
+      toast.show({
+        placement: 'top',
+        duration: 5000,
+        render: ({ id }) => (
+          <Toast nativeID={id} action="error" variant="solid">
+            <ToastTitle>Request Failed</ToastTitle>
+            <ToastDescription>
+              {error.message || 'Failed to submit consultation request. Please try again.'}
+            </ToastDescription>
+          </Toast>
+        ),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -598,7 +614,7 @@ export default function LawyerBookingView() {
 
   if (!lawyerData) {
     return (
-      <Box className="flex-1 bg-gray-50 items-center justify-center">
+      <Box className="items-center justify-center flex-1 bg-gray-50">
         <Text>Loading lawyer information...</Text>
       </Box>
     );
@@ -650,7 +666,7 @@ export default function LawyerBookingView() {
               {lawyerData.hours_available && Object.keys(lawyerData.hours_available).length > 0 && (
                 <HStack className="items-center">
                   <Calendar size={16} color={Colors.text.sub} strokeWidth={2} />
-                  <Text className="text-sm ml-2 font-medium" style={{ color: Colors.text.sub }}>
+                  <Text className="ml-2 text-sm font-medium" style={{ color: Colors.text.sub }}>
                     {Object.keys(lawyerData.hours_available).join(', ')}
                   </Text>
                 </HStack>
@@ -659,15 +675,15 @@ export default function LawyerBookingView() {
           </HStack>
 
           {/* Specializations - Modern Pills */}
-          <VStack className="mb-5 pb-5 border-b" style={{ borderColor: '#F3F4F6' }}>
+          <VStack className="pb-5 mb-5 border-b" style={{ borderColor: '#F3F4F6' }}>
             <HStack className="items-center mb-3">
-              <Box className="w-1 h-4 rounded-full mr-2" style={{ backgroundColor: Colors.primary.blue }} />
+              <Box className="w-1 h-4 mr-2 rounded-full" style={{ backgroundColor: Colors.primary.blue }} />
               <Text className="text-xs font-bold tracking-wide" style={{ color: Colors.text.secondary }}>
                 SPECIALIZATIONS
               </Text>
             </HStack>
             <HStack className="flex-wrap">
-              <Box className="px-4 py-2 rounded-full mr-2 mb-2" style={{ backgroundColor: Colors.primary.blue, shadowColor: Colors.primary.blue, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 2 }}>
+              <Box className="px-4 py-2 mb-2 mr-2 rounded-full" style={{ backgroundColor: Colors.primary.blue, shadowColor: Colors.primary.blue, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 2 }}>
                 <Text className="text-sm font-bold" style={{ color: 'white' }}>
                   {primarySpecialization}
                 </Text>
@@ -686,9 +702,9 @@ export default function LawyerBookingView() {
           </VStack>
 
           {showAllSpecializations && (
-            <Box className="mb-5 p-4 rounded-xl w-full" style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }}>
+            <Box className="w-full p-4 mb-5 rounded-xl" style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }}>
               <Text
-                className="text-sm font-bold mb-3"
+                className="mb-3 text-sm font-bold"
                 style={{ color: Colors.text.head }}
               >
                 All Specializations
@@ -698,7 +714,7 @@ export default function LawyerBookingView() {
                   <HStack key={index} className="items-center">
                     <Box className="w-1.5 h-1.5 rounded-full mr-3" style={{ backgroundColor: Colors.primary.blue }} />
                     <Text
-                      className="text-sm font-medium flex-1"
+                      className="flex-1 text-sm font-medium"
                       style={{ color: Colors.text.sub }}
                     >
                       {spec}
@@ -712,7 +728,7 @@ export default function LawyerBookingView() {
           {lawyerData.bio && lawyerData.bio.trim() !== "" ? (
             <VStack>
               <HStack className="items-center mb-3">
-                <Box className="w-1 h-4 rounded-full mr-2" style={{ backgroundColor: Colors.primary.blue }} />
+                <Box className="w-1 h-4 mr-2 rounded-full" style={{ backgroundColor: Colors.primary.blue }} />
                 <Text className="text-xs font-bold tracking-wide" style={{ color: Colors.text.secondary }}>
                   ABOUT
                 </Text>
@@ -757,7 +773,7 @@ export default function LawyerBookingView() {
             </VStack>
           ) : (
             <VStack className="items-center py-6">
-              <Box className="w-12 h-12 rounded-full items-center justify-center mb-2" style={{ backgroundColor: '#F3F4F6' }}>
+              <Box className="items-center justify-center w-12 h-12 mb-2 rounded-full" style={{ backgroundColor: '#F3F4F6' }}>
                 <User size={24} color={Colors.text.sub} strokeWidth={1.5} />
               </Box>
               <Text className="text-sm font-medium" style={{ color: Colors.text.sub }}>
@@ -770,7 +786,7 @@ export default function LawyerBookingView() {
         {/* Schedule - Modern Card */}
         <VStack className={`${isSmallScreen ? 'mx-3 p-5' : 'mx-4 p-6'} mb-3 bg-white rounded-2xl`} style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }}>
           <HStack className="items-center mb-5">
-            <Box className="w-10 h-10 rounded-xl items-center justify-center mr-3" style={{ backgroundColor: '#EFF6FF' }}>
+            <Box className="items-center justify-center w-10 h-10 mr-3 rounded-xl" style={{ backgroundColor: '#EFF6FF' }}>
               <Clock size={20} color={Colors.primary.blue} strokeWidth={2.5} />
             </Box>
             <VStack className="flex-1">
@@ -784,7 +800,7 @@ export default function LawyerBookingView() {
           </HStack>
 
           {/* Calendar Navigation - Modern */}
-          <HStack className="items-center justify-between mb-4 px-2">
+          <HStack className="items-center justify-between px-2 mb-4">
             <TouchableOpacity
               onPress={navigateToPreviousMonth}
               disabled={!canNavigateToPrevious}
@@ -890,11 +906,11 @@ export default function LawyerBookingView() {
           </VStack>
 
           {/* Time Slots - Modern Grid */}
-          <VStack className="mt-4 pt-4 border-t" style={{ borderColor: '#E5E7EB' }}>
+          <VStack className="pt-4 mt-4 border-t" style={{ borderColor: '#E5E7EB' }}>
             <HStack className="items-center justify-between mb-3">
               <HStack className="items-center">
                 <Clock size={16} color={Colors.primary.blue} strokeWidth={2} />
-                <Text className="text-sm font-semibold ml-2" style={{ color: Colors.text.head }}>
+                <Text className="ml-2 text-sm font-semibold" style={{ color: Colors.text.head }}>
                   Available Time Slots
                 </Text>
               </HStack>
@@ -908,9 +924,9 @@ export default function LawyerBookingView() {
             </HStack>
             
             {validationErrors.timeSlot && (
-              <HStack className="items-center mb-2 p-2 rounded-lg" style={{ backgroundColor: '#FEE2E2' }}>
+              <HStack className="items-center p-2 mb-2 rounded-lg" style={{ backgroundColor: '#FEE2E2' }}>
                 <AlertCircle size={14} color="#DC2626" strokeWidth={2} />
-                <Text className="text-xs ml-2" style={{ color: '#DC2626' }}>
+                <Text className="ml-2 text-xs" style={{ color: '#DC2626' }}>
                   {validationErrors.timeSlot}
                 </Text>
               </HStack>
@@ -919,7 +935,7 @@ export default function LawyerBookingView() {
             {isLoadingSlots ? (
               <HStack className="items-center justify-center py-8">
                 <ActivityIndicator size="small" color={Colors.primary.blue} />
-                <Text className="text-sm ml-2" style={{ color: Colors.text.sub }}>
+                <Text className="ml-2 text-sm" style={{ color: Colors.text.sub }}>
                   Loading available slots...
                 </Text>
               </HStack>
@@ -985,12 +1001,17 @@ export default function LawyerBookingView() {
                       <HStack className="items-center">
                         <Clock size={16} color={selectedTimeSlot === slot.id ? "white" : Colors.text.sub} strokeWidth={2} />
                         <Text
-                          className="text-sm font-bold ml-2"
+                          className="ml-2 text-sm font-bold"
                           style={{
                             color: selectedTimeSlot === slot.id ? "white" : Colors.text.head,
                           }}
                         >
-                          {slot.time}
+                          {(() => {
+                            const [hours, minutes] = slot.time.split(':').map(Number);
+                            const ampm = hours >= 12 ? 'PM' : 'AM';
+                            const displayHour = hours % 12 || 12;
+                            return `${displayHour}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+                          })()}
                         </Text>
                         {selectedTimeSlot === slot.id && (
                           <Box className="ml-2">
@@ -1004,10 +1025,10 @@ export default function LawyerBookingView() {
               </HStack>
             ) : (
               <VStack className="items-center py-8">
-                <Box className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: '#F3F4F6' }}>
+                <Box className="items-center justify-center w-16 h-16 mb-3 rounded-full" style={{ backgroundColor: '#F3F4F6' }}>
                   <Clock size={32} color={Colors.text.sub} strokeWidth={1.5} />
                 </Box>
-                <Text className="text-sm font-medium mb-1" style={{ color: Colors.text.head }}>
+                <Text className="mb-1 text-sm font-medium" style={{ color: Colors.text.head }}>
                   No Available Slots
                 </Text>
                 <Text className="text-xs text-center" style={{ color: Colors.text.sub }}>
@@ -1021,7 +1042,7 @@ export default function LawyerBookingView() {
         {/* Contact Info - Modern Card */}
         <VStack className={`${isSmallScreen ? 'mx-3 p-5' : 'mx-4 p-6'} mb-3 bg-white rounded-2xl`} style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }}>
           <HStack className="items-center mb-5">
-            <Box className="w-10 h-10 rounded-xl items-center justify-center mr-3" style={{ backgroundColor: '#EFF6FF' }}>
+            <Box className="items-center justify-center w-10 h-10 mr-3 rounded-xl" style={{ backgroundColor: '#EFF6FF' }}>
               <MessageSquare size={20} color={Colors.primary.blue} strokeWidth={2.5} />
             </Box>
             <VStack className="flex-1">
@@ -1035,7 +1056,7 @@ export default function LawyerBookingView() {
           </HStack>
 
           <VStack className="mb-4">
-            <Text className="text-xs font-bold mb-2 tracking-wide" style={{ color: Colors.text.secondary }}>
+            <Text className="mb-2 text-xs font-bold tracking-wide" style={{ color: Colors.text.secondary }}>
               EMAIL ADDRESS
             </Text>
             <HStack className={`items-center ${isSmallScreen ? 'px-4 py-3.5' : 'px-4 py-4'} rounded-xl border-2`} style={{ borderColor: validationErrors.email ? '#EF4444' : '#E5E7EB', backgroundColor: '#FAFAFA' }}>
@@ -1053,14 +1074,14 @@ export default function LawyerBookingView() {
               />
             </HStack>
             {validationErrors.email && (
-              <Text className="text-red-500 text-xs mt-1">
+              <Text className="mt-1 text-xs text-red-500">
                 {validationErrors.email}
               </Text>
             )}
           </VStack>
 
           <VStack className="mb-4">
-            <Text className="text-xs font-bold mb-2 tracking-wide" style={{ color: Colors.text.secondary }}>
+            <Text className="mb-2 text-xs font-bold tracking-wide" style={{ color: Colors.text.secondary }}>
               MOBILE NUMBER
             </Text>
             <HStack className={`items-center ${isSmallScreen ? 'px-4 py-3.5' : 'px-4 py-4'} rounded-xl border-2`} style={{ borderColor: validationErrors.mobileNumber ? '#EF4444' : '#E5E7EB', backgroundColor: '#FAFAFA' }}>
@@ -1077,14 +1098,14 @@ export default function LawyerBookingView() {
               />
             </HStack>
             {validationErrors.mobileNumber && (
-              <Text className="text-red-500 text-xs mt-1">
+              <Text className="mt-1 text-xs text-red-500">
                 {validationErrors.mobileNumber}
               </Text>
             )}
           </VStack>
 
           <VStack className="mb-4">
-            <Text className="text-xs font-bold mb-2 tracking-wide" style={{ color: Colors.text.secondary }}>
+            <Text className="mb-2 text-xs font-bold tracking-wide" style={{ color: Colors.text.secondary }}>
               CONSULTATION MODE
             </Text>
             <VStack className="gap-2">
@@ -1106,17 +1127,17 @@ export default function LawyerBookingView() {
                       borderColor: isSelected ? Colors.primary.blue : '#E5E7EB',
                     }}
                   >
-                    <Box className="w-10 h-10 rounded-full items-center justify-center" style={{ backgroundColor: isSelected ? Colors.primary.blue : '#F3F4F6' }}>
+                    <Box className="items-center justify-center w-10 h-10 rounded-full" style={{ backgroundColor: isSelected ? Colors.primary.blue : '#F3F4F6' }}>
                       <ModeIcon size={18} color={isSelected ? 'white' : Colors.text.sub} strokeWidth={2} />
                     </Box>
                     <Text
-                      className="text-sm font-semibold ml-3 flex-1"
+                      className="flex-1 ml-3 text-sm font-semibold"
                       style={{ color: isSelected ? Colors.primary.blue : Colors.text.head }}
                     >
                       {mode}
                     </Text>
                     {isSelected && (
-                      <Box className="w-6 h-6 rounded-full items-center justify-center" style={{ backgroundColor: Colors.primary.blue }}>
+                      <Box className="items-center justify-center w-6 h-6 rounded-full" style={{ backgroundColor: Colors.primary.blue }}>
                         <Check size={14} color="white" strokeWidth={3} />
                       </Box>
                     )}
@@ -1127,7 +1148,7 @@ export default function LawyerBookingView() {
           </VStack>
 
           <VStack>
-            <Text className="text-xs font-bold mb-2 tracking-wide" style={{ color: Colors.text.secondary }}>
+            <Text className="mb-2 text-xs font-bold tracking-wide" style={{ color: Colors.text.secondary }}>
               YOUR CONCERN
             </Text>
             <Box className={`${isSmallScreen ? 'px-4 py-3.5' : 'px-4 py-4'} rounded-xl border-2`} style={{ borderColor: validationErrors.concern ? '#EF4444' : '#E5E7EB', minHeight: 120, backgroundColor: '#FAFAFA' }}>
@@ -1150,12 +1171,12 @@ export default function LawyerBookingView() {
               />
             </Box>
             {validationErrors.concern && (
-              <Text className="text-red-500 text-xs mt-1">
+              <Text className="mt-1 text-xs text-red-500">
                 {validationErrors.concern}
               </Text>
             )}
             {!validationErrors.concern && concern.trim() && (
-              <Text className="text-xs mt-1" style={{ color: Colors.text.sub }}>
+              <Text className="mt-1 text-xs" style={{ color: Colors.text.sub }}>
                 {concern.trim().length}/2000 characters
               </Text>
             )}
@@ -1180,7 +1201,7 @@ export default function LawyerBookingView() {
               ) : (
                 <Calendar size={22} color="white" strokeWidth={2.5} />
               )}
-              <Text className="text-white font-bold text-lg ml-2">
+              <Text className="ml-2 text-lg font-bold text-white">
                 {isSubmitting
                   ? "Processing..."
                   : `Book Consultation`}
@@ -1196,127 +1217,93 @@ export default function LawyerBookingView() {
         </Box>
       </ScrollView>
 
-      {/* Confirmation Modal - Modern Design */}
-      <Modal
-        visible={showConfirmationModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowConfirmationModal(false)}
-      >
-        <Pressable
-          className="flex-1 items-center justify-center px-4"
-          style={styles.modalOverlay}
-          onPress={() => !isSubmitting && setShowConfirmationModal(false)}
-        >
-          <Pressable
-            onPress={(e) => e.stopPropagation()}
-          >
-            <Box className="bg-white rounded-3xl p-6 w-full shadow-lg" style={{ maxWidth: 400 }}>
-              <HStack className="items-center justify-between mb-4">
-                <HStack className="items-center">
-                  <Box className="w-10 h-10 rounded-full items-center justify-center" style={{ backgroundColor: '#EFF6FF' }}>
-                    <Check size={20} color={Colors.primary.blue} strokeWidth={3} />
-                  </Box>
-                  <Text className="text-xl font-bold ml-3" style={{ color: Colors.text.head }}>
-                    Confirm Booking
-                  </Text>
-                </HStack>
-                <TouchableOpacity
-                  onPress={() => !isSubmitting && setShowConfirmationModal(false)}
-                  style={{ padding: 4 }}
-                >
-                  <X size={24} color={Colors.text.sub} strokeWidth={2} />
-                </TouchableOpacity>
-              </HStack>
-
-              <VStack className="mb-6 p-4 bg-gray-50 rounded-2xl">
-                <VStack className="mb-3">
-                  <Text className="text-xs font-semibold mb-1" style={{ color: Colors.text.secondary }}>
-                    LAWYER
-                  </Text>
-                  <Text className="text-base font-bold" style={{ color: Colors.text.head }}>
-                    {lawyerData.name}
-                  </Text>
+      {/* Confirmation Modal - GlueStack UI Design */}
+      <Modal isOpen={showConfirmationModal} onClose={() => !isSubmitting && setShowConfirmationModal(false)} size="md">
+        <ModalBackdrop className="bg-black/50" />
+        <ModalContent className="max-w-md mx-4 bg-white border-0 shadow-2xl rounded-2xl">
+          <ModalHeader className="px-4 pt-6 pb-0">
+            <VStack className="items-center w-full gap-3">
+              <Box className="flex items-center justify-center w-12 h-12 rounded-full" style={{ backgroundColor: '#E8F2FF' }}>
+                <Icon 
+                  as={CheckCircle2} 
+                  size="lg" 
+                  className="w-6 h-6"
+                  style={{ color: Colors.primary.blue }}
+                />
+              </Box>
+              <Heading size="lg" className="font-bold text-center text-gray-900">
+                Confirm Consultation
+              </Heading>
+            </VStack>
+          </ModalHeader>
+          
+          <ModalBody className="px-4 py-3">
+            <VStack className="gap-3">
+              <Text className="mb-2 text-sm text-center text-gray-600">
+                Please review your consultation details before confirming.
+              </Text>
+              
+              <Box className="p-4 bg-gray-50 rounded-xl">
+                <VStack className="gap-3">
+                  <VStack className="gap-1">
+                    <Text className="text-xs font-semibold text-gray-500">LAWYER</Text>
+                    <Text className="text-base font-bold text-gray-900">{lawyerData.name}</Text>
+                  </VStack>
+                  
+                  <HStack className="items-center gap-2">
+                    <Calendar size={16} color={Colors.text.sub} strokeWidth={2} />
+                    <Text className="text-sm text-gray-700">{getFormattedDate()}</Text>
+                  </HStack>
+                  
+                  <HStack className="items-center gap-2">
+                    <Clock size={16} color={Colors.text.sub} strokeWidth={2} />
+                    <Text className="text-sm text-gray-700">{getSelectedTimeSlotText()}</Text>
+                  </HStack>
+                  
+                  <HStack className="items-center gap-2">
+                    {communicationMode === 'Online' ? <Video size={16} color={Colors.text.sub} strokeWidth={2} /> : communicationMode === 'Phone' ? <Phone size={16} color={Colors.text.sub} strokeWidth={2} /> : <MapPin size={16} color={Colors.text.sub} strokeWidth={2} />}
+                    <Text className="text-sm text-gray-700">{communicationMode}</Text>
+                  </HStack>
+                  
+                  <HStack className="items-center gap-2">
+                    <Mail size={16} color={Colors.text.sub} strokeWidth={2} />
+                    <Text className="text-sm text-gray-700">{email}</Text>
+                  </HStack>
+                  
+                  <HStack className="items-center gap-2">
+                    <Phone size={16} color={Colors.text.sub} strokeWidth={2} />
+                    <Text className="text-sm text-gray-700">{mobileNumber}</Text>
+                  </HStack>
                 </VStack>
-
-                <HStack className="items-center mb-2">
-                  <Calendar size={16} color={Colors.text.sub} strokeWidth={2} />
-                  <Text className="text-sm ml-2" style={{ color: Colors.text.sub }}>
-                    {getFormattedDate()}
-                  </Text>
-                </HStack>
-
-                <HStack className="items-center mb-2">
-                  <Clock size={16} color={Colors.text.sub} strokeWidth={2} />
-                  <Text className="text-sm ml-2" style={{ color: Colors.text.sub }}>
-                    {getSelectedTimeSlotText()}
-                  </Text>
-                </HStack>
-
-                <HStack className="items-center mb-2">
-                  {communicationMode === 'Online' ? <Video size={16} color={Colors.text.sub} strokeWidth={2} /> : communicationMode === 'Phone' ? <Phone size={16} color={Colors.text.sub} strokeWidth={2} /> : <MapPin size={16} color={Colors.text.sub} strokeWidth={2} />}
-                  <Text className="text-sm ml-2" style={{ color: Colors.text.sub }}>
-                    {communicationMode}
-                  </Text>
-                </HStack>
-
-                <HStack className="items-center mb-2">
-                  <Mail size={16} color={Colors.text.sub} strokeWidth={2} />
-                  <Text className="text-sm ml-2" style={{ color: Colors.text.sub }}>
-                    {email}
-                  </Text>
-                </HStack>
-
-                <HStack className="items-center">
-                  <Phone size={16} color={Colors.text.sub} strokeWidth={2} />
-                  <Text className="text-sm ml-2" style={{ color: Colors.text.sub }}>
-                    {mobileNumber}
-                  </Text>
-                </HStack>
-              </VStack>
-
-              <HStack className="justify-between">
-                <TouchableOpacity
-                  onPress={() => setShowConfirmationModal(false)}
-                  disabled={isSubmitting}
-                  style={{
-                    flex: 1,
-                    marginRight: 8,
-                    paddingVertical: 14,
-                    borderRadius: 12,
-                    borderWidth: 2,
-                    borderColor: Colors.primary.blue,
-                    backgroundColor: 'white',
-                    alignItems: 'center',
-                    opacity: isSubmitting ? 0.5 : 1,
-                  }}
-                >
-                  <Text className="font-bold text-sm" style={{ color: Colors.primary.blue }}>
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={proceedWithBooking}
-                  disabled={isSubmitting}
-                  style={{
-                    flex: 1,
-                    marginLeft: 8,
-                    paddingVertical: 14,
-                    borderRadius: 12,
-                    backgroundColor: isSubmitting ? '#9CA3AF' : Colors.primary.blue,
-                    alignItems: 'center',
-                    opacity: isSubmitting ? 0.7 : 1,
-                  }}
-                >
-                  <Text className="text-white font-bold text-sm">
-                    {isSubmitting ? "Confirming..." : "Confirm Booking"}
-                  </Text>
-                </TouchableOpacity>
-              </HStack>
-            </Box>
-          </Pressable>
-        </Pressable>
+              </Box>
+            </VStack>
+          </ModalBody>
+          
+          <ModalFooter className="p-4 pt-1">
+            <HStack className="w-full gap-2">
+              <Button 
+                variant="outline" 
+                className="flex-1 py-3 bg-transparent border-gray-300 rounded-lg"
+                onPress={() => setShowConfirmationModal(false)}
+                isDisabled={isSubmitting}
+              >
+                <ButtonText className="text-sm font-medium text-gray-700">
+                  Cancel
+                </ButtonText>
+              </Button>
+              <Button 
+                variant="solid"
+                className="flex-1 py-3 rounded-lg bg-[#023D7B] hover:bg-[#012B5A]"
+                onPress={proceedWithBooking}
+                isDisabled={isSubmitting}
+              >
+                <ButtonText className="text-sm font-semibold text-white">
+                  {isSubmitting ? "Confirming..." : "Confirm"}
+                </ButtonText>
+              </Button>
+            </HStack>
+          </ModalFooter>
+        </ModalContent>
       </Modal>
     </Box>
 
@@ -1329,9 +1316,3 @@ export default function LawyerBookingView() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  modalOverlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-});
