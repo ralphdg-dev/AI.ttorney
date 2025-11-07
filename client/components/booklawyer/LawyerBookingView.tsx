@@ -333,8 +333,16 @@ export default function LawyerBookingView() {
 
   // Initialize lawyer data from params instead of making API call
   useEffect(() => {
+    console.log("📋 Received params:", {
+      id: params.id,
+      lawyerId: params.lawyerId,
+      lawyerName: params.lawyerName
+    });
+    
     if (params.lawyerId && params.lawyerName) {
       initializeLawyerData();
+    } else {
+      console.error("❌ Missing required params: lawyerId or lawyerName");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -484,23 +492,32 @@ export default function LawyerBookingView() {
     setIsSubmitting(true);
 
     try {
+      // Normalize consultation mode to lowercase for backend
+      const normalizedMode = communicationMode.toLowerCase().replace('in-person', 'onsite');
+      
       const consultationRequestData = {
         user_id: user?.id || "anonymous",
-        lawyer_id: lawyerData?.id, // Use lawyer_info.id (the primary key that consultation_requests references)
+        lawyer_id: lawyerData?.id, // Use lawyer_info.id (backend validates against lawyer_info table)
         message: concern.trim(),
         email: email.trim(),
         mobile_number: mobileNumber.trim(),
         consultation_date: getFormattedDateForAPI(),
-        consultation_time: getSelectedTimeSlotText(),
-        consultation_mode: communicationMode,
+        consultation_time: selectedTimeSlot || '', // Send 24-hour format (e.g., "09:00")
+        consultation_mode: normalizedMode, // Send lowercase: "online", "onsite", or "phone"
       };
 
-      console.log("Sending consultation request:", consultationRequestData);
-      console.log(" Lawyer Data:", {
+      console.log("📤 Sending consultation request:", consultationRequestData);
+      console.log("👨‍⚖️ Lawyer Data:", {
         id: lawyerData?.id,
         lawyer_id: lawyerData?.lawyer_id,
-        name: lawyerData?.name
+        name: lawyerData?.name,
+        accepting_consultations: lawyerData?.accepting_consultations
       });
+      
+      // Validate lawyer_id exists
+      if (!lawyerData?.lawyer_id) {
+        throw new Error('Lawyer ID is missing. Please try selecting the lawyer again.');
+      }
 
       const { NetworkConfig } = await import('@/utils/networkConfig');
       const apiUrl = await NetworkConfig.getBestApiUrl();
@@ -518,7 +535,13 @@ export default function LawyerBookingView() {
       const result = await response.json();
       
       console.log("Response status:", response.status);
-      console.log(' Consultation request submitted successfully:', result.data);
+      console.log("Response data:", result);
+      
+      if (!response.ok) {
+        throw new Error(result.detail || result.message || 'Failed to submit consultation request');
+      }
+      
+      console.log('✅ Consultation request submitted successfully:', result.data);
       
       // Show success toast
       toast.show({
@@ -534,9 +557,9 @@ export default function LawyerBookingView() {
         ),
       });
       
-      // Navigate back after a short delay
+      // Navigate back to directory after a short delay
       setTimeout(() => {
-        router.back();
+        router.push('/directory');
       }, 500);
     } catch (error: any) {
       console.error(' Error submitting consultation request:', error);
@@ -1006,12 +1029,7 @@ export default function LawyerBookingView() {
                             color: selectedTimeSlot === slot.id ? "white" : Colors.text.head,
                           }}
                         >
-                          {(() => {
-                            const [hours, minutes] = slot.time.split(':').map(Number);
-                            const ampm = hours >= 12 ? 'PM' : 'AM';
-                            const displayHour = hours % 12 || 12;
-                            return `${displayHour}:${minutes.toString().padStart(2, '0')} ${ampm}`;
-                          })()}
+                          {slot.time}
                         </Text>
                         {selectedTimeSlot === slot.id && (
                           <Box className="ml-2">
