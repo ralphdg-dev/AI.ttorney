@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Calendar, Clock, Mail, Phone, MessageSquare, Video, MapPin, User, Check, ChevronLeft, ChevronRight, X, AlertCircle, CheckCircle2 } from "lucide-react-native";
 import Colors from "../../constants/Colors";
 import Navbar from "@/components/Navbar";
+import { LawyerNavbar } from "@/components/lawyer/shared";
 import Header from "@/components/Header";
 import { SidebarWrapper } from "@/components/AppSidebar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1319,7 +1320,11 @@ export default function LawyerBookingView() {
       </Modal>
     </Box>
 
-      <Navbar activeTab="find" />
+      {user?.role === 'verified_lawyer' ? (
+        <LawyerNavbar activeTab={null} />
+      ) : (
+        <Navbar activeTab="find" />
+      )}
       <SidebarWrapper />
     </SafeAreaView>
   );

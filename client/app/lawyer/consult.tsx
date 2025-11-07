@@ -23,11 +23,13 @@ import { ConsultationListSkeleton } from "./consultation/ConsultationCardSkeleto
 import { LawyerNavbar } from "../../components/lawyer/shared";
 import Header from "../../components/Header";
 import { ConfirmationModal } from "../../components/lawyer/consultation";
+import { SidebarWrapper } from "../../components/AppSidebar";
 import { useAuth } from "../../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../../constants/Colors";
 import { shouldUseNativeDriver } from "../../utils/animations";
 import { NetworkConfig } from "../../utils/networkConfig";
+import { formatConsultationTime } from "../../utils/consultationUtils";
 
 interface ConsultationRequest {
   id: string;
@@ -883,7 +885,7 @@ const LawyerConsultPage: React.FC = () => {
                             <Text
                               style={tw`text-sm text-gray-700 ml-2 font-medium`}
                             >
-                              {request.consultation_time}
+                              {formatConsultationTime(request.consultation_time)}
                             </Text>
                           </View>
                         )}
@@ -1007,6 +1009,8 @@ const LawyerConsultPage: React.FC = () => {
         actionType={confirmationModal.actionType}
         clientName={confirmationModal.clientName || undefined}
       />
+      
+      <SidebarWrapper />
     </SafeAreaView>
   );
 };

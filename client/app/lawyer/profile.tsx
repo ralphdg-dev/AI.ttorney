@@ -807,12 +807,6 @@ const LawyerProfilePage: React.FC = () => {
           </Text>
           <View style={tw`flex-row flex-wrap -mx-2`}>
             <View style={tw`w-1/2 px-2 mb-4`}>
-              <Text style={tw`text-xs text-gray-500 mb-1`}>Experience</Text>
-              <Text style={tw`text-sm font-semibold text-gray-900`}>
-                {profileData.experience}
-              </Text>
-            </View>
-            <View style={tw`w-1/2 px-2 mb-4`}>
               <Text style={tw`text-xs text-gray-500 mb-1`}>
                 Roll Signing Date
               </Text>
@@ -828,7 +822,7 @@ const LawyerProfilePage: React.FC = () => {
                   : "Not provided"}
               </Text>
             </View>
-            <View style={tw`w-full px-2`}>
+            <View style={tw`w-1/2 px-2 mb-4`}>
               <Text style={tw`text-xs text-gray-500 mb-1`}>
                 Supreme Court Roll Number
               </Text>

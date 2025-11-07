@@ -166,12 +166,6 @@ class ConsultationService:
             if not self._validate_time_format(consultation_time):
                 raise InvalidTimeError()
             
-            # 3. Validate business hours
-            if not self._validate_business_hours(consultation_time):
-                raise InvalidTimeError(
-                    "Consultation time must be between 8:00 AM and 8:00 PM"
-                )
-            
             # 4. Verify lawyer exists and is accepting consultations
             logger.info(f"🔍 Checking if lawyer exists: {lawyer_id}")
             lawyer_result = self.supabase.table("lawyer_info")\
