@@ -35,10 +35,12 @@ export default function ConsultationSkeleton({ isFirst = false }: ConsultationSk
 
   return (
     <Box 
-      className="mx-4 md:mx-6 bg-white rounded-lg border border-gray-200 p-4 md:p-6"
+      className="bg-white rounded-lg p-3 md:p-4"
       style={{
-        marginBottom: 16,
+        marginBottom: 12,
         marginTop: 0,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
       }}
     >
       <HStack className="justify-between items-start mb-3">

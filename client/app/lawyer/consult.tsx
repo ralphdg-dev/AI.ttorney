@@ -504,7 +504,7 @@ const LawyerConsultPage: React.FC = () => {
           </View>
 
           {/* Consultation cards skeleton */}
-          <View style={tw`px-4`}>
+          <View style={tw`px-5`}>
             <ConsultationListSkeleton count={3} />
           </View>
         </ScrollView>
@@ -634,7 +634,7 @@ const LawyerConsultPage: React.FC = () => {
         </View>
 
         {/* Enhanced Filter Tabs */}
-        <View style={tw`px-4 py-4`}>
+        <View style={tw`px-5 py-4`}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -687,7 +687,7 @@ const LawyerConsultPage: React.FC = () => {
         </View>
 
         {/* Enhanced Consultation Cards */}
-        <View style={tw`px-4`}>
+        <View style={tw`px-5`}>
           <View style={tw`flex-row items-center justify-between mb-4`}>
             <Text style={tw`text-lg font-bold text-gray-900`}>
               {filter === "all"
@@ -725,10 +725,14 @@ const LawyerConsultPage: React.FC = () => {
                 <View
                   key={request.id}
                   style={[
-                    tw`bg-white rounded-2xl p-5 mb-4 border border-gray-100`,
+                    tw`bg-white rounded-xl p-4 mb-3 border`,
                     {
-                      boxShadow:
-                        "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+                      borderColor: '#E5E7EB',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.05,
+                      shadowRadius: 2,
+                      elevation: 1,
                     },
                   ]}
                 >

@@ -28,11 +28,12 @@ export default function PostSkeleton() {
         backgroundColor: '#FFFFFF',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        marginHorizontal: 16,
-        marginVertical: 6,
+        marginHorizontal: 20,
+        marginVertical: 0,
+        marginBottom: 8,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#E1E8ED',
+        borderColor: '#E5E7EB',
       }}
     >
       {/* Header */}

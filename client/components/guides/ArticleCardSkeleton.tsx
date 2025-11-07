@@ -30,8 +30,8 @@ export default function ArticleCardSkeleton({ containerStyle }: ArticleCardSkele
 
   return (
     <Box
-      className="mb-4 bg-white rounded-2xl border border-gray-200 overflow-hidden"
-      style={containerStyle}
+      className="mb-3 bg-white rounded-xl border overflow-hidden"
+      style={[{ borderColor: '#E5E7EB' }, containerStyle]}
     >
       {/* Image skeleton */}
       <Animated.View
