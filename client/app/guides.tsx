@@ -4,7 +4,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
-import ToggleGroup from "@/components/ui/ToggleGroup";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
@@ -50,10 +49,7 @@ export default function GuidesScreen() {
     }
   }, [legalArticles, activeCategory, searchQuery]);
 
-  const tabOptions = [
-    { id: "guides", label: "Legal Guides" },
-    { id: "terms", label: "Legal Terms" },
-  ];
+  // Removed tab options - only showing legal terms for guests
 
   // Search debounce
   useEffect(() => {
@@ -130,10 +126,7 @@ export default function GuidesScreen() {
     await toggleBookmark(item.id, item.title);
   };
 
-  const onToggleChange = useCallback((id: string) => {
-    // ⚡ FAANG OPTIMIZATION: Navigate to glossary with terms tab active
-    router.push("/glossary");
-  }, [router]);
+  // Removed toggle - only showing legal terms for guests
 
   const handleMenuPress = useCallback(() => {
     if (isGuestMode) {
@@ -291,8 +284,6 @@ const renderPagination = () => {
         showMenu={true}
         onMenuPress={handleMenuPress}
       />
-
-        <ToggleGroup options={tabOptions} activeOption="guides" onOptionChange={onToggleChange} />
 
         <Box className="px-6 pt-6 mb-4">
           <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">

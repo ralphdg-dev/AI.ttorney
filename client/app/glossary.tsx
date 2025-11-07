@@ -607,11 +607,13 @@ export default function GlossaryScreen() {
         onMenuPress={handleMenuPress}
       />
 
-      <ToggleGroup
-        options={tabOptions}
-        activeOption={activeTab}
-        onOptionChange={handleTabChange}
-      />
+      {!isGuestMode && (
+        <ToggleGroup
+          options={tabOptions}
+          activeOption={activeTab}
+          onOptionChange={handleTabChange}
+        />
+      )}
 
       <UnifiedSearchBar
         value={searchQuery}

@@ -22,7 +22,7 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab }) => {
   const getActiveTab = () => {
     if (activeTab) return activeTab;
     
-    if (pathname.includes('/guides')) return 'learn';
+    if (pathname.includes('/glossary')) return 'learn';
     if (pathname.includes('/chatbot')) return 'ask';
     
     // Default to 'ask' for guests (chatbot is their index page)
@@ -34,16 +34,10 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab }) => {
   const handleTabPress = (tabId: string) => {
     switch (tabId) {
       case 'learn':
-        router.push('/glossary'); // Match registered users' navbar behavior
+        router.push('/glossary');
         break;
       case 'ask':
         router.push('/chatbot');
-        break;
-      case 'login':
-        router.push('/login');
-        break;
-      case 'register':
-        router.push('/onboarding/registration');
         break;
       default:
         console.log(`Unknown tab: ${tabId}`);

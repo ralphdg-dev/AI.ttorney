@@ -19,10 +19,15 @@ import { LawyerNavbar } from "@/components/lawyer/shared";
 export default function NotificationsScreen() {
   const { user } = useAuth();
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead, fetchNotifications } = useNotifications();
+  const hasFetched = React.useRef(false);
 
   React.useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+    if (!hasFetched.current) {
+      hasFetched.current = true;
+      fetchNotifications();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Inbox filter state
   const [inboxFilter, setInboxFilter] = useState<"all" | "unread" | "read">("all");

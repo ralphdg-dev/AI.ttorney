@@ -11,7 +11,8 @@ import {
   UserCircle,
   X,
   LogIn,
-  UserPlus
+  UserPlus,
+  Book
 } from 'lucide-react-native';
 import { shouldUseNativeDriver } from '@/utils/animations';
 import { createShadowStyle } from '@/utils/shadowUtils';
@@ -91,6 +92,12 @@ export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) =
   };
 
   const menuItems: MenuItem[] = [
+    {
+      id: 'legal-terms',
+      label: 'Legal Terms',
+      icon: Book,
+      onPress: () => handleNavigation('/glossary'),
+    },
     {
       id: 'help',
       label: 'Help & Support',
