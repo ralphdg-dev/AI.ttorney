@@ -141,10 +141,10 @@ export default function NotificationsScreen() {
   };
 
   const renderEmpty = () => (
-    <View style={[tw`flex-1 items-center justify-center`, { paddingHorizontal: 24 }]}> 
-      <Bell size={40} color={Colors.primary.blue} strokeWidth={1.5} />
-      <GSText size="lg" bold className="mt-4" style={{ color: Colors.text.head }}>No Notifications Yet</GSText>
-      <GSText size="sm" className="mt-2 text-center" style={{ color: Colors.text.sub }}>
+    <View style={[tw`flex-1 items-center`, { paddingHorizontal: 24, justifyContent: 'center' }]}> 
+      <Bell size={48} color={Colors.primary.blue} strokeWidth={1.5} />
+      <GSText size="lg" bold className="mt-4" style={{ color: Colors.text.head, textAlign: 'center' }}>No Notifications Yet</GSText>
+      <GSText size="sm" className="mt-2" style={{ color: Colors.text.sub, textAlign: 'center' }}>
         When you get updates, like consultation changes or replies to your posts, they will appear here.
       </GSText>
     </View>
@@ -156,7 +156,7 @@ export default function NotificationsScreen() {
       <Header title="Notifications" showMenu={true} />
 
       {/* Inbox filter row */}
-      <Box className="px-5 pt-6 pb-2" style={{ zIndex: menuOpen ? 100 : 1, position: "relative", elevation: menuOpen ? 12 : 0, overflow: 'visible' }}>
+      <Box className="px-5 pt-6 pb-4" style={{ zIndex: menuOpen ? 100 : 1, position: "relative", elevation: menuOpen ? 12 : 0, overflow: 'visible' }}>
         <HStack className="items-center justify-between">
           <View style={{ position: "relative", flex: 1, zIndex: menuOpen ? 200 : 1 }}>
             <Pressable onPress={() => setMenuOpen(v => !v)} style={({ pressed }) => [tw`flex-row items-center`, { opacity: pressed ? 0.6 : 1 }]}>

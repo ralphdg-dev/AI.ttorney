@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
   },
   timelineContent: {
-    paddingVertical: 10,
+    paddingTop: 10,
     paddingBottom: 100, // Account for bottom navigation
   },
   skeletonContainer: {
