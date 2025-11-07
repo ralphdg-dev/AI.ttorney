@@ -1,7 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, View } from 'react-native';
-import { Box } from '@/components/ui/box';
-import { VStack } from '@/components/ui/vstack';
 import { shouldUseNativeDriver } from '@/utils/animations';
 
 interface ArticleCardSkeletonProps {
@@ -29,9 +27,18 @@ export default function ArticleCardSkeleton({ containerStyle }: ArticleCardSkele
   }, [pulseAnim]);
 
   return (
-    <Box
-      className="mb-3 bg-white rounded-xl border overflow-hidden"
-      style={[{ borderColor: '#E5E7EB' }, containerStyle]}
+    <View
+      style={[
+        {
+          marginBottom: 12,
+          backgroundColor: '#FFFFFF',
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: '#E5E7EB',
+          overflow: 'hidden',
+        },
+        containerStyle,
+      ]}
     >
       {/* Image skeleton */}
       <Animated.View
@@ -44,7 +51,7 @@ export default function ArticleCardSkeleton({ containerStyle }: ArticleCardSkele
       />
 
       {/* Content skeleton */}
-      <VStack space="sm" className="p-4">
+      <View style={{ padding: 16 }}>
         {/* Category badge skeleton */}
         <Animated.View
           style={{
@@ -53,11 +60,12 @@ export default function ArticleCardSkeleton({ containerStyle }: ArticleCardSkele
             backgroundColor: '#E5E7EB',
             borderRadius: 10,
             opacity: pulseAnim,
+            marginBottom: 8,
           }}
         />
 
         {/* Title skeleton - 2 lines */}
-        <VStack space="xs">
+        <View style={{ marginBottom: 8 }}>
           <Animated.View
             style={{
               height: 18,
@@ -65,6 +73,7 @@ export default function ArticleCardSkeleton({ containerStyle }: ArticleCardSkele
               backgroundColor: '#E5E7EB',
               borderRadius: 4,
               opacity: pulseAnim,
+              marginBottom: 4,
             }}
           />
           <Animated.View
@@ -76,10 +85,10 @@ export default function ArticleCardSkeleton({ containerStyle }: ArticleCardSkele
               opacity: pulseAnim,
             }}
           />
-        </VStack>
+        </View>
 
         {/* Description skeleton - 2 lines */}
-        <VStack space="xs">
+        <View style={{ marginBottom: 8 }}>
           <Animated.View
             style={{
               height: 14,
@@ -87,6 +96,7 @@ export default function ArticleCardSkeleton({ containerStyle }: ArticleCardSkele
               backgroundColor: '#E5E7EB',
               borderRadius: 4,
               opacity: pulseAnim,
+              marginBottom: 4,
             }}
           />
           <Animated.View
@@ -98,7 +108,7 @@ export default function ArticleCardSkeleton({ containerStyle }: ArticleCardSkele
               opacity: pulseAnim,
             }}
           />
-        </VStack>
+        </View>
 
         {/* Footer with icon skeleton */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
@@ -112,8 +122,8 @@ export default function ArticleCardSkeleton({ containerStyle }: ArticleCardSkele
             }}
           />
         </View>
-      </VStack>
-    </Box>
+      </View>
+    </View>
   );
 }
 

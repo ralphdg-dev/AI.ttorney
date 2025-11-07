@@ -69,15 +69,15 @@ const CHEVRON_SIZE = 20;
 // Styles
 const cardStyles = {
   container: tw`mb-4 flex-1`,
-  card: [
-    tw`bg-white border border-gray-200`,
-    {
-      borderRadius: 16,
-      overflow: "hidden" as const,
-      position: "relative" as const,
-      flexDirection: "column" as const,
-    },
-  ],
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    overflow: "hidden" as const,
+    position: "relative" as const,
+    flexDirection: "column" as const,
+  },
   imageContainer: { height: IMAGE_HEIGHT, width: "100%" as const },
   image: { width: "100%" as const, height: "100%" as const },
   bookmarkButton: {
@@ -89,11 +89,11 @@ const cardStyles = {
     backgroundColor: "rgba(255,255,255,0.9)",
     zIndex: 10,
   },
-  content: tw`p-4 pb-12`,
-  header: tw`flex-row items-start justify-between mb-3`,
-  title: [tw`font-bold text-base`, { flex: 1, marginRight: 8 }],
-  filipinoTitle: [tw`text-sm mb-3 font-medium`],
-  summary: tw`text-sm`,
+  content: { padding: 16, paddingBottom: 48 },
+  header: { flexDirection: "row" as const, alignItems: "flex-start" as const, justifyContent: "space-between" as const, marginBottom: 12 },
+  title: { fontWeight: "700" as const, fontSize: 16, flex: 1, marginRight: 8 },
+  filipinoTitle: { fontSize: 14, marginBottom: 12, fontWeight: "500" as const },
+  summary: { fontSize: 14 },
   chevronButton: { position: "absolute" as const, right: 12, bottom: 12 },
 };
 

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { Alert, useWindowDimensions, Modal, SafeAreaView, StyleSheet, TouchableOpacity, TextInput } from "react-native";
+import React, { useState, useEffect, useMemo } from "react";
+import { Alert, useWindowDimensions, Modal, SafeAreaView, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { Calendar, Clock, Mail, Phone, MessageSquare, Video, MapPin, User, Check, ChevronLeft, ChevronRight, X } from "lucide-react-native";
+import { Calendar, Clock, Mail, Phone, MessageSquare, Video, MapPin, User, Check, ChevronLeft, ChevronRight, X, AlertCircle, CheckCircle2 } from "lucide-react-native";
 import Colors from "../../constants/Colors";
 import Navbar from "@/components/Navbar";
 import Header from "@/components/Header";
@@ -85,6 +85,7 @@ export default function LawyerBookingView() {
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedDay, setSelectedDay] = useState(currentDate);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   
   const months = [
     "January",
@@ -103,7 +104,6 @@ export default function LawyerBookingView() {
   const communicationModes = ["Online", "In-person", "Phone"];
 
   const isMediumScreen = width >= 375 && width < 768;
-  const isLargeScreen = width >= 768;
 
   const parseHoursAvailable = (hoursData: any): DayAvailability[] | Record<string, string[]> => {
     if (!hoursData) return [];
@@ -172,36 +172,81 @@ export default function LawyerBookingView() {
   const timeSlots: TimeSlot[] = getTimeSlotsForSelectedDay();
 
   const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    // RFC 5322 compliant email regex (simplified)
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    return emailRegex.test(email.trim());
   };
 
   const validateMobileNumber = (mobile: string): boolean => {
-    const mobileRegex = /^[+]?[\d\s\-\(\)]{10,}$/;
-    return mobileRegex.test(mobile.trim());
+    // Remove all non-digit characters for validation
+    const digitsOnly = mobile.replace(/\D/g, '');
+    
+    // Philippine mobile numbers: 10 digits (09XXXXXXXXX) or 11 digits with country code (639XXXXXXXXX)
+    // International format: 8-15 digits
+    if (mobile.startsWith('+63')) {
+      // Philippine format with +63: should have 12 digits total (63 + 10 digits)
+      return digitsOnly.length === 12 && digitsOnly.startsWith('63');
+    } else if (mobile.startsWith('09')) {
+      // Philippine format without country code: should have 11 digits
+      return digitsOnly.length === 11 && digitsOnly.startsWith('09');
+    } else if (mobile.startsWith('+')) {
+      // International format: 8-15 digits after +
+      return digitsOnly.length >= 8 && digitsOnly.length <= 15;
+    } else {
+      // Generic validation: at least 10 digits
+      return digitsOnly.length >= 10 && digitsOnly.length <= 15;
+    }
   };
 
   const validateBookingForm = (): ValidationErrors => {
     const errors: ValidationErrors = {};
 
+    // Email validation
     if (!email.trim()) {
       errors.email = "Email address is required";
+    } else if (email.trim().length < 5) {
+      errors.email = "Email address is too short";
+    } else if (email.trim().length > 254) {
+      errors.email = "Email address is too long";
     } else if (!validateEmail(email.trim())) {
-      errors.email = "Please enter a valid email address";
+      errors.email = "Please enter a valid email address (e.g., name@example.com)";
     }
 
+    // Mobile number validation
     if (!mobileNumber.trim()) {
       errors.mobileNumber = "Mobile number is required";
     } else if (!validateMobileNumber(mobileNumber)) {
-      errors.mobileNumber = "Please enter a valid mobile number";
+      const digitsOnly = mobileNumber.replace(/\D/g, '');
+      if (digitsOnly.length < 10) {
+        errors.mobileNumber = "Mobile number is too short (minimum 10 digits)";
+      } else if (digitsOnly.length > 15) {
+        errors.mobileNumber = "Mobile number is too long (maximum 15 digits)";
+      } else {
+        errors.mobileNumber = "Please enter a valid mobile number (e.g., +63 912 345 6789)";
+      }
     }
 
+    // Concern validation
     if (!concern.trim()) {
-      errors.concern = "Please describe your concern";
+      errors.concern = "Please describe your legal concern";
+    } else if (concern.trim().length < 10) {
+      errors.concern = "Please provide more details (minimum 10 characters)";
+    } else if (concern.trim().length > 2000) {
+      errors.concern = "Concern is too long (maximum 2000 characters)";
     }
 
+    // Time slot validation
     if (!selectedTimeSlot) {
       errors.timeSlot = "Please select a time slot";
+    }
+
+    // Date validation (ensure not in the past)
+    const selectedDate = new Date(selectedYear, selectedMonth, selectedDay);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      errors.timeSlot = "Cannot book consultation for past dates";
     }
 
     return errors;
@@ -295,6 +340,7 @@ export default function LawyerBookingView() {
 
     const prevMonthLastDay = new Date(year, month, 0).getDate();
 
+    // Previous month days
     for (let i = daysFromPrevMonth - 1; i >= 0; i--) {
       const date = prevMonthLastDay - i;
       const dayDate = new Date(year, month - 1, date);
@@ -308,6 +354,7 @@ export default function LawyerBookingView() {
       });
     }
 
+    // Current month days
     for (let i = 1; i <= lastDay.getDate(); i++) {
       const dayDate = new Date(year, month, i);
       const isToday =
@@ -328,6 +375,7 @@ export default function LawyerBookingView() {
       });
     }
 
+    // Next month days
     for (let i = 1; i <= daysFromNextMonth; i++) {
       const dayDate = new Date(year, month + 1, i);
 
@@ -346,16 +394,28 @@ export default function LawyerBookingView() {
   useEffect(() => {
     setCalendarDays(generateCalendarDays(selectedMonth, selectedYear));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, selectedDay]);
+
+  const canNavigateToPrevious = useMemo(() => {
+    if (selectedYear < currentYear) return false;
+    if (selectedYear === currentYear && selectedMonth <= currentMonth) return false;
+    return true;
+  }, [selectedMonth, selectedYear, currentMonth, currentYear]);
 
   const navigateToPreviousMonth = () => {
+    if (!canNavigateToPrevious) return;
+    
     if (selectedMonth === 0) {
       setSelectedMonth(11);
       setSelectedYear(selectedYear - 1);
     } else {
       setSelectedMonth(selectedMonth - 1);
     }
-    setSelectedDay(1);
+    // Set to first available day of new month
+    const newDate = new Date(selectedYear, selectedMonth - 1, 1);
+    const firstAvailableDay = newDate < today ? today.getDate() : 1;
+    setSelectedDay(firstAvailableDay);
+    setSelectedTimeSlot("");
   };
 
   const navigateToNextMonth = () => {
@@ -366,9 +426,13 @@ export default function LawyerBookingView() {
       setSelectedMonth(selectedMonth + 1);
     }
     setSelectedDay(1);
+    setSelectedTimeSlot("");
   };
 
   const handleDaySelect = (day: CalendarDay) => {
+    // Simulate loading for better UX
+    setIsLoadingSlots(true);
+    
     if (!day.isCurrentMonth) {
       setSelectedMonth(day.month);
       setSelectedYear(day.year);
@@ -380,6 +444,9 @@ export default function LawyerBookingView() {
     if (validationErrors.timeSlot) {
       setValidationErrors((prev) => ({ ...prev, timeSlot: undefined }));
     }
+
+    // Simulate async loading
+    setTimeout(() => setIsLoadingSlots(false), 300);
   };
 
   const handleBackPress = () => {
@@ -477,22 +544,46 @@ export default function LawyerBookingView() {
 
   const handleEmailChange = (value: string) => {
     setEmail(value);
-    if (validationErrors.email) {
-      setValidationErrors((prev) => ({ ...prev, email: undefined }));
+    
+    // Real-time validation
+    if (value.trim() && validationErrors.email) {
+      // Clear error if user is typing and field is not empty
+      if (value.trim().length >= 5 && validateEmail(value.trim())) {
+        setValidationErrors((prev) => ({ ...prev, email: undefined }));
+      }
+    } else if (!value.trim() && validationErrors.email) {
+      // Keep showing error if field is empty
+      setValidationErrors((prev) => ({ ...prev, email: "Email address is required" }));
     }
   };
 
   const handleMobileChange = (value: string) => {
     setMobileNumber(value);
-    if (validationErrors.mobileNumber) {
-      setValidationErrors((prev) => ({ ...prev, mobileNumber: undefined }));
+    
+    // Real-time validation
+    if (value.trim() && validationErrors.mobileNumber) {
+      // Clear error if valid
+      if (validateMobileNumber(value)) {
+        setValidationErrors((prev) => ({ ...prev, mobileNumber: undefined }));
+      }
+    } else if (!value.trim() && validationErrors.mobileNumber) {
+      // Keep showing error if field is empty
+      setValidationErrors((prev) => ({ ...prev, mobileNumber: "Mobile number is required" }));
     }
   };
 
   const handleConcernChange = (value: string) => {
     setConcern(value);
-    if (validationErrors.concern) {
-      setValidationErrors((prev) => ({ ...prev, concern: undefined }));
+    
+    // Real-time validation
+    if (value.trim() && validationErrors.concern) {
+      // Clear error if user has typed enough
+      if (value.trim().length >= 10) {
+        setValidationErrors((prev) => ({ ...prev, concern: undefined }));
+      }
+    } else if (!value.trim() && validationErrors.concern) {
+      // Keep showing error if field is empty
+      setValidationErrors((prev) => ({ ...prev, concern: "Please describe your legal concern" }));
     }
   };
 
@@ -529,51 +620,63 @@ export default function LawyerBookingView() {
         showsVerticalScrollIndicator={false}
       >
         {/* Lawyer Profile Card - Modern Design */}
-        <VStack className={`${isSmallScreen ? 'mx-3 p-4' : 'mx-4 p-5'} mt-4 mb-3 bg-white rounded-2xl shadow-sm`}>
-          <HStack className="items-center mb-4">
+        <VStack className={`${isSmallScreen ? 'mx-3 p-5' : 'mx-4 p-6'} mt-4 mb-3 bg-white rounded-2xl`} style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }}>
+          <HStack className="items-start mb-5">
             <Box
               className={`${
-                isSmallScreen ? "w-16 h-16" : "w-20 h-20"
-              } rounded-full items-center justify-center mr-4`}
-              style={{ backgroundColor: Colors.primary.blue }}
+                isSmallScreen ? "w-20 h-20" : "w-24 h-24"
+              } rounded-2xl items-center justify-center mr-4`}
+              style={{ backgroundColor: Colors.primary.blue, shadowColor: Colors.primary.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
             >
-              <User size={isSmallScreen ? 32 : 40} color="white" strokeWidth={2} />
+              <User size={isSmallScreen ? 36 : 44} color="white" strokeWidth={2.5} />
             </Box>
             <VStack className="flex-1">
               <Text
                 className={`${
-                  isSmallScreen ? "text-lg" : "text-xl"
-                } font-bold mb-1`}
-                style={{ color: Colors.text.head }}
+                  isSmallScreen ? "text-xl" : "text-2xl"
+                } font-bold mb-2`}
+                style={{ color: Colors.text.head, letterSpacing: -0.5 }}
               >
                 {lawyerData.name}
               </Text>
-              <HStack className="items-center">
-                <Calendar size={14} color={Colors.text.sub} strokeWidth={2} />
-                <Text className="text-sm ml-1.5" style={{ color: Colors.text.sub }}>
-                  {lawyerData.days}
-                </Text>
+              <HStack className="items-center mb-2">
+                <Box className="px-2 py-1 rounded-md" style={{ backgroundColor: '#ECFDF5' }}>
+                  <Text className="text-xs font-semibold" style={{ color: '#059669' }}>
+                    Available
+                  </Text>
+                </Box>
               </HStack>
+              {lawyerData.hours_available && Object.keys(lawyerData.hours_available).length > 0 && (
+                <HStack className="items-center">
+                  <Calendar size={16} color={Colors.text.sub} strokeWidth={2} />
+                  <Text className="text-sm ml-2 font-medium" style={{ color: Colors.text.sub }}>
+                    {Object.keys(lawyerData.hours_available).join(', ')}
+                  </Text>
+                </HStack>
+              )}
             </VStack>
           </HStack>
 
           {/* Specializations - Modern Pills */}
-          <VStack className="mb-4">
-            <Text className="text-xs font-semibold mb-2" style={{ color: Colors.text.secondary }}>
-              SPECIALIZATIONS
-            </Text>
+          <VStack className="mb-5 pb-5 border-b" style={{ borderColor: '#F3F4F6' }}>
+            <HStack className="items-center mb-3">
+              <Box className="w-1 h-4 rounded-full mr-2" style={{ backgroundColor: Colors.primary.blue }} />
+              <Text className="text-xs font-bold tracking-wide" style={{ color: Colors.text.secondary }}>
+                SPECIALIZATIONS
+              </Text>
+            </HStack>
             <HStack className="flex-wrap">
-              <Box className="px-3 py-1.5 rounded-full mr-2 mb-2" style={{ backgroundColor: '#EFF6FF' }}>
-                <Text className="text-sm font-medium" style={{ color: Colors.primary.blue }}>
+              <Box className="px-4 py-2 rounded-full mr-2 mb-2" style={{ backgroundColor: Colors.primary.blue, shadowColor: Colors.primary.blue, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 2 }}>
+                <Text className="text-sm font-bold" style={{ color: 'white' }}>
                   {primarySpecialization}
                 </Text>
               </Box>
               {additionalCount > 0 && (
                 <TouchableOpacity
                   onPress={() => setShowAllSpecializations(!showAllSpecializations)}
-                  style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: '#F3F4F6', marginRight: 8, marginBottom: 8 }}
+                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: '#F0F9FF', marginRight: 8, marginBottom: 8, borderWidth: 1, borderColor: '#BFDBFE' }}
                 >
-                  <Text className="text-sm font-medium" style={{ color: Colors.primary.blue }}>
+                  <Text className="text-sm font-bold" style={{ color: Colors.primary.blue }}>
                     +{additionalCount} more
                   </Text>
                 </TouchableOpacity>
@@ -582,46 +685,49 @@ export default function LawyerBookingView() {
           </VStack>
 
           {showAllSpecializations && (
-            <Box className="mb-4 p-3 bg-gray-100 rounded-lg w-full">
+            <Box className="mb-5 p-4 rounded-xl w-full" style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }}>
               <Text
-                className="text-sm font-semibold mb-2 text-center"
+                className="text-sm font-bold mb-3"
                 style={{ color: Colors.text.head }}
               >
-                All Specializations:
+                All Specializations
               </Text>
-              {lawyerData.specialization.map((spec, index) => (
-                <Text
-                  key={index}
-                  className="text-sm text-center"
-                  style={{ color: Colors.text.sub }}
-                >
-                  • {spec}
-                </Text>
-              ))}
+              <VStack className="gap-2">
+                {lawyerData.specialization.map((spec, index) => (
+                  <HStack key={index} className="items-center">
+                    <Box className="w-1.5 h-1.5 rounded-full mr-3" style={{ backgroundColor: Colors.primary.blue }} />
+                    <Text
+                      className="text-sm font-medium flex-1"
+                      style={{ color: Colors.text.sub }}
+                    >
+                      {spec}
+                    </Text>
+                  </HStack>
+                ))}
+              </VStack>
             </Box>
           )}
 
           {lawyerData.bio && lawyerData.bio.trim() !== "" ? (
-            <VStack
-              className={`mt-4 p-4 bg-gray-50 rounded-lg ${
-                isLargeScreen ? "mx-8" : "mx-0"
-              }`}
-            >
-              <Text className="text-xs font-semibold mb-3" style={{ color: Colors.text.secondary }}>
-                ABOUT
-              </Text>
+            <VStack>
+              <HStack className="items-center mb-3">
+                <Box className="w-1 h-4 rounded-full mr-2" style={{ backgroundColor: Colors.primary.blue }} />
+                <Text className="text-xs font-bold tracking-wide" style={{ color: Colors.text.secondary }}>
+                  ABOUT
+                </Text>
+              </HStack>
 
               <Text
                 className={`${
                   isSmallScreen
-                    ? "text-xs leading-5"
-                    : isMediumScreen
                     ? "text-sm leading-6"
+                    : isMediumScreen
+                    ? "text-base leading-7"
                     : "text-base leading-7"
                 }`}
                 style={{
                   color: Colors.text.sub,
-                  textAlign: "justify",
+                  textAlign: "left",
                 }}
               >
                 {showFullBio || !shouldShowReadMore
@@ -632,44 +738,63 @@ export default function LawyerBookingView() {
               {shouldShowReadMore && (
                 <Pressable
                   onPress={() => setShowFullBio(!showFullBio)}
-                  className="mt-2"
+                  className="mt-3"
                 >
-                  <Text
-                    className={`${
-                      isSmallScreen ? "text-xs" : "text-sm"
-                    } font-medium`}
-                    style={{ color: Colors.primary.blue }}
-                  >
-                    {showFullBio ? "Show Less" : "Read More"}
-                  </Text>
+                  <HStack className="items-center">
+                    <Text
+                      className={`${
+                        isSmallScreen ? "text-sm" : "text-sm"
+                      } font-bold`}
+                      style={{ color: Colors.primary.blue }}
+                    >
+                      {showFullBio ? "Show Less" : "Read More"}
+                    </Text>
+                    <ChevronRight size={16} color={Colors.primary.blue} strokeWidth={2.5} style={{ transform: [{ rotate: showFullBio ? '90deg' : '0deg' }] }} />
+                  </HStack>
                 </Pressable>
               )}
             </VStack>
           ) : (
-            <Box className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <Text className="text-sm italic text-center" style={{ color: Colors.text.sub }}>
+            <VStack className="items-center py-6">
+              <Box className="w-12 h-12 rounded-full items-center justify-center mb-2" style={{ backgroundColor: '#F3F4F6' }}>
+                <User size={24} color={Colors.text.sub} strokeWidth={1.5} />
+              </Box>
+              <Text className="text-sm font-medium" style={{ color: Colors.text.sub }}>
                 No bio available
               </Text>
-            </Box>
+            </VStack>
           )}
         </VStack>
 
         {/* Schedule - Modern Card */}
-        <VStack className={`${isSmallScreen ? 'mx-3 p-4' : 'mx-4 p-5'} mb-3 bg-white rounded-2xl shadow-sm`}>
-          <HStack className="items-center mb-4">
-            <Clock size={20} color={Colors.primary.blue} strokeWidth={2} />
-            <Text className="text-lg font-bold ml-2" style={{ color: Colors.text.head }}>
-              Select Date & Time
-            </Text>
+        <VStack className={`${isSmallScreen ? 'mx-3 p-5' : 'mx-4 p-6'} mb-3 bg-white rounded-2xl`} style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }}>
+          <HStack className="items-center mb-5">
+            <Box className="w-10 h-10 rounded-xl items-center justify-center mr-3" style={{ backgroundColor: '#EFF6FF' }}>
+              <Clock size={20} color={Colors.primary.blue} strokeWidth={2.5} />
+            </Box>
+            <VStack className="flex-1">
+              <Text className="text-lg font-bold" style={{ color: Colors.text.head }}>
+                Select Date & Time
+              </Text>
+              <Text className="text-xs" style={{ color: Colors.text.sub }}>
+                Choose your preferred slot
+              </Text>
+            </VStack>
           </HStack>
 
           {/* Calendar Navigation - Modern */}
           <HStack className="items-center justify-between mb-4 px-2">
             <TouchableOpacity
               onPress={navigateToPreviousMonth}
-              style={{ padding: 8, borderRadius: 8, backgroundColor: '#F9FAFB' }}
+              disabled={!canNavigateToPrevious}
+              style={{ 
+                padding: 8, 
+                borderRadius: 8, 
+                backgroundColor: canNavigateToPrevious ? '#F9FAFB' : '#F3F4F6',
+                opacity: canNavigateToPrevious ? 1 : 0.4
+              }}
             >
-              <ChevronLeft size={20} color={Colors.primary.blue} strokeWidth={2.5} />
+              <ChevronLeft size={20} color={canNavigateToPrevious ? Colors.primary.blue : '#9CA3AF'} strokeWidth={2.5} />
             </TouchableOpacity>
 
             <Text className="text-base font-bold" style={{ color: Colors.text.head }}>
@@ -685,83 +810,119 @@ export default function LawyerBookingView() {
           </HStack>
 
           {/* Calendar Grid */}
-          <HStack className="flex-wrap justify-between mb-4">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-              <Box
-                key={day}
-                className={`${
-                  isSmallScreen ? "w-10" : "w-12"
-                } items-center mb-2`}
-              >
-                <Text
-                  className="text-xs font-semibold"
-                  style={{ color: Colors.text.sub }}
-                >
-                  {day}
-                </Text>
-              </Box>
-            ))}
-
-            {calendarDays.map((day) => {
-              const dayDate = new Date(day.year, day.month, day.date);
-              const isPastDay =
-                dayDate <
-                new Date(
-                  today.getFullYear(),
-                  today.getMonth(),
-                  today.getDate()
-                );
-
-              return (
-                <Pressable
-                  key={`${day.month}-${day.date}`}
-                  className={`${
-                    isSmallScreen ? "w-10 h-10" : "w-12 h-12"
-                  } rounded-lg items-center justify-center mb-1`}
-                  disabled={!day.isCurrentMonth || isPastDay} // 🔒 disable past days
-                  style={{
-                    backgroundColor: day.isSelected
-                      ? Colors.primary.blue
-                      : day.isToday
-                      ? "#E3F2FD"
-                      : "transparent",
-                    opacity: !day.isCurrentMonth || isPastDay ? 0.3 : 1, // faded style for past days
-                  }}
-                  onPress={() => {
-                    if (!isPastDay) handleDaySelect(day);
-                  }}
+          <VStack className="mb-4">
+            {/* Day Headers */}
+            <HStack className="mb-2" style={{ width: '100%' }}>
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                <Box
+                  key={day}
+                  style={{ flex: 1, alignItems: 'center' }}
                 >
                   <Text
-                    className={`${
-                      isSmallScreen ? "text-sm" : "text-base"
-                    } font-medium`}
+                    className="text-xs font-semibold"
+                    style={{ color: Colors.text.sub }}
+                  >
+                    {day}
+                  </Text>
+                </Box>
+              ))}
+            </HStack>
+
+            {/* Calendar Days Grid */}
+            <HStack className="flex-wrap" style={{ width: '100%' }}>
+              {calendarDays.map((day) => {
+                const dayDate = new Date(day.year, day.month, day.date);
+                const isPastDay =
+                  dayDate <
+                  new Date(
+                    today.getFullYear(),
+                    today.getMonth(),
+                    today.getDate()
+                  );
+
+                return (
+                  <Pressable
+                    key={`${day.month}-${day.date}`}
                     style={{
-                      color: day.isSelected
-                        ? "white"
-                        : day.isToday
+                      width: `${100 / 7}%`,
+                      aspectRatio: 1,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 4,
+                      borderRadius: 12,
+                      backgroundColor: day.isSelected
                         ? Colors.primary.blue
-                        : Colors.text.head,
+                        : day.isToday
+                        ? "#DBEAFE"
+                        : "transparent",
+                      opacity: !day.isCurrentMonth || isPastDay ? 0.3 : 1,
+                      borderWidth: day.isToday && !day.isSelected ? 2 : 0,
+                      borderColor: Colors.primary.blue,
+                    }}
+                    disabled={!day.isCurrentMonth || isPastDay}
+                    onPress={() => {
+                      if (!isPastDay) handleDaySelect(day);
                     }}
                   >
-                    {day.date}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </HStack>
+                    <Text
+                      className={`${
+                        isSmallScreen ? "text-sm" : "text-base"
+                      } ${
+                        day.isSelected || day.isToday ? "font-bold" : "font-medium"
+                      }`}
+                      style={{
+                        color: day.isSelected
+                          ? "white"
+                          : day.isToday
+                          ? Colors.primary.blue
+                          : day.isCurrentMonth
+                          ? Colors.text.head
+                          : Colors.text.tertiary,
+                      }}
+                    >
+                      {day.date}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </HStack>
+          </VStack>
 
           {/* Time Slots - Modern Grid */}
-          <Text className="text-sm font-semibold mb-3" style={{ color: Colors.text.head }}>
-            Available Time Slots
-          </Text>
-          {validationErrors.timeSlot && (
-            <Text className="text-red-500 text-xs mb-2">
-              {validationErrors.timeSlot}
-            </Text>
-          )}
-          <VStack>
+          <VStack className="mt-4 pt-4 border-t" style={{ borderColor: '#E5E7EB' }}>
+            <HStack className="items-center justify-between mb-3">
+              <HStack className="items-center">
+                <Clock size={16} color={Colors.primary.blue} strokeWidth={2} />
+                <Text className="text-sm font-semibold ml-2" style={{ color: Colors.text.head }}>
+                  Available Time Slots
+                </Text>
+              </HStack>
+              {timeSlots.length > 0 && (
+                <Box className="px-2 py-1 rounded-full" style={{ backgroundColor: '#ECFDF5' }}>
+                  <Text className="text-xs font-semibold" style={{ color: '#059669' }}>
+                    {timeSlots.length} slots
+                  </Text>
+                </Box>
+              )}
+            </HStack>
+            
+            {validationErrors.timeSlot && (
+              <HStack className="items-center mb-2 p-2 rounded-lg" style={{ backgroundColor: '#FEE2E2' }}>
+                <AlertCircle size={14} color="#DC2626" strokeWidth={2} />
+                <Text className="text-xs ml-2" style={{ color: '#DC2626' }}>
+                  {validationErrors.timeSlot}
+                </Text>
+              </HStack>
+            )}
 
-            {timeSlots.length > 0 ? (
+            {isLoadingSlots ? (
+              <HStack className="items-center justify-center py-8">
+                <ActivityIndicator size="small" color={Colors.primary.blue} />
+                <Text className="text-sm ml-2" style={{ color: Colors.text.sub }}>
+                  Loading available slots...
+                </Text>
+              </HStack>
+            ) : timeSlots.length > 0 ? (
               <HStack className="flex-wrap">
                 {timeSlots.map((slot) => {
                   const selectedDate = new Date(
@@ -794,14 +955,19 @@ export default function LawyerBookingView() {
                       disabled={isDisabled}
                       style={{
                         paddingHorizontal: 16,
-                        paddingVertical: 10,
+                        paddingVertical: 12,
                         borderRadius: 12,
                         marginRight: 8,
                         marginBottom: 8,
-                        borderWidth: selectedTimeSlot === slot.id ? 0 : 1,
+                        borderWidth: 2,
                         backgroundColor: selectedTimeSlot === slot.id ? Colors.primary.blue : 'white',
-                        borderColor: '#E5E7EB',
+                        borderColor: selectedTimeSlot === slot.id ? Colors.primary.blue : '#E5E7EB',
                         opacity: isDisabled ? 0.4 : 1,
+                        shadowColor: selectedTimeSlot === slot.id ? Colors.primary.blue : '#000',
+                        shadowOffset: { width: 0, height: selectedTimeSlot === slot.id ? 2 : 0 },
+                        shadowOpacity: selectedTimeSlot === slot.id ? 0.2 : 0,
+                        shadowRadius: 4,
+                        elevation: selectedTimeSlot === slot.id ? 2 : 0,
                       }}
                       onPress={() => {
                         if (!isDisabled) {
@@ -816,42 +982,62 @@ export default function LawyerBookingView() {
                       }}
                     >
                       <HStack className="items-center">
-                        <Clock size={14} color={selectedTimeSlot === slot.id ? "white" : Colors.text.sub} strokeWidth={2} />
+                        <Clock size={16} color={selectedTimeSlot === slot.id ? "white" : Colors.text.sub} strokeWidth={2} />
                         <Text
-                          className="text-sm font-semibold ml-1.5"
+                          className="text-sm font-bold ml-2"
                           style={{
                             color: selectedTimeSlot === slot.id ? "white" : Colors.text.head,
                           }}
                         >
                           {slot.time}
                         </Text>
+                        {selectedTimeSlot === slot.id && (
+                          <Box className="ml-2">
+                            <CheckCircle2 size={14} color="white" strokeWidth={2.5} />
+                          </Box>
+                        )}
                       </HStack>
                     </TouchableOpacity>
                   );
                 })}
               </HStack>
             ) : (
-              <Text className="text-sm text-gray-500">
-                No available slots for the selected day
-              </Text>
+              <VStack className="items-center py-8">
+                <Box className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: '#F3F4F6' }}>
+                  <Clock size={32} color={Colors.text.sub} strokeWidth={1.5} />
+                </Box>
+                <Text className="text-sm font-medium mb-1" style={{ color: Colors.text.head }}>
+                  No Available Slots
+                </Text>
+                <Text className="text-xs text-center" style={{ color: Colors.text.sub }}>
+                  Please select a different day
+                </Text>
+              </VStack>
             )}
           </VStack>
         </VStack>
 
         {/* Contact Info - Modern Card */}
-        <VStack className={`${isSmallScreen ? 'mx-3 p-4' : 'mx-4 p-5'} mb-3 bg-white rounded-2xl shadow-sm`}>
-          <HStack className="items-center mb-4">
-            <MessageSquare size={20} color={Colors.primary.blue} strokeWidth={2} />
-            <Text className="text-lg font-bold ml-2" style={{ color: Colors.text.head }}>
-              Your Information
-            </Text>
+        <VStack className={`${isSmallScreen ? 'mx-3 p-5' : 'mx-4 p-6'} mb-3 bg-white rounded-2xl`} style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }}>
+          <HStack className="items-center mb-5">
+            <Box className="w-10 h-10 rounded-xl items-center justify-center mr-3" style={{ backgroundColor: '#EFF6FF' }}>
+              <MessageSquare size={20} color={Colors.primary.blue} strokeWidth={2.5} />
+            </Box>
+            <VStack className="flex-1">
+              <Text className="text-lg font-bold" style={{ color: Colors.text.head }}>
+                Your Information
+              </Text>
+              <Text className="text-xs" style={{ color: Colors.text.sub }}>
+                Contact details
+              </Text>
+            </VStack>
           </HStack>
 
-          <VStack className="mb-3">
-            <Text className="text-xs font-semibold mb-2" style={{ color: Colors.text.secondary }}>
+          <VStack className="mb-4">
+            <Text className="text-xs font-bold mb-2 tracking-wide" style={{ color: Colors.text.secondary }}>
               EMAIL ADDRESS
             </Text>
-            <HStack className={`items-center ${isSmallScreen ? 'px-3 py-3' : 'px-4 py-3.5'} rounded-lg border`} style={{ borderColor: validationErrors.email ? '#EF4444' : '#E5E7EB', backgroundColor: 'white' }}>
+            <HStack className={`items-center ${isSmallScreen ? 'px-4 py-3.5' : 'px-4 py-4'} rounded-xl border-2`} style={{ borderColor: validationErrors.email ? '#EF4444' : '#E5E7EB', backgroundColor: '#FAFAFA' }}>
               <Mail size={18} color={validationErrors.email ? '#EF4444' : Colors.text.sub} strokeWidth={2} />
               <TextInput
                 style={{ flex: 1, marginLeft: 8, color: Colors.text.head, fontSize: 14, padding: 0, outlineStyle: 'none' } as any}
@@ -859,6 +1045,9 @@ export default function LawyerBookingView() {
                 onChangeText={handleEmailChange}
                 placeholder="your.email@example.com"
                 keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
                 placeholderTextColor={Colors.text.tertiary}
               />
             </HStack>
@@ -869,11 +1058,11 @@ export default function LawyerBookingView() {
             )}
           </VStack>
 
-          <VStack className="mb-3">
-            <Text className="text-xs font-semibold mb-2" style={{ color: Colors.text.secondary }}>
+          <VStack className="mb-4">
+            <Text className="text-xs font-bold mb-2 tracking-wide" style={{ color: Colors.text.secondary }}>
               MOBILE NUMBER
             </Text>
-            <HStack className={`items-center ${isSmallScreen ? 'px-3 py-3' : 'px-4 py-3.5'} rounded-lg border`} style={{ borderColor: validationErrors.mobileNumber ? '#EF4444' : '#E5E7EB', backgroundColor: 'white' }}>
+            <HStack className={`items-center ${isSmallScreen ? 'px-4 py-3.5' : 'px-4 py-4'} rounded-xl border-2`} style={{ borderColor: validationErrors.mobileNumber ? '#EF4444' : '#E5E7EB', backgroundColor: '#FAFAFA' }}>
               <Phone size={18} color={validationErrors.mobileNumber ? '#EF4444' : Colors.text.sub} strokeWidth={2} />
               <TextInput
                 style={{ flex: 1, marginLeft: 8, color: Colors.text.head, fontSize: 14, padding: 0, outlineStyle: 'none' } as any}
@@ -881,6 +1070,8 @@ export default function LawyerBookingView() {
                 onChangeText={handleMobileChange}
                 placeholder="+63 912 345 6789"
                 keyboardType="phone-pad"
+                autoComplete="tel"
+                maxLength={20}
                 placeholderTextColor={Colors.text.tertiary}
               />
             </HStack>
@@ -891,8 +1082,8 @@ export default function LawyerBookingView() {
             )}
           </VStack>
 
-          <VStack className="mb-3">
-            <Text className="text-xs font-semibold mb-2" style={{ color: Colors.text.secondary }}>
+          <VStack className="mb-4">
+            <Text className="text-xs font-bold mb-2 tracking-wide" style={{ color: Colors.text.secondary }}>
               CONSULTATION MODE
             </Text>
             <VStack className="gap-2">
@@ -935,10 +1126,10 @@ export default function LawyerBookingView() {
           </VStack>
 
           <VStack>
-            <Text className="text-xs font-semibold mb-2" style={{ color: Colors.text.secondary }}>
+            <Text className="text-xs font-bold mb-2 tracking-wide" style={{ color: Colors.text.secondary }}>
               YOUR CONCERN
             </Text>
-            <Box className={`${isSmallScreen ? 'px-3 py-3' : 'px-4 py-3'} rounded-lg border`} style={{ borderColor: validationErrors.concern ? '#EF4444' : '#E5E7EB', minHeight: 100, backgroundColor: 'white' }}>
+            <Box className={`${isSmallScreen ? 'px-4 py-3.5' : 'px-4 py-4'} rounded-xl border-2`} style={{ borderColor: validationErrors.concern ? '#EF4444' : '#E5E7EB', minHeight: 120, backgroundColor: '#FAFAFA' }}>
               <TextInput
                 style={{
                   color: Colors.text.head,
@@ -950,15 +1141,21 @@ export default function LawyerBookingView() {
                 } as any}
                 value={concern}
                 onChangeText={handleConcernChange}
-                placeholder="Please describe your legal concern in detail..."
+                placeholder="Describe your legal concern (minimum 10 characters)"
                 placeholderTextColor={Colors.text.tertiary}
                 multiline
                 numberOfLines={5}
+                maxLength={2000}
               />
             </Box>
             {validationErrors.concern && (
               <Text className="text-red-500 text-xs mt-1">
                 {validationErrors.concern}
+              </Text>
+            )}
+            {!validationErrors.concern && concern.trim() && (
+              <Text className="text-xs mt-1" style={{ color: Colors.text.sub }}>
+                {concern.trim().length}/2000 characters
               </Text>
             )}
           </VStack>
@@ -971,25 +1168,30 @@ export default function LawyerBookingView() {
             disabled={isSubmitting}
             style={{
               backgroundColor: isSubmitting ? '#9CA3AF' : Colors.primary.blue,
-              paddingVertical: 14,
-              borderRadius: 12,
+              paddingVertical: 16,
+              borderRadius: 16,
               opacity: isSubmitting ? 0.7 : 1,
             }}
           >
             <HStack className="items-center justify-center">
-              {!isSubmitting && (
-                <Calendar size={20} color="white" strokeWidth={2} />
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Calendar size={22} color="white" strokeWidth={2.5} />
               )}
-              <Text className="text-white font-bold text-base ml-2">
+              <Text className="text-white font-bold text-lg ml-2">
                 {isSubmitting
                   ? "Processing..."
                   : `Book Consultation`}
               </Text>
             </HStack>
           </TouchableOpacity>
-          <Text className="text-xs text-center mt-2" style={{ color: Colors.text.sub }}>
-            You&apos;ll receive a confirmation email shortly
-          </Text>
+          <HStack className="items-center justify-center mt-3">
+            <CheckCircle2 size={14} color={Colors.text.sub} strokeWidth={2} />
+            <Text className="text-xs ml-1.5" style={{ color: Colors.text.sub }}>
+              You&apos;ll receive a confirmation email shortly
+            </Text>
+          </HStack>
         </Box>
       </ScrollView>
 

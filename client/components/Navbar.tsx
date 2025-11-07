@@ -65,11 +65,13 @@ const Navbar: React.FC<NavbarProps> = ({
     }
 
     // Default navigation behavior
+    console.log(`[Navbar] Navigating to tab: ${tabId}`);
     switch (tabId) {
       case 'home':
         router.push('/home');
         break;
       case 'learn':
+        console.log('[Navbar] Pushing to /glossary');
         router.push('/glossary');
         break;
       case 'ask':
