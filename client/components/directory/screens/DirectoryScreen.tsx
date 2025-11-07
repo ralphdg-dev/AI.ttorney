@@ -26,7 +26,7 @@ import Navbar from "../../Navbar";
 import { SidebarWrapper } from "../../AppSidebar";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../../contexts/AuthContext";
-import SearchBarWithFilter from "../../common/SearchBarWithFilter";
+import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 
 interface Lawyer {
   id: string;
@@ -279,18 +279,19 @@ export default function DirectoryScreen() {
         // Law Firms Tab - Google Law Firms Finder
         <GoogleLawFirmsFinder searchQuery={searchQuery} />
       ) : (
-        // Lawyers Tab - Using SearchBarWithFilter component
+        // Lawyers Tab - Using UnifiedSearchBar component
         <View style={{ flex: 1 }}>
-          <SearchBarWithFilter
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onFilterPress={() => setFilterVisible(true)}
-            placeholder="Search lawyers..."
-            loading={loading}
-            editable={true}
-            maxLength={100}
-            hasActiveFilters={hasActiveFilters}
-          />
+          <View style={{ paddingHorizontal: 20 }}>
+            <UnifiedSearchBar
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search lawyers..."
+              loading={loading}
+              showFilterIcon={true}
+              onFilterPress={() => setFilterVisible(true)}
+              containerClassName="pt-6 pb-4"
+            />
+          </View>
 
           <FilterModal
             visible={filterVisible}
@@ -304,7 +305,7 @@ export default function DirectoryScreen() {
           <ScrollView
               style={tw`flex-1 bg-gray-50`}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 60, paddingTop: 12 }}
+              contentContainerStyle={{ paddingBottom: 60, paddingTop: 12, paddingHorizontal: 20 }}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}

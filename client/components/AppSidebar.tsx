@@ -190,16 +190,16 @@ const Sidebar: React.FC<SidebarProps> = ({
       badge: badgeCounts.acceptedConsultations || undefined,
     },
     {
-      id: "notifications",
-      label: "Notifications",
-      icon: Bell,
-      route: "notifications",
-    },
-    {
       id: "divider1",
       label: "",
       icon: View,
       divider: true,
+    },
+    {
+      id: "notifications",
+      label: "Notifications",
+      icon: Bell,
+      route: "notifications",
     },
     {
       id: "settings",

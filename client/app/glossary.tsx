@@ -31,6 +31,7 @@ import {
 import { NetworkConfig } from "@/utils/networkConfig";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBookmarks } from "@/contexts/BookmarksContext";
+import { useFavorites } from "@/contexts/FavoritesContext";
 import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 
 const ITEMS_PER_PAGE = 10;
@@ -44,6 +45,8 @@ export default function GlossaryScreen() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState<boolean>(false);
+  const [showBookmarksOnly, setShowBookmarksOnly] = useState<boolean>(false);
 
   // Terms state
   const [terms, setTerms] = useState<TermItem[]>([]);
@@ -65,6 +68,7 @@ export default function GlossaryScreen() {
   const [displayArticles, setDisplayArticles] = useState<ArticleItem[]>([]);
   const [isSearchingArticles, setIsSearchingArticles] = useState<boolean>(false);
   const { isBookmarked, toggleBookmark } = useBookmarks();
+  const { isFavorite } = useFavorites();
   
   // Animation and layout
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -74,7 +78,7 @@ export default function GlossaryScreen() {
   // Responsive design
   const isTablet = screenWidth >= 768;
   const isDesktop = screenWidth >= 1024;
-  const horizontalPadding = isDesktop ? 32 : isTablet ? 24 : 16;
+  const horizontalPadding = 20; // Consistent 20px padding across all screen sizes
   const minCardWidth = isDesktop ? 320 : isTablet ? 280 : 300;
   const numColumns = Math.max(
     1,
@@ -255,12 +259,20 @@ export default function GlossaryScreen() {
   // Handle data differently for terms (server-side pagination) vs articles (client-side pagination)
   const currentData = useMemo(() => {
     if (activeTab === "terms") {
-      // For terms, return the data as-is since pagination is handled server-side
+      // For terms, apply favorites filter if enabled
+      if (showFavoritesOnly && !isGuestMode) {
+        return terms.filter(term => isFavorite(term.id));
+      }
       return terms;
     } else {
-      return displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: isBookmarked(a.id) }));
+      // For articles, apply bookmarks filter if enabled
+      let articles = displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: isBookmarked(a.id) }));
+      if (showBookmarksOnly && !isGuestMode) {
+        articles = articles.filter(a => a.isBookmarked);
+      }
+      return articles;
     }
-  }, [activeTab, terms, displayArticles, isBookmarked]);
+  }, [activeTab, terms, displayArticles, isBookmarked, isFavorite, showFavoritesOnly, showBookmarksOnly, isGuestMode]);
 
   // Calculate pagination info based on tab
   const totalPages = activeTab === "terms" ? termsTotalPages : Math.ceil(currentData.length / ITEMS_PER_PAGE);
@@ -284,6 +296,8 @@ export default function GlossaryScreen() {
     setCurrentPage(1);
     setActiveCategory("all");
     setSearchQuery("");
+    setShowFavoritesOnly(false);
+    setShowBookmarksOnly(false);
   };
 
   const handleMenuPress = useCallback(() => {
@@ -343,6 +357,61 @@ export default function GlossaryScreen() {
   // Render functions
   const renderListHeader = useCallback(() => (
     <View style={{ marginBottom: isDesktop ? 28 : isTablet ? 24 : 20 }}>
+      {/* Filter Chip */}
+      {!isGuestMode && (
+        <View style={{ marginBottom: 16 }}>
+          <TouchableOpacity
+            onPress={() => {
+              if (activeTab === "terms") {
+                setShowFavoritesOnly(!showFavoritesOnly);
+                setCurrentPage(1);
+              } else {
+                setShowBookmarksOnly(!showBookmarksOnly);
+                setCurrentPage(1);
+              }
+            }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              alignSelf: 'flex-start',
+              paddingVertical: 8,
+              paddingHorizontal: 14,
+              backgroundColor: (activeTab === "terms" ? showFavoritesOnly : showBookmarksOnly) ? Colors.primary.blue : 'white',
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: (activeTab === "terms" ? showFavoritesOnly : showBookmarksOnly) ? Colors.primary.blue : '#D1D5DB',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.05,
+              shadowRadius: 2,
+              elevation: 1,
+            }}
+          >
+            <Ionicons
+              name={(activeTab === "terms" ? showFavoritesOnly : showBookmarksOnly) ? "star" : "star-outline"}
+              size={16}
+              color={(activeTab === "terms" ? showFavoritesOnly : showBookmarksOnly) ? 'white' : Colors.text.sub}
+            />
+            <GSText
+              size="sm"
+              style={{
+                marginLeft: 6,
+                fontSize: 13,
+                fontWeight: '500',
+                color: (activeTab === "terms" ? showFavoritesOnly : showBookmarksOnly) ? 'white' : Colors.text.head,
+              }}
+            >
+              {activeTab === "terms" ? "Favorites" : "Bookmarks"}
+            </GSText>
+            {(activeTab === "terms" ? showFavoritesOnly : showBookmarksOnly) && (
+              <View style={{ marginLeft: 6 }}>
+                <Ionicons name="close-circle" size={16} color="white" />
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
       <HStack className="items-center" style={{ marginBottom: isDesktop ? 16 : 12 }}>
         <Ionicons name="pricetags" size={16} color={Colors.text.sub} />
         <GSText size="sm" className="ml-2 font-semibold text-gray-600">
@@ -354,7 +423,7 @@ export default function GlossaryScreen() {
         onCategoryChange={handleCategoryChange}
       />
     </View>
-  ), [activeCategory, handleCategoryChange, isDesktop, isTablet]);
+  ), [activeCategory, handleCategoryChange, isDesktop, isTablet, activeTab, showFavoritesOnly, showBookmarksOnly, isGuestMode]);
 
   const renderPaginationControls = useCallback(() => {
     // Show pagination if there are multiple pages
@@ -615,13 +684,16 @@ export default function GlossaryScreen() {
         />
       )}
 
-      <UnifiedSearchBar
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
-        loading={termsLoading || articlesLoading}
-        showFilterIcon={true}
-      />
+      <View style={{ paddingHorizontal: 20 }}>
+        <UnifiedSearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
+          loading={termsLoading || articlesLoading}
+          showFilterIcon={false}
+          containerClassName="pt-6 pb-4"
+        />
+      </View>
 
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <FlatList

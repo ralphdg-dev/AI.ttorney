@@ -30,7 +30,7 @@ export default function ConsultationCard({ consultation, index, onViewDetails }:
   return (
     <Box
       key={consultation.id}
-      className="mx-4 bg-white rounded-lg p-3 md:p-4"
+      className="bg-white rounded-lg p-3 md:p-4"
       style={{
         marginBottom: 12,
         marginTop: 0,

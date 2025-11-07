@@ -19,7 +19,7 @@ import ConsultationCard from "@/components/sidebar/consultations/ConsultationCar
 import ConsultationSkeleton from "@/components/sidebar/consultations/ConsultationSkeleton";
 import ConsultationEmptyState from "@/components/sidebar/consultations/ConsultationEmptyState";
 import ConsultationDetailModal from "@/components/sidebar/consultations/ConsultationDetailModal";
-import SearchBarWithFilter from "../components/common/SearchBarWithFilter";
+import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 import ConsultationFilterModal from "../components/sidebar/consultations/ConsultationFilterModal";
 
 export default function ConsultationsScreen() {
@@ -45,6 +45,7 @@ export default function ConsultationsScreen() {
       setLoading(true);
       console.log("🔄 Fetching consultations for user:", user.id);
 
+      // Optimized query with limit for faster initial load
       const { data, error } = await supabase
         .from("consultation_requests")
         .select(
@@ -59,7 +60,8 @@ export default function ConsultationsScreen() {
         )
         .eq("user_id", user.id)
         .is("deleted_at", null)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50); // Limit to 50 most recent for faster loading
 
       if (error) {
         console.error("❌ Error fetching consultations:", error);
@@ -314,23 +316,24 @@ export default function ConsultationsScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header title="My Consultations" showMenu={true} />
       
-      <SearchBarWithFilter
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onFilterPress={() => setFilterModalVisible(true)}
-        placeholder="Search consultations..."
-        loading={authLoading || loading}
-        editable={true}
-        maxLength={100}
-        hasActiveFilters={activeFilter !== "all"}
-      />
-      
       <View style={{ flex: 1 }}>
+        <View style={{ paddingHorizontal: 20 }}>
+          <UnifiedSearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search consultations..."
+            loading={authLoading || loading}
+            showFilterIcon={true}
+            onFilterPress={() => setFilterModalVisible(true)}
+            containerClassName="pt-6 pb-4"
+          />
+        </View>
         
         <ScrollView
           style={tw`flex-1`}
-          contentContainerStyle={{ paddingBottom: 96, paddingTop: 16, flexGrow: 0 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 96, paddingTop: 0, flexGrow: 0 }}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

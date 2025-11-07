@@ -51,7 +51,7 @@ const SkeletonBox = ({ width, height, style }: any) => {
 
 export default function LawyerCardSkeleton() {
   return (
-    <Box className="mx-4 mb-3 bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <Box className="mb-3 bg-white rounded-lg border border-gray-200 overflow-hidden">
       {/* Header Section */}
       <Box className="p-4 pb-3">
         <HStack className="justify-between items-start mb-3">

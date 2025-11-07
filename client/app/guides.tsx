@@ -4,11 +4,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
-import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
-import { Input, InputField, InputSlot } from "@/components/ui/input";
 import { Ionicons } from "@expo/vector-icons";
+import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 import Colors from "@/constants/Colors";
 import { LAYOUT } from "@/constants/LayoutConstants";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
@@ -31,6 +30,7 @@ export default function GuidesScreen() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
+  const [showBookmarksOnly, setShowBookmarksOnly] = useState<boolean>(false);
   const flatListRef = useRef<FlatList>(null);
   const { width } = useWindowDimensions();
   
@@ -89,8 +89,15 @@ export default function GuidesScreen() {
   }, [searchQuery, activeCategory, legalArticles, searchArticles, getArticlesByCategory]);
 
   const articlesToRender: ArticleItem[] = useMemo(() => {
-    return displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: isBookmarked(a.id) }));
-  }, [displayArticles, isBookmarked]);
+    let articles = displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: isBookmarked(a.id) }));
+    
+    // Apply bookmarks filter if enabled
+    if (showBookmarksOnly && !isGuestMode) {
+      articles = articles.filter(a => a.isBookmarked);
+    }
+    
+    return articles;
+  }, [displayArticles, isBookmarked, showBookmarksOnly, isGuestMode]);
 
   // Pagination
   const totalArticles = articlesToRender.length;
@@ -101,7 +108,7 @@ export default function GuidesScreen() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, activeCategory]);
+  }, [searchQuery, activeCategory, showBookmarksOnly]);
 
   const handleCategoryChange = (categoryId: string): void => {
     setActiveCategory(categoryId);
@@ -139,6 +146,56 @@ export default function GuidesScreen() {
 
   const renderListHeader = () => (
     <View>
+      {/* Filter Chip */}
+      {!isGuestMode && (
+        <View style={{ marginBottom: 16 }}>
+          <TouchableOpacity
+            onPress={() => {
+              setShowBookmarksOnly(!showBookmarksOnly);
+              setCurrentPage(1);
+            }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              alignSelf: 'flex-start',
+              paddingVertical: 8,
+              paddingHorizontal: 14,
+              backgroundColor: showBookmarksOnly ? Colors.primary.blue : 'white',
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: showBookmarksOnly ? Colors.primary.blue : '#D1D5DB',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.05,
+              shadowRadius: 2,
+              elevation: 1,
+            }}
+          >
+            <Ionicons
+              name={showBookmarksOnly ? "star" : "star-outline"}
+              size={16}
+              color={showBookmarksOnly ? 'white' : Colors.text.sub}
+            />
+            <GSText
+              size="sm"
+              style={{
+                marginLeft: 6,
+                fontSize: 13,
+                fontWeight: '500',
+                color: showBookmarksOnly ? 'white' : Colors.text.head,
+              }}
+            >
+              Bookmarks
+            </GSText>
+            {showBookmarksOnly && (
+              <View style={{ marginLeft: 6 }}>
+                <Ionicons name="close-circle" size={16} color="white" />
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
       <HStack className="items-center mb-4">
         <Ionicons name="pricetags" size={16} color={Colors.text.sub} />
         <GSText size="sm" bold className="ml-2" style={{ color: Colors.text.sub }}>
@@ -285,23 +342,16 @@ const renderPagination = () => {
         onMenuPress={handleMenuPress}
       />
 
-        <Box className="px-6 pt-6 mb-4">
-          <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
-            <InputSlot className="pl-3">
-              <Ionicons name="search" size={20} color="#9CA3AF" />
-            </InputSlot>
-            <InputField
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search articles"
-              placeholderTextColor="#9CA3AF"
-              className="text-[#313131]"
-            />
-            <InputSlot className="pr-3">
-              <Ionicons name="options" size={20} color={Colors.text.sub} />
-            </InputSlot>
-          </Input>
-        </Box>
+        <View style={{ paddingHorizontal: 20 }}>
+          <UnifiedSearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search articles"
+            loading={loading}
+            showFilterIcon={false}
+            containerClassName="pt-6 pb-4"
+          />
+        </View>
 
         {loading ? (
         <ArticleCardSkeletonList count={3} containerStyle={{ width: "100%", marginHorizontal: 0 }} />
@@ -327,7 +377,7 @@ const renderPagination = () => {
               ListHeaderComponent={renderListHeader}
               ListFooterComponent={renderPagination}
               contentContainerStyle={{
-                paddingHorizontal: 16,
+                paddingHorizontal: 20,
                 paddingBottom: 100,  
                 flexGrow: 1 
               }}

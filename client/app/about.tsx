@@ -32,7 +32,7 @@ export default function AboutScreen() {
 
       <ScrollView
         style={tw`flex-1`}
-        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Title */}

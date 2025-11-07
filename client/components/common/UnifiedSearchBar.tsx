@@ -34,7 +34,7 @@ export default function UnifiedSearchBar({
   editable = true,
   showFilterIcon = false,
   onFilterPress,
-  containerClassName = "px-4 pt-4 pb-4",
+  containerClassName = "pt-6 pb-4",
 }: UnifiedSearchBarProps) {
   // Memoized handlers for performance
   const handleTextChange = useCallback(

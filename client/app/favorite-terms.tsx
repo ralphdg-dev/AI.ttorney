@@ -7,8 +7,7 @@ import tw from "tailwind-react-native-classnames";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
 import { Button, ButtonText } from "@/components/ui/button/";
-import { Input, InputField, InputSlot } from "@/components/ui/input";
-import { Box } from "@/components/ui/box";
+import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 import { Ionicons } from "@expo/vector-icons";
 import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
@@ -143,22 +142,18 @@ export default function FavoritesScreen() {
         showMenu={true}
       />
 
-      {/* Search Bar (match Bookmarked Guides styling) */}
+      {/* Search Bar */}
       {favoriteTerms.length > 0 && (
-        <Box className="px-6 pt-6 mb-4">
-          <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
-            <InputSlot className="pl-3">
-              <Ionicons name="search" size={20} color="#9CA3AF" />
-            </InputSlot>
-            <InputField
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search your favorite terms"
-              placeholderTextColor="#9CA3AF"
-              className="text-[#313131]"
-            />
-          </Input>
-        </Box>
+        <View style={{ paddingHorizontal: 20 }}>
+          <UnifiedSearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search your favorite terms"
+            loading={loading}
+            showFilterIcon={false}
+            containerClassName="pt-6 pb-4"
+          />
+        </View>
       )}
 
       {favoriteTerms.length === 0 ? (
@@ -200,8 +195,8 @@ export default function FavoritesScreen() {
             { useNativeDriver: shouldUseNativeDriver('transform') }
           )}
         >
-          {/* Category Filter (match Bookmarked Guides header) */}
-          <View style={tw`px-4`}>
+          {/* Category Filter */}
+          <View style={tw`px-5`}>
             <HStack className="items-center mb-4">
               <Ionicons name="bookmarks" size={16} color={Colors.text.sub} />
               <GSText size="sm" bold className="ml-2" style={{ color: Colors.text.sub }}>
@@ -235,7 +230,7 @@ export default function FavoritesScreen() {
           </View>
 
           {/* Terms List */}
-          <View style={tw`px-3`}>
+          <View style={tw`px-5`}>
             {filteredTerms.length === 0 ? (
               <View style={tw`items-center py-12`}>
                 <Filter size={32} color={Colors.text.sub} strokeWidth={1.5} />
@@ -268,7 +263,7 @@ export default function FavoritesScreen() {
       )}
       
       {/* Bottom Navigation */}
-      <Navbar activeTab="learn" />
+      <Navbar />
       <SidebarWrapper />
     </SafeAreaView>
   );

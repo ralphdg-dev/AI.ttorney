@@ -116,7 +116,7 @@ export default function BookmarkedGuidesScreen() {
 
   const renderListHeader = () => (
     <View>
-      <HStack className="items-center mb-4 px-4">
+      <HStack className="items-center mb-4 px-5">
         <Ionicons name="bookmarks" size={16} color={Colors.text.sub} />
         <GSText size="sm" bold className="ml-2" style={{ color: Colors.text.sub }}>
           Filter by Category
@@ -124,8 +124,8 @@ export default function BookmarkedGuidesScreen() {
       </HStack>
       <CategoryScroller activeCategory={activeCategory} onCategoryChange={handleCategoryChange} includeAllOption />
 
-      {/* Results Info (match Favorite Terms) */}
-      <View style={tw`px-4 mb-3`}>
+      {/* Results Info */}
+      <View style={tw`px-5 mb-3`}>
         <HStack className="items-center justify-between">
           <GSText size="sm" style={{ color: Colors.text.sub }}>
             {filteredArticles.length} {filteredArticles.length === 1 ? 'result' : 'results'}
@@ -166,12 +166,15 @@ export default function BookmarkedGuidesScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header title="Bookmarked Guides" showMenu={true} />
 
-      <UnifiedSearchBar
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        placeholder="Search your bookmarked guides"
-        loading={loading}
-      />
+      <View style={{ paddingHorizontal: 20 }}>
+        <UnifiedSearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search your bookmarked guides"
+          loading={loading}
+          containerClassName="pt-6 pb-4"
+        />
+      </View>
 
       {loading ? (
         <ArticleCardSkeletonList count={3} containerStyle={{ width: "100%", marginHorizontal: 0 }} />
@@ -196,7 +199,7 @@ export default function BookmarkedGuidesScreen() {
               </GSText>
             </View>
           }
-          contentContainerStyle={{ paddingBottom: 80, paddingHorizontal: 16, flexGrow: 1 }}
+          contentContainerStyle={{ paddingBottom: 80, paddingHorizontal: 20, flexGrow: 1 }}
           columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
           renderItem={({ item }) => (
             <ArticleCard

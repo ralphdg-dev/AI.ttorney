@@ -7,6 +7,8 @@ export type DropdownOption = {
   onPress: () => void;
   danger?: boolean;
   bold?: boolean;
+  icon?: React.ReactNode;
+  textColor?: string;
 };
 
 interface DropdownMenuProps {
@@ -35,7 +37,13 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({ open, options, position, mi
             activeOpacity={0.8}
             onPress={opt.onPress}
           >
-            <Text style={[styles.menuText, opt.danger ? { color: '#B91C1C' } : null, opt.bold ? { fontWeight: '700' } : null]}>
+            {opt.icon && <View style={{ marginRight: 8 }}>{opt.icon}</View>}
+            <Text style={[
+              styles.menuText, 
+              opt.danger ? { color: '#B91C1C' } : null, 
+              opt.bold ? { fontWeight: '700' } : null,
+              opt.textColor ? { color: opt.textColor } : null
+            ]}>
               {opt.label}
             </Text>
           </TouchableOpacity>

@@ -10,7 +10,7 @@ import { Button, ButtonText } from "@/components/ui/button/";
 import Navbar from "@/components/Navbar";
 import { SidebarWrapper } from "@/components/AppSidebar";
 import Colors from "@/constants/Colors";
-import { Bell, MessageSquare, Calendar, CheckCircle, ChevronRight, ChevronDown } from "lucide-react-native";
+import { Bell, MessageSquare, Calendar, ChevronDown, MoreVertical, Trash2 } from "lucide-react-native";
 import DropdownMenu from "@/components/common/DropdownMenu";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,7 +18,7 @@ import { LawyerNavbar } from "@/components/lawyer/shared";
 
 export default function NotificationsScreen() {
   const { user } = useAuth();
-  const { notifications, unreadCount, loading, markAsRead, markAllAsRead, fetchNotifications } = useNotifications();
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification, fetchNotifications } = useNotifications();
   const hasFetched = React.useRef(false);
 
   React.useEffect(() => {
@@ -32,6 +32,7 @@ export default function NotificationsScreen() {
   // Inbox filter state
   const [inboxFilter, setInboxFilter] = useState<"all" | "unread" | "read">("all");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeNotificationMenu, setActiveNotificationMenu] = useState<string | null>(null);
 
   const filteredNotifications = useMemo(() => {
     switch (inboxFilter) {
@@ -61,6 +62,7 @@ export default function NotificationsScreen() {
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
 
+    if (minutes < 1) return 'Just now';
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
     if (days === 1) return 'Yesterday';
@@ -68,43 +70,73 @@ export default function NotificationsScreen() {
     return date.toLocaleDateString();
   };
 
+  const handleDeleteNotification = async (notificationId: string) => {
+    setActiveNotificationMenu(null);
+    await deleteNotification(notificationId);
+  };
+
   const renderItem = ({ item }: { item: any }) => {
     const isUnread = !item.read;
     const borderColor = isUnread ? "#BFDBFE" : "#E5E7EB";
     const titleColor = Colors.text.head;
     const subColor = Colors.text.sub;
+    const isMenuOpen = activeNotificationMenu === item.id;
 
     return (
-      <Pressable
-        onPress={() => {
-          if (isUnread) {
-            markAsRead(item.id);
-          }
-        }}
-        style={[tw`rounded-xl mb-3`, { backgroundColor: isUnread ? '#F0F9FF' : '#FFFFFF', padding: 14, borderWidth: 1, borderColor, position: 'relative' }]}
-      >
-        <HStack className="items-start">
-          <View style={[tw`mr-3`, { marginTop: 2 }]}>
-            {renderIcon(item.type, isUnread ? Colors.primary.blue : subColor)}
-          </View>
-          <View style={tw`flex-1`}>
-            <GSText size="sm" bold style={{ color: titleColor }}>{item.title}</GSText>
-            <GSText size="sm" className="mt-1" style={{ color: Colors.text.head }}>{item.message}</GSText>
-            <HStack className="items-center mt-2">
-              <GSText size="xs" style={{ color: subColor }}>{formatTime(item.created_at)}</GSText>
-              {isUnread && (
-                <View style={[tw`ml-2`, { backgroundColor: Colors.primary.blue, height: 6, width: 6, borderRadius: 3 }]} />
-              )}
-            </HStack>
-          </View>
-          {!isUnread && (
-            <CheckCircle size={16} color={subColor} strokeWidth={1.7} />
-          )}
-        </HStack>
-        <View style={{ position: 'absolute', right: 12, bottom: 10 }}>
-          <ChevronRight size={18} color={Colors.text.sub} strokeWidth={1.7} />
+      <View style={[tw`rounded-xl mb-3`, { backgroundColor: isUnread ? '#F0F9FF' : '#FFFFFF', padding: 14, borderWidth: 1, borderColor, position: 'relative', zIndex: isMenuOpen ? 100 : 1 }]}>
+        <Pressable
+          onPress={() => {
+            if (isUnread) {
+              markAsRead(item.id);
+            }
+          }}
+        >
+          <HStack className="items-start">
+            <View style={[tw`mr-3`, { marginTop: 2 }]}>
+              {renderIcon(item.type, isUnread ? Colors.primary.blue : subColor)}
+            </View>
+            <View style={tw`flex-1`}>
+              <GSText size="sm" bold style={{ color: titleColor }}>{item.title}</GSText>
+              <GSText size="sm" className="mt-1" style={{ color: Colors.text.head }}>{item.message}</GSText>
+              <HStack className="items-center mt-2">
+                <GSText size="xs" style={{ color: subColor }}>{formatTime(item.created_at)}</GSText>
+                {isUnread && (
+                  <View style={[tw`ml-2`, { backgroundColor: Colors.primary.blue, height: 6, width: 6, borderRadius: 3 }]} />
+                )}
+              </HStack>
+            </View>
+          </HStack>
+        </Pressable>
+
+        {/* Three-dot menu button */}
+        <View style={{ position: 'absolute', right: 8, top: 8, zIndex: isMenuOpen ? 200 : 10 }}>
+          <Pressable
+            onPress={() => setActiveNotificationMenu(isMenuOpen ? null : item.id)}
+            style={({ pressed }) => [
+              tw`p-2 rounded-full`,
+              { backgroundColor: pressed ? '#F3F4F6' : 'transparent' }
+            ]}
+          >
+            <MoreVertical size={18} color={Colors.text.sub} strokeWidth={1.7} />
+          </Pressable>
+
+          {/* Dropdown menu */}
+          <DropdownMenu
+            open={isMenuOpen}
+            position={{ top: 32, right: 0 }}
+            minWidth={180}
+            options={[
+              {
+                key: 'delete',
+                label: 'Delete notification',
+                icon: <Trash2 size={16} color="#EF4444" strokeWidth={1.7} />,
+                textColor: '#EF4444',
+                onPress: () => handleDeleteNotification(item.id),
+              },
+            ]}
+          />
         </View>
-      </Pressable>
+      </View>
     );
   };
 
@@ -124,7 +156,7 @@ export default function NotificationsScreen() {
       <Header title="Notifications" showMenu={true} />
 
       {/* Inbox filter row */}
-      <Box className="px-6 pt-4 pb-2" style={{ zIndex: menuOpen ? 100 : 1, position: "relative", elevation: menuOpen ? 12 : 0, overflow: 'visible' }}>
+      <Box className="px-5 pt-6 pb-2" style={{ zIndex: menuOpen ? 100 : 1, position: "relative", elevation: menuOpen ? 12 : 0, overflow: 'visible' }}>
         <HStack className="items-center justify-between">
           <View style={{ position: "relative", flex: 1, zIndex: menuOpen ? 200 : 1 }}>
             <Pressable onPress={() => setMenuOpen(v => !v)} style={({ pressed }) => [tw`flex-row items-center`, { opacity: pressed ? 0.6 : 1 }]}>
@@ -182,7 +214,7 @@ export default function NotificationsScreen() {
           data={filteredNotifications}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 8, paddingBottom: 80 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 80 }}
           style={{ zIndex: 0, elevation: 0 }}
           showsVerticalScrollIndicator={false}
         />

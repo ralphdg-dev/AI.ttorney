@@ -134,19 +134,20 @@ export default function HelpScreen() {
 
       <ScrollView
         style={tw`flex-1`}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingTop: 24, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         {/* Heading */}
-        <View style={{ alignItems: 'center', marginBottom: 14 }}>
+        <View style={{ alignItems: 'center', marginBottom: 14, paddingHorizontal: 20 }}>
           <GSText size="xl" bold style={{ color: Colors.text.head }}>
             How can we help you?
           </GSText>
         </View>
 
         {/* Search Bar */}
-        <HStack className="items-center mb-4">
+        <View style={{ paddingHorizontal: 20 }}>
+          <HStack className="items-center mb-4">
           <Box
             className="flex-1 rounded-xl border bg-white"
             style={{ borderColor: '#E5E7EB' }}
@@ -168,9 +169,10 @@ export default function HelpScreen() {
             </HStack>
           </Box>
         </HStack>
+        </View>
 
         {/* Category Cards */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12, paddingLeft: 20 }}>
           <View style={{ flexDirection: 'row' }}>
             {categories.map((item) => (
               <CategoryCard key={item.id} item={item} />
@@ -179,7 +181,7 @@ export default function HelpScreen() {
         </ScrollView>
 
         {/* Top Questions */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 8, paddingHorizontal: 20 }}>
           <GSText size="lg" bold style={{ color: Colors.text.head }}>Top Questions</GSText>
           <TouchableOpacity activeOpacity={0.7}>
             <GSText size="sm" bold style={{ color: Colors.primary.blue }}>View all</GSText>
@@ -187,7 +189,7 @@ export default function HelpScreen() {
         </View>
 
         {/* FAQ List */}
-        <VStack style={{ gap: 12 }}>
+        <VStack style={{ gap: 12, paddingHorizontal: 20 }}>
           {faqs.map((item, idx) => (
             <FAQItem key={`${idx}-${item.q}`} q={item.q} a={item.a} />
           ))}
@@ -200,6 +202,7 @@ export default function HelpScreen() {
             borderRadius: 16,
             padding: 16,
             marginTop: 20,
+            marginHorizontal: 20,
             borderWidth: 1,
             borderColor: '#E5E7EB',
           }}

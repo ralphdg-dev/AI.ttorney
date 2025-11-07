@@ -310,12 +310,15 @@ export default function BookmarkedPostsScreen() {
   );
 
   const renderSearchBar = () => (
-    <UnifiedSearchBar
-      value={searchQuery}
-      onChangeText={setSearchQuery}
-      placeholder="Search bookmarked posts..."
-      loading={loading}
-    />
+    <View style={{ paddingHorizontal: 20 }}>
+      <UnifiedSearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Search bookmarked posts..."
+        loading={loading}
+        containerClassName="pt-6 pb-4"
+      />
+    </View>
   );
 
   const renderHeader = () => (

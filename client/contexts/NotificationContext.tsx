@@ -50,7 +50,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (response.ok) {
         const data = await response.json();
-        setNotifications(data.data || []);
+        // Remove duplicates by ID before setting state
+        const notificationList = (data.data || []) as Notification[];
+        const uniqueNotifications = Array.from(
+          new Map(notificationList.map((n: Notification) => [n.id, n])).values()
+        );
+        setNotifications(uniqueNotifications);
         setUnreadCount(data.unread_count || 0);
       }
     } catch (error) {
@@ -167,8 +172,20 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           filter: `user_id=eq.${user.id}`,
         },
         (payload: any) => {
+          console.log('📬 Real-time notification event:', payload.eventType, payload.new?.id);
+          
           if (payload.eventType === 'INSERT') {
-            setNotifications(prev => [payload.new as Notification, ...prev]);
+            const newNotification = payload.new as Notification;
+            // Prevent duplicates - only add if not already in list
+            setNotifications(prev => {
+              const exists = prev.some(n => n.id === newNotification.id);
+              if (exists) {
+                console.log('⚠️ Duplicate notification prevented:', newNotification.id);
+                return prev;
+              }
+              console.log('✅ New notification added:', newNotification.id);
+              return [newNotification, ...prev];
+            });
             setUnreadCount(prev => prev + 1);
           } else if (payload.eventType === 'UPDATE') {
             setNotifications(prev =>

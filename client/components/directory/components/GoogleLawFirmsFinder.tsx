@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
+  View,
   TextInput, 
   Pressable, 
   Linking, 
@@ -28,6 +29,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../../constants/Colors';
 import { NetworkConfig } from '../../../utils/networkConfig';
 import { shadowPresets, createShadowStyle } from '../../../utils/shadowUtils';
+import UnifiedSearchBar from '@/components/common/UnifiedSearchBar';
 
 interface LawFirm {
   id: string;
@@ -940,7 +942,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   }, [sortedLawFirms, mapCenter, userLocation, selectedFirmId]);
 
   const renderLawFirmCard = useCallback((firm: LawFirm) => (
-    <Box key={firm.id} className="mx-4 mb-3 bg-white rounded-lg border border-gray-200">
+    <Box key={firm.id} className="mb-3 bg-white rounded-lg border border-gray-200">
       <VStack space="sm" className="p-4">
         <HStack space="sm" className="items-start">
           <Box className="p-2 bg-blue-50 rounded-lg">
@@ -1146,7 +1148,21 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
   // Clean Search Header Component - no memoization needed
   const renderSearchHeader = () => (
-    <VStack space="md" className="px-4 py-3 bg-white" style={{ zIndex: 1000 }}>
+    <View style={{ paddingHorizontal: 20, backgroundColor: 'white', zIndex: 1000 }}>
+      <UnifiedSearchBar
+        value={searchText}
+        onChangeText={handleSearchTextChange}
+        placeholder="Search by street, barangay, or city"
+        loading={searching}
+        showFilterIcon={false}
+        containerClassName="pt-6 pb-4"
+      />
+    </View>
+  );
+
+  // Radius filter and other controls
+  const renderFilters = () => (
+    <VStack space="md" className="px-5 py-3 bg-white" style={{ zIndex: 999 }}>
       <Box className="relative" style={{ zIndex: 1000 }}>
         <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ 
           minHeight: 48,
@@ -1483,7 +1499,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       className="flex-1" 
       style={{ backgroundColor: '#f9fafb' }}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 120 }}
+      contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 20 }}
       keyboardShouldPersistTaps="handled"
     >
       {sortedLawFirms.length > 0 ? (
