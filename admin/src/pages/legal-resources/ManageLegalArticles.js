@@ -49,6 +49,8 @@ const ManageLegalArticles = () => {
     open: false,
     article: null,
   });
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [itemsPerPage] = React.useState(10);
 
   const [articles, setArticles] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -75,6 +77,7 @@ const ManageLegalArticles = () => {
       const json = await res.json();
       if (json.success) {
         setArticles(json.data);
+        setCurrentPage(1); // Reset to first page when data changes
       } else {
         console.error("Failed to fetch articles");
       }
@@ -199,6 +202,22 @@ const ManageLegalArticles = () => {
 
     return rows;
   }, [query, category, sortBy, articles]);
+
+  // Pagination calculations
+  const totalItems = filteredData.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+  // Get current page items
+  const currentItems = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredData.slice(startIndex, endIndex);
+  }, [filteredData, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [query, category, sortBy]);
 
   const formatDate = (date) =>
     new Intl.DateTimeFormat("en-US", {
@@ -543,7 +562,7 @@ const ManageLegalArticles = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredData.length === 0 ? (
+              {currentItems.length === 0 ? (
                 <tr>
                   <td
                     colSpan={columns.length}
@@ -556,7 +575,7 @@ const ManageLegalArticles = () => {
                   </td>
                 </tr>
               ) : (
-                filteredData.map((row) => (
+                currentItems.map((row) => (
                   <tr key={row.id} className="hover:bg-gray-50 relative">
                     {columns.map((col) => (
                       <td
@@ -582,11 +601,11 @@ const ManageLegalArticles = () => {
 
       {/* Pagination */}
       <Pagination
-        currentPage={1}
-        totalPages={1}
-        totalItems={filteredData.length}
-        itemsPerPage={10}
-        onPageChange={() => {}}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
         itemName="articles"
       />
 
