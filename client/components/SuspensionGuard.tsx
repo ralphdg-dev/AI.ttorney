@@ -36,13 +36,13 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       // Skip check if:
-      // 1. Already on suspended screen
+      // 1. Already on suspended screen or suspension-lifted screen
       // 2. On login/register screens
       // 3. No user session (CRITICAL: prevents check after logout when user/session are null)
       // 4. Already checking
       // 5. Auth is still loading
       // 6. Already checked for this user
-      const publicRoutes = ['/login', '/register', '/suspended', '/forgot-password', '/onboarding'];
+      const publicRoutes = ['/login', '/register', '/suspended', '/suspension-lifted', '/forgot-password', '/onboarding'];
       const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route));
       
       if (isPublicRoute || !user || !session || isChecking || isLoading || hasChecked) {
@@ -61,6 +61,9 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
         if (suspensionStatus && suspensionStatus.isSuspended) {
           console.log('🚫 User is suspended, redirecting to suspended screen from guard');
           router.replace('/suspended');
+        } else if (suspensionStatus && suspensionStatus.needsLiftedAcknowledgment) {
+          console.log('✅ User suspension lifted, redirecting to suspension-lifted screen from guard');
+          router.replace('/suspension-lifted');
         } else {
           setHasChecked(true);
         }
@@ -82,9 +85,12 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
   }
 
   // Show loading indicator while checking suspension status
-  // CRITICAL: Never show loading on login page to prevent infinite loading after logout
+  // CRITICAL: Never show loading on login page, suspended page, or suspension-lifted page
   const isLoginPage = pathname === '/login';
-  if ((isChecking || !hasChecked) && user && session && pathname !== '/suspended' && !isLoginPage) {
+  const isSuspendedPage = pathname === '/suspended';
+  const isSuspensionLiftedPage = pathname === '/suspension-lifted';
+  
+  if ((isChecking || !hasChecked) && user && session && !isSuspendedPage && !isSuspensionLiftedPage && !isLoginPage) {
     return <LoadingWithTrivia />;
   }
 
