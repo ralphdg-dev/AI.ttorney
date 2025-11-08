@@ -132,6 +132,32 @@ export default function LawyerBookingView() {
     });
   };
 
+  // Check if lawyer is available on a specific date
+  const isLawyerAvailableOnDate = (date: Date): boolean => {
+    if (!lawyerData || !lawyerData.hours_available) return false;
+
+    const dayName = date.toLocaleDateString("en-US", {
+      weekday: "long",
+    });
+
+    // Handle JSONB format: {"Monday": ["09:00", "11:00"]}
+    if (typeof lawyerData.hours_available === 'object' && !Array.isArray(lawyerData.hours_available)) {
+      const times = lawyerData.hours_available[dayName] || [];
+      return times.length > 0;
+    }
+
+    // Legacy format: DayAvailability[]
+    if (Array.isArray(lawyerData.hours_available)) {
+      const dayAvailability = lawyerData.hours_available.find(
+        (availability) =>
+          availability.day.toLowerCase() === dayName.toLowerCase()
+      );
+      return dayAvailability ? dayAvailability.times.length > 0 : false;
+    }
+
+    return false;
+  };
+
   const getTimeSlotsForSelectedDay = (): TimeSlot[] => {
     if (!lawyerData || !lawyerData.hours_available) return [];
 
@@ -878,6 +904,10 @@ export default function LawyerBookingView() {
                     today.getMonth(),
                     today.getDate()
                   );
+                
+                // Check if lawyer is available on this date
+                const isAvailable = isLawyerAvailableOnDate(dayDate);
+                const isDisabled = !day.isCurrentMonth || isPastDay || !isAvailable;
 
                 return (
                   <Pressable
@@ -894,13 +924,13 @@ export default function LawyerBookingView() {
                         : day.isToday
                         ? "#DBEAFE"
                         : "transparent",
-                      opacity: !day.isCurrentMonth || isPastDay ? 0.3 : 1,
+                      opacity: isDisabled ? 0.3 : 1,
                       borderWidth: day.isToday && !day.isSelected ? 2 : 0,
                       borderColor: Colors.primary.blue,
                     }}
-                    disabled={!day.isCurrentMonth || isPastDay}
+                    disabled={isDisabled}
                     onPress={() => {
-                      if (!isPastDay) handleDaySelect(day);
+                      if (!isDisabled) handleDaySelect(day);
                     }}
                   >
                     <Text
@@ -988,6 +1018,9 @@ export default function LawyerBookingView() {
 
                   const isDisabled = isPastTime || !slot.available;
 
+                  // Determine if slot is fully booked (for future implementation with booking data)
+                  const isFullyBooked = false; // TODO: Check against actual bookings from backend
+
                   return (
                     <TouchableOpacity
                       key={slot.id}
@@ -999,8 +1032,16 @@ export default function LawyerBookingView() {
                         marginRight: 8,
                         marginBottom: 8,
                         borderWidth: 2,
-                        backgroundColor: selectedTimeSlot === slot.id ? Colors.primary.blue : 'white',
-                        borderColor: selectedTimeSlot === slot.id ? Colors.primary.blue : '#E5E7EB',
+                        backgroundColor: isFullyBooked 
+                          ? '#FEE2E2' 
+                          : selectedTimeSlot === slot.id 
+                          ? Colors.primary.blue 
+                          : 'white',
+                        borderColor: isFullyBooked
+                          ? '#DC2626'
+                          : selectedTimeSlot === slot.id 
+                          ? Colors.primary.blue 
+                          : '#E5E7EB',
                         opacity: isDisabled ? 0.4 : 1,
                         shadowColor: selectedTimeSlot === slot.id ? Colors.primary.blue : '#000',
                         shadowOffset: { width: 0, height: selectedTimeSlot === slot.id ? 2 : 0 },
@@ -1021,16 +1062,29 @@ export default function LawyerBookingView() {
                       }}
                     >
                       <HStack className="items-center">
-                        <Clock size={16} color={selectedTimeSlot === slot.id ? "white" : Colors.text.sub} strokeWidth={2} />
+                        <Clock 
+                          size={16} 
+                          color={isFullyBooked ? '#DC2626' : selectedTimeSlot === slot.id ? "white" : Colors.text.sub} 
+                          strokeWidth={2} 
+                        />
                         <Text
                           className="ml-2 text-sm font-bold"
                           style={{
-                            color: selectedTimeSlot === slot.id ? "white" : Colors.text.head,
+                            color: isFullyBooked 
+                              ? '#DC2626' 
+                              : selectedTimeSlot === slot.id 
+                              ? "white" 
+                              : Colors.text.head,
                           }}
                         >
                           {slot.time}
                         </Text>
-                        {selectedTimeSlot === slot.id && (
+                        {isFullyBooked && (
+                          <Box className="ml-2">
+                            <Text className="text-xs font-semibold" style={{ color: '#DC2626' }}>FULL</Text>
+                          </Box>
+                        )}
+                        {selectedTimeSlot === slot.id && !isFullyBooked && (
                           <Box className="ml-2">
                             <CheckCircle2 size={14} color="white" strokeWidth={2.5} />
                           </Box>
