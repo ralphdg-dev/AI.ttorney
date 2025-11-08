@@ -17,6 +17,7 @@ interface PostProps {
     avatar: string;
   };
   timestamp: string;
+  created_at?: string; // Raw timestamp for dynamic formatting
   category: string;
   content: string;
   comments: number;
@@ -39,6 +40,7 @@ const Post: React.FC<PostProps> = React.memo(({
   id,
   user,
   timestamp,
+  created_at,
   category,
   content,
   comments,
@@ -57,6 +59,7 @@ const Post: React.FC<PostProps> = React.memo(({
   const { user: currentUser, session } = useAuth();
   const [isBookmarked, setIsBookmarked] = useState(propIsBookmarked || false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+  const [displayTime, setDisplayTime] = useState(timestamp);
 
   // Helper function to get initials from name
   const getInitials = (name: string) => {
@@ -67,6 +70,47 @@ const Post: React.FC<PostProps> = React.memo(({
       .toUpperCase()
       .slice(0, 2);
   };
+
+  // Format timestamp dynamically
+  const formatTimeAgo = useCallback((isoDate: string): string => {
+    if (!isoDate) return '';
+    try {
+      const createdMs = new Date(isoDate).getTime();
+      if (Number.isNaN(createdMs)) return timestamp; // Fallback to static timestamp
+      const now = Date.now();
+      const diffSec = Math.max(0, Math.floor((now - createdMs) / 1000));
+      if (diffSec < 60) return `${diffSec}s`;
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin}m`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr}h`;
+      const diffDay = Math.floor(diffHr / 24);
+      if (diffDay < 7) return `${diffDay}d`;
+      const diffWeek = Math.floor(diffDay / 7);
+      if (diffWeek < 4) return `${diffWeek}w`;
+      const diffMonth = Math.floor(diffDay / 30);
+      if (diffMonth < 12) return `${diffMonth}mo`;
+      const diffYear = Math.floor(diffDay / 365);
+      return `${diffYear}y`;
+    } catch {
+      return timestamp; // Fallback to static timestamp
+    }
+  }, [timestamp]);
+
+  // Update display time periodically if we have raw timestamp
+  useEffect(() => {
+    if (!created_at) return;
+    
+    // Update immediately
+    setDisplayTime(formatTimeAgo(created_at));
+    
+    // Update every 30 seconds for real-time feel
+    const timer = setInterval(() => {
+      setDisplayTime(formatTimeAgo(created_at));
+    }, 30000);
+    
+    return () => clearInterval(timer);
+  }, [created_at, formatTimeAgo]);
   
   // Update local state when prop changes
   useEffect(() => {
@@ -256,7 +300,7 @@ const Post: React.FC<PostProps> = React.memo(({
             <View style={styles.userMetaRow}>
               <Text style={styles.userHandle}>@{user.username}</Text>
               <Text style={styles.metaSeparator}> • </Text>
-              <Text style={styles.timestamp}>{timestamp}</Text>
+              <Text style={styles.timestamp}>{displayTime}</Text>
             </View>
           </View>
           <TouchableOpacity
