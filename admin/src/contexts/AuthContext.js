@@ -119,7 +119,7 @@ export const AuthProvider = ({ children }) => {
     checkExistingSession();
   }, []);
 
-  // Login function
+  // Login function - Step 1: Verify credentials and trigger 2FA
   const login = async (email, password) => {
     dispatch({ type: 'LOGIN_START' });
 
@@ -135,7 +135,19 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
 
       if (response.ok) {
-        // Store token in localStorage
+        // Check if 2FA is required
+        if (data.requires2FA) {
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return { 
+            success: true, 
+            requires2FA: true,
+            email: data.email,
+            adminId: data.adminId,
+            message: data.message
+          };
+        }
+
+        // Legacy flow (if 2FA is not required) - should not happen now
         localStorage.setItem('admin_token', data.token);
         
         dispatch({
