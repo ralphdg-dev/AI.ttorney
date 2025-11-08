@@ -377,7 +377,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         if (__DEV__) console.log('📱 Timeline: Screen focused, cache valid - using cache');
         loadPosts(false, false); // Use cache if valid
       }
-    }, [isCacheValid])
+    }, [isCacheValid, loadPosts])
   );
 
   // Remove duplicate useFocusEffect - already handled above
@@ -524,7 +524,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     return optimisticPost.id;
   }, [currentUser]);
 
-  // Function to confirm optimistic post (make it fully opaque and keep it seamless)
+  // Function to confirm optimistic post (make it fully opaque and remove immediately)
   const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: PostData) => {
     setOptimisticPosts(prev => {
       const post = prev.find(p => p.id === optimisticId);
@@ -534,14 +534,13 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
           toValue: 1,
           duration: 200,
           useNativeDriver: true,
-        }).start();
-        
-        // Keep optimistic post visible and let duplicate detection handle seamless transition
-        // The post will automatically be filtered out when the real post appears
-        // Only remove it after a reasonable time to ensure the real post has loaded
-        setTimeout(() => {
+        }).start(() => {
+          // Remove immediately after animation completes
           setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
-        }, 3000); // Extended delay - duplicate detection prevents visual duplicates
+        });
+      } else {
+        // If no animation, remove immediately
+        return prev.filter(p => p.id !== optimisticId);
       }
       return prev;
     });
@@ -632,22 +631,28 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     return postComponent;
   }, [handleCommentPress, handleBookmarkPress, handleReportPress, handlePostPress, handleMenuToggle, openMenuPostId, handleBookmarkStatusChange]);
 
-  // Combined posts data with duplicate detection for seamless transition
+  // Combined posts data with strict duplicate detection
   const allPosts = useMemo(() => {
     if (optimisticPosts.length === 0) {
       // No optimistic posts, return all real posts
       return posts;
     }
     
-    // Filter out real posts that match optimistic posts to prevent duplicates
+    // Create a Set of optimistic post content for O(1) lookup
+    const optimisticContentSet = new Set(
+      optimisticPosts.map(p => p.content.trim().toLowerCase())
+    );
+    
+    // Filter out real posts that match optimistic posts by content
     const filteredRealPosts = posts.filter(realPost => {
-      // Check if there's an optimistic post with similar content
-      const hasOptimisticMatch = optimisticPosts.some(optPost => {
-        // Match by content only (more reliable than timestamp)
-        const contentMatch = optPost.content.trim() === realPost.content.trim();
-        return contentMatch;
-      });
-      return !hasOptimisticMatch;
+      const normalizedContent = realPost.content.trim().toLowerCase();
+      const isDuplicate = optimisticContentSet.has(normalizedContent);
+      
+      if (__DEV__ && isDuplicate) {
+        console.log(`🔄 Filtering duplicate real post (ID: ${realPost.id}) - matches optimistic post`);
+      }
+      
+      return !isDuplicate;
     });
     
     if (__DEV__ && filteredRealPosts.length !== posts.length) {
