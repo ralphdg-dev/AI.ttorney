@@ -24,7 +24,7 @@ import ConsultationFilterModal from "../components/sidebar/consultations/Consult
 
 export default function ConsultationsScreen() {
   const [consultations, setConsultations] = useState<ConsultationWithLawyer[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -96,30 +96,31 @@ export default function ConsultationsScreen() {
     setRefreshing(false);
   };
 
-  // Fetch consultations when auth is ready and user is authenticated
-  useEffect(() => {
-    // Wait for auth to finish loading
-    if (authLoading) {
-      return;
-    }
-    
-    // Check if user is authenticated and has ID
-    if (isAuthenticated && user?.id) {
-      fetchConsultations();
-    } else {
-      setLoading(false); // Stop loading if not authenticated
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated, user?.id]); // fetchConsultations is stable
-
-  // Also fetch when screen comes into focus (for navigation)
+  // Fetch consultations when screen comes into focus (handles both initial load and navigation)
   useFocusEffect(
     React.useCallback(() => {
-      if (!authLoading && isAuthenticated && user?.id) {
-        fetchConsultations();
+      console.log("📱 ConsultationsScreen focused - authLoading:", authLoading, "isAuthenticated:", isAuthenticated, "user?.id:", user?.id, "loading:", loading);
+      
+      // Wait for auth to finish loading
+      if (authLoading) {
+        console.log("⏳ Auth still loading, will wait");
+        setLoading(true);
+        return;
       }
+      
+      // If not authenticated or no user, show empty state immediately
+      if (!isAuthenticated || !user?.id) {
+        console.log("⚠️ Not authenticated or no user ID, showing empty state");
+        setLoading(false);
+        setConsultations([]);
+        return;
+      }
+      
+      // User is authenticated, fetch consultations
+      console.log("✅ User authenticated, fetching consultations");
+      fetchConsultations();
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [authLoading, isAuthenticated, user?.id]) // fetchConsultations is stable
+    }, [authLoading, isAuthenticated, user?.id])
   );
 
   // Real-time subscription for consultation updates

@@ -56,6 +56,10 @@ export default function ConsultationFilterModal({
     onClose(); // Close immediately after selection
   };
 
+  const handleBackdropPress = () => {
+    onClose();
+  };
+
   return (
     <Modal
       visible={visible}
@@ -64,6 +68,13 @@ export default function ConsultationFilterModal({
       onRequestClose={onClose}
     >
       <View style={tw`flex-1 bg-black bg-opacity-50 justify-end`}>
+        {/* Backdrop - Touchable area to close modal */}
+        <TouchableOpacity
+          style={tw`absolute inset-0`}
+          activeOpacity={1}
+          onPress={handleBackdropPress}
+        />
+        
         <Animated.View
           style={[
             tw`bg-white rounded-t-3xl`,
