@@ -220,7 +220,8 @@ const Header: React.FC<HeaderProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.background.primary,
-    borderBottomWidth: 0, // Remove border for seamless look
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
     ...Platform.select({
       ios: { shadowOpacity: 0 },
       android: { elevation: 0 },

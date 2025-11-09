@@ -13,6 +13,7 @@ import { Avatar, AvatarImage, AvatarFallbackText } from "@/components/ui/avatar"
 import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import { LawyerNavbar } from "@/components/lawyer/shared";
+import { SidebarWrapper } from "@/components/AppSidebar";
 import Colors from "@/constants/Colors";
 import { createShadowStyle } from '@/utils/shadowUtils';
 import { 
@@ -147,12 +148,11 @@ export default function SettingsScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
-      {/* Header with back button */}
+      {/* Header with menu button */}
       <Header 
         title="Settings" 
-        showBackButton={true}
-        showMenu={false}
-        onBackPress={() => router.back()}
+        showBackButton={false}
+        showMenu={true}
       />
 
       <ScrollView
@@ -249,6 +249,7 @@ export default function SettingsScreen() {
       </ScrollView>
 
       {isLawyer ? <LawyerNavbar /> : <Navbar />}
+      <SidebarWrapper />
     </SafeAreaView>
   );
 }
