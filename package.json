@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "smtp": "^0.0.5"
+  }
+}
