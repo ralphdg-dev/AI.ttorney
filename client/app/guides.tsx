@@ -30,7 +30,6 @@ export default function GuidesScreen() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
-  const [showBookmarksOnly, setShowBookmarksOnly] = useState<boolean>(false);
   const flatListRef = useRef<FlatList>(null);
   const { width } = useWindowDimensions();
   
@@ -89,15 +88,8 @@ export default function GuidesScreen() {
   }, [searchQuery, activeCategory, legalArticles, searchArticles, getArticlesByCategory]);
 
   const articlesToRender: ArticleItem[] = useMemo(() => {
-    let articles = displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: isBookmarked(a.id) }));
-    
-    // Apply bookmarks filter if enabled
-    if (showBookmarksOnly && !isGuestMode) {
-      articles = articles.filter(a => a.isBookmarked);
-    }
-    
-    return articles;
-  }, [displayArticles, isBookmarked, showBookmarksOnly, isGuestMode]);
+    return displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: isBookmarked(a.id) }));
+  }, [displayArticles, isBookmarked]);
 
   // Pagination
   const totalArticles = articlesToRender.length;
@@ -108,7 +100,7 @@ export default function GuidesScreen() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, activeCategory, showBookmarksOnly]);
+  }, [searchQuery, activeCategory]);
 
   const handleCategoryChange = (categoryId: string): void => {
     setActiveCategory(categoryId);
@@ -146,56 +138,6 @@ export default function GuidesScreen() {
 
   const renderListHeader = () => (
     <View>
-      {/* Filter Chip */}
-      {!isGuestMode && (
-        <View style={{ marginBottom: 16 }}>
-          <TouchableOpacity
-            onPress={() => {
-              setShowBookmarksOnly(!showBookmarksOnly);
-              setCurrentPage(1);
-            }}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              alignSelf: 'flex-start',
-              paddingVertical: 8,
-              paddingHorizontal: 14,
-              backgroundColor: showBookmarksOnly ? Colors.primary.blue : 'white',
-              borderRadius: 20,
-              borderWidth: 1,
-              borderColor: showBookmarksOnly ? Colors.primary.blue : '#D1D5DB',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.05,
-              shadowRadius: 2,
-              elevation: 1,
-            }}
-          >
-            <Ionicons
-              name={showBookmarksOnly ? "star" : "star-outline"}
-              size={16}
-              color={showBookmarksOnly ? 'white' : Colors.text.sub}
-            />
-            <GSText
-              size="sm"
-              style={{
-                marginLeft: 6,
-                fontSize: 13,
-                fontWeight: '500',
-                color: showBookmarksOnly ? 'white' : Colors.text.head,
-              }}
-            >
-              Bookmarks
-            </GSText>
-            {showBookmarksOnly && (
-              <View style={{ marginLeft: 6 }}>
-                <Ionicons name="close-circle" size={16} color="white" />
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
-
       <HStack className="items-center mb-4">
         <Ionicons name="pricetags" size={16} color={Colors.text.sub} />
         <GSText size="sm" bold className="ml-2" style={{ color: Colors.text.sub }}>

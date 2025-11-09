@@ -169,7 +169,7 @@ class ConsultationService:
             # 4. Verify lawyer exists and is accepting consultations
             logger.info(f"🔍 Checking if lawyer exists: {lawyer_id}")
             lawyer_result = self.supabase.table("lawyer_info")\
-                .select("name, accepting_consultations")\
+                .select("name, accepting_consultations, lawyer_id")\
                 .eq("id", lawyer_id)\
                 .execute()
             
@@ -184,6 +184,7 @@ class ConsultationService:
                 )
             
             lawyer_name = lawyer_result.data[0]["name"]
+            lawyer_user_id = lawyer_result.data[0]["lawyer_id"]  # This is the users.id for the lawyer
             accepting_consultations = lawyer_result.data[0].get("accepting_consultations", False)
             
             if not accepting_consultations:
@@ -233,9 +234,9 @@ class ConsultationService:
                 consultation_id = result.data[0]['id']
                 logger.info(f"Consultation created: {consultation_id} for lawyer {lawyer_id}")
                 
-                # Send real-time notification to lawyer
+                # Send real-time notification to lawyer (use lawyer_user_id, not lawyer_info.id)
                 await self._notify_lawyer_new_consultation(
-                    lawyer_id=lawyer_id,
+                    lawyer_id=lawyer_user_id,  # Use users.id, not lawyer_info.id
                     consultation_id=consultation_id,
                     consultation_date=consultation_date,
                     consultation_time=consultation_time,
