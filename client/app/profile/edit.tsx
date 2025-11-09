@@ -182,6 +182,20 @@ export default function EditProfilePage() {
         newPassword: "",
         confirmPassword: "",
       });
+      
+      // Reset all checking states
+      setUsernameAvailable(null);
+      setUsernameError("");
+      setUsernameChecking(false);
+      setEmailAvailable(null);
+      setEmailError("");
+      setEmailChecking(false);
+      setEmailVerified(false);
+      usernameCheckingRef.current = false;
+      emailCheckingRef.current = false;
+      lastCheckedUsernameRef.current = "";
+      lastCheckedEmailRef.current = "";
+      
       setIsLoading(false);
     }
   }, [user]);
@@ -199,41 +213,25 @@ export default function EditProfilePage() {
   }, []);
 
   const handleCancel = () => {
-    // Check if there are unsaved changes
     if (hasChanges() || emailVerified) {
       Alert.alert(
         "Discard Changes?",
         "You have unsaved changes. Are you sure you want to discard them?",
         [
-          {
-            text: "Keep Editing",
-            style: "cancel"
-          },
+          { text: "Keep Editing", style: "cancel" },
           {
             text: "Discard",
             style: "destructive",
             onPress: () => {
-              // Reset verification state
               setEmailVerified(false);
               setNewEmail("");
-              
-              // Navigate back
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.push('/profile');
-              }
+              router.push('/profile');
             }
           }
         ]
       );
     } else {
-      // No changes, just go back
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.push('/profile');
-      }
+      router.push('/profile');
     }
   };
 
@@ -700,7 +698,7 @@ export default function EditProfilePage() {
                   usernameTimeoutRef.current = setTimeout(() => {
                     checkUsernameAvailability(text);
                     usernameTimeoutRef.current = null;
-                  }, 800);
+                  }, 500);
                 }
               }}
               placeholder="Enter your username"
@@ -766,7 +764,7 @@ export default function EditProfilePage() {
                     emailTimeoutRef.current = setTimeout(() => {
                       checkEmailAvailability(text);
                       emailTimeoutRef.current = null;
-                    }, 800);
+                    }, 500);
                   }
                 }}
                 placeholder="Enter your email address"

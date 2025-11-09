@@ -511,10 +511,13 @@ async def verify_email_change(
         profile = current_user.get("profile")
         
         if not user_data or not profile:
+            logger.error(f"User not found in verify_email_change. current_user: {current_user}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
             )
+        
+        logger.info(f"Verifying email change for user {user_data.get('id')}, new email: {request.new_email}")
         
         # Verify OTP
         otp_service = OTPService()
@@ -525,10 +528,13 @@ async def verify_email_change(
         )
         
         if not otp_result["success"]:
+            logger.warning(f"OTP verification failed: {otp_result.get('error')}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=otp_result["error"]
+                detail=otp_result.get("error", "Invalid OTP code")
             )
+        
+        logger.info("OTP verified successfully, updating email...")
         
         # Update email in both auth and profile
         supabase_service = SupabaseService()
@@ -536,9 +542,10 @@ async def verify_email_change(
         # Update email in Supabase Auth
         auth_result = await supabase_service.update_user_email(user_data["id"], request.new_email)
         if not auth_result["success"]:
+            logger.error(f"Failed to update email in auth: {auth_result.get('error')}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to update email in authentication: {auth_result['error']}"
+                detail=f"Failed to update email: {auth_result.get('error', 'Unknown error')}"
             )
         
         # Update email in profile table
@@ -548,8 +555,9 @@ async def verify_email_change(
         )
         
         if not profile_result["success"]:
-            logger.warning(f"Failed to update email in profile: {profile_result['error']}")
-            # Note: Auth was updated but profile update failed
+            logger.warning(f"Failed to update email in profile: {profile_result.get('error')}")
+        
+        logger.info(f"Email successfully updated to {request.new_email}")
         
         return {
             "success": True,
@@ -560,8 +568,8 @@ async def verify_email_change(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Verify email change error: {str(e)}")
+        logger.error(f"Verify email change error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to verify email change"
+            detail=f"Failed to verify email change: {str(e)}"
         )

@@ -341,6 +341,30 @@ class SupabaseService:
             logger.error(f"Delete auth user error: {str(e)}")
             return {"success": False, "error": str(e)}
     
+    async def update_user_email(self, user_id: str, new_email: str) -> Dict[str, Any]:
+        """Update user email in Supabase Auth"""
+        try:
+            async with httpx.AsyncClient() as client:
+                payload = {"email": new_email}
+                
+                response = await client.put(
+                    f"{self.auth_url}/admin/users/{user_id}",
+                    json=payload,
+                    headers=self._get_headers(use_service_key=True)
+                )
+                
+                if response.status_code == 200:
+                    return {"success": True, "message": "Email updated successfully"}
+                else:
+                    error_data = response.json() if response.content else {}
+                    error_msg = error_data.get("message") or f"Update failed: {response.status_code}"
+                    logger.error(f"Failed to update email for user {user_id}: {error_data}")
+                    return {"success": False, "error": error_msg}
+                    
+        except Exception as e:
+            logger.error(f"Update user email error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
     async def test_connection(self) -> Dict[str, Any]:
         """Test Supabase connection"""
         try:
