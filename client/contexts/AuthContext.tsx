@@ -558,30 +558,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ⚡ FAANG OPTIMIZATION: Lightweight profile refresh for profile page
   const refreshProfile = React.useCallback(async () => {
-    try {
-      if (!authState.session?.user?.id) return;
+    const userId = authState.session?.user?.id;
+    if (!userId) return;
 
+    try {
       const { data: profile, error } = await supabase
         .from('users')
         .select('id,email,username,full_name,role,is_verified,pending_lawyer,birthdate,profile_photo,created_at,updated_at')
-        .eq('id', authState.session.user.id)
+        .eq('id', userId)
         .single();
 
       if (!error && profile) {
-        // Update cache
         await AsyncStorage.setItem(
-          `profile_cache_${authState.session.user.id}`,
-          JSON.stringify({
-            profile,
-            cachedAt: Date.now(),
-          })
+          `profile_cache_${userId}`,
+          JSON.stringify({ profile, cachedAt: Date.now() })
         );
 
-        // Update state
-        setAuthState(prev => ({
-          ...prev,
-          user: profile,
-        }));
+        setAuthState(prev => ({ ...prev, user: profile }));
       }
     } catch (error) {
       console.error('Error refreshing profile:', error);
