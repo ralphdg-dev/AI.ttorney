@@ -44,7 +44,7 @@ export interface AuthContextType {
   isLawyer: () => boolean;
   isAdmin: () => boolean;
   checkLawyerApplicationStatus: () => Promise<any>;
-  checkSuspensionStatus: () => Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null } | null>;
+  checkSuspensionStatus: () => Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null; needsLiftedAcknowledgment: boolean } | null>;
   hasRedirectedToStatus: boolean;
   setHasRedirectedToStatus: (value: boolean) => void;
   initialAuthCheck: boolean;
@@ -67,7 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isGuestMode, setIsGuestMode] = useState(false);
 
 
-  const checkSuspensionStatus = React.useCallback(async (): Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null } | null> => {
+  const checkSuspensionStatus = React.useCallback(async (): Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null; needsLiftedAcknowledgment: boolean } | null> => {
     try {
       if (!authState.session?.access_token) {
         return null;
@@ -84,10 +84,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.ok) {
         const data = await response.json();
+        
+        // Check if user needs to acknowledge suspension lifted
+        // This happens when:
+        // 1. Account status is NOT suspended (suspension has ended or been lifted)
+        // 2. There is a most recent suspension
+        // 3. lifted_acknowledged is false or null
+        const needsLiftedAcknowledgment = 
+          data.account_status !== 'suspended' && 
+          data.most_recent_suspension_id && 
+          (data.lifted_acknowledged === false || data.lifted_acknowledged === null);
+        
         return {
           isSuspended: data.account_status === 'suspended',
           suspensionCount: data.suspension_count || 0,
           suspensionEnd: data.suspension_end || null,
+          needsLiftedAcknowledgment,
         };
       }
       
@@ -171,10 +183,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (shouldNavigate && profile) {
         // Check suspension status (already fetched in parallel)
         const suspensionStatus = suspensionResult.status === 'fulfilled' ? suspensionResult.value : null;
+        
+        // Check if user is currently suspended
         if (suspensionStatus && suspensionStatus.isSuspended) {
           console.log('🚫 User is suspended, redirecting to suspended screen');
           setIsLoading(false);
           router.replace('/suspended' as any);
+          return;
+        }
+        
+        // Check if user needs to acknowledge suspension lifted
+        if (suspensionStatus && suspensionStatus.needsLiftedAcknowledgment) {
+          console.log('✅ User suspension lifted, redirecting to suspension-lifted screen');
+          setIsLoading(false);
+          router.replace('/suspension-lifted' as any);
           return;
         }
         

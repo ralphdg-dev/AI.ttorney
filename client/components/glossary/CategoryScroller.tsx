@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import Colors from "@/constants/Colors";
 import { LAYOUT } from "@/constants/LayoutConstants";
@@ -11,6 +11,7 @@ import {
   Gavel,
   ShoppingCart,
   Tag,
+  HardHat,
 } from "lucide-react-native";
 
 interface CategoryScrollerProps {
@@ -25,7 +26,7 @@ const composeCategories = (includeAll: boolean) =>
     : (LEGAL_CATEGORIES as (LegalCategory | { id: string; label: string })[])
   );
 
-export default function CategoryScroller({ activeCategory, onCategoryChange, includeAllOption = true }: CategoryScrollerProps) {
+const CategoryScroller = React.memo(({ activeCategory, onCategoryChange, includeAllOption = true }: CategoryScrollerProps) => {
   // Memoize categories to prevent re-renders
   const categories = useMemo(() => composeCategories(includeAllOption), [includeAllOption]);
 
@@ -33,12 +34,71 @@ export default function CategoryScroller({ activeCategory, onCategoryChange, inc
   const categoryIcons = useMemo(() => ({
     all: Library,
     family: Users,
-    work: Briefcase,
+    work: HardHat,
     civil: ScrollText,
     criminal: Gavel,
     consumer: ShoppingCart,
     others: Tag,
   }), []);
+
+  // Memoize category press handler
+  const handleCategoryPress = useCallback((categoryId: string) => {
+    if (categoryId !== activeCategory) {
+      onCategoryChange(categoryId);
+    }
+  }, [activeCategory, onCategoryChange]);
+
+  // Memoize render items to prevent re-creation
+  const renderCategory = useMemo(() => {
+    return categories.map((c) => {
+      const isActive = activeCategory === c.id;
+      const Icon = categoryIcons[c.id as keyof typeof categoryIcons];
+
+      return (
+        <TouchableOpacity
+          key={c.id}
+          style={styles.categoryButton}
+          onPress={() => handleCategoryPress(c.id)}
+          activeOpacity={0.7}
+          disabled={isActive}
+        >
+          <View
+            style={[
+              styles.iconContainer,
+              isActive ? styles.iconContainerActive : styles.iconContainerInactive
+            ]}
+          >
+            {Icon ? (
+              <Icon 
+                size={24} 
+                className="sm:w-7 sm:h-7 lg:w-8 lg:h-8"
+                color={isActive ? Colors.primary.blue : "#9CA3AF"} 
+                strokeWidth={2} 
+              />
+            ) : (
+              <Library 
+                size={24}
+                className="sm:w-7 sm:h-7 lg:w-8 lg:h-8"
+                color={isActive ? Colors.primary.blue : "#9CA3AF"} 
+                strokeWidth={2} 
+              />
+            )}
+          </View>
+          
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            style={[
+              styles.label,
+              isActive ? styles.labelActive : styles.labelInactive
+            ]}
+          >
+            {c.label}
+          </Text>
+        </TouchableOpacity>
+      );
+    });
+  }, [categories, activeCategory, categoryIcons, handleCategoryPress]);
 
   return (
     <View style={styles.container}>
@@ -46,60 +106,25 @@ export default function CategoryScroller({ activeCategory, onCategoryChange, inc
         horizontal 
         showsHorizontalScrollIndicator={false} 
         contentContainerStyle={styles.scrollContent}
+        decelerationRate="fast"
+        snapToInterval={72}
+        snapToAlignment="start"
       >
         <View style={styles.categoriesRow}>
-          {categories.map((c) => {
-            const isActive = activeCategory === c.id;
-            const Icon = categoryIcons[c.id as keyof typeof categoryIcons];
-            
-            return (
-              <TouchableOpacity
-                key={c.id}
-                style={styles.categoryButton}
-                onPress={() => onCategoryChange(c.id)}
-                activeOpacity={0.8}
-              >
-                <View
-                  style={[
-                    styles.iconContainer,
-                    isActive ? styles.iconContainerActive : styles.iconContainerInactive
-                  ]}
-                >
-                  {Icon ? (
-                    <Icon 
-                      size={24} 
-                      className="sm:w-7 sm:h-7 lg:w-8 lg:h-8"
-                      color={isActive ? Colors.primary.blue : "#9CA3AF"} 
-                      strokeWidth={2} 
-                    />
-                  ) : (
-                    <Library 
-                      size={24}
-                      className="sm:w-7 sm:h-7 lg:w-8 lg:h-8"
-                      color={isActive ? Colors.primary.blue : "#9CA3AF"} 
-                      strokeWidth={2} 
-                    />
-                  )}
-                </View>
-                
-                <Text
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  style={[
-                    styles.label,
-                    isActive ? styles.labelActive : styles.labelInactive
-                  ]}
-                >
-                  {c.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          {renderCategory}
         </View>
       </ScrollView>
     </View>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison for better performance
+  return prevProps.activeCategory === nextProps.activeCategory &&
+         prevProps.includeAllOption === nextProps.includeAllOption;
+});
+
+CategoryScroller.displayName = 'CategoryScroller';
+
+export default CategoryScroller;
 
 const styles = StyleSheet.create({
   container: {

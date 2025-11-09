@@ -252,7 +252,7 @@ export default function SuspendedScreen() {
   return (
     <View className="flex-1 bg-white">
       {/* Simple Header with Logo Only */}
-      <View className="bg-white px-4 pt-10 pb-3 border-b border-gray-200 items-center">
+      <View className="bg-white px-4 pt-6 pb-3 border-b border-gray-200 items-center">
         <Image
           source={require('../assets/images/logo.png')}
           style={{ width: 140, height: 35 }}

@@ -12,6 +12,10 @@ export interface ModerationStatus {
   account_status: 'active' | 'suspended' | 'banned';
   suspension_end: string | null;
   last_violation_at: string | null;
+  lifted_acknowledged: boolean | null;
+  lifted_at: string | null;
+  was_lifted_by_admin: boolean;
+  most_recent_suspension_id: string | null;
 }
 
 export interface ModerationError {

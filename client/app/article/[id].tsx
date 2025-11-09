@@ -9,6 +9,23 @@ import LegalDisclaimer from '@/components/guides/LegalDisclaimer';
 import { articleCache } from '@/services/articleCache';
 import { NetworkConfig } from '@/utils/networkConfig';
 
+// Helper function to get full Supabase Storage URL
+const getStorageUrl = (path: string | null | undefined): string | undefined => {
+  if (!path) return undefined;
+  
+  // If it's already a full URL, return as is
+  if (path.startsWith('http')) return path;
+  
+  // If it's a storage path, construct the full URL
+  // Use hardcoded URL as fallback to ensure images always load
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://vmlbrckrlgwlobhnpstx.supabase.co';
+  
+  // Remove leading slash if present to avoid double slashes
+  const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+  
+  return `${supabaseUrl}/storage/v1/object/public/legal-articles/${cleanPath}`;
+};
+
 // Database article shape (subset)
 interface DbArticleRow {
   id: string;
@@ -62,6 +79,7 @@ export default function ArticleViewScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showFilipino, setShowFilipino] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const noImageUri = 'https://placehold.co/1200x800/png?text=No+Image+Available';
 
   useEffect(() => {
@@ -214,13 +232,22 @@ export default function ArticleViewScreen() {
         {/* Article Image */}
         <Image 
           source={{ 
-            uri: ((article as any).image_article 
-              ? `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/legal-articles/${(article as any).image_article}`
-              : noImageUri
-            ) as string 
+            uri: (getStorageUrl((article as any).image_article) || noImageUri) as string 
           }}
           style={styles.articleImage}
           resizeMode="cover"
+          onError={(error) => {
+            if (__DEV__) {
+              console.warn(`Failed to load article image:`, error.nativeEvent?.error);
+              console.warn('Image path was:', (article as any).image_article);
+            }
+            setImageError(true);
+          }}
+          onLoad={() => {
+            if (__DEV__ && !imageError) {
+              console.log('Article image loaded successfully');
+            }
+          }}
         />
 
 

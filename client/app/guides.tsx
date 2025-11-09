@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, FlatList, useWindowDimensions, TouchableOpacity, StatusBar } from "react-native";
+import React, { useEffect, useMemo, useRef, useState, useCallback, startTransition } from "react";
+import { View, FlatList, useWindowDimensions, TouchableOpacity, StatusBar, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
@@ -46,6 +46,10 @@ export default function GuidesScreen() {
   const [displayArticles, setDisplayArticles] = useState<ArticleItem[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const previousSearchRef = useRef<string>("");
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const categoryCache = useRef<Record<string, ArticleItem[]>>({});
+  const lastCategoryRef = useRef<string>("all");
+  const latestCategoryRef = useRef<string>("all");
   
   // Debug effect to track displayArticles changes
   useEffect(() => {
@@ -65,49 +69,119 @@ export default function GuidesScreen() {
 
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
 
-  // Search debounce
+  // Search debounce - OPTIMIZED with latest value pattern
   useEffect(() => {
+    // Cancel any pending requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    const trimmedQuery = searchQuery.trim();
+    
+    // Track the latest category
+    latestCategoryRef.current = activeCategory;
+    
+    // Immediate optimistic update for category-only changes
+    if (!trimmedQuery && activeCategory !== lastCategoryRef.current) {
+      lastCategoryRef.current = activeCategory;
+      
+      // Use startTransition for non-urgent updates
+      startTransition(() => {
+        setCurrentPage(1);
+      });
+      
+      // Immediate synchronous update with cached data
+      if (activeCategory === "all") {
+        if (legalArticles.length > 0) {
+          setDisplayArticles(legalArticles);
+          categoryCache.current["all"] = legalArticles;
+        }
+      } else if (categoryCache.current[activeCategory]) {
+        setDisplayArticles(categoryCache.current[activeCategory]);
+      }
+    }
+    
+    const debounceTime = !trimmedQuery ? 0 : 150;
+    
     const searchTimeout = setTimeout(async () => {
-      const trimmedQuery = searchQuery.trim();
       const searchKey = `${trimmedQuery}-${activeCategory}`;
       
+      // Skip if same search
       if (previousSearchRef.current === searchKey) return;
       previousSearchRef.current = searchKey;
       
-      if (trimmedQuery) {
-        if (trimmedQuery.length >= 2) {
-          setIsSearching(true);
-          try {
-            const searchResults = await searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController();
+      const currentController = abortControllerRef.current;
+      
+      if (trimmedQuery && trimmedQuery.length >= 2) {
+        setIsSearching(true);
+        try {
+          const searchResults = await searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
+          // Only update if not aborted
+          if (!currentController.signal.aborted) {
             setDisplayArticles(searchResults);
-          } catch (err) {
+          }
+        } catch (err) {
+          if (!currentController.signal.aborted) {
             console.error("Search error:", err);
             setDisplayArticles([]);
-          } finally {
+          }
+        } finally {
+          if (!currentController.signal.aborted) {
             setIsSearching(false);
           }
         }
       } else {
         setIsSearching(false);
         if (activeCategory === "all") {
-          setDisplayArticles(legalArticles);
-        } else {
-          try {
-            const byCat = await getArticlesByCategory(activeCategory);
-            setDisplayArticles(byCat);
-          } catch (err) {
-            console.error("Category fetch error:", err);
+          if (!currentController.signal.aborted && legalArticles.length > 0) {
             setDisplayArticles(legalArticles);
+            categoryCache.current["all"] = legalArticles;
+          }
+        } else {
+          // Only fetch if not in cache and still the latest category
+          if (!categoryCache.current[activeCategory]) {
+            try {
+              const byCat = await getArticlesByCategory(activeCategory);
+              // Only update if this is still the latest category requested
+              if (!currentController.signal.aborted && byCat.length > 0 && latestCategoryRef.current === activeCategory) {
+                setDisplayArticles(byCat);
+                categoryCache.current[activeCategory] = byCat;
+              }
+            } catch (err) {
+              if (!currentController.signal.aborted) {
+                console.error("Category fetch error:", err);
+                if (legalArticles.length > 0 && latestCategoryRef.current === activeCategory) {
+                  setDisplayArticles(legalArticles);
+                }
+              }
+            }
           }
         }
       }
-    }, 500);
+    }, debounceTime);
 
-    return () => clearTimeout(searchTimeout);
-  }, [searchQuery, activeCategory, legalArticles, searchArticles, getArticlesByCategory]);
+    return () => {
+      clearTimeout(searchTimeout);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [searchQuery, activeCategory]);
 
+  const previousArticlesRef = useRef<ArticleItem[]>([]);
+  
   const articlesToRender: ArticleItem[] = useMemo(() => {
-    return displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
+    const newArticles = displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
+    
+    // Keep previous data if new data is empty to prevent blank screen
+    if (newArticles.length > 0) {
+      previousArticlesRef.current = newArticles;
+      return newArticles;
+    }
+    
+    return previousArticlesRef.current;
   }, [displayArticles, bookmarks]);
 
   // Pagination
@@ -117,32 +191,30 @@ export default function GuidesScreen() {
   const endIndex = startIndex + ARTICLES_PER_PAGE;
   const paginatedArticles = articlesToRender.slice(startIndex, endIndex);
 
+  // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, activeCategory]);
 
-  const handleCategoryChange = (categoryId: string): void => {
-    setActiveCategory(categoryId);
-    if (categoryId && categoryId !== "all") {
-      (async () => {
-        const byCat = await getArticlesByCategory(categoryId);
-        setDisplayArticles(byCat);
-      })();
-    } else {
-      setDisplayArticles(legalArticles);
-    }
-    setTimeout(() => {
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-    }, 50);
-  };
+  const handleCategoryChange = useCallback((categoryId: string): void => {
+    if (categoryId === activeCategory) return;
+    
+    // Batch state updates for smoother transition
+    startTransition(() => {
+      setActiveCategory(categoryId);
+    });
+    
+    // Immediate scroll to top
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [activeCategory]);
 
-  const handleArticlePress = (item: ArticleItem): void => {
+  const handleArticlePress = useCallback((item: ArticleItem): void => {
     router.push(`/article/${item.id}` as any);
-  };
+  }, [router]);
 
-  const handleToggleBookmark = (item: ArticleItem): void => {
+  const handleToggleBookmark = useCallback((item: ArticleItem): void => {
     setBookmarks((prev) => ({ ...prev, [item.id]: !prev[item.id] }));
-  };
+  }, []);
 
   const onToggleChange = (id: string) => {
     // Always navigate to glossary page - it has both tabs
@@ -194,8 +266,12 @@ const renderPagination = () => {
   };
 
   const handlePageChange = (page: number): void => {
+    if (page === currentPage) return;
+    
     setCurrentPage(page);
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    
+    // Immediate scroll to top
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
   };
 
   return (
@@ -297,7 +373,11 @@ const renderPagination = () => {
         <Box className="px-6 pt-6 mb-4">
           <Input variant="outline" size="lg" className="bg-white rounded-lg border border-gray-300">
             <InputSlot className="pl-3">
-              <Ionicons name="search" size={20} color="#9CA3AF" />
+              {isSearching ? (
+                <ActivityIndicator size="small" color={Colors.primary.blue} />
+              ) : (
+                <Ionicons name="search" size={20} color="#9CA3AF" />
+              )}
             </InputSlot>
             <InputField
               value={searchQuery}
@@ -305,7 +385,20 @@ const renderPagination = () => {
               placeholder="Search articles"
               placeholderTextColor="#9CA3AF"
               className="text-[#313131]"
+              returnKeyType="search"
+              autoCorrect={false}
+              autoCapitalize="none"
             />
+            {searchQuery.length > 0 && (
+              <InputSlot className="pr-2">
+                <TouchableOpacity
+                  onPress={() => setSearchQuery("")}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              </InputSlot>
+            )}
             <InputSlot className="pr-3">
               <Ionicons name="options" size={20} color={Colors.text.sub} />
             </InputSlot>
@@ -333,10 +426,10 @@ const renderPagination = () => {
             <FlatList
               ref={flatListRef}
               data={paginatedArticles}
-              key={`guides-${numColumns}-${activeCategory}-${currentPage}-${width}`}
+              key={`guides-${numColumns}-${width}`}
               keyExtractor={(item) => item.id}
               numColumns={numColumns}
-              extraData={width}
+              extraData={[width, activeCategory, currentPage, paginatedArticles.length]}
               ListHeaderComponent={renderListHeader}
               ListFooterComponent={renderPagination}
               contentContainerStyle={{ 
@@ -359,12 +452,27 @@ const renderPagination = () => {
               showsVerticalScrollIndicator={false}
               style={{ flex: 1 }}
               removeClippedSubviews={true}
-              maxToRenderPerBatch={8}
-              initialNumToRender={6}
-              windowSize={8}
+              maxToRenderPerBatch={5}
+              initialNumToRender={8}
+              windowSize={5}
+              updateCellsBatchingPeriod={50}
+              getItemLayout={(data, index) => ({
+                length: 200,
+                offset: 200 * index,
+                index,
+              })}
+              refreshing={false}
+              onRefresh={() => {
+                setCurrentPage(1);
+                refetch();
+              }}
               ListEmptyComponent={
                 <View style={tw`flex-1 justify-center items-center py-8`}>
-                  <GSText size="lg" className="text-gray-500 text-center">No articles found</GSText>
+                  <Ionicons name="document-text" size={48} color="#9CA3AF" />
+                  <GSText size="lg" className="text-gray-500 text-center mt-4">No articles found</GSText>
+                  {searchQuery.trim() && (
+                    <GSText size="sm" className="text-gray-400 text-center mt-2">Try adjusting your search or filters</GSText>
+                  )}
                 </View>
               }
             />

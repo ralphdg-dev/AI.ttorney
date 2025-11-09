@@ -68,11 +68,18 @@ export const ArticleCard = ({
   const noImageUri =
     "https://placehold.co/1200x800/png?text=No+Image+Available";
   const initialSource: ImageSourcePropType = useMemo(
-    () => item.image ?? { uri: item.imageUrl || noImageUri },
-    [item.image, item.imageUrl]
+    () => {
+      // Debug logging to help identify image URL issues
+      if (__DEV__ && item.imageUrl) {
+        console.log(`Article "${item.title}" image URL:`, item.imageUrl);
+      }
+      return item.image ?? { uri: item.imageUrl || noImageUri };
+    },
+    [item.image, item.imageUrl, item.title]
   );
   const [imageSource, setImageSource] =
     useState<ImageSourcePropType>(initialSource);
+  const [imageError, setImageError] = useState(false);
 
   return (
     <View style={[tw`mb-4 flex-1 px-2`, containerStyle]}>
@@ -98,7 +105,19 @@ export const ArticleCard = ({
               source={imageSource}
               style={{ width: "100%", height: "100%" }}
               resizeMode="cover"
-              onError={() => setImageSource({ uri: noImageUri })}
+              onError={(error) => {
+                if (__DEV__) {
+                  console.warn(`Failed to load image for "${item.title}":`, error.nativeEvent?.error);
+                  console.warn('Image source was:', imageSource);
+                }
+                setImageError(true);
+                setImageSource({ uri: noImageUri });
+              }}
+              onLoad={() => {
+                if (__DEV__ && imageError) {
+                  console.log(`Successfully loaded fallback image for "${item.title}"`);
+                }
+              }}
               accessibilityLabel={`Cover image for ${item.title}`}
             />
           </View>

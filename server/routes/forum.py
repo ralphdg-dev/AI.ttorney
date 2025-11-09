@@ -430,18 +430,23 @@ async def create_test_reply(current_user: Dict[str, Any] = Depends(get_current_u
 
 
 @router.get("/posts/recent", response_model=ListPostsResponse)
-async def list_recent_posts(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """BEST APPROACH: Minimal queries with smart global caching."""
+async def list_recent_posts(
+    limit: int = 20,
+    offset: int = 0,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """BEST APPROACH: Minimal queries with smart global caching and pagination support."""
     try:
         user_id = current_user["user"]["id"]
         
         # Global posts cache (shared across users for base posts)
-        cache_key = "global_posts"
+        # Include pagination params in cache key for proper segmentation
+        cache_key = f"global_posts_{limit}_{offset}"
         current_time = time.time()
         
-        # Check global posts cache first
+        # Check global posts cache first (only for first page to maintain real-time feel)
         base_posts = None
-        if cache_key in _posts_cache:
+        if offset == 0 and cache_key in _posts_cache:
             cached_posts, cache_time = _posts_cache[cache_key]
             age = current_time - cache_time
             logger.info(f"Cache found, age: {age:.1f}s, limit: {CACHE_DURATION}s")
@@ -451,15 +456,15 @@ async def list_recent_posts(current_user: Dict[str, Any] = Depends(get_current_u
             else:
                 logger.info("Cache expired, fetching fresh data")
         else:
-            logger.info("No cache found, fetching fresh data")
+            logger.info(f"No cache found for offset {offset}, fetching fresh data")
         
         # If no cached posts, fetch them WITH replies for instant ViewPost loading
         if base_posts is None:
             supabase = SupabaseService()
             async with httpx.AsyncClient(timeout=20.0) as client:
-                # First fetch posts
+                # First fetch posts with pagination
                 posts_response = await client.get(
-                    f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&order=created_at.desc&limit=20",
+                    f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&order=created_at.desc&limit={limit}&offset={offset}",
                     headers=supabase._get_headers(use_service_key=True)
                 )
 
@@ -544,9 +549,10 @@ async def list_recent_posts(current_user: Dict[str, Any] = Depends(get_current_u
                         for post in base_posts:
                             post["forum_replies"] = []
             
-            # Cache globally (shared across all users)
-            _posts_cache[cache_key] = (base_posts, current_time)
-            logger.info(f"📦 CACHED {len(base_posts)} posts with replies for {CACHE_DURATION}s")
+            # Cache globally (shared across all users) - only cache first page
+            if offset == 0:
+                _posts_cache[cache_key] = (base_posts, current_time)
+                logger.info(f"📦 CACHED {len(base_posts)} posts with replies for {CACHE_DURATION}s")
         
         # Get user-specific data using cached functions
         user_bookmarks = set()

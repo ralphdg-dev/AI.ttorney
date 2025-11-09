@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Dimensions, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { 
@@ -24,7 +24,7 @@ interface GuestSidebarProps {
 }
 
 const { width: screenWidth } = Dimensions.get('window');
-const SIDEBAR_WIDTH = screenWidth * 0.8;
+const SIDEBAR_WIDTH = Math.min(screenWidth * 0.8, 320);
 const ANIMATION_DURATION = 280;
 
 interface MenuItem {
@@ -42,30 +42,51 @@ interface MenuItem {
 export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) => {
   const router = useRouter();
   const [slideAnim] = useState(() => new Animated.Value(-SIDEBAR_WIDTH));
+  const [overlayAnim] = useState(() => new Animated.Value(0));
 
   // Animation effect
   useEffect(() => {
     const animationConfig = {
       duration: ANIMATION_DURATION,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: shouldUseNativeDriver('transform'),
     };
 
+    const overlayConfig = {
+      duration: ANIMATION_DURATION,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: shouldUseNativeDriver('opacity'),
+    };
+
     if (isOpen) {
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        ...animationConfig,
-      }).start();
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          ...animationConfig,
+        }),
+        Animated.timing(overlayAnim, {
+          toValue: 1,
+          ...overlayConfig,
+        }),
+      ]).start();
     } else {
-      Animated.timing(slideAnim, {
-        toValue: -SIDEBAR_WIDTH,
-        ...animationConfig,
-      }).start();
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: -SIDEBAR_WIDTH,
+          ...animationConfig,
+        }),
+        Animated.timing(overlayAnim, {
+          toValue: 0,
+          ...overlayConfig,
+        }),
+      ]).start();
     }
 
     return () => {
       slideAnim.stopAnimation();
+      overlayAnim.stopAnimation();
     };
-  }, [isOpen, slideAnim]);
+  }, [isOpen, slideAnim, overlayAnim]);
 
   const handleNavigation = (path: string) => {
     onClose();
@@ -154,16 +175,31 @@ export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) =
     );
   };
 
-  if (!isOpen) return null;
-
   return (
-    <View style={styles.container}>
+    <View style={styles.container} pointerEvents={isOpen ? 'auto' : 'none'}>
+      {/* Overlay */}
+      <TouchableOpacity
+        style={styles.overlayTouchable}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <Animated.View
+          style={[
+            styles.overlay,
+            {
+              opacity: overlayAnim,
+            },
+          ]}
+        />
+      </TouchableOpacity>
+
       {/* Sidebar */}
       <Animated.View
         style={[
           styles.sidebar,
           {
             transform: [{ translateX: slideAnim }],
+            opacity: overlayAnim,
           },
         ]}
         accessible={true}
@@ -217,11 +253,7 @@ export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) =
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
     zIndex: LAYOUT.Z_INDEX.drawer,
   },
   overlay: {
@@ -230,11 +262,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'black',
-    zIndex: LAYOUT.Z_INDEX.overlay,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   overlayTouchable: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: LAYOUT.Z_INDEX.overlay,
   },
   sidebar: {
     position: 'absolute',
@@ -243,6 +279,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: SIDEBAR_WIDTH,
     backgroundColor: '#FFFFFF',
+    zIndex: LAYOUT.Z_INDEX.drawer,
     ...createShadowStyle({
       shadowColor: '#000',
       shadowOffset: { width: 2, height: 0 },
