@@ -31,21 +31,42 @@ const createSupabaseClient = () => {
 // Export singleton instance - this ensures only one client is created
 export const supabase = createSupabaseClient();
 
-// Simple helper to clear auth storage when needed
+// Industry-grade auth storage cleanup (Facebook/Google pattern)
+const AUTH_KEYWORDS = ['auth', 'supabase', 'session', 'profile', 'token', 'user'];
+const WEB_KEYS = [STORAGE_KEYS.AUTH, STORAGE_KEYS.USER_SESSION, STORAGE_KEYS.USER_PROFILE, STORAGE_KEYS.SUPABASE_TOKEN, 'sb-access-token', 'sb-refresh-token'];
+
 export const clearAuthStorage = async () => {
   try {
+    console.log('🧹 Clearing auth storage...');
+    
     if (Platform.OS !== 'web') {
-      await AsyncStorage.removeItem(STORAGE_KEYS.SUPABASE_TOKEN);
-      await AsyncStorage.removeItem(STORAGE_KEYS.AUTH);
-      await AsyncStorage.removeItem(STORAGE_KEYS.USER_SESSION);
-      await AsyncStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
+      const allKeys = await AsyncStorage.getAllKeys();
+      const authKeys = allKeys.filter(key => AUTH_KEYWORDS.some(kw => key.includes(kw)));
+      if (authKeys.length > 0) {
+        await AsyncStorage.multiRemove(authKeys);
+        console.log(`✅ Cleared ${authKeys.length} keys`);
+      }
     } else {
-      // Clear web storage
-      localStorage.removeItem(STORAGE_KEYS.AUTH);
-      localStorage.removeItem(STORAGE_KEYS.USER_SESSION);
-      localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
+      WEB_KEYS.forEach(key => {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+      });
+      console.log('✅ Cleared web storage');
     }
   } catch (error) {
-    console.error('Error clearing auth storage:', error);
+    console.error('❌ Storage cleanup failed:', error);
+  }
+};
+
+// Force reset Supabase client (nuclear option)
+export const resetSupabaseClient = async () => {
+  try {
+    console.log('🔄 Resetting client...');
+    if (supabaseInstance) await supabaseInstance.auth.signOut({ scope: 'global' });
+    await clearAuthStorage();
+    supabaseInstance = null;
+    console.log('✅ Reset complete');
+  } catch (error) {
+    console.error('❌ Reset failed:', error);
   }
 };

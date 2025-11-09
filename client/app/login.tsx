@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
@@ -10,7 +10,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function Login() {
   const toast = useToast();
-  const { signIn, continueAsGuest, isLoading: authLoading } = useAuth();
+  const { signIn, continueAsGuest, isLoading: authLoading, isAuthenticated } = useAuth();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,6 +23,16 @@ export default function Login() {
   // Validation states
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  
+  // Clear form on mount & auto-redirect if authenticated
+  useEffect(() => {
+    setEmail("");
+    setPassword("");
+    setEmailError("");
+    setPasswordError("");
+    setShowPassword(false);
+    if (isAuthenticated) router.replace('/home');
+  }, [isAuthenticated]);
 
 
   // Validation functions

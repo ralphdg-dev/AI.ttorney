@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
-import { supabase, clearAuthStorage } from '../config/supabase';
+import { supabase, clearAuthStorage, resetSupabaseClient } from '../config/supabase';
 import { router } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -299,12 +299,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
 
-        // Get initial session
+        // Check for existing session
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Session error:', error.message);
-          // Clear session on error and redirect to login
+          console.error('❌ Session error:', error.message);
           await clearAuthStorage();
           setAuthState({ session: null, user: null, supabaseUser: null });
           setIsLoading(false);
@@ -313,6 +312,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         if (initialSession) {
+          console.log('✅ Existing session found');
           await handleAuthStateChange(initialSession, false);
         } else {
           setAuthState({ session: null, user: null, supabaseUser: null });
@@ -321,28 +321,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         setInitialAuthCheck(true);
 
-        // Listen for auth state changes
+        // Auth state listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event: string, session: any) => {
+            console.log('🔔 Auth event:', event);
+            
+            // Ignore events during sign out (prevent race conditions)
+            if (isSigningOut) return;
+            
             if (event === 'SIGNED_IN' && session) {
               await handleAuthStateChange(session, true);
             } else if (event === 'TOKEN_REFRESHED' && session) {
               await handleAuthStateChange(session, false);
             } else if (event === 'SIGNED_OUT') {
-              // Clear auth state and redirect flag
               setAuthState({ session: null, user: null, supabaseUser: null });
               setHasRedirectedToStatus(false);
+              setIsGuestMode(false);
               setIsLoading(false);
-              setIsSigningOut(false);
-              
-              // Navigation is already handled by signOut function
-              // This event handler just ensures state is cleared
             }
             
-            // Ensure loading is always set to false after auth state changes
-            if (event !== 'SIGNED_OUT') {
-              setIsLoading(false);
-            }
+            if (event !== 'SIGNED_OUT') setIsLoading(false);
           }
         );
 
@@ -350,10 +348,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Cleanup subscription on unmount
         return () => {
+          console.log('🧹 Cleaning up auth listener');
           subscription.unsubscribe();
         };
       } catch (error) {
-        console.error('Auth initialization error:', error);
+        console.error('❌ Auth initialization error:', error);
         setIsLoading(false);
       }
     };
@@ -365,54 +364,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('🔐 signIn called for:', email);
+      console.log('🔐 Signing in:', email);
       setIsLoading(true);
       setHasRedirectedToStatus(false);
       
-      // CRITICAL: Clear any existing guest session before login
-      // This prevents guest mode from persisting after successful authentication
-      const guestSessionData = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
-      if (guestSessionData) {
-        console.log('🗑️ Clearing guest session before login');
+      // Clear stale data before login
+      await clearAuthStorage();
+      const guestSession = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
+      if (guestSession) {
         await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
         setIsGuestMode(false);
       }
       
-      // Supabase best practice: Use signInWithPassword for email/password auth
+      // Fresh login attempt
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
         password,
       });
 
       if (error) {
-        console.error('❌ Supabase signIn error:', error.message);
-        
-        // Map Supabase errors to user-friendly messages (industry standard)
-        let errorMessage = 'Invalid email or password';
-        if (error.message.includes('Invalid login credentials')) {
-          errorMessage = 'Invalid email or password';
-        } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Please verify your email address';
-        } else if (error.message.includes('email_not_confirmed')) {
-          errorMessage = 'Please verify your email address';
-        } else if (error.message.includes('network') || error.message.includes('fetch')) {
-          errorMessage = 'Network error. Please check your connection';
-        } else if (error.message.includes('rate_limit')) {
-          errorMessage = 'Too many attempts. Please try again later';
-        }
-        
+        console.error('❌ Login error:', error.message);
         setIsLoading(false);
+        
+        // Map errors to user-friendly messages
+        const errorMap: Record<string, string> = {
+          'Invalid login credentials': 'Invalid email or password',
+          'Email not confirmed': 'Please verify your email address',
+          'email_not_confirmed': 'Please verify your email address',
+          'network': 'Network error. Please check your connection',
+          'fetch': 'Network error. Please check your connection',
+          'rate_limit': 'Too many attempts. Please try again later',
+        };
+        
+        const errorMessage = Object.entries(errorMap).find(([key]) => 
+          error.message.includes(key)
+        )?.[1] || 'Invalid email or password';
+        
         return { success: false, error: errorMessage };
       }
 
       if (data.session) {
-        console.log('✅ Supabase session created, handling auth state...');
-        // handleAuthStateChange will set isLoading to false
+        console.log('✅ Login successful');
         await handleAuthStateChange(data.session, true);
         return { success: true };
       }
 
-      console.error('❌ No session returned from Supabase');
       setIsLoading(false);
       return { success: false, error: 'Login failed. Please try again' };
     } catch (error: any) {
@@ -493,34 +489,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      console.log('🚪 signOut called');
-      // Set signing out flag FIRST so guards know to skip checks
+      console.log('🚪 Signing out...');
       setIsSigningOut(true);
       
-      // Clear auth state IMMEDIATELY
+      // Clear state & redirect immediately (optimistic UI)
       setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
+      setIsGuestMode(false);
       setIsLoading(false);
-      
-      // Redirect to login IMMEDIATELY - don't wait for anything
       router.replace('/login');
       
-      // Clear signing out flag after a tiny delay to ensure navigation completes
-      setTimeout(() => setIsSigningOut(false), 100);
+      // Background cleanup (non-blocking)
+      const cleanup = async () => {
+        const allKeys = await AsyncStorage.getAllKeys();
+        const profileKeys = allKeys.filter(key => key.startsWith('profile_cache_'));
+        if (profileKeys.length > 0) await AsyncStorage.multiRemove(profileKeys);
+      };
       
-      // Clear storage and sign out in background (non-blocking)
-      clearAuthStorage().catch(() => {});
-      supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+      Promise.all([
+        cleanup().catch(() => {}),
+        supabase.auth.signOut({ scope: 'global' }).catch(() => {}),
+        clearAuthStorage().catch(() => {}),
+      ]).finally(() => {
+        console.log('✅ Logout complete');
+        setTimeout(() => setIsSigningOut(false), 100);
+      });
+      
     } catch (error) {
-      console.error('❌ signOut error:', error);
-      
-      // Force clear ALL states and redirect immediately
-      setIsSigningOut(true);
+      console.error('❌ Logout error:', error);
+      // Nuclear fallback
       setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
+      setIsGuestMode(false);
       setIsLoading(false);
       router.replace('/login');
-      setTimeout(() => setIsSigningOut(false), 100);
+      resetSupabaseClient().finally(() => setTimeout(() => setIsSigningOut(false), 100));
     }
   };
 
