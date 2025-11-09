@@ -3,6 +3,7 @@ const router = express.Router();
 const { supabaseAdmin } = require("../config/supabase");
 const multer = require("multer");
 const { authenticateAdmin } = require("../middleware/auth");
+const { notifyArticlePublished, notifyArticleUpdated } = require("../utils/notificationHelper");
 const upload = multer({ storage: multer.memoryStorage() });
 
 // GET /api/legal-articles — get all articles with admin full_name
@@ -250,6 +251,17 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       status: updatedArticle.is_verified ? "Published" : "Unpublished",
     };
 
+    // Send notifications to users who bookmarked this article (if published)
+    if (updatedArticle.is_verified) {
+      notifyArticleUpdated(
+        id,
+        updatedArticle.title_en || "Article",
+        updatedArticle.title_fil || "Artikulo"
+      ).catch((err) => {
+        console.error("⚠️ Failed to send update notifications (non-blocking):", err);
+      });
+    }
+
     res.status(200).json({ success: true, data: formattedArticle });
   } catch (err) {
     console.error(err);
@@ -314,6 +326,18 @@ router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
       verifiedByName: updatedArticle.admin?.full_name || null,
       status: updatedArticle.is_verified ? "Published" : "Unpublished",
     };
+
+    // Send notifications to mobile app users
+    if (publish) {
+      // Article was just published - notify all users
+      notifyArticlePublished(
+        id,
+        updatedArticle.title_en || "New Article",
+        updatedArticle.title_fil || "Bagong Artikulo"
+      ).catch((err) => {
+        console.error("⚠️ Failed to send publish notifications (non-blocking):", err);
+      });
+    }
 
     res.status(200).json({ success: true, data: formattedArticle });
   } catch (err) {
