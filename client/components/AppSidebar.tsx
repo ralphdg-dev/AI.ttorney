@@ -473,7 +473,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: LAYOUT.Z_INDEX.drawer,
-    overflow: 'hidden',
   },
   overlay: {
     position: "absolute",

@@ -11,9 +11,7 @@ import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 import { Ionicons } from "@expo/vector-icons";
 import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
-import {
-  SidebarWrapper,
-} from "@/components/AppSidebar";
+import { SidebarWrapper } from "@/components/AppSidebar";
 import Colors from "@/constants/Colors";
 import { Star, Filter, SortAsc } from "lucide-react-native";
 import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
@@ -39,6 +37,7 @@ export default function FavoritesScreen() {
   const loadFavoriteTerms = useCallback(async () => {
     if (!session?.access_token) {
       setFavoriteTerms([]);
+      setLoading(false);
       return;
     }
 
@@ -115,48 +114,27 @@ export default function FavoritesScreen() {
     router.push(`/glossary/${term.id}`);
   };
 
-
-
-  if (loading) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-        <Header
-          title="Favorite Terms"
-          showMenu={true}
-        />
-        <View style={tw`items-center justify-center flex-1`}>
-          <GSText>Loading your favorite terms...</GSText>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      
-      {/* Header */}
-      <Header
-        title="Favorite Terms"
-        showMenu={true}
-      />
+      <Header title="Favorite Terms" showMenu={true} />
 
-      {/* Search Bar */}
-      {favoriteTerms.length > 0 && (
-        <View style={{ paddingHorizontal: 20 }}>
-          <UnifiedSearchBar
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search your favorite terms"
-            loading={loading}
-            showFilterIcon={false}
-            containerClassName="pt-6 pb-4"
-          />
+      <View style={{ paddingHorizontal: 20 }}>
+        <UnifiedSearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search your favorite terms"
+          loading={loading}
+          showFilterIcon={false}
+          containerClassName="pt-6 pb-4"
+        />
+      </View>
+
+      {loading ? (
+        <View style={tw`items-center justify-center flex-1`}>
+          <GSText>Loading your favorite terms...</GSText>
         </View>
-      )}
-
-      {favoriteTerms.length === 0 ? (
+      ) : favoriteTerms.length === 0 ? (
         // Empty State
         <View style={[tw`items-center justify-center flex-1 px-8`, { marginTop: -60 }]}>
           <View style={[tw`items-center justify-center w-24 h-24 mb-6 rounded-full`, { backgroundColor: '#F0F9FF' }]}>

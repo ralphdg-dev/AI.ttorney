@@ -309,13 +309,6 @@ const styles = StyleSheet.create({
     width: SIDEBAR_WIDTH,
     backgroundColor: '#FFFFFF',
     zIndex: LAYOUT.Z_INDEX.drawer,
-    ...createShadowStyle({
-      shadowColor: '#000',
-      shadowOffset: { width: 2, height: 0 },
-      shadowOpacity: 0.25,
-      shadowRadius: 10,
-      elevation: 16,
-    }),
   },
   header: {
     flexDirection: 'row',
