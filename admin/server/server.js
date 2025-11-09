@@ -15,7 +15,8 @@ const glossaryTermsRoutes = require('./routes/glossary-terms');
 const forumManagementRoutes = require('./routes/forum-management');
 const adminModerationRoutes = require('./routes/admin-moderation');
 const statsRoutes = require('./routes/stats');
-
+const legalArticles = require('./routes/legal-articles');
+const translateText = require('./routes/translate');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -127,7 +128,8 @@ app.use('/api/glossary-terms', glossaryTermsRoutes);
 app.use('/api/forum', forumManagementRoutes);
 app.use('/api/admin/moderation', adminModerationRoutes);
 app.use('/api/stats', statsRoutes);
-
+app.use('/api/legal-articles', legalArticles);
+app.use('/api/translate', translateText);
 
 // 404 handler
 app.use('*', (req, res) => {

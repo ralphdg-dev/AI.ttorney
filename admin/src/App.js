@@ -15,6 +15,7 @@ import ManageAdminsPage from './pages/admin/ManageAdmins';
 import ManageAuditLogs from './pages/system/ManageAuditLogs';
 import ManageGlossaryTerms from './pages/legal-resources/ManageGlossaryTerms';
 import ManageAppeals from './pages/moderation/ManageAppeals';
+import ManageLegalArticles from './pages/legal-resources/ManageLegalArticles';
 
 // Forum Management Pages
 import ManageTopicsThreadsPage from './pages/forum/ManageTopicsThreadsPage';
@@ -46,6 +47,47 @@ const LegalArticles = () => (
 );
 
 
+const OpenTickets = () => (
+  <div className="p-6">
+    <h1 className="text-2xl font-bold text-gray-900 mb-4">Open Tickets</h1>
+    <p className="text-gray-600">Open tickets management coming soon...</p>
+  </div>
+);
+
+const AssignedTickets = () => (
+  <div className="p-6">
+    <h1 className="text-2xl font-bold text-gray-900 mb-4">Assigned Tickets</h1>
+    <p className="text-gray-600">Assigned tickets management coming soon...</p>
+  </div>
+);
+
+const TicketHistory = () => (
+  <div className="p-6">
+    <h1 className="text-2xl font-bold text-gray-900 mb-4">Ticket History</h1>
+    <p className="text-gray-600">Ticket history coming soon...</p>
+  </div>
+);
+
+const UserAnalytics = () => (
+  <div className="p-6">
+    <h1 className="text-2xl font-bold text-gray-900 mb-4">User Analytics</h1>
+    <p className="text-gray-600">User analytics coming soon...</p>
+  </div>
+);
+
+const ContentAnalytics = () => (
+  <div className="p-6">
+    <h1 className="text-2xl font-bold text-gray-900 mb-4">Content Analytics</h1>
+    <p className="text-gray-600">Content analytics coming soon...</p>
+  </div>
+);
+
+const ForumAnalytics = () => (
+  <div className="p-6">
+    <h1 className="text-2xl font-bold text-gray-900 mb-4">Forum Analytics</h1>
+    <p className="text-gray-600">Forum analytics coming soon...</p>
+  </div>
+);
 
 const App = () => {
   return (
@@ -116,7 +158,7 @@ const AdminDashboard = () => {
               
               {/* Legal Resources Routes */}
               <Route path="/legal-resources/glossary-terms" element={<ManageGlossaryTerms />} />
-              <Route path="/legal-resources/legal-articles" element={<LegalArticles />} />
+              <Route path="/legal-resources/legal-articles" element={<ManageLegalArticles />} />
               
               {/* Forum Routes */}
               <Route path="/forum/topics-threads" element={<ManageTopicsThreadsPage />} />
