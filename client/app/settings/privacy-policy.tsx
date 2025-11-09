@@ -39,7 +39,7 @@ export default function PrivacyPolicyScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <Box className="flex-1 bg-white">
-        <Header showBackButton={true} showMenu={false} onBackPress={() => router.back()} />
+        <Header showBackButton={true} showMenu={false} onBackPress={() => router.push('/settings')} />
 
         <ScrollView
           style={tw`flex-1`}
