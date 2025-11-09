@@ -54,16 +54,10 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
   const [, setError] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [offset, setOffset] = useState(0);
   
   // Refs for optimization
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isComponentMounted = useRef(true);
-  const isLoadingMoreRef = useRef(false);
-  const offsetRef = useRef(0);
-  const flatListRef = useRef<FlatList>(null);
   
   // Force cache refresh to fix any lingering references
   React.useEffect(() => {
@@ -196,10 +190,10 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     }
   }, [session?.access_token]);
 
-  // Optimized loadPosts with persistent caching and pagination
-  const loadPosts = useCallback(async (force = false, loadMore = false) => {
-    // Check cache first (only for initial load)
-    if (!force && !loadMore && isCacheValid()) {
+  // Optimized loadPosts with persistent caching
+  const loadPosts = useCallback(async (force = false) => {
+    // Check cache first
+    if (!force && isCacheValid()) {
       const cachedPosts = getCachedPosts();
       if (cachedPosts && cachedPosts.length > 0) {
         if (__DEV__) console.log('Timeline: Using cached posts, skipping fetch');
@@ -210,9 +204,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     }
     
     // Close any open dropdown menus when refreshing
-    if (!loadMore) {
-      setOpenMenuPostId(null);
-    }
+    setOpenMenuPostId(null);
     setError(null);
     
     if (!isAuthenticated) {
@@ -224,21 +216,11 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     }
     
     // Prevent concurrent requests
-    if ((refreshing && !force) || (loadMore && isLoadingMoreRef.current)) {
+    if (refreshing && !force) {
       return;
     }
     
-    if (loadMore) {
-      setLoadingMore(true);
-      isLoadingMoreRef.current = true;
-    } else {
-      setRefreshing(true);
-      // Reset pagination on refresh
-      setOffset(0);
-      offsetRef.current = 0;
-      setHasMore(true);
-    }
-    
+    setRefreshing(true);
     const now = Date.now();
     setLastFetchTime(now);
     
@@ -246,17 +228,10 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       const headers = await getAuthHeaders();
       const API_BASE_URL = await NetworkConfig.getBestApiUrl();
       
-      const currentOffset = loadMore ? offsetRef.current : 0;
-      const limit = 20;
-      
-      if (__DEV__) {
-        console.log(`📊 Loading posts: loadMore=${loadMore}, currentOffset=${currentOffset}, limit=${limit}`);
-      }
-      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
       
-      const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent?limit=${limit}&offset=${currentOffset}`, {
+      const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`, {
         method: 'GET',
         headers,
         signal: controller.signal,
@@ -285,55 +260,10 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         mapped = data.map(mapApiToPost);
       }
       
-      // Check if we have more posts to load
-      const hasMorePosts = mapped.length === limit;
-      
       // Only update if component is still mounted
       if (isComponentMounted.current) {
-        if (loadMore) {
-          // Append new posts to existing ones, filtering out duplicates
-          setPosts(prev => {
-            // Create a Set of existing post IDs for O(1) lookup
-            const existingIds = new Set(prev.map(p => p.id));
-            
-            // Filter out posts that already exist
-            const newPosts = mapped.filter(post => !existingIds.has(post.id));
-            
-            if (__DEV__) {
-              console.log(`📦 Appending ${newPosts.length} new posts (${mapped.length - newPosts.length} duplicates filtered) to existing ${prev.length} posts`);
-              if (newPosts.length === 0) {
-                console.warn('⚠️ No new posts to add - all were duplicates!');
-              }
-            }
-            
-            return [...prev, ...newPosts];
-          });
-          const newOffset = currentOffset + limit;
-          setOffset(newOffset);
-          offsetRef.current = newOffset;
-          setHasMore(hasMorePosts && mapped.length > 0);
-          if (__DEV__) {
-            console.log(`✅ Load more complete: newOffset=${newOffset}, hasMore=${hasMorePosts}`);
-          }
-        } else {
-          // Replace posts on refresh
-          setPosts(mapped);
-          setCachedPosts(mapped); // Cache the posts
-          setOffset(limit);
-          offsetRef.current = limit;
-          setHasMore(hasMorePosts);
-          if (__DEV__) {
-            console.log(`✅ Refresh complete: ${mapped.length} posts loaded, hasMore=${hasMorePosts}`);
-          }
-          
-          // Force FlatList to render from top immediately
-          requestAnimationFrame(() => {
-            if (flatListRef.current && mapped.length > 0) {
-              flatListRef.current.scrollToOffset({ offset: 0, animated: false });
-            }
-          });
-        }
-        
+        setPosts(mapped);
+        setCachedPosts(mapped); // Cache the posts
         if (__DEV__ && mapped.length === 0) {
           console.log('Timeline: No posts found');
         }
@@ -358,14 +288,16 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       if (isComponentMounted.current) {
         setRefreshing(false);
         setInitialLoading(false);
-        setLoadingMore(false);
-        isLoadingMoreRef.current = false;
       }
     }
   }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, refreshing]);
 
-  // Initial load with cache check - REMOVED to prevent infinite loop
-  // loadPosts is called by useFocusEffect instead
+  // Initial load with cache check
+  useEffect(() => {
+    if (isComponentMounted.current) {
+      loadPosts();
+    }
+  }, [loadPosts]);
   
   // Refresh posts when screen comes into focus (e.g., returning from CreatePost)
   useFocusEffect(
@@ -373,12 +305,12 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       // Check if cache is invalid or if we should refresh
       if (!isCacheValid()) {
         if (__DEV__) console.log('📱 Timeline: Screen focused, cache invalid - refreshing');
-        loadPosts(true, false); // Force refresh, not loading more
+        loadPosts(true); // Force refresh
       } else {
         if (__DEV__) console.log('📱 Timeline: Screen focused, cache valid - using cache');
-        loadPosts(false, false); // Use cache if valid
+        loadPosts(); // Use cache if valid
       }
-    }, [isCacheValid, loadPosts])
+    }, [loadPosts, isCacheValid])
   );
 
   // Remove duplicate useFocusEffect - already handled above
@@ -398,7 +330,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       fetchTimeoutRef.current = setTimeout(() => {
         if (isComponentMounted.current && isAuthenticated) {
           // Only poll if the component is still mounted and user is on the page
-          loadPosts(false, false); // Not force, not loading more
+          loadPosts();
           scheduleNextFetch(); // Schedule next fetch
         }
       }, 120000); // 2 minutes - much less aggressive
@@ -465,20 +397,8 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   
   // Manual refresh handler
   const handleRefresh = useCallback(() => {
-    loadPosts(true, false); // Force refresh, not loading more
+    loadPosts(true); // Force refresh
   }, [loadPosts]);
-
-  // Load more handler for infinite scrolling
-  const handleLoadMore = useCallback(() => {
-    if (!loadingMore && hasMore && !refreshing && !initialLoading) {
-      if (__DEV__) console.log('🔄 Triggering load more...');
-      loadPosts(false, true); // Not force, but loading more
-    } else {
-      if (__DEV__) {
-        console.log(`⏸️ Load more blocked: loadingMore=${loadingMore}, hasMore=${hasMore}, refreshing=${refreshing}, initialLoading=${initialLoading}`);
-      }
-    }
-  }, [loadPosts, loadingMore, hasMore, refreshing, initialLoading]);
 
   const handleCreatePost = useCallback(() => {
     const route = context === 'lawyer' ? '/lawyer/CreatePost' : '/home/CreatePost';
@@ -525,7 +445,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     return optimisticPost.id;
   }, [currentUser]);
 
-  // Function to confirm optimistic post (make it fully opaque and remove immediately)
+  // Function to confirm optimistic post (make it fully opaque and keep it seamless)
   const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: PostData) => {
     setOptimisticPosts(prev => {
       const post = prev.find(p => p.id === optimisticId);
@@ -535,13 +455,14 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
           toValue: 1,
           duration: 200,
           useNativeDriver: true,
-        }).start(() => {
-          // Remove immediately after animation completes
+        }).start();
+        
+        // Keep optimistic post visible and let duplicate detection handle seamless transition
+        // The post will automatically be filtered out when the real post appears
+        // Only remove it after a reasonable time to ensure the real post has loaded
+        setTimeout(() => {
           setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
-        });
-      } else {
-        // If no animation, remove immediately
-        return prev.filter(p => p.id !== optimisticId);
+        }, 3000); // Extended delay - duplicate detection prevents visual duplicates
       }
       return prev;
     });
@@ -579,30 +500,17 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     }
   }, [addOptimisticPost, confirmOptimisticPost, removeOptimisticPost, context]);
 
-  // Memoized key extractor with safety check
-  const keyExtractor = useCallback((item: PostData, index: number) => {
-    if (!item || !item.id) {
-      if (__DEV__) console.warn('⚠️ Invalid item in keyExtractor at index', index);
-      return `invalid-${index}`;
-    }
-    return item.id;
-  }, []);
+  // Memoized key extractor
+  const keyExtractor = useCallback((item: PostData) => item.id, []);
 
   // Memoized render item
   const renderItem: ListRenderItem<PostData> = useCallback(({ item, index }: { item: PostData; index: number }) => {
-    // Safety check - skip rendering if item is invalid
-    if (!item || !item.id) {
-      if (__DEV__) console.warn('⚠️ Skipping invalid post item at index', index);
-      return null;
-    }
-    
     const postComponent = (
       <Post
         key={item.id}
         id={item.id}
         user={item.user}
         timestamp={item.timestamp}
-        created_at={item.created_at}
         category={item.category}
         content={item.content}
         comments={item.comments}
@@ -632,33 +540,21 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     return postComponent;
   }, [handleCommentPress, handleBookmarkPress, handleReportPress, handlePostPress, handleMenuToggle, openMenuPostId, handleBookmarkStatusChange]);
 
-  // Combined posts data with strict duplicate detection
+  // Combined posts data with duplicate detection for seamless transition
   const allPosts = useMemo(() => {
-    if (optimisticPosts.length === 0) {
-      // No optimistic posts, return all real posts
-      return posts;
-    }
-    
-    // Create a Set of optimistic post content for O(1) lookup
-    const optimisticContentSet = new Set(
-      optimisticPosts.map(p => p.content.trim().toLowerCase())
-    );
-    
-    // Filter out real posts that match optimistic posts by content
+    // Filter out real posts that match optimistic posts to prevent duplicates
     const filteredRealPosts = posts.filter(realPost => {
-      const normalizedContent = realPost.content.trim().toLowerCase();
-      const isDuplicate = optimisticContentSet.has(normalizedContent);
-      
-      if (__DEV__ && isDuplicate) {
-        console.log(`🔄 Filtering duplicate real post (ID: ${realPost.id}) - matches optimistic post`);
-      }
-      
-      return !isDuplicate;
+      // Check if there's an optimistic post with similar content and timestamp
+      const hasOptimisticMatch = optimisticPosts.some(optPost => {
+        // Match by content and approximate timestamp (within 30 seconds)
+        const contentMatch = optPost.content.trim() === realPost.content.trim();
+        const timeMatch = Math.abs(
+          new Date(optPost.timestamp).getTime() - new Date(realPost.timestamp).getTime()
+        ) < 30000; // 30 seconds tolerance
+        return contentMatch && timeMatch;
+      });
+      return !hasOptimisticMatch;
     });
-    
-    if (__DEV__ && filteredRealPosts.length !== posts.length) {
-      console.log(`🔄 Filtered ${posts.length - filteredRealPosts.length} duplicate posts from optimistic matches`);
-    }
     
     return [...optimisticPosts, ...filteredRealPosts];
   }, [optimisticPosts, posts]);
@@ -680,51 +576,26 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     />
   ), [refreshing, handleRefresh]);
 
-  // Footer component for loading more indicator with consistent height
-  const renderFooter = useCallback(() => {
-    return (
-      <View style={styles.footerContainer}>
-        {loadingMore && (
-          <View style={styles.loadingMoreContainer}>
-            <ActivityIndicator size="small" color={Colors.primary.blue} />
-            <Text style={styles.loadingMoreText}>Loading more posts...</Text>
-          </View>
-        )}
-      </View>
-    );
-  }, [loadingMore]);
-
   return (
     <View style={styles.container}>
       {/* Forum Loading Animation */}
-      <ForumLoadingAnimation visible={initialLoading && allPosts.length === 0} />
+      <ForumLoadingAnimation visible={initialLoading} />
       
-      {/* Show skeleton loading until posts are actually loaded and ready */}
-      {allPosts.length === 0 ? (
+      {/* Show skeleton loading for initial load */}
+      {initialLoading && allPosts.length === 0 ? (
         <View style={styles.skeletonContainer}>
           <SkeletonList itemCount={8} itemHeight={200} spacing={12} />
         </View>
       ) : (
         <FlatList
-          ref={flatListRef}
           {...listProps}
           style={styles.timeline}
           contentContainerStyle={styles.timelineContent}
           showsVerticalScrollIndicator={false}
           refreshControl={refreshControl}
-          ListFooterComponent={renderFooter}
+          ListFooterComponent={<View style={styles.bottomSpacer} />}
           onScroll={() => setOpenMenuPostId(null)}
           scrollEventThrottle={16}
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
-          removeClippedSubviews={false}
-          initialNumToRender={20}
-          maxToRenderPerBatch={20}
-          updateCellsBatchingPeriod={50}
-          windowSize={21}
-          scrollEnabled={!initialLoading}
-          bounces={!initialLoading}
-          overScrollMode={initialLoading ? 'never' : 'auto'}
         />
       )}
 
@@ -754,21 +625,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
     paddingHorizontal: 16,
   },
-  footerContainer: {
-    minHeight: 100, // Fixed height to prevent layout shift
-    paddingBottom: 80, // Account for bottom navigation
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-  },
-  loadingMoreContainer: {
-    paddingVertical: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingMoreText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: Colors.text.secondary,
+  bottomSpacer: {
+    height: 80, // Add a spacer at the bottom to prevent content from being hidden
   },
   createPostButton: {
     position: 'absolute',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { View, Alert, StatusBar, Animated, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { shouldUseNativeDriver } from '@/utils/animations';
@@ -86,8 +86,8 @@ export default function FavoritesScreen() {
     loadFavoriteTerms();
   }, [loadFavoriteTerms]);
 
-  // Filter terms based on search query and category - MEMOIZED
-  const filteredTerms = useMemo(() => {
+  // Filter terms based on search query and category
+  useEffect(() => {
     let filtered = favoriteTerms;
 
     // Filter by category
@@ -107,13 +107,13 @@ export default function FavoritesScreen() {
       );
     }
 
-    return filtered;
+    setFilteredTerms(filtered);
   }, [favoriteTerms, searchQuery, activeCategory]);
 
 
-  const handleTermPress = useCallback((term: TermItem) => {
+  const handleTermPress = (term: TermItem) => {
     router.push(`/glossary/${term.id}`);
-  }, [router]);
+  };
 
 
 
