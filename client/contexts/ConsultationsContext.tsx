@@ -1,10 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '../config/supabase';
 
 interface ConsultationsContextType {
   consultationsCount: number;
   loadConsultations: () => Promise<void>;
+  incrementCount: () => void;
+  decrementCount: () => void;
 }
 
 interface ConsultationsProviderProps {
@@ -16,6 +18,7 @@ const ConsultationsContext = createContext<ConsultationsContextType | undefined>
 export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ children }) => {
   const [consultationsCount, setConsultationsCount] = useState<number>(0);
   const { user, isAuthenticated } = useAuth();
+  const subscriptionRef = useRef<any>(null);
 
   const loadConsultations = useCallback(async () => {
     if (!isAuthenticated || !user?.id) {
@@ -40,16 +43,57 @@ export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ ch
     }
   }, [isAuthenticated, user?.id]);
 
-  // FAANG OPTIMIZATION: Load on mount and when auth state changes
+  // Optimistic updates (instant feedback)
+  const incrementCount = useCallback(() => {
+    setConsultationsCount(prev => prev + 1);
+  }, []);
+
+  const decrementCount = useCallback(() => {
+    setConsultationsCount(prev => Math.max(0, prev - 1));
+  }, []);
+
+  // Real-time sync + initial load
   useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      setConsultationsCount(0);
+      return;
+    }
+
     loadConsultations();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, user?.id]);
+
+    // Real-time subscription
+    const channel = supabase
+      .channel(`consultations:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'consultation_requests',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          // Refresh count on any change
+          loadConsultations();
+        }
+      )
+      .subscribe();
+
+    subscriptionRef.current = channel;
+
+    return () => {
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+      }
+    };
+  }, [isAuthenticated, user?.id, loadConsultations]);
 
   const value: ConsultationsContextType = React.useMemo(() => ({
     consultationsCount,
     loadConsultations,
-  }), [consultationsCount, loadConsultations]);
+    incrementCount,
+    decrementCount,
+  }), [consultationsCount, loadConsultations, incrementCount, decrementCount]);
 
   return (
     <ConsultationsContext.Provider value={value}>

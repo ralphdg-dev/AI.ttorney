@@ -38,58 +38,37 @@ export const PostBookmarksProvider: React.FC<PostBookmarksProviderProps> = ({ ch
   }, [isAuthenticated, user?.id, session]);
 
   const toggleBookmark = useCallback(async (postId: string) => {
-    try {
-      if (!isAuthenticated || !user?.id) {
-        return;
-      }
+    if (!isAuthenticated || !user?.id) return;
 
-      const isCurrentlyBookmarked = bookmarkedPostIds.has(postId);
-      
-      // Optimistic update
+    const isCurrentlyBookmarked = bookmarkedPostIds.has(postId);
+    
+    // Optimistic update
+    setBookmarkedPostIds(prev => {
+      const newSet = new Set(prev);
       if (isCurrentlyBookmarked) {
-        setBookmarkedPostIds(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(postId);
-          return newSet;
-        });
+        newSet.delete(postId);
       } else {
-        setBookmarkedPostIds(prev => new Set([...prev, postId]));
+        newSet.add(postId);
       }
-      
-      // API call
+      return newSet;
+    });
+    
+    try {
       const result = await BookmarkService.toggleBookmark(postId, user.id, session);
-      
-      if (!result.success) {
-        // Revert on failure
+      if (!result.success) throw new Error('Toggle failed');
+    } catch {
+      // Rollback
+      setBookmarkedPostIds(prev => {
+        const newSet = new Set(prev);
         if (isCurrentlyBookmarked) {
-          setBookmarkedPostIds(prev => new Set([...prev, postId]));
+          newSet.add(postId);
         } else {
-          setBookmarkedPostIds(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(postId);
-            return newSet;
-          });
+          newSet.delete(postId);
         }
-      } else {
-        // Sync with server state
-        if (result.isBookmarked !== !isCurrentlyBookmarked) {
-          setBookmarkedPostIds(prev => {
-            const newSet = new Set(prev);
-            if (result.isBookmarked) {
-              newSet.add(postId);
-            } else {
-              newSet.delete(postId);
-            }
-            return newSet;
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling post bookmark:', error);
-      // Revert optimistic update on error
-      loadBookmarks();
+        return newSet;
+      });
     }
-  }, [bookmarkedPostIds, isAuthenticated, user?.id, session, loadBookmarks]);
+  }, [bookmarkedPostIds, isAuthenticated, user?.id, session]);
 
   const isBookmarked = useCallback((postId: string): boolean => {
     return bookmarkedPostIds.has(postId);
@@ -97,8 +76,7 @@ export const PostBookmarksProvider: React.FC<PostBookmarksProviderProps> = ({ ch
 
   useEffect(() => {
     loadBookmarks();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user?.id, loadBookmarks]);
 
   const value: PostBookmarksContextType = React.useMemo(() => ({
     bookmarkedPostIds,

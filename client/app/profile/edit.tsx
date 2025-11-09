@@ -246,10 +246,7 @@ export default function EditProfilePage() {
       return;
     }
 
-    // Prevent duplicate checks for the same username (only if currently checking)
-    if (username === lastCheckedUsernameRef.current && usernameCheckingRef.current) {
-      return;
-    }
+    if (username === lastCheckedUsernameRef.current && usernameCheckingRef.current) return;
 
     if (username.length < 3) {
       setUsernameAvailable(false);
@@ -258,18 +255,14 @@ export default function EditProfilePage() {
       return;
     }
 
-    const usernameRegex = /^[a-zA-Z0-9_]+$/;
-    if (!usernameRegex.test(username)) {
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       setUsernameAvailable(false);
       setUsernameError("Only letters, numbers, and underscores allowed");
       setUsernameChecking(false);
       return;
     }
 
-    // Prevent multiple concurrent checks
-    if (usernameCheckingRef.current) {
-      return;
-    }
+    if (usernameCheckingRef.current) return;
 
     try {
       usernameCheckingRef.current = true;
@@ -283,9 +276,7 @@ export default function EditProfilePage() {
         body: undefined
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to check username');
-      }
+      if (!response.ok) throw new Error('Failed to check username');
 
       const data = await response.json();
       
@@ -296,8 +287,7 @@ export default function EditProfilePage() {
         setUsernameAvailable(true);
         setUsernameError("");
       }
-    } catch (error) {
-      console.error("Username check error:", error);
+    } catch {
       setUsernameAvailable(null);
       setUsernameError("Unable to verify username");
     } finally {
@@ -315,23 +305,16 @@ export default function EditProfilePage() {
       return;
     }
 
-    // Prevent duplicate checks for the same email (only if currently checking)
-    if (email === lastCheckedEmailRef.current && emailCheckingRef.current) {
-      return;
-    }
+    if (email === lastCheckedEmailRef.current && emailCheckingRef.current) return;
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setEmailAvailable(false);
       setEmailError("Please enter a valid email address");
       setEmailChecking(false);
       return;
     }
 
-    // Prevent multiple concurrent checks
-    if (emailCheckingRef.current) {
-      return;
-    }
+    if (emailCheckingRef.current) return;
 
     try {
       emailCheckingRef.current = true;
@@ -345,9 +328,7 @@ export default function EditProfilePage() {
         body: undefined
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to check email');
-      }
+      if (!response.ok) throw new Error('Failed to check email');
 
       const data = await response.json();
       
@@ -358,8 +339,7 @@ export default function EditProfilePage() {
         setEmailAvailable(true);
         setEmailError("Email available - click Send OTP to verify");
       }
-    } catch (error) {
-      console.error("Email check error:", error);
+    } catch {
       setEmailAvailable(null);
       setEmailError("Unable to verify email");
     } finally {
@@ -521,16 +501,26 @@ export default function EditProfilePage() {
     setShowConfirmModal(false);
     setIsSaving(true);
 
+    const updatedData = {
+      full_name: editFormData.full_name,
+      username: editFormData.username,
+      email: emailVerified ? newEmail : profileData.email,
+      birthdate: editFormData.birthdate,
+    };
+
+    // Optimistic update - update local state immediately
+    const previousData = profileData;
+    setProfileData({
+      ...editFormData,
+      email: emailVerified ? newEmail : profileData.email,
+      profile_photo: editFormData.profile_photo || DEFAULT_PROFILE_PHOTO,
+    });
+
     try {
       const response = await makeApiRequest({
         method: 'PUT',
         endpoint: '/api/user/profile',
-        body: {
-          full_name: editFormData.full_name,
-          username: editFormData.username,
-          email: emailVerified ? newEmail : profileData.email, // Only update if verified
-          birthdate: editFormData.birthdate,
-        }
+        body: updatedData
       });
 
       if (!response.ok) {
@@ -538,7 +528,6 @@ export default function EditProfilePage() {
         throw new Error(errorData.detail || 'Failed to update profile');
       }
 
-      // Show success toast
       toast.show({
         placement: "top",
         duration: 3000,
@@ -552,21 +541,12 @@ export default function EditProfilePage() {
         ),
       });
 
-      // Update local state
-      setProfileData({
-        ...editFormData,
-        email: emailVerified ? newEmail : profileData.email,
-        profile_photo: editFormData.profile_photo || DEFAULT_PROFILE_PHOTO,
-      });
-
-      // Reset email verification state
       setEmailVerified(false);
       setNewEmail("");
 
-      // Refresh user data in context
+      // Refresh context in background
       await refreshUserData();
 
-      // Navigate back
       setTimeout(() => {
         if (router.canGoBack()) {
           router.back();
@@ -576,7 +556,8 @@ export default function EditProfilePage() {
       }, 1500);
 
     } catch (error: any) {
-      console.error("Profile update error:", error);
+      // Rollback on failure
+      setProfileData(previousData);
       Alert.alert("Error", error.message || "Failed to update profile");
     } finally {
       setIsSaving(false);

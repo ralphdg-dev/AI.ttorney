@@ -1,15 +1,4 @@
-/**
- * Moderation Status Context
- * 
- * Centralized state management for user moderation status (strikes, suspensions, bans)
- * Follows DRY principle - single source of truth for moderation data
- * 
- * Features:
- * - Real-time status tracking
- * - Automatic refresh after violations
- * - Shared state across forum & chatbot
- * - Optimized API calls (fetch once, use everywhere)
- */
+// Moderation status management
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { getUserModerationStatus, type ModerationStatus } from '@/services/moderationService';
@@ -19,7 +8,7 @@ interface ModerationContextType {
   moderationStatus: ModerationStatus | null;
   isLoading: boolean;
   refreshStatus: () => Promise<void>;
-  isBlocked: boolean; // Convenience flag for suspended/banned
+  isBlocked: boolean;
 }
 
 const ModerationContext = createContext<ModerationContextType | undefined>(undefined);
@@ -28,49 +17,27 @@ export const ModerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const { session, isAuthenticated } = useAuth();
   const [moderationStatus, setModerationStatus] = useState<ModerationStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const isFetchingRef = useRef(false); // Prevent duplicate fetches
+  const isFetchingRef = useRef(false);
 
-  /**
-   * Fetch moderation status from API
-   */
   const refreshStatus = useCallback(async () => {
-    if (!session?.access_token || !isAuthenticated) {
-      setModerationStatus(null);
-      return;
-    }
-
-    // Prevent duplicate concurrent fetches
-    if (isFetchingRef.current) {
-      console.log('[ModerationContext] Fetch already in progress, skipping...');
+    if (!session?.access_token || !isAuthenticated || isFetchingRef.current) {
+      if (!session?.access_token || !isAuthenticated) setModerationStatus(null);
       return;
     }
 
     try {
       isFetchingRef.current = true;
       setIsLoading(true);
-      console.log('[ModerationContext] Fetching moderation status...');
-      
       const status = await getUserModerationStatus(session.access_token);
-      
-      if (status) {
-        setModerationStatus(status);
-        console.log('[ModerationContext] Status updated:', {
-          strikes: status.strike_count,
-          suspensions: status.suspension_count,
-          status: status.account_status,
-        });
-      }
+      if (status) setModerationStatus(status);
     } catch (error) {
-      console.error('[ModerationContext] Failed to fetch status:', error);
+      console.error('Failed to fetch moderation status:', error);
     } finally {
       setIsLoading(false);
       isFetchingRef.current = false;
     }
   }, [session?.access_token, isAuthenticated]);
 
-  /**
-   * Fetch status on mount and when session changes
-   */
   useEffect(() => {
     if (isAuthenticated && session?.access_token) {
       refreshStatus();
@@ -79,33 +46,18 @@ export const ModerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [isAuthenticated, session?.access_token, refreshStatus]);
 
-  /**
-   * Convenience flag for blocked status
-   */
   const isBlocked = moderationStatus?.account_status === 'suspended' || 
                     moderationStatus?.account_status === 'banned';
 
-  const value: ModerationContextType = {
-    moderationStatus,
-    isLoading,
-    refreshStatus,
-    isBlocked,
-  };
-
   return (
-    <ModerationContext.Provider value={value}>
+    <ModerationContext.Provider value={{ moderationStatus, isLoading, refreshStatus, isBlocked }}>
       {children}
     </ModerationContext.Provider>
   );
 };
 
-/**
- * Hook to access moderation context
- */
 export const useModerationStatus = (): ModerationContextType => {
   const context = useContext(ModerationContext);
-  if (!context) {
-    throw new Error('useModerationStatus must be used within ModerationProvider');
-  }
+  if (!context) throw new Error('useModerationStatus must be used within ModerationProvider');
   return context;
 };

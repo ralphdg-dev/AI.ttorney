@@ -31,7 +31,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const { session, user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
   const subscriptionRef = useRef<any>(null);
   const hasInitialized = useRef(false);
 
@@ -39,7 +38,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!session?.access_token || !user?.id) return;
 
     try {
-      setLoading(true);
       const apiUrl = NetworkConfig.getApiUrl();
       const response = await fetch(`${apiUrl}/api/notifications/?limit=50`, {
         headers: {
@@ -50,7 +48,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (response.ok) {
         const data = await response.json();
-        // Remove duplicates by ID before setting state
         const notificationList = (data.data || []) as Notification[];
         const uniqueNotifications = Array.from(
           new Map(notificationList.map((n: Notification) => [n.id, n])).values()
@@ -60,8 +57,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
-    } finally {
-      setLoading(false);
     }
   }, [session?.access_token, user?.id]);
 
@@ -71,9 +66,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const notification = notifications.find(n => n.id === notificationId);
     if (!notification || notification.read) return;
 
-    setNotifications(prev => 
-      prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-    );
+    // Optimistic update
+    setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
     setUnreadCount(prev => Math.max(0, prev - 1));
 
     try {
@@ -85,11 +79,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           'Content-Type': 'application/json',
         },
       });
-    } catch (error) {
-      console.error('Failed to mark notification as read:', error);
-      setNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, read: false } : n)
-      );
+    } catch {
+      // Rollback
+      setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: false } : n));
       setUnreadCount(prev => prev + 1);
     }
   }, [session?.access_token, notifications]);
@@ -100,6 +92,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const previousNotifications = notifications;
     const previousCount = unreadCount;
 
+    // Optimistic update
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     setUnreadCount(0);
 
@@ -112,8 +105,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           'Content-Type': 'application/json',
         },
       });
-    } catch (error) {
-      console.error('Failed to mark all notifications as read:', error);
+    } catch {
+      // Rollback
       setNotifications(previousNotifications);
       setUnreadCount(previousCount);
     }
@@ -125,10 +118,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const notification = notifications.find(n => n.id === notificationId);
     if (!notification) return;
 
+    // Optimistic delete
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    if (!notification.read) {
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    }
+    if (!notification.read) setUnreadCount(prev => Math.max(0, prev - 1));
 
     try {
       const apiUrl = NetworkConfig.getApiUrl();
@@ -139,12 +131,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           'Content-Type': 'application/json',
         },
       });
-    } catch (error) {
-      console.error('Failed to delete notification:', error);
+    } catch {
+      // Rollback
       setNotifications(prev => [notification, ...prev]);
-      if (!notification.read) {
-        setUnreadCount(prev => prev + 1);
-      }
+      if (!notification.read) setUnreadCount(prev => prev + 1);
     }
   }, [session?.access_token, notifications]);
 
@@ -172,36 +162,22 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           filter: `user_id=eq.${user.id}`,
         },
         (payload: any) => {
-          console.log('📬 Real-time notification event:', payload.eventType, payload.new?.id);
-          
           if (payload.eventType === 'INSERT') {
             const newNotification = payload.new as Notification;
-            // Prevent duplicates - only add if not already in list
             setNotifications(prev => {
-              const exists = prev.some(n => n.id === newNotification.id);
-              if (exists) {
-                console.log('⚠️ Duplicate notification prevented:', newNotification.id);
-                return prev;
-              }
-              console.log('✅ New notification added:', newNotification.id);
+              if (prev.some(n => n.id === newNotification.id)) return prev;
               return [newNotification, ...prev];
             });
             setUnreadCount(prev => prev + 1);
           } else if (payload.eventType === 'UPDATE') {
-            setNotifications(prev =>
-              prev.map(n => n.id === payload.new.id ? payload.new as Notification : n)
-            );
-            const wasUnread = payload.old?.read === false;
-            const isNowRead = payload.new?.read === true;
-            if (wasUnread && isNowRead) {
+            setNotifications(prev => prev.map(n => n.id === payload.new.id ? payload.new as Notification : n));
+            if (payload.old?.read === false && payload.new?.read === true) {
               setUnreadCount(prev => Math.max(0, prev - 1));
             }
           } else if (payload.eventType === 'DELETE') {
             setNotifications(prev => {
               const deleted = prev.find(n => n.id === payload.old.id);
-              if (deleted && !deleted.read) {
-                setUnreadCount(count => Math.max(0, count - 1));
-              }
+              if (deleted && !deleted.read) setUnreadCount(c => Math.max(0, c - 1));
               return prev.filter(n => n.id !== payload.old.id);
             });
           }
@@ -217,15 +193,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         subscriptionRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.access_token, user?.id]);
+  }, [session?.access_token, user?.id, fetchNotifications]);
 
   return (
     <NotificationContext.Provider
       value={{
         notifications,
         unreadCount,
-        loading,
+        loading: false,
         fetchNotifications,
         markAsRead,
         markAllAsRead,
