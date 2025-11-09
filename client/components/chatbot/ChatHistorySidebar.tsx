@@ -59,13 +59,26 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, sessionToken]);
 
+  const [overlayAnim] = useState(new Animated.Value(0));
+
   useEffect(() => {
-    Animated.timing(slideAnim, {
+    const slideConfig = {
       toValue: isOpen ? 0 : (SIDEBAR_POSITION === 'right' ? SIDEBAR_WIDTH : -SIDEBAR_WIDTH),
       duration: 300,
       useNativeDriver: Platform.OS !== 'web',
-    }).start();
-  }, [isOpen, slideAnim]);
+    };
+
+    const overlayConfig = {
+      toValue: isOpen ? 1 : 0,
+      duration: 300,
+      useNativeDriver: Platform.OS !== 'web',
+    };
+
+    Animated.parallel([
+      Animated.timing(slideAnim, slideConfig),
+      Animated.timing(overlayAnim, overlayConfig),
+    ]).start();
+  }, [isOpen, slideAnim, overlayAnim]);
 
   const loadConversations = React.useCallback(async () => {
     try {
@@ -257,20 +270,24 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
 
   return (
     <>
-      {/* Overlay */}
-      {isOpen && (
+      {/* Overlay with fade animation */}
+      <Animated.View
+        style={[
+          tw`absolute inset-0`,
+          { 
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            zIndex: LAYOUT.Z_INDEX.overlay,
+            opacity: overlayAnim,
+          },
+        ]}
+        pointerEvents={isOpen ? 'auto' : 'none'}
+      >
         <TouchableOpacity
           activeOpacity={1}
           onPress={() => setIsOpen(false)}
-          style={[
-            tw`absolute inset-0`,
-            { 
-              backgroundColor: 'rgba(0, 0, 0, 0.3)',
-              zIndex: LAYOUT.Z_INDEX.overlay,
-            },
-          ]}
+          style={tw`absolute inset-0`}
         />
-      )}
+      </Animated.View>
 
       {/* Sidebar */}
       <Animated.View
@@ -282,15 +299,6 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
             backgroundColor: Colors.background.primary,
             transform: [{ translateX: slideAnim }],
             zIndex: LAYOUT.Z_INDEX.drawer,
-            ...(Platform.OS === 'web'
-              ? { boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.1)' }
-              : {
-                  shadowColor: '#000',
-                  shadowOffset: { width: -2, height: 0 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 8,
-                  elevation: 5,
-                }),
           },
         ]}
       >

@@ -106,6 +106,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   // INDUSTRY STANDARD: Lazy initialization with useState
   const [slideAnim] = useState(() => new Animated.Value(-SIDEBAR_WIDTH));
+  const [overlayAnim] = useState(() => new Animated.Value(0));
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
   const { favoriteTermIds } = useFavorites();
@@ -114,30 +115,48 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { consultationsCount } = useConsultations();
 
 
-  // Animation effect - SIMPLE and CLEAN
+  // Animation effect - SIMPLE and CLEAN with smooth slide-back
   useEffect(() => {
-    const animationConfig = {
+    const slideConfig = {
       duration: ANIMATION_DURATION,
       useNativeDriver: shouldUseNativeDriver('transform'),
     };
 
+    const overlayConfig = {
+      duration: ANIMATION_DURATION,
+      useNativeDriver: shouldUseNativeDriver('opacity'),
+    };
+
     if (isVisible) {
-      // Animate in
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        ...animationConfig,
-      }).start();
+      // Animate in - slide sidebar and fade in overlay
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          ...slideConfig,
+        }),
+        Animated.timing(overlayAnim, {
+          toValue: 1,
+          ...overlayConfig,
+        }),
+      ]).start();
     } else {
-      // Animate out
-      Animated.timing(slideAnim, {
-        toValue: -SIDEBAR_WIDTH,
-        ...animationConfig,
-      }).start();
+      // Animate out - slide sidebar back and fade out overlay
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: -SIDEBAR_WIDTH,
+          ...slideConfig,
+        }),
+        Animated.timing(overlayAnim, {
+          toValue: 0,
+          ...overlayConfig,
+        }),
+      ]).start();
     }
 
     // Cleanup
     return () => {
       slideAnim.stopAnimation();
+      overlayAnim.stopAnimation();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible]);
@@ -296,17 +315,24 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  // Don't render if not visible
-  if (!isVisible) return null;
-
   return (
-    <View style={styles.container}>
-      {/* Backdrop - Click to close */}
-      <TouchableOpacity
-        style={styles.backdrop}
-        activeOpacity={1}
-        onPress={onClose}
-      />
+    <View style={styles.container} pointerEvents={isVisible ? 'auto' : 'none'}>
+      {/* Backdrop - Click to close with fade animation */}
+      <Animated.View
+        style={[
+          styles.backdrop,
+          {
+            opacity: overlayAnim,
+          },
+        ]}
+        pointerEvents={isVisible ? 'auto' : 'none'}
+      >
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+      </Animated.View>
       {/* Sidebar */}
       <Animated.View
         style={[
@@ -447,6 +473,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: LAYOUT.Z_INDEX.drawer,
+    overflow: 'hidden',
   },
   overlay: {
     position: "absolute",
@@ -467,13 +494,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: SIDEBAR_WIDTH,
     backgroundColor: "#FFFFFF",
-    ...createShadowStyle({
-      shadowColor: "#000",
-      shadowOffset: { width: 2, height: 0 },
-      shadowOpacity: 0.25,
-      shadowRadius: 10,
-      elevation: 16,
-    }),
   },
   header: {
     flexDirection: "row",
