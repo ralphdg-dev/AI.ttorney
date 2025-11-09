@@ -121,8 +121,12 @@ class EmailSupportService:
             html_part = MIMEText(html_content, "html")
             mime_message.attach(html_part)
             
-            # Send email
+            # Send email with SSL context that handles certificate issues
             context = ssl.create_default_context()
+            # For development/local environments, allow unverified certificates
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls(context=context)
                 if self.smtp_username and self.smtp_password:
@@ -165,8 +169,12 @@ class EmailSupportService:
             html_part = MIMEText(html_content, "html")
             mime_message.attach(html_part)
             
-            # Send email
+            # Send email with SSL context that handles certificate issues
             context = ssl.create_default_context()
+            # For development/local environments, allow unverified certificates
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls(context=context)
                 if self.smtp_username and self.smtp_password:

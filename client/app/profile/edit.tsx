@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, StatusBar } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -130,6 +130,18 @@ export default function EditProfilePage() {
   const [emailChecking, setEmailChecking] = useState(false);
   const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
   const [emailError, setEmailError] = useState<string>("");
+  
+  // Debounce timers to prevent infinite loops
+  const usernameTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emailTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Track last checked values to prevent duplicate checks
+  const lastCheckedUsernameRef = useRef<string>("");
+  const lastCheckedEmailRef = useRef<string>("");
+  
+  // Track checking state with refs to avoid circular dependencies
+  const usernameCheckingRef = useRef<boolean>(false);
+  const emailCheckingRef = useRef<boolean>(false);
 
   // Helper function to check if there are any changes
   const hasChanges = () => {
@@ -174,6 +186,18 @@ export default function EditProfilePage() {
     }
   }, [user]);
 
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (usernameTimeoutRef.current) {
+        clearTimeout(usernameTimeoutRef.current);
+      }
+      if (emailTimeoutRef.current) {
+        clearTimeout(emailTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleCancel = () => {
     // Check if there are unsaved changes
     if (hasChanges() || emailVerified) {
@@ -213,16 +237,24 @@ export default function EditProfilePage() {
     }
   };
 
-  const checkUsernameAvailability = async (username: string) => {
+  const checkUsernameAvailability = useCallback(async (username: string) => {
     if (!username || username === profileData.username) {
       setUsernameAvailable(null);
       setUsernameError("");
+      setUsernameChecking(false);
+      lastCheckedUsernameRef.current = "";
+      return;
+    }
+
+    // Prevent duplicate checks for the same username (only if currently checking)
+    if (username === lastCheckedUsernameRef.current && usernameCheckingRef.current) {
       return;
     }
 
     if (username.length < 3) {
       setUsernameAvailable(false);
       setUsernameError("Username must be at least 3 characters");
+      setUsernameChecking(false);
       return;
     }
 
@@ -230,12 +262,20 @@ export default function EditProfilePage() {
     if (!usernameRegex.test(username)) {
       setUsernameAvailable(false);
       setUsernameError("Only letters, numbers, and underscores allowed");
+      setUsernameChecking(false);
+      return;
+    }
+
+    // Prevent multiple concurrent checks
+    if (usernameCheckingRef.current) {
       return;
     }
 
     try {
+      usernameCheckingRef.current = true;
       setUsernameChecking(true);
       setUsernameError("");
+      lastCheckedUsernameRef.current = username;
 
       const response = await makeApiRequest({
         method: 'GET',
@@ -261,14 +301,22 @@ export default function EditProfilePage() {
       setUsernameAvailable(null);
       setUsernameError("Unable to verify username");
     } finally {
+      usernameCheckingRef.current = false;
       setUsernameChecking(false);
     }
-  };
+  }, [profileData.username]);
 
-  const checkEmailAvailability = async (email: string) => {
+  const checkEmailAvailability = useCallback(async (email: string) => {
     if (!email || email === profileData.email) {
       setEmailAvailable(null);
       setEmailError("");
+      setEmailChecking(false);
+      lastCheckedEmailRef.current = "";
+      return;
+    }
+
+    // Prevent duplicate checks for the same email (only if currently checking)
+    if (email === lastCheckedEmailRef.current && emailCheckingRef.current) {
       return;
     }
 
@@ -276,12 +324,20 @@ export default function EditProfilePage() {
     if (!emailRegex.test(email)) {
       setEmailAvailable(false);
       setEmailError("Please enter a valid email address");
+      setEmailChecking(false);
+      return;
+    }
+
+    // Prevent multiple concurrent checks
+    if (emailCheckingRef.current) {
       return;
     }
 
     try {
+      emailCheckingRef.current = true;
       setEmailChecking(true);
       setEmailError("");
+      lastCheckedEmailRef.current = email;
 
       const response = await makeApiRequest({
         method: 'GET',
@@ -307,9 +363,10 @@ export default function EditProfilePage() {
       setEmailAvailable(null);
       setEmailError("Unable to verify email");
     } finally {
+      emailCheckingRef.current = false;
       setEmailChecking(false);
     }
-  };
+  }, [profileData.email]);
 
   const handleSendOTP = async () => {
     if (!editFormData.email || editFormData.email === profileData.email) {
@@ -641,12 +698,28 @@ export default function EditProfilePage() {
               value={editFormData.username}
               onChangeText={(text: string) => {
                 setEditFormData(prev => ({ ...prev, username: text }));
+                
+                // Clear previous timeout
+                if (usernameTimeoutRef.current) {
+                  clearTimeout(usernameTimeoutRef.current);
+                  usernameTimeoutRef.current = null;
+                }
+                
+                // Reset states immediately
+                setUsernameAvailable(null);
+                setUsernameError("");
+                setUsernameChecking(false);
+                usernameCheckingRef.current = false;
+                
+                // Reset last checked to allow re-checking if user types same value again
+                lastCheckedUsernameRef.current = "";
+                
                 // Debounce username check
                 if (text && text !== profileData.username) {
-                  setTimeout(() => checkUsernameAvailability(text), 500);
-                } else {
-                  setUsernameAvailable(null);
-                  setUsernameError("");
+                  usernameTimeoutRef.current = setTimeout(() => {
+                    checkUsernameAvailability(text);
+                    usernameTimeoutRef.current = null;
+                  }, 800);
                 }
               }}
               placeholder="Enter your username"
@@ -687,15 +760,32 @@ export default function EditProfilePage() {
                 value={editFormData.email}
                 onChangeText={(text: string) => {
                   setEditFormData(prev => ({ ...prev, email: text }));
+                  
+                  // Clear previous timeout
+                  if (emailTimeoutRef.current) {
+                    clearTimeout(emailTimeoutRef.current);
+                    emailTimeoutRef.current = null;
+                  }
+                  
                   // Reset verification when email changes
                   setEmailVerified(false);
                   setNewEmail("");
+                  
+                  // Reset states immediately
+                  setEmailAvailable(null);
+                  setEmailError("");
+                  setEmailChecking(false);
+                  emailCheckingRef.current = false;
+                  
+                  // Reset last checked to allow re-checking if user types same value again
+                  lastCheckedEmailRef.current = "";
+                  
                   // Debounce email check
                   if (text && text !== profileData.email) {
-                    setTimeout(() => checkEmailAvailability(text), 500);
-                  } else {
-                    setEmailAvailable(null);
-                    setEmailError("");
+                    emailTimeoutRef.current = setTimeout(() => {
+                      checkEmailAvailability(text);
+                      emailTimeoutRef.current = null;
+                    }, 800);
                   }
                 }}
                 placeholder="Enter your email address"

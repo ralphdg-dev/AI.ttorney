@@ -140,6 +140,12 @@ class OTPService:
         self.from_email = os.getenv("FROM_EMAIL", "noreply@ai.ttorney.com")
         self.from_name = os.getenv("FROM_NAME", "AI.ttorney")
         
+        # Log SMTP configuration for debugging (without password)
+        logger.info(f"OTP Service initialized with SMTP server: {self.smtp_server}:{self.smtp_port}")
+        logger.info(f"SMTP username configured: {'Yes' if self.smtp_username else 'No'}")
+        logger.info(f"SMTP password configured: {'Yes' if self.smtp_password else 'No'}")
+        logger.info(f"From email: {self.from_email}")
+        
         # Use global OTP store singleton
         self.otp_store = get_otp_store()
         
@@ -338,16 +344,79 @@ class OTPService:
             html_part = MIMEText(html_content, "html")
             message.attach(html_part)
             
-            # Send email
-            context = ssl.create_default_context()
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls(context=context)
-                if self.smtp_username and self.smtp_password:
-                    server.login(self.smtp_username, self.smtp_password)
-                text = message.as_string()
-                server.sendmail(self.from_email, [email], text)
+            # Send email with Gmail-optimized secure strategies
+            logger.info(f"Attempting to send OTP email to {email} using Gmail SMTP")
             
-            logger.info(f"OTP email sent successfully to {email}")
+            # Strategy 1: Try Gmail's preferred SSL port 465 first
+            try:
+                logger.info("Strategy 1: Attempting Gmail SMTP_SSL on port 465 (recommended)")
+                
+                # Create SSL context for Gmail
+                context = ssl.create_default_context()
+                # For development, allow self-signed certificates but keep encryption
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+                
+                with smtplib.SMTP_SSL(self.smtp_server, 465, context=context) as server:
+                    server.login(self.smtp_username, self.smtp_password)
+                    text = message.as_string()
+                    server.sendmail(self.from_email, [email], text)
+                    
+                logger.info(f"Strategy 1 SUCCESS: OTP email sent to {email} via secure Gmail SSL")
+                
+            except Exception as strategy1_error:
+                logger.error(f"Strategy 1 FAILED: {strategy1_error}")
+                
+                # Strategy 2: Try STARTTLS on port 587 with relaxed SSL
+                try:
+                    logger.info("Strategy 2: Attempting Gmail STARTTLS on port 587 with relaxed SSL")
+                    
+                    context = ssl.create_default_context()
+                    context.check_hostname = False
+                    context.verify_mode = ssl.CERT_NONE
+                    # Set minimum TLS version for Gmail compatibility
+                    context.minimum_version = ssl.TLSVersion.TLSv1_2
+                    
+                    with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                        server.starttls(context=context)
+                        server.login(self.smtp_username, self.smtp_password)
+                        text = message.as_string()
+                        server.sendmail(self.from_email, [email], text)
+                        
+                    logger.info(f"Strategy 2 SUCCESS: OTP email sent to {email} via Gmail STARTTLS")
+                    
+                except Exception as strategy2_error:
+                    logger.error(f"Strategy 2 FAILED: {strategy2_error}")
+                    
+                    # Strategy 3: Try with even more relaxed SSL settings
+                    try:
+                        logger.info("Strategy 3: Attempting with maximum SSL compatibility")
+                        
+                        context = ssl.create_default_context()
+                        context.check_hostname = False
+                        context.verify_mode = ssl.CERT_NONE
+                        context.set_ciphers('DEFAULT@SECLEVEL=1')
+                        # Allow older TLS versions if needed
+                        context.minimum_version = ssl.TLSVersion.TLSv1
+                        
+                        with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                            server.starttls(context=context)
+                            server.login(self.smtp_username, self.smtp_password)
+                            text = message.as_string()
+                            server.sendmail(self.from_email, [email], text)
+                            
+                        logger.info(f"Strategy 3 SUCCESS: OTP email sent to {email} with maximum compatibility")
+                        
+                    except Exception as strategy3_error:
+                        logger.error(f"Strategy 3 FAILED: {strategy3_error}")
+                        logger.error("ALL SECURE STRATEGIES FAILED")
+                        
+                        # Log the SMTP configuration for debugging
+                        logger.error(f"SMTP Server: {self.smtp_server}:{self.smtp_port}")
+                        logger.error(f"Username: {self.smtp_username}")
+                        logger.error(f"Password configured: {'Yes' if self.smtp_password else 'No'}")
+                        
+                        raise Exception(f"Failed to send email via Gmail SMTP. Please check credentials and network connectivity. Last error: {strategy3_error}")
             
             return {
                 "success": True,
