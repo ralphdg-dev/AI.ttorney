@@ -22,24 +22,28 @@ export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ ch
 
   const loadConsultations = useCallback(async () => {
     if (!isAuthenticated || !user?.id) {
+      console.log("⚠️ ConsultationsContext: No user authenticated, setting count to 0");
       setConsultationsCount(0);
       return;
     }
 
     try {
+      console.log("🔄 ConsultationsContext: Loading consultations for user:", user.id);
       const { count, error } = await supabase
         .from("consultation_requests")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .is("deleted_at", null);
 
       if (error) {
-        console.error("Error fetching consultations count:", error);
+        console.error("❌ ConsultationsContext: Error fetching consultations count:", error);
         return;
       }
 
+      console.log("✅ ConsultationsContext: Loaded count:", count);
       setConsultationsCount(count || 0);
     } catch (error) {
-      console.error("Error in loadConsultations:", error);
+      console.error("❌ ConsultationsContext: Exception in loadConsultations:", error);
     }
   }, [isAuthenticated, user?.id]);
 

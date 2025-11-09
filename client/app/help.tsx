@@ -12,13 +12,18 @@ import {
   Modal,
   Alert,
   Dimensions,
+  StatusBar,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import axios from "axios";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../constants/Colors";
 import Header from "@/components/Header";
+import Navbar from "@/components/Navbar";
+import { SidebarWrapper } from "@/components/AppSidebar";
+import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 
 const { width, height } = Dimensions.get("window");
 
@@ -247,16 +252,28 @@ export default function HelpAndSupport() {
   const handleCallSupport = () => Linking.openURL("tel:+123456789");
 
   return (
-    <View style={tw`flex-1 bg-white`}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <Header
+        title="Help & Support"
+        showMenu={true}
+      />
+
+      <View style={{ paddingHorizontal: 20 }}>
+        <UnifiedSearchBar
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search FAQs..."
+          loading={isLoading}
+          showFilterIcon={false}
+          containerClassName="pt-6 pb-6"
+        />
+      </View>
+
       <KeyboardAvoidingView
         style={tw`flex-1`}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <Header
-          title="Help & Support"
-          showBackButton
-          onBackPress={() => router.back()}
-        />
         <ScrollView
           style={tw`flex-1`}
           contentContainerStyle={tw`pb-12`}
@@ -267,26 +284,6 @@ export default function HelpAndSupport() {
             <SkeletonLoader />
           ) : (
             <>
-              {/* Search Bar */}
-              <View style={tw`px-6 mt-2 mb-4`}>
-                <View
-                  style={tw`flex-row items-center bg-gray-100 rounded-xl px-4 py-3`}
-                >
-                  <Ionicons name="search-outline" size={20} color="#9CA3AF" />
-                  <TextInput
-                    placeholder="Search FAQs..."
-                    placeholderTextColor="#9CA3AF"
-                    style={tw`ml-2 flex-1 text-base text-gray-700`}
-                    value={search}
-                    onChangeText={setSearch}
-                  />
-                  {search.length > 0 && (
-                    <TouchableOpacity onPress={() => setSearch("")}>
-                      <Ionicons name="close-circle" size={20} color="#9CA3AF" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
 
               {/* FAQ List */}
               <View style={tw`px-6`}>
@@ -358,7 +355,7 @@ export default function HelpAndSupport() {
               </View>
 
               {/* Contact Section */}
-              <View style={tw`px-6 mt-8`}>
+              <View style={tw`px-6 mt-8 mb-8`}>
                 <Text
                   style={[
                     tw`text-base font-semibold mb-3`,
@@ -441,6 +438,10 @@ export default function HelpAndSupport() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Bottom Navigation */}
+      <Navbar />
+      <SidebarWrapper />
 
       {/* EMAIL FORM MODAL */}
       <Modal
@@ -644,7 +645,7 @@ export default function HelpAndSupport() {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 

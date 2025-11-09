@@ -38,6 +38,7 @@ export default function ConsultationsScreen() {
   const fetchConsultations = useCallback(async () => {
     if (!user?.id) {
       console.log("❌ No user ID, skipping fetch");
+      setLoading(false);
       return;
     }
 
@@ -72,19 +73,17 @@ export default function ConsultationsScreen() {
       console.log("✅ Fetched consultations raw data:", JSON.stringify(data, null, 2));
       console.log("📊 Total consultations found:", data?.length || 0);
 
+      // Set consultations regardless of whether data is empty or not
+      setConsultations(data || []);
+      
       if (!data || data.length === 0) {
         console.log("⚠️  No consultations found for user");
-        setConsultations([]);
-        setLoading(false);
-        return;
+      } else {
+        console.log("✅ Setting consultations state with", data.length, "items");
       }
-
-      const transformedData: ConsultationWithLawyer[] = data as ConsultationWithLawyer[];
-
-      console.log("✅ Setting consultations state with", transformedData.length, "items");
-      setConsultations(transformedData);
     } catch (error) {
       console.error("❌ Exception in fetchConsultations:", error);
+      setConsultations([]);
     } finally {
       setLoading(false);
       console.log("✅ Loading complete");
