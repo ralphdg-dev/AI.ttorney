@@ -21,7 +21,7 @@ export default function TabNavigation({ activeTab, onTabChange }: TabNavigationP
   ];
 
   return (
-    <HStack className="mx-6 mb-4" space="none">
+    <HStack className="mx-6 mb-0">
       {tabs.map((tab) => (
         <Pressable
           key={tab.id}

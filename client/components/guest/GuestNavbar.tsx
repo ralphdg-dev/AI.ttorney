@@ -4,9 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
 import { 
   Scale, 
-  MessageSquarePlus, 
-  LogIn,
-  UserPlus
+  MessageSquarePlus
 } from 'lucide-react-native';
 import Colors from '../../constants/Colors';
 import { LAYOUT } from '../../constants/LayoutConstants';
@@ -24,7 +22,7 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab }) => {
   const getActiveTab = () => {
     if (activeTab) return activeTab;
     
-    if (pathname.includes('/guides')) return 'learn';
+    if (pathname.includes('/glossary')) return 'learn';
     if (pathname.includes('/chatbot')) return 'ask';
     
     // Default to 'ask' for guests (chatbot is their index page)
@@ -36,16 +34,10 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab }) => {
   const handleTabPress = (tabId: string) => {
     switch (tabId) {
       case 'learn':
-        router.push('/glossary'); // Match registered users' navbar behavior
+        router.push('/glossary');
         break;
       case 'ask':
         router.push('/chatbot');
-        break;
-      case 'login':
-        router.push('/login');
-        break;
-      case 'register':
-        router.push('/onboarding/registration');
         break;
       default:
         console.log(`Unknown tab: ${tabId}`);
@@ -66,20 +58,6 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab }) => {
       icon: MessageSquarePlus,
       active: currentActiveTab === 'ask',
       type: 'navigation' as const
-    },
-    {
-      id: 'login',
-      label: 'Login',
-      icon: LogIn,
-      active: false,
-      type: 'action' as const
-    },
-    {
-      id: 'register',
-      label: 'Sign Up',
-      icon: UserPlus,
-      active: false,
-      type: 'action' as const
     }
   ];
 
@@ -88,27 +66,23 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab }) => {
       <View style={styles.navbar}>
         {tabs.map((tab) => {
           const IconComponent = tab.icon;
-          const isActionButton = tab.type === 'action';
           
           return (
             <TouchableOpacity
               key={tab.id}
-              style={[
-                styles.tabItem,
-                isActionButton && styles.actionButton
-              ]}
+              style={styles.tabItem}
               onPress={() => handleTabPress(tab.id)}
               activeOpacity={0.7}
             >
               <IconComponent
                 size={20}
-                color={isActionButton ? '#6B7280' : (tab.active ? '#023D7B' : '#6B6B6B')}
+                color={tab.active ? '#023D7B' : '#6B6B6B'}
                 strokeWidth={2.2}
               />
               <Text
                 style={[
                   styles.tabLabel,
-                  isActionButton ? styles.actionLabel : (tab.active ? styles.activeLabel : styles.inactiveLabel)
+                  tab.active ? styles.activeLabel : styles.inactiveLabel
                 ]}
               >
                 {tab.label}

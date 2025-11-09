@@ -5,6 +5,7 @@ import logging
 from pydantic import BaseModel
 from datetime import datetime, date
 from config.dependencies import get_current_user as get_auth_user, get_supabase
+from services.notification_service import NotificationService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,7 +26,7 @@ class ConsultationRequest(BaseModel):
     consultation_date: Optional[str]
     consultation_time: Optional[str]
     consultation_mode: Optional[str]
-    requested_at: str
+    requested_at: Optional[str]
     responded_at: Optional[str]
     created_at: str
     updated_at: str
@@ -101,11 +102,27 @@ async def get_my_consultations(
     Get consultation requests for the logged-in lawyer with client names from users table
     """
     try:
-        lawyer_id = current_user["id"]
-        logger.info(f"Fetching consultations for lawyer: {lawyer_id}, filter: {status_filter}")
+        user_id = current_user["id"]
         
-        # Build the query
-        query = supabase.table("consultation_requests").select(USER_JOIN_QUERY).eq("lawyer_id", lawyer_id)
+        # Get lawyer_info.id for this user
+        try:
+            lawyer_info_response = supabase.table("lawyer_info").select("id").eq("lawyer_id", user_id).execute()
+            
+            if not lawyer_info_response.data or len(lawyer_info_response.data) == 0:
+                logger.warning(f"⚠️  No lawyer_info found for user: {user_id}")
+                return []
+            
+            lawyer_info_id = lawyer_info_response.data[0]["id"]
+            logger.info(f"🔍 Fetching consultations for lawyer_info.id: {lawyer_info_id} (user_id: {user_id}), filter: {status_filter}")
+        except Exception as e:
+            logger.error(f"❌ Error fetching lawyer_info: {e}")
+            return []
+        
+        # Build the query using lawyer_info.id
+        query = supabase.table("consultation_requests").select(USER_JOIN_QUERY).eq("lawyer_id", lawyer_info_id)
+        
+        # Debug: Log the query
+        logger.info(f"📊 Query: consultation_requests WHERE lawyer_id = {lawyer_info_id}")
         
         # Apply status filter if provided
         if status_filter and status_filter != "all":
@@ -118,56 +135,37 @@ async def get_my_consultations(
         response = query.execute()
         
         if hasattr(response, 'error') and response.error:
-            logger.error(f"Supabase error: {response.error}")
+            logger.error(f"❌ Supabase error: {response.error}")
             raise HTTPException(status_code=500, detail="Database error")
         
         consultations = response.data if hasattr(response, 'data') else []
         
+        # Debug: Log raw data
+        logger.info(f"📥 Raw response: {len(consultations)} rows")
+        if consultations:
+            logger.info(f"📋 First consultation: {consultations[0]}")
+        else:
+            logger.warning(f"⚠️  No consultations found for lawyer_info.id: {lawyer_info_id}")
+            # Check if any consultations exist in the table
+            all_response = supabase.table("consultation_requests").select("id, lawyer_id, user_id, status, created_at").order("created_at", desc=True).limit(10).execute()
+            if all_response.data:
+                logger.info(f"🔍 Total consultations in DB: {len(all_response.data)}")
+                for idx, c in enumerate(all_response.data):
+                    logger.info(f"  [{idx+1}] id={c.get('id')[:8]}... lawyer_id={c.get('lawyer_id')[:8] if c.get('lawyer_id') else 'NULL'}... user_id={c.get('user_id')[:8]}... status={c.get('status')}")
+                logger.info(f"🎯 Looking for lawyer_info.id: {lawyer_info_id}")
+            else:
+                logger.warning(f"🚨 NO CONSULTATIONS EXIST IN DATABASE AT ALL")
+        
         # Transform the data using helper function
         transformed_consultations = [transform_consultation_data(c) for c in consultations]
         
-        logger.info(f"Found {len(transformed_consultations)} consultations for lawyer {lawyer_id}")
+        logger.info(f"✅ Returning {len(transformed_consultations)} consultations for lawyer_info.id {lawyer_info_id}")
         return transformed_consultations
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching consultations: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-@router.get("/{consultation_id}", response_model=ConsultationRequest)
-async def get_consultation_detail(
-    consultation_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user_dict),
-    supabase: Client = Depends(get_supabase)
-):
-    """
-    Get detailed information for a specific consultation request
-    """
-    try:
-        lawyer_id = current_user["id"]
-        
-        # Fetch consultation with user data
-        response = supabase.table("consultation_requests").select(USER_JOIN_QUERY).eq("id", consultation_id).eq("lawyer_id", lawyer_id).execute()
-        
-        if hasattr(response, 'error') and response.error:
-            logger.error(f"Supabase error: {response.error}")
-            raise HTTPException(status_code=500, detail="Database error")
-        
-        consultations = response.data if hasattr(response, 'data') else []
-        
-        if not consultations:
-            raise HTTPException(status_code=404, detail="Consultation not found")
-        
-        consultation = consultations[0]
-        
-        # Transform the data using helper function
-        return transform_consultation_data(consultation)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching consultation detail: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/stats", response_model=ConsultationStats)
@@ -179,10 +177,39 @@ async def get_consultation_stats(
     Get statistics for the logged-in lawyer's consultation requests
     """
     try:
-        lawyer_id = current_user["id"]
+        user_id = current_user["id"]
+        
+        # Get lawyer_info.id for this user
+        try:
+            lawyer_info_response = supabase.table("lawyer_info").select("id").eq("lawyer_id", user_id).execute()
+            
+            if not lawyer_info_response.data or len(lawyer_info_response.data) == 0:
+                logger.warning(f"⚠️  No lawyer_info found for user: {user_id}")
+                return ConsultationStats(
+                    total_requests=0,
+                    pending_requests=0,
+                    accepted_requests=0,
+                    completed_requests=0,
+                    rejected_requests=0,
+                    cancelled_requests=0,
+                    today_sessions=0
+                )
+            
+            lawyer_info_id = lawyer_info_response.data[0]["id"]
+        except Exception as e:
+            logger.error(f"❌ Error fetching lawyer_info: {e}")
+            return ConsultationStats(
+                total_requests=0,
+                pending_requests=0,
+                accepted_requests=0,
+                completed_requests=0,
+                rejected_requests=0,
+                cancelled_requests=0,
+                today_sessions=0
+            )
         
         # Get all consultations for the lawyer
-        response = supabase.table("consultation_requests").select("*").eq("lawyer_id", lawyer_id).execute()
+        response = supabase.table("consultation_requests").select("*").eq("lawyer_id", lawyer_info_id).execute()
         
         if hasattr(response, 'error') and response.error:
             logger.error(f"Supabase error: {response.error}")
@@ -218,7 +245,58 @@ async def get_consultation_stats(
         return stats
         
     except Exception as e:
-        logger.error(f"Error fetching stats: {str(e)}")
+        logger.error(f"❌ Error fetching stats: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/{consultation_id}", response_model=ConsultationRequest)
+async def get_consultation_detail(
+    consultation_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user_dict),
+    supabase: Client = Depends(get_supabase)
+):
+    """
+    Get a specific consultation request by ID
+    """
+    try:
+        user_id = current_user["id"]
+        
+        # Get lawyer_info.id for this user
+        try:
+            lawyer_info_response = supabase.table("lawyer_info").select("id").eq("lawyer_id", user_id).execute()
+            
+            if not lawyer_info_response.data or len(lawyer_info_response.data) == 0:
+                logger.warning(f"⚠️  No lawyer_info found for user: {user_id}")
+                raise HTTPException(status_code=404, detail="Lawyer profile not found")
+            
+            lawyer_info_id = lawyer_info_response.data[0]["id"]
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Error fetching lawyer_info: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+        
+        # Fetch consultation with user data
+        response = supabase.table("consultation_requests").select(USER_JOIN_QUERY).eq("id", consultation_id).eq("lawyer_id", lawyer_info_id).execute()
+        
+        if hasattr(response, 'error') and response.error:
+            logger.error(f"Supabase error: {response.error}")
+            raise HTTPException(status_code=500, detail="Database error")
+        
+        consultations = response.data if hasattr(response, 'data') else []
+        
+        if not consultations:
+            raise HTTPException(status_code=404, detail="Consultation not found")
+        
+        consultation = consultations[0]
+        
+        # Transform the data using helper function
+        return transform_consultation_data(consultation)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching consultation detail: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/{consultation_id}/accept", response_model=SuccessResponse)
@@ -264,11 +342,26 @@ async def update_consultation_status(
     Helper function to update consultation status
     """
     try:
-        lawyer_id = current_user["id"]
+        user_id = current_user["id"]
         now = datetime.now().isoformat()
         
+        # Get lawyer_info.id for this user
+        try:
+            lawyer_info_response = supabase.table("lawyer_info").select("id").eq("lawyer_id", user_id).execute()
+            
+            if not lawyer_info_response.data or len(lawyer_info_response.data) == 0:
+                logger.warning(f"⚠️  No lawyer_info found for user: {user_id}")
+                raise HTTPException(status_code=404, detail="Lawyer profile not found")
+            
+            lawyer_info_id = lawyer_info_response.data[0]["id"]
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Error fetching lawyer_info: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+        
         # First verify the consultation belongs to this lawyer
-        response = supabase.table("consultation_requests").select("*").eq("id", consultation_id).eq("lawyer_id", lawyer_id).execute()
+        response = supabase.table("consultation_requests").select("*").eq("id", consultation_id).eq("lawyer_id", lawyer_info_id).execute()
         
         if hasattr(response, 'error') and response.error:
             logger.error(f"Supabase error: {response.error}")
@@ -294,6 +387,8 @@ async def update_consultation_status(
         if hasattr(update_response, 'error') and update_response.error:
             logger.error(f"Supabase update error: {update_response.error}")
             raise HTTPException(status_code=500, detail="Database error")
+        
+        await _send_consultation_notification(supabase, consultations[0], new_status)
         
         return SuccessResponse(success=True, message=f"Consultation {new_status} successfully")
         
@@ -350,6 +445,8 @@ async def cancel_consultation(
             logger.error(f"Supabase update error: {update_response.error}")
             raise HTTPException(status_code=500, detail="Database error")
         
+        await _send_consultation_notification(supabase, consultations[0], "cancelled")
+        
         return SuccessResponse(success=True, message="Consultation cancelled successfully")
         
     except HTTPException:
@@ -357,3 +454,49 @@ async def cancel_consultation(
     except Exception as e:
         logger.error(f"Error cancelling consultation: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+async def _send_consultation_notification(supabase: Client, consultation: Dict[str, Any], status: str):
+    """Send notification based on consultation status change"""
+    try:
+        notification_service = NotificationService(supabase)
+        
+        lawyer_result = supabase.table("lawyer_info").select("name, lawyer_id").eq("id", consultation["lawyer_id"]).execute()
+        if not lawyer_result.data:
+            return
+        
+        lawyer_name = lawyer_result.data[0]["name"]
+        lawyer_user_id = lawyer_result.data[0]["lawyer_id"]
+        user_id = consultation["user_id"]
+        consultation_id = consultation["id"]
+        
+        if status == "accepted":
+            await notification_service.notify_consultation_accepted(
+                user_id=user_id,
+                lawyer_name=lawyer_name,
+                consultation_date=consultation.get("consultation_date", "TBD"),
+                consultation_time=consultation.get("consultation_time", "TBD"),
+                consultation_id=consultation_id
+            )
+        elif status == "rejected":
+            await notification_service.notify_consultation_rejected(
+                user_id=user_id,
+                lawyer_name=lawyer_name,
+                consultation_id=consultation_id
+            )
+        elif status == "completed":
+            await notification_service.notify_consultation_completed(
+                user_id=user_id,
+                lawyer_name=lawyer_name,
+                consultation_id=consultation_id
+            )
+        elif status == "cancelled":
+            user_result = supabase.table("users").select("full_name").eq("id", user_id).execute()
+            user_name = user_result.data[0]["full_name"] if user_result.data else "A user"
+            
+            await notification_service.notify_consultation_cancelled(
+                lawyer_id=lawyer_user_id,
+                user_name=user_name,
+                consultation_id=consultation_id
+            )
+    except Exception as e:
+        logger.error(f"Failed to send consultation notification: {e}")

@@ -155,6 +155,43 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     errorBoundary: true
   },
 
+  // Bookmarks & Favorites routes (shared between users and lawyers)
+  '/bookmarked-posts': { 
+    path: '/bookmarked-posts', 
+    allowedRoles: ['registered_user', 'verified_lawyer'],
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
+  '/favorite-terms': { 
+    path: '/favorite-terms', 
+    requiredRole: 'registered_user',
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
+  '/bookmarked-guides': { 
+    path: '/bookmarked-guides', 
+    requiredRole: 'registered_user',
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
+  '/consultations': { 
+    path: '/consultations', 
+    requiredRole: 'registered_user',
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
+  '/notifications': { 
+    path: '/notifications', 
+    allowedRoles: ['registered_user', 'verified_lawyer'],
+    redirectTo: 'role-based',
+    serverValidation: true,
+    errorBoundary: true
+  },
+
   // Settings routes
   '/settings': { 
     path: '/settings', 

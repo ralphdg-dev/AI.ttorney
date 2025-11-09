@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl, StyleSheet, TouchableOpacity, TextInput, StatusBar } from 'react-native';
+import { View, Text, FlatList, RefreshControl, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bookmark, Filter, SortAsc, Search, X } from 'lucide-react-native';
+import { Bookmark, Filter, SortAsc } from 'lucide-react-native';
+import UnifiedSearchBar from '@/components/common/UnifiedSearchBar';
+import { PostSkeletonList } from '@/components/home/PostSkeleton';
 import Post from '../components/home/Post';
 import Header from '../components/Header';
 import Navbar from '../components/Navbar';
 import { SidebarWrapper } from '../components/AppSidebar';
 import { useAuth } from '../contexts/AuthContext';
+import { usePostBookmarks } from '../contexts/PostBookmarksContext';
 import { BookmarkService } from '../services/bookmarkService';
 import Colors from '../constants/Colors';
 import { GlobalStyles } from '../constants/GlobalStyles';
@@ -56,7 +59,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 12,
   },
   statsRow: {
@@ -83,7 +86,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 16,
   },
   emptyTitle: {
     fontSize: 18,
@@ -111,7 +114,7 @@ const styles = StyleSheet.create({
     ...GlobalStyles.textSemiBold,
   },
   searchContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 8,
     backgroundColor: Colors.background.primary,
@@ -142,6 +145,7 @@ const styles = StyleSheet.create({
 export default function BookmarkedPostsScreen() {
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
+  const { loadBookmarks: refreshBookmarkContext } = usePostBookmarks();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -258,8 +262,10 @@ export default function BookmarkedPostsScreen() {
   const handleBookmarkStatusChange = useCallback((postId: string, isBookmarked: boolean) => {
     if (!isBookmarked) {
       setPosts(prev => prev.filter(post => post.id !== postId));
+      // Refresh the context to update sidebar badge count
+      setTimeout(() => refreshBookmarkContext(), 100);
     }
-  }, []);
+  }, [refreshBookmarkContext]);
 
   const handleReportPress = useCallback((postId: string) => {
     // The Post component handles the actual report logic
@@ -304,22 +310,14 @@ export default function BookmarkedPostsScreen() {
   );
 
   const renderSearchBar = () => (
-    <View style={styles.searchContainer}>
-      <View style={styles.searchBar}>
-        <Search size={18} color={Colors.text.sub} strokeWidth={2} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search bookmarked posts..."
-          placeholderTextColor={Colors.text.sub}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-            <X size={18} color={Colors.text.sub} strokeWidth={2} />
-          </TouchableOpacity>
-        )}
-      </View>
+    <View style={{ paddingHorizontal: 20 }}>
+      <UnifiedSearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Search bookmarked posts..."
+        loading={loading}
+        containerClassName="pt-6 pb-4"
+      />
     </View>
   );
 
@@ -369,9 +367,7 @@ export default function BookmarkedPostsScreen() {
       <Header title="Bookmarked Posts" showMenu={true} />
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading bookmarked posts...</Text>
-        </View>
+        <PostSkeletonList count={3} />
       ) : posts.length === 0 ? (
         renderEmptyState()
       ) : (
@@ -415,7 +411,7 @@ export default function BookmarkedPostsScreen() {
         </>
       )}
 
-      <Navbar activeTab="home" />
+      <Navbar />
       <SidebarWrapper />
     </SafeAreaView>
   );

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl, Animated, TouchableOpacity, StyleSheet, ListRenderItem, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, FlatList, RefreshControl, TouchableOpacity, Animated, StyleSheet, ListRenderItem } from 'react-native';
+import { NetworkConfig } from '../../utils/networkConfig';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import Post from './Post';
@@ -46,7 +47,7 @@ interface TimelineProps {
 const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
-  const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, getLastFetchTime, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
+  const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
   const [posts, setPosts] = useState<PostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [optimisticPosts, setOptimisticPosts] = useState<PostData[]>([]);
@@ -243,7 +244,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     
     try {
       const headers = await getAuthHeaders();
-      const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_BASE_URL = await NetworkConfig.getBestApiUrl();
       
       const currentOffset = loadMore ? offsetRef.current : 0;
       const limit = 20;
@@ -745,7 +746,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
   },
   timelineContent: {
-    paddingTop: 0, // Remove top padding to prevent blank space
+    paddingTop: 10,
     paddingBottom: 100, // Account for bottom navigation
   },
   skeletonContainer: {

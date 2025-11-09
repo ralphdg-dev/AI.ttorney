@@ -1,37 +1,38 @@
-import React from "react";
-import { ScrollView, StatusBar, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import tw from "tailwind-react-native-classnames";
-import { useRouter } from "expo-router";
-import Header from "@/components/Header";
-import { Box } from "@/components/ui/box";
-import { VStack } from "@/components/ui/vstack";
-import { Text as GSText } from "@/components/ui/text";
+import React, { useCallback } from 'react';
+import { ScrollView, StatusBar } from 'react-native';
+import tw from 'tailwind-react-native-classnames';
+import { useRouter, usePathname } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Header from '@/components/Header';
+import { Box } from '@/components/ui/box';
+import { VStack } from '@/components/ui/vstack';
+import { Text as GSText } from '@/components/ui/text';
 import Navbar from "@/components/Navbar";
-import Colors from "@/constants/Colors";
-import { useAuth } from "@/contexts/AuthContext";
+import { GuestNavbar } from "@/components/guest";
+import Colors from '@/constants/Colors';
+import { useAuth } from '@/contexts/AuthContext';
+import { safeGoBack } from '@/utils/navigationHelper';
 
-const BulletPoint = ({ children }: { children: React.ReactNode }) => (
-  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
-    <GSText size="md" style={{ color: Colors.text.sub, marginTop: 2 }}>•</GSText>
-    <GSText size="md" style={{ color: Colors.text.body, flex: 1 }}>
-      {children}
-    </GSText>
-  </View>
-);
-
-export default function TermsOfUseScreen() {
+export default function TermsScreen() {
   const router = useRouter();
-  const { user } = useAuth();
-  
-  // Determine if user is a verified lawyer
-  const isLawyer = user?.role === 'verified_lawyer';
+  const pathname = usePathname();
+  const { isGuestMode, isAuthenticated, user } = useAuth();
+
+  // Intelligent back navigation handler (FAANG best practice)
+  const handleBackPress = useCallback(() => {
+    safeGoBack(router, {
+      isGuestMode,
+      isAuthenticated,
+      userRole: user?.role,
+      currentPath: pathname,
+    });
+  }, [router, isGuestMode, isAuthenticated, user?.role, pathname]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <Box className="flex-1 bg-white">
-      <Header showBackButton={true} showMenu={false} onBackPress={() => router.push('/settings')} />
+      <Header showBackButton={true} showMenu={false} onBackPress={handleBackPress} />
 
       <ScrollView
         style={tw`flex-1`}
@@ -39,374 +40,128 @@ export default function TermsOfUseScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Title */}
-        <GSText size="2xl" bold style={{ color: Colors.text.head, marginBottom: 8 }}>
-          {isLawyer ? 'Terms of Use for Lawyer Users' : 'Terms of Use for Legal Seekers'}
-        </GSText>
-        <GSText size="sm" style={{ color: Colors.text.sub, marginBottom: 4 }}>
-          Effective Date: January 1, 2025
-        </GSText>
-        <GSText size="sm" style={{ color: Colors.text.sub, marginBottom: 24 }}>
-          Last Updated: January 1, 2025
+        <GSText size="2xl" bold style={{ color: Colors.text.head, marginBottom: 24 }}>
+          Terms of Use
         </GSText>
 
-        {/* Content - Conditional based on user role */}
+        {/* Content */}
         <VStack style={{ gap: 20 }}>
-          {isLawyer ? (
-            // LAWYER TERMS
-            <>
-              {/* Introduction */}
-              <GSText size="md" style={{ color: Colors.text.body }}>
-                Welcome to Ai.ttorney ("we," "our," or "us"). These Terms of Use ("Terms") govern your access to and use of the Ai.ttorney platform as a Lawyer User. By registering or using the platform, you agree to comply with these Terms and applicable laws, including the Code of Professional Responsibility and Accountability (CPRA) of the Integrated Bar of the Philippines (IBP).
-              </GSText>
-              <GSText size="md" style={{ color: Colors.text.body, fontWeight: '600' }}>
-                If you do not agree, please do not use Ai.ttorney.
-              </GSText>
+          {/* Acceptance of Terms */}
+          <VStack style={{ gap: 12 }}>
+            <GSText size="lg" bold style={{ color: Colors.text.head }}>
+              1. Acceptance of Terms
+            </GSText>
+            <GSText size="md" style={{ color: Colors.text.body }}>
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+            </GSText>
+            <GSText size="md" style={{ color: Colors.text.body }}>
+              Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+            </GSText>
+          </VStack>
 
-              {/* 1. Purpose of the Platform */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  1. Purpose of the Platform
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  Ai.ttorney is a legal literacy and access-to-justice platform that connects verified legal professionals ("Lawyer Users") with individuals seeking general legal assistance ("Legal Seekers").
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  The Platform allows lawyers to:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Accept or reject consultation requests made by Legal Seekers;</BulletPoint>
-                  <BulletPoint>Share general legal knowledge in the community forum; and</BulletPoint>
-                  <BulletPoint>Participate in public legal awareness efforts.</BulletPoint>
-                </VStack>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  Ai.ttorney is not a law firm, does not practice law, and does not provide or participate in attorney-client relationships. It serves only as a neutral platform to facilitate pro bono consultation scheduling and public legal education.
-                </GSText>
-              </VStack>
+          {/* Description of Service */}
+          <VStack style={{ gap: 12 }}>
+            <GSText size="lg" bold style={{ color: Colors.text.head }}>
+              2. Description of Service
+            </GSText>
+            <GSText size="md" style={{ color: Colors.text.body }}>
+              Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.
+            </GSText>
+          </VStack>
 
-              {/* 2. Eligibility */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  2. Eligibility
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  To register as a Lawyer User, you must:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Be a licensed attorney in good standing with the Integrated Bar of the Philippines;</BulletPoint>
-                  <BulletPoint>Submit verifiable credentials upon registration; and</BulletPoint>
-                  <BulletPoint>Use the Platform solely for pro bono purposes.</BulletPoint>
-                </VStack>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  We reserve the right to verify your credentials and deny or revoke access if information provided is inaccurate or misleading.
-                </GSText>
-              </VStack>
+          {/* User Responsibilities */}
+          <VStack style={{ gap: 12 }}>
+            <GSText size="lg" bold style={{ color: Colors.text.head }}>
+              3. User Responsibilities
+            </GSText>
+            <GSText size="md" style={{ color: Colors.text.body }}>
+              Sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.
+            </GSText>
+            <GSText size="md" style={{ color: Colors.text.body }}>
+              Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur.
+            </GSText>
+          </VStack>
 
-              {/* 3. Consultation Rules */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  3. Consultation Rules
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>All consultations are pro bono (free of charge).</BulletPoint>
-                  <BulletPoint>Consultations are scheduled only through the Ai.ttorney booking feature.</BulletPoint>
-                  <BulletPoint>There is no in-app chat or messaging between lawyers and users.</BulletPoint>
-                  <BulletPoint>Once a consultation is booked, the Lawyer User must initiate contact with the Legal Seeker using the information provided in the booking details (e.g., email, phone).</BulletPoint>
-                  <BulletPoint>Consultations must comply with IBP ethical standards and applicable laws.</BulletPoint>
-                </VStack>
-                <GSText size="md" style={{ color: Colors.text.body, marginTop: 8 }}>
-                  Lawyer Users must not:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Request or accept payment, gifts, or compensation for any consultation arranged via Ai.ttorney;</BulletPoint>
-                  <BulletPoint>Offer or solicit paid services outside the Platform in connection with any Ai.ttorney booking;</BulletPoint>
-                  <BulletPoint>Use Ai.ttorney for lead generation or firm promotion.</BulletPoint>
-                </VStack>
-              </VStack>
+          {/* Prohibited Uses */}
+          <VStack style={{ gap: 12 }}>
+            <GSText size="lg" bold style={{ color: Colors.text.head }}>
+              4. Prohibited Uses
+            </GSText>
+            <GSText size="md" style={{ color: Colors.text.body }}>
+              Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur, vel illum qui dolorem eum fugiat quo voluptas nulla pariatur. At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti.
+            </GSText>
+            <GSText size="md" style={{ color: Colors.text.body }}>
+              Quos dolores et quas molestias excepturi sint occaecati cupiditate non provident, similique sunt in culpa qui officia deserunt mollitia animi, id est laborum et dolorum fuga.
+            </GSText>
+          </VStack>
 
-              {/* 4. Conduct in the Community Forum */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  4. Conduct in the Community Forum
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  Lawyer Users are encouraged to share general legal knowledge to promote public awareness. However, you must:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Provide educational and general information only;</BulletPoint>
-                  <BulletPoint>Not give case-specific advice or solicit legal representation;</BulletPoint>
-                  <BulletPoint>Not promote your law firm, services, or external links;</BulletPoint>
-                  <BulletPoint>Maintain professionalism and respect for all participants.</BulletPoint>
-                </VStack>
-              </VStack>
+          {/* Intellectual Property */}
+          <VStack style={{ gap: 12 }}>
+            <GSText size="lg" bold style={{ color: Colors.text.head }}>
+              5. Intellectual Property
+            </GSText>
+            <GSText size="md" style={{ color: Colors.text.body }}>
+              Et harum quidem rerum facilis est et expedita distinctio. Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus, omnis voluptas assumenda est, omnis dolor repellendus.
+            </GSText>
+          </VStack>
 
-              {/* 5. Confidentiality */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  5. Confidentiality
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  You must:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Respect the privacy and confidentiality of any Legal Seeker data shared through Ai.ttorney;</BulletPoint>
-                  <BulletPoint>Avoid requesting or collecting unnecessary personal or case details beyond what's required for scheduling;</BulletPoint>
-                  <BulletPoint>Handle any received information responsibly and in accordance with the Data Privacy Act of 2012 (RA 10173).</BulletPoint>
-                </VStack>
-              </VStack>
+          {/* Limitation of Liability */}
+          <VStack style={{ gap: 12 }}>
+            <GSText size="lg" bold style={{ color: Colors.text.head }}>
+              6. Limitation of Liability
+            </GSText>
+            <GSText size="md" style={{ color: Colors.text.body }}>
+              Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet ut et voluptates repudiandae sint et molestiae non recusandae. Itaque earum rerum hic tenetur a sapiente delectus, ut aut reiciendis voluptatibus maiores alias consequatur aut perferendis doloribus asperiores repellat.
+            </GSText>
+          </VStack>
 
-              {/* 6. Liability Disclaimer */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  6. Liability Disclaimer
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Ai.ttorney is not responsible for any interaction, communication, or outcome arising from consultations.</BulletPoint>
-                  <BulletPoint>Ai.ttorney does not verify, endorse, or monitor the legal advice or assistance given by Lawyer Users.</BulletPoint>
-                  <BulletPoint>You acknowledge that any professional relationship that may form after a consultation occurs outside Ai.ttorney's scope and responsibility.</BulletPoint>
-                  <BulletPoint>Ai.ttorney shall not be liable for any claims, losses, damages, or disputes between Lawyer Users and Legal Seekers.</BulletPoint>
-                </VStack>
-              </VStack>
+          {/* Termination */}
+          <VStack style={{ gap: 12 }}>
+            <GSText size="lg" bold style={{ color: Colors.text.head }}>
+              7. Termination
+            </GSText>
+            <GSText size="md" style={{ color: Colors.text.body }}>
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+            </GSText>
+          </VStack>
 
-              {/* 7. Account Suspension and Termination */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  7. Account Suspension and Termination
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  Ai.ttorney may suspend or terminate your access if you:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Violate these Terms or IBP ethical rules;</BulletPoint>
-                  <BulletPoint>Misrepresent your credentials or identity;</BulletPoint>
-                  <BulletPoint>Solicit, advertise, or request payment through the Platform; or</BulletPoint>
-                  <BulletPoint>Engage in unprofessional or unlawful behavior.</BulletPoint>
-                </VStack>
-              </VStack>
+          {/* Changes to Terms */}
+          <VStack style={{ gap: 12 }}>
+            <GSText size="lg" bold style={{ color: Colors.text.head }}>
+              8. Changes to Terms
+            </GSText>
+            <GSText size="md" style={{ color: Colors.text.body }}>
+              Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+            </GSText>
+          </VStack>
 
-              {/* 8. Modifications */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  8. Modifications
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  Ai.ttorney may update these Terms at any time. Continued use after revisions means you agree to the updated version.
-                </GSText>
-              </VStack>
-
-              {/* 9. Governing Law */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  9. Governing Law
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  These Terms are governed by the laws of the Republic of the Philippines. Any dispute shall be brought before the proper courts of the Philippines.
-                </GSText>
-              </VStack>
-
-              {/* 10. Contact */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  10. Contact
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  For questions or clarifications:
-                </GSText>
-                <View style={{ backgroundColor: '#F9FAFB', padding: 14, borderRadius: 6, borderWidth: 1, borderColor: '#E5E7EB', marginTop: 4 }}>
-                  <GSText size="sm" style={{ color: Colors.text.body }}>
-                    Email: ai.ttorney@gmail.com
-                  </GSText>
-                </View>
-              </VStack>
-            </>
-          ) : (
-            // LEGAL SEEKER TERMS
-            <>
-              {/* Introduction */}
-              <GSText size="md" style={{ color: Colors.text.body }}>
-                Welcome to Ai.ttorney ("we," "our," or "us"). These Terms of Use ("Terms") govern your use of the Ai.ttorney platform as a Legal Seeker — a user seeking free legal consultation, general legal knowledge, or access to educational resources.
-              </GSText>
-              <GSText size="md" style={{ color: Colors.text.body, fontWeight: '600' }}>
-                By using Ai.ttorney, you agree to these Terms. If you do not agree, please stop using the Platform.
-              </GSText>
-
-              {/* 1. Purpose of the Platform */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  1. Purpose of the Platform
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Ai.ttorney helps individuals connect with verified legal professionals offering free (pro bono) consultations and general legal guidance.</BulletPoint>
-                  <BulletPoint>We also provide educational content, community discussions, and AI-assisted legal literacy tools.</BulletPoint>
-                  <BulletPoint>Ai.ttorney is not a law firm, does not provide legal advice, and is not a party to any lawyer-client relationship.</BulletPoint>
-                </VStack>
-              </VStack>
-
-              {/* 2. Eligibility */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  2. Eligibility
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  You must:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Be at least 18 years old;</BulletPoint>
-                  <BulletPoint>Provide truthful information when booking consultations;</BulletPoint>
-                  <BulletPoint>Use the Platform only for lawful and personal purposes.</BulletPoint>
-                </VStack>
-              </VStack>
-
-              {/* 3. Consultations */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  3. Consultations
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>All consultations booked through Ai.ttorney are pro bono (free).</BulletPoint>
-                  <BulletPoint>Consultations are scheduled through the booking system only — there is no chat or messaging feature.</BulletPoint>
-                  <BulletPoint>After a booking is accepted, the Lawyer User will contact you directly using your provided contact details.</BulletPoint>
-                  <BulletPoint>Consultations occur outside the app (e.g., via phone, email, or meeting) based on lawyer discretion.</BulletPoint>
-                </VStack>
-                <GSText size="md" style={{ color: Colors.text.body, marginTop: 8 }}>
-                  You agree not to:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Offer or send payment to any lawyer through Ai.ttorney;</BulletPoint>
-                  <BulletPoint>Request or expect legal representation through the Platform;</BulletPoint>
-                  <BulletPoint>Share unnecessary or sensitive details publicly, especially in the forum.</BulletPoint>
-                </VStack>
-              </VStack>
-
-              {/* 4. Community Forum and Content */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  4. Community Forum and Content
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  Ai.ttorney provides a Community Forum for public discussion of general legal topics.
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  Please note:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Lawyers may only share general legal information, not personalized legal advice.</BulletPoint>
-                  <BulletPoint>You must not treat forum posts or chatbot responses as official legal opinions.</BulletPoint>
-                  <BulletPoint>Any content you post must be respectful, lawful, and accurate.</BulletPoint>
-                </VStack>
-              </VStack>
-
-              {/* 5. Privacy and Data Protection */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  5. Privacy and Data Protection
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Your personal data is protected under the Data Privacy Act of 2012 (RA 10173).</BulletPoint>
-                  <BulletPoint>We collect and process only information needed to facilitate your consultation booking and account management.</BulletPoint>
-                  <BulletPoint>For full details, please review our Privacy Policy.</BulletPoint>
-                </VStack>
-              </VStack>
-
-              {/* 6. Limitation of Liability */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  6. Limitation of Liability
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  You acknowledge and agree that:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Ai.ttorney does not control or guarantee the quality or accuracy of any information provided by Lawyer Users;</BulletPoint>
-                  <BulletPoint>Ai.ttorney is not responsible for the content, advice, or outcome of any consultation;</BulletPoint>
-                  <BulletPoint>Ai.ttorney does not verify or participate in any lawyer-client relationship that may form after consultation;</BulletPoint>
-                  <BulletPoint>Ai.ttorney is not liable for any damages, misunderstandings, or disputes arising from use of the Platform or interactions with Lawyer Users.</BulletPoint>
-                </VStack>
-              </VStack>
-
-              {/* 7. Prohibited Conduct */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  7. Prohibited Conduct
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  You agree not to:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Post false, abusive, or defamatory content;</BulletPoint>
-                  <BulletPoint>Attempt to bypass the booking process;</BulletPoint>
-                  <BulletPoint>Misuse lawyer contact details for solicitation or harassment;</BulletPoint>
-                  <BulletPoint>Share AI-generated or plagiarized content in the forum.</BulletPoint>
-                </VStack>
-                <GSText size="md" style={{ color: Colors.text.body, marginTop: 8 }}>
-                  Violation may result in immediate account suspension or permanent banning.
-                </GSText>
-              </VStack>
-
-              {/* 8. Termination */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  8. Termination
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  Ai.ttorney may suspend or terminate your access if you:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Violate these Terms;</BulletPoint>
-                  <BulletPoint>Provide false or misleading information; or</BulletPoint>
-                  <BulletPoint>Engage in misconduct or unlawful activity.</BulletPoint>
-                </VStack>
-                <GSText size="md" style={{ color: Colors.text.body, marginTop: 8 }}>
-                  You may also request account deletion anytime.
-                </GSText>
-              </VStack>
-
-              {/* 9. Modifications */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  9. Modifications
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  Ai.ttorney may update these Terms periodically. Continued use after updates constitutes acceptance of the new Terms.
-                </GSText>
-              </VStack>
-
-              {/* 10. Governing Law */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  10. Governing Law
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  These Terms are governed by the laws of the Republic of the Philippines, and any dispute shall be brought before the proper courts of the Philippines.
-                </GSText>
-              </VStack>
-
-              {/* 11. Contact */}
-              <VStack style={{ gap: 12 }}>
-                <GSText size="lg" bold style={{ color: Colors.text.head }}>
-                  11. Contact
-                </GSText>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  For questions or assistance, please contact:
-                </GSText>
-                <View style={{ backgroundColor: '#F9FAFB', padding: 14, borderRadius: 6, borderWidth: 1, borderColor: '#E5E7EB', marginTop: 4 }}>
-                  <GSText size="sm" style={{ color: Colors.text.body }}>
-                    Email: ai.ttorney@gmail.com
-                  </GSText>
-                </View>
-              </VStack>
-            </>
-          )}
+          {/* Contact Information */}
+          <VStack style={{ gap: 12 }}>
+            <GSText size="lg" bold style={{ color: Colors.text.head }}>
+              9. Contact Information
+            </GSText>
+            <GSText size="md" style={{ color: Colors.text.body }}>
+              Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.
+            </GSText>
+            <GSText size="md" style={{ color: Colors.text.body, marginTop: 8 }}>
+              Email: legal@example.com
+            </GSText>
+          </VStack>
 
           {/* Last Updated */}
-          <VStack style={{ gap: 8, marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
-            <GSText size="xs" style={{ color: Colors.text.sub, textAlign: 'center' }}>
-              © 2025 Ai.ttorney. All rights reserved.
+          <VStack style={{ gap: 12, marginTop: 20, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
+            <GSText size="sm" style={{ color: Colors.text.sub }}>
+              Last updated: December 2024
             </GSText>
           </VStack>
         </VStack>
       </ScrollView>
       
-      <Navbar />
+      {isGuestMode ? (
+        <GuestNavbar activeTab="learn" />
+      ) : (
+        <Navbar activeTab="profile" />
+      )}
     </Box>
     </SafeAreaView>
   );

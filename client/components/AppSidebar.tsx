@@ -1,7 +1,10 @@
- import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Dimensions, Easing } from "react-native";
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Dimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { useFavorites } from "../contexts/FavoritesContext";
+import { useBookmarks } from "../contexts/BookmarksContext";
+import { usePostBookmarks } from "../contexts/PostBookmarksContext";
+import { useConsultations } from "../contexts/ConsultationsContext";
 import { shouldUseNativeDriver } from '@/utils/animations';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -10,22 +13,21 @@ import {
   HelpCircle,
   FileText,
   LogOut,
-  Bell,
   MessageSquare,
   Star,
   Calendar,
   User,
-  X
+  X,
+  Bell
 } from "lucide-react-native";
 import Colors from "../constants/Colors";
 import { GlobalStyles } from "../constants/GlobalStyles";
 import { useAuth } from "../contexts/AuthContext";
-import { supabase } from "../config/supabase";
 import { createShadowStyle } from "../utils/shadowUtils";
 import { LAYOUT } from "../constants/LayoutConstants";
 
 const { width: screenWidth } = Dimensions.get("window");
-const SIDEBAR_WIDTH = Math.min(screenWidth * 0.8, 320);
+const SIDEBAR_WIDTH = Math.min(screenWidth * 0.75, 320);
 const ANIMATION_DURATION = 280;
 
 // Types
@@ -104,134 +106,87 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   // INDUSTRY STANDARD: Lazy initialization with useState
   const [slideAnim] = useState(() => new Animated.Value(-SIDEBAR_WIDTH));
-  const [overlayAnim] = useState(() => new Animated.Value(0));
-  const [acceptedConsultationsCount, setAcceptedConsultationsCount] = useState(0);
   const insets = useSafeAreaInsets();
-  const { signOut, user } = useAuth();
+  const { signOut } = useAuth();
   const { favoriteTermIds } = useFavorites();
-  const hasFetchedConsultations = useRef(false);
+  const { bookmarkedGuideIds } = useBookmarks();
+  const { bookmarkedPostIds } = usePostBookmarks();
+  const { consultationsCount } = useConsultations();
 
-  // Fetch accepted consultations count ONCE when sidebar becomes visible
-  useEffect(() => {
-    const fetchAcceptedConsultations = async () => {
-      if (!user?.id) return;
-
-      try {
-        const { count, error } = await supabase
-          .from("consultation_requests")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .in("status", ["accepted", "rejected"]);
-
-        if (error) {
-          console.error("Error fetching accepted consultations count:", error);
-          return;
-        }
-
-        setAcceptedConsultationsCount(count || 0);
-      } catch (error) {
-        console.error("Error in fetchAcceptedConsultations:", error);
-      }
-    };
-
-    // Only fetch if the sidebar is visible AND we haven't fetched before
-    if (isVisible && user?.id && !hasFetchedConsultations.current) {
-      fetchAcceptedConsultations();
-      hasFetchedConsultations.current = true; // Mark as fetched
-    }
-
-    // Reset fetch status when sidebar closes
-    if (!isVisible) {
-      hasFetchedConsultations.current = false;
-    }
-  }, [isVisible, user?.id]);
 
   // Animation effect - SIMPLE and CLEAN
   useEffect(() => {
     const animationConfig = {
       duration: ANIMATION_DURATION,
-      easing: Easing.out(Easing.cubic),
       useNativeDriver: shouldUseNativeDriver('transform'),
-    };
-
-    const overlayConfig = {
-      duration: ANIMATION_DURATION,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: shouldUseNativeDriver('opacity'),
     };
 
     if (isVisible) {
       // Animate in
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          ...animationConfig,
-        }),
-        Animated.timing(overlayAnim, {
-          toValue: 1,
-          ...overlayConfig,
-        }),
-      ]).start();
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        ...animationConfig,
+      }).start();
     } else {
       // Animate out
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: -SIDEBAR_WIDTH,
-          ...animationConfig,
-        }),
-        Animated.timing(overlayAnim, {
-          toValue: 0,
-          ...overlayConfig,
-        }),
-      ]).start();
+      Animated.timing(slideAnim, {
+        toValue: -SIDEBAR_WIDTH,
+        ...animationConfig,
+      }).start();
     }
 
     // Cleanup
     return () => {
       slideAnim.stopAnimation();
-      overlayAnim.stopAnimation();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible]);
   
-  // Get favorite count directly from Set size
-  const favoriteCount = favoriteTermIds.size;
-  
-  // Memoize badge counts to prevent recreating on every render
+  // FAANG OPTIMIZATION: Direct Set.size and primitive access - O(1) constant time
+  // All data pre-loaded from contexts, zero API calls on sidebar open
+  // Instant badge updates with no network latency
   const badgeCounts = React.useMemo(() => ({
-    favoriteTerms: favoriteCount,
-    bookmarkedGuides: 0,
-    acceptedConsultations: acceptedConsultationsCount,
-    unreadNotifications: 0,
-  }), [favoriteCount, acceptedConsultationsCount]);
+    favoriteTerms: favoriteTermIds.size,
+    bookmarkedPosts: bookmarkedPostIds.size,
+    bookmarkedGuides: bookmarkedGuideIds.size,
+    acceptedConsultations: consultationsCount,
+  }), [favoriteTermIds.size, bookmarkedPostIds.size, bookmarkedGuideIds.size, consultationsCount]);
+
+  const { user } = useAuth();
+  const isLawyer = user?.role === 'verified_lawyer';
 
   // Memoize menu items to prevent recreating on every render
   const menuItems: MenuItem[] = React.useMemo(() => [
-    {
-      id: "bookmarks",
-      label: "Favorite Terms",
-      icon: Star,
-      route: "favorite-terms",
-      badge: badgeCounts.favoriteTerms || undefined,
-    },
+    // Bookmarked Posts - Available for both users and lawyers (same page)
     {
       id: "bookmarked-posts",
       label: "Bookmarked Posts",
       icon: MessageSquare,
       route: "bookmarked-posts",
+      badge: badgeCounts.bookmarkedPosts || undefined,
     },
-    {
+    // Favorite Terms - Only for regular users
+    ...(!isLawyer ? [{
+      id: "bookmarks",
+      label: "Favorite Terms",
+      icon: Star,
+      route: "favorite-terms",
+      badge: badgeCounts.favoriteTerms || undefined,
+    }] : []),
+    // Bookmarked Guides - Only for regular users
+    ...(!isLawyer ? [{
       id: "bookmarked-guides",
       label: "Bookmarked Guides",
       icon: Bookmark,
       route: "bookmarked-guides",
       badge: badgeCounts.bookmarkedGuides || undefined,
-    },
+    }] : []),
+    // Consultations - Different routes for users vs lawyers
     {
       id: "consultations",
-      label: "Consultations",
+      label: isLawyer ? "Consultation Requests" : "Consultations",
       icon: Calendar,
-      route: "consultations",
+      route: isLawyer ? "lawyer/consult" : "consultations",
       badge: badgeCounts.acceptedConsultations || undefined,
     },
     {
@@ -245,7 +200,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: "Notifications",
       icon: Bell,
       route: "notifications",
-      badge: badgeCounts.unreadNotifications || undefined,
     },
     {
       id: "settings",
@@ -295,7 +249,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         }
       },
     },
-  ], [badgeCounts, signOut]);
+  ], [badgeCounts, signOut, isLawyer]);
 
   const handleMenuItemPress = (item: MenuItem) => {
     if (item.action) {
@@ -342,31 +296,23 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
+  // Don't render if not visible
+  if (!isVisible) return null;
+
   return (
-    <View style={styles.container} pointerEvents={isVisible ? 'auto' : 'none'}>
-      {/* Overlay */}
+    <View style={styles.container}>
+      {/* Backdrop - Click to close */}
       <TouchableOpacity
-        style={styles.overlayTouchable}
+        style={styles.backdrop}
         activeOpacity={1}
         onPress={onClose}
-      >
-        <Animated.View
-          style={[
-            styles.overlay,
-            {
-              opacity: overlayAnim,
-            },
-          ]}
-        />
-      </TouchableOpacity>
-
+      />
       {/* Sidebar */}
       <Animated.View
         style={[
           styles.sidebar,
           {
             transform: [{ translateX: slideAnim }],
-            opacity: overlayAnim,
             paddingTop: insets.top,
             paddingBottom: insets.bottom,
           },
@@ -450,6 +396,9 @@ export const SidebarWrapper: React.FC<{
       case "consultations":
         router.push("/consultations");
         break;
+      case "lawyer/consult":
+        router.push("/lawyer/consult");
+        break;
       case "bookmarked-guides":
         router.push("/bookmarked-guides");
         break;
@@ -492,7 +441,11 @@ export const SidebarWrapper: React.FC<{
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: LAYOUT.Z_INDEX.drawer,
   },
   overlay: {
@@ -501,15 +454,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "black",
+    zIndex: LAYOUT.Z_INDEX.overlay,
   },
   overlayTouchable: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: LAYOUT.Z_INDEX.overlay,
+    flex: 1,
   },
   sidebar: {
     position: "absolute",
@@ -518,7 +467,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: SIDEBAR_WIDTH,
     backgroundColor: "#FFFFFF",
-    zIndex: LAYOUT.Z_INDEX.drawer,
     ...createShadowStyle({
       shadowColor: "#000",
       shadowOffset: { width: 2, height: 0 },
@@ -636,6 +584,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontStyle: "italic",
     ...GlobalStyles.text,
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
 });
 

@@ -1,31 +1,28 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, startTransition } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   TouchableOpacity,
   FlatList,
   Animated,
-  ActivityIndicator,
   Alert,
   useWindowDimensions,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { fadeIn, fadeOut } from '@/utils/animations';
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
-import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
-import { Input, InputField, InputSlot } from "@/components/ui/input";
 import Navbar from "@/components/Navbar";
 import { GuestNavbar, GuestSidebar } from "@/components/guest";
 import ToggleGroup from "@/components/ui/ToggleGroup";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
+import { ArticleCardSkeletonList } from "@/components/guides/ArticleCardSkeleton";
 import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
-import { SidebarWrapper } from "@/components/AppSidebar";
+import { SidebarWrapper, useSidebar } from "@/components/AppSidebar";
 import { useLegalArticles } from "@/hooks/useLegalArticles";
 import {
   CacheService,
@@ -33,18 +30,24 @@ import {
 } from "@/services/cacheService";
 import { NetworkConfig } from "@/utils/networkConfig";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBookmarks } from "@/contexts/BookmarksContext";
+import { useFavorites } from "@/contexts/FavoritesContext";
+import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 
 const ITEMS_PER_PAGE = 10;
 
 export default function GlossaryScreen() {
   const router = useRouter();
   const { isGuestMode } = useAuth();
+  const { openSidebar } = useSidebar();
   const [activeTab, setActiveTab] = useState<string>("terms");
-  const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState<boolean>(false);
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
-  
+  const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState<boolean>(false);
+  const [showBookmarksOnly, setShowBookmarksOnly] = useState<boolean>(false);
+
   // Terms state
   const [terms, setTerms] = useState<TermItem[]>([]);
   const [termsLoading, setTermsLoading] = useState<boolean>(true);
@@ -64,10 +67,8 @@ export default function GlossaryScreen() {
   } = useLegalArticles();
   const [displayArticles, setDisplayArticles] = useState<ArticleItem[]>([]);
   const [isSearchingArticles, setIsSearchingArticles] = useState<boolean>(false);
-  const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
-  const categoryCache = useRef<Record<string, ArticleItem[]>>({});
-  const lastCategoryRef = useRef<string>("all");
-  const latestCategoryRef = useRef<string>("all");
+  const { isBookmarked, toggleBookmark } = useBookmarks();
+  const { isFavorite } = useFavorites();
   
   // Animation and layout
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -77,7 +78,7 @@ export default function GlossaryScreen() {
   // Responsive design
   const isTablet = screenWidth >= 768;
   const isDesktop = screenWidth >= 1024;
-  const horizontalPadding = isDesktop ? 32 : isTablet ? 24 : 16;
+  const horizontalPadding = 20; // Consistent 20px padding across all screen sizes
   const minCardWidth = isDesktop ? 320 : isTablet ? 280 : 300;
   const numColumns = Math.max(
     1,
@@ -208,125 +209,70 @@ export default function GlossaryScreen() {
     }
   }, [activeTab, fetchLegalTerms]);
 
-  // Search and category change with debounce - OPTIMIZED
+  // Search and category change with debounce
   useEffect(() => {
-    if (activeTab !== "terms") return;
-    
-    const timeoutId = setTimeout(() => {
-      setCurrentPage(1);
-      fetchLegalTerms(1, activeCategory, searchQuery);
-    }, 150); // Reduced from 300ms to 150ms for faster response
-    
-    return () => clearTimeout(timeoutId);
-  }, [activeCategory, searchQuery, activeTab]);
-
-  // Articles search - OPTIMIZED with latest value pattern
-  useEffect(() => {
-    if (activeTab !== "guides") return;
-    
-    let isCancelled = false;
-    const trimmedQuery = searchQuery.trim();
-    
-    // Track the latest category
-    latestCategoryRef.current = activeCategory;
-    
-    // Immediate optimistic update for category-only changes
-    if (!trimmedQuery && activeCategory !== lastCategoryRef.current) {
-      lastCategoryRef.current = activeCategory;
-      
-      // Use startTransition for non-urgent updates
-      startTransition(() => {
-        setCurrentPage(1);
-      });
-      
-      // Immediate synchronous update with cached data
-      if (activeCategory === "all") {
-        if (legalArticles.length > 0) {
-          setDisplayArticles(legalArticles);
-          categoryCache.current["all"] = legalArticles;
-        }
-      } else if (categoryCache.current[activeCategory]) {
-        setDisplayArticles(categoryCache.current[activeCategory]);
-      }
+    if (activeTab === "terms") {
+      const timeoutId = setTimeout(() => {
+        fetchLegalTerms(1, activeCategory, searchQuery);
+      }, 500);
+      return () => clearTimeout(timeoutId);
     }
-    
-    const debounceTime = !trimmedQuery ? 0 : 150;
-    
-    const searchTimeout = setTimeout(async () => {
-      if (trimmedQuery && trimmedQuery.length >= 2) {
-        setIsSearchingArticles(true);
-        try {
-          const searchResults = await searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
-          if (!isCancelled) {
+  }, [activeCategory, searchQuery, activeTab, fetchLegalTerms]);
+
+  // Articles search with debounce
+  useEffect(() => {
+    if (activeTab === "guides") {
+      const searchTimeout = setTimeout(async () => {
+        const trimmedQuery = searchQuery.trim();
+        
+        if (trimmedQuery && trimmedQuery.length >= 2) {
+          setIsSearchingArticles(true);
+          try {
+            const searchResults = await searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
             setDisplayArticles(searchResults);
-          }
-        } catch (err) {
-          console.error("Search error:", err);
-          if (!isCancelled) {
+          } catch (err) {
+            console.error("Search error:", err);
             setDisplayArticles([]);
-          }
-        } finally {
-          if (!isCancelled) {
+          } finally {
             setIsSearchingArticles(false);
           }
-        }
-      } else {
-        setIsSearchingArticles(false);
-        if (activeCategory === "all") {
-          if (!isCancelled && legalArticles.length > 0) {
-            setDisplayArticles(legalArticles);
-            categoryCache.current["all"] = legalArticles;
-          }
         } else {
-          // Only fetch if not in cache and still the latest category
-          if (!categoryCache.current[activeCategory]) {
+          setIsSearchingArticles(false);
+          if (activeCategory === "all") {
+            setDisplayArticles(legalArticles);
+          } else {
             try {
               const byCat = await getArticlesByCategory(activeCategory);
-              // Only update if this is still the latest category requested
-              if (!isCancelled && byCat.length > 0 && latestCategoryRef.current === activeCategory) {
-                setDisplayArticles(byCat);
-                categoryCache.current[activeCategory] = byCat;
-              }
+              setDisplayArticles(byCat);
             } catch (err) {
               console.error("Category fetch error:", err);
-              if (!isCancelled && legalArticles.length > 0 && latestCategoryRef.current === activeCategory) {
-                setDisplayArticles(legalArticles);
-              }
+              setDisplayArticles(legalArticles);
             }
           }
         }
-      }
-    }, debounceTime);
+      }, 500);
 
-    return () => {
-      isCancelled = true;
-      clearTimeout(searchTimeout);
-    };
-  }, [searchQuery, activeCategory, activeTab]);
+      return () => clearTimeout(searchTimeout);
+    }
+  }, [searchQuery, activeCategory, activeTab, legalArticles, searchArticles, getArticlesByCategory]);
 
-  // Stable reference to prevent blinking
-  const previousDataRef = useRef<(TermItem | ArticleItem)[]>([]);
-  
   // Handle data differently for terms (server-side pagination) vs articles (client-side pagination)
   const currentData = useMemo(() => {
-    let newData: (TermItem | ArticleItem)[];
-    
     if (activeTab === "terms") {
-      // For terms, return the data as-is since pagination is handled server-side
-      newData = terms;
+      // For terms, apply favorites filter if enabled
+      if (showFavoritesOnly && !isGuestMode) {
+        return terms.filter(term => isFavorite(term.id));
+      }
+      return terms;
     } else {
-      // For articles, apply client-side filtering
-      newData = displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
+      // For articles, apply bookmarks filter if enabled
+      let articles = displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: isBookmarked(a.id) }));
+      if (showBookmarksOnly && !isGuestMode) {
+        articles = articles.filter(a => a.isBookmarked);
+      }
+      return articles;
     }
-    
-    // Only update if we have data, otherwise keep previous to prevent blank screen
-    if (newData.length > 0) {
-      previousDataRef.current = newData;
-      return newData;
-    }
-    
-    return previousDataRef.current;
-  }, [activeTab, terms, displayArticles, bookmarks]);
+  }, [activeTab, terms, displayArticles, isBookmarked, isFavorite, showFavoritesOnly, showBookmarksOnly, isGuestMode]);
 
   // Calculate pagination info based on tab
   const totalPages = activeTab === "terms" ? termsTotalPages : Math.ceil(currentData.length / ITEMS_PER_PAGE);
@@ -335,41 +281,55 @@ export default function GlossaryScreen() {
   const paginatedData = useMemo(() => {
     if (activeTab === "terms") {
       // For terms, return all data since server already paginated
-      return currentData.length > 0 ? currentData : previousDataRef.current;
+      return currentData;
     } else {
       // For articles, apply client-side pagination
       const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-      const data = currentData.length > 0 ? currentData : previousDataRef.current;
-      return data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+      return currentData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }
   }, [activeTab, currentData, currentPage]);
 
   // Handlers
-  const handleTabChange = useCallback((id: string) => {
-    if (id === activeTab) return;
-    
-    // Smooth transition animation ONLY for tab switches
-    fadeOut(fadeAnim, 150).start(() => {
-      setActiveTab(id);
-      setCurrentPage(1);
-      setSearchQuery("");
-      setActiveCategory("all");
-      
-      fadeIn(fadeAnim, 150).start();
-    });
-  }, [activeTab, fadeAnim]);
+  const handleTabChange = (tabId: string) => {
+    // ⚡ FAANG OPTIMIZATION: State-based tabs - no navigation, no page reload
+    setActiveTab(tabId);
+    setCurrentPage(1);
+    setActiveCategory("all");
+    setSearchQuery("");
+    setShowFavoritesOnly(false);
+    setShowBookmarksOnly(false);
+  };
+
+  const handleMenuPress = useCallback(() => {
+    if (isGuestMode) {
+      setIsGuestSidebarOpen(true);
+    } else {
+      openSidebar();
+    }
+  }, [isGuestMode, openSidebar]);
 
   const handleCategoryChange = useCallback((categoryId: string) => {
-    if (categoryId === activeCategory) return;
+    setActiveCategory(categoryId);
+    setCurrentPage(1);
     
-    // Batch state updates for smoother transition
-    startTransition(() => {
-      setActiveCategory(categoryId);
-    });
+    if (activeTab === "guides" && categoryId !== "all") {
+      (async () => {
+        try {
+          const byCat = await getArticlesByCategory(categoryId);
+          setDisplayArticles(byCat);
+        } catch (err) {
+          console.error("Category fetch error:", err);
+          setDisplayArticles(legalArticles);
+        }
+      })();
+    } else if (activeTab === "guides") {
+      setDisplayArticles(legalArticles);
+    }
     
-    // Immediate scroll to top
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-  }, [activeCategory]);
+    setTimeout(() => {
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, 50);
+  }, [activeTab, getArticlesByCategory, legalArticles]);
 
   const handleItemPress = useCallback((item: TermItem | ArticleItem) => {
     if (activeTab === "terms") {
@@ -379,13 +339,11 @@ export default function GlossaryScreen() {
     }
   }, [activeTab, router]);
 
-  const handleToggleBookmark = useCallback((item: ArticleItem) => {
-    setBookmarks(prev => ({ ...prev, [item.id]: !prev[item.id] }));
-  }, []);
+  const handleToggleBookmark = useCallback(async (item: ArticleItem) => {
+    await toggleBookmark(item.id, item.title);
+  }, [toggleBookmark]);
 
   const handlePageChange = useCallback((page: number) => {
-    if (page === currentPage) return;
-    
     setCurrentPage(page);
     
     // For terms, fetch new data from server
@@ -393,16 +351,68 @@ export default function GlossaryScreen() {
       fetchLegalTerms(page, activeCategory, searchQuery);
     }
     
-    // Smooth scroll to top
-    requestAnimationFrame(() => {
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-    });
-  }, [activeTab, activeCategory, searchQuery, currentPage, fetchLegalTerms]);
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, [activeTab, activeCategory, searchQuery, fetchLegalTerms]);
 
   // Render functions
   const renderListHeader = useCallback(() => (
-    <View className="mb-6">
-      <HStack className="items-center mb-4">
+    <View style={{ marginBottom: isDesktop ? 28 : isTablet ? 24 : 20 }}>
+      {/* Filter Chip */}
+      {!isGuestMode && (
+        <View style={{ marginBottom: 16 }}>
+          <TouchableOpacity
+            onPress={() => {
+              if (activeTab === "terms") {
+                setShowFavoritesOnly(!showFavoritesOnly);
+                setCurrentPage(1);
+              } else {
+                setShowBookmarksOnly(!showBookmarksOnly);
+                setCurrentPage(1);
+              }
+            }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              alignSelf: 'flex-start',
+              paddingVertical: 8,
+              paddingHorizontal: 14,
+              backgroundColor: (activeTab === "terms" ? showFavoritesOnly : showBookmarksOnly) ? Colors.primary.blue : 'white',
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: (activeTab === "terms" ? showFavoritesOnly : showBookmarksOnly) ? Colors.primary.blue : '#D1D5DB',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.05,
+              shadowRadius: 2,
+              elevation: 1,
+            }}
+          >
+            <Ionicons
+              name={(activeTab === "terms" ? showFavoritesOnly : showBookmarksOnly) ? "star" : "star-outline"}
+              size={16}
+              color={(activeTab === "terms" ? showFavoritesOnly : showBookmarksOnly) ? 'white' : Colors.text.sub}
+            />
+            <GSText
+              size="sm"
+              style={{
+                marginLeft: 6,
+                fontSize: 13,
+                fontWeight: '500',
+                color: (activeTab === "terms" ? showFavoritesOnly : showBookmarksOnly) ? 'white' : Colors.text.head,
+              }}
+            >
+              {activeTab === "terms" ? "Favorites" : "Bookmarks"}
+            </GSText>
+            {(activeTab === "terms" ? showFavoritesOnly : showBookmarksOnly) && (
+              <View style={{ marginLeft: 6 }}>
+                <Ionicons name="close-circle" size={16} color="white" />
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <HStack className="items-center" style={{ marginBottom: isDesktop ? 16 : 12 }}>
         <Ionicons name="pricetags" size={16} color={Colors.text.sub} />
         <GSText size="sm" className="ml-2 font-semibold text-gray-600">
           Choose Category
@@ -413,7 +423,7 @@ export default function GlossaryScreen() {
         onCategoryChange={handleCategoryChange}
       />
     </View>
-  ), [activeCategory, handleCategoryChange]);
+  ), [activeCategory, handleCategoryChange, isDesktop, isTablet, activeTab, showFavoritesOnly, showBookmarksOnly, isGuestMode]);
 
   const renderPaginationControls = useCallback(() => {
     // Show pagination if there are multiple pages
@@ -438,46 +448,77 @@ export default function GlossaryScreen() {
     const visiblePages = getVisiblePages();
 
     return (
-      <View className="py-6 bg-gray-50">
+      <View style={{ 
+        paddingTop: isDesktop ? 32 : isTablet ? 24 : 20,
+        paddingBottom: isDesktop ? 24 : isTablet ? 20 : 16,
+        paddingHorizontal: horizontalPadding,
+        backgroundColor: '#f9fafb',
+        marginTop: 8,
+      }}>
         <View className="flex-col items-center">
-          <View className="flex-row justify-center items-center mb-4">
+          <View className="flex-row flex-wrap items-center justify-center" style={{ marginBottom: isDesktop ? 16 : 12 }}>
             <TouchableOpacity
               onPress={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className={`w-10 h-10 mx-1 rounded-full justify-center items-center ${
-                currentPage === 1
-                  ? "bg-gray-200 opacity-50"
-                  : "bg-white border border-gray-300"
-              }`}
+              style={{
+                width: isDesktop ? 44 : 40,
+                height: isDesktop ? 44 : 40,
+                marginHorizontal: isDesktop ? 6 : 4,
+                marginVertical: 4,
+                borderRadius: 9999,
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: currentPage === 1 ? '#E5E7EB' : 'white',
+                borderWidth: currentPage === 1 ? 0 : 1,
+                borderColor: '#D1D5DB',
+                opacity: currentPage === 1 ? 0.5 : 1,
+              }}
             >
               <Ionicons
                 name="chevron-back"
-                size={18}
+                size={isDesktop ? 20 : 18}
                 color={currentPage === 1 ? "#9CA3AF" : Colors.primary.blue}
               />
             </TouchableOpacity>
 
             {visiblePages.map((page, index) =>
               page === "..." ? (
-                <View key={`ellipsis-${index}`} className="w-10 h-10 mx-1 justify-center items-center">
-                  <GSText className="text-gray-500">...</GSText>
+                <View 
+                  key={`ellipsis-${index}`} 
+                  style={{
+                    width: isDesktop ? 44 : 40,
+                    height: isDesktop ? 44 : 40,
+                    marginHorizontal: isDesktop ? 6 : 4,
+                    marginVertical: 4,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <GSText className="text-gray-500" style={{ fontSize: isDesktop ? 16 : 14 }}>...</GSText>
                 </View>
               ) : (
                 <TouchableOpacity
                   key={page}
                   onPress={() => handlePageChange(page as number)}
-                  className={`w-10 h-10 mx-1 rounded-lg justify-center items-center border ${
-                    currentPage === page
-                      ? "bg-blue-100 border-blue-300"
-                      : "bg-white border-gray-300"
-                  }`}
+                  style={{
+                    width: isDesktop ? 44 : 40,
+                    height: isDesktop ? 44 : 40,
+                    marginHorizontal: isDesktop ? 6 : 4,
+                    marginVertical: 4,
+                    borderRadius: 8,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: currentPage === page ? '#DBEAFE' : 'white',
+                    borderWidth: 1,
+                    borderColor: currentPage === page ? '#93C5FD' : '#D1D5DB',
+                  }}
                 >
                   <GSText
-                    className={
-                      currentPage === page
-                        ? "text-blue-700 font-bold"
-                        : "text-gray-700"
-                    }
+                    style={{
+                      fontSize: isDesktop ? 15 : 14,
+                      fontWeight: currentPage === page ? '700' : '500',
+                      color: currentPage === page ? '#1E40AF' : '#374151',
+                    }}
                   >
                     {page}
                   </GSText>
@@ -488,27 +529,40 @@ export default function GlossaryScreen() {
             <TouchableOpacity
               onPress={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className={`w-10 h-10 mx-1 rounded-full justify-center items-center ${
-                currentPage === totalPages
-                  ? "bg-gray-200 opacity-50"
-                  : "bg-white border border-gray-300"
-              }`}
+              style={{
+                width: isDesktop ? 44 : 40,
+                height: isDesktop ? 44 : 40,
+                marginHorizontal: isDesktop ? 6 : 4,
+                marginVertical: 4,
+                borderRadius: 9999,
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: currentPage === totalPages ? '#E5E7EB' : 'white',
+                borderWidth: currentPage === totalPages ? 0 : 1,
+                borderColor: '#D1D5DB',
+                opacity: currentPage === totalPages ? 0.5 : 1,
+              }}
             >
               <Ionicons
                 name="chevron-forward"
-                size={18}
+                size={isDesktop ? 20 : 18}
                 color={currentPage === totalPages ? "#9CA3AF" : Colors.primary.blue}
               />
             </TouchableOpacity>
           </View>
 
-          <GSText className="text-sm text-gray-600">
+          <GSText 
+            style={{ 
+              fontSize: isDesktop ? 14 : 13,
+              color: '#6B7280',
+            }}
+          >
             Showing {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount} results
           </GSText>
         </View>
       </View>
     );
-  }, [totalCount, totalPages, currentPage, handlePageChange]);
+  }, [totalCount, totalPages, currentPage, handlePageChange, isDesktop, isTablet, horizontalPadding]);
 
   const renderEmptyState = useCallback(() => {
     const isLoading = activeTab === "terms" ? termsLoading : (articlesLoading || isSearchingArticles);
@@ -516,24 +570,19 @@ export default function GlossaryScreen() {
 
     if (isLoading) {
       return (
-        <View className="flex-1 justify-center items-center py-20">
-          <ActivityIndicator size="large" color={Colors.primary.blue} />
-          <GSText className="mt-4 text-center text-gray-600">
-            {isOffline ? "Loading cached data..." : `Loading ${activeTab}...`}
-          </GSText>
-        </View>
+        <ArticleCardSkeletonList count={3} containerStyle={{ width: "100%", marginHorizontal: 0 }} />
       );
     }
 
     if (error) {
       return (
-        <View className="flex-1 justify-center items-center py-20 px-6">
+        <View className="items-center justify-center flex-1 px-6 py-20">
           <Ionicons
             name={isOffline ? "cloud-offline" : "warning"}
             size={48}
             color={Colors.text.sub}
           />
-          <GSText className="mt-4 text-center font-bold text-gray-800">
+          <GSText className="mt-4 font-bold text-center text-gray-800">
             {isOffline ? "Offline Mode" : "Connection Error"}
           </GSText>
           <GSText className="mt-2 text-center text-gray-600">
@@ -544,9 +593,9 @@ export default function GlossaryScreen() {
           {!isOffline && (
             <TouchableOpacity
               onPress={() => activeTab === "terms" ? fetchLegalTerms(currentPage) : refetch()}
-              className="mt-4 px-6 py-3 bg-blue-500 rounded-lg"
+              className="px-6 py-3 mt-4 bg-blue-500 rounded-lg"
             >
-              <GSText className="text-white font-semibold">Retry</GSText>
+              <GSText className="font-semibold text-white">Retry</GSText>
             </TouchableOpacity>
           )}
         </View>
@@ -555,9 +604,9 @@ export default function GlossaryScreen() {
 
     if (currentData.length === 0 && searchQuery.trim()) {
       return (
-        <View className="flex-1 justify-center items-center py-20">
+        <View className="items-center justify-center flex-1 py-20">
           <Ionicons name="search" size={48} color={Colors.text.sub} />
-          <GSText className="mt-4 text-center font-bold text-gray-800">
+          <GSText className="mt-4 font-bold text-center text-gray-800">
             No results found
           </GSText>
           <GSText className="mt-2 text-center text-gray-600">
@@ -570,9 +619,9 @@ export default function GlossaryScreen() {
     }
 
     return (
-      <View className="flex-1 justify-center items-center py-20">
+      <View className="items-center justify-center flex-1 py-20">
         <Ionicons name={activeTab === "terms" ? "book" : "document-text"} size={48} color={Colors.text.sub} />
-        <GSText className="mt-4 text-center font-bold text-gray-800">
+        <GSText className="mt-4 font-bold text-center text-gray-800">
           No {activeTab} available
         </GSText>
         <GSText className="mt-2 text-center text-gray-600">
@@ -585,6 +634,8 @@ export default function GlossaryScreen() {
   }, [activeTab, termsLoading, articlesLoading, isSearchingArticles, termsError, articlesError, isOffline, currentData.length, searchQuery, currentPage, fetchLegalTerms, refetch]);
 
   const renderItem = useCallback(({ item }: { item: any }) => {
+    const itemMarginBottom = isDesktop ? 16 : isTablet ? 14 : 12;
+    
     if (activeTab === "terms") {
       return (
         <TermListItem
@@ -593,7 +644,7 @@ export default function GlossaryScreen() {
           showFavorite={!isGuestMode}
           containerStyle={{
             width: numColumns > 1 ? (screenWidth - horizontalPadding * 2 - 12) / numColumns : "100%",
-            marginBottom: 12,
+            marginBottom: itemMarginBottom,
           }}
         />
       );
@@ -603,70 +654,135 @@ export default function GlossaryScreen() {
           item={item}
           onPress={handleItemPress}
           onToggleBookmark={handleToggleBookmark}
+          showBookmark={!isGuestMode}
           containerStyle={{
             width: numColumns > 1 ? (screenWidth - horizontalPadding * 2 - 12) / numColumns : "100%",
             marginHorizontal: 0,
-            marginBottom: 12,
+            marginBottom: itemMarginBottom,
           }}
         />
       );
     }
-  }, [activeTab, handleItemPress, handleToggleBookmark, numColumns, screenWidth, horizontalPadding, isGuestMode]);
+  }, [activeTab, handleItemPress, handleToggleBookmark, numColumns, screenWidth, horizontalPadding, isGuestMode, isDesktop, isTablet]);
+
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header 
-        title="Know Your Batas" 
+        title="Legal Glossary" 
+        showBackButton={false}
         showMenu={true}
-        onMenuPress={isGuestMode ? () => setIsGuestSidebarOpen(true) : undefined}
+        onMenuPress={handleMenuPress}
       />
 
-      <ToggleGroup
-        options={tabOptions}
-        activeOption={activeTab}
-        onOptionChange={handleTabChange}
+      {!isGuestMode && (
+        <ToggleGroup
+          options={tabOptions}
+          activeOption={activeTab}
+          onOptionChange={handleTabChange}
+        />
+      )}
+
+      <View style={{ paddingHorizontal: 20 }}>
+        <UnifiedSearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
+          loading={termsLoading || articlesLoading}
+          showFilterIcon={false}
+          containerClassName="pt-6 pb-4"
+        />
+      </View>
+
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <FlatList
+          ref={flatListRef}
+          data={paginatedData}
+          key={`glossary-${numColumns}-${activeCategory}-${currentPage}-${activeTab}-${screenWidth}`}
+          keyExtractor={(item) => item.id}
+          numColumns={numColumns}
+          extraData={screenWidth}
+          ListHeaderComponent={renderListHeader}
+          ListFooterComponent={renderPaginationControls}
+          ListEmptyComponent={renderEmptyState}
+          contentContainerStyle={{
+            paddingHorizontal: horizontalPadding,
+            paddingBottom: isDesktop ? 120 : isTablet ? 110 : 100,
+            paddingTop: isDesktop ? 8 : isTablet ? 6 : 4,
+            flexGrow: 1,
+          }}
+          columnWrapperStyle={
+            numColumns > 1
+              ? { justifyContent: "space-between", marginBottom: 0 }
+              : undefined
+          }
+          renderItem={renderItem}
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          initialNumToRender={8}
+          windowSize={10}
+          refreshing={termsLoading || articlesLoading}
+          onRefresh={() => activeTab === "terms" ? fetchLegalTerms(currentPage) : refetch()}
+        />
+      </Animated.View>
+
+      {/* Guest Sidebar */}
+      {isGuestMode && (
+        <GuestSidebar 
+          isOpen={isGuestSidebarOpen} 
+          onClose={() => setIsGuestSidebarOpen(false)} 
+        />
+      )}
+
+      {/* Conditional navbar rendering based on guest mode */}
+      {isGuestMode ? (
+        <GuestNavbar activeTab="learn" />
+      ) : (
+        <Navbar activeTab="learn" />
+      )}
+      
+      {/* Sidebar - Guest or Authenticated */}
+      {isGuestMode ? (
+        <GuestSidebar 
+          isOpen={isGuestSidebarOpen} 
+          onClose={() => setIsGuestSidebarOpen(false)} 
+        />
+      ) : (
+        <SidebarWrapper />
+      )}
+    </SafeAreaView>
+  );
+}
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <Header 
+        title="Legal Glossary" 
+        showBackButton={false}
+        showMenu={true}
+        onMenuPress={handleMenuPress}
       />
 
-      <Box className={`px-${horizontalPadding / 4} pt-6 pb-4`}>
-        <Input
-          variant="outline"
-          size="lg"
-          className="bg-white rounded-lg border border-gray-300"
-        >
-          <InputSlot className="pl-4">
-            {(termsLoading && activeTab === "terms") || (isSearchingArticles && activeTab === "guides") ? (
-              <ActivityIndicator size="small" color={Colors.primary.blue} />
-            ) : (
-              <Ionicons name="search" size={20} color="#9CA3AF" />
-            )}
-          </InputSlot>
-          <InputField
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
-            placeholderTextColor="#9CA3AF"
-            className="text-gray-800 text-base"
-            editable={!termsLoading && !articlesLoading}
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {searchQuery.length > 0 && (
-            <InputSlot className="pr-2">
-              <TouchableOpacity
-                onPress={() => setSearchQuery("")}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
-              </TouchableOpacity>
-            </InputSlot>
-          )}
-          <InputSlot className="pr-4">
-            <Ionicons name="options" size={20} color={Colors.text.sub} />
-          </InputSlot>
-        </Input>
-      </Box>
+      {!isGuestMode && (
+        <ToggleGroup
+          options={tabOptions}
+          activeOption={activeTab}
+          onOptionChange={handleTabChange}
+        />
+      )}
+
+      <View style={{ paddingHorizontal: 20 }}>
+        <UnifiedSearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
+          loading={termsLoading || articlesLoading}
+          showFilterIcon={false}
+          containerClassName="pt-6 pb-4"
+        />
+      </View>
 
       <View style={{ flex: 1 }}>
         <FlatList
@@ -681,7 +797,8 @@ export default function GlossaryScreen() {
           ListEmptyComponent={renderEmptyState}
           contentContainerStyle={{
             paddingHorizontal: horizontalPadding,
-            paddingBottom: 100,
+            paddingBottom: isDesktop ? 120 : isTablet ? 110 : 100,
+            paddingTop: isDesktop ? 8 : isTablet ? 6 : 4,
             flexGrow: 1,
           }}
           columnWrapperStyle={
@@ -727,7 +844,16 @@ export default function GlossaryScreen() {
       ) : (
         <Navbar activeTab="learn" />
       )}
-      {!isGuestMode && <SidebarWrapper />}
+      
+      {/* Sidebar - Guest or Authenticated */}
+      {isGuestMode ? (
+        <GuestSidebar 
+          isOpen={isGuestSidebarOpen} 
+          onClose={() => setIsGuestSidebarOpen(false)} 
+        />
+      ) : (
+        <SidebarWrapper />
+      )}
     </SafeAreaView>
   );
 }

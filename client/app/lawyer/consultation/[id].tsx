@@ -8,6 +8,7 @@ import { HStack } from '../../../components/ui/hstack';
 import { useAuth } from '../../../contexts/AuthContext';
 import Colors from '../../../constants/Colors';
 import tw from 'tailwind-react-native-classnames';
+import { formatConsultationTime } from '../../../utils/consultationUtils';
 import { NetworkConfig } from '../../../utils/networkConfig';
 import Header from '../../../components/Header';
 import { LawyerNavbar } from '../../../components/lawyer/shared';
@@ -309,7 +310,7 @@ const ConsultationDetailPage: React.FC = () => {
                     <Text style={tw`font-medium text-gray-600 ml-2`}>Preferred Time</Text>
                   </View>
                   <Text style={tw`text-gray-700 font-medium`}>
-                    {consultation.consultation_time}
+                    {formatConsultationTime(consultation.consultation_time)}
                   </Text>
                 </View>
               )}

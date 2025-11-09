@@ -7,86 +7,38 @@ import { Text as UIText } from "@/components/ui/text";
 import { Pressable as UIPressable } from "@/components/ui/pressable";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
+import { ConsultationWithLawyer } from "@/types/consultation.types";
+import { getStatusColor, getModeColor, getModeIcon, formatConsultationDate, formatConsultationTime } from "@/utils/consultationUtils";
 
 const { width: screenWidth } = Dimensions.get("window");
 
-interface Consultation {
-  id: string;
-  lawyer_name: string;
-  specialization: string;
-  consultation_date: string;
-  consultation_time: string;
-  status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
-  created_at: string;
-  message?: string;
-  email?: string;
-  mobile_number?: string;
-  responded_at?: string;
-}
-
-const STATUS_CONFIG = {
-  pending: {
-    color: "#F59E0B",
-    bgColor: "#FEF3C7",
-    icon: "time-outline" as const,
-    label: "Pending",
-  },
-  accepted: {
-    color: "#10B981",
-    bgColor: "#D1FAE5",
-    icon: "checkmark-circle-outline" as const,
-    label: "Accepted",
-  },
-  rejected: {
-    color: "#EF4444",
-    bgColor: "#FEE2E2",
-    icon: "close-circle-outline" as const,
-    label: "Rejected",
-  },
-  completed: {
-    color: "#6B7280",
-    bgColor: "#F3F4F6",
-    icon: "checkmark-done-outline" as const,
-    label: "Completed",
-  },
-  cancelled: {
-    color: "#EF4444",
-    bgColor: "#FEE2E2",
-    icon: "close-circle-outline" as const,
-    label: "Cancelled",
-  },
-};
 
 interface ConsultationCardProps {
-  consultation: Consultation;
+  consultation: ConsultationWithLawyer;
   index: number;
-  onViewDetails: (consultation: Consultation) => void;
+  onViewDetails: (consultation: ConsultationWithLawyer) => void;
 }
 
-const formatDate = (dateString: string) => {
-  if (!dateString) return "Not scheduled";
-
-  const date = new Date(dateString);
-  const options: Intl.DateTimeFormatOptions = {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  };
-  return date.toLocaleDateString("en-US", options);
-};
 
 export default function ConsultationCard({ consultation, index, onViewDetails }: ConsultationCardProps) {
-  const statusConfig = STATUS_CONFIG[consultation.status];
+  const statusConfig = getStatusColor(consultation.status);
+  const modeConfig = getModeColor(consultation.consultation_mode);
+  const ModeIcon = getModeIcon(consultation.consultation_mode);
+  const lawyerName = consultation.lawyer_info?.name || "Pending Assignment";
+  const specialization = consultation.lawyer_info?.specialization || "Awaiting Lawyer";
 
   return (
     <Box
       key={consultation.id}
-      className="mx-4 md:mx-6 bg-white rounded-lg border border-gray-200 p-4 md:p-6"
+      className="bg-white rounded-lg p-3 md:p-4"
       style={{
-        marginBottom: 16,
+        marginBottom: 12,
         marginTop: 0,
+        borderWidth: 1,
+        borderColor: "#E5E7EB",
       }}
     >
+      {/* Header: Lawyer Info + Status */}
       <HStack className="justify-between items-start mb-3">
         <VStack className="flex-1 mr-2">
           <UIText
@@ -96,33 +48,32 @@ export default function ConsultationCard({ consultation, index, onViewDetails }:
               color: Colors.text.head,
             }}
           >
-            {consultation.lawyer_name}
+            {lawyerName}
           </UIText>
           <UIText
-            className="mt-1"
+            className="mt-0.5"
             style={{
-              fontSize: screenWidth < 768 ? 12 : 14,
+              fontSize: screenWidth < 768 ? 12 : 13,
               color: Colors.text.sub,
             }}
           >
-            {consultation.specialization}
+            {specialization}
           </UIText>
         </VStack>
 
         <Box
-          className="px-2 md:px-3 py-1 rounded-full flex-row items-center"
-          style={{ backgroundColor: statusConfig.bgColor }}
+          className="px-2.5 py-1 rounded-full"
+          style={{ 
+            backgroundColor: statusConfig.bg, 
+            borderColor: statusConfig.border, 
+            borderWidth: 1 
+          }}
         >
-          <Ionicons
-            name={statusConfig.icon}
-            size={screenWidth < 768 ? 12 : 14}
-            color={statusConfig.color}
-          />
           <UIText
-            className="font-semibold ml-1"
+            className="font-semibold"
             style={{
-              fontSize: screenWidth < 768 ? 10 : 12,
-              color: statusConfig.color,
+              fontSize: 10,
+              color: statusConfig.text,
             }}
           >
             {statusConfig.label}
@@ -130,35 +81,46 @@ export default function ConsultationCard({ consultation, index, onViewDetails }:
         </Box>
       </HStack>
 
+      {/* Message Preview */}
       {consultation.message && (
-        <UIText
-          className="mb-3 italic"
+        <Box
+          className="mb-3 p-2 rounded"
           style={{
-            fontSize: screenWidth < 768 ? 12 : 14,
-            color: Colors.text.sub,
+            backgroundColor: "#F9FAFB",
+            borderLeftWidth: 3,
+            borderLeftColor: "#9CA3AF",
           }}
-          numberOfLines={2}
         >
-          &ldquo;{consultation.message}&rdquo;
-        </UIText>
+          <UIText
+            className="italic"
+            style={{
+              fontSize: 13,
+              color: Colors.text.sub,
+            }}
+            numberOfLines={2}
+          >
+            &ldquo;{consultation.message}&rdquo;
+          </UIText>
+        </Box>
       )}
 
-      <VStack className="mb-3" space="sm">
+      {/* Consultation Details */}
+      <VStack className="mb-3" space="xs">
         {consultation.consultation_date && (
           <HStack className="items-center">
             <Ionicons
               name="calendar-outline"
-              size={screenWidth < 768 ? 14 : 16}
+              size={14}
               color={Colors.text.sub}
             />
             <UIText
               className="ml-2"
               style={{
-                fontSize: screenWidth < 768 ? 12 : 14,
-                color: Colors.text.sub,
+                fontSize: 13,
+                color: Colors.text.head,
               }}
             >
-              {formatDate(consultation.consultation_date)}
+              {formatConsultationDate(consultation.consultation_date)}
             </UIText>
           </HStack>
         )}
@@ -167,35 +129,50 @@ export default function ConsultationCard({ consultation, index, onViewDetails }:
           <HStack className="items-center">
             <Ionicons
               name="time-outline"
-              size={screenWidth < 768 ? 14 : 16}
+              size={14}
               color={Colors.text.sub}
             />
             <UIText
               className="ml-2"
               style={{
-                fontSize: screenWidth < 768 ? 12 : 14,
-                color: Colors.text.sub,
+                fontSize: 13,
+                color: Colors.text.head,
               }}
             >
-              {consultation.consultation_time}
+              {formatConsultationTime(consultation.consultation_time)}
+            </UIText>
+          </HStack>
+        )}
+
+        {consultation.consultation_mode && (
+          <HStack className="items-center">
+            <ModeIcon size={14} color={Colors.text.sub} />
+            <UIText
+              className="ml-2"
+              style={{
+                fontSize: 13,
+                color: Colors.text.head,
+              }}
+            >
+              {modeConfig.label}
             </UIText>
           </HStack>
         )}
       </VStack>
 
+      {/* View Details Button */}
       <UIPressable
-        className="py-2 md:py-3 rounded-lg items-center justify-center border"
+        className="py-2 rounded items-center justify-center"
         style={{
-          borderColor: Colors.primary.blue,
-          backgroundColor: "white",
+          backgroundColor: Colors.primary.blue,
         }}
         onPress={() => onViewDetails(consultation)}
       >
         <UIText
           className="font-semibold"
           style={{
-            fontSize: screenWidth < 768 ? 13 : 14,
-            color: Colors.primary.blue,
+            fontSize: 13,
+            color: "white",
           }}
         >
           View Details
@@ -204,5 +181,3 @@ export default function ConsultationCard({ consultation, index, onViewDetails }:
     </Box>
   );
 }
-
-export type { Consultation };

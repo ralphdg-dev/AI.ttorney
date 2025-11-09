@@ -4,9 +4,9 @@ import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } fro
 import ReportModal from '../common/ReportModal';
 import { ReportService } from '../../services/reportService';
 import Colors from '@/constants/Colors';
-import { createShadowStyle } from '@/utils/shadowUtils';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePostBookmarks } from '../../contexts/PostBookmarksContext';
 import FadeInView from '../ui/FadeInView';
 
 interface PostProps {
@@ -57,6 +57,7 @@ const Post: React.FC<PostProps> = React.memo(({
   onBookmarkStatusChange,
 }) => {
   const { user: currentUser, session } = useAuth();
+  const { loadBookmarks: refreshBookmarkContext } = usePostBookmarks();
   const [isBookmarked, setIsBookmarked] = useState(propIsBookmarked || false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
   const [displayTime, setDisplayTime] = useState(timestamp);
@@ -153,6 +154,8 @@ const Post: React.FC<PostProps> = React.memo(({
           setIsBookmarked(result.isBookmarked);
           onBookmarkStatusChange?.(id, result.isBookmarked);
         }
+        // Refresh context to update sidebar badge count
+        setTimeout(() => refreshBookmarkContext(), 100);
       } else {
         // Revert optimistic update on failure
         setIsBookmarked(previousBookmarkState);
@@ -163,7 +166,7 @@ const Post: React.FC<PostProps> = React.memo(({
       setIsBookmarked(previousBookmarkState);
       onBookmarkStatusChange?.(id, previousBookmarkState);
     }
-  }, [currentUser?.id, id, onBookmarkPress, onBookmarkStatusChange, session, isBookmarked]);
+  }, [currentUser?.id, id, onBookmarkPress, onBookmarkStatusChange, session, isBookmarked, refreshBookmarkContext]);
 
   const handleMorePress = useCallback(() => {
     onMenuToggle?.(id);
@@ -372,24 +375,23 @@ const Post: React.FC<PostProps> = React.memo(({
 });
 const styles = StyleSheet.create({
   fadeContainer: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   container: {
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginHorizontal: 16,
-    marginVertical: 8,
+    marginHorizontal: 20,
+    marginVertical: 0,
+    marginBottom: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E1E8ED',
-    ...createShadowStyle({
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 2,
-      elevation: 1,
-    }),
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   loadingPost: {
     opacity: 0.7,
@@ -470,14 +472,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E1E8ED',
-    ...createShadowStyle({
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    }),
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     zIndex: 1000,
     minWidth: 160,
   },

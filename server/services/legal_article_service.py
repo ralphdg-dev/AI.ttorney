@@ -1,9 +1,11 @@
 from typing import List, Optional
 from services.supabase_service import SupabaseService
+from services.notification_service import NotificationService
 from models.legal_article import LegalArticle, SearchParams
 import logging
 import httpx
 import time
+from supabase import create_client
 
 logger = logging.getLogger(__name__)
 
@@ -228,3 +230,41 @@ class LegalArticleService:
         """Clear all cached data"""
         self._article_cache.clear()
         logger.info("🗑️ Article cache cleared")
+
+    async def notify_article_published(self, article_id: str, title: str):
+        """Notify all users of new article"""
+        try:
+            supabase = create_client(self.supabase_service.url, self.supabase_service.service_key)
+            notification_service = NotificationService(supabase)
+
+            users_result = supabase.table("users").select("id").eq("role", "registered_user").execute()
+            if users_result.data:
+                user_ids = [user["id"] for user in users_result.data[:100]]
+                await notification_service.notify_content_published(
+                    user_ids=user_ids,
+                    content_type="article",
+                    title=title,
+                    content_id=article_id
+                )
+                logger.info(f"✅ Sent article published notifications to {len(user_ids)} users")
+        except Exception as e:
+            logger.error(f"Failed to send article published notifications: {e}")
+
+    async def notify_article_updated(self, article_id: str, title: str):
+        """Notify users who bookmarked the article"""
+        try:
+            supabase = create_client(self.supabase_service.url, self.supabase_service.service_key)
+            notification_service = NotificationService(supabase)
+
+            bookmarks_result = supabase.table("user_guide_bookmarks").select("user_id").eq("guide_id", article_id).execute()
+            if bookmarks_result.data:
+                user_ids = list(set([bookmark["user_id"] for bookmark in bookmarks_result.data]))
+                await notification_service.notify_content_updated(
+                    user_ids=user_ids,
+                    content_type="article",
+                    title=title,
+                    content_id=article_id
+                )
+                logger.info(f"✅ Sent article updated notifications to {len(user_ids)} users")
+        except Exception as e:
+            logger.error(f"Failed to send article updated notifications: {e}")

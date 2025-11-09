@@ -18,6 +18,8 @@ export interface User {
   role: UserRole;
   is_verified: boolean;
   pending_lawyer?: boolean;
+  birthdate?: string;
+  profile_photo?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -40,6 +42,7 @@ export interface AuthContextType {
   continueAsGuest: () => void;
   setUser: (user: User | null) => void;
   refreshUserData: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
   hasRole: (role: UserRole) => boolean;
   isLawyer: () => boolean;
   isAdmin: () => boolean;
@@ -139,11 +142,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('🔐 handleAuthStateChange called:', { shouldNavigate, userId: session.user.id });
       
-      // ⚡ OPTIMIZATION: Run ALL API calls in PARALLEL instead of sequentially
+      // ⚡ FAANG OPTIMIZATION: Run ALL API calls in PARALLEL + Cache profile data
       // This reduces login time from ~3-5 seconds to ~1 second
       const [profileResult, suspensionResult, lawyerStatusResult] = await Promise.allSettled([
-        // 1. Fetch user profile
-        supabase.from('users').select('*').eq('id', session.user.id).single(),
+        // 1. Fetch FULL user profile (including birthdate, profile_photo)
+        supabase.from('users').select('id,email,username,full_name,role,is_verified,pending_lawyer,birthdate,profile_photo,created_at,updated_at').eq('id', session.user.id).single(),
         // 2. Check suspension status (only if we have a token)
         session?.access_token ? checkSuspensionStatus() : Promise.resolve(null),
         // 3. Pre-fetch lawyer status (we'll use it if needed)
@@ -171,6 +174,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       console.log('✅ Profile loaded:', { username: profile.username, role: profile.role });
+
+      // ⚡ FAANG OPTIMIZATION: Cache profile data in AsyncStorage for instant loads
+      try {
+        await AsyncStorage.setItem(
+          `profile_cache_${session.user.id}`,
+          JSON.stringify({
+            profile,
+            cachedAt: Date.now(),
+          })
+        );
+      } catch (error) {
+        console.warn('Failed to cache profile:', error);
+      }
 
       // Update auth state immediately
       setAuthState({
@@ -353,6 +369,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       setHasRedirectedToStatus(false);
       
+      // CRITICAL: Clear any existing guest session before login
+      // This prevents guest mode from persisting after successful authentication
+      const guestSessionData = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
+      if (guestSessionData) {
+        console.log('🗑️ Clearing guest session before login');
+        await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+        setIsGuestMode(false);
+      }
+      
       // Supabase best practice: Use signInWithPassword for email/password auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
@@ -405,6 +430,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('📝 signUp called for:', email);
       setIsLoading(true);
+      
+      // CRITICAL: Clear any existing guest session before signup
+      // This prevents guest mode from persisting after successful registration
+      const guestSessionData = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
+      if (guestSessionData) {
+        console.log('🗑️ Clearing guest session before signup');
+        await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+        setIsGuestMode(false);
+      }
       
       // Supabase best practice: Use signUp with email confirmation
       const { data, error } = await supabase.auth.signUp({
@@ -519,6 +553,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // ⚡ FAANG OPTIMIZATION: Lightweight profile refresh for profile page
+  const refreshProfile = React.useCallback(async () => {
+    try {
+      if (!authState.session?.user?.id) return;
+
+      const { data: profile, error } = await supabase
+        .from('users')
+        .select('id,email,username,full_name,role,is_verified,pending_lawyer,birthdate,profile_photo,created_at,updated_at')
+        .eq('id', authState.session.user.id)
+        .single();
+
+      if (!error && profile) {
+        // Update cache
+        await AsyncStorage.setItem(
+          `profile_cache_${authState.session.user.id}`,
+          JSON.stringify({
+            profile,
+            cachedAt: Date.now(),
+          })
+        );
+
+        // Update state
+        setAuthState(prev => ({
+          ...prev,
+          user: profile,
+        }));
+      }
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
+    }
+  }, [authState.session?.user?.id]);
+
   const hasRole = (role: UserRole): boolean => {
     return authState.user?.role === role;
   };
@@ -550,6 +616,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     continueAsGuest,
     setUser: setUserData,
     refreshUserData,
+    refreshProfile,
     hasRole,
     isLawyer,
     isAdmin,

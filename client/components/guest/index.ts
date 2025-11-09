@@ -7,3 +7,4 @@
 export { GuestSidebar } from './GuestSidebar';
 export { default as GuestNavbar } from './GuestNavbar';
 export { GuestDisclaimer } from './GuestDisclaimer';
+export { GuestRateLimitBanner } from './GuestRateLimitBanner';

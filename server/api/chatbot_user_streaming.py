@@ -245,12 +245,16 @@ async def ask_legal_question(
             if is_simple_greeting(request.question):
                 print(f"✅ Detected as greeting: {request.question}")
                 greeting_response = generate_ai_response(request.question, language, 'greeting')
-                yield format_sse({'content': greeting_response, 'done': True})
                 
                 # Save greeting interaction to chat history
+                # Note: For guests, this will still work - save_chat_interaction handles guest sessions
+                session_id = None
+                user_msg_id = None
+                assistant_msg_id = None
+                
                 if effective_user_id:
                     try:
-                        await save_chat_interaction(
+                        session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
                             chat_service=chat_service,
                             effective_user_id=effective_user_id,
                             session_id=request.session_id,
@@ -262,6 +266,19 @@ async def ask_legal_question(
                     except Exception as e:
                         logger.error(f"Failed to save greeting to history: {e}")
                 
+                # Send greeting response with session metadata
+                yield format_sse({'content': greeting_response})
+                
+                # Send metadata with session info (for both authenticated and guest users)
+                yield format_sse({
+                    'type': 'metadata',
+                    'language': language,
+                    'session_id': session_id,
+                    'user_message_id': user_msg_id,
+                    'assistant_message_id': assistant_msg_id
+                })
+                
+                yield format_sse({'done': True})
                 return
             
             # Check if legal question

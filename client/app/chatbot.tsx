@@ -26,19 +26,20 @@ import Colors from "../constants/Colors";
 import Header from "../components/Header";
 import { SidebarWrapper } from "../components/AppSidebar";
 import Navbar from "../components/Navbar";
-import { GuestNavbar, GuestSidebar } from "../components/guest";
+import { GuestNavbar, GuestSidebar, GuestRateLimitBanner } from "../components/guest";
 import { LawyerNavbar } from "../components/lawyer/shared";
 import { useAuth } from "../contexts/AuthContext";
 import { useGuest } from "../contexts/GuestContext";
+import { useGuestChat } from "../contexts/GuestChatContext";
 import { useModerationStatus } from "../contexts/ModerationContext";
 import ChatHistorySidebar, { ChatHistorySidebarRef } from "../components/chatbot/ChatHistorySidebar";
 import { ChatHistoryService } from "../services/chatHistoryService";
 import { Send } from "lucide-react-native";
 import { MarkdownText } from "../components/chatbot/MarkdownText";
-import { GuestLimitBanner } from "../components/chatbot/GuestLimitBanner";
 import { ModerationWarningBanner } from "../components/moderation/ModerationWarningBanner";
 import { NetworkConfig } from "../utils/networkConfig";
 import { LAYOUT, getTotalUIHeight } from "../constants/LayoutConstants";
+import { addGuestDataToRequest, logGuestRequest } from "../utils/guestRequestHelper";
 
 // ============================================================================
 // HELPER FUNCTIONS - DRY Principle
@@ -272,12 +273,52 @@ interface Message {
 
 export default function ChatbotScreen() {
   const { user, session, isLawyer, isGuestMode } = useAuth();
-  const { hasReachedLimit, promptsRemaining, incrementPromptCount } = useGuest();
+  const { hasReachedLimit, promptsRemaining, incrementPromptCount, startGuestSession, guestSession, isLoading: isGuestLoading } = useGuest();
+  const guestChat = useGuestChat(); // Always call hooks unconditionally
   const { moderationStatus, refreshStatus } = useModerationStatus();
   const insets = useSafeAreaInsets();
   const [showLimitBanner, setShowLimitBanner] = useState(true);
   const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [localMessages, setLocalMessages] = useState<Message[]>([]);
+  
+  // DRY: Unified message access - guests use context, authenticated use local state
+  const messages = isGuestMode ? guestChat.messages : localMessages;
+  
+  
+  // Unified setMessages that works for both guests and authenticated users
+  const setMessages = useCallback((update: Message[] | ((prev: Message[]) => Message[])) => {
+    if (isGuestMode) {
+      // For guests: Apply update function to get new messages
+      const currentMsgs = guestChat.messages;
+      const newMsgs = typeof update === 'function' ? update(currentMsgs) : update;
+      
+      // CRITICAL FIX: Handle both new messages AND updates to existing messages
+      const currentIds = new Set(currentMsgs.map(m => m.id));
+      
+      newMsgs.forEach(msg => {
+        if (currentIds.has(msg.id)) {
+          // Update existing message (for streaming)
+          guestChat.updateMessage(msg.id, msg);
+        } else {
+          // Add new message
+          guestChat.addMessage(msg);
+        }
+      });
+      
+      // Update conversation history
+      guestChat.setConversationHistory(newMsgs.map(m => ({
+        role: m.fromUser ? 'user' : 'assistant',
+        content: m.text
+      })));
+    } else {
+      // For authenticated users: Use functional update to avoid stale closure
+      if (typeof update === 'function') {
+        setLocalMessages(update);
+      } else {
+        setLocalMessages(update);
+      }
+    }
+  }, [isGuestMode, guestChat]);
   
   // Helper function to update message with sources (DRY principle)
   const updateMessageWithSources = useCallback((
@@ -286,20 +327,26 @@ export default function ChatbotScreen() {
     sources: any[],
     language: string
   ) => {
-    setMessages((prev) => {
-      const newMessages = [...prev];
-      const msgIndex = newMessages.findIndex(m => m.id === msgId);
-      if (msgIndex !== -1) {
-        newMessages[msgIndex] = { 
-          ...newMessages[msgIndex], 
-          text,
-          sources,
-          language
-        };
-      }
-      return newMessages;
-    });
-  }, []);
+    if (isGuestMode) {
+      // For guests, use context's updateMessage directly
+      guestChat.updateMessage(msgId, { text, sources, language });
+    } else {
+      // For authenticated users, update local state
+      setLocalMessages((prev) => {
+        const newMessages = [...prev];
+        const msgIndex = newMessages.findIndex(m => m.id === msgId);
+        if (msgIndex !== -1) {
+          newMessages[msgIndex] = { 
+            ...newMessages[msgIndex], 
+            text,
+            sources,
+            language
+          };
+        }
+        return newMessages;
+      });
+    }
+  }, [isGuestMode, guestChat]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false); // Separate state for AI generation
@@ -420,6 +467,25 @@ export default function ChatbotScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // FAANG Best Practice: Initialize guest session only after loading completes
+  // This prevents race conditions and unnecessary session creation
+  useEffect(() => {
+    // Skip if still loading or not in guest mode
+    if (isGuestLoading || !isGuestMode) return;
+    
+    // Sync guest session with GuestChatContext
+    if (guestSession) {
+      guestChat.setGuestSession({ id: guestSession.id });
+      console.log('🎫 Guest session ready:', guestSession.id, 'Count:', guestSession.promptCount);
+    } else {
+      // No session exists after loading - create one
+      console.log('🎫 Creating new guest session...');
+      startGuestSession().then(() => {
+        // Session will be synced on next render when guestSession updates
+      });
+    }
+  }, [isGuestMode, isGuestLoading, guestSession, startGuestSession, guestChat]);
+
   const initializeConversation = useCallback(async () => {
     try {
       console.log('🔄 Initializing conversation - always starting fresh');
@@ -510,16 +576,19 @@ export default function ChatbotScreen() {
     // Industry-standard approach (ChatGPT/Claude): Don't create session until first message
     // This prevents "New Conversation" titles from appearing
     console.log('✨ Starting new chat - will create session on first message');
-    
-    setCurrentConversationId("");
-    isFirstMessageRef.current = true;
-    setMessages([]);
-    setConversationHistory([]);
-    setError(null);
-    
-    // Clear stored conversation ID
-    if (user?.id) {
-      await ChatHistoryService.setCurrentConversationId("", user.id);
+    try {
+      setCurrentConversationId("");
+      isFirstMessageRef.current = true;
+      setLocalMessages([]);
+      setConversationHistory([]);
+      setError(null);
+      
+      // Clear stored conversation ID
+      if (user?.id) {
+        await ChatHistoryService.setCurrentConversationId("", user.id);
+      }
+    } catch (error) {
+      console.error('❌ Error starting new chat:', error);
     }
   };
 
@@ -601,7 +670,7 @@ export default function ChatbotScreen() {
     };
 
     return (
-      <Text style={tw`text-xs text-gray-600 italic`}>
+      <Text style={tw`text-xs italic text-gray-600`}>
         {parts.map((part, index) =>
           part.isLink ? (
             <Text
@@ -740,16 +809,29 @@ export default function ChatbotScreen() {
         let isViolation = false;
 
         try {
+          // Prepare base request body
+          const baseRequestBody = {
+            question: userMessage,
+            conversation_history: formattedHistory,
+            max_tokens: userRole === "verified_lawyer" ? 1500 : 400,
+            user_id: user?.id || null,
+            session_id: sessionId || null,
+          };
+          
+          // DRY: Use helper to add guest data (OpenAI/Anthropic pattern)
+          const requestBody = addGuestDataToRequest(
+            baseRequestBody,
+            isGuestMode,
+            guestSession
+          );
+          
+          // DRY: Centralized logging
+          logGuestRequest(guestSession, endpoint);
+          
           await streamChatResponse({
             endpoint,
             headers,
-            requestBody: {
-              question: userMessage,
-              conversation_history: formattedHistory,
-              max_tokens: userRole === "verified_lawyer" ? 1500 : 400,
-              user_id: user?.id || null,
-              session_id: sessionId || null,
-            },
+            requestBody,
             onContent: (content: string) => {
               answer += content;
               // Real-time UI update: Show message as it streams in
@@ -767,6 +849,16 @@ export default function ChatbotScreen() {
               returnedSessionId = metadata.session_id;
               userMessageId = metadata.user_message_id;
               assistantMessageId = metadata.assistant_message_id;
+              
+              // OpenAI/Anthropic pattern: Sync server count with client
+              if (isGuestMode && metadata.server_count !== undefined) {
+                console.log('🔄 Syncing guest count from server:', {
+                  server_count: metadata.server_count,
+                  remaining: metadata.remaining
+                });
+                // Server is authoritative - update client to match
+                // Note: This happens in onComplete after successful response
+              }
             },
             onViolation: async (violation: any) => {
               // Violation detected - refresh moderation status to show updated strike count
@@ -786,11 +878,12 @@ export default function ChatbotScreen() {
               if (!isViolation) {
                 updateMessageWithSources(streamingMsgId, answer, sources, language);
                 
-                // Guest mode: Increment prompt count after successful response
+                // OpenAI/Anthropic pattern: Increment count ONLY after successful response
+                // Server already incremented, we just update client to match
                 if (isGuestMode) {
                   const success = await incrementPromptCount();
                   if (!success) {
-                    console.log('\ud83d\udeab Guest reached prompt limit after this message');
+                    console.log('🚫 Guest reached prompt limit after this message');
                     setShowLimitBanner(true);
                   }
                 }
@@ -992,7 +1085,7 @@ export default function ChatbotScreen() {
     
     return (
       <View style={tw`px-4 py-1.5`}>
-        <View style={isUser ? tw`items-end` : tw`items-start flex-row`}>
+        <View style={isUser ? tw`items-end` : tw`flex-row items-start`}>
           {!isUser && (
             <View style={tw`mr-2.5`}>
               <Image
@@ -1043,7 +1136,7 @@ export default function ChatbotScreen() {
             {!isUser && item.normalized_query && (
               <View
                 style={[
-                  tw`mb-2 p-2 rounded-lg`,
+                  tw`p-2 mb-2 rounded-lg`,
                   { backgroundColor: Colors.status.info + "15" },
                 ]}
               >
@@ -1069,13 +1162,13 @@ export default function ChatbotScreen() {
             {!isUser && item.sources && item.sources.length > 0 && (
               <View
                 style={[
-                  tw`mt-3 pt-2 border-t`,
+                  tw`pt-2 mt-3 border-t`,
                   { borderTopColor: Colors.border.light },
                 ]}
               >
                 <Text
                   style={[
-                    tw`text-sm font-bold mb-2`,
+                    tw`mb-2 text-sm font-bold`,
                     { color: Colors.text.primary },
                   ]}
                 >
@@ -1085,13 +1178,13 @@ export default function ChatbotScreen() {
                   <View
                     key={idx}
                     style={[
-                      tw`mb-3 p-3 rounded-lg`,
+                      tw`p-3 mb-3 rounded-lg`,
                       { backgroundColor: Colors.background.tertiary },
                     ]}
                   >
                     <Text
                       style={[
-                        tw`text-sm font-bold mb-1`,
+                        tw`mb-1 text-sm font-bold`,
                         { color: Colors.text.primary },
                       ]}
                     >
@@ -1099,7 +1192,7 @@ export default function ChatbotScreen() {
                     </Text>
                     <Text
                       style={[
-                        tw`text-xs mb-2`,
+                        tw`mb-2 text-xs`,
                         { color: Colors.text.secondary },
                       ]}
                     >
@@ -1108,7 +1201,7 @@ export default function ChatbotScreen() {
                     {source.article_title && (
                       <Text
                         style={[
-                          tw`text-xs mb-2`,
+                          tw`mb-2 text-xs`,
                           { color: Colors.text.secondary, lineHeight: 18 },
                         ]}
                       >
@@ -1119,7 +1212,7 @@ export default function ChatbotScreen() {
                     {source.text_preview && (
                       <Text
                         style={[
-                          tw`text-xs mb-3`,
+                          tw`mb-3 text-xs`,
                           { color: Colors.text.secondary, lineHeight: 18 },
                         ]}
                         numberOfLines={3}
@@ -1159,7 +1252,7 @@ export default function ChatbotScreen() {
             {!isUser && item.legal_disclaimer && (
               <View
                 style={[
-                  tw`mt-3 pt-2 border-t`,
+                  tw`pt-2 mt-3 border-t`,
                   { borderTopColor: Colors.border.light },
                 ]}
               >
@@ -1180,13 +1273,13 @@ export default function ChatbotScreen() {
               item.fallback_suggestions.length > 0 && (
                 <View
                   style={[
-                    tw`mt-3 p-3 rounded-lg`,
+                    tw`p-3 mt-3 rounded-lg`,
                     { backgroundColor: Colors.status.info + "15" },
                   ]}
                 >
                   <Text
                     style={[
-                      tw`text-sm font-bold mb-2`,
+                      tw`mb-2 text-sm font-bold`,
                       { color: Colors.status.info },
                     ]}
                   >
@@ -1196,7 +1289,7 @@ export default function ChatbotScreen() {
                     <View key={idx} style={tw`mb-2`}>
                       <Text
                         style={[
-                          tw`text-xs font-semibold mb-1`,
+                          tw`mb-1 text-xs font-semibold`,
                           { color: Colors.text.primary },
                         ]}
                       >
@@ -1204,7 +1297,7 @@ export default function ChatbotScreen() {
                       </Text>
                       <Text
                         style={[
-                          tw`text-xs ml-3`,
+                          tw`ml-3 text-xs`,
                           { color: Colors.text.secondary },
                         ]}
                       >
@@ -1257,12 +1350,11 @@ export default function ChatbotScreen() {
         onChatHistoryToggle={() => sidebarRef.current?.toggleSidebar?.()}
       />
 
-      {/* Guest Limit Banner - Show for guest users */}
+      {/* Guest Rate Limit Banner - Show for guest users */}
       {isGuestMode && showLimitBanner && (
-        <GuestLimitBanner
-          promptsRemaining={promptsRemaining}
-          hasReachedLimit={hasReachedLimit}
-          onDismiss={() => setShowLimitBanner(false)}
+        <GuestRateLimitBanner
+          variant={hasReachedLimit ? 'limit-reached' : 'warning'}
+          showInChatbot={true}
         />
       )}
 
@@ -1301,7 +1393,7 @@ export default function ChatbotScreen() {
               {/* Greeting */}
               <Text
                 style={[
-                  tw`text-2xl font-bold text-center mb-2`,
+                  tw`mb-2 text-2xl font-bold text-center`,
                   { color: Colors.text.primary },
                 ]}
               >
@@ -1311,7 +1403,7 @@ export default function ChatbotScreen() {
               {/* Subtitle */}
               <Text
                 style={[
-                  tw`text-base text-center mb-10 px-4`,
+                  tw`px-4 mb-10 text-base text-center`,
                   { color: Colors.text.secondary, lineHeight: 24 },
                 ]}
               >
@@ -1323,7 +1415,7 @@ export default function ChatbotScreen() {
               <View style={tw`w-full px-2`}>
                 <Text
                   style={[
-                    tw`text-sm font-semibold mb-4 px-2`,
+                    tw`px-2 mb-4 text-sm font-semibold`,
                     { color: Colors.text.secondary },
                   ]}
                 >
@@ -1342,7 +1434,7 @@ export default function ChatbotScreen() {
                     key={idx}
                     onPress={() => setInput(suggestion)}
                     style={[
-                      tw`p-4 mb-3 rounded-2xl flex-row items-center`,
+                      tw`flex-row items-center p-4 mb-3 rounded-2xl`,
                       {
                         backgroundColor: Colors.background.secondary,
                         borderWidth: 1,
@@ -1361,7 +1453,7 @@ export default function ChatbotScreen() {
                   >
                     <View
                       style={[
-                        tw`w-8 h-8 rounded-full items-center justify-center mr-3`,
+                        tw`items-center justify-center w-8 h-8 mr-3 rounded-full`,
                         { backgroundColor: Colors.primary.blue + "15" },
                       ]}
                     >
@@ -1373,7 +1465,7 @@ export default function ChatbotScreen() {
                     </View>
                     <Text
                       style={[
-                        tw`text-sm flex-1`,
+                        tw`flex-1 text-sm`,
                         { color: Colors.text.primary, lineHeight: 20 },
                       ]}
                     >
@@ -1464,7 +1556,7 @@ export default function ChatbotScreen() {
             </View>
             <View
               style={[
-                tw`px-4 py-3 rounded-2xl flex-row items-center`,
+                tw`flex-row items-center px-4 py-3 rounded-2xl`,
                 { backgroundColor: Colors.background.secondary },
               ]}
             >
@@ -1479,7 +1571,7 @@ export default function ChatbotScreen() {
         <View style={tw`px-6 pb-3`}>
           <View
             style={[
-              tw`p-4 rounded-xl flex-row items-start`,
+              tw`flex-row items-start p-4 rounded-xl`,
               { backgroundColor: Colors.status.error + "15" },
             ]}
           >
@@ -1489,7 +1581,7 @@ export default function ChatbotScreen() {
               color={Colors.status.error}
               style={tw`mr-2`}
             />
-            <Text style={[tw`text-sm flex-1`, { color: Colors.status.error }]}>
+            <Text style={[tw`flex-1 text-sm`, { color: Colors.status.error }]}>
               {error}
             </Text>
           </View>
@@ -1533,7 +1625,7 @@ export default function ChatbotScreen() {
             <View style={tw`flex-1 mr-3`}>
               <View
                 style={[
-                  tw`rounded-full px-5`,
+                  tw`px-5 rounded-full`,
                   {
                     backgroundColor: Colors.background.secondary,
                     borderWidth: 1,
@@ -1557,7 +1649,7 @@ export default function ChatbotScreen() {
                   placeholder="Ask your legal question..."
                   placeholderTextColor="#9CA3AF"
                   style={[
-                    tw`text-base flex-1`,
+                    tw`flex-1 text-base`,
                     {
                       color: Colors.text.primary,
                       outlineStyle: "none",
@@ -1576,7 +1668,7 @@ export default function ChatbotScreen() {
               onPress={sendMessage}
               disabled={isGenerating || !input.trim()} // Disable only while generating
               style={[
-                tw`w-12 h-12 rounded-full items-center justify-center`,
+                tw`items-center justify-center w-12 h-12 rounded-full`,
                 {
                   backgroundColor:
                     isTyping || !input.trim()

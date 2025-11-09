@@ -26,10 +26,10 @@ class Lawyer(BaseModel):
     bio: str
     specialization: Optional[str] = None
     location: Optional[str] = None
-    hours: Optional[str] = None
-    days: Optional[str] = None
+    hours: Optional[str] = None  # Deprecated
+    days: Optional[str] = None  # Deprecated
     available: bool
-    hours_available: Optional[str] = None
+    hours_available: Optional[dict] = None  # JSONB format: {"Monday": ["09:00", "11:00"]}
     created_at: datetime
 
     class Config:

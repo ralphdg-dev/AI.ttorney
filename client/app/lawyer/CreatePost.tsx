@@ -134,10 +134,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E1E8ED',
+    borderBottomColor: '#E5E7EB',
     backgroundColor: '#FFFFFF',
   },
   backButton: {
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   },
   editorContainer: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 14,
     backgroundColor: '#FFFFFF',
   },

@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -21,22 +20,8 @@ import { useAuth } from "../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import { Avatar, AvatarImage, AvatarFallbackText } from "../components/ui/avatar";
-import { supabase } from "../config/supabase";
 import { SidebarWrapper } from "../components/AppSidebar";
 import { createShadowStyle } from "../utils/shadowUtils";
-import { NetworkConfig } from "../utils/networkConfig";
-
-interface UserProfileData {
-  full_name: string;
-  email: string;
-  username: string;
-  birthdate: string;
-  profile_photo: string;
-}
-
-// Constants
-const DEFAULT_PROFILE_PHOTO = "";
-const REQUEST_TIMEOUT_MS = 5000;
 
 // Common styling utilities
 const cardStyle = createShadowStyle({
@@ -51,46 +36,6 @@ const sectionHeaderStyle = {
   backgroundColor: Colors.background.tertiary
 };
 
-// Helper function to make API requests with timeout
-const makeApiRequest = async (endpoint: string): Promise<Response> => {
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  if (!session?.access_token) {
-    throw new Error("Authentication required");
-  }
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    const apiUrl = await NetworkConfig.getBestApiUrl();
-    const response = await fetch(`${apiUrl}${endpoint}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout - please check your connection');
-    }
-    throw error;
-  }
-};
-
-const createFallbackProfile = (user: any): UserProfileData => ({
-  full_name: user.full_name || "",
-  email: user.email || "",
-  username: (user as any).username || "",
-  birthdate: (user as any).birthdate || "",
-  profile_photo: DEFAULT_PROFILE_PHOTO,
-});
 
 // Helper function to format date
 const formatDate = (dateString: string) => {
@@ -127,133 +72,27 @@ const ProfileCard: React.FC<{
 );
 
 export default function UserProfilePage() {
-  const { user, signOut } = useAuth();
+  // ⚡ FAANG OPTIMIZATION: Use AuthContext data directly - ZERO loading time
+  const { user, signOut, refreshProfile } = useAuth();
   const router = useRouter();
-  
-  const [profileData, setProfileData] = useState<UserProfileData>({
-    full_name: "",
-    email: "",
-    username: "",
-    birthdate: "",
-    profile_photo: DEFAULT_PROFILE_PHOTO,
-  });
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchUserProfile = useCallback(async () => {
-    if (!user) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Create fallback profile immediately for faster UI
-      const fallbackProfile = createFallbackProfile(user);
-      setProfileData(fallbackProfile);
-      
-      // Try to make API request for updated data
-      let response: Response;
-      try {
-        response = await makeApiRequest('/api/user/profile');
-      } catch (error: any) {
-        if (error.message === "Authentication required") {
-          // Already set fallback data above
-          return;
-        }
-        throw error;
-      }
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          // Already set fallback data above
-          return;
-        }
-        throw new Error(`Failed to load profile: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      const userProfile: UserProfileData = {
-        full_name: data.full_name || user.full_name || "",
-        email: data.email || user.email || "",
-        username: data.username || (user as any).username || "",
-        birthdate: data.birthdate || (user as any).birthdate || "",
-        profile_photo: data.profile_photo || DEFAULT_PROFILE_PHOTO,
-      };
-      
-      // Only update if data is different to prevent unnecessary re-renders
-      setProfileData(prev => {
-        if (JSON.stringify(prev) !== JSON.stringify(userProfile)) {
-          return userProfile;
-        }
-        return prev;
-      });
-      
-    } catch (error: any) {
-      console.error("Error in fetchUserProfile:", error);
-      
-      // Only show error for non-timeout errors
-      if (!error.message?.includes('timeout') && !error.message?.includes('Authentication required')) {
-        setError("Failed to load profile data. Using cached information.");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
-
+  // Background refresh on mount (non-blocking)
   useEffect(() => {
     if (user) {
-      fetchUserProfile();
-    } else {
-      setIsLoading(false);
+      // Refresh in background without blocking UI
+      refreshProfile().catch(() => {});
     }
-  }, [user, fetchUserProfile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   const handleEditProfile = () => {
     router.push('/profile/edit');
   };
 
-  if (isLoading) {
-    return (
-        <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]}>
-          <View style={tw`flex-1 justify-center items-center px-4`}>
-            <View style={tw`items-center`}>
-              <ActivityIndicator size="large" color={Colors.primary.blue} />
-              <Text style={[tw`mt-4 text-base`, { color: Colors.text.secondary }]}>Loading profile...</Text>
-            </View>
-          </View>
-          <Navbar activeTab="profile" />
-          <SidebarWrapper />
-        </SafeAreaView>
-    );
-  }
-
-  if (error) {
-    return (
-        <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]}>
-          <View style={tw`flex-1 justify-center items-center px-4`}>
-            <View style={tw`items-center`}>
-              <Text style={tw`text-red-600 text-center text-lg font-bold mb-2`}>Error Loading Profile</Text>
-              <Text style={tw`text-red-600 text-center text-sm`}>{error}</Text>
-              <TouchableOpacity 
-                style={tw`mt-4 px-6 py-3 bg-red-600 rounded-lg`}
-                onPress={() => {
-                  setError(null);
-                  fetchUserProfile();
-                }}
-              >
-                <Text style={tw`text-white text-center font-medium`}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          <Navbar activeTab="profile" />
-          <SidebarWrapper />
-        </SafeAreaView>
-    );
+  // ⚡ FAANG OPTIMIZATION: No loading states - instant render with cached data
+  // If user is null, redirect to login (handled by AuthGuard)
+  if (!user) {
+    return null;
   }
 
   return (
@@ -277,10 +116,10 @@ export default function UserProfilePage() {
               }}
             >
               <AvatarFallbackText style={{ color: Colors.text.primary }}>
-                {profileData.full_name || "User"}
+                {user.full_name || "User"}
               </AvatarFallbackText>
               <AvatarImage 
-                source={{ uri: profileData.profile_photo || undefined }} 
+                source={{ uri: user.profile_photo || undefined }} 
                 alt="Profile"
               />
             </Avatar>
@@ -288,10 +127,10 @@ export default function UserProfilePage() {
           
           {/* User Info */}
           <Text style={[tw`text-2xl font-bold text-center`, { color: Colors.text.primary }]}>
-            {profileData.full_name || "User"}
+            {user.full_name || "User"}
           </Text>
           <Text style={[tw`text-base mt-2 text-center`, { color: Colors.text.secondary }]}>
-            @{profileData.username || "username"}
+            @{user.username || "username"}
           </Text>
           
           {/* Edit Profile Button */}
@@ -320,21 +159,21 @@ export default function UserProfilePage() {
               <View style={[tw`py-3 border-b`, { borderColor: Colors.border.light }]}>
                 <Text style={[tw`text-sm font-medium mb-1`, { color: Colors.text.secondary }]}>Full Name</Text>
                 <Text style={[tw`text-base`, { color: Colors.text.primary }]}>
-                  {profileData.full_name || "Not provided"}
+                  {user.full_name || "Not provided"}
                 </Text>
               </View>
 
               <View style={[tw`py-3 border-b`, { borderColor: Colors.border.light }]}>
                 <Text style={[tw`text-sm font-medium mb-1`, { color: Colors.text.secondary }]}>Email Address</Text>
                 <Text style={[tw`text-base`, { color: Colors.text.primary }]}>
-                  {profileData.email || "Not provided"}
+                  {user.email || "Not provided"}
                 </Text>
               </View>
 
               <View style={tw`py-3`}>
                 <Text style={[tw`text-sm font-medium mb-1`, { color: Colors.text.secondary }]}>Birth Date</Text>
                 <Text style={[tw`text-base`, { color: Colors.text.primary }]}>
-                  {formatDate(profileData.birthdate)}
+                  {formatDate(user.birthdate || "")}
                 </Text>
               </View>
             </View>

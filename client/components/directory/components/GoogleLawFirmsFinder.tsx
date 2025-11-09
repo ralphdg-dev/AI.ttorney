@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { WebView as RNWebView } from 'react-native-webview';
 import * as Location from 'expo-location';
+import { filterByRadius } from '@/utils/distanceCalculator';
 import { VStack } from '@/components/ui/vstack';
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
@@ -79,7 +80,29 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   // Radius filter states
   const [selectedRadius, setSelectedRadius] = useState(5); // Default 5km
   const [showRadiusFilter, setShowRadiusFilter] = useState(false);
-  const radiusOptions = [5, 10, 15, 25]; // km options (limited to 25km max)
+  const radiusOptions = [5, 10, 15, 25, 50]; // km options
+  
+  // Store all fetched firms for client-side filtering
+  const [allFetchedFirms, setAllFetchedFirms] = useState<LawFirm[]>([]);
+  const [searchCenter, setSearchCenter] = useState<{ lat: number; lng: number } | null>(null);
+  
+  // Client-side filtering with memoization (FAANG pattern - instant, no API calls)
+  const filteredLawFirms = useMemo(() => {
+    if (!searchCenter || allFetchedFirms.length === 0) {
+      return lawFirms;
+    }
+    
+    // Filter by radius using client-side distance calculation
+    const filtered = filterByRadius(
+      allFetchedFirms,
+      searchCenter.lat,
+      searchCenter.lng,
+      selectedRadius
+    );
+    
+    console.log(`📍 Client-side filter: ${filtered.length}/${allFetchedFirms.length} firms within ${selectedRadius}km`);
+    return filtered;
+  }, [allFetchedFirms, searchCenter, selectedRadius, lawFirms]);
   
   // View states - Two dedicated views approach
   const [currentView, setCurrentView] = useState<'list' | 'map'>('list'); // Default to List View
@@ -253,6 +276,9 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           place_id: place.place_id
         }));
 
+        // Set initial display (will be filtered by useMemo)
+        setAllFetchedFirms(firms);
+        setSearchCenter({ lat: latitude, lng: longitude });
         setLawFirms(firms);
         setCurrentLocationName(locationName);
         setRetryCount(0);
@@ -286,7 +312,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         },
         body: JSON.stringify({
           location_name: locationName,
-          radius: selectedRadius * 1000, // Convert km to meters
+          radius: 50000, // Fixed 50km radius - client-side filtering handles the rest
           type: 'law_firm' // Search for law firms and offices
         }),
       });
@@ -304,15 +330,20 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           address: place.vicinity || place.formatted_address || 'Address not available',
           phone: place.formatted_phone_number,
           rating: place.rating,
-          user_ratings_total: place.user_ratings_total, // Real review count from Google
+          user_ratings_total: place.user_ratings_total,
           types: place.types || [],
           latitude: place.geometry.location.lat,
           longitude: place.geometry.location.lng,
           place_id: place.place_id,
-          distance_km: place.distance_km // Include distance from API
+          distance_km: place.distance_km
         }));
 
-        setLawFirms(firms);
+        // Store all firms and search center for client-side filtering
+        setAllFetchedFirms(firms);
+        setSearchCenter({
+          lat: data.location.latitude,
+          lng: data.location.longitude
+        });
         setCurrentLocationName(data.location.formatted_address);
         setMapCenter({
           lat: data.location.latitude,
@@ -345,7 +376,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     } finally {
       setLoading(false);
     }
-  }, [selectedRadius]); // Include selectedRadius dependency
+  }, []); // Removed selectedRadius - we filter client-side now
 
   // Optimized prediction selection with session token renewal
   const handlePredictionSelectUpdated = useCallback(async (prediction: AutocompletePrediction) => {
@@ -940,7 +971,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   }, [sortedLawFirms, mapCenter, userLocation, selectedFirmId]);
 
   const renderLawFirmCard = useCallback((firm: LawFirm) => (
-    <Box key={firm.id} className="mx-2 mb-3 bg-white rounded-lg border border-gray-200">
+    <Box key={firm.id} className="mb-3 bg-white rounded-lg border border-gray-200">
       <VStack space="sm" className="p-4">
         <HStack space="sm" className="items-start">
           <Box className="p-2 bg-blue-50 rounded-lg">
@@ -1144,9 +1175,9 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     handleSearchTextChangeWithAutocomplete(text);
   };
 
-  // Clean Search Header Component - no memoization needed
+  // Search header with autocomplete dropdown
   const renderSearchHeader = () => (
-    <VStack space="md" className="px-4 py-4 bg-white" style={{ zIndex: 1000 }}>
+    <VStack space="md" className="px-5 py-3 bg-white" style={{ zIndex: 999 }}>
       <Box className="relative" style={{ zIndex: 1000 }}>
         <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ 
           minHeight: 48,
@@ -1188,7 +1219,6 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
               numberOfLines={1}
             />
             
-            {/* Fixed-width container for right icons */}
             <Box style={{ 
               width: 24, 
               height: 48, 
@@ -1229,8 +1259,8 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           </HStack>
         </Box>
         
-        {/* Clean Autocomplete Dropdown */}
-        {showPredictions && (
+        {/* Autocomplete Dropdown */}
+        {showPredictions && predictions.length > 0 && (
           <Box
             style={{
               position: 'absolute',
@@ -1260,47 +1290,47 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                 </HStack>
               ) : (
                 predictions.map((item, index) => (
-              <Pressable
-                key={item.place_id}
-                style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  borderBottomWidth: index < predictions.length - 1 ? 0.5 : 0,
-                  borderBottomColor: '#F3F4F6',
-                }}
-                onPress={() => handlePredictionSelectUpdated(item)}
-              >
-                <MapPin size={16} color="#9CA3AF" style={{ marginRight: 12 }} />
-                <VStack space="xs" style={{ flex: 1, minWidth: 0 }}>
-                  <Text 
-                    size="sm" 
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                    style={{ 
-                      color: '#111827',
-                      fontWeight: '400',
+                  <Pressable
+                    key={item.place_id}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      borderBottomWidth: index < predictions.length - 1 ? 0.5 : 0,
+                      borderBottomColor: '#F3F4F6',
                     }}
+                    onPress={() => handlePredictionSelectUpdated(item)}
                   >
-                    {item.main_text}
-                  </Text>
-                  {item.secondary_text && (
-                    <Text 
-                      size="xs" 
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                      style={{ 
-                        color: '#6B7280',
-                      }}
-                    >
-                      {item.secondary_text}
-                    </Text>
-                  )}
-                </VStack>
-              </Pressable>
-              ))
-            )}
+                    <MapPin size={16} color="#9CA3AF" style={{ marginRight: 12 }} />
+                    <VStack space="xs" style={{ flex: 1, minWidth: 0 }}>
+                      <Text 
+                        size="sm" 
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={{ 
+                          color: '#111827',
+                          fontWeight: '400',
+                        }}
+                      >
+                        {item.main_text}
+                      </Text>
+                      {item.secondary_text && (
+                        <Text 
+                          size="xs" 
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                          style={{ 
+                            color: '#6B7280',
+                          }}
+                        >
+                          {item.secondary_text}
+                        </Text>
+                      )}
+                    </VStack>
+                  </Pressable>
+                ))
+              )}
               {loadingPredictions && predictions.length > 0 && (
                 <HStack space="sm" style={{ padding: 12, justifyContent: 'center' }}>
                   <Spinner size="small" color={Colors.primary.blue} />
@@ -1327,7 +1357,6 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           </HStack>
         </Pressable>
         
-        {/* Radius Filter Button */}
         <Pressable
           className="px-3 py-2 bg-white rounded-lg border border-gray-300 active:bg-gray-50"
           onPress={() => setShowRadiusFilter(!showRadiusFilter)}
@@ -1341,12 +1370,11 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         </Pressable>
       </HStack>
       
-      {/* Radius Filter Dropdown - Overlapping */}
       {showRadiusFilter && (
         <Box 
           style={{
             position: 'absolute',
-            top: 110, // Position below the buttons
+            top: 110,
             right: 16,
             backgroundColor: 'white',
             borderWidth: 1,
@@ -1379,10 +1407,6 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                 onPress={() => {
                   setSelectedRadius(radius);
                   setShowRadiusFilter(false);
-                  // Trigger new search with updated radius
-                  if (searchText.trim()) {
-                    handleSearch();
-                  }
                 }}
               >
                 <HStack className="justify-between items-center">
@@ -1413,10 +1437,12 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         </Box>
       )}
 
-      {lawFirms.length > 0 && (
-        <Text className="px-1 text-sm font-medium" style={{ color: Colors.text.sub }}>
-          {lawFirms.length} law firms found in {currentLocationName}
-        </Text>
+      {filteredLawFirms.length > 0 && (
+        <Box className="px-1 pb-2">
+          <Text className="text-sm" style={{ color: Colors.text.sub }}>
+            {filteredLawFirms.length} {filteredLawFirms.length === 1 ? 'law firm' : 'law firms'} found in {currentLocationName}
+          </Text>
+        </Box>
       )}
     </VStack>
   );
@@ -1483,12 +1509,12 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       className="flex-1" 
       style={{ backgroundColor: '#f9fafb' }}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 120 }}
+      contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 20 }}
       keyboardShouldPersistTaps="handled"
     >
-      {sortedLawFirms.length > 0 ? (
-        <VStack space="xs" style={{ paddingTop: 12, paddingHorizontal: 8 }}>
-          {sortedLawFirms.map(renderLawFirmCard)}
+      {filteredLawFirms.length > 0 ? (
+        <VStack space="xs" style={{ paddingTop: 12 }}>
+          {filteredLawFirms.map(renderLawFirmCard)}
         </VStack>
       ) : error ? (
         <Box className="px-4">

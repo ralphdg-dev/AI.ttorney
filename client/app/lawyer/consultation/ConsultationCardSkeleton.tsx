@@ -51,10 +51,14 @@ export function ConsultationCardSkeleton() {
   return (
     <View
       style={[
-        tw`bg-white rounded-2xl p-5 mb-4 border border-gray-100`,
+        tw`bg-white rounded-xl p-4 mb-3 border`,
         {
-          boxShadow:
-            "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+          borderColor: '#E5E7EB',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.05,
+          shadowRadius: 2,
+          elevation: 1,
         },
       ]}
     >

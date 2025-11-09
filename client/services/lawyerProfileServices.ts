@@ -18,8 +18,8 @@ export interface ProfileData {
   avatar: string;
   specialization: string[];
   bio: string;
-  days?: string; // Add this
-  hours_available?: string; // Add this
+  days?: string;
+  hours_available?: string | Record<string, string[]>; // JSONB or legacy string
 }
 interface LawyerProfileResponse {
   success: boolean;
@@ -29,10 +29,6 @@ interface LawyerProfileResponse {
 }
 
 class LawyerProfileService {
-  constructor() {
-    // No longer need to store baseUrl, will use NetworkConfig dynamically
-  }
-
   async saveLawyerProfile(
     profileData: ProfileData,
     availabilitySlots: TimeSlot[],
@@ -43,27 +39,18 @@ class LawyerProfileService {
         ? profileData.specialization.join(", ")
         : profileData.specialization;
 
+      // Send hours_available directly (not nested in profile_data)
       const payload = {
-        profile_data: {
-          name: profileData.name,
-          specialization: specializationsString,
-          location: profileData.location,
-          phone_number: profileData.phone,
-          bio: profileData.bio,
-          days: profileData.days || "", // Ensure this is included
-          hours_available: profileData.hours_available || "", // Ensure this is included
-        },
-        availability_slots: availabilitySlots.map((slot) => ({
-          ...slot,
-          startTime: this.ensureTimeFormat(slot.startTime),
-          endTime: this.ensureTimeFormat(slot.endTime),
-        })),
+        name: profileData.name,
+        specialization: specializationsString,
+        location: profileData.location,
+        phone_number: profileData.phone,
+        bio: profileData.bio,
+        days: profileData.days || "",
+        hours_available: profileData.hours_available || {}, // Send JSONB object or empty object
       };
 
-      console.log("Sending payload with availability:", {
-        days: profileData.days,
-        hours_available: profileData.hours_available,
-      });
+      console.log("Sending payload to backend:", payload);
 
       const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(`${apiUrl}/api/lawyer/profile`, {
@@ -76,10 +63,16 @@ class LawyerProfileService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.detail || `HTTP error! status: ${response.status}`
-        );
+        const errorText = await response.text();
+        console.error("Backend error response:", errorText);
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(
+            errorData.detail || `HTTP error! status: ${response.status}`
+          );
+        } catch {
+          throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+        }
       }
 
       return await response.json();

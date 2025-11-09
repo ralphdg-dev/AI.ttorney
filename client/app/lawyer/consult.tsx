@@ -23,11 +23,14 @@ import { ConsultationListSkeleton } from "./consultation/ConsultationCardSkeleto
 import { LawyerNavbar } from "../../components/lawyer/shared";
 import Header from "../../components/Header";
 import { ConfirmationModal } from "../../components/lawyer/consultation";
+import { SidebarWrapper } from "../../components/AppSidebar";
 import { useAuth } from "../../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../../constants/Colors";
 import { shouldUseNativeDriver } from "../../utils/animations";
 import { NetworkConfig } from "../../utils/networkConfig";
+import { formatConsultationTime } from "../../utils/consultationUtils";
+import { useToast, Toast, ToastTitle, ToastDescription } from "../../components/ui/toast";
 
 interface ConsultationRequest {
   id: string;
@@ -52,6 +55,7 @@ interface ConsultationRequest {
 const LawyerConsultPage: React.FC = () => {
   const router = useRouter();
   const { user, session } = useAuth();
+  const toast = useToast();
   const [filter, setFilter] = useState<
     "all" | "pending" | "accepted" | "completed"
   >("all");
@@ -415,22 +419,51 @@ const LawyerConsultPage: React.FC = () => {
         // Refresh the data
         await fetchConsultationRequests();
         await fetchStats();
-        Alert.alert(
-          "Success",
-          `Consultation ${confirmationModal.actionType}ed successfully`
-        );
+        
+        // Show success toast
+        toast.show({
+          placement: 'top',
+          duration: 3000,
+          render: ({ id }) => (
+            <Toast nativeID={id} action="success" variant="solid">
+              <ToastTitle>Success!</ToastTitle>
+              <ToastDescription>
+                Consultation {confirmationModal.actionType}ed successfully
+              </ToastDescription>
+            </Toast>
+          ),
+        });
       } else {
-        Alert.alert(
-          "Error",
-          `Failed to ${confirmationModal.actionType} consultation`
-        );
+        // Show error toast
+        toast.show({
+          placement: 'top',
+          duration: 4000,
+          render: ({ id }) => (
+            <Toast nativeID={id} action="error" variant="solid">
+              <ToastTitle>Error</ToastTitle>
+              <ToastDescription>
+                Failed to {confirmationModal.actionType} consultation
+              </ToastDescription>
+            </Toast>
+          ),
+        });
       }
     } catch (error) {
       console.error("Error updating consultation:", error);
-      Alert.alert(
-        "Error",
-        `Failed to ${confirmationModal.actionType} consultation`
-      );
+      
+      // Show error toast
+      toast.show({
+        placement: 'top',
+        duration: 4000,
+        render: ({ id }) => (
+          <Toast nativeID={id} action="error" variant="solid">
+            <ToastTitle>Error</ToastTitle>
+            <ToastDescription>
+              Failed to {confirmationModal.actionType} consultation. Please try again.
+            </ToastDescription>
+          </Toast>
+        ),
+      });
     } finally {
       setConfirmationModal({
         isOpen: false,
@@ -504,7 +537,7 @@ const LawyerConsultPage: React.FC = () => {
           </View>
 
           {/* Consultation cards skeleton */}
-          <View style={tw`px-4`}>
+          <View style={tw`px-5`}>
             <ConsultationListSkeleton count={3} />
           </View>
         </ScrollView>
@@ -634,7 +667,7 @@ const LawyerConsultPage: React.FC = () => {
         </View>
 
         {/* Enhanced Filter Tabs */}
-        <View style={tw`px-4 py-4`}>
+        <View style={tw`px-5 py-4`}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -687,7 +720,7 @@ const LawyerConsultPage: React.FC = () => {
         </View>
 
         {/* Enhanced Consultation Cards */}
-        <View style={tw`px-4`}>
+        <View style={tw`px-5`}>
           <View style={tw`flex-row items-center justify-between mb-4`}>
             <Text style={tw`text-lg font-bold text-gray-900`}>
               {filter === "all"
@@ -725,10 +758,14 @@ const LawyerConsultPage: React.FC = () => {
                 <View
                   key={request.id}
                   style={[
-                    tw`bg-white rounded-2xl p-5 mb-4 border border-gray-100`,
+                    tw`bg-white rounded-xl p-4 mb-3 border`,
                     {
-                      boxShadow:
-                        "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+                      borderColor: '#E5E7EB',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.05,
+                      shadowRadius: 2,
+                      elevation: 1,
                     },
                   ]}
                 >
@@ -879,7 +916,7 @@ const LawyerConsultPage: React.FC = () => {
                             <Text
                               style={tw`text-sm text-gray-700 ml-2 font-medium`}
                             >
-                              {request.consultation_time}
+                              {formatConsultationTime(request.consultation_time)}
                             </Text>
                           </View>
                         )}
@@ -1003,6 +1040,8 @@ const LawyerConsultPage: React.FC = () => {
         actionType={confirmationModal.actionType}
         clientName={confirmationModal.clientName || undefined}
       />
+      
+      <SidebarWrapper />
     </SafeAreaView>
   );
 };

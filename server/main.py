@@ -130,14 +130,15 @@ from routes.user_profile import router as user_profile_router
 app.include_router(user_profile_router)
 
 # Import and include chatbot routers (separated for users and lawyers)
-from api.chatbot_user import router as user_chatbot_router
+# IMPORTANT: Register streaming routers FIRST so they take precedence
 from api.chatbot_user_streaming import router as user_chatbot_streaming_router
-from api.chatbot_lawyer import router as lawyer_chatbot_router
 from api.chatbot_lawyer_streaming import router as lawyer_chatbot_streaming_router
-app.include_router(user_chatbot_router)
-app.include_router(user_chatbot_streaming_router)
-app.include_router(lawyer_chatbot_router)
-app.include_router(lawyer_chatbot_streaming_router)
+from api.chatbot_user import router as user_chatbot_router
+from api.chatbot_lawyer import router as lawyer_chatbot_router
+app.include_router(user_chatbot_streaming_router)  # Streaming takes precedence
+app.include_router(lawyer_chatbot_streaming_router)  # Streaming takes precedence
+app.include_router(user_chatbot_router)  # Legacy/fallback
+app.include_router(lawyer_chatbot_router)  # Legacy/fallback
 
 # Import and include chat history routes
 from routes.chat_history import router as chat_history_router
@@ -160,6 +161,14 @@ from routes.user_appeals import router as user_appeals_router
 from routes.admin_appeals import router as admin_appeals_router
 app.include_router(user_appeals_router)
 app.include_router(admin_appeals_router)
+
+# Import and include user favorites/bookmarks routes
+from routes.user_favorites import router as user_favorites_router
+app.include_router(user_favorites_router)
+
+# Import and include notifications routes
+from routes.notifications import router as notifications_router
+app.include_router(notifications_router)
 
 @app.get("/")
 async def root():

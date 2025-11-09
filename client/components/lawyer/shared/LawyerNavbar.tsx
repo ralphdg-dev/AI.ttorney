@@ -13,7 +13,7 @@ import Colors from '../../../constants/Colors';
 import { GlobalStyles } from '../../../constants/GlobalStyles';
 
 interface LawyerNavbarProps {
-  activeTab?: 'home' | 'forum' | 'consult' | 'chatbot' | 'profile';
+  activeTab?: 'home' | 'forum' | 'consult' | 'chatbot' | 'profile' | null;
   onTabPress?: (tab: string) => void;
 }
 
@@ -26,8 +26,13 @@ const LawyerNavbar: React.FC<LawyerNavbarProps> = ({
   const pathname = usePathname();
 
   // Auto-detect active tab based on current route if not provided
-  const getActiveTab = (): 'home' | 'forum' | 'consult' | 'chatbot' | 'profile' => {
-    if (activeTab) return activeTab;
+  const getActiveTab = (): 'home' | 'forum' | 'consult' | 'chatbot' | 'profile' | null => {
+    if (activeTab !== undefined) return activeTab;
+    
+    // Check sidebar routes first - these should NOT highlight any navbar tab
+    if (pathname.includes('/notifications')) return null;
+    if (pathname.includes('/settings')) return null;
+    if (pathname.includes('/help')) return null;
     
     if (pathname.includes('/lawyer') && (pathname === '/lawyer' || pathname.includes('/lawyer/index'))) return 'home';
     if (pathname.includes('/lawyer/forum')) return 'forum';

@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Alert } from 'react-native';
+import { useAuth } from './AuthContext';
+import { NetworkConfig } from '@/utils/networkConfig';
+import { useToast, Toast, ToastTitle } from '@/components/ui/toast';
+
+const API_BASE_URL = NetworkConfig.getApiUrl();
 
 interface FavoritesContextType {
   favoriteTermIds: Set<string>;
   toggleFavorite: (termId: string, termTitle?: string) => Promise<void>;
   isFavorite: (termId: string) => boolean;
-  getFavoriteCount: () => number;
   loadFavorites: () => Promise<void>;
 }
 
@@ -17,77 +20,126 @@ const FavoritesContext = createContext<FavoritesContextType | undefined>(undefin
 
 export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }) => {
   const [favoriteTermIds, setFavoriteTermIds] = useState<Set<string>>(new Set());
+  const { session } = useAuth();
+  const toast = useToast();
 
   const loadFavorites = useCallback(async () => {
+    if (!session?.access_token) {
+      setFavoriteTermIds(new Set());
+      return;
+    }
+
     try {
-      // TODO: Replace with actual API call to load user's favorites
-      // const { data, error } = await db.userPreferences.favorites.getAll();
-      // if (data) {
-      //   setFavoriteTermIds(new Set(data.map(fav => fav.glossary_id.toString())));
-      // }
-      
-      // For now, load from sample data
-      const sampleFavorites = new Set(['1', '4']); // Annulment and Probable Cause
-      setFavoriteTermIds(sampleFavorites);
+      const response = await fetch(`${API_BASE_URL}/api/user/favorites/terms`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const ids = new Set<string>(data.map((fav: any) => fav.glossary_id.toString()));
+        setFavoriteTermIds(ids);
+      }
     } catch (error) {
       console.error('Error loading favorites:', error);
     }
-  }, []);
+  }, [session?.access_token]);
 
   const toggleFavorite = useCallback(async (termId: string, termTitle?: string) => {
     try {
+      if (!session?.access_token) {
+        toast.show({
+          placement: 'top',
+          duration: 2000,
+          render: ({ id }) => (
+            <Toast nativeID={id} action="muted" variant="outline">
+              <ToastTitle>Login required</ToastTitle>
+            </Toast>
+          ),
+        });
+        return;
+      }
+
       const isCurrentlyFavorite = favoriteTermIds.has(termId);
       
+      // Optimistic update
       if (isCurrentlyFavorite) {
-        // Remove from favorites
-        // TODO: Replace with actual API call
-        // await db.userPreferences.favorites.delete(termId);
-        
         setFavoriteTermIds(prev => {
           const newSet = new Set(prev);
           newSet.delete(termId);
           return newSet;
         });
-        
-        if (termTitle) {
-          Alert.alert('Removed', `"${termTitle}" removed from favorites`);
+      } else {
+        setFavoriteTermIds(prev => new Set([...prev, termId]));
+      }
+      
+      // API call
+      if (isCurrentlyFavorite) {
+        const response = await fetch(`${API_BASE_URL}/api/user/favorites/terms/${termId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (!response.ok) {
+          setFavoriteTermIds(prev => new Set([...prev, termId]));
+          toast.show({
+            placement: 'top',
+            duration: 2000,
+            render: ({ id }) => (
+              <Toast nativeID={id} action="error" variant="outline">
+                <ToastTitle>Failed to remove</ToastTitle>
+              </Toast>
+            ),
+          });
         }
       } else {
-        // Add to favorites
-        // TODO: Replace with actual API call
-        // await db.userPreferences.favorites.create({ user_id: userId, glossary_id: termId });
-        
-        setFavoriteTermIds(prev => new Set([...prev, termId]));
-        
-        if (termTitle) {
-          Alert.alert('Added', `"${termTitle}" added to favorites`);
+        const response = await fetch(`${API_BASE_URL}/api/user/favorites/terms`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ glossary_id: termId }),
+        });
+
+        if (!response.ok && response.status !== 409) {
+          setFavoriteTermIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(termId);
+            return newSet;
+          });
+          toast.show({
+            placement: 'top',
+            duration: 2000,
+            render: ({ id }) => (
+              <Toast nativeID={id} action="error" variant="outline">
+                <ToastTitle>Failed to add</ToastTitle>
+              </Toast>
+            ),
+          });
         }
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
-      Alert.alert('Error', 'Failed to update favorites');
     }
-  }, [favoriteTermIds]);
+  }, [favoriteTermIds, session, toast]);
 
   const isFavorite = useCallback((termId: string): boolean => {
     return favoriteTermIds.has(termId);
   }, [favoriteTermIds]);
 
-  const getFavoriteCount = useCallback((): number => {
-    return favoriteTermIds.size;
-  }, [favoriteTermIds]);
-
   useEffect(() => {
     loadFavorites();
-  }, [loadFavorites]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.access_token]);
 
   const value: FavoritesContextType = React.useMemo(() => ({
     favoriteTermIds,
     toggleFavorite,
     isFavorite,
-    getFavoriteCount,
     loadFavorites,
-  }), [favoriteTermIds, toggleFavorite, isFavorite, getFavoriteCount, loadFavorites]);
+  }), [favoriteTermIds, toggleFavorite, isFavorite, loadFavorites]);
 
   return (
     <FavoritesContext.Provider value={value}>

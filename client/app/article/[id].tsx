@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/Colors';
 import { Badge, BadgeText } from '@/components/ui/badge';
-import LegalDisclaimer from '@/components/guides/LegalDisclaimer';
 import { articleCache } from '@/services/articleCache';
 import { NetworkConfig } from '@/utils/networkConfig';
+import { useAuth } from '@/contexts/AuthContext';
+import { safeGoBack } from '@/utils/navigationHelper';
+import LegalDisclaimer from '@/components/guides/LegalDisclaimer';
+import Navbar from '@/components/Navbar';
+import { GuestNavbar } from '@/components/guest';
 
 // Helper function to get full Supabase Storage URL
 const getStorageUrl = (path: string | null | undefined): string | undefined => {
@@ -75,6 +79,8 @@ function formatDate(dateString: string | null): string {
 export default function ArticleViewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const pathname = usePathname();
+  const { isGuestMode, isAuthenticated, user } = useAuth();
   const [article, setArticle] = useState<DbArticleRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -177,9 +183,15 @@ export default function ArticleViewScreen() {
     }
   };
 
-  const handleBack = () => {
-    router.back();
-  };
+  // Intelligent back navigation handler (FAANG best practice)
+  const handleBack = useCallback(() => {
+    safeGoBack(router, {
+      isGuestMode,
+      isAuthenticated,
+      userRole: user?.role,
+      currentPath: pathname,
+    }, '/guides'); // Custom fallback to guides page
+  }, [router, isGuestMode, isAuthenticated, user?.role, pathname]);
 
   const toggleLanguage = () => {
     setShowFilipino(!showFilipino);
@@ -232,7 +244,10 @@ export default function ArticleViewScreen() {
         {/* Article Image */}
         <Image 
           source={{ 
-            uri: (getStorageUrl((article as any).image_article) || noImageUri) as string 
+            uri: ((article as any).image_article 
+              ? `https://vmlbrckrlgwlobhnpstx.supabase.co/storage/v1/object/public/legal-articles/${(article as any).image_article}`
+              : noImageUri
+            ) as string 
           }}
           style={styles.articleImage}
           resizeMode="cover"
@@ -339,6 +354,13 @@ export default function ArticleViewScreen() {
        
         </View>
       </ScrollView>
+
+      {/* Conditional navbar rendering based on guest mode */}
+      {isGuestMode ? (
+        <GuestNavbar activeTab="learn" />
+      ) : (
+        <Navbar activeTab="learn" />
+      )}
     </SafeAreaView>
   );
 }

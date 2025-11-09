@@ -32,6 +32,7 @@ interface ArticleCardProps {
   onPress?: (item: ArticleItem) => void;
   containerStyle?: StyleProp<ViewStyle>;
   onToggleBookmark?: (item: ArticleItem) => void;
+  showBookmark?: boolean; // Control bookmark visibility
 }
 
 function getCategoryBadgeClasses(
@@ -59,161 +60,178 @@ function getCategoryBadgeClasses(
   }
 }
 
+// Constants
+const NO_IMAGE_URI = "https://placehold.co/1200x800/png?text=No+Image+Available";
+const IMAGE_HEIGHT = 160;
+const BOOKMARK_SIZE = 18;
+const CHEVRON_SIZE = 20;
+
+// Styles
+const cardStyles = {
+  container: tw`mb-4 flex-1`,
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    overflow: "hidden" as const,
+    position: "relative" as const,
+    flexDirection: "column" as const,
+  },
+  imageContainer: { height: IMAGE_HEIGHT, width: "100%" as const },
+  image: { width: "100%" as const, height: "100%" as const },
+  bookmarkButton: {
+    position: "absolute" as const,
+    top: 10,
+    right: 10,
+    padding: 6,
+    borderRadius: 9999,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    zIndex: 10,
+  },
+  content: { padding: 16, paddingBottom: 48 },
+  header: { flexDirection: "row" as const, alignItems: "flex-start" as const, justifyContent: "space-between" as const, marginBottom: 12 },
+  title: { fontWeight: "700" as const, fontSize: 16, flex: 1, marginRight: 8 },
+  filipinoTitle: { fontSize: 14, marginBottom: 12, fontWeight: "500" as const },
+  summary: { fontSize: 14 },
+  chevronButton: { position: "absolute" as const, right: 12, bottom: 12 },
+};
+
 export const ArticleCard = ({
   item,
   onPress,
   containerStyle,
   onToggleBookmark,
+  showBookmark = true,
 }: ArticleCardProps) => {
-  const noImageUri =
-    "https://placehold.co/1200x800/png?text=No+Image+Available";
+  // Memoized image source
   const initialSource: ImageSourcePropType = useMemo(
-    () => {
-      // Debug logging to help identify image URL issues
-      if (__DEV__ && item.imageUrl) {
-        console.log(`Article "${item.title}" image URL:`, item.imageUrl);
-      }
-      return item.image ?? { uri: item.imageUrl || noImageUri };
-    },
-    [item.image, item.imageUrl, item.title]
+    () => item.image ?? { uri: item.imageUrl || NO_IMAGE_URI },
+    [item.image, item.imageUrl]
   );
-  const [imageSource, setImageSource] =
-    useState<ImageSourcePropType>(initialSource);
-  const [imageError, setImageError] = useState(false);
+  const [imageSource, setImageSource] = useState<ImageSourcePropType>(initialSource);
+
+  // Memoized category badge classes
+  const categoryBadge = useMemo(
+    () => item.category ? getCategoryBadgeClasses(item.category) : null,
+    [item.category]
+  );
+
+  // Memoized handlers
+  const handlePress = useMemo(
+    () => () => onPress?.(item),
+    [onPress, item]
+  );
+
+  const handleBookmarkPress = useMemo(
+    () => () => onToggleBookmark?.(item),
+    [onToggleBookmark, item]
+  );
+
+  const handleImageError = useMemo(
+    () => () => setImageSource({ uri: NO_IMAGE_URI }),
+    []
+  );
 
   return (
-    <View style={[tw`mb-4 flex-1 px-2`, containerStyle]}>
-      <View
-        style={[
-          tw`bg-white border border-gray-200`,
-          {
-            borderRadius: 16,
-            overflow: "hidden",
-            position: "relative",
-            height: 400, // fixed height for consistent cards
-            flexDirection: "column",
-          },
-        ]}
-      >
+    <View style={[cardStyles.container, containerStyle]}>
+      <View style={cardStyles.card}>
         {/* Image */}
         <TouchableOpacity
           accessibilityRole="button"
-          onPress={() => onPress && onPress(item)}
+          onPress={handlePress}
         >
-          <View style={{ height: 160, width: "100%" }}>
+          <View style={cardStyles.imageContainer}>
             <Image
               source={imageSource}
-              style={{ width: "100%", height: "100%" }}
+              style={cardStyles.image}
               resizeMode="cover"
-              onError={(error) => {
-                if (__DEV__) {
-                  console.warn(`Failed to load image for "${item.title}":`, error.nativeEvent?.error);
-                  console.warn('Image source was:', imageSource);
-                }
-                setImageError(true);
-                setImageSource({ uri: noImageUri });
-              }}
-              onLoad={() => {
-                if (__DEV__ && imageError) {
-                  console.log(`Successfully loaded fallback image for "${item.title}"`);
-                }
-              }}
+              onError={handleImageError}
               accessibilityLabel={`Cover image for ${item.title}`}
             />
           </View>
         </TouchableOpacity>
 
         {/* Bookmark */}
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => onToggleBookmark && onToggleBookmark(item)}
-          style={{
-            position: "absolute",
-            top: 10,
-            right: 10,
-            padding: 6,
-            borderRadius: 9999,
-            backgroundColor: "rgba(255,255,255,0.9)",
-            zIndex: 10,
-          }}
-        >
-          <Bookmark
-            size={18}
-            color={item.isBookmarked ? "#f59e0b" : "#9ca3af"}
-            strokeWidth={2}
-            fill={item.isBookmarked ? "#f59e0b" : "none"}
-          />
-        </TouchableOpacity>
+        {showBookmark && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={handleBookmarkPress}
+            style={cardStyles.bookmarkButton}
+          >
+            <Bookmark
+              size={BOOKMARK_SIZE}
+              color={item.isBookmarked ? "#f59e0b" : "#9ca3af"}
+              strokeWidth={2}
+              fill={item.isBookmarked ? "#f59e0b" : "none"}
+            />
+          </TouchableOpacity>
+        )}
 
         {/* Content */}
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => onPress && onPress(item)}
-          style={{ flex: 1 }}
-        >
-          <View style={[tw`p-4 flex-1`]}>
-            <View style={tw`flex-row items-start justify-between mb-3`}>
-              <Text
-                numberOfLines={2}
-                ellipsizeMode="tail"
-                style={[
-                  tw`font-bold text-base`,
-                  { color: Colors.text.head, flex: 1, marginRight: 8 },
-                ]}
+        <View style={cardStyles.content}>
+          {/* Header: Title + Category Badge */}
+          <View style={cardStyles.header}>
+            <Text
+              numberOfLines={2}
+              ellipsizeMode="tail"
+              style={[cardStyles.title, { color: Colors.text.head }]}
+            >
+              {item.title}
+            </Text>
+            {categoryBadge && (
+              <Badge
+                variant="outline"
+                className={`rounded-md ${categoryBadge.container}`}
               >
-                {item.title}
-              </Text>
-              {item.category ? (
-                <Badge
-                  variant="outline"
-                  className={`rounded-md ${
-                    getCategoryBadgeClasses(item.category).container
-                  }`}
-                >
-                  <BadgeText
-                    size="sm"
-                    className={getCategoryBadgeClasses(item.category).text}
-                  >
-                    {item.category}
-                  </BadgeText>
-                </Badge>
-              ) : null}
-            </View>
+                <BadgeText size="sm" className={categoryBadge.text}>
+                  {item.category}
+                </BadgeText>
+              </Badge>
+            )}
+          </View>
 
-            {item.filipinoTitle ? (
-              <Text
-                style={[
-                  tw`text-sm mb-3 font-medium`,
-                  { color: Colors.primary.blue },
-                ]}
-              >
-                {item.filipinoTitle}
-              </Text>
-            ) : null}
+          {/* Filipino Title */}
+          {item.filipinoTitle && (
+            <Text style={[cardStyles.filipinoTitle, { color: Colors.primary.blue }]}>
+              {item.filipinoTitle}
+            </Text>
+          )}
 
+          {/* Summary */}
+          <Text
+            numberOfLines={3}
+            ellipsizeMode="tail"
+            style={[
+              cardStyles.summary,
+              { 
+                color: Colors.text.sub,
+                marginBottom: item.filipinoSummary ? 12 : 0,
+              },
+            ]}
+          >
+            {item.summary}
+          </Text>
+
+          {/* Filipino Summary */}
+          {item.filipinoSummary && (
             <Text
               numberOfLines={3}
               ellipsizeMode="tail"
-              style={[tw`text-sm leading-5 mb-3`, { color: Colors.text.sub }]}
+              style={[cardStyles.summary, { color: Colors.text.sub }]}
             >
-              {item.summary}
+              {item.filipinoSummary}
             </Text>
+          )}
+        </View>
 
-            {item.filipinoSummary ? (
-              <Text
-                numberOfLines={3}
-                ellipsizeMode="tail"
-                style={[tw`text-sm leading-5`, { color: Colors.text.sub }]}
-              >
-                {item.filipinoSummary}
-              </Text>
-            ) : (
-              <View style={tw`h-6`} />
-            )}
-          </View>
-          <View style={{ position: "absolute", right: 12, bottom: 12 }}>
-            <ChevronRight size={20} color={Colors.primary.blue} />
-          </View>
+        {/* Chevron */}
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={handlePress}
+          style={cardStyles.chevronButton}
+        >
+          <ChevronRight size={CHEVRON_SIZE} color={Colors.primary.blue} />
         </TouchableOpacity>
       </View>
     </View>
