@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, startTransition } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -65,6 +65,9 @@ export default function GlossaryScreen() {
   const [displayArticles, setDisplayArticles] = useState<ArticleItem[]>([]);
   const [isSearchingArticles, setIsSearchingArticles] = useState<boolean>(false);
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
+  const categoryCache = useRef<Record<string, ArticleItem[]>>({});
+  const lastCategoryRef = useRef<string>("all");
+  const latestCategoryRef = useRef<string>("all");
   
   // Animation and layout
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -205,62 +208,124 @@ export default function GlossaryScreen() {
     }
   }, [activeTab, fetchLegalTerms]);
 
-  // Search and category change with debounce
+  // Search and category change with debounce - OPTIMIZED
   useEffect(() => {
-    if (activeTab === "terms") {
-      const timeoutId = setTimeout(() => {
-        fetchLegalTerms(1, activeCategory, searchQuery);
-      }, 500);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [activeCategory, searchQuery, activeTab, fetchLegalTerms]);
+    if (activeTab !== "terms") return;
+    
+    const timeoutId = setTimeout(() => {
+      setCurrentPage(1);
+      fetchLegalTerms(1, activeCategory, searchQuery);
+    }, 150); // Reduced from 300ms to 150ms for faster response
+    
+    return () => clearTimeout(timeoutId);
+  }, [activeCategory, searchQuery, activeTab]);
 
-  // Articles search with debounce
+  // Articles search - OPTIMIZED with latest value pattern
   useEffect(() => {
-    if (activeTab === "guides") {
-      const searchTimeout = setTimeout(async () => {
-        const trimmedQuery = searchQuery.trim();
-        
-        if (trimmedQuery && trimmedQuery.length >= 2) {
-          setIsSearchingArticles(true);
-          try {
-            const searchResults = await searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
+    if (activeTab !== "guides") return;
+    
+    let isCancelled = false;
+    const trimmedQuery = searchQuery.trim();
+    
+    // Track the latest category
+    latestCategoryRef.current = activeCategory;
+    
+    // Immediate optimistic update for category-only changes
+    if (!trimmedQuery && activeCategory !== lastCategoryRef.current) {
+      lastCategoryRef.current = activeCategory;
+      
+      // Use startTransition for non-urgent updates
+      startTransition(() => {
+        setCurrentPage(1);
+      });
+      
+      // Immediate synchronous update with cached data
+      if (activeCategory === "all") {
+        if (legalArticles.length > 0) {
+          setDisplayArticles(legalArticles);
+          categoryCache.current["all"] = legalArticles;
+        }
+      } else if (categoryCache.current[activeCategory]) {
+        setDisplayArticles(categoryCache.current[activeCategory]);
+      }
+    }
+    
+    const debounceTime = !trimmedQuery ? 0 : 150;
+    
+    const searchTimeout = setTimeout(async () => {
+      if (trimmedQuery && trimmedQuery.length >= 2) {
+        setIsSearchingArticles(true);
+        try {
+          const searchResults = await searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
+          if (!isCancelled) {
             setDisplayArticles(searchResults);
-          } catch (err) {
-            console.error("Search error:", err);
+          }
+        } catch (err) {
+          console.error("Search error:", err);
+          if (!isCancelled) {
             setDisplayArticles([]);
-          } finally {
+          }
+        } finally {
+          if (!isCancelled) {
             setIsSearchingArticles(false);
           }
-        } else {
-          setIsSearchingArticles(false);
-          if (activeCategory === "all") {
+        }
+      } else {
+        setIsSearchingArticles(false);
+        if (activeCategory === "all") {
+          if (!isCancelled && legalArticles.length > 0) {
             setDisplayArticles(legalArticles);
-          } else {
+            categoryCache.current["all"] = legalArticles;
+          }
+        } else {
+          // Only fetch if not in cache and still the latest category
+          if (!categoryCache.current[activeCategory]) {
             try {
               const byCat = await getArticlesByCategory(activeCategory);
-              setDisplayArticles(byCat);
+              // Only update if this is still the latest category requested
+              if (!isCancelled && byCat.length > 0 && latestCategoryRef.current === activeCategory) {
+                setDisplayArticles(byCat);
+                categoryCache.current[activeCategory] = byCat;
+              }
             } catch (err) {
               console.error("Category fetch error:", err);
-              setDisplayArticles(legalArticles);
+              if (!isCancelled && legalArticles.length > 0 && latestCategoryRef.current === activeCategory) {
+                setDisplayArticles(legalArticles);
+              }
             }
           }
         }
-      }, 500);
+      }
+    }, debounceTime);
 
-      return () => clearTimeout(searchTimeout);
-    }
-  }, [searchQuery, activeCategory, activeTab, legalArticles, searchArticles, getArticlesByCategory]);
+    return () => {
+      isCancelled = true;
+      clearTimeout(searchTimeout);
+    };
+  }, [searchQuery, activeCategory, activeTab]);
 
+  // Stable reference to prevent blinking
+  const previousDataRef = useRef<(TermItem | ArticleItem)[]>([]);
+  
   // Handle data differently for terms (server-side pagination) vs articles (client-side pagination)
   const currentData = useMemo(() => {
+    let newData: (TermItem | ArticleItem)[];
+    
     if (activeTab === "terms") {
       // For terms, return the data as-is since pagination is handled server-side
-      return terms;
+      newData = terms;
     } else {
       // For articles, apply client-side filtering
-      return displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
+      newData = displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: !!bookmarks[a.id] }));
     }
+    
+    // Only update if we have data, otherwise keep previous to prevent blank screen
+    if (newData.length > 0) {
+      previousDataRef.current = newData;
+      return newData;
+    }
+    
+    return previousDataRef.current;
   }, [activeTab, terms, displayArticles, bookmarks]);
 
   // Calculate pagination info based on tab
@@ -270,11 +335,12 @@ export default function GlossaryScreen() {
   const paginatedData = useMemo(() => {
     if (activeTab === "terms") {
       // For terms, return all data since server already paginated
-      return currentData;
+      return currentData.length > 0 ? currentData : previousDataRef.current;
     } else {
       // For articles, apply client-side pagination
       const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-      return currentData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+      const data = currentData.length > 0 ? currentData : previousDataRef.current;
+      return data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }
   }, [activeTab, currentData, currentPage]);
 
@@ -282,7 +348,7 @@ export default function GlossaryScreen() {
   const handleTabChange = useCallback((id: string) => {
     if (id === activeTab) return;
     
-    // Smooth transition animation for both tabs
+    // Smooth transition animation ONLY for tab switches
     fadeOut(fadeAnim, 150).start(() => {
       setActiveTab(id);
       setCurrentPage(1);
@@ -294,27 +360,16 @@ export default function GlossaryScreen() {
   }, [activeTab, fadeAnim]);
 
   const handleCategoryChange = useCallback((categoryId: string) => {
-    setActiveCategory(categoryId);
-    setCurrentPage(1);
+    if (categoryId === activeCategory) return;
     
-    if (activeTab === "guides" && categoryId !== "all") {
-      (async () => {
-        try {
-          const byCat = await getArticlesByCategory(categoryId);
-          setDisplayArticles(byCat);
-        } catch (err) {
-          console.error("Category fetch error:", err);
-          setDisplayArticles(legalArticles);
-        }
-      })();
-    } else if (activeTab === "guides") {
-      setDisplayArticles(legalArticles);
-    }
+    // Batch state updates for smoother transition
+    startTransition(() => {
+      setActiveCategory(categoryId);
+    });
     
-    setTimeout(() => {
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-    }, 50);
-  }, [activeTab, getArticlesByCategory, legalArticles]);
+    // Immediate scroll to top
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [activeCategory]);
 
   const handleItemPress = useCallback((item: TermItem | ArticleItem) => {
     if (activeTab === "terms") {
@@ -329,6 +384,8 @@ export default function GlossaryScreen() {
   }, []);
 
   const handlePageChange = useCallback((page: number) => {
+    if (page === currentPage) return;
+    
     setCurrentPage(page);
     
     // For terms, fetch new data from server
@@ -336,8 +393,11 @@ export default function GlossaryScreen() {
       fetchLegalTerms(page, activeCategory, searchQuery);
     }
     
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-  }, [activeTab, activeCategory, searchQuery, fetchLegalTerms]);
+    // Smooth scroll to top
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    });
+  }, [activeTab, activeCategory, searchQuery, currentPage, fetchLegalTerms]);
 
   // Render functions
   const renderListHeader = useCallback(() => (
@@ -575,7 +635,11 @@ export default function GlossaryScreen() {
           className="bg-white rounded-lg border border-gray-300"
         >
           <InputSlot className="pl-4">
-            <Ionicons name="search" size={20} color="#9CA3AF" />
+            {(termsLoading && activeTab === "terms") || (isSearchingArticles && activeTab === "guides") ? (
+              <ActivityIndicator size="small" color={Colors.primary.blue} />
+            ) : (
+              <Ionicons name="search" size={20} color="#9CA3AF" />
+            )}
           </InputSlot>
           <InputField
             value={searchQuery}
@@ -584,21 +648,34 @@ export default function GlossaryScreen() {
             placeholderTextColor="#9CA3AF"
             className="text-gray-800 text-base"
             editable={!termsLoading && !articlesLoading}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
           />
+          {searchQuery.length > 0 && (
+            <InputSlot className="pr-2">
+              <TouchableOpacity
+                onPress={() => setSearchQuery("")}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+            </InputSlot>
+          )}
           <InputSlot className="pr-4">
             <Ionicons name="options" size={20} color={Colors.text.sub} />
           </InputSlot>
         </Input>
       </Box>
 
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+      <View style={{ flex: 1 }}>
         <FlatList
           ref={flatListRef}
           data={paginatedData}
-          key={`glossary-${numColumns}-${activeCategory}-${currentPage}-${activeTab}-${screenWidth}`}
+          key={`glossary-${numColumns}-${activeTab}-${screenWidth}`}
           keyExtractor={(item) => item.id}
           numColumns={numColumns}
-          extraData={screenWidth}
+          extraData={[screenWidth, activeCategory, currentPage, paginatedData.length]}
           ListHeaderComponent={renderListHeader}
           ListFooterComponent={renderPaginationControls}
           ListEmptyComponent={renderEmptyState}
@@ -615,13 +692,26 @@ export default function GlossaryScreen() {
           renderItem={renderItem}
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}
-          maxToRenderPerBatch={10}
+          maxToRenderPerBatch={5}
           initialNumToRender={8}
-          windowSize={10}
-          refreshing={termsLoading || articlesLoading}
-          onRefresh={() => activeTab === "terms" ? fetchLegalTerms(currentPage) : refetch()}
+          windowSize={5}
+          updateCellsBatchingPeriod={50}
+          getItemLayout={(data, index) => ({
+            length: activeTab === "terms" ? 180 : 200,
+            offset: (activeTab === "terms" ? 180 : 200) * index,
+            index,
+          })}
+          refreshing={false}
+          onRefresh={() => {
+            if (activeTab === "terms") {
+              setCurrentPage(1);
+              fetchLegalTerms(1, activeCategory, searchQuery);
+            } else {
+              refetch();
+            }
+          }}
         />
-      </Animated.View>
+      </View>
 
       {/* Guest Sidebar */}
       {isGuestMode && (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { View, Alert, StatusBar, Animated, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { shouldUseNativeDriver } from '@/utils/animations';
@@ -68,7 +68,6 @@ const sampleFavoriteTerms: TermItem[] = [
 export default function FavoritesScreen() {
   const router = useRouter();
   const { favoriteTermIds, loadFavorites } = useFavorites();
-  const [filteredTerms, setFilteredTerms] = useState<TermItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -105,8 +104,8 @@ export default function FavoritesScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
-  // Filter terms based on search query and category
-  useEffect(() => {
+  // Filter terms based on search query and category - MEMOIZED
+  const filteredTerms = useMemo(() => {
     let filtered = favoriteTerms;
 
     // Filter by category
@@ -126,13 +125,13 @@ export default function FavoritesScreen() {
       );
     }
 
-    setFilteredTerms(filtered);
+    return filtered;
   }, [favoriteTerms, searchQuery, activeCategory]);
 
 
-  const handleTermPress = (term: TermItem) => {
+  const handleTermPress = useCallback((term: TermItem) => {
     router.push(`/glossary/${term.id}`);
-  };
+  }, [router]);
 
 
 

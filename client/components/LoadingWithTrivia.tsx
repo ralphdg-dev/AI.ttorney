@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Animated, Image } from 'react-native';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../constants/Colors';
 
-const loadingVideo = require('../assets/images/loading-state.mp4');
+const loadingGif = require('../assets/images/aittorney-loading.gif');
 
 // Philippine Law Trivia - 25 Random Facts about Philippine Law
 const PH_LAW_TRIVIAS = [
@@ -47,7 +46,6 @@ export const LoadingWithTrivia: React.FC<LoadingWithTriviaProps> = ({
   const displayMessage = message || "LOADING...";
   const [currentTrivia, setCurrentTrivia] = useState('');
   const [fadeAnim] = useState(new Animated.Value(0));
-  const videoRef = useRef<Video>(null);
 
   useEffect(() => {
     // Select random trivia on mount
@@ -64,16 +62,12 @@ export const LoadingWithTrivia: React.FC<LoadingWithTriviaProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Loading Video */}
-      <Animated.View style={[styles.videoContainer, { opacity: fadeAnim }]}>
-        <Video
-          ref={videoRef}
-          source={loadingVideo}
-          style={styles.loadingVideo}
-          resizeMode={ResizeMode.CONTAIN}
-          shouldPlay
-          isLooping
-          isMuted
+      {/* Loading GIF */}
+      <Animated.View style={[styles.gifContainer, { opacity: fadeAnim }]}>
+        <Image
+          source={loadingGif}
+          style={styles.loadingGif}
+          resizeMode="contain"
         />
       </Animated.View>
 
@@ -98,14 +92,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     paddingHorizontal: 40,
   },
-  videoContainer: {
+  gifContainer: {
     width: 150,
     height: 150,
     marginBottom: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingVideo: {
+  loadingGif: {
     width: 150,
     height: 150,
   },
