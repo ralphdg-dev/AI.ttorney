@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -72,28 +72,23 @@ const ProfileCard: React.FC<{
 );
 
 export default function UserProfilePage() {
-  // ⚡ FAANG OPTIMIZATION: Use AuthContext data directly - ZERO loading time
   const { user, signOut, refreshProfile } = useAuth();
   const router = useRouter();
+  const hasRefreshed = useRef(false);
 
-  // Background refresh on mount (non-blocking)
+  // Background refresh once on mount
   useEffect(() => {
-    if (user) {
-      // Refresh in background without blocking UI
+    if (user && !hasRefreshed.current) {
+      hasRefreshed.current = true;
       refreshProfile().catch(() => {});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  }, [user, refreshProfile]);
 
   const handleEditProfile = () => {
     router.push('/profile/edit');
   };
 
-  // ⚡ FAANG OPTIMIZATION: No loading states - instant render with cached data
-  // If user is null, redirect to login (handled by AuthGuard)
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
