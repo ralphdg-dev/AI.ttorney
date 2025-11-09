@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import forumManagementService from "../../services/forumManagementService";
 import DataTable from "../ui/DataTable";
+import ListToolbar from "../ui/ListToolbar";
 import Pagination from "../ui/Pagination";
 import Tooltip from "../ui/Tooltip";
 
@@ -178,11 +179,6 @@ const ReportedPosts = () => {
               )}
             </span>
           </div>
-          {report.reason_context && (
-            <p className="text-xs text-gray-500 italic">
-              "{report.reason_context}"
-            </p>
-          )}
         </div>
       ),
     },
@@ -282,45 +278,30 @@ const ReportedPosts = () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search reports..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {statusOptions.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {categoryOptions.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      {/* Toolbar */}
+      <ListToolbar
+        query={searchTerm}
+        onQueryChange={setSearchTerm}
+        totalText={pagination.total ? `Total Reports: ${pagination.total}` : null}
+        filter={{
+          value: statusOptions.find(s => s.value === statusFilter)?.label || "All Reports",
+          onChange: (label) => {
+            const status = statusOptions.find(s => s.label === label);
+            setStatusFilter(status?.value || "all");
+          },
+          options: statusOptions.map(s => s.label),
+          label: "Status Filter"
+        }}
+        secondaryFilter={{
+          value: categoryOptions.find(c => c.value === categoryFilter)?.label || "All Categories",
+          onChange: (label) => {
+            const category = categoryOptions.find(c => c.label === label);
+            setCategoryFilter(category?.value || "all");
+          },
+          options: categoryOptions.map(c => c.label),
+          label: "Category Filter"
+        }}
+      />
 
       {error && !showResolutionModal && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">

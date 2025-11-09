@@ -231,7 +231,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
       
-      const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`, {
+      const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent?limit=50`, {
         method: 'GET',
         headers,
         signal: controller.signal,
@@ -254,10 +254,24 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
       const data = await response.json();
       let mapped: PostData[] = [];
       
+      if (__DEV__) {
+        console.log('Timeline: Raw API response:', {
+          success: data?.success,
+          dataType: Array.isArray(data?.data) ? 'array' : typeof data?.data,
+          dataLength: Array.isArray(data?.data) ? data.data.length : 'not array',
+          directArray: Array.isArray(data),
+          directLength: Array.isArray(data) ? data.length : 'not array'
+        });
+      }
+      
       if (Array.isArray(data?.data)) {
         mapped = data.data.map(mapApiToPost);
       } else if (Array.isArray(data)) {
         mapped = data.map(mapApiToPost);
+      }
+      
+      if (__DEV__) {
+        console.log(`Timeline: Mapped ${mapped.length} posts from API response`);
       }
       
       // Only update if component is still mounted
@@ -265,7 +279,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         setPosts(mapped);
         setCachedPosts(mapped); // Cache the posts
         if (__DEV__ && mapped.length === 0) {
-          console.log('Timeline: No posts found');
+          console.log('Timeline: No posts found after mapping');
         }
         
         // Clear any error state on successful load

@@ -104,7 +104,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
       
-      const response = await fetch(`${apiUrl}/api/forum/posts/recent`, {
+      const response = await fetch(`${apiUrl}/api/forum/posts/recent?limit=50`, {
         method: 'GET',
         headers,
         signal: controller.signal,
@@ -127,6 +127,13 @@ const LawyerTimeline: React.FC = React.memo(() => {
 
       const data = await response.json();
       
+      console.log('LawyerTimeline: Raw API response:', {
+        success: data?.success,
+        dataType: Array.isArray(data?.data) ? 'array' : typeof data?.data,
+        dataLength: Array.isArray(data?.data) ? data.data.length : 'not array',
+        directArray: Array.isArray(data),
+        directLength: Array.isArray(data) ? data.length : 'not array'
+      });
       
       // Helper function to map post data
       const mapPostData = (r: any): ForumPostWithUser => {
@@ -172,9 +179,14 @@ const LawyerTimeline: React.FC = React.memo(() => {
         mapped = data.map(mapPostData);
       }
       
+      console.log(`LawyerTimeline: Mapped ${mapped.length} posts from API response`);
+      
       // Only update if component is still mounted
       if (isComponentMounted.current) {
         setPosts(mapped);
+        if (mapped.length === 0) {
+          console.log('LawyerTimeline: No posts found after mapping');
+        }
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {

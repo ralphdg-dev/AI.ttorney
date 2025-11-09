@@ -15,6 +15,7 @@ import {
   Tag,
 } from "lucide-react";
 import Tooltip from "../ui/Tooltip";
+import ListToolbar from "../ui/ListToolbar";
 import forumManagementService from "../../services/forumManagementService";
 import Pagination from "../ui/Pagination";
 
@@ -28,7 +29,6 @@ const ManageTopicsThreads = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [reportedFilter, setReportedFilter] = useState("all");
   const [sortBy, setSortBy] = useState("created_at");
   const [sortOrder, setSortOrder] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -53,10 +53,6 @@ const ManageTopicsThreads = () => {
     { value: "all", label: "All Posts" },
     { value: "active", label: "Active Posts" },
     { value: "deleted", label: "Deleted Posts" },
-  ];
-
-  const reportedOptions = [
-    { value: "all", label: "All Posts" },
     { value: "reported", label: "Reported Posts" },
     { value: "unreported", label: "Unreported Posts" },
   ];
@@ -72,7 +68,6 @@ const ManageTopicsThreads = () => {
     searchTerm,
     categoryFilter,
     statusFilter,
-    reportedFilter,
     sortBy,
     sortOrder,
     currentPage,
@@ -82,13 +77,25 @@ const ManageTopicsThreads = () => {
     try {
       setLoading(true);
       
+      // Handle combined status filter
+      let actualStatus = "all";
+      let actualReported = "all";
+      
+      if (statusFilter === "reported" || statusFilter === "unreported") {
+        actualReported = statusFilter;
+        actualStatus = "all";
+      } else {
+        actualStatus = statusFilter;
+        actualReported = "all";
+      }
+
       const params = {
         page: currentPage,
         limit: 20,
         search: searchTerm,
         category: categoryFilter,
-        status: statusFilter,
-        reported: reportedFilter,
+        status: actualStatus,
+        reported: actualReported,
         sort_by: sortBy,
         sort_order: sortOrder,
       };
@@ -342,82 +349,30 @@ const ManageTopicsThreads = () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search posts..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Category Filter */}
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {categories.map((category) => (
-              <option key={category.value} value={category.value}>
-                {category.label}
-              </option>
-            ))}
-          </select>
-
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {statusOptions.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
-
-          {/* Reported Filter */}
-          <select
-            value={reportedFilter}
-            onChange={(e) => setReportedFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {reportedOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Sort Options */}
-        <div className="flex gap-4">
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="created_at">Created Date</option>
-            <option value="updated_at">Updated Date</option>
-          </select>
-
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="desc">Newest First</option>
-            <option value="asc">Oldest First</option>
-          </select>
-        </div>
-      </div>
+      {/* Toolbar */}
+      <ListToolbar
+        query={searchTerm}
+        onQueryChange={setSearchTerm}
+        totalText={pagination.total ? `Total Posts: ${pagination.total}` : null}
+        filter={{
+          value: categories.find(cat => cat.value === categoryFilter)?.label || "All Categories",
+          onChange: (label) => {
+            const category = categories.find(cat => cat.label === label);
+            setCategoryFilter(category?.value || "all");
+          },
+          options: categories.map(cat => cat.label),
+          label: "Category Filter"
+        }}
+        secondaryFilter={{
+          value: statusOptions.find(status => status.value === statusFilter)?.label || "All Posts",
+          onChange: (label) => {
+            const status = statusOptions.find(status => status.label === label);
+            setStatusFilter(status?.value || "all");
+          },
+          options: statusOptions.map(status => status.label),
+          label: "Status & Reports"
+        }}
+      />
 
       {/* Error Message */}
       {error && (
