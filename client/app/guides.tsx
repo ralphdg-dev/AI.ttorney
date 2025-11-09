@@ -28,8 +28,10 @@ export default function GuidesScreen() {
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
+  const [isFiltering, setIsFiltering] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const { width } = useWindowDimensions();
   
@@ -50,14 +52,24 @@ export default function GuidesScreen() {
 
   // Removed tab options - only showing legal terms for guests
 
-  // Search debounce
+  // Debounce search input
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  // Search and filter
   useEffect(() => {
     const searchTimeout = setTimeout(async () => {
-      const trimmedQuery = searchQuery.trim();
+      const trimmedQuery = debouncedSearch.trim();
       const searchKey = `${trimmedQuery}-${activeCategory}`;
       
       if (previousSearchRef.current === searchKey) return;
       previousSearchRef.current = searchKey;
+      
+      setIsFiltering(true);
       
       if (trimmedQuery) {
         if (trimmedQuery.length >= 2) {
@@ -82,10 +94,12 @@ export default function GuidesScreen() {
           }
         }
       }
-    }, 500);
+      
+      setIsFiltering(false);
+    }, 100);
 
     return () => clearTimeout(searchTimeout);
-  }, [searchQuery, activeCategory, legalArticles, searchArticles, getArticlesByCategory]);
+  }, [debouncedSearch, activeCategory, legalArticles, searchArticles, getArticlesByCategory]);
 
   const articlesToRender: ArticleItem[] = useMemo(() => {
     return displayArticles.map((a: ArticleItem) => ({ ...a, isBookmarked: isBookmarked(a.id) }));

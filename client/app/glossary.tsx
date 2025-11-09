@@ -42,8 +42,10 @@ export default function GlossaryScreen() {
   const [activeTab, setActiveTab] = useState<string>("terms");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
+  const [isFiltering, setIsFiltering] = useState(false);
 
   // Terms state
   const [terms, setTerms] = useState<TermItem[]>([]);
@@ -205,21 +207,32 @@ export default function GlossaryScreen() {
     }
   }, [activeTab, fetchLegalTerms]);
 
-  // Search and category change with debounce
+  // Debounce search input
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  // Search and category change
   useEffect(() => {
     if (activeTab === "terms") {
+      setIsFiltering(true);
       const timeoutId = setTimeout(() => {
-        fetchLegalTerms(1, activeCategory, searchQuery);
-      }, 500);
+        fetchLegalTerms(1, activeCategory, debouncedSearch).finally(() => {
+          setIsFiltering(false);
+        });
+      }, 100);
       return () => clearTimeout(timeoutId);
     }
-  }, [activeCategory, searchQuery, activeTab, fetchLegalTerms]);
+  }, [activeCategory, debouncedSearch, activeTab, fetchLegalTerms]);
 
-  // Articles search with debounce
+  // Articles search with optimized debounce
   useEffect(() => {
     if (activeTab === "guides") {
       const searchTimeout = setTimeout(async () => {
-        const trimmedQuery = searchQuery.trim();
+        const trimmedQuery = debouncedSearch.trim();
         
         if (trimmedQuery && trimmedQuery.length >= 2) {
           setIsSearchingArticles(true);
@@ -246,7 +259,7 @@ export default function GlossaryScreen() {
             }
           }
         }
-      }, 500);
+      }, 100);
 
       return () => clearTimeout(searchTimeout);
     }
