@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Image, KeyboardAvoidingView, Platform, ActivityIndicator, Dimensions } from 'react-native';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import BackButton from '../../components/ui/BackButton';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import { Ionicons } from '@expo/vector-icons';
@@ -624,10 +623,8 @@ export default function UserRegistration() {
                 ),
               });
               
-              // Step 3: Store password temporarily for session creation after OTP verification
-              await AsyncStorage.setItem('temp_password', password);
-              
-              // Step 4: Navigate to verify-otp with the email
+              // Step 3: Navigate to verify-otp with the email
+              // Note: Password is NOT stored - user will sign in after verification
               router.push(`./verify-otp?email=${encodeURIComponent(email)}` as any);
               
             } catch (error) {

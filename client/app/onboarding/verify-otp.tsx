@@ -14,7 +14,6 @@ import PrimaryButton from "../../components/ui/PrimaryButton";
 import BackButton from "../../components/ui/BackButton";
 import Colors from "../../constants/Colors";
 import { apiClient } from "../../lib/api-client";
-import { supabase } from "../../config/supabase";
 import otpsent from "../../assets/images/otpsent.png";
 
 export default function VerifyOTP() {
@@ -134,30 +133,9 @@ export default function VerifyOTP() {
         }
       } else {
         // Success case - OTP verified successfully
-        console.log('OTP verification successful, creating authenticated session');
+        console.log('✅ Email verified successfully!');
         
-        // Get the temporary password from AsyncStorage (stored during registration)
-        const tempPassword = await AsyncStorage.getItem('temp_password');
-        
-        if (!tempPassword) {
-          setError("Registration session expired. Please register again.");
-          return;
-        }
-        
-        // Sign in the user with Supabase to create an authenticated session
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password: tempPassword,
-        });
-        
-        if (signInError) {
-          console.error('Error creating session after OTP verification:', signInError);
-          setError("Failed to create session. Please try logging in manually.");
-          return;
-        }
-        
-        // Clear temporary password and store user email
-        await AsyncStorage.removeItem('temp_password');
+        // Store verified email
         await AsyncStorage.setItem('user_email', email);
         
         // Clear form states
@@ -166,11 +144,18 @@ export default function VerifyOTP() {
         setAttemptsRemaining(null);
         setIsLockedOut(false);
         
-        // Wait a moment for auth state to update, then navigate
-        console.log('Session created, navigating to role selection...');
-        setTimeout(() => {
-          router.replace('/role-selection');
-        }, 100);
+        // Navigate to login page - user must sign in with their password
+        console.log('Redirecting to login page...');
+        Alert.alert(
+          "Email Verified!",
+          "Your email has been verified. Please sign in with your credentials.",
+          [
+            {
+              text: "Go to Login",
+              onPress: () => router.replace('/login')
+            }
+          ]
+        );
       }
     } catch {
       setError("Verification failed. Please try again.");

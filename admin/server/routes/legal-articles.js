@@ -49,12 +49,16 @@ router.get("/", async (req, res) => {
     const getImageUrl = (imagePath) => {
       if (!imagePath) return "";
       if (imagePath.startsWith("http")) return imagePath;
+      
+      // SECURITY: Never use hardcoded URLs - fail if env var missing
+      if (!process.env.SUPABASE_URL) {
+        throw new Error("SUPABASE_URL environment variable is required");
+      }
+      
       const bucketName = "legal-articles";
       const cleanPath = imagePath.replace(/^\//, "");
       const encodedPath = encodeURIComponent(cleanPath);
-      const supabaseUrl =
-        process.env.SUPABASE_URL || "https://vmlbrckrlgwlobhnpstx.supabase.co";
-      return `${supabaseUrl}/storage/v1/object/public/${bucketName}/${encodedPath}`;
+      return `${process.env.SUPABASE_URL}/storage/v1/object/public/${bucketName}/${encodedPath}`;
     };
 
     const formattedData = data.map((article) => ({
@@ -137,11 +141,13 @@ router.post("/", upload.single("image"), async (req, res) => {
       if (updateError) throw updateError;
     }
 
-    const supabaseUrl =
-      process.env.SUPABASE_URL || "https://vmlbrckrlgwlobhnpstx.supabase.co";
+    // SECURITY: Fail if SUPABASE_URL not set
+    if (!process.env.SUPABASE_URL) {
+      throw new Error("SUPABASE_URL environment variable is required");
+    }
     const getImageUrl = (path) =>
       path
-        ? `${supabaseUrl}/storage/v1/object/public/legal-articles/${encodeURIComponent(
+        ? `${process.env.SUPABASE_URL}/storage/v1/object/public/legal-articles/${encodeURIComponent(
             path
           )}`
         : "";
@@ -225,11 +231,13 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       if (imageUpdateError) throw imageUpdateError;
     }
 
-    const supabaseUrl =
-      process.env.SUPABASE_URL || "https://vmlbrckrlgwlobhnpstx.supabase.co";
+    // SECURITY: Fail if SUPABASE_URL not set
+    if (!process.env.SUPABASE_URL) {
+      throw new Error("SUPABASE_URL environment variable is required");
+    }
     const getImageUrl = (path) =>
       path
-        ? `${supabaseUrl}/storage/v1/object/public/legal-articles/${encodeURIComponent(
+        ? `${process.env.SUPABASE_URL}/storage/v1/object/public/legal-articles/${encodeURIComponent(
             path
           )}`
         : "";
@@ -301,11 +309,13 @@ router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
 
     if (error) throw error;
 
-    const supabaseUrl =
-      process.env.SUPABASE_URL || "https://vmlbrckrlgwlobhnpstx.supabase.co";
+    // SECURITY: Fail if SUPABASE_URL not set
+    if (!process.env.SUPABASE_URL) {
+      throw new Error("SUPABASE_URL environment variable is required");
+    }
     const getImageUrl = (path) =>
       path
-        ? `${supabaseUrl}/storage/v1/object/public/legal-articles/${encodeURIComponent(
+        ? `${process.env.SUPABASE_URL}/storage/v1/object/public/legal-articles/${encodeURIComponent(
             path
           )}`
         : "";
