@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from routes import legalTerms
 from contextlib import asynccontextmanager
 from routes.legalConsultations import router as legal_consultations_router
+from routes import support
 
 
 # Load environment variables
@@ -113,6 +114,7 @@ app.include_router(consultation_router)
 app.include_router(lawyer_info_router)
 app.include_router(consult_action)
 app.include_router(route_validation_router, prefix="/api")
+app.include_router(support.router, prefix="/api")
 
 # Import and include lawyer application router
 from routes.lawyer_applications import router as lawyer_applications_router
