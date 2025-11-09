@@ -46,7 +46,8 @@ const Sidebar = ({ activeItem }) => {
       case 'manage-legal-articles': return '/legal-resources/legal-articles';
       case 'manage-topics-threads': return '/forum/topics-threads';
       case 'reported-posts': return '/forum/reported-posts';
-      case 'ban-restrict-users': return '/forum/ban-restrict-users';
+      case 'reported-replies': return '/forum/reported-replies';
+      case 'ban-restrict-users': return '/appeals/ban-restrict-users';
       case 'open-tickets': return '/tickets/open';
       case 'assigned-tickets': return '/tickets/assigned';
       case 'ticket-history': return '/tickets/history';

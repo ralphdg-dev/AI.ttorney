@@ -258,9 +258,10 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
   return (
     <Modal 
       open={open} 
-      onClose={onClose} 
+      onClose={() => {}} 
       title="Admin Details"
       width="max-w-4xl"
+      showCloseButton={false}
     >
       <div className="space-y-6">
         {/* Admin Basic Info - Two Column Layout */}
@@ -507,6 +508,15 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
           </div>
         </div>
 
+        {/* Close Button */}
+        <div className="flex justify-end pt-4 border-t border-gray-200">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#023D7B]"
+          >
+            Close
+          </button>
+        </div>
       </div>
 
       {/* Activity Detail Modal */}

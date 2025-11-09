@@ -81,7 +81,7 @@ const Select = ({
       </button>
 
       {open && !disabled && (
-        <div className={`absolute z-30 mt-1 rounded-md border border-gray-200 bg-white shadow-lg overflow-hidden ${
+        <div className={`absolute z-[9998] mt-1 rounded-md border border-gray-200 bg-white shadow-xl overflow-hidden ${
           variant === 'form' ? 'left-0 right-0' : 'right-0 w-40'
         }`}>
           <ul className="max-h-60 overflow-auto py-1">

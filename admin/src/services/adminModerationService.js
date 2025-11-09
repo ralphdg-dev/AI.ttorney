@@ -110,6 +110,32 @@ class AdminModerationService {
     }
   }
 
+  // Lift ban (admin override)
+  async liftBan(userId, reason) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/moderation/lift-ban/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        },
+        body: JSON.stringify({ reason })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to lift ban');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Lift ban error:', error);
+      throw error;
+    }
+  }
+
+
   // Helper method to format violation action for API
   formatModerationAction(action, postContent, adminReason, reportId = null, contentId = null, duration = 'permanent') {
     return {

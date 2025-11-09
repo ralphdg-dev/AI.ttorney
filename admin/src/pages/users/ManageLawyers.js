@@ -3,7 +3,8 @@ import { Users, Eye, Pencil, UserX, Loader2, XCircle, ChevronUp, ChevronDown, Ch
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
-import ViewLegalSeekerModal from '../../components/users/ViewLegalSeekerModal';
+import ViewLawyerModal from '../../components/lawyers/ViewLawyerModal';
+import EditLawyerModal from '../../components/lawyers/EditLawyerModal';
 import DataTable from '../../components/ui/DataTable';
 import Pagination from '../../components/ui/Pagination';
 import { useToast } from '../../components/ui/Toast';
@@ -41,6 +42,10 @@ const ManageLawyers = () => {
     loading: false,
     changes: null // For tracking edit changes
   });
+  const [viewModalOpen, setViewModalOpen] = React.useState(false);
+  const [selectedLawyer, setSelectedLawyer] = React.useState(null);
+  const [editModalOpen, setEditModalOpen] = React.useState(false);
+  const [editingLawyer, setEditingLawyer] = React.useState(null);
 
   // Load data from API
   const loadData = React.useCallback(async () => {
@@ -75,24 +80,34 @@ const ManageLawyers = () => {
 
   // Handle view lawyer details
   const handleView = (lawyer) => {
-    alert(`View details for: ${lawyer.full_name}\nEmail: ${lawyer.email}\nStatus: ${lawyer.status}`);
+    setSelectedLawyer(lawyer);
+    setViewModalOpen(true);
   };
 
   const handleEdit = (lawyer) => {
-    // For now, simulate edit changes since actual edit modal doesn't exist yet
-    const simulatedChanges = {
-      Status: { from: lawyer.status, to: 'suspended' },
-      'Accepting Consultations': { from: lawyer.accepting_consultations ? 'Yes' : 'No', to: 'No' }
-    };
-    
-    setConfirmationModal({
-      open: true,
-      type: 'edit',
-      lawyerId: lawyer.id,
-      lawyerName: lawyer.full_name,
-      loading: false,
-      changes: simulatedChanges
-    });
+    setEditingLawyer(lawyer);
+    setEditModalOpen(true);
+  };
+
+  // Handle edit save
+  const handleEditSave = async (updatedLawyer, originalLawyer) => {
+    try {
+      // TODO: Replace with actual lawyersService.updateLawyer call
+      console.log('Updating lawyer:', updatedLawyer);
+      
+      // For now, simulate the update
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      await loadData(); // Reload data to reflect changes
+      setEditModalOpen(false);
+      setEditingLawyer(null);
+      
+      showSuccess(`Lawyer "${updatedLawyer.full_name}" updated successfully!`);
+      
+    } catch (err) {
+      console.error('Failed to update lawyer:', err);
+      showError('Failed to update lawyer: ' + (err.message || 'Unknown error'));
+    }
   };
 
   // Handle suspend lawyer
@@ -108,7 +123,7 @@ const ManageLawyers = () => {
 
   // Helper function to get modal content based on type
   const getModalContent = () => {
-    const { type, lawyerName, changes } = confirmationModal;
+    const { type, lawyerName } = confirmationModal;
     
     switch (type) {
       case 'suspend':
@@ -117,16 +132,6 @@ const ManageLawyers = () => {
           message: `Are you sure you want to suspend ${lawyerName}? This will prevent them from accepting new consultations and accessing lawyer features.`,
           confirmText: 'Suspend Lawyer',
           onConfirm: confirmSuspend
-        };
-      case 'edit':
-        const changesList = changes ? Object.entries(changes).map(([field, change]) => 
-          `• ${field}: "${change.from}" → "${change.to}"`
-        ).join('\n') : '';
-        return {
-          title: 'Confirm Lawyer Changes',
-          message: `Are you sure you want to save these changes to ${lawyerName}?\n\nChanges:\n${changesList}`,
-          confirmText: 'Save Changes',
-          onConfirm: confirmEdit
         };
       default:
         return {};
@@ -160,26 +165,6 @@ const ManageLawyers = () => {
     }
   };
 
-  // Handle edit confirmation
-  const confirmEdit = async () => {
-    const { lawyerId, lawyerName, changes } = confirmationModal;
-    
-    try {
-      setConfirmationModal(prev => ({ ...prev, loading: true }));
-      
-      // TODO: Implement actual edit API call
-      console.log(`Editing lawyer: ${lawyerName}`, changes);
-      alert(`Lawyer "${lawyerName}" changes have been saved successfully!`);
-      
-      await loadData(); // Reload data
-      setConfirmationModal({ open: false, type: '', lawyerId: null, lawyerName: '', loading: false, changes: null });
-      
-    } catch (err) {
-      console.error('Failed to edit lawyer:', err);
-      alert('Failed to edit lawyer: ' + err.message);
-      setConfirmationModal(prev => ({ ...prev, loading: false }));
-    }
-  };
   // Handle column sorting
   const handleSort = (columnKey) => {
     let direction = 'asc';
@@ -365,7 +350,9 @@ const ManageLawyers = () => {
         </button>
       ),
       render: (row) => {
+        if (!row.roll_sign_date) return 'N/A';
         const date = new Date(row.roll_sign_date);
+        if (isNaN(date.getTime())) return 'Invalid Date';
         return new Intl.DateTimeFormat('en-US', {
           month: 'short',
           day: 'numeric', 
@@ -599,6 +586,21 @@ const ManageLawyers = () => {
           </div>
         </div>
       )}
+
+      {/* View Lawyer Modal */}
+      <ViewLawyerModal
+        open={viewModalOpen}
+        onClose={() => setViewModalOpen(false)}
+        lawyer={selectedLawyer}
+      />
+
+      {/* Edit Lawyer Modal */}
+      <EditLawyerModal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        lawyer={editingLawyer}
+        onSave={handleEditSave}
+      />
 
       {/* Confirmation Modal */}
       <ConfirmationModal

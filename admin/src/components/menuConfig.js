@@ -1,4 +1,4 @@
-import { Users, Shield, BookOpen, MessageSquare, Ticket, BarChart3 } from 'lucide-react';
+import { Users, Shield, BookOpen, MessageSquare, Scale } from 'lucide-react';
 
 // Centralized menu configuration used by Sidebar and Header
 export const sections = [
@@ -13,7 +13,6 @@ export const sections = [
           { id: 'manage-legal-seekers', label: 'Manage Legal Seekers' },
           { id: 'manage-lawyers', label: 'Manage Lawyers' },
           { id: 'lawyer-applications', label: 'Lawyer Applications' },
-          { id: 'suspended-accounts', label: 'Suspended Accounts' },
         ],
       },
       {
@@ -38,25 +37,14 @@ export const sections = [
         items: [
           { id: 'manage-topics-threads', label: 'Manage Topics & Threads' },
           { id: 'reported-posts', label: 'Reported Posts' },
-          { id: 'ban-restrict-users', label: 'Ban/Restrict Users' },
+          { id: 'reported-replies', label: 'Reported Replies' },
         ],
       },
       {
-        icon: Ticket,
-        label: 'Report Tickets',
+        icon: Scale,
+        label: 'Appeals',
         items: [
-          { id: 'open-tickets', label: 'Open Tickets' },
-          { id: 'assigned-tickets', label: 'Assigned Tickets' },
-          { id: 'ticket-history', label: 'Ticket History' },
-        ],
-      },
-      {
-        icon: BarChart3,
-        label: 'Analytics',
-        items: [
-          { id: 'user-analytics', label: 'User Analytics' },
-          { id: 'content-analytics', label: 'Content Analytics' },
-          { id: 'forum-analytics', label: 'Forum Analytics' },
+          { id: 'ban-restrict-users', label: 'User Sanctions' },
         ],
       },
     ],

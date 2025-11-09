@@ -561,7 +561,8 @@ router.get('/suspensions/:user_id', authenticateAdmin, async (req, res) => {
         status,
         lifted_at,
         lifted_reason,
-        lifted_by
+        lifted_by,
+        lifted_acknowledged
       `)
       .eq('user_id', user_id)
       .order('started_at', { ascending: false });
@@ -662,7 +663,8 @@ router.post('/lift-suspension/:user_id', authenticateAdmin, async (req, res) => 
         status: 'lifted',
         lifted_at: new Date().toISOString(),
         lifted_by: adminId,
-        lifted_reason: reason
+        lifted_reason: reason,
+        lifted_acknowledged: false // User needs to acknowledge the lift
       })
       .eq('user_id', user_id)
       .eq('status', 'active');
@@ -698,6 +700,245 @@ router.post('/lift-suspension/:user_id', authenticateAdmin, async (req, res) => 
     res.status(500).json({
       success: false,
       error: 'Internal server error'
+    });
+  }
+});
+
+// Lift ban (admin override)
+router.post('/lift-ban/:user_id', authenticateAdmin, async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    const { reason } = req.body;
+    const adminId = req.admin?.id;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Reason is required'
+      });
+    }
+
+    // Get current user status
+    const { data: currentUser, error: fetchError } = await supabaseAdmin
+      .from('users')
+      .select('account_status, suspension_count, banned_at, banned_reason')
+      .eq('id', user_id)
+      .single();
+
+    if (fetchError || !currentUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    if (currentUser.account_status !== 'banned') {
+      return res.status(400).json({
+        success: false,
+        error: 'User is not currently banned'
+      });
+    }
+
+    // Update user status
+    const { error: userUpdateError } = await supabaseAdmin
+      .from('users')
+      .update({
+        account_status: 'active',
+        suspension_end: null,
+        banned_at: null,
+        banned_reason: null
+      })
+      .eq('id', user_id);
+
+    if (userUpdateError) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update user status'
+      });
+    }
+
+    // Update suspension record (bans are stored as permanent suspensions)
+    const { error: suspensionUpdateError } = await supabaseAdmin
+      .from('user_suspensions')
+      .update({
+        status: 'lifted',
+        lifted_at: new Date().toISOString(),
+        lifted_by: adminId,
+        lifted_reason: reason,
+        lifted_acknowledged: false // User needs to acknowledge the lift
+      })
+      .eq('user_id', user_id)
+      .eq('status', 'active')
+      .eq('suspension_type', 'permanent');
+
+    if (suspensionUpdateError) {
+      console.error('Error updating ban record:', suspensionUpdateError);
+      // Don't fail the request
+    }
+
+    // Log admin action
+    try {
+      await supabaseAdmin.from('admin_audit_logs').insert({
+        admin_id: adminId,
+        action: 'admin_lift_ban',
+        target_type: 'user',
+        target_id: user_id,
+        details: {
+          reason: reason,
+          suspension_count: currentUser.suspension_count,
+          previous_ban_reason: currentUser.banned_reason,
+          banned_at: currentUser.banned_at
+        }
+      });
+    } catch (auditError) {
+      console.warn('Failed to log admin action:', auditError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Ban lifted successfully'
+    });
+
+  } catch (error) {
+    console.error('Lift ban error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Mark lifted suspension as acknowledged (for user notification system)
+router.post('/acknowledge-lift/:user_id/:suspension_id', authenticateAdmin, async (req, res) => {
+  try {
+    const { user_id, suspension_id } = req.params;
+    const adminId = req.admin?.id;
+
+    // Verify the suspension exists and is lifted
+    const { data: suspension, error: fetchError } = await supabaseAdmin
+      .from('user_suspensions')
+      .select('id, status, lifted_at, lifted_acknowledged')
+      .eq('id', suspension_id)
+      .eq('user_id', user_id)
+      .single();
+
+    if (fetchError || !suspension) {
+      return res.status(404).json({
+        success: false,
+        error: 'Suspension record not found'
+      });
+    }
+
+    if (suspension.status !== 'lifted') {
+      return res.status(400).json({
+        success: false,
+        error: 'Suspension is not in lifted status'
+      });
+    }
+
+    if (suspension.lifted_acknowledged === true) {
+      return res.status(400).json({
+        success: false,
+        error: 'Suspension lift has already been acknowledged'
+      });
+    }
+
+    // Mark as acknowledged
+    const { error: updateError } = await supabaseAdmin
+      .from('user_suspensions')
+      .update({
+        lifted_acknowledged: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', suspension_id);
+
+    if (updateError) {
+      console.error('Error marking suspension as acknowledged:', updateError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to mark suspension as acknowledged'
+      });
+    }
+
+    // Log admin action
+    try {
+      await supabaseAdmin.from('admin_audit_logs').insert({
+        admin_id: adminId,
+        action: 'admin_acknowledge_lift',
+        target_type: 'user_suspension',
+        target_id: suspension_id,
+        details: {
+          user_id: user_id,
+          suspension_id: suspension_id,
+          acknowledged_at: new Date().toISOString()
+        }
+      });
+    } catch (auditError) {
+      console.warn('Failed to log acknowledgment action:', auditError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Suspension lift acknowledged successfully'
+    });
+
+  } catch (error) {
+    console.error('Acknowledge lift error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Get unacknowledged lifted suspensions for user notifications
+router.get('/unacknowledged-lifts/:user_id', authenticateAdmin, async (req, res) => {
+  try {
+    const { user_id } = req.params;
+
+    const { data: suspensions, error } = await supabaseAdmin
+      .from('user_suspensions')
+      .select(`
+        id,
+        suspension_type,
+        reason,
+        lifted_at,
+        lifted_reason,
+        lifted_by,
+        lifted_acknowledged
+      `)
+      .eq('user_id', user_id)
+      .eq('status', 'lifted')
+      .eq('lifted_acknowledged', false)
+      .order('lifted_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching unacknowledged lifts:', error);
+      
+      // If table doesn't exist, return empty data
+      if (error.code === '42P01' || error.message.includes('relation') || error.message.includes('does not exist')) {
+        return res.json({
+          success: true,
+          data: []
+        });
+      }
+      
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch unacknowledged lifts: ' + error.message
+      });
+    }
+
+    res.json({
+      success: true,
+      data: suspensions || []
+    });
+
+  } catch (error) {
+    console.error('Get unacknowledged lifts error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error: ' + error.message
     });
   }
 });

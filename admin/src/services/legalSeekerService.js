@@ -57,6 +57,30 @@ const legalSeekerService = {
     }
   },
 
+  // Create new legal seeker
+  createLegalSeeker: async (userData) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/legal-seekers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...legalSeekerService.getAuthHeader()
+        },
+        body: JSON.stringify(userData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to create legal seeker:', error);
+      throw error;
+    }
+  },
+
   // Update legal seeker status
   updateLegalSeeker: async (userId, updateData) => {
     try {
@@ -70,12 +94,36 @@ const legalSeekerService = {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       return await response.json();
     } catch (error) {
       console.error('Failed to update legal seeker:', error);
+      throw error;
+    }
+  },
+
+  // Delete legal seeker (soft delete)
+  deleteLegalSeeker: async (userId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/legal-seekers/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...legalSeekerService.getAuthHeader()
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to delete legal seeker:', error);
       throw error;
     }
   },
