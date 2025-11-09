@@ -1,9 +1,11 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 
 const Login = () => {
+  const navigate = useNavigate();
   const { showSuccess, showError, ToastContainer } = useToast();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -34,10 +36,25 @@ const Login = () => {
 
     const result = await login(email, password);
     if (result.success) {
-      showSuccess('Login successful! Redirecting to dashboard...');
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 1000);
+      // Check if 2FA is required
+      if (result.requires2FA) {
+        showSuccess('Verification code sent to your email!');
+        // Navigate to OTP verification page
+        setTimeout(() => {
+          navigate('/verify-otp', {
+            state: {
+              email: result.email,
+              adminId: result.adminId
+            }
+          });
+        }, 500);
+      } else {
+        // Direct login (legacy flow)
+        showSuccess('Login successful! Redirecting to dashboard...');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1000);
+      }
     } else {
       showError(result.error || 'Login failed. Please check your credentials.');
     }

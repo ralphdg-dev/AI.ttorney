@@ -1,10 +1,11 @@
-import React from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
-import ProtectedRoute from "./components/ProtectedRoute";
-import Sidebar from "./components/Sidebar";
-import Header from "./components/Header";
-import Login from "./pages/auth/Login";
+import React from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import Sidebar from './components/Sidebar';
+import Header from './components/Header';
+import Login from './pages/auth/Login';
+import VerifyOTP from './pages/auth/VerifyOTP';
 
 // Import all page components
 import Dashboard from './pages/Dashboard';
@@ -95,6 +96,7 @@ const App = () => {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/verify-otp" element={<VerifyOTP />} />
           <Route
             path="/*"
             element={

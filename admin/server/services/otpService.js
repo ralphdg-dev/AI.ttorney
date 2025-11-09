@@ -1,0 +1,256 @@
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+
+// In-memory OTP storage (consider Redis for production)
+const otpStore = new Map();
+
+// Cleanup expired OTPs every 30 seconds
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of otpStore.entries()) {
+    if (now > value.expiresAt) {
+      otpStore.delete(key);
+    } else if (value.lockedUntil && now > value.lockedUntil) {
+      // Clear lockout but keep OTP if not expired
+      value.lockedUntil = null;
+      value.attempts = 0;
+    }
+  }
+}, 30000);
+
+class OTPService {
+  constructor() {
+    // SMTP Configuration
+    this.transporter = nodemailer.createTransport({
+      host: process.env.SMTP_SERVER || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: false, // true for 465, false for other ports
+      auth: {
+        user: process.env.SMTP_USERNAME,
+        pass: process.env.SMTP_PASSWORD
+      }
+    });
+
+    this.fromEmail = process.env.FROM_EMAIL || 'noreply@ai.ttorney.com';
+    this.fromName = process.env.FROM_NAME || 'AI.ttorney Admin';
+    this.OTP_TTL_SECONDS = 120; // 2 minutes
+    this.MAX_ATTEMPTS = 5;
+    this.LOCKOUT_DURATION = 900; // 15 minutes in seconds
+  }
+
+  /**
+   * Generate a random 6-digit OTP
+   */
+  generateOTP() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  /**
+   * Hash OTP code using SHA-256
+   */
+  hashOTP(otpCode) {
+    return crypto.createHash('sha256').update(otpCode).digest('hex');
+  }
+
+  /**
+   * Get OTP storage key
+   */
+  getOTPKey(email, otpType = 'admin_login') {
+    return `otp:${otpType}:${email.toLowerCase().trim()}`;
+  }
+
+  /**
+   * Send OTP via email
+   */
+  async sendOTPEmail(email, otpCode, adminName = 'Admin') {
+    try {
+      // Check if SMTP credentials are configured
+      if (!this.transporter.options.auth || !this.transporter.options.auth.user || !this.transporter.options.auth.pass) {
+        console.error('❌ SMTP credentials not configured. Please set SMTP_USERNAME and SMTP_PASSWORD in .env file');
+        console.log('\n📧 For testing, the OTP code is:', otpCode);
+        console.log('⚠️  Configure SMTP to send real emails\n');
+        return { success: false, error: 'SMTP not configured. Check server logs for OTP code.' };
+      }
+
+      const mailOptions = {
+        from: `"${this.fromName}" <${this.fromEmail}>`,
+        to: email,
+        subject: 'Admin Login Verification Code',
+        html: this.getEmailTemplate(otpCode, adminName)
+      };
+
+      await this.transporter.sendMail(mailOptions);
+      console.log(`✅ OTP email sent successfully to ${email}`);
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Send OTP email error:', error.message);
+      console.log('\n📧 For testing, the OTP code is:', otpCode);
+      console.log('⚠️  Configure SMTP credentials in .env file to send real emails\n');
+      return { success: false, error: 'Failed to send email. Check server logs for OTP code.' };
+    }
+  }
+
+  /**
+   * Generate and send OTP for admin login
+   */
+  async sendLoginOTP(email, adminName = 'Admin') {
+    try {
+      const otpCode = this.generateOTP();
+      const otpHash = this.hashOTP(otpCode);
+      const otpKey = this.getOTPKey(email);
+
+      // Store OTP data
+      otpStore.set(otpKey, {
+        hash: otpHash,
+        email: email,
+        expiresAt: Date.now() + (this.OTP_TTL_SECONDS * 1000),
+        attempts: 0,
+        lockedUntil: null
+      });
+
+      console.log(`Admin login OTP stored for: ${email}, expires in: ${this.OTP_TTL_SECONDS}s`);
+
+      // Send email
+      const emailResult = await this.sendOTPEmail(email, otpCode, adminName);
+
+      if (emailResult.success) {
+        return {
+          success: true,
+          message: 'OTP sent successfully to your email',
+          expiresInMinutes: 2
+        };
+      } else {
+        return {
+          success: false,
+          error: 'Failed to send OTP email'
+        };
+      }
+    } catch (error) {
+      console.error('Send login OTP error:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Verify OTP code
+   */
+  async verifyOTP(email, otpCode) {
+    try {
+      const otpKey = this.getOTPKey(email);
+      const otpData = otpStore.get(otpKey);
+
+      // Check if OTP exists
+      if (!otpData) {
+        return {
+          success: false,
+          error: 'OTP not found or expired'
+        };
+      }
+
+      // Check if expired
+      if (Date.now() > otpData.expiresAt) {
+        otpStore.delete(otpKey);
+        return {
+          success: false,
+          error: 'OTP has expired'
+        };
+      }
+
+      // Check if locked out
+      if (otpData.lockedUntil && Date.now() < otpData.lockedUntil) {
+        const remainingSeconds = Math.ceil((otpData.lockedUntil - Date.now()) / 1000);
+        const minutes = Math.floor(remainingSeconds / 60);
+        const seconds = remainingSeconds % 60;
+        return {
+          success: false,
+          error: `Too many failed attempts. Please try again in ${minutes} minutes and ${seconds} seconds.`,
+          lockedOut: true,
+          retryAfter: remainingSeconds
+        };
+      }
+
+      // Verify OTP
+      const providedHash = this.hashOTP(otpCode);
+
+      if (otpData.hash !== providedHash) {
+        // Increment attempt counter
+        otpData.attempts += 1;
+
+        // Check if max attempts reached
+        if (otpData.attempts >= this.MAX_ATTEMPTS) {
+          otpData.lockedUntil = Date.now() + (this.LOCKOUT_DURATION * 1000);
+          console.warn(`Admin ${email} locked out after ${otpData.attempts} failed OTP attempts`);
+
+          return {
+            success: false,
+            error: 'Too many failed attempts. Your account has been temporarily locked for 15 minutes.',
+            lockedOut: true,
+            retryAfter: this.LOCKOUT_DURATION
+          };
+        }
+
+        const remainingAttempts = this.MAX_ATTEMPTS - otpData.attempts;
+        return {
+          success: false,
+          error: `Invalid OTP code. ${remainingAttempts} attempt(s) remaining.`,
+          attemptsRemaining: remainingAttempts
+        };
+      }
+
+      // OTP is correct - delete from store
+      otpStore.delete(otpKey);
+      console.log(`OTP verified successfully for: ${email}`);
+
+      return {
+        success: true,
+        message: 'OTP verified successfully'
+      };
+    } catch (error) {
+      console.error('Verify OTP error:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Email template for OTP
+   */
+  getEmailTemplate(otpCode, adminName) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Admin Login Verification</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #023D7B;">Admin Login Verification</h2>
+          <p>Hi ${adminName},</p>
+          <p>You are attempting to sign in to the AI.ttorney Admin Dashboard. Please use the following verification code to complete your login:</p>
+          
+          <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; border: 2px solid #023D7B;">
+            <h1 style="color: #023D7B; font-size: 32px; margin: 0; letter-spacing: 8px;">${otpCode}</h1>
+          </div>
+          
+          <p>This code will expire in <strong>2 minutes</strong>.</p>
+          <p><strong>Security Notice:</strong> If you didn't attempt to sign in, please ignore this email and ensure your account credentials are secure.</p>
+          
+          <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
+          <p style="font-size: 14px; color: #6b7280;">
+            Best regards,<br>
+            The AI.ttorney Admin Team
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+}
+
+module.exports = new OTPService();
