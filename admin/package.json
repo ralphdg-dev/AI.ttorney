@@ -10,6 +10,7 @@
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.13.1",
     "es-toolkit": "^1.40.0",
+    "date-fns": "^4.1.0",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",
     "lodash": "^4.17.21",

@@ -17,6 +17,7 @@ const adminModerationRoutes = require('./routes/admin-moderation');
 const statsRoutes = require('./routes/stats');
 const legalArticles = require('./routes/legal-articles');
 const translateText = require('./routes/translate');
+const manageAppeals = require('./routes/appeals-management')
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -130,6 +131,8 @@ app.use('/api/admin/moderation', adminModerationRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/legal-articles', legalArticles);
 app.use('/api/translate', translateText);
+app.use('/api/appeals-management', manageAppeals);
+
 
 // 404 handler
 app.use('*', (req, res) => {
