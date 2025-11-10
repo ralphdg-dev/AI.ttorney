@@ -42,12 +42,15 @@ const ReportModal: React.FC<ReportModalProps> = ({
   }, [showAlreadyReportedProp]);
 
   const handleClose = () => {
-    setSelectedCategory('');
-    setCustomReason('');
-    setIsSubmitting(false);
-    setShowSuccess(false);
-    setShowAlreadyReported(false);
+    // Close modal first, then reset states
     onClose();
+    setTimeout(() => {
+      setSelectedCategory('');
+      setCustomReason('');
+      setIsSubmitting(false);
+      setShowSuccess(false);
+      setShowAlreadyReported(false);
+    }, 400);
   };
 
   const handleSubmit = async () => {
@@ -71,17 +74,31 @@ const ReportModal: React.FC<ReportModalProps> = ({
   };
 
   const handleSuccessClose = () => {
-    setShowSuccess(false);
-    handleClose();
+    // First close the modal, then reset states after animation completes
+    onClose();
+    setTimeout(() => {
+      setShowSuccess(false);
+      setSelectedCategory('');
+      setCustomReason('');
+      setIsSubmitting(false);
+      setShowAlreadyReported(false);
+    }, 400); // Wait for modal close animation to fully complete
   };
 
   const handleAlreadyReportedClose = () => {
-    setShowAlreadyReported(false);
-    handleClose();
+    // First close the modal, then reset states after animation completes
+    onClose();
+    setTimeout(() => {
+      setShowAlreadyReported(false);
+      setSelectedCategory('');
+      setCustomReason('');
+      setIsSubmitting(false);
+      setShowSuccess(false);
+    }, 400); // Wait for modal close animation to fully complete
   };
 
   // Already Reported Modal
-  if (showAlreadyReported) {
+  if (showAlreadyReported && visible) {
     return (
       <Modal
         visible={visible}
@@ -120,7 +137,7 @@ const ReportModal: React.FC<ReportModalProps> = ({
   }
 
   // Success Modal
-  if (showSuccess) {
+  if (showSuccess && visible) {
     return (
       <Modal
         visible={visible}
@@ -156,6 +173,11 @@ const ReportModal: React.FC<ReportModalProps> = ({
         </View>
       </Modal>
     );
+  }
+
+  // Don't render report form if modal is closing
+  if (!visible) {
+    return null;
   }
 
   return (

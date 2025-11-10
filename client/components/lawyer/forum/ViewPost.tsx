@@ -221,19 +221,27 @@ const ViewPost: React.FC = () => {
       return;
     }
 
-    setIsBookmarkLoading(true);
+    // Optimistic update - toggle immediately
+    const newBookmarkState = !bookmarked;
+    setBookmarked(newBookmarkState);
+
+    // Make API call in background
     try {
       const result = await BookmarkService.toggleBookmark(String(postId), currentUser.id, session);
       if (result.success) {
-        setBookmarked(result.isBookmarked);
-        setMenuOpen(false);
+        // Confirm the state matches, if not correct it
+        if (result.isBookmarked !== newBookmarkState) {
+          setBookmarked(result.isBookmarked);
+        }
+      } else {
+        // Revert on failure
+        setBookmarked(!newBookmarkState);
       }
     } catch {
-      // Error handled silently
-    } finally {
-      setIsBookmarkLoading(false);
+      // Revert on error
+      setBookmarked(!newBookmarkState);
     }
-  }, [currentUser?.id, postId, session]);
+  }, [currentUser?.id, postId, session, bookmarked]);
 
   const handleReportPress = async () => {
     setMenuOpen(false);
@@ -275,13 +283,13 @@ const ViewPost: React.FC = () => {
       );
       
       if (result.success) {
-        setReportModalVisible(false);
+        // Don't close modal here - let ReportModal handle showing success and closing
         setMenuOpen(false);
       } else {
         throw new Error(result.error || 'Failed to submit report');
       }
     } catch (error) {
-      console.error('Report submission error:', error);
+      throw error; // Re-throw to let ReportModal handle the error display
     } finally {
       setIsReportLoading(false);
     }
@@ -316,9 +324,8 @@ const ViewPost: React.FC = () => {
       );
       
       if (result.success) {
-        setReportReplyModalVisible(false);
+        // Don't close modal here - let ReportModal handle showing success and closing
         setReplyMenuOpen(null);
-        setSelectedReplyId(null);
       } else {
         throw new Error(result.error || 'Failed to submit report');
       }
