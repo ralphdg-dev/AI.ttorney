@@ -1,5 +1,3 @@
-// ManageLegalArticles.js
-
 import React from "react";
 import ReactDOM from "react-dom";
 import {
@@ -92,9 +90,9 @@ const ManageLegalArticles = () => {
     fetchArticles(showArchives);
   }, [showArchives]);
 
-  // Toggle Archives button
-  const toggleArchives = () => {
-    setShowArchives((prev) => !prev);
+  // Handle archive filter change
+  const handleArchiveFilterChange = (value) => {
+    setShowArchives(value === "Archived");
   };
 
   // Handle fade-in on modal open
@@ -107,7 +105,7 @@ const ManageLegalArticles = () => {
     setTimeout(() => setImageModal({ open: false, src: null }), 300);
   };
 
-  const handleAddArticle = async (formData) => {
+  const handleAddArticle = async (formData, token) => {
     try {
       const data = new FormData();
       data.append("title_en", formData.enTitle);
@@ -121,6 +119,9 @@ const ManageLegalArticles = () => {
 
       const res = await fetch("http://localhost:5001/api/legal-articles", {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: data,
       });
 
@@ -158,6 +159,56 @@ const ManageLegalArticles = () => {
     }
   };
 
+  // Handle restore
+  const handleRestore = async (articleId) => {
+    try {
+      const res = await fetch(
+        `http://localhost:5001/api/legal-articles/${articleId}/restore`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(json.message || "Failed to restore article");
+      }
+
+      // Remove the restored article from the archives list
+      setArticles((prev) => prev.filter((a) => a.id !== articleId));
+    } catch (err) {
+      console.error("Restore error:", err);
+    }
+  };
+
+  // Handle publish/unpublish
+  const handlePublish = async (articleId, publish) => {
+    try {
+      const res = await fetch(
+        `http://localhost:5001/api/legal-articles/${articleId}/publish`,
+        {
+          method: "PATCH",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ publish }),
+        }
+      );
+
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(
+          json.message ||
+            `Failed to ${publish ? "publish" : "unpublish"} article`
+        );
+      }
+
+      return json.data;
+    } catch (err) {
+      console.error("Publish error:", err);
+      throw err;
+    }
+  };
+
   // Filtering & sorting
   const filteredData = React.useMemo(() => {
     let rows = [...articles];
@@ -170,8 +221,8 @@ const ManageLegalArticles = () => {
       );
     }
 
-    // Category filter (case-insensitive)
-    if (category !== "All") {
+    // Category filter (case-insensitive) - only apply if not viewing archives and category is not "All"
+    if (!showArchives && category !== "All") {
       rows = rows.filter(
         (r) => (r.category || "").toLowerCase() === category.toLowerCase()
       );
@@ -201,7 +252,7 @@ const ManageLegalArticles = () => {
     }
 
     return rows;
-  }, [query, category, sortBy, articles]);
+  }, [query, category, sortBy, articles, showArchives]);
 
   // Pagination calculations
   const totalItems = filteredData.length;
@@ -217,7 +268,7 @@ const ManageLegalArticles = () => {
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [query, category, sortBy]);
+  }, [query, category, sortBy, showArchives]);
 
   const formatDate = (date) =>
     new Intl.DateTimeFormat("en-US", {
@@ -505,38 +556,36 @@ const ManageLegalArticles = () => {
       </div>
 
       {/* Toolbar */}
-      <div className="w-full mb-3 flex items-center gap-2">
-        <div className="flex-1">
-          <ListToolbar
-            query={query}
-            onQueryChange={setQuery}
-            filter={{
-              value: category,
-              onChange: setCategory,
-              options: categories,
-              label: "Category",
-            }}
-            sort={{
-              value: sortBy,
-              onChange: setSortBy,
-              options: ["Newest", "Oldest", "A-Z (Title)", "Z-A (Title)"],
-              label: "Sort by",
-            }}
-          />
-        </div>
-        <button
-          onClick={() => setAddModalOpen(true)}
-          className="inline-flex items-center gap-1.5 bg-[#023D7B] text-white text-[11px] px-3 py-1.5 rounded-md hover:bg-[#013462]"
-        >
-          Add New
-        </button>
-
-        <button
-          onClick={toggleArchives}
-          className="inline-flex items-center gap-1.5  border border-gray-200 text-gray-700 text-[11px] px-3 py-1.5 rounded-md hover:bg-gray-100"
-        >
-          {showArchives ? "Back" : "Archives"}
-        </button>
+      <div className="w-full mb-3">
+        <ListToolbar
+          query={query}
+          onQueryChange={setQuery}
+          filter={{
+            value: showArchives ? "Archived" : category,
+            onChange: (value) => {
+              if (value === "Archived") {
+                setShowArchives(true);
+                setCategory("All");
+              } else {
+                setShowArchives(false);
+                setCategory(value);
+              }
+            },
+            options: ["All", "Family", "Criminal", "Civil", "Labor", "Consumer", "Archived"],
+            label: "Filter",
+          }}
+          sort={{
+            value: sortBy,
+            onChange: setSortBy,
+            options: ["Newest", "Oldest", "A-Z (Title)", "Z-A (Title)"],
+            label: "Sort by",
+          }}
+          primaryButton={{
+            label: "Add New",
+            onClick: () => setAddModalOpen(true),
+            className: "inline-flex items-center gap-1 bg-[#023D7B] text-white text-[11px] px-3 py-1.5 rounded-md hover:bg-[#013462]"
+          }}
+        />
       </div>
 
       {/* Table */}
@@ -630,16 +679,7 @@ const ManageLegalArticles = () => {
             if (confirmationModal.type === "archive") {
               await handleArchive(confirmationModal.articleId);
             } else if (confirmationModal.type === "restore") {
-              const res = await fetch(
-                `http://localhost:5001/api/legal-articles/${confirmationModal.articleId}/restore`,
-                { method: "PATCH" }
-              );
-              const json = await res.json();
-              if (json.success) {
-                setArticles((prev) =>
-                  prev.filter((a) => a.id !== confirmationModal.articleId)
-                );
-              } else throw new Error(json.message);
+              await handleRestore(confirmationModal.articleId);
             }
           } catch (err) {
             console.error(err);
@@ -674,25 +714,14 @@ const ManageLegalArticles = () => {
         article={publishModal.article}
         onClose={() => setPublishModal({ open: false, article: null })}
         onConfirm={async () => {
-          const articleId = publishModal.article.id;
-          const publish = publishModal.article.status === "Unpublished";
           try {
-            const res = await fetch(
-              `http://localhost:5001/api/legal-articles/${articleId}/publish`,
-              {
-                method: "PATCH",
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ publish }),
-              }
+            const articleId = publishModal.article.id;
+            const publish = publishModal.article.status === "Unpublished";
+            const updatedArticle = await handlePublish(articleId, publish);
+
+            setArticles((prev) =>
+              prev.map((a) => (a.id === articleId ? updatedArticle : a))
             );
-            const json = await res.json();
-            if (json.success) {
-              setArticles((prev) =>
-                prev.map((a) => (a.id === articleId ? json.data : a))
-              );
-            } else {
-              throw new Error(json.message);
-            }
           } catch (err) {
             console.error(err);
           } finally {

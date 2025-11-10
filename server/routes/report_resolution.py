@@ -6,6 +6,7 @@ from services.supabase_service import SupabaseService
 from services.violation_tracking_service import get_violation_tracking_service
 from services.notification_service import NotificationService
 from models.violation_types import ViolationType
+from routes.forum import clear_posts_cache, clear_reply_counts_cache
 import httpx
 import logging
 
@@ -34,7 +35,7 @@ async def resolve_reply_report(
     try:
         supabase = SupabaseService()
         violation_service = get_violation_tracking_service()
-        notification_service = NotificationService()
+        notification_service = NotificationService(supabase.supabase)
         
         # 1. Get the report details
         async with httpx.AsyncClient() as client:
@@ -69,7 +70,7 @@ async def resolve_reply_report(
                 headers=supabase._get_headers(use_service_key=True),
                 json={
                     "status": request.action,
-                    "updated_at": "now()"
+                    "updated_at": __import__('datetime').datetime.utcnow().isoformat()
                 }
             )
         
@@ -86,71 +87,106 @@ async def resolve_reply_report(
         
         # 3. If sanctioned (approved), perform additional actions
         if request.action == "sanctioned":
-            # Map report reason to violation type
+            # Prepare moderation_result based on report reason
             reason = report.get('reason', 'other')
-            violation_type_map = {
-                'spam': ViolationType.SPAM,
-                'harassment': ViolationType.HARASSMENT,
-                'hate_speech': ViolationType.HATE_SPEECH,
-                'misinformation': ViolationType.MISINFORMATION,
-                'inappropriate': ViolationType.INAPPROPRIATE_CONTENT,
-                'other': ViolationType.OTHER
+            moderation_result = {
+                "categories": {reason: True},
+                "category_scores": {reason: 1.0},
+                "violation_summary": f"Reply reported for {reason}"
             }
-            violation_type = violation_type_map.get(reason, ViolationType.OTHER)
-            
-            # 4. Create user_violations record and add strike
-            violation_result = await violation_service.record_violation(
-                user_id=violating_user_id,
-                violation_type=violation_type,
-                content_text=reply.get('reply_body', ''),
-                content_id=reply_id,
-                violation_summary=f"Reply reported for {reason} and approved by admin",
-                action_taken="strike_added"
-            )
-            
-            if not violation_result.get('success'):
-                logger.error(f"Failed to record violation: {violation_result.get('error')}")
-                raise HTTPException(status_code=500, detail="Failed to record violation")
-            
-            # 5. Hide the reply
-            async with httpx.AsyncClient() as client:
-                hide_response = await client.patch(
-                    f"{supabase.rest_url}/forum_replies?id=eq.{reply_id}",
-                    headers=supabase._get_headers(use_service_key=True),
-                    json={"hidden": True}
-                )
-            
-            if hide_response.status_code not in [200, 204]:
-                logger.error(f"Failed to hide reply {reply_id}")
-            
-            # 6. Send notification to the violating user
+
             try:
-                await notification_service.create_notification(
+                # 4. Create user_violations record and apply action via service
+                violation_outcome = await violation_service.record_violation(
                     user_id=violating_user_id,
-                    notification_type="violation_warning",
-                    title="Content Violation Warning",
-                    message=f"Your reply has been removed for violating community guidelines: {reason}. A strike has been added to your account.",
-                    data={
-                        "violation_type": reason,
-                        "content_id": reply_id,
-                        "strike_count": violation_result.get('data', {}).get('strike_count_after', 1)
-                    }
+                    violation_type=ViolationType.FORUM_REPLY,
+                    content_text=reply.get('reply_body', ''),
+                    moderation_result=moderation_result,
+                    content_id=reply_id
                 )
-            except Exception as e:
-                logger.error(f"Failed to send notification: {str(e)}")
-            
-            logger.info(f"Report {report_id} approved by admin {current_user['user']['id']}. Violation recorded for user {violating_user_id}")
-            
-            return {
-                "success": True,
-                "message": "Report approved successfully",
-                "data": {
-                    "violation_recorded": True,
-                    "content_hidden": True,
-                    "strike_count": violation_result.get('data', {}).get('strike_count_after', 1),
-                    "notification_sent": True
+
+                if not violation_outcome or not violation_outcome.get('action_taken'):
+                    logger.error("Failed to record violation via ViolationTrackingService")
+                    raise Exception("Failed to record violation")
+
+                # 5. Hide the reply
+                async with httpx.AsyncClient() as client:
+                    hide_response = await client.patch(
+                        f"{supabase.rest_url}/forum_replies?id=eq.{reply_id}",
+                        headers=supabase._get_headers(use_service_key=True),
+                        json={"hidden": True}
+                    )
+
+                if hide_response.status_code not in [200, 204]:
+                    logger.error(f"Failed to hide reply {reply_id}")
+                else:
+                    # Clear caches so hidden replies are not served from cache
+                    try:
+                        clear_posts_cache()
+                        clear_reply_counts_cache()
+                    except Exception as cache_err:
+                        logger.warning(f"Failed to clear forum caches after hiding reply: {cache_err}")
+
+                # 6. Send notification to the violating user (non-critical)
+                try:
+                    action_taken = violation_outcome.get("action_taken")
+                    strike_count = violation_outcome.get("strike_count")
+                    suspension_count = violation_outcome.get("suspension_count")
+                    suspension_end = violation_outcome.get("suspension_end")
+
+                    if action_taken == "banned":
+                        title = "Account Banned"
+                        message = f"Your reply has been removed and your account has been permanently banned for violating community guidelines: {reason}."
+                    elif action_taken == "suspended":
+                        title = "Account Suspended"
+                        message = f"Your reply has been removed and your account has been suspended for 7 days for violating community guidelines: {reason}. This is suspension #{suspension_count}."
+                    else:
+                        title = "Content Violation Warning"
+                        message = f"Your reply has been removed for violating community guidelines: {reason}. A strike has been added to your account ({strike_count} total)."
+
+                    await notification_service.create_notification(
+                        user_id=violating_user_id,
+                        notification_type="violation_warning",
+                        title=title,
+                        message=message,
+                        data={
+                            "violation_type": reason,
+                            "content_id": reply_id,
+                            "strike_count": strike_count,
+                            "action_taken": action_taken
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send notification: {str(e)}")
+
+                logger.info(f"Report {report_id} approved by admin {current_user['user']['id']}. Violation recorded for user {violating_user_id}")
+
+                return {
+                    "success": True,
+                    "message": "Report approved successfully",
+                    "data": {
+                        "violation_recorded": True,
+                        "content_hidden": True,
+                        "strike_count": violation_outcome.get('strike_count', 1),
+                        "notification_sent": True
+                    }
                 }
-            }
+            except Exception as critical_error:
+                # Rollback report status to pending on critical failure
+                try:
+                    async with httpx.AsyncClient() as client:
+                        await client.patch(
+                            f"{supabase.rest_url}/reported_replies?id=eq.{report_id}",
+                            headers=supabase._get_headers(use_service_key=True),
+                            json={
+                                "status": "pending",
+                                "updated_at": __import__('datetime').datetime.utcnow().isoformat()
+                            }
+                        )
+                except Exception as rollback_err:
+                    logger.error(f"Failed to rollback report {report_id} to pending: {rollback_err}")
+                logger.error(f"Critical error during sanction flow for report {report_id}: {critical_error}")
+                raise HTTPException(status_code=500, detail="Failed to approve report; changes rolled back")
     
     except HTTPException:
         raise

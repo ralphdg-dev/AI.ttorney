@@ -189,6 +189,96 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
 
     if (updateError) throw updateError;
 
+    // If approved, lift the user's suspension
+    if (updateData.status && updateData.status.toLowerCase() === "approved") {
+      try {
+        // 1) Mark the related suspension as lifted
+        const { error: liftError } = await supabaseAdmin
+          .from("user_suspensions")
+          .update({
+            status: "lifted",
+            lifted_at: new Date().toISOString(),
+            lifted_by: req.admin.id,
+            lifted_reason: "Appeal approved",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.suspension_id);
+
+        if (liftError) throw liftError;
+
+        // 2) Restore the user's account to active and clear suspension_end
+        const { error: userUpdateError } = await supabaseAdmin
+          .from("users")
+          .update({ account_status: "active", suspension_end: null })
+          .eq("id", existing.user_id);
+
+        if (userUpdateError) throw userUpdateError;
+
+        // 3) Notify the user about appeal approval
+        const approvedTitle = "Appeal Approved";
+        const approvedMessage =
+          "Your suspension appeal was approved. Your account has been restored to active.";
+
+        const { error: notifyApproveError } = await supabaseAdmin
+          .from("notifications")
+          .insert([
+            {
+              user_id: existing.user_id,
+              type: "appeal_decision",
+              title: approvedTitle,
+              message: approvedMessage,
+              data: {
+                decision: "approved",
+                appeal_id: existing.id,
+                suspension_id: existing.suspension_id,
+                reviewed_by: req.admin.id,
+              },
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+        if (notifyApproveError) throw notifyApproveError;
+      } catch (liftErr) {
+        console.error("Error lifting suspension after appeal approval:", liftErr);
+        return res
+          .status(500)
+          .json({ success: false, error: "Failed to lift suspension after approval" });
+      }
+    }
+    // If rejected, notify the user
+    else if (updateData.status && updateData.status.toLowerCase() === "rejected") {
+      try {
+        const title = "Appeal Rejected";
+        const message =
+          "Your suspension appeal was reviewed and has been rejected. Your current suspension terms remain in effect.";
+
+        const { error: notifyError } = await supabaseAdmin
+          .from("notifications")
+          .insert([
+            {
+              user_id: existing.user_id,
+              type: "appeal_decision",
+              title,
+              message,
+              data: {
+                decision: "rejected",
+                appeal_id: existing.id,
+                suspension_id: existing.suspension_id,
+                reviewed_by: req.admin.id,
+              },
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+        if (notifyError) throw notifyError;
+      } catch (notifyErr) {
+        console.error("Error notifying user about rejected appeal:", notifyErr);
+        return res
+          .status(500)
+          .json({ success: false, error: "Failed to notify user about rejected appeal" });
+      }
+    }
+
     res.json({
       success: true,
       message: "Appeal updated successfully",
