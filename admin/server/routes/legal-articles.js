@@ -3,8 +3,38 @@ const router = express.Router();
 const { supabaseAdmin } = require("../config/supabase");
 const multer = require("multer");
 const { authenticateAdmin } = require("../middleware/auth");
-const { notifyArticlePublished, notifyArticleUpdated } = require("../utils/notificationHelper");
+const {
+  notifyArticlePublished,
+  notifyArticleUpdated,
+} = require("../utils/notificationHelper");
 const upload = multer({ storage: multer.memoryStorage() });
+
+// Audit logging utility function
+const logAuditEvent = async (
+  action,
+  targetTable,
+  targetId,
+  actorId,
+  role,
+  metadata = {}
+) => {
+  try {
+    const { error } = await supabaseAdmin.from("admin_audit_logs").insert({
+      action,
+      target_table: targetTable,
+      target_id: targetId,
+      actor_id: actorId,
+      role: role,
+      metadata: metadata,
+    });
+
+    if (error) {
+      console.error("Audit log error:", error);
+    }
+  } catch (error) {
+    console.error("Failed to log audit event:", error);
+  }
+};
 
 // GET /api/legal-articles — get all articles with admin full_name
 router.get("/", async (req, res) => {
@@ -49,12 +79,12 @@ router.get("/", async (req, res) => {
     const getImageUrl = (imagePath) => {
       if (!imagePath) return "";
       if (imagePath.startsWith("http")) return imagePath;
-      
+
       // SECURITY: Never use hardcoded URLs - fail if env var missing
       if (!process.env.SUPABASE_URL) {
         throw new Error("SUPABASE_URL environment variable is required");
       }
-      
+
       const bucketName = "legal-articles";
       const cleanPath = imagePath.replace(/^\//, "");
       const encodedPath = encodeURIComponent(cleanPath);
@@ -85,116 +115,17 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST /api/legal-articles — add new article
-router.post("/", upload.single("image"), async (req, res) => {
-  try {
-    const {
-      title_en,
-      title_fil,
-      description_en,
-      description_fil,
-      content_en,
-      content_fil,
-      category,
-    } = req.body;
+// POST /api/legal-articles — add new article (NOW WITH AUTH)
+router.post(
+  "/",
+  authenticateAdmin,
+  upload.single("image"),
+  async (req, res) => {
+    const adminId = req.admin.id; // Get logged-in admin ID from middleware
+    const role = req.admin.role || "admin";
 
-    const { data: article, error: insertError } = await supabaseAdmin
-      .from("legal_articles")
-      .insert([
-        {
-          title_en,
-          title_fil,
-          description_en,
-          description_fil,
-          content_en,
-          content_fil,
-          category,
-          is_verified: false,
-        },
-      ])
-      .select()
-      .single();
-
-    if (insertError) throw insertError;
-
-    let imagePath = null;
-
-    if (req.file) {
-      const fileExtension = req.file.originalname.split(".").pop();
-      const fileName = `${article.id}_article-image.${fileExtension}`;
-      const storagePath = `articles-img/${fileName}`;
-
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from("legal-articles")
-        .upload(storagePath, req.file.buffer, {
-          contentType: req.file.mimetype,
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
-      imagePath = storagePath;
-
-      const { error: updateError } = await supabaseAdmin
-        .from("legal_articles")
-        .update({ image_article: imagePath })
-        .eq("id", article.id);
-      if (updateError) throw updateError;
-    }
-
-    // SECURITY: Fail if SUPABASE_URL not set
-    if (!process.env.SUPABASE_URL) {
-      throw new Error("SUPABASE_URL environment variable is required");
-    }
-    const getImageUrl = (path) =>
-      path
-        ? `${process.env.SUPABASE_URL}/storage/v1/object/public/legal-articles/${encodeURIComponent(
-            path
-          )}`
-        : "";
-
-    const formattedArticle = {
-      ...article,
-      enTitle: article.title_en,
-      filTitle: article.title_fil,
-      enDescription: article.description_en,
-      filDescription: article.description_fil,
-      enContent: article.content_en,
-      filContent: article.content_fil,
-      image: getImageUrl(imagePath),
-      createdAt: article.created_at,
-      updatedAt: article.updated_at,
-      verifiedAt: article.verified_at,
-      verifiedBy: article.verified_by,
-      verifiedByName: null,
-      status: article.is_verified ? "Published" : "Unpublished",
-    };
-
-    res.status(201).json({ success: true, data: formattedArticle });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ success: false, message: err.message || "Server error" });
-  }
-});
-
-// PUT /api/legal-articles/:id — update article
-router.put("/:id", upload.single("image"), async (req, res) => {
-  const { id } = req.params;
-  const {
-    title_en,
-    title_fil,
-    description_en,
-    description_fil,
-    content_en,
-    content_fil,
-    category,
-  } = req.body;
-
-  try {
-    const { data: updatedArticle, error: updateError } = await supabaseAdmin
-      .from("legal_articles")
-      .update({
+    try {
+      const {
         title_en,
         title_fil,
         description_en,
@@ -202,90 +133,272 @@ router.put("/:id", upload.single("image"), async (req, res) => {
         content_en,
         content_fil,
         category,
-      })
-      .eq("id", id)
-      .select()
-      .single();
+      } = req.body;
 
-    if (updateError) throw updateError;
-
-    let imagePath = updatedArticle.image_article || null;
-    if (req.file) {
-      const fileExtension = req.file.originalname.split(".").pop();
-      const fileName = `${id}_article-image.${fileExtension}`;
-      const storagePath = `articles-img/${fileName}`;
-
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from("legal-articles")
-        .upload(storagePath, req.file.buffer, {
-          contentType: req.file.mimetype,
-          upsert: true,
-        });
-      if (uploadError) throw uploadError;
-      imagePath = storagePath;
-
-      const { error: imageUpdateError } = await supabaseAdmin
+      const { data: article, error: insertError } = await supabaseAdmin
         .from("legal_articles")
-        .update({ image_article: imagePath })
-        .eq("id", id);
-      if (imageUpdateError) throw imageUpdateError;
+        .insert([
+          {
+            title_en,
+            title_fil,
+            description_en,
+            description_fil,
+            content_en,
+            content_fil,
+            category,
+            is_verified: false,
+            created_by: adminId, // Set the admin who created the article
+          },
+        ])
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      let imagePath = null;
+
+      if (req.file) {
+        const fileExtension = req.file.originalname.split(".").pop();
+        const fileName = `${article.id}_article-image.${fileExtension}`;
+        const storagePath = `articles-img/${fileName}`;
+
+        const { error: uploadError } = await supabaseAdmin.storage
+          .from("legal-articles")
+          .upload(storagePath, req.file.buffer, {
+            contentType: req.file.mimetype,
+            upsert: true,
+          });
+
+        if (uploadError) throw uploadError;
+        imagePath = storagePath;
+
+        const { error: updateError } = await supabaseAdmin
+          .from("legal_articles")
+          .update({ image_article: imagePath })
+          .eq("id", article.id);
+        if (updateError) throw updateError;
+      }
+
+      // Log audit event for article creation
+      await logAuditEvent(
+        "Added new article",
+        "legal_articles",
+        article.id,
+        adminId,
+        role,
+        {
+          title_en,
+          title_fil,
+          category,
+          has_image: !!req.file,
+          image_path: imagePath,
+        }
+      );
+
+      // SECURITY: Fail if SUPABASE_URL not set
+      if (!process.env.SUPABASE_URL) {
+        throw new Error("SUPABASE_URL environment variable is required");
+      }
+      const getImageUrl = (path) =>
+        path
+          ? `${
+              process.env.SUPABASE_URL
+            }/storage/v1/object/public/legal-articles/${encodeURIComponent(
+              path
+            )}`
+          : "";
+
+      const formattedArticle = {
+        ...article,
+        enTitle: article.title_en,
+        filTitle: article.title_fil,
+        enDescription: article.description_en,
+        filDescription: article.description_fil,
+        enContent: article.content_en,
+        filContent: article.content_fil,
+        image: getImageUrl(imagePath),
+        createdAt: article.created_at,
+        updatedAt: article.updated_at,
+        verifiedAt: article.verified_at,
+        verifiedBy: article.verified_by,
+        verifiedByName: null,
+        status: article.is_verified ? "Published" : "Unpublished",
+      };
+
+      res.status(201).json({ success: true, data: formattedArticle });
+    } catch (err) {
+      console.error(err);
+      res
+        .status(500)
+        .json({ success: false, message: err.message || "Server error" });
     }
-
-    // SECURITY: Fail if SUPABASE_URL not set
-    if (!process.env.SUPABASE_URL) {
-      throw new Error("SUPABASE_URL environment variable is required");
-    }
-    const getImageUrl = (path) =>
-      path
-        ? `${process.env.SUPABASE_URL}/storage/v1/object/public/legal-articles/${encodeURIComponent(
-            path
-          )}`
-        : "";
-
-    const formattedArticle = {
-      ...updatedArticle,
-      enTitle: updatedArticle.title_en,
-      filTitle: updatedArticle.title_fil,
-      enDescription: updatedArticle.description_en,
-      filDescription: updatedArticle.description_fil,
-      enContent: updatedArticle.content_en,
-      filContent: updatedArticle.content_fil,
-      image: getImageUrl(imagePath),
-      createdAt: updatedArticle.created_at,
-      updatedAt: updatedArticle.updated_at,
-      verifiedAt: updatedArticle.verified_at,
-      verifiedBy: updatedArticle.verified_by,
-      verifiedByName: null,
-      status: updatedArticle.is_verified ? "Published" : "Unpublished",
-    };
-
-    // Send notifications to users who bookmarked this article (if published)
-    if (updatedArticle.is_verified) {
-      notifyArticleUpdated(
-        id,
-        updatedArticle.title_en || "Article",
-        updatedArticle.title_fil || "Artikulo"
-      ).catch((err) => {
-        console.error("⚠️ Failed to send update notifications (non-blocking):", err);
-      });
-    }
-
-    res.status(200).json({ success: true, data: formattedArticle });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ success: false, message: err.message || "Server error" });
   }
-});
+);
 
-// PATCH /api/legal-articles/:id/publish - NOW WITH AUTH
+// PUT /api/legal-articles/:id — update article (NOW WITH AUTH)
+router.put(
+  "/:id",
+  authenticateAdmin,
+  upload.single("image"),
+  async (req, res) => {
+    const { id } = req.params;
+    const adminId = req.admin.id; // Get logged-in admin ID from middleware
+    const role = req.admin.role || "admin";
+
+    try {
+      // Get current article data for audit logging
+      const { data: currentArticle, error: fetchError } = await supabaseAdmin
+        .from("legal_articles")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const {
+        title_en,
+        title_fil,
+        description_en,
+        description_fil,
+        content_en,
+        content_fil,
+        category,
+        audit_logs,
+      } = req.body;
+
+      const { data: updatedArticle, error: updateError } = await supabaseAdmin
+        .from("legal_articles")
+        .update({
+          title_en,
+          title_fil,
+          description_en,
+          description_fil,
+          content_en,
+          content_fil,
+          category,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      let imagePath = updatedArticle.image_article || null;
+      if (req.file) {
+        const fileExtension = req.file.originalname.split(".").pop();
+        const fileName = `${id}_article-image.${fileExtension}`;
+        const storagePath = `articles-img/${fileName}`;
+
+        const { error: uploadError } = await supabaseAdmin.storage
+          .from("legal-articles")
+          .upload(storagePath, req.file.buffer, {
+            contentType: req.file.mimetype,
+            upsert: true,
+          });
+        if (uploadError) throw uploadError;
+        imagePath = storagePath;
+
+        const { error: imageUpdateError } = await supabaseAdmin
+          .from("legal_articles")
+          .update({ image_article: imagePath })
+          .eq("id", id);
+        if (imageUpdateError) throw imageUpdateError;
+      }
+
+      // Create separate audit logs for each field change
+      if (audit_logs) {
+        try {
+          const logs = JSON.parse(audit_logs);
+          for (const log of logs) {
+            await logAuditEvent(
+              log.action,
+              "legal_articles",
+              id,
+              adminId,
+              role,
+              {
+                article_title: currentArticle.title_en,
+                ...log.metadata,
+              }
+            );
+          }
+        } catch (parseError) {
+          console.error("Error parsing audit logs:", parseError);
+        }
+      }
+
+      // SECURITY: Fail if SUPABASE_URL not set
+      if (!process.env.SUPABASE_URL) {
+        throw new Error("SUPABASE_URL environment variable is required");
+      }
+      const getImageUrl = (path) =>
+        path
+          ? `${
+              process.env.SUPABASE_URL
+            }/storage/v1/object/public/legal-articles/${encodeURIComponent(
+              path
+            )}`
+          : "";
+
+      const formattedArticle = {
+        ...updatedArticle,
+        enTitle: updatedArticle.title_en,
+        filTitle: updatedArticle.title_fil,
+        enDescription: updatedArticle.description_en,
+        filDescription: updatedArticle.description_fil,
+        enContent: updatedArticle.content_en,
+        filContent: updatedArticle.content_fil,
+        image: getImageUrl(imagePath),
+        createdAt: updatedArticle.created_at,
+        updatedAt: updatedArticle.updated_at,
+        verifiedAt: updatedArticle.verified_at,
+        verifiedBy: updatedArticle.verified_by,
+        verifiedByName: null,
+        status: updatedArticle.is_verified ? "Published" : "Unpublished",
+      };
+
+      // Send notifications to users who bookmarked this article (if published)
+      if (updatedArticle.is_verified) {
+        notifyArticleUpdated(
+          id,
+          updatedArticle.title_en || "Article",
+          updatedArticle.title_fil || "Artikulo"
+        ).catch((err) => {
+          console.error(
+            "⚠️ Failed to send update notifications (non-blocking):",
+            err
+          );
+        });
+      }
+
+      res.status(200).json({ success: true, data: formattedArticle });
+    } catch (err) {
+      console.error(err);
+      res
+        .status(500)
+        .json({ success: false, message: err.message || "Server error" });
+    }
+  }
+);
+
+// PATCH /api/legal-articles/:id/publish - WITH AUTH
 router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
   const { id } = req.params;
   const { publish } = req.body;
   const adminId = req.admin.id; // Get logged-in admin ID from middleware
+  const role = req.admin.role || "admin";
 
   try {
+    // Get current article data for audit logging
+    const { data: currentArticle, error: fetchError } = await supabaseAdmin
+      .from("legal_articles")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
     // Prepare update data
     const updateData = {
       is_verified: publish,
@@ -309,15 +422,35 @@ router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
 
     if (error) throw error;
 
+    // Log audit event for publish/unpublish
+    await logAuditEvent(
+      publish
+        ? 'Article status changed to "Published"'
+        : 'Article status changed to "Unpublished"',
+      "legal_articles",
+      id,
+      adminId,
+      role,
+      {
+        article_title: updatedArticle.title_en,
+        previous_status: currentArticle.is_verified
+          ? "published"
+          : "unpublished",
+        new_status: publish ? "published" : "unpublished",
+        verified_by: publish ? adminId : null,
+        verified_at: publish ? new Date().toISOString() : null,
+      }
+    );
+
     // SECURITY: Fail if SUPABASE_URL not set
     if (!process.env.SUPABASE_URL) {
       throw new Error("SUPABASE_URL environment variable is required");
     }
     const getImageUrl = (path) =>
       path
-        ? `${process.env.SUPABASE_URL}/storage/v1/object/public/legal-articles/${encodeURIComponent(
-            path
-          )}`
+        ? `${
+            process.env.SUPABASE_URL
+          }/storage/v1/object/public/legal-articles/${encodeURIComponent(path)}`
         : "";
 
     const formattedArticle = {
@@ -345,7 +478,10 @@ router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
         updatedArticle.title_en || "New Article",
         updatedArticle.title_fil || "Bagong Artikulo"
       ).catch((err) => {
-        console.error("⚠️ Failed to send publish notifications (non-blocking):", err);
+        console.error(
+          "⚠️ Failed to send publish notifications (non-blocking):",
+          err
+        );
       });
     }
 
@@ -358,9 +494,11 @@ router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
   }
 });
 
-// PATCH /api/legal-articles/:id/archive
-router.patch("/:id/archive", async (req, res) => {
+// PATCH /api/legal-articles/:id/archive (NOW WITH AUTH)
+router.patch("/:id/archive", authenticateAdmin, async (req, res) => {
   const { id } = req.params;
+  const adminId = req.admin.id; // Get logged-in admin ID from middleware
+  const role = req.admin.role || "admin";
 
   try {
     const { data: article, error: fetchError } = await supabaseAdmin
@@ -388,6 +526,20 @@ router.patch("/:id/archive", async (req, res) => {
 
     if (updateError) throw updateError;
 
+    // Log audit event for archive
+    await logAuditEvent(
+      "Archived Article",
+      "legal_articles",
+      id,
+      adminId,
+      role,
+      {
+        article_title: article.title_en,
+        was_published: article.is_verified,
+        archived_at: new Date().toISOString(),
+      }
+    );
+
     res.status(200).json({
       success: true,
       message: "Article archived successfully",
@@ -401,11 +553,22 @@ router.patch("/:id/archive", async (req, res) => {
   }
 });
 
-// PATCH /api/legal-articles/:id/restore
-router.patch("/:id/restore", async (req, res) => {
+// PATCH /api/legal-articles/:id/restore (NOW WITH AUTH)
+router.patch("/:id/restore", authenticateAdmin, async (req, res) => {
   const { id } = req.params;
+  const adminId = req.admin.id; // Get logged-in admin ID from middleware
+  const role = req.admin.role || "admin";
 
   try {
+    // Get current article data for audit logging
+    const { data: currentArticle, error: fetchError } = await supabaseAdmin
+      .from("legal_articles")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
     const { data: restoredArticle, error } = await supabaseAdmin
       .from("legal_articles")
       .update({ deleted_at: null })
@@ -414,6 +577,22 @@ router.patch("/:id/restore", async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    // Log audit event for restore
+    await logAuditEvent(
+      "Article Restored",
+      "legal_articles",
+      id,
+      adminId,
+      role,
+      {
+        article_title: restoredArticle.title_en,
+        restored_at: new Date().toISOString(),
+        previous_status: currentArticle.is_verified
+          ? "published"
+          : "unpublished",
+      }
+    );
 
     res.status(200).json({
       success: true,

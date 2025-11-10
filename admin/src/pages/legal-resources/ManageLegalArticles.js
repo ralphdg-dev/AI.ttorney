@@ -1,5 +1,3 @@
-// ManageLegalArticles.js
-
 import React from "react";
 import ReactDOM from "react-dom";
 import {
@@ -107,7 +105,7 @@ const ManageLegalArticles = () => {
     setTimeout(() => setImageModal({ open: false, src: null }), 300);
   };
 
-  const handleAddArticle = async (formData) => {
+  const handleAddArticle = async (formData, token) => {
     try {
       const data = new FormData();
       data.append("title_en", formData.enTitle);
@@ -121,6 +119,9 @@ const ManageLegalArticles = () => {
 
       const res = await fetch("http://localhost:5001/api/legal-articles", {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: data,
       });
 
@@ -155,6 +156,56 @@ const ManageLegalArticles = () => {
       setArticles((prev) => prev.filter((a) => a.id !== articleId));
     } catch (err) {
       console.error("Archive error:", err);
+    }
+  };
+
+  // Handle restore
+  const handleRestore = async (articleId) => {
+    try {
+      const res = await fetch(
+        `http://localhost:5001/api/legal-articles/${articleId}/restore`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(json.message || "Failed to restore article");
+      }
+
+      // Remove the restored article from the archives list
+      setArticles((prev) => prev.filter((a) => a.id !== articleId));
+    } catch (err) {
+      console.error("Restore error:", err);
+    }
+  };
+
+  // Handle publish/unpublish
+  const handlePublish = async (articleId, publish) => {
+    try {
+      const res = await fetch(
+        `http://localhost:5001/api/legal-articles/${articleId}/publish`,
+        {
+          method: "PATCH",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ publish }),
+        }
+      );
+
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(
+          json.message ||
+            `Failed to ${publish ? "publish" : "unpublish"} article`
+        );
+      }
+
+      return json.data;
+    } catch (err) {
+      console.error("Publish error:", err);
+      throw err;
     }
   };
 
@@ -630,16 +681,7 @@ const ManageLegalArticles = () => {
             if (confirmationModal.type === "archive") {
               await handleArchive(confirmationModal.articleId);
             } else if (confirmationModal.type === "restore") {
-              const res = await fetch(
-                `http://localhost:5001/api/legal-articles/${confirmationModal.articleId}/restore`,
-                { method: "PATCH" }
-              );
-              const json = await res.json();
-              if (json.success) {
-                setArticles((prev) =>
-                  prev.filter((a) => a.id !== confirmationModal.articleId)
-                );
-              } else throw new Error(json.message);
+              await handleRestore(confirmationModal.articleId);
             }
           } catch (err) {
             console.error(err);
@@ -674,25 +716,14 @@ const ManageLegalArticles = () => {
         article={publishModal.article}
         onClose={() => setPublishModal({ open: false, article: null })}
         onConfirm={async () => {
-          const articleId = publishModal.article.id;
-          const publish = publishModal.article.status === "Unpublished";
           try {
-            const res = await fetch(
-              `http://localhost:5001/api/legal-articles/${articleId}/publish`,
-              {
-                method: "PATCH",
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ publish }),
-              }
+            const articleId = publishModal.article.id;
+            const publish = publishModal.article.status === "Unpublished";
+            const updatedArticle = await handlePublish(articleId, publish);
+
+            setArticles((prev) =>
+              prev.map((a) => (a.id === articleId ? updatedArticle : a))
             );
-            const json = await res.json();
-            if (json.success) {
-              setArticles((prev) =>
-                prev.map((a) => (a.id === articleId ? json.data : a))
-              );
-            } else {
-              throw new Error(json.message);
-            }
           } catch (err) {
             console.error(err);
           } finally {
