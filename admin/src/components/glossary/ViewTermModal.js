@@ -1,186 +1,625 @@
-import React from 'react';
-import Modal from '../ui/Modal';
-import { CheckCircle, XCircle } from 'lucide-react';
+import React, { useState, useEffect, useContext } from "react";
+import Modal from "../ui/Modal";
+import Tooltip from "../ui/Tooltip";
+import {
+  X,
+  Download,
+  History,
+  Activity,
+  ChevronUp,
+  ChevronDown,
+  Eye,
+  FileText,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import {
+  exportTermAuditTrailPDF,
+  exportTermActivityPDF,
+} from "./TermPDFExportUtils";
 
-const VerificationStatus = ({ isVerified, verifiedBy }) => {
-  if (isVerified === null || isVerified === undefined) {
-    return (
-      <div className="flex items-center gap-2">
-        <XCircle size={14} className="text-gray-400" />
-        <span className="text-xs text-gray-700">Not Set</span>
-      </div>
-    );
-  }
-
-  if (isVerified) {
-    return (
-      <div className="flex items-center gap-2">
-        <CheckCircle size={14} className="text-emerald-600" />
-        <span className="text-xs text-gray-900">Verified by {verifiedBy || 'Admin'}</span>
-      </div>
-    );
-  } else {
-    return (
-      <div className="flex items-center gap-2">
-        <XCircle size={14} className="text-red-600" />
-        <span className="text-xs text-gray-900">Not Verified</span>
-      </div>
-    );
-  }
-};
-
-const ViewTermModal = ({ open, onClose, term, loading = false }) => {
-  // Format category for display
-  const formatCategory = (category) => {
-    if (!category) return '-';
-    return category.charAt(0).toUpperCase() + category.slice(1);
-  };
-
-  // Get category badge classes
-  const getCategoryClasses = (category) => {
-    switch ((category || '').toLowerCase()) {
-      case 'family':
-        return 'bg-red-50 border-red-200 text-red-700';
-      case 'civil':
-        return 'bg-violet-50 border-violet-200 text-violet-700';
-      case 'criminal':
-        return 'bg-red-50 border-red-200 text-red-600';
-      case 'labor':
-        return 'bg-blue-50 border-blue-200 text-blue-700';
-      case 'consumer':
-        return 'bg-emerald-50 border-emerald-200 text-emerald-700';
-      case 'others':
-        return 'bg-gray-50 border-gray-200 text-gray-700';
+const StatusBadge = ({ status }) => {
+  const getStatusStyles = (status) => {
+    switch (status?.toLowerCase()) {
+      case "verified":
+        return "bg-green-100 text-green-800 border border-green-200";
+      case "unverified":
+        return "bg-gray-100 text-gray-800 border border-gray-200";
+      case "pending":
+        return "bg-yellow-100 text-yellow-800 border border-yellow-200";
       default:
-        return 'bg-gray-50 border-gray-200 text-gray-700';
+        return "bg-gray-100 text-gray-800 border border-gray-200";
     }
   };
 
-  // Format date for display
+  const getDisplayStatus = (status) => {
+    if (status === null || status === undefined) return "Pending";
+    return status ? "Verified" : "Unverified";
+  };
+
+  const styles = getStatusStyles(getDisplayStatus(status));
+  const displayStatus = getDisplayStatus(status);
+
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium ${styles}`}
+    >
+      {displayStatus}
+    </span>
+  );
+};
+
+const CategoryBadge = ({ category }) => {
+  const getCategoryStyles = (category) => {
+    switch ((category || "").toLowerCase()) {
+      case "family":
+        return "bg-red-50 border-red-200 text-rose-700";
+      case "civil":
+        return "bg-violet-50 border-violet-200 text-violet-700";
+      case "criminal":
+        return "bg-red-50 border-red-200 text-red-600";
+      case "labor":
+        return "bg-blue-50 border-blue-200 text-blue-700";
+      case "consumer":
+        return "bg-emerald-50 border-emerald-200 text-emerald-700";
+      default:
+        return "bg-gray-50 border-gray-200 text-gray-700";
+    }
+  };
+
+  const styles = getCategoryStyles(category);
+  const displayCategory = category
+    ? category.charAt(0).toUpperCase() + category.slice(1)
+    : "Uncategorized";
+
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium ${styles}`}
+    >
+      {displayCategory}
+    </span>
+  );
+};
+
+const ViewTermModal = ({ open, onClose, term }) => {
+  const [activeTab, setActiveTab] = useState("audit");
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState(null);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState(null);
+  const [selectedActivity, setSelectedActivity] = useState(null);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const { admin: currentAdmin } = useAuth();
+
+  // Helper function to get auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("admin_token");
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+  };
+
+  useEffect(() => {
+    if (open && term?.id) {
+      loadAuditLogs();
+      loadRecentActivity();
+    }
+  }, [open, term?.id]);
+
+  if (!term) return null;
+
   const formatDate = (dateString) => {
-    if (!dateString) return '-';
+    if (!dateString) return "Never";
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
-  if (!term && !loading) {
-    return (
-      <Modal open={open} onClose={() => {}} title="Glossary Term Details" width="max-w-4xl" showCloseButton={false}>
-        <div className="flex items-center justify-center h-32">
-          <p className="text-sm text-gray-600">Term not found</p>
-        </div>
-      </Modal>
-    );
-  }
+  const formatRelativeTime = (dateString) => {
+    if (!dateString) return "Never";
 
-  if (loading) {
-    return (
-      <Modal open={open} onClose={() => {}} title="Glossary Term Details" width="max-w-4xl" showCloseButton={false}>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#023D7B] mx-auto mb-4"></div>
-            <p className="text-sm text-gray-600">Loading term details...</p>
-          </div>
-        </div>
-      </Modal>
-    );
-  }
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    const diffInDays = Math.floor(diffInHours / 24);
+
+    if (diffInMinutes < 1) {
+      return "Just now";
+    } else if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`;
+    } else if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
+    } else if (diffInDays < 7) {
+      return `${diffInDays}d ago`;
+    } else {
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+  };
+
+  const loadAuditLogs = async () => {
+    try {
+      setAuditLoading(true);
+      setAuditError(null);
+
+      const response = await fetch(
+        `http://localhost:5001/api/glossary-terms/${term.id}/audit-logs`,
+        {
+          headers: getAuthHeaders(),
+        }
+      );
+
+      if (response.status === 401) {
+        throw new Error("Unauthorized. Please log in again.");
+      }
+
+      const json = await response.json();
+
+      if (json.success) {
+        setAuditLogs(json.data || []);
+      } else {
+        throw new Error(json.message || "Failed to load audit logs");
+      }
+    } catch (error) {
+      console.error("Failed to load audit logs:", error);
+      setAuditError(error.message);
+      setAuditLogs([
+        {
+          id: 1,
+          action: "Term created",
+          actor_name: "System",
+          role: "system",
+          created_at: term.created_at,
+          metadata: { action: "Glossary term created" },
+        },
+      ]);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  const auditTrail = auditLogs.map((log) => ({
+    id: log.id,
+    action: log.action,
+    admin: log.actor_name || "Unknown Admin",
+    role: log.role || "Admin",
+    date: log.created_at,
+    details: (() => {
+      try {
+        const metadata =
+          typeof log.metadata === "string"
+            ? JSON.parse(log.metadata)
+            : log.metadata;
+        return metadata?.action || log.action;
+      } catch {
+        return log.action;
+      }
+    })(),
+  }));
+
+  const loadRecentActivity = async () => {
+    try {
+      setActivityLoading(true);
+      setActivityError(null);
+
+      const response = await fetch(
+        `http://localhost:5001/api/glossary-terms/${term.id}/recent-activity`,
+        {
+          headers: getAuthHeaders(),
+        }
+      );
+
+      if (response.status === 401) {
+        throw new Error("Unauthorized. Please log in again.");
+      }
+
+      const json = await response.json();
+
+      if (json.success) {
+        setRecentActivity(json.data || []);
+      } else {
+        throw new Error(json.message || "Failed to load recent activity");
+      }
+    } catch (error) {
+      console.error("Failed to load recent activity:", error);
+      setActivityError(error.message);
+      setRecentActivity([
+        {
+          id: 1,
+          action: "Term viewed",
+          target_table: "glossary_terms",
+          created_at: new Date().toISOString(),
+          metadata: { action_type: "view" },
+        },
+      ]);
+    } finally {
+      setActivityLoading(false);
+    }
+  };
+
+  const handleExportAuditTrail = async () => {
+    try {
+      await exportTermAuditTrailPDF(
+        auditLogs,
+        term.term_en,
+        term.category,
+        currentAdmin,
+        term.id
+      );
+      console.log("Term audit trail PDF exported and logged successfully");
+
+      setTimeout(() => {
+        loadAuditLogs();
+        loadRecentActivity();
+      }, 1000);
+    } catch (error) {
+      console.error("Failed to export audit trail PDF:", error);
+      alert("Failed to export audit trail PDF. Please try again.");
+    }
+  };
+
+  const handleExportActivity = async () => {
+    try {
+      const activityData = recentActivity.map((activity) => ({
+        action: activity.action,
+        date: activity.created_at,
+        details: activity.metadata?.action_type || activity.action,
+      }));
+
+      await exportTermActivityPDF(
+        activityData,
+        term.term_en,
+        term.category,
+        currentAdmin,
+        term.id
+      );
+      console.log("Term activity PDF exported and logged successfully");
+
+      setTimeout(() => {
+        loadAuditLogs();
+        loadRecentActivity();
+      }, 1000);
+    } catch (error) {
+      console.error("Failed to export activity PDF:", error);
+      alert("Failed to export activity PDF. Please try again.");
+    }
+  };
+
+  const handleViewActivity = (activity) => {
+    setSelectedActivity(activity);
+    setShowActivityModal(true);
+  };
+
+  const handleCloseActivityModal = () => {
+    setShowActivityModal(false);
+    setSelectedActivity(null);
+  };
 
   return (
-    <Modal 
-      open={open} 
-      onClose={() => {}} 
-      title="Glossary Term Details"
+    <Modal
+      open={open}
+      onClose={() => {}}
+      title="Term Details"
       width="max-w-4xl"
       showCloseButton={false}
     >
       <div className="space-y-6">
-        {/* Terms and Category */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div>
-            <div className="text-[9px] text-gray-500">English Term</div>
-            <div className="text-xs font-medium text-gray-900 mt-1">{term.term_en || '-'}</div>
+        {/* Term Basic Info - Two Column Layout */}
+        <div className="grid grid-cols-2 gap-6">
+          {/* Left Column */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                English Term
+              </label>
+              <div className="text-xs text-gray-900">
+                {term.term_en || "N/A"}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                Filipino Term
+              </label>
+              <div className="text-xs text-gray-900">
+                {term.term_fil || "N/A"}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                Created Date
+              </label>
+              <div className="text-xs text-gray-900">
+                {formatDate(term.created_at)}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                Category
+              </label>
+              <div>
+                <CategoryBadge category={term.category} />
+              </div>
+            </div>
           </div>
-          <div>
-            <div className="text-[9px] text-gray-500">Filipino Term</div>
-            <div className="text-xs font-medium text-gray-900 mt-1">{term.term_fil || '-'}</div>
+
+          {/* Right Column */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                English Definition
+              </label>
+              <div className="text-xs text-gray-900 line-clamp-3">
+                {term.definition_en || "No definition"}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <div>
+                <StatusBadge status={term.is_verified} />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                Last Updated
+              </label>
+              <div className="text-xs text-gray-900">
+                {term.updated_at
+                  ? formatDate(term.updated_at)
+                  : term.created_at
+                  ? formatDate(term.created_at)
+                  : "Never"}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[9px] font-medium text-gray-700 mb-1">
+                Verified By
+              </label>
+              <div className="text-xs text-gray-900">
+                {term.verified_by || "Not verified"}
+              </div>
+            </div>
           </div>
-          <div>
-            <div className="text-[9px] text-gray-500">Category</div>
-            <div className="mt-1">
-              {term.category && (
-                <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-semibold border ${getCategoryClasses(term.category)}`}>
-                  {formatCategory(term.category)}
-                </span>
+        </div>
+
+        {/* Term History & Audit Trail Section */}
+        <div className="border-t border-gray-200 pt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Recent Activity Column */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-3 w-3 text-gray-600" />
+                  <h4 className="text-xs font-medium text-gray-900">
+                    Recent Activity
+                  </h4>
+                  <span className="text-[10px] text-gray-500">
+                    ({recentActivity.length} entries)
+                  </span>
+                </div>
+                <Tooltip content="Download as PDF">
+                  <button
+                    onClick={handleExportActivity}
+                    disabled={!recentActivity || recentActivity.length === 0}
+                    className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Download size={14} />
+                  </button>
+                </Tooltip>
+              </div>
+
+              {activityLoading ? (
+                <div className="text-center py-6">
+                  <Loader2 className="h-6 w-6 text-gray-400 mx-auto mb-1 animate-spin" />
+                  <p className="text-[10px] text-gray-500">
+                    Loading recent activity...
+                  </p>
+                </div>
+              ) : activityError ? (
+                <div className="text-center py-6">
+                  <AlertCircle className="h-6 w-6 text-red-400 mx-auto mb-1" />
+                  <p className="text-[10px] text-red-500 mb-2">
+                    {activityError}
+                  </p>
+                  <button
+                    onClick={loadRecentActivity}
+                    className="text-[9px] text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : recentActivity.length > 0 ? (
+                <div className="overflow-hidden border border-gray-200 rounded-lg">
+                  <div className="max-h-32 overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Action
+                          </th>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Details
+                          </th>
+                          <th className="px-2 py-1.5 text-right text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {recentActivity.map((activity) => (
+                          <tr key={activity.id} className="hover:bg-gray-50">
+                            <td className="px-2 py-1.5">
+                              <div className="text-[9px] font-medium text-gray-900">
+                                {activity.action}
+                              </div>
+                            </td>
+                            <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
+                              {formatDate(activity.created_at)}
+                            </td>
+                            <td className="px-2 py-1.5 max-w-32">
+                              <div
+                                className="text-[9px] text-gray-700 truncate"
+                                title={
+                                  activity.metadata?.action_type ||
+                                  activity.action ||
+                                  "-"
+                                }
+                              >
+                                {activity.metadata?.action_type ||
+                                  activity.action ||
+                                  "-"}
+                              </div>
+                            </td>
+                            <td className="px-2 py-1.5 text-right">
+                              <Tooltip content="View Details">
+                                <button
+                                  onClick={() => handleViewActivity(activity)}
+                                  className="p-1 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-800"
+                                >
+                                  <Eye size={12} />
+                                </button>
+                              </Tooltip>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <Activity className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                  <p className="text-[10px] text-gray-500">
+                    No recent activity found
+                  </p>
+                </div>
               )}
-              {!term.category && (
-                <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-semibold border bg-gray-50 border-gray-200 text-gray-700">
-                  -
-                </span>
+            </div>
+
+            {/* Audit Trail Column */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <History className="h-3 w-3 text-gray-600" />
+                  <h4 className="text-xs font-medium text-gray-900">
+                    Audit Trail
+                  </h4>
+                  <span className="text-[10px] text-gray-500">
+                    ({auditTrail.length} entries)
+                  </span>
+                </div>
+                <Tooltip content="Download as PDF">
+                  <button
+                    onClick={handleExportAuditTrail}
+                    disabled={
+                      auditLoading || !auditTrail || auditTrail.length === 0
+                    }
+                    className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {auditLoading ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Download size={14} />
+                    )}
+                  </button>
+                </Tooltip>
+              </div>
+
+              {auditLoading ? (
+                <div className="text-center py-6">
+                  <Loader2 className="h-6 w-6 text-gray-400 mx-auto mb-1 animate-spin" />
+                  <p className="text-[10px] text-gray-500">
+                    Loading audit trail...
+                  </p>
+                </div>
+              ) : auditError ? (
+                <div className="text-center py-6">
+                  <AlertCircle className="h-6 w-6 text-red-400 mx-auto mb-1" />
+                  <p className="text-[10px] text-red-500 mb-2">{auditError}</p>
+                  <button
+                    onClick={loadAuditLogs}
+                    className="text-[9px] text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : auditTrail.length > 0 ? (
+                <div className="overflow-hidden border border-gray-200 rounded-lg">
+                  <div className="max-h-32 overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Action
+                          </th>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Admin
+                          </th>
+                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {auditTrail.map((log) => (
+                          <tr key={log.id} className="hover:bg-gray-50">
+                            <td className="px-2 py-1.5">
+                              <div className="text-[9px] font-medium text-gray-900">
+                                {log.action}
+                              </div>
+                            </td>
+                            <td className="px-2 py-1.5 whitespace-nowrap">
+                              <div className="text-[9px]">
+                                <div className="font-medium text-gray-900">
+                                  {log.admin || "Unknown Admin"}
+                                </div>
+                                <div className="text-gray-500 capitalize">
+                                  {log.role || "Admin"}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
+                              {formatDate(log.date)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <History className="h-6 w-6 text-gray-400 mx-auto mb-1" />
+                  <p className="text-[10px] text-gray-500">
+                    No audit trail found
+                  </p>
+                </div>
               )}
             </div>
-          </div>
-        </div>
-
-        <hr className="border-gray-200" />
-
-        {/* Definitions */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <div className="text-[9px] text-gray-500 mb-1">English Definition</div>
-            <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded border min-h-[60px]">
-              {term.definition_en || 'No definition provided'}
-            </div>
-          </div>
-          <div>
-            <div className="text-[9px] text-gray-500 mb-1">Filipino Definition</div>
-            <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded border min-h-[60px]">
-              {term.definition_fil || 'Walang kahulugang ibinigay'}
-            </div>
-          </div>
-        </div>
-
-        <hr className="border-gray-200" />
-
-        {/* Examples */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <div className="text-[9px] text-gray-500 mb-1">English Example</div>
-            <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded border min-h-[60px]">
-              {term.example_en || 'No example provided'}
-            </div>
-          </div>
-          <div>
-            <div className="text-[9px] text-gray-500 mb-1">Filipino Example</div>
-            <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded border min-h-[60px]">
-              {term.example_fil || 'Walang halimbawang ibinigay'}
-            </div>
-          </div>
-        </div>
-
-        <hr className="border-gray-200" />
-
-        {/* Verification & Metadata */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <div className="text-[9px] text-gray-500">Verification Status</div>
-            <div className="text-xs font-medium text-gray-900">
-              <VerificationStatus isVerified={term.is_verified} verifiedBy={term.verified_by} />
-            </div>
-          </div>
-          <div>
-            <div className="text-[9px] text-gray-500">Created Date</div>
-            <div className="text-xs text-gray-700">{formatDate(term.created_at)}</div>
-          </div>
-          <div>
-            <div className="text-[9px] text-gray-500">Last Updated</div>
-            <div className="text-xs text-gray-700">{formatDate(term.updated_at)}</div>
           </div>
         </div>
 
@@ -194,6 +633,98 @@ const ViewTermModal = ({ open, onClose, term, loading = false }) => {
           </button>
         </div>
       </div>
+
+      {/* Activity Detail Modal */}
+      {showActivityModal && selectedActivity && (
+        <Modal
+          open={showActivityModal}
+          onClose={handleCloseActivityModal}
+          title="Activity Details"
+          width="max-w-2xl"
+        >
+          <div className="space-y-4">
+            <div className="border-b border-gray-200 pb-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-900">
+                  {selectedActivity.action}
+                </h3>
+                <span className="text-xs text-gray-500">
+                  {formatDate(selectedActivity.created_at)}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Action Type
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
+                  {selectedActivity.action}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Date & Time
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
+                  {formatDate(selectedActivity.created_at)}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Details
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md min-h-[60px]">
+                  {selectedActivity.metadata?.action_type ||
+                    selectedActivity.action ||
+                    "No additional details available"}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Term Information
+                </label>
+                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
+                  <div className="flex items-center justify-between">
+                    <span>{term.term_en}</span>
+                    <div className="flex items-center gap-2">
+                      <CategoryBadge category={term.category} />
+                      <StatusBadge status={term.is_verified} />
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {term.category} • Created: {formatDate(term.created_at)}
+                  </div>
+                </div>
+              </div>
+
+              {selectedActivity.id && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    Activity ID
+                  </label>
+                  <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md font-mono">
+                    {selectedActivity.id}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-gray-200">
+              <button
+                onClick={handleCloseActivityModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </Modal>
   );
 };
