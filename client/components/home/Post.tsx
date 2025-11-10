@@ -67,6 +67,7 @@ const Post: React.FC<PostProps> = React.memo(({
   const [isBookmarked, setIsBookmarked] = useState(propIsBookmarked || false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
   const [displayTime, setDisplayTime] = useState(timestamp);
+  const [showAlreadyReported, setShowAlreadyReported] = useState(false);
 
   // Helper function to get initials from name
   const getInitials = (name: string) => {
@@ -186,29 +187,35 @@ const Post: React.FC<PostProps> = React.memo(({
     onCommentPress?.();
   }, [onCommentPress]);
 
-  const handleReportPress = useCallback(() => {
-    setReportModalVisible(true);
-  }, []);
-
-  const handleReportSubmit = useCallback(async (reason: string, category: string, reasonContext?: string) => {
-    if (!currentUser?.id) return;
-
-    setIsReportLoading(true);
-    try {
-      // First check if user has already reported this post
+  const handleReportPress = useCallback(async () => {
+    // Check if user has already reported this post
+    if (currentUser?.id) {
       const checkResult = await ReportService.hasUserReported(
         id,
         'post',
         currentUser.id,
         session
       );
-
+      
       if (checkResult.success && checkResult.hasReported) {
-        // User has already reported this post - throw error to trigger "already reported" modal
-        throw new Error('You have already reported this post');
+        // Show already reported modal immediately
+        setShowAlreadyReported(true);
+        setReportModalVisible(true);
+        return;
       }
+    }
+    
+    // User hasn't reported yet, show normal report form
+    setShowAlreadyReported(false);
+    setReportModalVisible(true);
+  }, [currentUser?.id, id, session]);
 
-      // User hasn't reported this post - proceed with submission
+  const handleReportSubmit = useCallback(async (reason: string, category: string, reasonContext?: string) => {
+    if (!currentUser?.id) return;
+
+    setIsReportLoading(true);
+    try {
+      // Submit the report (already checked in handleReportPress)
       const result = await ReportService.submitReport(
         id,
         'post',
@@ -402,10 +409,14 @@ const Post: React.FC<PostProps> = React.memo(({
         {/* Report Modal */}
         <ReportModal
           visible={reportModalVisible}
-          onClose={() => setReportModalVisible(false)}
+          onClose={() => {
+            setReportModalVisible(false);
+            setShowAlreadyReported(false);
+          }}
           onSubmit={handleReportSubmit}
           targetType="post"
           isLoading={isReportLoading}
+          showAlreadyReported={showAlreadyReported}
         />
       </TouchableOpacity>
     </FadeInView>

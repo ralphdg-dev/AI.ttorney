@@ -1008,4 +1008,395 @@ router.get("/statistics", authenticateAdmin, async (req, res) => {
   }
 });
 
+// Get all reported replies with filtering and pagination
+router.get("/reported-replies", authenticateAdmin, async (req, res) => {
+  try {
+    console.log("Reported replies endpoint called with query:", req.query);
+
+    const {
+      page = 1,
+      limit = 50,
+      status = "all",
+      category = "all",
+      sort_by = "submitted_at",
+      sort_order = "desc",
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+
+    // Build the base query for reported_replies
+    let query = supabaseAdmin
+      .from("reported_replies")
+      .select(
+        `
+        id,
+        reason,
+        reason_context,
+        status,
+        submitted_at,
+        reporter:users!reported_replies_reporter_id_fkey(
+          id,
+          full_name,
+          email,
+          username
+        ),
+        reply:forum_replies!reported_replies_reply_id_fkey(
+          id,
+          reply_body,
+          created_at,
+          user_id,
+          post_id,
+          user:users(id, full_name, email, username, role),
+          post:forum_posts(id, body, is_anonymous, user:users(id, full_name, email, username))
+        )
+      `
+      );
+
+    // Apply filters
+    if (status !== "all") {
+      query = query.eq("status", status);
+    }
+
+    if (category !== "all") {
+      query = query.eq("reason", category);
+    }
+
+    const sortColumn = sort_by === "created_at" ? "submitted_at" : sort_by;
+    query = query.order(sortColumn, { ascending: sort_order === "asc" });
+
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: reports, error } = await query;
+
+    if (error) {
+      console.error("Get reported replies error:", error);
+      return res.status(500).json({
+        success: false,
+        error: `Failed to fetch reported replies: ${error.message}`,
+      });
+    }
+
+    // Count query
+    let countQuery = supabaseAdmin
+      .from("reported_replies")
+      .select("id", { count: "exact", head: true });
+
+    if (status !== "all") {
+      countQuery = countQuery.eq("status", status);
+    }
+
+    if (category !== "all") {
+      countQuery = countQuery.eq("reason", category);
+    }
+
+    const { count, error: countError } = await countQuery;
+
+    if (countError) console.error("Count error:", countError);
+
+    res.json({
+      success: true,
+      data: reports || [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Get reported replies error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+    });
+  }
+});
+
+// Resolve a reported reply
+router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action } = req.body; // action: 'dismiss' | 'sanctioned'
+    const adminId = req.admin?.id;
+
+    console.log("=== RESOLVE REPLY REPORT ===");
+    console.log("Report ID:", id);
+    console.log("Action:", action);
+    console.log("Admin ID:", adminId);
+
+    if (!action || !["dismiss", "sanctioned"].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid action. Must be 'dismiss' or 'sanctioned'",
+      });
+    }
+
+    // Get the report details first
+    const { data: report, error: reportError } = await supabaseAdmin
+      .from("reported_replies")
+      .select(
+        `
+        id,
+        reply_id,
+        reporter_id,
+        reason,
+        reason_context,
+        reply:forum_replies!reported_replies_reply_id_fkey(
+          id,
+          reply_body,
+          user_id,
+          post_id
+        )
+      `
+      )
+      .eq("id", id)
+      .single();
+
+    if (reportError || !report) {
+      return res.status(404).json({
+        success: false,
+        error: "Report not found",
+        details: reportError?.message,
+      });
+    }
+
+    // If action is sanctioned, create a violation record and add a strike
+    if (action === "sanctioned" && report.reply) {
+      try {
+        // Get current user status
+        const { data: userData, error: userError } = await supabaseAdmin
+          .from("users")
+          .select("id, strike_count, suspension_count, account_status")
+          .eq("id", report.reply.user_id)
+          .single();
+
+        if (userError) {
+          console.error("Error fetching user:", userError);
+          throw new Error("Failed to fetch user data");
+        }
+
+        const currentStrikes = userData.strike_count || 0;
+        const currentSuspensions = userData.suspension_count || 0;
+        const newStrikeCount = currentStrikes + 1;
+
+        // Determine action based on strikes
+        let actionTaken = "strike_added";
+        let newSuspensionCount = currentSuspensions;
+        let suspensionEnd = null;
+        let accountStatus = "active";
+
+        if (newStrikeCount >= 3) {
+          if (currentSuspensions >= 2) {
+            // Permanent ban
+            actionTaken = "banned";
+            accountStatus = "banned";
+            newSuspensionCount = currentSuspensions + 1;
+          } else {
+            // 7-day suspension
+            actionTaken = "suspended";
+            accountStatus = "suspended";
+            const suspensionDate = new Date();
+            suspensionDate.setDate(suspensionDate.getDate() + 7);
+            suspensionEnd = suspensionDate.toISOString();
+            newSuspensionCount = currentSuspensions + 1;
+          }
+        }
+
+        // Create violation record
+        const violationData = {
+          user_id: report.reply.user_id,
+          content_id: report.reply_id,
+          violation_type: "forum_reply",
+          content_text: report.reply.reply_body || "",
+          flagged_categories: {
+            [report.reason]: true,
+          },
+          category_scores: {
+            [report.reason]: 1.0,
+          },
+          violation_summary: `Reply reported for ${report.reason}${report.reason_context ? `: ${report.reason_context}` : ""}`,
+          action_taken: actionTaken,
+          strike_count_after: actionTaken === "banned" || actionTaken === "suspended" ? 0 : newStrikeCount,
+          suspension_count_after: newSuspensionCount,
+        };
+
+        const { data: violation, error: violationError } = await supabaseAdmin
+          .from("user_violations")
+          .insert(violationData)
+          .select()
+          .single();
+
+        if (violationError) {
+          console.error("Error creating violation:", violationError);
+          throw new Error("Failed to create violation record");
+        }
+
+        console.log("✅ Violation created:", violation.id);
+
+        // Update user status
+        const userUpdate = {
+          strike_count: actionTaken === "banned" || actionTaken === "suspended" ? 0 : newStrikeCount,
+          suspension_count: newSuspensionCount,
+          account_status: accountStatus,
+          last_violation_at: new Date().toISOString(),
+        };
+
+        if (suspensionEnd) {
+          userUpdate.suspension_end = suspensionEnd;
+        }
+
+        if (accountStatus === "banned") {
+          userUpdate.banned_at = new Date().toISOString();
+          userUpdate.banned_reason = `Automatic ban after ${newSuspensionCount} suspensions`;
+        }
+
+        const { error: updateError } = await supabaseAdmin
+          .from("users")
+          .update(userUpdate)
+          .eq("id", report.reply.user_id);
+
+        if (updateError) {
+          console.error("Error updating user:", updateError);
+          throw new Error("Failed to update user status");
+        }
+
+        console.log(`✅ User updated: ${actionTaken}, strikes: ${userUpdate.strike_count}`);
+
+        // Hide the reply
+        const { error: hideError } = await supabaseAdmin
+          .from("forum_replies")
+          .update({ hidden: true })
+          .eq("id", report.reply_id);
+
+        if (hideError) {
+          console.error("Error hiding reply:", hideError);
+        } else {
+          console.log("✅ Reply hidden");
+        }
+
+        // Send notification to violating user
+        try {
+          const notificationMessage = actionTaken === "banned" 
+            ? `Your reply has been removed and your account has been permanently banned for violating community guidelines: ${report.reason}.`
+            : actionTaken === "suspended"
+            ? `Your reply has been removed and your account has been suspended for 7 days for violating community guidelines: ${report.reason}. This is suspension #${newSuspensionCount}.`
+            : `Your reply has been removed for violating community guidelines: ${report.reason}. A strike has been added to your account (${newStrikeCount} total).`;
+
+          const notificationTitle = actionTaken === "banned" 
+            ? "Account Banned" 
+            : actionTaken === "suspended" 
+            ? "Account Suspended" 
+            : "Content Violation Warning";
+
+          const { data: notifData, error: notifError } = await supabaseAdmin
+            .from("notifications")
+            .insert({
+              user_id: report.reply.user_id,
+              type: "violation_warning",
+              title: notificationTitle,
+              message: notificationMessage,
+              data: JSON.stringify({
+                violation_type: report.reason,
+                content_id: report.reply_id,
+                strike_count: newStrikeCount,
+                action_taken: actionTaken,
+              }),
+              read: false,
+            })
+            .select();
+
+          if (notifError) {
+            console.error("❌ Error sending notification:", notifError);
+            throw notifError;
+          }
+          
+          console.log("✅ Notification sent to user:", notifData);
+        } catch (notifError) {
+          console.error("❌ Failed to send notification:", notifError.message || notifError);
+        }
+
+        // Create suspension record if needed
+        if (actionTaken === "suspended" || actionTaken === "banned") {
+          const suspensionData = {
+            user_id: report.reply.user_id,
+            suspension_type: actionTaken === "banned" ? "permanent" : "temporary",
+            reason: `Automatic ${actionTaken === "banned" ? "permanent ban" : "suspension"} after ${currentStrikes + 1} strikes`,
+            violation_ids: [violation.id],
+            suspension_number: newSuspensionCount,
+            strikes_at_suspension: currentStrikes + 1,
+            ends_at: suspensionEnd,
+            status: "active",
+          };
+
+          const { error: suspensionError } = await supabaseAdmin
+            .from("user_suspensions")
+            .insert(suspensionData);
+
+          if (suspensionError) {
+            console.error("Error creating suspension:", suspensionError);
+          } else {
+            console.log("✅ Suspension record created");
+          }
+        }
+      } catch (violationErr) {
+        console.error("Error processing violation:", violationErr);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to process violation",
+          details: violationErr.message,
+        });
+      }
+    }
+
+    // Update the report status
+    const { data, error } = await supabaseAdmin
+      .from("reported_replies")
+      .update({
+        status: action,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({
+        success: false,
+        error: "Report not found or update failed",
+        details: error?.message,
+      });
+    }
+
+    // Log the resolution
+    try {
+      await supabaseAdmin.from("admin_audit_logs").insert({
+        admin_id: adminId,
+        action: `reply_report_${action}`,
+        target_type: "reported_reply",
+        target_id: id,
+        details: { 
+          status_updated_to: action,
+          reply_id: report.reply_id,
+          violation_created: action === "sanctioned"
+        },
+      });
+    } catch (auditError) {
+      console.warn("Failed to log audit trail:", auditError.message);
+    }
+
+    res.json({
+      success: true,
+      message: `Report ${action === "dismiss" ? "dismissed" : "sanctioned"} successfully`,
+      data: data,
+    });
+  } catch (error) {
+    console.error("Resolve reply report error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+      details: error.message,
+    });
+  }
+});
+
 module.exports = router;
