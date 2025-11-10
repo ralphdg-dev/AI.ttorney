@@ -904,9 +904,11 @@ const ViewPost: React.FC = () => {
                     
                     {/* [username] [law category] - side by side */}
                     <View style={tw`flex-row items-center mt-1`}>
-                      <Text style={tw`text-sm text-gray-500 mr-2`}>
-                        @{!isAnonymous ? displayUser.name?.toLowerCase().replace(/\s+/g, '') : 'anonymous'}
-                      </Text>
+                      {!isAnonymous && (
+                        <Text style={tw`text-sm text-gray-500 mr-2`}>
+                          @{displayUser.name?.toLowerCase().replace(/\s+/g, '')}
+                        </Text>
+                      )}
                       
                       {post.domain && (
                         <View style={[
@@ -1011,9 +1013,11 @@ const ViewPost: React.FC = () => {
                             </View>
                             
                             {/* [username] - law category not available in comments */}
-                            <Text style={tw`text-sm text-gray-500 mt-1`}>
-                              @{!isReplyAnonymous && 'username' in replyUser ? replyUser.username : 'anonymous'}
-                            </Text>
+                            {!isReplyAnonymous && (
+                              <Text style={tw`text-sm text-gray-500 mt-1`}>
+                                @{replyUser.name?.toLowerCase().replace(/\s+/g, '') || 'user'}
+                              </Text>
+                            )}
                           </View>
                           
                           {/* [post content] */}

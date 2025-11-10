@@ -6,13 +6,26 @@ import Navbar from '../../components/Navbar';
 import Timeline from '../../components/home/Timeline';
 import Header from '../../components/Header';
 import { SidebarWrapper } from '../../components/AppSidebar';
+import AnimatedSearchBar from '../../components/forum/AnimatedSearchBar';
 import Colors from '../../constants/Colors';
+import { useForumSearch } from '../../hooks/useForumSearch';
 
 const HomePage: React.FC = () => {
   const router = useRouter();
+  const {
+    query,
+    results,
+    isSearching,
+    isSearchVisible,
+    hasSearched,
+    setQuery,
+    search,
+    showSearch,
+    hideSearch,
+  } = useForumSearch();
 
   const handleSearchPress = () => {
-    console.log('Search functionality to be implemented');
+    showSearch();
   };
 
   const handleNotificationPress = () => {
@@ -29,9 +42,26 @@ const HomePage: React.FC = () => {
           onSearchPress={handleSearchPress}
           onNotificationPress={handleNotificationPress}
         />
-        <View style={styles.content}>
-          {/* Timeline no longer renders "home/index" */}
-          <Timeline />
+        
+        {/* Animated Search Bar - positioned below header */}
+        {isSearchVisible && (
+          <AnimatedSearchBar
+            visible={isSearchVisible}
+            onClose={hideSearch}
+            onSearch={search}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search forum posts..."
+          />
+        )}
+        
+        <View style={[styles.content, isSearchVisible && styles.contentSearchMode]}>
+          {/* Show search results or timeline */}
+          {hasSearched && isSearchVisible ? (
+            <Timeline searchResults={results} isSearchMode={true} searchQuery={query} />
+          ) : (
+            <Timeline />
+          )}
         </View>
         
         <Navbar activeTab="home" />
@@ -48,6 +78,9 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: Colors.background.secondary, // Content area gray
+  },
+  contentSearchMode: {
+    backgroundColor: Colors.background.primary, // Slightly different background when searching
   },
 });
 

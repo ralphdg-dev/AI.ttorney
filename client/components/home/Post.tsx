@@ -8,6 +8,7 @@ import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePostBookmarks } from '../../contexts/PostBookmarksContext';
 import FadeInView from '../ui/FadeInView';
+import SearchHighlight from '../forum/SearchHighlight';
 
 interface PostProps {
   id: string;
@@ -34,6 +35,9 @@ interface PostProps {
   // Bookmark status passed from parent to prevent individual API calls
   isBookmarked?: boolean;
   onBookmarkStatusChange?: (postId: string, isBookmarked: boolean) => void;
+  // Search highlighting
+  searchTerm?: string;
+  isSearchResult?: boolean;
 }
 
 const Post: React.FC<PostProps> = React.memo(({
@@ -55,6 +59,8 @@ const Post: React.FC<PostProps> = React.memo(({
   onMenuToggle,
   isBookmarked: propIsBookmarked,
   onBookmarkStatusChange,
+  searchTerm,
+  isSearchResult = false,
 }) => {
   const { user: currentUser, session } = useAuth();
   const { loadBookmarks: refreshBookmarkContext } = usePostBookmarks();
@@ -230,22 +236,20 @@ const Post: React.FC<PostProps> = React.memo(({
 
   // Get category colors based on category type
   const getCategoryColors = (category: string) => {
-    switch ((category || '').toLowerCase()) {
-      case 'family':
-        return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', textColor: '#BE123C' };
-      case 'work':
-        return { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', textColor: '#1D4ED8' };
-      case 'civil':
-        return { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE', textColor: '#7C3AED' };
-      case 'criminal':
-        return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', textColor: '#DC2626' };
-      case 'labor':
-        // Treat 'labor' as 'work' for styling
-        return { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', textColor: '#1D4ED8' };
-      case 'consumer':
-        return { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', textColor: '#047857' };
-      default:
-        return { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB', textColor: '#374151' };
+    const lowerCategory = (category || '').toLowerCase();
+    
+    if (lowerCategory.includes('family')) {
+      return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', textColor: '#BE123C' };
+    } else if (lowerCategory.includes('labor') || lowerCategory.includes('work')) {
+      return { backgroundColor: '#FEF3C7', borderColor: '#FDE68A', textColor: '#D97706' };
+    } else if (lowerCategory.includes('civil')) {
+      return { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', textColor: '#2563EB' };
+    } else if (lowerCategory.includes('criminal')) {
+      return { backgroundColor: '#F3E8FF', borderColor: '#C4B5FD', textColor: '#7C3AED' };
+    } else if (lowerCategory.includes('consumer')) {
+      return { backgroundColor: '#ECFDF5', borderColor: '#BBF7D0', textColor: '#059669' };
+    } else {
+      return { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB', textColor: '#6B7280' };
     }
   };
 
@@ -254,8 +258,14 @@ const Post: React.FC<PostProps> = React.memo(({
   // Determine display text - show "OTHERS" for non-matching categories
   const getDisplayText = (category: string) => {
     const lowerCategory = category.toLowerCase();
-    const validCategories = ['family', 'work', 'civil', 'criminal', 'labor', 'consumer'];
-    return validCategories.includes(lowerCategory) ? category : 'OTHERS';
+    
+    if (lowerCategory.includes('family')) return 'FAMILY';
+    if (lowerCategory.includes('labor') || lowerCategory.includes('work')) return 'LABOR';
+    if (lowerCategory.includes('civil')) return 'CIVIL';
+    if (lowerCategory.includes('criminal')) return 'CRIMINAL';
+    if (lowerCategory.includes('consumer')) return 'CONSUMER';
+    
+    return 'OTHERS';
   };
 
   const displayText = getDisplayText(cleanCategory);
@@ -288,24 +298,44 @@ const Post: React.FC<PostProps> = React.memo(({
               </Text>
             </View>
           )}
+          
           <View style={styles.userInfo}>
+            {/* User Name and Category Row */}
             <View style={styles.userNameRow}>
-              <Text style={styles.userName}>{user.name}</Text>
-              <View style={[styles.categoryBadge, {
+              {isSearchResult && searchTerm && searchTerm.startsWith('@') ? (
+                <SearchHighlight
+                  text={user.name}
+                  searchTerm={searchTerm}
+                  style={styles.userName}
+                  isUsername={true}
+                />
+              ) : (
+                <Text style={styles.userName}>{user.name}</Text>
+              )}
+              
+              {/* Category Badge */}
+              <View style={[styles.categoryBadge, { 
                 backgroundColor: categoryColors.backgroundColor,
-                borderColor: categoryColors.borderColor,
+                borderColor: categoryColors.borderColor 
               }]}>
                 <Text style={[styles.categoryText, { color: categoryColors.textColor }]}>
                   {displayText}
                 </Text>
               </View>
             </View>
+            
+            {/* User Handle and Timestamp Row */}
             <View style={styles.userMetaRow}>
-              <Text style={styles.userHandle}>@{user.username}</Text>
-              <Text style={styles.metaSeparator}> • </Text>
+              {!isAnonymous && (
+                <>
+                  <Text style={styles.userHandle}>@{user.username}</Text>
+                  <Text style={styles.metaSeparator}> • </Text>
+                </>
+              )}
               <Text style={styles.timestamp}>{displayTime}</Text>
             </View>
           </View>
+          
           <TouchableOpacity
             style={styles.moreButton}
             onPress={handleMorePress}
@@ -315,7 +345,15 @@ const Post: React.FC<PostProps> = React.memo(({
         </View>
 
         {/* Post Content */}
-        <Text style={styles.content}>{content}</Text>
+        {isSearchResult && searchTerm ? (
+          <SearchHighlight
+            text={content}
+            searchTerm={searchTerm}
+            style={styles.content}
+          />
+        ) : (
+          <Text style={styles.content}>{content}</Text>
+        )}
 
         {/* More Menu */}
         {isMenuOpen && (

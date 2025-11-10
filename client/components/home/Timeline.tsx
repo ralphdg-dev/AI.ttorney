@@ -42,9 +42,12 @@ interface PostData {
 
 interface TimelineProps {
   context?: 'user' | 'lawyer';
+  searchResults?: any[];
+  isSearchMode?: boolean;
+  searchQuery?: string;
 }
 
-const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
+const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, isSearchMode = false, searchQuery }) => {
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
   const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
@@ -525,6 +528,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         id={item.id}
         user={item.user}
         timestamp={item.timestamp}
+        created_at={item.created_at}
         category={item.category}
         content={item.content}
         comments={item.comments}
@@ -539,6 +543,8 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         onMenuToggle={handleMenuToggle}
         isBookmarked={item.isBookmarked || false}
         onBookmarkStatusChange={handleBookmarkStatusChange}
+        searchTerm={searchQuery}
+        isSearchResult={isSearchMode}
       />
     );
 
@@ -556,6 +562,11 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
 
   // Combined posts data with duplicate detection for seamless transition
   const allPosts = useMemo(() => {
+    // If in search mode, use search results
+    if (isSearchMode && searchResults) {
+      return searchResults.map(mapApiToPost);
+    }
+    
     // Filter out real posts that match optimistic posts to prevent duplicates
     const filteredRealPosts = posts.filter(realPost => {
       // Check if there's an optimistic post with similar content and timestamp
@@ -571,7 +582,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     });
     
     return [...optimisticPosts, ...filteredRealPosts];
-  }, [optimisticPosts, posts]);
+  }, [optimisticPosts, posts, isSearchMode, searchResults, mapApiToPost]);
 
   // Use simple list hook
   const listProps = useList({

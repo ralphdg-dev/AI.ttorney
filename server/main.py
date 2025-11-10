@@ -129,6 +129,10 @@ app.include_router(places_proxy_router)
 from routes.user_profile import router as user_profile_router
 app.include_router(user_profile_router)
 
+# Import and include forum search API
+from api.forum_search import router as forum_search_router
+app.include_router(forum_search_router)
+
 # Import and include chatbot routers (separated for users and lawyers)
 # IMPORTANT: Register streaming routers FIRST so they take precedence
 from api.chatbot_user_streaming import router as user_chatbot_streaming_router

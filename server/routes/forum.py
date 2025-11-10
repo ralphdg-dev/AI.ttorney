@@ -1148,3 +1148,392 @@ async def get_reports_by_user(
         logger.error(f"Get reports by user endpoint error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
+# Search Models
+class SearchPostsResponse(BaseModel):
+    success: bool
+    data: list
+    total: int
+    query: str
+    message: Optional[str] = None
+
+
+@router.get("/search", response_model=SearchPostsResponse)
+async def search_forum_posts(
+    q: str,  # Search query
+    limit: int = 20,
+    category: Optional[str] = None,
+    sort: str = "relevance",  # relevance, date, replies
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Search forum posts by keywords, exact content, username, or category.
+    
+    Search capabilities:
+    - Keywords in post content
+    - Exact post content matching
+    - Username search (searches posts by specific users)
+    - Category filtering
+    - Sorting by relevance, date, or reply count
+    """
+    try:
+        if not q or len(q.strip()) < 2:
+            return SearchPostsResponse(
+                success=True,
+                data=[],
+                total=0,
+                query=q,
+                message="Please enter at least 2 characters to search"
+            )
+        
+        query = q.strip()
+        supabase = SupabaseService()
+        
+        # Build the search query
+        search_conditions = []
+        
+        # Check if searching by username (starts with @)
+        if query.startswith('@'):
+            username = query[1:].lower()  # Remove @ and convert to lowercase
+            # Search by username in the users table
+            search_conditions.append(f"users.username.ilike.%{username}%")
+            search_conditions.append(f"users.full_name.ilike.%{username}%")
+        else:
+            # Search in post content (case-insensitive)
+            search_conditions.append(f"body.ilike.%{query}%")
+        
+        # Add category filter if specified
+        category_filter = ""
+        if category:
+            category_filter = f"&category=eq.{category}"
+        
+        # Build sort parameter
+        sort_param = ""
+        if sort == "date":
+            sort_param = "&order=created_at.desc"
+        elif sort == "replies":
+            sort_param = "&order=reply_count.desc"
+        else:  # relevance (default)
+            sort_param = "&order=created_at.desc"  # For now, use date as relevance
+        
+        # Construct the query URL
+        base_query = (
+            f"{supabase.rest_url}/forum_posts?"
+            f"select=*,users(id,username,full_name,role),"
+            f"forum_replies(count)"
+            f"{category_filter}"
+            f"{sort_param}"
+            f"&limit={limit}"
+        )
+        
+        # Execute search with different strategies
+        all_results = []
+        
+        if query.startswith('@'):
+            # Username search - need to join with users table
+            username = query[1:].lower()
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                # Search by username - use proper PostgREST syntax
+                username_response = await client.get(
+                    f"{supabase.rest_url}/forum_posts?"
+                    f"select=*,users!inner(id,username,full_name,role)"
+                    f"&users.username.ilike.*{username}*"
+                    f"{category_filter}"
+                    f"{sort_param}"
+                    f"&limit={limit}",
+                    headers=supabase._get_headers(use_service_key=True)
+                )
+                
+                logger.info(f"Username search URL: {username_response.url}")
+                logger.info(f"Username search status: {username_response.status_code}")
+                
+                if username_response.status_code == 200:
+                    username_results = username_response.json() or []
+                    logger.info(f"Username search results: {len(username_results)} posts")
+                    all_results.extend(username_results)
+                else:
+                    logger.error(f"Username search failed: {username_response.text}")
+                
+                # Also search by full name
+                fullname_response = await client.get(
+                    f"{supabase.rest_url}/forum_posts?"
+                    f"select=*,users!inner(id,username,full_name,role)"
+                    f"&users.full_name.ilike.*{username}*"
+                    f"{category_filter}"
+                    f"{sort_param}"
+                    f"&limit={limit}",
+                    headers=supabase._get_headers(use_service_key=True)
+                )
+                
+                logger.info(f"Full name search status: {fullname_response.status_code}")
+                
+                if fullname_response.status_code == 200:
+                    fullname_results = fullname_response.json() or []
+                    logger.info(f"Full name search results: {len(fullname_results)} posts")
+                    all_results.extend(fullname_results)
+                else:
+                    logger.error(f"Full name search failed: {fullname_response.text}")
+        else:
+            # Content search
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                # Search in post body - use proper PostgREST syntax
+                content_response = await client.get(
+                    f"{supabase.rest_url}/forum_posts?"
+                    f"select=*,users(id,username,full_name,role)"
+                    f"&body.ilike.*{query}*"
+                    f"{category_filter}"
+                    f"{sort_param}"
+                    f"&limit={limit}",
+                    headers=supabase._get_headers(use_service_key=True)
+                )
+                
+                logger.info(f"Content search URL: {content_response.url}")
+                logger.info(f"Content search status: {content_response.status_code}")
+                
+                if content_response.status_code == 200:
+                    content_results = content_response.json() or []
+                    logger.info(f"Content search results: {len(content_results)} posts")
+                    all_results.extend(content_results)
+                else:
+                    logger.error(f"Content search failed: {content_response.text}")
+        
+        # Remove duplicates based on post ID
+        seen_ids = set()
+        unique_results = []
+        for post in all_results:
+            post_id = str(post.get('id'))
+            if post_id not in seen_ids:
+                seen_ids.add(post_id)
+                unique_results.append(post)
+        
+        # Limit results
+        unique_results = unique_results[:limit]
+        
+        # Get user bookmarks for the found posts
+        user_id = current_user.get("id")
+        post_ids = [str(post.get("id")) for post in unique_results]
+        user_bookmarks = await _get_cached_bookmarks(user_id, post_ids) if post_ids else set()
+        
+        # Process results
+        processed_results = []
+        for post in unique_results:
+            try:
+                # Calculate reply count (simplified for now)
+                reply_count = 0  # We'll add this back when forum_replies join works properly
+                
+                # Check if user bookmarked this post
+                is_bookmarked = str(post.get("id")) in user_bookmarks
+                
+                # Process user data
+                user_data = post.get("users", {}) or {}
+                
+                processed_post = {
+                    "id": post.get("id"),
+                    "body": post.get("body"),
+                    "category": post.get("category"),
+                    "created_at": post.get("created_at"),
+                    "updated_at": post.get("updated_at"),
+                    "user_id": post.get("user_id"),
+                    "is_anonymous": post.get("is_anonymous", False),
+                    "is_flagged": post.get("is_flagged", False),
+                    "reply_count": reply_count,
+                    "is_bookmarked": is_bookmarked,
+                    "users": user_data
+                }
+                processed_results.append(processed_post)
+                
+            except Exception as e:
+                logger.error(f"Error processing post {post.get('id', 'unknown')}: {str(e)}")
+                continue
+        
+        # Sort results by relevance if requested
+        if sort == "relevance":
+            # Simple relevance scoring: exact matches first, then partial matches
+            def relevance_score(post):
+                body = (post.get("body") or "").lower()
+                query_lower = query.lower()
+                
+                # Exact match gets highest score
+                if query_lower in body:
+                    if body == query_lower:
+                        return 1000  # Exact full match
+                    elif body.startswith(query_lower):
+                        return 900   # Starts with query
+                    elif body.endswith(query_lower):
+                        return 800   # Ends with query
+                    else:
+                        return 700   # Contains query
+                
+                # Username matches
+                user_data = post.get("users", {}) or {}
+                username = (user_data.get("username") or "").lower()
+                full_name = (user_data.get("full_name") or "").lower()
+                
+                if query.startswith('@'):
+                    search_term = query[1:].lower()
+                    if search_term in username or search_term in full_name:
+                        return 600
+                
+                return 0
+            
+            processed_results.sort(key=relevance_score, reverse=True)
+        
+        logger.info(f"Forum search completed: query='{query}', results={len(processed_results)}")
+        
+        return SearchPostsResponse(
+            success=True,
+            data=processed_results,
+            total=len(processed_results),
+            query=query,
+            message=f"Found {len(processed_results)} posts" if processed_results else "No posts found"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Forum search error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Search failed")
+
+
+@router.get("/search/suggestions")
+async def get_search_suggestions(
+    q: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get search suggestions based on partial query."""
+    try:
+        if not q or len(q.strip()) < 2:
+            return {"suggestions": []}
+        
+        query = q.strip().lower()
+        supabase = SupabaseService()
+        
+        suggestions = []
+        
+        # Get category suggestions
+        categories = ["Family Law", "Criminal Law", "Labor Law", "Civil Law", "Commercial Law", "Others"]
+        category_suggestions = [cat for cat in categories if query in cat.lower()]
+        suggestions.extend(category_suggestions)
+        
+        # Get username suggestions if query starts with @
+        if query.startswith('@'):
+            username_query = query[1:]
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{supabase.rest_url}/users?"
+                    f"select=username,full_name"
+                    f"&or=(username.ilike.%{username_query}%,full_name.ilike.%{username_query}%)"
+                    f"&limit=5",
+                    headers=supabase._get_headers(use_service_key=True)
+                )
+                
+                if response.status_code == 200:
+                    users = response.json() or []
+                    for user in users:
+                        username = user.get("username")
+                        full_name = user.get("full_name")
+                        if username:
+                            suggestions.append(f"@{username}")
+                        if full_name and full_name != username:
+                            suggestions.append(f"@{full_name}")
+        
+        # Limit suggestions
+        suggestions = list(set(suggestions))[:10]
+        
+        return {"suggestions": suggestions}
+        
+    except Exception as e:
+        logger.error(f"Search suggestions error: {str(e)}")
+        return {"suggestions": []}
+
+
+@router.get("/search/popular")
+async def get_popular_searches(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get popular search terms."""
+    try:
+        # For now, return static popular searches
+        # In the future, this could be based on actual search analytics
+        popular_searches = [
+            "labor law",
+            "family law",
+            "criminal law",
+            "contract",
+            "employment",
+            "divorce",
+            "inheritance",
+            "small claims",
+            "illegal dismissal",
+            "breach of contract"
+        ]
+        
+        return {"popular": popular_searches}
+        
+    except Exception as e:
+        logger.error(f"Popular searches error: {str(e)}")
+        return {"popular": []}
+
+
+@router.get("/debug/search-test")
+async def debug_search_test():
+    """Debug endpoint to test basic forum post retrieval and search."""
+    try:
+        supabase = SupabaseService()
+        
+        # Test 1: Get all posts (no filters)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            all_posts_response = await client.get(
+                f"{supabase.rest_url}/forum_posts?select=*&limit=5",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+            
+            logger.info(f"All posts query status: {all_posts_response.status_code}")
+            all_posts = all_posts_response.json() if all_posts_response.status_code == 200 else []
+            
+            # Test 2: Get posts with users
+            posts_with_users_response = await client.get(
+                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name)&limit=5",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+            
+            logger.info(f"Posts with users query status: {posts_with_users_response.status_code}")
+            posts_with_users = posts_with_users_response.json() if posts_with_users_response.status_code == 200 else []
+            
+            # Test 3: Simple content search
+            content_search_response = await client.get(
+                f"{supabase.rest_url}/forum_posts?select=*&body.ilike.*test*&limit=5",
+                headers=supabase._get_headers(use_service_key=True)
+            )
+            
+            logger.info(f"Content search query status: {content_search_response.status_code}")
+            content_search_results = content_search_response.json() if content_search_response.status_code == 200 else []
+            
+            return {
+                "success": True,
+                "tests": {
+                    "all_posts": {
+                        "status": all_posts_response.status_code,
+                        "count": len(all_posts),
+                        "sample": all_posts[:2] if all_posts else []
+                    },
+                    "posts_with_users": {
+                        "status": posts_with_users_response.status_code,
+                        "count": len(posts_with_users),
+                        "sample": posts_with_users[:2] if posts_with_users else []
+                    },
+                    "content_search": {
+                        "status": content_search_response.status_code,
+                        "count": len(content_search_results),
+                        "sample": content_search_results[:2] if content_search_results else []
+                    }
+                }
+            }
+            
+    except Exception as e:
+        logger.error(f"Debug search test error: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+

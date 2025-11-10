@@ -71,9 +71,11 @@ const Comments: React.FC<CommentsProps> = React.memo(({
               <Text style={styles.commentUserName}>
                 {item.is_anonymous ? 'Anonymous' : (item.user?.name || 'Anonymous')}
               </Text>
-              <Text style={styles.commentUserHandle}>
-                @{item.is_anonymous ? 'anonymous' : (item.user?.username || 'anonymous')}
-              </Text>
+              {!item.is_anonymous && (
+                <Text style={styles.commentUserHandle}>
+                  @{item.user?.username || 'user'}
+                </Text>
+              )}
             </View>
             {item.user?.isLawyer && (
               <View style={styles.verifiedBadge}>
