@@ -121,7 +121,7 @@ router.post(
   authenticateAdmin,
   upload.single("image"),
   async (req, res) => {
-    const adminId = req.admin.id; // Get logged-in admin ID from middleware
+    const adminId = req.admin.id;
     const role = req.admin.role || "admin";
 
     try {
@@ -147,7 +147,7 @@ router.post(
             content_fil,
             category,
             is_verified: false,
-            created_by: adminId, // Set the admin who created the article
+            created_by: adminId,
           },
         ])
         .select()
@@ -195,7 +195,6 @@ router.post(
         }
       );
 
-      // SECURITY: Fail if SUPABASE_URL not set
       if (!process.env.SUPABASE_URL) {
         throw new Error("SUPABASE_URL environment variable is required");
       }
@@ -235,18 +234,17 @@ router.post(
   }
 );
 
-// PUT /api/legal-articles/:id — update article (NOW WITH AUTH)
+// PUT /api/legal-articles/:id — update article
 router.put(
   "/:id",
   authenticateAdmin,
   upload.single("image"),
   async (req, res) => {
     const { id } = req.params;
-    const adminId = req.admin.id; // Get logged-in admin ID from middleware
+    const adminId = req.admin.id;
     const role = req.admin.role || "admin";
 
     try {
-      // Get current article data for audit logging
       const { data: currentArticle, error: fetchError } = await supabaseAdmin
         .from("legal_articles")
         .select("*")
@@ -306,7 +304,6 @@ router.put(
         if (imageUpdateError) throw imageUpdateError;
       }
 
-      // Create separate audit logs for each field change
       if (audit_logs) {
         try {
           const logs = JSON.parse(audit_logs);
@@ -328,7 +325,6 @@ router.put(
         }
       }
 
-      // SECURITY: Fail if SUPABASE_URL not set
       if (!process.env.SUPABASE_URL) {
         throw new Error("SUPABASE_URL environment variable is required");
       }
@@ -358,7 +354,6 @@ router.put(
         status: updatedArticle.is_verified ? "Published" : "Unpublished",
       };
 
-      // Send notifications to users who bookmarked this article (if published)
       if (updatedArticle.is_verified) {
         notifyArticleUpdated(
           id,
@@ -382,15 +377,14 @@ router.put(
   }
 );
 
-// PATCH /api/legal-articles/:id/publish - WITH AUTH
+// PATCH /api/legal-articles/:id/publish
 router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
   const { id } = req.params;
   const { publish } = req.body;
-  const adminId = req.admin.id; // Get logged-in admin ID from middleware
+  const adminId = req.admin.id;
   const role = req.admin.role || "admin";
 
   try {
-    // Get current article data for audit logging
     const { data: currentArticle, error: fetchError } = await supabaseAdmin
       .from("legal_articles")
       .select("*")
@@ -399,11 +393,10 @@ router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
 
     if (fetchError) throw fetchError;
 
-    // Prepare update data
     const updateData = {
       is_verified: publish,
       verified_at: publish ? new Date().toISOString() : null,
-      verified_by: publish ? adminId : null, // Set verified_by to admin ID
+      verified_by: publish ? adminId : null,
     };
 
     const { data: updatedArticle, error } = await supabaseAdmin
@@ -422,7 +415,6 @@ router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
 
     if (error) throw error;
 
-    // Log audit event for publish/unpublish
     await logAuditEvent(
       publish
         ? 'Article status changed to "Published"'
@@ -442,7 +434,6 @@ router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
       }
     );
 
-    // SECURITY: Fail if SUPABASE_URL not set
     if (!process.env.SUPABASE_URL) {
       throw new Error("SUPABASE_URL environment variable is required");
     }
@@ -470,9 +461,7 @@ router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
       status: updatedArticle.is_verified ? "Published" : "Unpublished",
     };
 
-    // Send notifications to mobile app users
     if (publish) {
-      // Article was just published - notify all users
       notifyArticlePublished(
         id,
         updatedArticle.title_en || "New Article",
@@ -494,10 +483,10 @@ router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
   }
 });
 
-// PATCH /api/legal-articles/:id/archive (NOW WITH AUTH)
+// PATCH /api/legal-articles/:id/archive
 router.patch("/:id/archive", authenticateAdmin, async (req, res) => {
   const { id } = req.params;
-  const adminId = req.admin.id; // Get logged-in admin ID from middleware
+  const adminId = req.admin.id;
   const role = req.admin.role || "admin";
 
   try {
@@ -526,7 +515,6 @@ router.patch("/:id/archive", authenticateAdmin, async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // Log audit event for archive
     await logAuditEvent(
       "Archived Article",
       "legal_articles",
@@ -553,14 +541,13 @@ router.patch("/:id/archive", authenticateAdmin, async (req, res) => {
   }
 });
 
-// PATCH /api/legal-articles/:id/restore (NOW WITH AUTH)
+// PATCH /api/legal-articles/:id/restore
 router.patch("/:id/restore", authenticateAdmin, async (req, res) => {
   const { id } = req.params;
-  const adminId = req.admin.id; // Get logged-in admin ID from middleware
+  const adminId = req.admin.id;
   const role = req.admin.role || "admin";
 
   try {
-    // Get current article data for audit logging
     const { data: currentArticle, error: fetchError } = await supabaseAdmin
       .from("legal_articles")
       .select("*")
@@ -578,7 +565,6 @@ router.patch("/:id/restore", authenticateAdmin, async (req, res) => {
 
     if (error) throw error;
 
-    // Log audit event for restore
     await logAuditEvent(
       "Article Restored",
       "legal_articles",
@@ -607,4 +593,151 @@ router.patch("/:id/restore", authenticateAdmin, async (req, res) => {
   }
 });
 
+// Get article audit logs - Real data only
+router.get("/:id/audit-logs", authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 50 } = req.query;
+    const offset = (page - 1) * limit;
+
+    // First verify the article exists
+    const { data: article, error: articleError } = await supabaseAdmin
+      .from("legal_articles")
+      .select("id, title_en, category, created_at")
+      .eq("id", id)
+      .single();
+
+    if (articleError || !article) {
+      return res.status(404).json({
+        success: false,
+        error: "Article not found",
+      });
+    }
+
+    // Get all audit logs for this article (removed actor_id filter)
+    const { data: auditLogs, error: auditError } = await supabaseAdmin
+      .from("admin_audit_logs")
+      .select(
+        `
+        id,
+        action,
+        target_table,
+        actor_id,
+        role,
+        target_id,
+        metadata,
+        created_at
+      `
+      )
+      .eq("target_id", id)
+      .eq("target_table", "legal_articles")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (auditError) {
+      return res.status(500).json({
+        success: false,
+        error: "Failed to fetch audit logs: " + auditError.message,
+      });
+    }
+
+    // Get total count for pagination
+    const { count: totalCount } = await supabaseAdmin
+      .from("admin_audit_logs")
+      .select("*", { count: "exact", head: true })
+      .eq("target_id", id)
+      .eq("target_table", "legal_articles");
+
+    res.json({
+      success: true,
+      data: auditLogs || [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalCount || 0,
+        pages: Math.ceil((totalCount || 0) / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Get article audit logs error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+    });
+  }
+});
+
+// Get article recent activity - Real data only
+router.get("/:id/recent-activity", authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 50 } = req.query;
+    const offset = (page - 1) * limit;
+
+    // Verify the article exists
+    const { data: article, error: articleError } = await supabaseAdmin
+      .from("legal_articles")
+      .select("id, title_en, category, created_at, updated_at")
+      .eq("id", id)
+      .single();
+
+    if (articleError || !article) {
+      return res.status(404).json({
+        success: false,
+        error: "Article not found",
+      });
+    }
+
+    // Get all recent activity for this article
+    const { data: recentActivity, error: activityError } = await supabaseAdmin
+      .from("admin_audit_logs")
+      .select(
+        `
+        id,
+        action,
+        target_table,
+        actor_id,
+        role,
+        target_id,
+        metadata,
+        created_at
+      `
+      )
+      .eq("target_id", id)
+      .eq("target_table", "legal_articles")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (activityError) {
+      return res.status(500).json({
+        success: false,
+        error: "Failed to fetch recent activity: " + activityError.message,
+      });
+    }
+
+    // Get total count for pagination
+    const { count: totalCount } = await supabaseAdmin
+      .from("admin_audit_logs")
+      .select("*", { count: "exact", head: true })
+      .eq("target_id", id)
+      .eq("target_table", "legal_articles");
+
+    res.json({
+      success: true,
+      data: recentActivity || [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalCount || 0,
+        pages: Math.ceil((totalCount || 0) / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Get article recent activity error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+    });
+  }
+});
 module.exports = router;
