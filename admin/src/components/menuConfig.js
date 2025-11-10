@@ -35,7 +35,7 @@ export const sections = [
         icon: MessageSquare,
         label: "Forum",
         items: [
-          { id: "manage-topics-threads", label: "Manage Topics & Threads" },
+          { id: "manage-topics-threads", label: "Manage Community Forum" },
           { id: "reported-posts", label: "Reported Posts" },
           { id: "reported-replies", label: "Reported Replies" },
         ],

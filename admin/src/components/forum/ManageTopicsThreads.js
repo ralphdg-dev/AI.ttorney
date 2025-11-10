@@ -343,7 +343,7 @@ const ManageTopicsThreads = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Manage Topics & Threads
+            Manage Community Forum
           </h1>
           <p className="text-gray-600">Monitor and moderate forum posts</p>
         </div>
