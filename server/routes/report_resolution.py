@@ -34,7 +34,7 @@ async def resolve_reply_report(
     try:
         supabase = SupabaseService()
         violation_service = get_violation_tracking_service()
-        notification_service = NotificationService()
+        notification_service = NotificationService(supabase.supabase)
         
         # 1. Get the report details
         async with httpx.AsyncClient() as client:
@@ -69,7 +69,7 @@ async def resolve_reply_report(
                 headers=supabase._get_headers(use_service_key=True),
                 json={
                     "status": request.action,
-                    "updated_at": "now()"
+                    "updated_at": __import__('datetime').datetime.utcnow().isoformat()
                 }
             )
         
@@ -86,30 +86,25 @@ async def resolve_reply_report(
         
         # 3. If sanctioned (approved), perform additional actions
         if request.action == "sanctioned":
-            # Map report reason to violation type
+            # Prepare moderation_result based on report reason
             reason = report.get('reason', 'other')
-            violation_type_map = {
-                'spam': ViolationType.SPAM,
-                'harassment': ViolationType.HARASSMENT,
-                'hate_speech': ViolationType.HATE_SPEECH,
-                'misinformation': ViolationType.MISINFORMATION,
-                'inappropriate': ViolationType.INAPPROPRIATE_CONTENT,
-                'other': ViolationType.OTHER
+            moderation_result = {
+                "categories": {reason: True},
+                "category_scores": {reason: 1.0},
+                "violation_summary": f"Reply reported for {reason}"
             }
-            violation_type = violation_type_map.get(reason, ViolationType.OTHER)
             
-            # 4. Create user_violations record and add strike
-            violation_result = await violation_service.record_violation(
+            # 4. Create user_violations record and apply action via service
+            violation_outcome = await violation_service.record_violation(
                 user_id=violating_user_id,
-                violation_type=violation_type,
+                violation_type=ViolationType.FORUM_REPLY,
                 content_text=reply.get('reply_body', ''),
-                content_id=reply_id,
-                violation_summary=f"Reply reported for {reason} and approved by admin",
-                action_taken="strike_added"
+                moderation_result=moderation_result,
+                content_id=reply_id
             )
             
-            if not violation_result.get('success'):
-                logger.error(f"Failed to record violation: {violation_result.get('error')}")
+            if not violation_outcome or not violation_outcome.get('action_taken'):
+                logger.error("Failed to record violation via ViolationTrackingService")
                 raise HTTPException(status_code=500, detail="Failed to record violation")
             
             # 5. Hide the reply
@@ -125,15 +120,31 @@ async def resolve_reply_report(
             
             # 6. Send notification to the violating user
             try:
+                action_taken = violation_outcome.get("action_taken")
+                strike_count = violation_outcome.get("strike_count")
+                suspension_count = violation_outcome.get("suspension_count")
+                suspension_end = violation_outcome.get("suspension_end")
+
+                if action_taken == "banned":
+                    title = "Account Banned"
+                    message = f"Your reply has been removed and your account has been permanently banned for violating community guidelines: {reason}."
+                elif action_taken == "suspended":
+                    title = "Account Suspended"
+                    message = f"Your reply has been removed and your account has been suspended for 7 days for violating community guidelines: {reason}. This is suspension #{suspension_count}."
+                else:
+                    title = "Content Violation Warning"
+                    message = f"Your reply has been removed for violating community guidelines: {reason}. A strike has been added to your account ({strike_count} total)."
+
                 await notification_service.create_notification(
                     user_id=violating_user_id,
                     notification_type="violation_warning",
-                    title="Content Violation Warning",
-                    message=f"Your reply has been removed for violating community guidelines: {reason}. A strike has been added to your account.",
+                    title=title,
+                    message=message,
                     data={
                         "violation_type": reason,
                         "content_id": reply_id,
-                        "strike_count": violation_result.get('data', {}).get('strike_count_after', 1)
+                        "strike_count": strike_count,
+                        "action_taken": action_taken
                     }
                 )
             except Exception as e:
@@ -147,7 +158,7 @@ async def resolve_reply_report(
                 "data": {
                     "violation_recorded": True,
                     "content_hidden": True,
-                    "strike_count": violation_result.get('data', {}).get('strike_count_after', 1),
+                    "strike_count": violation_outcome.get('strike_count', 1),
                     "notification_sent": True
                 }
             }
