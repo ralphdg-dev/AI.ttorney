@@ -145,6 +145,10 @@ router.get("/:id", async (req, res) => {
       id,
       full_name
     ),
+    suspension:user_suspensions!suspension_appeals_suspension_id_fkey (
+      id,
+      reason
+    ),
     reviewer:admin!suspension_appeals_reviewed_by_fkey1 (
       id,
       full_name
@@ -160,6 +164,7 @@ router.get("/:id", async (req, res) => {
     }
 
     data.user_full_name = data.user?.full_name || "Unknown User";
+    data.suspension_reason = data.suspension?.reason || "No reason specified";
     data.reviewed_by = data.reviewer?.full_name || "N/A";
 
     res.json({ success: true, data });
@@ -260,6 +265,62 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
             action_type: "appeal_approved",
           }
         );
+
+        // Lift the related suspension and reactivate the user, then notify
+        try {
+          const { error: liftError } = await supabaseAdmin
+            .from("user_suspensions")
+            .update({
+              status: "lifted",
+              lifted_at: new Date().toISOString(),
+              lifted_by: adminId,
+              lifted_reason: "Appeal approved",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", existing.suspension_id);
+
+          if (liftError) throw liftError;
+
+          const { error: userUpdateError } = await supabaseAdmin
+            .from("users")
+            .update({ account_status: "active", suspension_end: null })
+            .eq("id", existing.user_id);
+
+          if (userUpdateError) throw userUpdateError;
+
+          const approvedTitle = "Appeal Approved";
+          const approvedMessage =
+            "Your suspension appeal was approved. Your account has been restored to active.";
+
+          const { error: notifyApproveError } = await supabaseAdmin
+            .from("notifications")
+            .insert([
+              {
+                user_id: existing.user_id,
+                type: "appeal_decision",
+                title: approvedTitle,
+                message: approvedMessage,
+                data: {
+                  decision: "approved",
+                  appeal_id: existing.id,
+                  suspension_id: existing.suspension_id,
+                  reviewed_by: adminId,
+                },
+                created_at: new Date().toISOString(),
+              },
+            ]);
+
+          if (notifyApproveError) throw notifyApproveError;
+        } catch (liftErr) {
+          console.error(
+            "Error lifting suspension after appeal approval:",
+            liftErr
+          );
+          return res.status(500).json({
+            success: false,
+            error: "Failed to lift suspension after approval",
+          });
+        }
       } else if (newStatus === "rejected") {
         await logAuditEvent(
           `Rejected appeal for user "${userFullName}"`,
@@ -278,6 +339,39 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
             action_type: "appeal_rejected",
           }
         );
+
+        // Notify user about rejection
+        try {
+          const { error: notifyError } = await supabaseAdmin
+            .from("notifications")
+            .insert([
+              {
+                user_id: existing.user_id,
+                type: "appeal_decision",
+                title: "Appeal Rejected",
+                message:
+                  "Your suspension appeal was reviewed and has been rejected. Your current suspension terms remain in effect.",
+                data: {
+                  decision: "rejected",
+                  appeal_id: existing.id,
+                  suspension_id: existing.suspension_id,
+                  reviewed_by: adminId,
+                },
+                created_at: new Date().toISOString(),
+              },
+            ]);
+
+          if (notifyError) throw notifyError;
+        } catch (notifyErr) {
+          console.error(
+            "Error notifying user about rejected appeal:",
+            notifyErr
+          );
+          return res.status(500).json({
+            success: false,
+            error: "Failed to notify user about rejected appeal",
+          });
+        }
       }
     } else {
       // Log admin notes update only
