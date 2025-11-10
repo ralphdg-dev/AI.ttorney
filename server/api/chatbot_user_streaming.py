@@ -24,6 +24,7 @@ from api.chatbot_user import (
     
     # Greeting detection
     is_simple_greeting,
+    is_conversation_context_question,
     
     # Configuration
     CHAT_MODEL,
@@ -270,6 +271,122 @@ async def ask_legal_question(
                 yield format_sse({'content': greeting_response})
                 
                 # Send metadata with session info (for both authenticated and guest users)
+                yield format_sse({
+                    'type': 'metadata',
+                    'language': language,
+                    'session_id': session_id,
+                    'user_message_id': user_msg_id,
+                    'assistant_message_id': assistant_msg_id
+                })
+                
+                yield format_sse({'done': True})
+                return
+            
+            # Check if this is a conversation context question (handle specially)
+            if is_conversation_context_question(request.question):
+                print(f"\n💬 [CONVERSATION CONTEXT] Detected conversation context question")
+                
+                # Try to retrieve past conversations if user is authenticated
+                past_conversations_summary = ""
+                if effective_user_id:
+                    try:
+                        print(f"   🔍 Retrieving past conversations for user {effective_user_id[:8]}...")
+                        
+                        # Get recent sessions (last 5)
+                        user_sessions = await chat_service.get_user_sessions(
+                            user_id=effective_user_id,
+                            include_archived=False,
+                            page=1,
+                            page_size=5
+                        )
+                        
+                        if user_sessions and user_sessions.sessions:
+                            print(f"   ✅ Found {len(user_sessions.sessions)} recent conversations")
+                            
+                            # Build summary of past conversations
+                            conversation_summaries = []
+                            for session in user_sessions.sessions[:3]:  # Show last 3 conversations
+                                # Get a few messages from each session for context
+                                session_with_messages = await chat_service.get_session_with_messages(
+                                    session_id=session.id,
+                                    message_limit=4  # Get first 2 exchanges (user + assistant)
+                                )
+                                
+                                if session_with_messages and session_with_messages.messages:
+                                    messages = session_with_messages.messages
+                                    # Get the first user question
+                                    user_questions = [msg for msg in messages if msg.role == 'user']
+                                    if user_questions:
+                                        first_question = user_questions[0].content[:100]
+                                        conversation_summaries.append(
+                                            f"• **{session.title}**: {first_question}{'...' if len(user_questions[0].content) > 100 else ''}"
+                                        )
+                            
+                            if conversation_summaries:
+                                if language == "tagalog":
+                                    past_conversations_summary = f"\n\n**Mga Nakaraang Usapan Natin:**\n" + "\n".join(conversation_summaries)
+                                else:
+                                    past_conversations_summary = f"\n\n**Our Recent Conversations:**\n" + "\n".join(conversation_summaries)
+                        else:
+                            print(f"   ℹ️ No past conversations found for user")
+                            
+                    except Exception as e:
+                        print(f"   ⚠️ Error retrieving past conversations: {e}")
+                        logger.error(f"Error retrieving past conversations: {e}")
+                
+                # Generate intelligent response with actual conversation history
+                if language == "tagalog":
+                    context_response = (
+                        "Ako si Ai.ttorney, ang inyong legal assistant para sa Philippine law! 😊\n\n"
+                        "Naaalala ko ang aming mga nakaraang usapan! Narito ang ilang sa mga pinag-usapan natin:"
+                        f"{past_conversations_summary}\n\n" if past_conversations_summary else 
+                        "Wala pa tayong nakaraang usapan sa sistema, pero handa akong tumulong sa anumang legal na tanong!\n\n"
+                        "Maaari ninyong itanong ang tungkol sa:\n"
+                        "• Family Law (kasal, annulment, child custody)\n"
+                        "• Labor Law (trabaho, sahod, termination)\n"
+                        "• Consumer Law (produkto, serbisyo, warranty)\n"
+                        "• Criminal Law (krimen, arrest, bail)\n"
+                        "• Civil Law (kontrata, property, utang)\n\n"
+                        "Ano pong legal na tanong ang mayroon kayo ngayon?"
+                    )
+                else:
+                    context_response = (
+                        "I'm Ai.ttorney, your legal assistant for Philippine law! 😊\n\n"
+                        "I can remember our past conversations! Here are some topics we've discussed:"
+                        f"{past_conversations_summary}\n\n" if past_conversations_summary else 
+                        "We don't have any previous conversations in the system yet, but I'm ready to help with any legal questions!\n\n"
+                        "You can ask me about:\n"
+                        "• Family Law (marriage, annulment, child custody)\n"
+                        "• Labor Law (employment, wages, termination)\n"
+                        "• Consumer Law (products, services, warranties)\n"
+                        "• Criminal Law (crimes, arrest, bail)\n"
+                        "• Civil Law (contracts, property, debts)\n\n"
+                        "What legal question can I help you with today?"
+                    )
+                
+                # Save conversation context interaction
+                session_id = None
+                user_msg_id = None
+                assistant_msg_id = None
+                
+                if effective_user_id:
+                    try:
+                        session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                            chat_service=chat_service,
+                            effective_user_id=effective_user_id,
+                            session_id=request.session_id,
+                            question=request.question,
+                            answer=context_response,
+                            language=language,
+                            metadata={"type": "conversation_context", "streaming": True, "past_conversations_found": len(past_conversations_summary) > 0}
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to save conversation context to history: {e}")
+                
+                # Send conversation context response
+                yield format_sse({'content': context_response})
+                
+                # Send metadata with session info
                 yield format_sse({
                     'type': 'metadata',
                     'language': language,

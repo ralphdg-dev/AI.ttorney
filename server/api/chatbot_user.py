@@ -531,6 +531,41 @@ def detect_language(text: str) -> str:
         return "english"  # Default to English for non-Tagalog content
 
 
+def is_conversation_context_question(text: str) -> bool:
+    """
+    Check if the query is asking about conversation history, past chats, or chatbot capabilities
+    These should be handled as valid conversational queries, not rejected as non-legal
+    """
+    text_lower = text.lower().strip()
+    
+    conversation_patterns = [
+        # Past conversation references
+        'past convos', 'past conversations', 'previous chats', 'chat history',
+        'our conversation', 'our chat', 'what we talked about', 'earlier discussion',
+        'last convo', 'last conversation', 'our last chat', 'our last talk',
+        'before', 'previously', 'last time', 'earlier', 'nakaraan', 'dati',
+        
+        # Chatbot capability questions
+        'can you remember', 'do you remember', 'can you recall',
+        'what can you do', 'your capabilities', 'how do you work',
+        'kaya mo ba', 'naaalala mo ba', 'ano kaya mo',
+        
+        # Memory/recall questions
+        'remember', 'recall', 'bring up', 'show me', 'naaalala', 'ipakita',
+        'history', 'kasaysayan', 'nakaraan',
+        
+        # Search patterns
+        'search', 'find', 'look for', 'hanap', 'hanapin', 'search for',
+        'we discussed', 'we talked about', 'pinag-usapan natin', 'napag-usapan',
+        
+        # Direct conversation references
+        'talk about our', 'discuss our', 'about our conversation',
+        'usapan natin', 'pag-uusapan natin'
+    ]
+    
+    return any(pattern in text_lower for pattern in conversation_patterns)
+
+
 def is_simple_greeting(text: str) -> bool:
     """
     Check if the query is a simple greeting that doesn't require legal information
@@ -677,16 +712,20 @@ def is_personal_advice_question(text: str) -> bool:
 
 def is_legal_question(text: str) -> bool:
     """
-    Check if the input is actually asking for legal information or advice.
-    Handles both direct questions and conversational queries.
+    Check if the input is asking for legal information, advice, or is a valid conversational query.
+    Made more permissive to handle legitimate user interactions.
     
-    CRITICAL: Must exclude non-legal topics (medical, tech, religious, etc.)
-    to prevent false positives and irrelevant legal sources/disclaimers.
+    UPDATED: Now includes conversation context questions and general inquiries as valid.
     """
     text_lower = text.lower().strip()
     
-    # FIRST: Check for explicitly non-legal topics (medical, tech, etc.)
-    # This prevents false positives from generic words like "gamit", "sira"
+    # FIRST: Check if it's a conversation context question (always valid)
+    if is_conversation_context_question(text):
+        logger.debug(f"Detected as conversation context question - treating as valid")
+        return True
+    
+    # SECOND: Check for explicitly non-legal topics (medical, tech, etc.) - but be more lenient
+    # Only exclude if there are STRONG indicators (3+ matches) and NO legal context
     non_legal_topics = {
         'medical': [
             'gamot', 'medicine', 'medication', 'lunas', 'treatment',
@@ -722,31 +761,19 @@ def is_legal_question(text: str) -> bool:
             'blessing', 'pagpapala', 'miracle', 'himala',
             'sin', 'kasalanan', 'confession', 'kumpisal',
             'mass', 'misa', 'worship', 'pagsamba'
-        ],
-        'general_advice': [
-            'recipe', 'lutuin', 'cooking', 'pagluluto',
-            'exercise', 'ehersisyo', 'workout', 'gym',
-            'diet', 'pagkain', 'nutrition', 'nutrisyon',
-            'relationship advice', 'love advice', 'payo sa pag-ibig',
-            'fashion', 'damit', 'style', 'estilo',
-            'beauty', 'ganda', 'makeup', 'cosmetics'
         ]
     }
     
-    # Check each non-legal category
+    # Check each non-legal category - INCREASED threshold to 3+ matches
     for category, keywords in non_legal_topics.items():
         matches = sum(1 for keyword in keywords if keyword in text_lower)
-        # If 2+ matches in a non-legal category, it's NOT a legal question
-        if matches >= 2:
-            logger.info(f"Query identified as {category} topic ({matches} matches) - NOT legal")
-            return False
-        # Even 1 strong medical indicator is enough to exclude
-        if category == 'medical' and matches >= 1:
-            # Check if it's ONLY medical (no legal context)
-            legal_context_words = ['law', 'batas', 'legal', 'rights', 'karapatan', 'court', 'korte']
+        # Only exclude if 3+ matches in a non-legal category AND no legal context
+        if matches >= 3:
+            # Check if there's any legal context
+            legal_context_words = ['law', 'batas', 'legal', 'rights', 'karapatan', 'court', 'korte', 'case', 'kaso']
             has_legal_context = any(word in text_lower for word in legal_context_words)
             if not has_legal_context:
-                logger.info(f"Query identified as medical topic - NOT legal")
+                logger.info(f"Query identified as {category} topic ({matches} matches) - NOT legal")
                 return False
 
     # Legal domain keywords (5 main areas)
@@ -924,18 +951,35 @@ def is_legal_question(text: str) -> bool:
     # Check for conversational patterns
     has_conversational_pattern = any(pattern in text_lower for pattern in conversational_patterns)
 
-    # A question is legal if:
+    # UPDATED: More permissive approach - A question is legal if:
     # 1. It mentions a legal domain (consumer law, labor law, etc.), OR
     # 2. It has STRONG legal keywords (explicit legal terms), OR
-    # 3. It has legal keywords AND conversational patterns
-    # 
-    # CHANGED: Require stronger evidence to avoid false positives
-    is_legal = has_legal_domain or has_strong_legal_keyword or (has_conversational_pattern and has_legal_keyword)
+    # 3. It has legal keywords AND conversational patterns, OR
+    # 4. It's a general inquiry that could be legal-related, OR
+    # 5. It's asking for help/information (benefit of the doubt)
+    
+    # Add general inquiry patterns (more permissive)
+    general_inquiry_patterns = [
+        'can you', 'are you able', 'do you know', 'tell me', 'explain',
+        'what is', 'what are', 'how do', 'why', 'when', 'where',
+        'help', 'assist', 'guide', 'advice', 'information',
+        'kaya mo ba', 'alam mo ba', 'sabihin mo', 'ipaliwanag',
+        'ano ang', 'paano', 'bakit', 'kailan', 'saan',
+        'tulong', 'gabay', 'payo', 'impormasyon'
+    ]
+    
+    has_general_inquiry = any(pattern in text_lower for pattern in general_inquiry_patterns)
+    
+    # More permissive logic - include general inquiries
+    is_legal = (has_legal_domain or 
+                has_strong_legal_keyword or 
+                (has_conversational_pattern and has_legal_keyword) or
+                (has_general_inquiry and len(text.strip()) > 10))  # General inquiries over 10 chars
     
     if is_legal:
-        logger.debug(f"Detected as legal question - domain:{has_legal_domain}, strong_keyword:{has_strong_legal_keyword}, keyword:{has_legal_keyword}, conversational:{has_conversational_pattern}")
+        logger.debug(f"Detected as valid question - domain:{has_legal_domain}, strong_keyword:{has_strong_legal_keyword}, keyword:{has_legal_keyword}, conversational:{has_conversational_pattern}, general_inquiry:{has_general_inquiry}")
     else:
-        logger.debug(f"NOT a legal question - will provide casual/redirect response")
+        logger.debug(f"NOT a valid question - will provide casual/redirect response")
     
     return is_legal
 
@@ -2040,6 +2084,107 @@ async def ask_legal_question(
                 # Fail-open: Continue without moderation if service fails
                 print(f"⚠️  Content moderation failed, continuing without moderation: {e}")
         
+        # Check if this is a conversation context question (handle specially)
+        if is_conversation_context_question(request.question):
+            print(f"\n💬 [CONVERSATION CONTEXT] Detected conversation context question")
+            
+            # Try to retrieve past conversations if user is authenticated
+            past_conversations_summary = ""
+            if effective_user_id:
+                try:
+                    print(f"   🔍 Retrieving past conversations for user {effective_user_id[:8]}...")
+                    
+                    # Get recent sessions (last 5)
+                    user_sessions = await chat_history_service.get_user_sessions(
+                        user_id=effective_user_id,
+                        include_archived=False,
+                        page=1,
+                        page_size=5
+                    )
+                    
+                    if user_sessions and user_sessions.sessions:
+                        print(f"   ✅ Found {len(user_sessions.sessions)} recent conversations")
+                        
+                        # Build summary of past conversations
+                        conversation_summaries = []
+                        for session in user_sessions.sessions[:3]:  # Show last 3 conversations
+                            # Get a few messages from each session for context
+                            session_with_messages = await chat_history_service.get_session_with_messages(
+                                session_id=session.id,
+                                message_limit=4  # Get first 2 exchanges (user + assistant)
+                            )
+                            
+                            if session_with_messages and session_with_messages.messages:
+                                messages = session_with_messages.messages
+                                # Get the first user question
+                                user_questions = [msg for msg in messages if msg.role == 'user']
+                                if user_questions:
+                                    first_question = user_questions[0].content[:100]
+                                    conversation_summaries.append(
+                                        f"• **{session.title}**: {first_question}{'...' if len(user_questions[0].content) > 100 else ''}"
+                                    )
+                        
+                        if conversation_summaries:
+                            if language == "tagalog":
+                                past_conversations_summary = f"\n\n**Mga Nakaraang Usapan Natin:**\n" + "\n".join(conversation_summaries)
+                            else:
+                                past_conversations_summary = f"\n\n**Our Recent Conversations:**\n" + "\n".join(conversation_summaries)
+                    else:
+                        print(f"   ℹ️ No past conversations found for user")
+                        
+                except Exception as e:
+                    print(f"   ⚠️ Error retrieving past conversations: {e}")
+                    logger.error(f"Error retrieving past conversations: {e}")
+            
+            # Generate intelligent response with actual conversation history
+            if language == "tagalog":
+                context_response = (
+                    "Ako si Ai.ttorney, ang inyong legal assistant para sa Philippine law! 😊\n\n"
+                    "Naaalala ko ang aming mga nakaraang usapan! Narito ang ilang sa mga pinag-usapan natin:"
+                    f"{past_conversations_summary}\n\n" if past_conversations_summary else 
+                    "Wala pa tayong nakaraang usapan sa sistema, pero handa akong tumulong sa anumang legal na tanong!\n\n"
+                    "Maaari ninyong itanong ang tungkol sa:\n"
+                    "• Family Law (kasal, annulment, child custody)\n"
+                    "• Labor Law (trabaho, sahod, termination)\n"
+                    "• Consumer Law (produkto, serbisyo, warranty)\n"
+                    "• Criminal Law (krimen, arrest, bail)\n"
+                    "• Civil Law (kontrata, property, utang)\n\n"
+                    "Ano pong legal na tanong ang mayroon kayo ngayon?"
+                )
+            else:
+                context_response = (
+                    "I'm Ai.ttorney, your legal assistant for Philippine law! 😊\n\n"
+                    "I can remember our past conversations! Here are some topics we've discussed:"
+                    f"{past_conversations_summary}\n\n" if past_conversations_summary else 
+                    "We don't have any previous conversations in the system yet, but I'm ready to help with any legal questions!\n\n"
+                    "You can ask me about:\n"
+                    "• Family Law (marriage, annulment, child custody)\n"
+                    "• Labor Law (employment, wages, termination)\n"
+                    "• Consumer Law (products, services, warranties)\n"
+                    "• Criminal Law (crimes, arrest, bail)\n"
+                    "• Civil Law (contracts, property, debts)\n\n"
+                    "What legal question can I help you with today?"
+                )
+            
+            # Save conversation context interaction
+            session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                chat_service=chat_history_service,
+                effective_user_id=effective_user_id,
+                session_id=request.session_id,
+                question=request.question,
+                answer=context_response,
+                language=language,
+                metadata={"type": "conversation_context", "past_conversations_found": len(past_conversations_summary) > 0}
+            )
+            
+            return create_chat_response(
+                answer=context_response,
+                simplified_summary="Retrieved and displayed past conversation history" if past_conversations_summary else "No past conversations found",
+                session_id=session_id,
+                message_id=assistant_msg_id,
+                user_message_id=user_msg_id
+            )
+        
         # Check if this is actually a legal question or just casual conversation
         if not is_legal_question(request.question):
             # For casual, friendly, or unrelated messages, generate intelligent response using AI
@@ -2144,6 +2289,7 @@ async def ask_legal_question(
         print(f"\n🤖 [STEP 9] Generating AI answer with OpenAI...")
         print(f"   📡 Calling OpenAI API (model: {CHAT_MODEL})...")
         print(f"   Max tokens: {request.max_tokens}")
+        print(f"   Conversation history: {len(request.conversation_history or [])} messages")
         answer, _, simplified_summary = generate_answer(
             request.question,
             context,
