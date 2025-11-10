@@ -112,7 +112,7 @@ async def _get_cached_reply_counts(post_ids: list) -> dict:
         ids_param = ",".join(post_ids)
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                f"{supabase.rest_url}/forum_replies?select=post_id&post_id=in.({ids_param})",
+                f"{supabase.rest_url}/forum_replies?select=post_id&post_id=in.({ids_param})&hidden=eq.false",
                 headers=supabase._get_headers(use_service_key=True)
             )
         
@@ -483,7 +483,7 @@ async def list_recent_posts(
                         # Fetch all replies for these posts
                         ids_param = ",".join(post_ids)
                         # Include user data with proper join syntax
-                        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=in.({ids_param})&order=created_at.asc"
+                        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=in.({ids_param})&hidden=eq.false&order=created_at.asc"
                         
                         logger.info(f"🔍 Fetching replies with URL: {replies_url}")
                         
@@ -500,7 +500,7 @@ async def list_recent_posts(
                             
                             # Try fallback query without users join
                             logger.info("🔄 Trying fallback query without users join...")
-                            fallback_url = f"{supabase.rest_url}/forum_replies?select=id,reply_body,created_at,user_id,is_anonymous,post_id&post_id=in.({ids_param})&order=created_at.asc"
+                            fallback_url = f"{supabase.rest_url}/forum_replies?select=id,reply_body,created_at,user_id,is_anonymous,post_id&post_id=in.({ids_param})&hidden=eq.false&order=created_at.asc"
                             logger.info(f"🔍 Fallback URL: {fallback_url}")
                             
                             async with httpx.AsyncClient(timeout=15.0) as client:
@@ -644,7 +644,7 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
         supabase = SupabaseService()
         # Increased timeout for better reliability
         # Include user data with proper join syntax
-        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=eq.{post_id}&order=created_at.desc"
+        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=eq.{post_id}&hidden=eq.false&order=created_at.desc"
         logger.info(f"🔍 Individual replies URL: {replies_url}")
         
         async with httpx.AsyncClient(timeout=20.0) as client:
@@ -674,7 +674,7 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
             
             # Try fallback query without users join
             logger.info("🔄 Trying fallback individual replies query without users join...")
-            fallback_url = f"{supabase.rest_url}/forum_replies?select=*&post_id=eq.{post_id}&order=created_at.desc"
+            fallback_url = f"{supabase.rest_url}/forum_replies?select=*&post_id=eq.{post_id}&hidden=eq.false&order=created_at.desc"
             logger.info(f"🔍 Fallback individual replies URL: {fallback_url}")
             
             async with httpx.AsyncClient(timeout=20.0) as client:

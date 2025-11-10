@@ -189,6 +189,38 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
 
     if (updateError) throw updateError;
 
+    // If approved, lift the user's suspension
+    if (updateData.status && updateData.status.toLowerCase() === "approved") {
+      try {
+        // 1) Mark the related suspension as lifted
+        const { error: liftError } = await supabaseAdmin
+          .from("user_suspensions")
+          .update({
+            status: "lifted",
+            lifted_at: new Date().toISOString(),
+            lifted_by: req.admin.id,
+            lifted_reason: "Appeal approved",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.suspension_id);
+
+        if (liftError) throw liftError;
+
+        // 2) Restore the user's account to active and clear suspension_end
+        const { error: userUpdateError } = await supabaseAdmin
+          .from("users")
+          .update({ account_status: "active", suspension_end: null })
+          .eq("id", existing.user_id);
+
+        if (userUpdateError) throw userUpdateError;
+      } catch (liftErr) {
+        console.error("Error lifting suspension after appeal approval:", liftErr);
+        return res
+          .status(500)
+          .json({ success: false, error: "Failed to lift suspension after approval" });
+      }
+    }
+
     res.json({
       success: true,
       message: "Appeal updated successfully",
