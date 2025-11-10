@@ -24,6 +24,8 @@ import { SidebarProvider } from "../components/AppSidebar";
 import { AuthGuard } from "../components/AuthGuard";
 import { SuspensionGuard } from "../components/SuspensionGuard";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
+import NoInternetModal from "../components/common/NoInternetModal";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
 
 // Keep the splash screen visible while we fetch resources
 // This prevents flash of unauthenticated UI during auth check
@@ -32,6 +34,8 @@ SplashScreen.preventAutoHideAsync();
 function AppContent() {
   const { initialAuthCheck } = useAuth();
   const [isReady, setIsReady] = useState(false);
+  const isConnected = useNetworkStatus();
+  const [showNoInternet, setShowNoInternet] = useState(false);
 
   useEffect(() => {
     // Only hide splash screen when auth check is complete
@@ -41,12 +45,26 @@ function AppContent() {
     }
   }, [initialAuthCheck]);
 
+  // Show/hide no internet modal based on connection status
+  useEffect(() => {
+    if (isConnected === false) {
+      setShowNoInternet(true);
+    } else if (isConnected === true) {
+      setShowNoInternet(false);
+    }
+  }, [isConnected]);
+
   // Keep splash screen visible until auth check completes
   if (!isReady) {
     return null;
   }
 
   return (
+    <>
+      <NoInternetModal 
+        visible={showNoInternet} 
+        onDismiss={() => setShowNoInternet(false)}
+      />
     <GuestProvider>
       <GuestChatProvider>
         <ModerationProvider>
@@ -92,6 +110,7 @@ function AppContent() {
         </ModerationProvider>
       </GuestChatProvider>
     </GuestProvider>
+    </>
   );
 }
 
