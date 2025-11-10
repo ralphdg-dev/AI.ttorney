@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, TextInput } from 'react-native';
-import { X, Heart } from 'lucide-react-native';
+import { X, Heart, AlertCircle } from 'lucide-react-native';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 
@@ -10,6 +10,7 @@ interface ReportModalProps {
   onSubmit: (reason: string, category: string, reasonContext?: string) => Promise<void>;
   targetType: 'post' | 'reply';
   isLoading?: boolean;
+  showAlreadyReported?: boolean;
 }
 
 const REPORT_CATEGORIES = [
@@ -27,17 +28,25 @@ const ReportModal: React.FC<ReportModalProps> = ({
   onSubmit,
   targetType,
   isLoading = false,
+  showAlreadyReported: showAlreadyReportedProp = false,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [customReason, setCustomReason] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showAlreadyReported, setShowAlreadyReported] = useState(showAlreadyReportedProp);
+
+  // Update local state when prop changes
+  React.useEffect(() => {
+    setShowAlreadyReported(showAlreadyReportedProp);
+  }, [showAlreadyReportedProp]);
 
   const handleClose = () => {
     setSelectedCategory('');
     setCustomReason('');
     setIsSubmitting(false);
     setShowSuccess(false);
+    setShowAlreadyReported(false);
     onClose();
   };
 
@@ -49,8 +58,13 @@ const ReportModal: React.FC<ReportModalProps> = ({
       const selectedCategoryData = REPORT_CATEGORIES.find(cat => cat.id === selectedCategory);
       await onSubmit(selectedCategoryData?.label || selectedCategory, selectedCategory, customReason);
       setShowSuccess(true);
-    } catch {
-      // Error handling is done in parent component
+    } catch (error: any) {
+      // Check if error is about already reported
+      const errorMessage = error?.message || '';
+      if (errorMessage.toLowerCase().includes('already reported')) {
+        setShowAlreadyReported(true);
+      }
+      // Other errors are handled in parent component
     } finally {
       setIsSubmitting(false);
     }
@@ -61,6 +75,51 @@ const ReportModal: React.FC<ReportModalProps> = ({
     handleClose();
   };
 
+  const handleAlreadyReportedClose = () => {
+    setShowAlreadyReported(false);
+    handleClose();
+  };
+
+  // Already Reported Modal
+  if (showAlreadyReported) {
+    return (
+      <Modal
+        visible={visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleAlreadyReportedClose}
+      >
+        <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center px-4`}>
+          <View style={tw`bg-white rounded-lg w-full max-w-md p-6`}>
+            <View style={tw`items-center mb-6`}>
+              <View style={tw`w-16 h-16 bg-blue-100 rounded-full items-center justify-center mb-4`}>
+                <AlertCircle size={32} color="#3B82F6" />
+              </View>
+            </View>
+            <Text style={tw`text-lg font-semibold text-gray-900 mb-2 text-center`}>
+              Already Reported
+            </Text>
+            <Text style={tw`text-sm text-gray-600 text-center mb-6 leading-5`}>
+              You have already submitted a report for this {targetType}. Our support team is reviewing your previous report and will take appropriate action.
+            </Text>
+            <TouchableOpacity
+              onPress={handleAlreadyReportedClose}
+              style={[
+                tw`w-full py-3 rounded-lg`,
+                { backgroundColor: Colors.primary.blue }
+              ]}
+            >
+              <Text style={tw`text-center font-medium text-white`}>
+                Got it
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Success Modal
   if (showSuccess) {
     return (
       <Modal

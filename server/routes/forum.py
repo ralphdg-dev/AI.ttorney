@@ -1060,6 +1060,18 @@ async def submit_report(
     try:
         user_id = current_user["user"]["id"]
         report_service = ReportService()
+        
+        # First, check if user has already reported this target
+        check_result = await report_service.check_user_report(
+            report_data.target_id,
+            report_data.target_type,
+            user_id
+        )
+        
+        if check_result["success"] and check_result.get("data", {}).get("hasReported"):
+            raise HTTPException(status_code=400, detail="You have already reported this content")
+        
+        # Proceed with submission
         result = await report_service.submit_report(
             report_data.target_id,
             report_data.target_type,

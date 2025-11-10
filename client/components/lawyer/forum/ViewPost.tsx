@@ -88,6 +88,11 @@ const ViewPost: React.FC = () => {
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [reportReplyModalVisible, setReportReplyModalVisible] = useState(false);
+  const [selectedReplyId, setSelectedReplyId] = useState<string | null>(null);
+  const [replyMenuOpen, setReplyMenuOpen] = useState<string | null>(null);
+  const [showAlreadyReportedReply, setShowAlreadyReportedReply] = useState(false);
+  const [showAlreadyReportedPost, setShowAlreadyReportedPost] = useState(false);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [repliesLoading, setRepliesLoading] = useState(false);
   const [optimisticReplies, setOptimisticReplies] = useState<Reply[]>([]);
@@ -230,45 +235,124 @@ const ViewPost: React.FC = () => {
     }
   }, [currentUser?.id, postId, session]);
 
-  const handleReportPress = () => {
+  const handleReportPress = async () => {
     setMenuOpen(false);
+    
+    // Check if user has already reported this post
+    if (post?.id && currentUser?.id) {
+      const checkResult = await ReportService.hasUserReported(
+        post.id,
+        'post',
+        currentUser.id,
+        session
+      );
+      
+      if (checkResult.success && checkResult.hasReported) {
+        // Show already reported modal immediately
+        setShowAlreadyReportedPost(true);
+        setReportModalVisible(true);
+        return;
+      }
+    }
+    
+    // User hasn't reported yet, show normal report form
+    setShowAlreadyReportedPost(false);
     setReportModalVisible(true);
   };
 
   const handleSubmitReport = async (reason: string, category: string, reasonContext?: string) => {
-    if (!currentUser?.id || !postId) {
-      throw new Error('Missing user ID or post ID');
-    }
-
+    if (!post?.id || !currentUser?.id) return;
+    
     setIsReportLoading(true);
     try {
-      // Check if user has already reported this post
-      const existingReport = await ReportService.hasUserReported(
-        String(postId), 
-        'post', 
-        currentUser.id,
-        session
-      );
-
-      if (existingReport.success && existingReport.hasReported) {
-        throw new Error('You have already reported this post');
-      }
-
       const result = await ReportService.submitReport(
-        String(postId),
+        post.id,
         'post',
-        reason,
+        category,
         currentUser.id,
         reasonContext,
         session
       );
-
-      if (!result.success) {
+      
+      if (result.success) {
+        setReportModalVisible(false);
+        setMenuOpen(false);
+      } else {
         throw new Error(result.error || 'Failed to submit report');
       }
+    } catch (error) {
+      console.error('Report submission error:', error);
     } finally {
       setIsReportLoading(false);
     }
+  };
+
+  const handleSubmitReplyReport = async (reason: string, category: string, reasonContext?: string) => {
+    if (!selectedReplyId || !currentUser?.id) return;
+    
+    setIsReportLoading(true);
+    try {
+      // First check if user has already reported this reply
+      const checkResult = await ReportService.hasUserReported(
+        selectedReplyId,
+        'reply',
+        currentUser.id,
+        session
+      );
+
+      if (checkResult.success && checkResult.hasReported) {
+        // User has already reported this reply - throw error to trigger "already reported" modal
+        throw new Error('You have already reported this reply');
+      }
+
+      // User hasn't reported this reply - proceed with submission
+      const result = await ReportService.submitReport(
+        selectedReplyId,
+        'reply',
+        category,
+        currentUser.id,
+        reasonContext,
+        session
+      );
+      
+      if (result.success) {
+        setReportReplyModalVisible(false);
+        setReplyMenuOpen(null);
+        setSelectedReplyId(null);
+      } else {
+        throw new Error(result.error || 'Failed to submit report');
+      }
+    } catch (error) {
+      throw error; // Re-throw to let ReportModal handle the error display
+    } finally {
+      setIsReportLoading(false);
+    }
+  };
+
+  const handleReportReplyPress = async (replyId: string) => {
+    setSelectedReplyId(replyId);
+    setReplyMenuOpen(null);
+    
+    // Check if user has already reported this reply
+    if (currentUser?.id) {
+      const checkResult = await ReportService.hasUserReported(
+        replyId,
+        'reply',
+        currentUser.id,
+        session
+      );
+      
+      if (checkResult.success && checkResult.hasReported) {
+        // Show already reported modal immediately
+        setShowAlreadyReportedReply(true);
+        setReportReplyModalVisible(true);
+        return;
+      }
+    }
+    
+    // User hasn't reported yet, show normal report form
+    setShowAlreadyReportedReply(false);
+    setReportReplyModalVisible(true);
   };
 
   // Optimized post loading with cache-first approach
@@ -794,7 +878,7 @@ const ViewPost: React.FC = () => {
           />
           <View style={{
             position: 'absolute',
-            top: 100,
+            top: 60,
             right: 16,
             backgroundColor: 'white',
             borderWidth: 1,
@@ -996,17 +1080,27 @@ const ViewPost: React.FC = () => {
                         <View style={tw`flex-1`}>
                           {/* [Full Name] [lawyer badge] */}
                           <View style={tw`mb-2`}>
-                            <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                              <Text style={tw`text-base font-semibold text-gray-900 mr-2`}>
-                                {replyUser.name}
-                              </Text>
-                              {replyUser.isLawyer && (
-                                <View style={tw`px-2 py-0.5 bg-green-50 rounded-full border border-green-100`}>
-                                  <View style={tw`flex-row items-center`}>
-                                    <Shield size={10} color="#15803d" fill="#15803d" />
-                                    <Text style={tw`text-xs font-medium text-green-700 ml-1`}>Verified Lawyer</Text>
+                            <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
+                              <View style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
+                                <Text style={tw`text-base font-semibold text-gray-900 mr-2`}>
+                                  {replyUser.name}
+                                </Text>
+                                {replyUser.isLawyer && (
+                                  <View style={tw`px-2 py-0.5 bg-green-50 rounded-full border border-green-100`}>
+                                    <View style={tw`flex-row items-center`}>
+                                      <Shield size={10} color="#15803d" fill="#15803d" />
+                                      <Text style={tw`text-xs font-medium text-green-700 ml-1`}>Verified Lawyer</Text>
+                                    </View>
                                   </View>
-                                </View>
+                                )}
+                              </View>
+                              {!reply.isOptimistic && (
+                                <TouchableOpacity
+                                  onPress={() => setReplyMenuOpen(replyMenuOpen === reply.id ? null : reply.id)}
+                                  style={tw`p-1`}
+                                >
+                                  <MoreHorizontal size={16} color="#6B7280" />
+                                </TouchableOpacity>
                               )}
                             </View>
                             
@@ -1025,6 +1119,50 @@ const ViewPost: React.FC = () => {
                           </Text>
                         </View>
                       </View>
+                      
+                      {/* Reply Menu Dropdown */}
+                      {replyMenuOpen === reply.id && (
+                        <>
+                          <TouchableOpacity 
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              zIndex: 998
+                            }} 
+                            activeOpacity={1} 
+                            onPress={() => setReplyMenuOpen(null)} 
+                          />
+                          <View style={{
+                            position: 'absolute',
+                            top: 30,
+                            right: 0,
+                            backgroundColor: 'white',
+                            borderWidth: 1,
+                            borderColor: '#E5E7EB',
+                            borderRadius: 8,
+                            ...createShadowStyle({
+                              shadowColor: '#000',
+                              shadowOffset: { width: 0, height: 2 },
+                              shadowOpacity: 0.1,
+                              shadowRadius: 6,
+                              elevation: 3,
+                            }),
+                            zIndex: 999,
+                            width: 160
+                          }}>
+                            <TouchableOpacity
+                              style={tw`flex-row items-center px-4 py-3`}
+                              onPress={() => handleReportReplyPress(reply.id)}
+                            >
+                              <Flag size={16} color="#B91C1C" />
+                              <Text style={tw`ml-3 text-red-700`}>Report reply</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </>
+                      )}
                     </View>
                   );
                   
@@ -1080,13 +1218,31 @@ const ViewPost: React.FC = () => {
         </View>
       )}
 
-      {/* Report Modal */}
+      {/* Report Post Modal */}
       <ReportModal
         visible={reportModalVisible}
-        onClose={() => setReportModalVisible(false)}
+        onClose={() => {
+          setReportModalVisible(false);
+          setShowAlreadyReportedPost(false);
+        }}
         onSubmit={handleSubmitReport}
         targetType="post"
         isLoading={isReportLoading}
+        showAlreadyReported={showAlreadyReportedPost}
+      />
+
+      {/* Report Reply Modal */}
+      <ReportModal
+        visible={reportReplyModalVisible}
+        onClose={() => {
+          setReportReplyModalVisible(false);
+          setSelectedReplyId(null);
+          setShowAlreadyReportedReply(false);
+        }}
+        onSubmit={handleSubmitReplyReport}
+        targetType="reply"
+        isLoading={isReportLoading}
+        showAlreadyReported={showAlreadyReportedReply}
       />
 
     </SafeAreaView>
