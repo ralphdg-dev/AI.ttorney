@@ -1,7 +1,7 @@
 const API_BASE_URL =
   process.env.REACT_APP_API_URL || "http://localhost:5001/api";
 
-// Add these functions to your existing glossaryTermsService
+// Enhanced service functions for glossaryTermsService.js
 
 const createAuditLog = async (termId, action, metadata = {}) => {
   try {
@@ -26,6 +26,27 @@ const createAuditLog = async (termId, action, metadata = {}) => {
     return data;
   } catch (error) {
     console.error("Error creating audit log:", error);
+    throw error;
+  }
+};
+
+const logViewAction = async (termId) => {
+  try {
+    const token = localStorage.getItem("admin_token");
+    const response = await fetch(
+      `http://localhost:5001/api/glossary-terms/${termId}/view`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error logging view action:", error);
     throw error;
   }
 };
@@ -72,8 +93,13 @@ const getTermRecentActivity = async (termId, page = 1, limit = 50) => {
   }
 };
 
-// Export the new functions
-export { createAuditLog, getTermAuditLogs, getTermRecentActivity };
+// Export the enhanced functions
+export {
+  createAuditLog,
+  logViewAction,
+  getTermAuditLogs,
+  getTermRecentActivity,
+};
 
 const glossaryTermsService = {
   getAuthHeader() {
