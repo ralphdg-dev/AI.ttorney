@@ -18,23 +18,7 @@ router.get("/", async (req, res) => {
 
     const { data: appeals, error: appealsError } = await supabaseAdmin
       .from("suspension_appeals")
-      .select(
-        `
-    *,
-    user:users!suspension_appeals_user_id_fkey (
-      id,
-      full_name
-    ),
-    suspension:user_suspensions!suspension_appeals_suspension_id_fkey (
-      id,
-      reason
-    ),
-    reviewer:admin!suspension_appeals_reviewed_by_fkey1 (
-      id,
-      full_name
-    )
-  `
-      )
+      .select("id,user_id,suspension_id,appeal_reason,status,reviewed_by,reviewed_at,rejection_reason,created_at,updated_at")
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -56,12 +40,7 @@ router.get("/", async (req, res) => {
         .json({ success: false, error: countError.message });
     }
 
-    let formatted = (appeals || []).map((a) => ({
-      ...a,
-      user_full_name: a.user?.full_name || "Unknown User",
-      suspension_reason: a.suspension?.reason || "No reason specified",
-      reviewed_by: a.reviewer?.full_name || "N/A",
-    }));
+    let formatted = appeals || [];
 
     // 🔹 Filtering
     if (search.trim()) {
@@ -111,19 +90,7 @@ router.get("/:id", async (req, res) => {
 
     const { data, error } = await supabaseAdmin
       .from("suspension_appeals")
-      .select(
-        `
-    *,
-    user:users!suspension_appeals_user_id_fkey (
-      id,
-      full_name
-    ),
-    reviewer:admin!suspension_appeals_reviewed_by_fkey1 (
-      id,
-      full_name
-    )
-  `
-      )
+      .select("id,user_id,suspension_id,appeal_reason,status,reviewed_by,reviewed_at,rejection_reason,created_at,updated_at")
       .eq("id", id)
       .single();
 
@@ -132,8 +99,7 @@ router.get("/:id", async (req, res) => {
       return res.status(500).json({ success: false, error: error.message });
     }
 
-    data.user_full_name = data.user?.full_name || "Unknown User";
-    data.reviewed_by = data.reviewer?.full_name || "N/A";
+    // Return raw appeal fields only (no additional context)
 
     res.json({ success: true, data });
   } catch (error) {

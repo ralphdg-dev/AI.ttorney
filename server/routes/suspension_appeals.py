@@ -36,7 +36,6 @@ admin_router = APIRouter(prefix="/admin/appeals", tags=["appeals", "admin"])
 # Request Models
 class SubmitAppealRequest(BaseModel):
     appeal_reason: str = Field(..., min_length=1, max_length=2000, description="Reason for appeal (1-2000 characters)")
-    additional_context: Optional[str] = Field(None, max_length=1000, description="Additional context (optional)")
 
 
 class ReviewAppealRequest(BaseModel):
@@ -51,7 +50,6 @@ class AppealResponse(BaseModel):
     user_id: str
     suspension_id: str
     appeal_reason: str
-    additional_context: Optional[str]
     status: str
     reviewed_by: Optional[str]
     reviewed_at: Optional[str]
@@ -174,7 +172,6 @@ async def submit_appeal(
                 "user_id": user_id,
                 "suspension_id": suspension_id,
                 "appeal_reason": body.appeal_reason,
-                "additional_context": body.additional_context,
                 "status": "pending"
             }
             
@@ -224,7 +221,7 @@ async def get_my_appeals(
                 f"{supabase.rest_url}/suspension_appeals",
                 params={
                     "user_id": f"eq.{user_id}",
-                    "select": "id,user_id,suspension_id,appeal_reason,additional_context,status,reviewed_by,reviewed_at,rejection_reason,created_at,updated_at,user_suspensions!inner(suspension_type,suspension_number)",
+                    "select": "id,user_id,suspension_id,appeal_reason,status,reviewed_by,reviewed_at,rejection_reason,created_at,updated_at,user_suspensions!inner(suspension_type,suspension_number)",
                     "order": "created_at.desc"
                 },
                 headers=supabase._get_headers(use_service_key=True)
@@ -283,7 +280,7 @@ async def get_appeal(
                 params={
                     "id": f"eq.{appeal_id}",
                     "user_id": f"eq.{user_id}",
-                    "select": "*"
+                    "select": "id,user_id,suspension_id,appeal_reason,status,reviewed_by,reviewed_at,rejection_reason,created_at,updated_at"
                 },
                 headers=supabase._get_headers(use_service_key=True)
             )
@@ -334,7 +331,7 @@ async def get_all_appeals(
         
         # Build query params
         params = {
-            "select": "id,user_id,suspension_id,appeal_reason,additional_context,status,reviewed_by,reviewed_at,rejection_reason,created_at,updated_at,users!inner(email,username),user_suspensions!inner(suspension_type,suspension_number)",
+            "select": "id,user_id,suspension_id,appeal_reason,status,reviewed_by,reviewed_at,rejection_reason,created_at,updated_at,users!inner(email,username),user_suspensions!inner(suspension_type,suspension_number)",
             "order": "created_at.desc",
             "limit": limit,
             "offset": offset

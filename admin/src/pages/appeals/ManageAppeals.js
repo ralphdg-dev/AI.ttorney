@@ -198,7 +198,6 @@ const ManageAppeals = () => {
     { key: "suspension_id", header: "Suspension ID" },
     { key: "suspension_reason", header: "Suspension Reason" },
     { key: "appeal_reason", header: "Appeal Reason" },
-    { key: "additional_context", header: "Additional Context" },
     {
       key: "status",
       header: "Status",
@@ -305,13 +304,12 @@ const ManageAppeals = () => {
                   {columns.map((col) => (
                     <th
                       key={col.key}
-                      className={`px-4 py-2 text-[10px] font-medium text-gray-500 ${
-                        col.align === "center"
+                      className={`px-4 py-2 text-[10px] font-medium text-gray-500 ${col.align === "center"
                           ? "text-center"
                           : col.align === "right"
-                          ? "text-right"
-                          : "text-left"
-                      }`}
+                            ? "text-right"
+                            : "text-left"
+                        }`}
                     >
                       {col.header}
                     </th>
@@ -337,13 +335,12 @@ const ManageAppeals = () => {
                       {columns.map((col) => (
                         <td
                           key={col.key}
-                          className={`px-4 py-2 text-[11px] text-gray-700 ${
-                            col.align === "center"
+                          className={`px-4 py-2 text-[11px] text-gray-700 ${col.align === "center"
                               ? "text-center"
                               : col.align === "right"
-                              ? "text-right"
-                              : ""
-                          }`}
+                                ? "text-right"
+                                : ""
+                            }`}
                         >
                           {col.render
                             ? col.render(row)
@@ -387,7 +384,7 @@ const ManageAppeals = () => {
         totalPages={1}
         totalItems={filteredData.length}
         itemsPerPage={10}
-        onPageChange={() => {}}
+        onPageChange={() => { }}
         itemName="appeals"
       />
     </div>

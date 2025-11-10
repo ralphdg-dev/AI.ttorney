@@ -19,7 +19,7 @@ class NotificationService:
     async def create_notification(
         self,
         user_id: str,
-        notification_type: str,
+        type: str,
         title: str,
         message: str,
         data: Optional[Dict[str, Any]] = None
@@ -28,7 +28,7 @@ class NotificationService:
         try:
             notification_data = {
                 "user_id": user_id,
-                "type": notification_type,
+                "type": type,
                 "title": title,
                 "message": message,
                 "data": data or {},
@@ -41,7 +41,7 @@ class NotificationService:
             
             if result.data:
                 notification_id = result.data[0]["id"]
-                logger.info(f"✅ Notification created: {notification_type} for user {user_id[:8]}...")
+                logger.info(f"✅ Notification created: {type} for user {user_id[:8]}...")
                 return notification_id
             
             return None
@@ -169,7 +169,7 @@ class NotificationService:
         logger.info(f"📬 Creating consultation_booked notification for lawyer {lawyer_id[:8]}...")
         result = await self.create_notification(
             user_id=lawyer_id,
-            notification_type="consultation_booked",
+            type="consultation_booked",
             title="New Consultation Request",
             message=f"{user_name} requested a consultation on {consultation_date} at {consultation_time}",
             data={
@@ -191,7 +191,7 @@ class NotificationService:
         """Notify user their consultation was accepted"""
         await self.create_notification(
             user_id=user_id,
-            notification_type="consultation_accepted",
+            type="consultation_accepted",
             title="Consultation Accepted",
             message=f"{lawyer_name} accepted your consultation for {consultation_date} at {consultation_time}",
             data={
@@ -210,7 +210,7 @@ class NotificationService:
         """Notify user their consultation was rejected"""
         await self.create_notification(
             user_id=user_id,
-            notification_type="consultation_rejected",
+            type="consultation_rejected",
             title="Consultation Declined",
             message=f"{lawyer_name} declined your consultation request",
             data={"consultation_id": consultation_id}
@@ -225,7 +225,7 @@ class NotificationService:
         """Notify user their consultation was marked complete"""
         await self.create_notification(
             user_id=user_id,
-            notification_type="consultation_completed",
+            type="consultation_completed",
             title="Consultation Completed",
             message=f"{lawyer_name} marked your consultation as completed",
             data={"consultation_id": consultation_id}
@@ -240,7 +240,7 @@ class NotificationService:
         """Notify lawyer that user cancelled consultation"""
         await self.create_notification(
             user_id=lawyer_id,
-            notification_type="consultation_cancelled",
+            type="consultation_cancelled",
             title="Consultation Cancelled",
             message=f"{user_name} cancelled their consultation",
             data={"consultation_id": consultation_id}
@@ -257,7 +257,7 @@ class NotificationService:
         """Notify user of new reply on their post or a post they commented on"""
         await self.create_notification(
             user_id=user_id,
-            notification_type="forum_reply",
+            type="forum_reply",
             title="New Reply",
             message=f"{commenter_name} replied to: {post_title[:50]}{'...' if len(post_title) > 50 else ''}",
             data={
@@ -274,13 +274,13 @@ class NotificationService:
         content_id: str
     ):
         """Notify users of new article or guide"""
-        notification_type = f"{content_type}_published"
+        type = f"{content_type}_published"
         content_label = "Article" if content_type == "article" else "Guide"
         
         for user_id in user_ids:
             await self.create_notification(
                 user_id=user_id,
-                notification_type=notification_type,
+                type=type,
                 title=f"New {content_label} Published",
                 message=f"Check out: {title[:80]}{'...' if len(title) > 80 else ''}",
                 data={
@@ -296,13 +296,13 @@ class NotificationService:
         content_id: str
     ):
         """Notify users of updated article or guide"""
-        notification_type = f"{content_type}_updated"
+        type = f"{content_type}_updated"
         content_label = "Article" if content_type == "article" else "Guide"
         
         for user_id in user_ids:
             await self.create_notification(
                 user_id=user_id,
-                notification_type=notification_type,
+                type=type,
                 title=f"{content_label} Updated",
                 message=f"Updated: {title[:80]}{'...' if len(title) > 80 else ''}",
                 data={

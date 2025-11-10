@@ -21,7 +21,6 @@ export default function SuspendedScreen() {
   // Appeal state
   const [showAppealForm, setShowAppealForm] = useState(false);
   const [appealReason, setAppealReason] = useState('');
-  const [additionalContext, setAdditionalContext] = useState('');
   const [submittingAppeal, setSubmittingAppeal] = useState(false);
   const [existingAppeal, setExistingAppeal] = useState<Appeal | null>(null);
   const [loadingAppeal, setLoadingAppeal] = useState(true);
@@ -122,7 +121,6 @@ export default function SuspendedScreen() {
 
       const appeal = await appealService.submitAppeal(
         appealReason,
-        additionalContext || undefined,
         session.access_token
       );
 
@@ -130,7 +128,7 @@ export default function SuspendedScreen() {
       setShowAppealForm(false);
       setShowAppealModal(false);
       setAppealReason('');
-      setAdditionalContext('');
+      
       
       Alert.alert(
         'Appeal Submitted',
@@ -365,12 +363,7 @@ export default function SuspendedScreen() {
                       <View className="bg-gray-50 p-3 rounded-lg mb-3">
                         <Text className="text-xs text-gray-600 mb-1">Your Appeal:</Text>
                         <Text className="text-sm text-gray-900">{existingAppeal.appeal_reason}</Text>
-                        {existingAppeal.additional_context && (
-                          <>
-                            <Text className="text-xs text-gray-600 mt-2 mb-1">Additional Context:</Text>
-                            <Text className="text-sm text-gray-900">{existingAppeal.additional_context}</Text>
-                          </>
-                        )}
+                        
                       </View>
 
                       {existingAppeal.status === 'rejected' && existingAppeal.rejection_reason && (
@@ -429,23 +422,7 @@ export default function SuspendedScreen() {
                 </Text>
               </View>
 
-              <View className="mb-4">
-                <Text className="text-sm font-medium text-gray-700 mb-2">
-                  Additional Context (Optional)
-                </Text>
-                <TextInput
-                  className="border border-gray-300 rounded-lg p-3 text-sm text-gray-900 min-h-[80px]"
-                  placeholder="Any additional information that may help..."
-                  value={additionalContext}
-                  onChangeText={setAdditionalContext}
-                  multiline
-                  textAlignVertical="top"
-                  maxLength={1000}
-                />
-                <Text className="text-xs text-gray-500 mt-1">
-                  {additionalContext.length}/1000 characters
-                </Text>
-              </View>
+              
 
               <View className="flex-row gap-3">
                 <TouchableOpacity
@@ -467,7 +444,7 @@ export default function SuspendedScreen() {
                     setShowAppealModal(false);
                     setShowAppealForm(false);
                     setAppealReason('');
-                    setAdditionalContext('');
+                    
                   }}
                   disabled={submittingAppeal}
                 >
