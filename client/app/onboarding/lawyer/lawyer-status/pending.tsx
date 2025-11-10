@@ -4,22 +4,13 @@ import { View, ActivityIndicator, Text } from 'react-native';
 import { lawyerApplicationService, LawyerApplicationStatus } from '../../../../services/lawyerApplicationService';
 import StatusScreen from '../../../../components/ui/StatusScreen';
 import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
-import { useStatusPolling } from '../../../../hooks/useStatusPolling';
 
 export default function PendingStatus() {
   const [applicationData, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Enable real-time status polling
-  useStatusPolling({
-    enabled: true,
-    onStatusChange: (newStatus) => {
-      if (newStatus) {
-        setApplicationData(newStatus);
-      }
-    }
-  });
+  // Status polling is handled by LawyerStatusGuard
 
   useEffect(() => {
     loadApplicationStatus();

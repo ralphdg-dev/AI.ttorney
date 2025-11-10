@@ -4,22 +4,13 @@ import { lawyerApplicationService, LawyerApplicationStatus } from '../../../../s
 import StatusScreen from '../../../../components/ui/StatusScreen';
 import { useAuth } from '../../../../contexts/AuthContext';
 import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
-import { useStatusPolling } from '../../../../hooks/useStatusPolling';
 
 export default function AcceptedStatus() {
   const [, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { refreshUserData } = useAuth();
 
-  // Enable real-time status polling
-  useStatusPolling({
-    enabled: true,
-    onStatusChange: (newStatus) => {
-      if (newStatus) {
-        setApplicationData(newStatus);
-      }
-    }
-  });
+  // Status polling is handled by LawyerStatusGuard
 
   useEffect(() => {
     loadApplicationStatus();

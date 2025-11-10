@@ -3,20 +3,11 @@ import { router } from 'expo-router';
 import { lawyerApplicationService, LawyerApplicationStatus } from '../../../../services/lawyerApplicationService';
 import StatusScreen from '../../../../components/ui/StatusScreen';
 import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
-import { useStatusPolling } from '../../../../hooks/useStatusPolling';
 
 export default function Resubmission() {
   const [, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
 
-  // Enable real-time status polling
-  useStatusPolling({
-    enabled: true,
-    onStatusChange: (newStatus) => {
-      if (newStatus) {
-        setApplicationData(newStatus);
-      }
-    }
-  });
+  // Status polling is handled by LawyerStatusGuard
 
   useEffect(() => {
     loadApplicationStatus();

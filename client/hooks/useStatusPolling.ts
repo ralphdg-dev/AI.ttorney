@@ -74,8 +74,8 @@ export function useStatusPolling({ enabled = true, onStatusChange }: UseStatusPo
       }
     };
 
-    // Start polling every 5 seconds
-    pollingInterval = setInterval(pollStatus, 5000);
+    // Start polling every 60 seconds (1 minute)
+    pollingInterval = setInterval(pollStatus, 60000);
     
     // Initial poll
     pollStatus();
