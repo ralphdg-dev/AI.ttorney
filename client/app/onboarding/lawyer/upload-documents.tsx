@@ -13,6 +13,8 @@ import Colors from '../../../constants/Colors';
 
 export default function LawyerReg() {
   const { user } = useAuth();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [rollNumber, setRollNumber] = useState('');
   const [rollSignDate, setRollSignDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -25,7 +27,7 @@ export default function LawyerReg() {
   const [ibpCard, setIbpCard] = useState<any | null>(null);
   const [ibpCardPath, setIbpCardPath] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
-  const isComplete = Boolean(rollNumber.trim() && rollSignDate && ibpCard);
+  const isComplete = Boolean(firstName.trim() && lastName.trim() && rollNumber.trim() && rollSignDate && ibpCard);
   const today = new Date();
 
   const handleBrowseFiles = async () => {
@@ -273,9 +275,62 @@ export default function LawyerReg() {
         </View>
 
         {/* Heading */}
-        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 18, marginTop: 8 }}>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 8, marginTop: 8 }}>
           Submit Legal Credentials
         </Text>
+
+        {/* Important Notice */}
+        <View style={{ backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', padding: 12, borderRadius: 8, marginBottom: 20 }}>
+          <Text style={{ fontSize: 13, color: '#1E3A8A', lineHeight: 18 }}>
+            <Text style={{ fontWeight: '600' }}>Note:</Text> Information must match your IBP ID and Roll of Attorneys records.
+          </Text>
+        </View>
+
+        {/* First Name */}
+        <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
+          First Name <Text style={{ color: '#ef4444' }}>*</Text>
+        </Text>
+        <TextInput
+          style={{
+            width: '100%',
+            borderWidth: 1,
+            borderColor: '#e5e7eb',
+            borderRadius: 8,
+            padding: 12,
+            fontSize: 16,
+            backgroundColor: '#fafbfc',
+            color: '#111827',
+            marginBottom: 12,
+          }}
+          placeholder="Enter First Name"
+          placeholderTextColor="#9ca3af"
+          value={firstName}
+          onChangeText={setFirstName}
+          autoCapitalize="words"
+        />
+
+        {/* Last Name */}
+        <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
+          Last Name <Text style={{ color: '#ef4444' }}>*</Text>
+        </Text>
+        <TextInput
+          style={{
+            width: '100%',
+            borderWidth: 1,
+            borderColor: '#e5e7eb',
+            borderRadius: 8,
+            padding: 12,
+            fontSize: 16,
+            backgroundColor: '#fafbfc',
+            color: '#111827',
+            marginBottom: 12,
+          }}
+          placeholder="Enter Last Name"
+          placeholderTextColor="#9ca3af"
+          value={lastName}
+          onChangeText={setLastName}
+          autoCapitalize="words"
+        />
 
         {/* Roll Number */}
         <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
@@ -693,17 +748,23 @@ export default function LawyerReg() {
 
       {/* Sticky footer next */}
       <StickyFooterButton
-        title={isUploading ? "Uploading..." : "Next"}
-        disabled={!isComplete || isUploading}
-        bottomOffset={16}
+        title="Continue"
+        disabled={!isComplete}
+        bottomOffset={0}
         onPress={async () => {
-          // Store form data in AsyncStorage for later submission
-          await AsyncStorage.setItem('lawyer_roll_number', rollNumber);
-          await AsyncStorage.setItem('lawyer_roll_sign_date', rollSignDate ? rollSignDate.toISOString() : '');
-          await AsyncStorage.setItem('lawyer_full_name', user?.full_name || '');
-          await AsyncStorage.setItem('lawyer_ibp_card_path', ibpCardPath);
+          if (!firstName || !lastName || !rollNumber || !rollSignDate) {
+            Alert.alert('Missing Information', 'Please fill in all required fields.');
+            return;
+          }
+          // Combine first and last name
+          const fullName = `${firstName.trim()} ${lastName.trim()}`;
           
-          router.push('./lawyer-face-verification');
+          // Store data in AsyncStorage
+          await AsyncStorage.setItem('lawyer_roll_number', rollNumber);
+          await AsyncStorage.setItem('lawyer_roll_sign_date', rollSignDate.toISOString());
+          await AsyncStorage.setItem('lawyer_full_name', fullName);
+          await AsyncStorage.setItem('lawyer_ibp_card_path', ibpCardPath);
+          router.push('/onboarding/lawyer/lawyer-face-verification');
         }}
       />
     </SafeAreaView>

@@ -18,7 +18,8 @@ import {
   Calendar,
   User,
   X,
-  Bell
+  Bell,
+  Briefcase
 } from "lucide-react-native";
 import Colors from "../constants/Colors";
 import { GlobalStyles } from "../constants/GlobalStyles";
@@ -232,17 +233,18 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: View,
       divider: true,
     },
+    // Apply to be a Lawyer - Only for regular users
+    ...(!isLawyer ? [{
+      id: "apply-lawyer",
+      label: "Apply to be a Lawyer",
+      icon: Briefcase,
+      route: "apply-lawyer",
+    }] : []),
     {
       id: "help",
       label: "Help & Support",
       icon: HelpCircle,
       route: "help",
-    },
-    {
-      id: "feedback",
-      label: "Send Feedback",
-      icon: MessageSquare,
-      route: "feedback",
     },
     {
       id: "about",
@@ -409,7 +411,7 @@ export const SidebarWrapper: React.FC<{
   const { user } = useAuth();
 
   // Memoize navigation handler to prevent recreation on every render
-  const handleNavigate = useCallback((route: string) => {
+  const handleNavigate = useCallback(async (route: string) => {
     console.log(`Navigate to ${route}`);
 
     switch (route) {
@@ -439,6 +441,42 @@ export const SidebarWrapper: React.FC<{
         break;
       case "about":
         router.push("/about");
+        break;
+      case "apply-lawyer":
+        // Check if user already has a pending application
+        try {
+          const { lawyerApplicationService } = await import('../services/lawyerApplicationService');
+          console.log('Checking application status...');
+          const status = await lawyerApplicationService.getApplicationStatus();
+          console.log('Application status:', status);
+          
+          if (status?.has_application && status.application) {
+            // Redirect to appropriate status page based on application status
+            const appStatus = status.application.status;
+            console.log('User has existing application with status:', appStatus);
+            
+            if (appStatus === 'pending') {
+              router.push('/onboarding/lawyer/lawyer-status/pending');
+            } else if (appStatus === 'accepted') {
+              router.push('/onboarding/lawyer/lawyer-status/accepted');
+            } else if (appStatus === 'rejected') {
+              router.push('/onboarding/lawyer/lawyer-status/rejected');
+            } else if (appStatus === 'resubmission') {
+              router.push('/onboarding/lawyer/lawyer-status/resubmission');
+            } else {
+              // Default to upload documents if status is unknown
+              router.push("/onboarding/lawyer/upload-documents");
+            }
+          } else {
+            // No existing application, proceed to upload documents
+            console.log('No existing application found, proceeding to upload documents');
+            router.push("/onboarding/lawyer/upload-documents");
+          }
+        } catch (error) {
+          console.error('Error checking application status:', error);
+          // On error, default to upload documents
+          router.push("/onboarding/lawyer/upload-documents");
+        }
         break;
       case "profile":
         console.log("Profile page not implemented yet");

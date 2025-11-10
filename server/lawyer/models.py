@@ -15,21 +15,19 @@ class LawyerApplicationSubmit(BaseModel):
     
     @validator('full_name')
     def validate_full_name(cls, v):
-        if not v or len(v.strip()) < 2:
-            raise ValueError('Full name must be at least 2 characters long')
+        if not v or len(v.strip()) < 1:
+            raise ValueError('Full name must be at least 1 character long')
         return v.strip()
     
     @validator('ibp_id')
     def validate_ibp_id(cls, v):
         # Allow empty string for cases where upload failed
-        if v and len(v.strip()) < 3:
-            raise ValueError('IBP ID must be at least 3 characters long')
         return v.strip() if v else ''
     
     @validator('roll_number')
     def validate_roll_number(cls, v):
-        if not v or len(v.strip()) < 3:
-            raise ValueError('Roll number must be at least 3 characters long')
+        if not v or len(v.strip()) < 1:
+            raise ValueError('Roll number must be at least 1 character long')
         return v.strip()
     
     @validator('selfie')

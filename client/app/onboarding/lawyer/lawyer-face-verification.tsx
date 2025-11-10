@@ -35,7 +35,7 @@ export default function LawyerFaceVerification() {
       // Set preview immediately for better UX
       setSelfie({ uri: a.uri, name: a.fileName || 'selfie.jpg', size: a.fileSize });
       
-      // Upload selfie to backend
+      // Upload selfie to backend immediately (like IBP card)
       setIsUploading(true);
       try {
         let uploadResult;
@@ -53,15 +53,18 @@ export default function LawyerFaceVerification() {
           });
         }
         
+        console.log('Selfie upload result:', uploadResult);
         
         if (uploadResult.success && uploadResult.file_path) {
           setSelfiePath(uploadResult.file_path);
         } else {
-          // Keep the preview but show warning - don't remove the image
+          // Keep the preview but show warning
+          console.warn('Selfie upload failed:', uploadResult.message);
           Alert.alert('Upload Warning', 'Selfie captured but upload failed. You can continue and try again later.');
         }
-      } catch {
-        // Keep the preview but show warning - don't remove the image
+      } catch (error) {
+        // Keep the preview but show warning
+        console.error('Selfie upload error:', error);
         Alert.alert('Upload Warning', 'Selfie captured but upload failed. You can continue and try again later.');
       } finally {
         setIsUploading(false);
@@ -164,7 +167,7 @@ export default function LawyerFaceVerification() {
       <StickyFooterButton
         title={isUploading ? "Uploading..." : "Next"}
         disabled={!selfie || isUploading}
-        bottomOffset={16}
+        bottomOffset={0}
         onPress={async () => {
           // Store selfie path for later submission
           await AsyncStorage.setItem('lawyer_selfie_path', selfiePath);

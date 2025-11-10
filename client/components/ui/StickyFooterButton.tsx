@@ -31,6 +31,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: '#FFFFFF',
+    paddingBottom: 8,
   },
   divider: {
     height: 1,
@@ -40,7 +41,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginTop: 12,
     paddingBottom: Platform.OS === 'ios' ? 8 : 8,
-    // Compensate for PrimaryButton's mb-3 (approx 12px) so there's no gap/line below
-    marginBottom: -12,
+    backgroundColor: '#FFFFFF',
   },
 });

@@ -85,6 +85,15 @@ class LawyerApplicationService {
 
   private async getAuthToken(): Promise<string | null> {
     try {
+      // Try to get token from Supabase session first
+      const { supabase } = await import('../config/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.access_token) {
+        return session.access_token;
+      }
+      
+      // Fallback to AsyncStorage for backward compatibility
       const token = await AsyncStorage.getItem('access_token');
       return token;
     } catch (error) {
