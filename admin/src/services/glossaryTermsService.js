@@ -1,20 +1,121 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || "http://localhost:5001/api";
+
+// Enhanced service functions for glossaryTermsService.js
+
+const createAuditLog = async (termId, action, metadata = {}) => {
+  try {
+    const token = localStorage.getItem("admin_token");
+    const response = await fetch(
+      "http://localhost:5001/api/glossary-terms/audit-log",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action,
+          target_id: termId,
+          metadata,
+        }),
+      }
+    );
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error creating audit log:", error);
+    throw error;
+  }
+};
+
+const logViewAction = async (termId) => {
+  try {
+    const token = localStorage.getItem("admin_token");
+    const response = await fetch(
+      `http://localhost:5001/api/glossary-terms/${termId}/view`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error logging view action:", error);
+    throw error;
+  }
+};
+
+const getTermAuditLogs = async (termId, page = 1, limit = 50) => {
+  try {
+    const token = localStorage.getItem("admin_token");
+    const response = await fetch(
+      `http://localhost:5001/api/glossary-terms/${termId}/audit-logs?page=${page}&limit=${limit}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error fetching term audit logs:", error);
+    throw error;
+  }
+};
+
+const getTermRecentActivity = async (termId, page = 1, limit = 50) => {
+  try {
+    const token = localStorage.getItem("admin_token");
+    const response = await fetch(
+      `http://localhost:5001/api/glossary-terms/${termId}/recent-activity?page=${page}&limit=${limit}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error fetching term recent activity:", error);
+    throw error;
+  }
+};
+
+// Export the enhanced functions
+export {
+  createAuditLog,
+  logViewAction,
+  getTermAuditLogs,
+  getTermRecentActivity,
+};
 
 const glossaryTermsService = {
   getAuthHeader() {
-    const token = localStorage.getItem('admin_token');
+    const token = localStorage.getItem("admin_token");
     return token ? { Authorization: `Bearer ${token}` } : {};
   },
 
   // Get all glossary terms with filtering and pagination
   async getGlossaryTerms(params = {}) {
     try {
-      const { 
-        page = 1, 
-        limit = 50, 
-        search = '', 
-        category = 'all',
-        status = 'all'
+      const {
+        page = 1,
+        limit = 50,
+        search = "",
+        category = "all",
+        status = "all",
       } = params;
 
       const queryParams = new URLSearchParams({
@@ -22,16 +123,19 @@ const glossaryTermsService = {
         limit: limit.toString(),
         search,
         category,
-        status
+        status,
       });
 
-      const response = await fetch(`${API_BASE_URL}/glossary-terms?${queryParams}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...glossaryTermsService.getAuthHeader()
+      const response = await fetch(
+        `${API_BASE_URL}/glossary-terms?${queryParams}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...glossaryTermsService.getAuthHeader(),
+          },
         }
-      });
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -39,7 +143,7 @@ const glossaryTermsService = {
 
       return await response.json();
     } catch (error) {
-      console.error('Failed to fetch glossary terms:', error);
+      console.error("Failed to fetch glossary terms:", error);
       throw error;
     }
   },
@@ -48,11 +152,11 @@ const glossaryTermsService = {
   async getGlossaryTerm(id) {
     try {
       const response = await fetch(`${API_BASE_URL}/glossary-terms/${id}`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
-          ...glossaryTermsService.getAuthHeader()
-        }
+          "Content-Type": "application/json",
+          ...glossaryTermsService.getAuthHeader(),
+        },
       });
 
       if (!response.ok) {
@@ -61,7 +165,7 @@ const glossaryTermsService = {
 
       return await response.json();
     } catch (error) {
-      console.error('Failed to fetch glossary term:', error);
+      console.error("Failed to fetch glossary term:", error);
       throw error;
     }
   },
@@ -70,12 +174,12 @@ const glossaryTermsService = {
   async createGlossaryTerm(termData) {
     try {
       const response = await fetch(`${API_BASE_URL}/glossary-terms`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          ...glossaryTermsService.getAuthHeader()
+          "Content-Type": "application/json",
+          ...glossaryTermsService.getAuthHeader(),
         },
-        body: JSON.stringify(termData)
+        body: JSON.stringify(termData),
       });
 
       if (!response.ok) {
@@ -84,7 +188,7 @@ const glossaryTermsService = {
 
       return await response.json();
     } catch (error) {
-      console.error('Failed to create glossary term:', error);
+      console.error("Failed to create glossary term:", error);
       throw error;
     }
   },
@@ -93,22 +197,24 @@ const glossaryTermsService = {
   async bulkCreateGlossaryTerms(termsArray) {
     try {
       const response = await fetch(`${API_BASE_URL}/glossary-terms/bulk`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          ...glossaryTermsService.getAuthHeader()
+          "Content-Type": "application/json",
+          ...glossaryTermsService.getAuthHeader(),
         },
-        body: JSON.stringify({ terms: termsArray })
+        body: JSON.stringify({ terms: termsArray }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        throw new Error(
+          errorData.error || `HTTP error! status: ${response.status}`
+        );
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Failed to bulk create glossary terms:', error);
+      console.error("Failed to bulk create glossary terms:", error);
       throw error;
     }
   },
@@ -117,12 +223,12 @@ const glossaryTermsService = {
   async updateGlossaryTerm(id, termData) {
     try {
       const response = await fetch(`${API_BASE_URL}/glossary-terms/${id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
-          ...glossaryTermsService.getAuthHeader()
+          "Content-Type": "application/json",
+          ...glossaryTermsService.getAuthHeader(),
         },
-        body: JSON.stringify(termData)
+        body: JSON.stringify(termData),
       });
 
       if (!response.ok) {
@@ -131,7 +237,7 @@ const glossaryTermsService = {
 
       return await response.json();
     } catch (error) {
-      console.error('Failed to update glossary term:', error);
+      console.error("Failed to update glossary term:", error);
       throw error;
     }
   },
@@ -140,11 +246,11 @@ const glossaryTermsService = {
   async deleteGlossaryTerm(id) {
     try {
       const response = await fetch(`${API_BASE_URL}/glossary-terms/${id}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          'Content-Type': 'application/json',
-          ...glossaryTermsService.getAuthHeader()
-        }
+          "Content-Type": "application/json",
+          ...glossaryTermsService.getAuthHeader(),
+        },
       });
 
       if (!response.ok) {
@@ -153,7 +259,7 @@ const glossaryTermsService = {
 
       return await response.json();
     } catch (error) {
-      console.error('Failed to delete glossary term:', error);
+      console.error("Failed to delete glossary term:", error);
       throw error;
     }
   },
@@ -162,36 +268,39 @@ const glossaryTermsService = {
   async createAuditLog(termId, action, metadata = {}) {
     try {
       const auditData = {
-        target_table: 'glossary_terms',
+        target_table: "glossary_terms",
         target_id: termId,
         action: action,
         metadata: {
           ...metadata,
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       };
 
-      const response = await fetch(`${API_BASE_URL}/glossary-terms/${termId}/audit-logs`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...glossaryTermsService.getAuthHeader()
-        },
-        body: JSON.stringify(auditData)
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/glossary-terms/${termId}/audit-logs`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...glossaryTermsService.getAuthHeader(),
+          },
+          body: JSON.stringify(auditData),
+        }
+      );
 
       if (!response.ok) {
         // Don't throw error for audit logging failures, just log them
-        console.warn('Failed to create audit log:', response.status);
+        console.warn("Failed to create audit log:", response.status);
         return null;
       }
 
       return await response.json();
     } catch (error) {
-      console.warn('Failed to create audit log:', error);
+      console.warn("Failed to create audit log:", error);
       return null;
     }
-  }
+  },
 };
 
 export default glossaryTermsService;
