@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
-import { AppealService } from '../services/appealService';
-import { ArrowLeft, FileText, Upload, X, CheckCircle } from 'lucide-react-native';
-import * as DocumentPicker from 'expo-document-picker';
+import { appealService } from '../services/appealService';
+import { ArrowLeft, FileText } from 'lucide-react-native';
 
 const APPEAL_REASONS = [
   { value: 'Content was misclassified', label: 'Content was misclassified by AI' },
@@ -20,9 +19,6 @@ export default function AppealSubmissionScreen() {
   
   const [selectedReason, setSelectedReason] = useState('');
   const [customReason, setCustomReason] = useState('');
-  const [appealMessage, setAppealMessage] = useState('');
-  const [evidenceUrls, setEvidenceUrls] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -38,75 +34,8 @@ export default function AppealSubmissionScreen() {
       newErrors.reason = 'Reason must not exceed 200 characters';
     }
 
-    if (!appealMessage || appealMessage.trim().length < 50) {
-      newErrors.message = 'Message must be at least 50 characters';
-    }
-    if (appealMessage.trim().length > 2000) {
-      newErrors.message = 'Message must not exceed 2000 characters';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
-
-  const handlePickDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/*', 'application/pdf'],
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled) return;
-
-      const file = result.assets[0];
-      
-      // Check file size (5MB limit)
-      if (file.size && file.size > 5 * 1024 * 1024) {
-        Alert.alert('File Too Large', 'Maximum file size is 5MB');
-        return;
-      }
-
-      setUploading(true);
-
-      // Create blob from file
-      const response = await fetch(file.uri);
-      const blob = await response.blob();
-
-      const uploadResult = await AppealService.uploadEvidence(
-        blob,
-        file.name,
-        session
-      );
-
-      if (uploadResult.success && uploadResult.data) {
-        setEvidenceUrls([...evidenceUrls, uploadResult.data.url]);
-        Alert.alert('Success', 'Evidence uploaded successfully');
-      } else {
-        Alert.alert('Upload Failed', uploadResult.error || 'Failed to upload evidence');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to pick or upload document');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleRemoveEvidence = async (index: number, url: string) => {
-    try {
-      // Extract filename from URL
-      const filename = url.split('/').pop() || '';
-      
-      const result = await AppealService.deleteEvidence(filename, session);
-      
-      if (result.success) {
-        const newUrls = evidenceUrls.filter((_, i) => i !== index);
-        setEvidenceUrls(newUrls);
-      } else {
-        Alert.alert('Error', result.error || 'Failed to delete evidence');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to remove evidence');
-    }
   };
 
   const handleSubmit = async () => {
@@ -128,15 +57,13 @@ export default function AppealSubmissionScreen() {
 
               const finalReason = selectedReason === 'Other' ? customReason : selectedReason;
 
-              const result = await AppealService.submitAppeal(
-                suspensionId,
+              const token = (session as any)?.accessToken ?? (session as any)?.access_token ?? '';
+              const result = await appealService.submitAppeal(
                 finalReason.trim(),
-                appealMessage.trim(),
-                evidenceUrls,
-                session
+                token
               );
 
-              if (result.success) {
+              if (result && (result as any).id) {
                 Alert.alert(
                   'Appeal Submitted',
                   'Your appeal has been submitted successfully. You will be notified when it is reviewed.',
@@ -148,7 +75,7 @@ export default function AppealSubmissionScreen() {
                   ]
                 );
               } else {
-                Alert.alert('Submission Failed', result.error || 'Failed to submit appeal');
+                Alert.alert('Submission Failed', 'Failed to submit appeal');
               }
             } catch (error) {
               Alert.alert('Error', 'An unexpected error occurred');
@@ -162,7 +89,7 @@ export default function AppealSubmissionScreen() {
   };
 
   const reasonLength = (selectedReason === 'Other' ? customReason : selectedReason).length;
-  const messageLength = appealMessage.length;
+  const messageLength = 0;
 
   return (
     <ScrollView className="flex-1 bg-gray-50">
@@ -238,79 +165,7 @@ export default function AppealSubmissionScreen() {
           )}
         </View>
 
-        {/* Detailed Message */}
-        <View className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-5">
-          <Text className="text-base font-bold text-gray-900 mb-3">Detailed Explanation *</Text>
-          <Text className="text-gray-600 text-sm mb-3">
-            Explain in detail why you believe this suspension should be reconsidered.
-          </Text>
-          
-          <TextInput
-            value={appealMessage}
-            onChangeText={setAppealMessage}
-            placeholder="Provide a detailed explanation of your situation... (50-2000 characters)"
-            className="bg-gray-50 border border-gray-300 rounded-lg p-4 text-gray-900 min-h-[150px]"
-            maxLength={2000}
-            multiline
-            textAlignVertical="top"
-          />
-          
-          <Text className={`text-xs mt-2 text-right ${
-            messageLength < 50 || messageLength > 2000 ? 'text-red-600' : 'text-gray-500'
-          }`}>
-            {messageLength}/2000 characters {messageLength < 50 && `(minimum 50)`}
-          </Text>
-
-          {errors.message && (
-            <Text className="text-red-600 text-sm mt-2">{errors.message}</Text>
-          )}
-        </View>
-
-        {/* Evidence Upload */}
-        <View className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
-          <Text className="text-base font-bold text-gray-900 mb-2">Supporting Evidence (Optional)</Text>
-          <Text className="text-gray-600 text-sm mb-4">
-            Upload screenshots, documents, or other files that support your appeal. Max 5 files, 5MB each.
-          </Text>
-
-          {evidenceUrls.map((url, index) => (
-            <View key={index} className="flex-row items-center bg-green-50 border border-green-200 rounded-lg p-3 mb-2">
-              <CheckCircle size={20} color="#059669" />
-              <Text className="flex-1 ml-2 text-green-700 text-sm" numberOfLines={1}>
-                Evidence {index + 1} uploaded
-              </Text>
-              <TouchableOpacity onPress={() => handleRemoveEvidence(index, url)}>
-                <X size={20} color="#DC2626" />
-              </TouchableOpacity>
-            </View>
-          ))}
-
-          {evidenceUrls.length < 5 && (
-            <TouchableOpacity
-              onPress={handlePickDocument}
-              disabled={uploading}
-              className={`flex-row items-center justify-center border-2 border-dashed rounded-lg p-4 ${
-                uploading ? 'border-gray-300 bg-gray-50' : 'border-blue-300 bg-blue-50'
-              }`}
-            >
-              {uploading ? (
-                <>
-                  <ActivityIndicator size="small" color="#3B82F6" />
-                  <Text className="ml-2 text-blue-600 font-medium">Uploading...</Text>
-                </>
-              ) : (
-                <>
-                  <Upload size={20} color="#3B82F6" />
-                  <Text className="ml-2 text-blue-600 font-medium">Upload Evidence</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-
-          <Text className="text-xs text-gray-500 mt-2">
-            Accepted formats: Images (JPG, PNG, GIF, WebP) and PDF. Max 5MB per file.
-          </Text>
-        </View>
+        {/* Additional fields removed: Only appeal reason is required */}
 
         {/* Submit Button */}
         <TouchableOpacity

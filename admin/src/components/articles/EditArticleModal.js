@@ -17,6 +17,7 @@ const EditArticleModal = ({ open, onClose, article, onUpdate }) => {
     existingImage: null,
   });
 
+  const [originalData, setOriginalData] = useState({});
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -29,7 +30,7 @@ const EditArticleModal = ({ open, onClose, article, onUpdate }) => {
   // Load article data when modal opens
   useEffect(() => {
     if (open && article) {
-      setFormData({
+      const initialData = {
         enTitle: article.enTitle || "",
         filTitle: article.filTitle || "",
         enDescription: article.enDescription || "",
@@ -41,7 +42,10 @@ const EditArticleModal = ({ open, onClose, article, onUpdate }) => {
           : "",
         image: null,
         existingImage: article.image || null,
-      });
+      };
+
+      setFormData(initialData);
+      setOriginalData(initialData);
       setValidationErrors({});
       setError(null);
       setLoading(false);
@@ -86,10 +90,101 @@ const EditArticleModal = ({ open, onClose, article, onUpdate }) => {
     setShowConfirmation(true);
   };
 
+  // Generate separate audit logs for each field change
+  const getAuditLogs = () => {
+    const auditLogs = [];
+
+    if (formData.enTitle !== originalData.enTitle) {
+      auditLogs.push({
+        action: `Edited English Title from "${originalData.enTitle}" to "${formData.enTitle}"`,
+        metadata: {
+          previous_title: originalData.enTitle,
+          new_title: formData.enTitle,
+        },
+      });
+    }
+
+    if (formData.filTitle !== originalData.filTitle) {
+      auditLogs.push({
+        action: `Edited Filipino Title from "${originalData.filTitle}" to "${formData.filTitle}"`,
+        metadata: {
+          previous_title: originalData.filTitle,
+          new_title: formData.filTitle,
+        },
+      });
+    }
+
+    if (formData.enDescription !== originalData.enDescription) {
+      auditLogs.push({
+        action: `Edited English Description from "${originalData.enDescription}" to "${formData.enDescription}"`,
+        metadata: {
+          previous_description: originalData.enDescription,
+          new_description: formData.enDescription,
+        },
+      });
+    }
+
+    if (formData.filDescription !== originalData.filDescription) {
+      auditLogs.push({
+        action: `Edited Filipino Description from "${originalData.filDescription}" to "${formData.filDescription}"`,
+        metadata: {
+          previous_description: originalData.filDescription,
+          new_description: formData.filDescription,
+        },
+      });
+    }
+
+    if (formData.content_en !== originalData.content_en) {
+      auditLogs.push({
+        action: `Edited English Content from "${originalData.content_en}" to "${formData.content_en}"`,
+        metadata: {
+          content_updated: true,
+        },
+      });
+    }
+
+    if (formData.content_fil !== originalData.content_fil) {
+      auditLogs.push({
+        action: `Edited Filipino Content from "${originalData.content_fil}" to "${formData.content_fil}"`,
+        metadata: {
+          content_updated: true,
+        },
+      });
+    }
+
+    if (formData.category !== originalData.category) {
+      auditLogs.push({
+        action: `Changed category from "${originalData.category}" to "${formData.category}"`,
+        metadata: {
+          previous_category: originalData.category,
+          new_category: formData.category,
+        },
+      });
+    }
+
+    if (formData.image) {
+      auditLogs.push({
+        action: "Updated image",
+        metadata: {
+          image_updated: true,
+        },
+      });
+    }
+
+    return auditLogs;
+  };
+
   const handleConfirmUpdate = async () => {
     try {
       setConfirmationLoading(true);
       setError(null);
+
+      const token = localStorage.getItem("admin_token");
+      if (!token) {
+        throw new Error("Admin authentication required");
+      }
+
+      const auditLogs = getAuditLogs();
 
       const data = new FormData();
       data.append("title_en", formData.enTitle);
@@ -99,12 +194,17 @@ const EditArticleModal = ({ open, onClose, article, onUpdate }) => {
       data.append("content_en", formData.content_en);
       data.append("content_fil", formData.content_fil);
       data.append("category", formData.category.toLowerCase());
+      data.append("audit_logs", JSON.stringify(auditLogs));
+
       if (formData.image) data.append("image", formData.image);
 
       const res = await fetch(
         `http://localhost:5001/api/legal-articles/${article.id}`,
         {
           method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           body: data,
         }
       );
@@ -166,7 +266,10 @@ const EditArticleModal = ({ open, onClose, article, onUpdate }) => {
           "fil"
         );
       } else if (!formData.content_en && formData.content_fil) {
-        newFormData.content_en = await translateText(formData.content_fil, "en");
+        newFormData.content_en = await translateText(
+          formData.content_fil,
+          "en"
+        );
       }
 
       setFormData(newFormData);
@@ -179,7 +282,12 @@ const EditArticleModal = ({ open, onClose, article, onUpdate }) => {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Edit Legal Article" width="max-w-2xl">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Edit Legal Article"
+      width="max-w-2xl"
+    >
       <form onSubmit={handleSubmit} className="space-y-3">
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-md p-2">
@@ -194,7 +302,9 @@ const EditArticleModal = ({ open, onClose, article, onUpdate }) => {
           </label>
           <Select
             value={formData.category}
-            onChange={(value) => setFormData((prev) => ({ ...prev, category: value }))}
+            onChange={(value) =>
+              setFormData((prev) => ({ ...prev, category: value }))
+            }
             options={categoryOptions}
             variant="form"
             error={!!validationErrors.category}
@@ -202,7 +312,9 @@ const EditArticleModal = ({ open, onClose, article, onUpdate }) => {
             placeholder="Select article category"
           />
           {validationErrors.category && (
-            <p className="mt-0.5 text-[10px] text-red-600">{validationErrors.category}</p>
+            <p className="mt-0.5 text-[10px] text-red-600">
+              {validationErrors.category}
+            </p>
           )}
         </div>
 
@@ -250,7 +362,9 @@ const EditArticleModal = ({ open, onClose, article, onUpdate }) => {
               onChange={handleChange}
               rows={2}
               className={`w-full px-2 py-1.5 border rounded-md text-xs resize-none focus:ring-1 focus:ring-[#023D7B] ${
-                validationErrors.enDescription ? "border-red-300" : "border-gray-300"
+                validationErrors.enDescription
+                  ? "border-red-300"
+                  : "border-gray-300"
               }`}
               placeholder="Enter short English description"
             />
@@ -265,7 +379,9 @@ const EditArticleModal = ({ open, onClose, article, onUpdate }) => {
               onChange={handleChange}
               rows={2}
               className={`w-full px-2 py-1.5 border rounded-md text-xs resize-none focus:ring-1 focus:ring-[#023D7B] ${
-                validationErrors.filDescription ? "border-red-300" : "border-gray-300"
+                validationErrors.filDescription
+                  ? "border-red-300"
+                  : "border-gray-300"
               }`}
               placeholder="Enter short Filipino description"
             />
@@ -307,7 +423,9 @@ const EditArticleModal = ({ open, onClose, article, onUpdate }) => {
               onChange={handleChange}
               rows={4}
               className={`w-full px-2 py-1.5 border rounded-md text-xs resize-none focus:ring-1 focus:ring-[#023D7B] ${
-                validationErrors.content_en ? "border-red-300" : "border-gray-300"
+                validationErrors.content_en
+                  ? "border-red-300"
+                  : "border-gray-300"
               }`}
               placeholder="Enter English content"
             />
@@ -322,7 +440,9 @@ const EditArticleModal = ({ open, onClose, article, onUpdate }) => {
               onChange={handleChange}
               rows={4}
               className={`w-full px-2 py-1.5 border rounded-md text-xs resize-none focus:ring-1 focus:ring-[#023D7B] ${
-                validationErrors.content_fil ? "border-red-300" : "border-gray-300"
+                validationErrors.content_fil
+                  ? "border-red-300"
+                  : "border-gray-300"
               }`}
               placeholder="Enter Filipino content"
             />

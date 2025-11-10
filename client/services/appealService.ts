@@ -11,7 +11,6 @@ export interface Appeal {
   user_id: string;
   suspension_id: string;
   appeal_reason: string;
-  additional_context?: string;
   status: 'pending' | 'under_review' | 'approved' | 'rejected';
   reviewed_by?: string;
   reviewed_at?: string;
@@ -29,7 +28,6 @@ export interface AppealWithDetails extends Appeal {
 
 export interface SubmitAppealRequest {
   appeal_reason: string;
-  additional_context?: string;
 }
 
 export interface AppealsListResponse {
@@ -44,7 +42,6 @@ class AppealService {
    */
   async submitAppeal(
     appealReason: string,
-    additionalContext: string | undefined,
     accessToken: string
   ): Promise<Appeal> {
     const apiUrl = await NetworkConfig.getBestApiUrl();
@@ -56,8 +53,7 @@ class AppealService {
         'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
-        appeal_reason: appealReason,
-        additional_context: additionalContext
+        appeal_reason: appealReason
       })
     });
 

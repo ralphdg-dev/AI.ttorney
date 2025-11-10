@@ -7,6 +7,11 @@ import {
   Archive,
   Upload,
   MoreVertical,
+  History,
+  Activity,
+  Download,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import Tooltip from "../../components/ui/Tooltip";
 import ListToolbar from "../../components/ui/ListToolbar";
@@ -32,6 +37,122 @@ const ManageAppeals = () => {
   const [successModalOpen, setSuccessModalOpen] = React.useState(false);
   const [successMessage, setSuccessMessage] = React.useState("");
   const [successType, setSuccessType] = React.useState("success");
+  const [auditLogs, setAuditLogs] = React.useState([]);
+  const [auditLoading, setAuditLoading] = React.useState(false);
+  const [auditError, setAuditError] = React.useState(null);
+  const [recentActivity, setRecentActivity] = React.useState([]);
+  const [activityLoading, setActivityLoading] = React.useState(false);
+  const [activityError, setActivityError] = React.useState(null);
+
+  // Get current admin info for audit logging
+  const getCurrentAdmin = () => {
+    try {
+      return JSON.parse(localStorage.getItem("admin_user") || "{}");
+    } catch {
+      return { full_name: "Admin", role: "admin" };
+    }
+  };
+
+  // Helper function to create audit log
+  const createAuditLog = async (action, appealId, metadata = {}) => {
+    try {
+      const currentAdmin = getCurrentAdmin();
+      const response = await fetch(
+        "http://localhost:5001/api/appeals-management/audit-log",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
+          },
+          body: JSON.stringify({
+            action,
+            target_id: appealId,
+            metadata: {
+              ...metadata,
+              admin_name: currentAdmin.full_name || "Admin",
+              admin_role: currentAdmin.role || "admin",
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        }
+      );
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Failed to create audit log:", error);
+      // Don't throw error - audit logging failure shouldn't break the main action
+    }
+  };
+
+  // Load appeal audit logs
+  const loadAuditLogs = async (appealId) => {
+    try {
+      setAuditLoading(true);
+      setAuditError(null);
+
+      const response = await fetch(
+        `http://localhost:5001/api/appeals-management/${appealId}/audit-logs`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
+          },
+        }
+      );
+
+      if (response.status === 401) {
+        throw new Error("Unauthorized. Please log in again.");
+      }
+
+      const json = await response.json();
+
+      if (json.success) {
+        setAuditLogs(json.data || []);
+      } else {
+        throw new Error(json.message || "Failed to load audit logs");
+      }
+    } catch (error) {
+      console.error("Failed to load audit logs:", error);
+      setAuditError(error.message);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  // Load recent activity
+  const loadRecentActivity = async (appealId) => {
+    try {
+      setActivityLoading(true);
+      setActivityError(null);
+
+      const response = await fetch(
+        `http://localhost:5001/api/appeals-management/${appealId}/recent-activity`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
+          },
+        }
+      );
+
+      if (response.status === 401) {
+        throw new Error("Unauthorized. Please log in again.");
+      }
+
+      const json = await response.json();
+
+      if (json.success) {
+        setRecentActivity(json.data || []);
+      } else {
+        throw new Error(json.message || "Failed to load recent activity");
+      }
+    } catch (error) {
+      console.error("Failed to load recent activity:", error);
+      setActivityError(error.message);
+    } finally {
+      setActivityLoading(false);
+    }
+  };
 
   // 🔹 Fetch data from Supabase API
   React.useEffect(() => {
@@ -108,6 +229,27 @@ const ManageAppeals = () => {
         );
         setActionModalOpen(false);
 
+        // Log the action for audit trail
+        const appeal = appeals.find((a) => a.id === id);
+        const userName = appeal?.user_full_name || "Unknown User";
+
+        if (newStatus === "approved") {
+          await createAuditLog(`Approved appeal for user "${userName}"`, id, {
+            user_name: userName,
+            appeal_id: id,
+            admin_notes: extraData.admin_notes || null,
+            action_type: "appeal_approved",
+          });
+        } else if (newStatus === "rejected") {
+          await createAuditLog(`Rejected appeal for user "${userName}"`, id, {
+            user_name: userName,
+            appeal_id: id,
+            admin_notes: extraData.admin_notes || null,
+            rejection_reason: extraData.rejection_reason || null,
+            action_type: "appeal_rejected",
+          });
+        }
+
         setSuccessType("success");
         setSuccessMessage(`Appeal ${newStatus} successfully.`);
         setSuccessModalOpen(true);
@@ -124,6 +266,26 @@ const ManageAppeals = () => {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleViewAppeal = (appeal) => {
+    setSelectedAppeal(appeal);
+    setViewModalOpen(true);
+
+    // Log view action
+    createAuditLog(
+      `Viewed appeal from user "${appeal.user_full_name}"`,
+      appeal.id,
+      {
+        user_name: appeal.user_full_name,
+        appeal_id: appeal.id,
+        action_type: "appeal_viewed",
+      }
+    );
+
+    // Load audit data for the modal
+    loadAuditLogs(appeal.id);
+    loadRecentActivity(appeal.id);
   };
 
   const renderDropdown = (row) => {
@@ -145,8 +307,7 @@ const ManageAppeals = () => {
       >
         <button
           onClick={() => {
-            setSelectedAppeal(row);
-            setViewModalOpen(true);
+            handleViewAppeal(row);
             setOpenMenuId(null);
           }}
           className="flex items-center w-full px-3 py-1.5 text-gray-700 hover:bg-gray-50"
@@ -198,7 +359,6 @@ const ManageAppeals = () => {
     { key: "suspension_id", header: "Suspension ID" },
     { key: "suspension_reason", header: "Suspension Reason" },
     { key: "appeal_reason", header: "Appeal Reason" },
-    { key: "additional_context", header: "Additional Context" },
     {
       key: "status",
       header: "Status",
@@ -305,13 +465,12 @@ const ManageAppeals = () => {
                   {columns.map((col) => (
                     <th
                       key={col.key}
-                      className={`px-4 py-2 text-[10px] font-medium text-gray-500 ${
-                        col.align === "center"
+                      className={`px-4 py-2 text-[10px] font-medium text-gray-500 ${col.align === "center"
                           ? "text-center"
                           : col.align === "right"
-                          ? "text-right"
-                          : "text-left"
-                      }`}
+                            ? "text-right"
+                            : "text-left"
+                        }`}
                     >
                       {col.header}
                     </th>
@@ -337,13 +496,12 @@ const ManageAppeals = () => {
                       {columns.map((col) => (
                         <td
                           key={col.key}
-                          className={`px-4 py-2 text-[11px] text-gray-700 ${
-                            col.align === "center"
+                          className={`px-4 py-2 text-[11px] text-gray-700 ${col.align === "center"
                               ? "text-center"
                               : col.align === "right"
-                              ? "text-right"
-                              : ""
-                          }`}
+                                ? "text-right"
+                                : ""
+                            }`}
                         >
                           {col.render
                             ? col.render(row)
@@ -358,10 +516,17 @@ const ManageAppeals = () => {
           </div>
         )}
       </div>
+
       <ViewAppealModal
         open={viewModalOpen}
         onClose={() => setViewModalOpen(false)}
         appeal={selectedAppeal}
+        auditLogs={auditLogs}
+        auditLoading={auditLoading}
+        auditError={auditError}
+        recentActivity={recentActivity}
+        activityLoading={activityLoading}
+        activityError={activityError}
       />
 
       <ActionAppealModal
@@ -387,7 +552,7 @@ const ManageAppeals = () => {
         totalPages={1}
         totalItems={filteredData.length}
         itemsPerPage={10}
-        onPageChange={() => {}}
+        onPageChange={() => { }}
         itemName="appeals"
       />
     </div>

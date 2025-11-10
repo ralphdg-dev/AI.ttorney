@@ -146,7 +146,7 @@ async def resolve_reply_report(
 
                     await notification_service.create_notification(
                         user_id=violating_user_id,
-                        notification_type="violation_warning",
+                        type="violation_warning",
                         title=title,
                         message=message,
                         data={

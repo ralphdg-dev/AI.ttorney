@@ -87,7 +87,14 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
     try {
       setConfirmationLoading(true);
       setError(null);
-      await onSave(formData);
+
+      // Get admin token for authentication
+      const token = localStorage.getItem("admin_token");
+      if (!token) {
+        throw new Error("Admin authentication required");
+      }
+
+      await onSave(formData, token);
       setShowConfirmation(false);
       onClose();
     } catch (err) {
@@ -155,7 +162,6 @@ const AddArticleModal = ({ open, onClose, onSave }) => {
       setTranslating(false);
     }
   };
-  // ------------------------------------------------------
 
   return (
     <Modal
