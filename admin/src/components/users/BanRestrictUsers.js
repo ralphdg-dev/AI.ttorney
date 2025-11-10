@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
-import ReactDOM from "react-dom";
+import React, { useState, useEffect } from "react";
 import Modal from '../ui/Modal';
 import Tooltip from '../ui/Tooltip';
 import { 
@@ -13,14 +12,12 @@ import {
   Ban, 
   AlertTriangle, 
   History,
-  Calendar,
   Minus,
   Shield
 } from "lucide-react";
 import usersService from "../../services/usersService";
 import adminModerationService from "../../services/adminModerationService";
 import DataTable from "../ui/DataTable";
-import Pagination from "../ui/Pagination";
 import ListToolbar from "../ui/ListToolbar";
 
 const BanRestrictUsers = () => {
@@ -32,7 +29,6 @@ const BanRestrictUsers = () => {
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Users");
-  const [riskFilter, setRiskFilter] = useState("all");
   const [sortBy, setSortBy] = useState("Newest");
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -48,7 +44,6 @@ const BanRestrictUsers = () => {
   const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
   const [userViolations, setUserViolations] = useState([]);
   const [userSuspensions, setUserSuspensions] = useState([]);
-  const [loadingDetails, setLoadingDetails] = useState(false);
   const [showViolationModal, setShowViolationModal] = useState(false);
   const [selectedViolation, setSelectedViolation] = useState(null);
 
@@ -71,42 +66,25 @@ const BanRestrictUsers = () => {
     };
   }, [openDropdown]);
 
-  const statusOptions = [
-    { value: "all", label: "All Users" },
-    { value: "active", label: "Active Users" },
-    { value: "suspended", label: "Suspended Users" },
-    { value: "banned", label: "Permanently Banned" },
-  ];
+  // Constants
+  const STATUS_FILTERS = ['All Users', 'Active Users', 'Suspended Users', 'Permanently Banned'];
+  const SORT_OPTIONS = ['Newest', 'Oldest', 'Name A-Z', 'Name Z-A', 'Most Strikes', 'Least Strikes'];
+  const ITEMS_PER_PAGE = 10;
+  const FETCH_LIMIT = 100;
 
-  const riskOptions = [
-    { value: "all", label: "All Risk Levels" },
-    { value: "low", label: "Low Risk" },
-    { value: "medium", label: "Medium Risk" },
-    { value: "high", label: "High Risk" },
-  ];
-
-  const durationOptions = [
-    { value: "permanent", label: "Permanent" },
-    { value: "1_day", label: "1 Day" },
-    { value: "3_days", label: "3 Days" },
-    { value: "1_week", label: "1 Week" },
-    { value: "2_weeks", label: "2 Weeks" },
-    { value: "1_month", label: "1 Month" },
-    { value: "3_months", label: "3 Months" },
-    { value: "6_months", label: "6 Months" },
-    { value: "1_year", label: "1 Year" },
-  ];
-
+  // Fetch users when filters change
   useEffect(() => {
     fetchUsers();
-  }, [searchTerm, statusFilter, riskFilter, sortBy, currentPage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, statusFilter, sortBy, currentPage]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     if (currentPage !== 1) {
       setCurrentPage(1);
     }
-  }, [searchTerm, statusFilter, riskFilter, sortBy]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, statusFilter, sortBy]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -127,10 +105,10 @@ const BanRestrictUsers = () => {
     try {
       setLoading(true);
       
-      // Map status filter values
+      // Map status filter values to database account_status enum
       let apiStatusFilter = "";
       if (statusFilter === "Active" || statusFilter === "Active Users") {
-        apiStatusFilter = ""; // Empty string for all active users
+        apiStatusFilter = "active";
       } else if (statusFilter === "Suspended Users") {
         apiStatusFilter = "suspended";
       } else if (statusFilter === "Permanently Banned") {
@@ -140,37 +118,25 @@ const BanRestrictUsers = () => {
       console.log("Filter mapping:", { statusFilter, apiStatusFilter });
       
       const response = await usersService.getLegalSeekers({
-        page: 1, // Always fetch from page 1 for client-side filtering
-        limit: 100, // Fetch more records for better filtering
+        page: 1,
+        limit: FETCH_LIMIT,
         search: searchTerm,
-        status: "", // Don't filter on server, do it client-side
+        status: apiStatusFilter,
         archived: "active",
       });
 
       let filteredUsers = response.data;
 
-      // Apply client-side status filtering to ensure accuracy
-      if (statusFilter === "Active Users") {
-        filteredUsers = filteredUsers.filter((user) => 
-          user.account_status === "active" || !user.account_status
+      // Apply client-side status filtering based on account_status enum
+      if (statusFilter !== "All Users") {
+        const statusMap = {
+          "Active Users": "active",
+          "Suspended Users": "suspended",
+          "Permanently Banned": "banned"
+        };
+        filteredUsers = filteredUsers.filter(user => 
+          user.account_status === statusMap[statusFilter]
         );
-      } else if (statusFilter === "Suspended Users") {
-        filteredUsers = filteredUsers.filter((user) => 
-          user.account_status === "suspended"
-        );
-      } else if (statusFilter === "Permanently Banned") {
-        filteredUsers = filteredUsers.filter((user) => 
-          user.account_status === "banned"
-        );
-      }
-      // "All Users" shows all users - no filtering needed
-
-      // Apply risk-based filtering
-      if (riskFilter !== "all") {
-        filteredUsers = filteredUsers.filter((user) => {
-          const riskLevel = getUserRiskLevel(user);
-          return riskLevel.level.toLowerCase() === riskFilter;
-        });
       }
 
       // Apply sorting
@@ -251,19 +217,16 @@ const BanRestrictUsers = () => {
 
       // Apply client-side pagination
       const totalFiltered = filteredUsers.length;
-      const startIndex = (currentPage - 1) * 10;
-      const endIndex = startIndex + 10;
+      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+      const endIndex = startIndex + ITEMS_PER_PAGE;
       const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
       
       setUsers(paginatedUsers);
-      
-      // Calculate proper pagination based on filtered results
-      const totalPages = Math.ceil(totalFiltered / 10);
       setPagination({
         page: currentPage,
-        limit: 10,
+        limit: ITEMS_PER_PAGE,
         total: totalFiltered,
-        pages: totalPages
+        pages: Math.ceil(totalFiltered / ITEMS_PER_PAGE)
       });
       setError(null);
     } catch (err) {
@@ -304,6 +267,8 @@ const BanRestrictUsers = () => {
         duration: actionDuration,
       });
 
+      let successMessage = "";
+
       // Call the appropriate API endpoint
       if (actionType === "add_strike" || actionType === "remove_strike") {
         const strikeAction = actionType === "add_strike" ? "add" : "remove";
@@ -312,16 +277,19 @@ const BanRestrictUsers = () => {
           strikeAction,
           actionReason
         );
+        successMessage = actionType === "add_strike" ? "Strike added successfully" : "Strike removed successfully";
       } else if (actionType === "lift_suspension") {
-        await adminModerationService.liftSuspension(
+        const response = await adminModerationService.liftSuspension(
           selectedUser.id,
           actionReason
         );
+        successMessage = response.message || "Suspension lifted. Strikes reset to 0.";
       } else if (actionType === "lift_ban") {
-        await adminModerationService.liftBan(
+        const response = await adminModerationService.liftBan(
           selectedUser.id,
           actionReason
         );
+        successMessage = response.message || "Ban lifted. Strikes reset to 0. Suspension history preserved.";
       } else {
         await usersService.moderateUser(
           selectedUser.id,
@@ -329,10 +297,15 @@ const BanRestrictUsers = () => {
           actionReason,
           actionDuration
         );
+        successMessage = "Action completed successfully";
       }
 
-      // Refresh the users list
+      // Refresh the users list to show updated risk level and strikes
       await fetchUsers();
+
+      // Log the action and risk level update
+      console.log("✅", successMessage);
+      console.log("🔄 User list refreshed - risk levels recalculated based on new strikes/suspensions");
 
       // Close modal and reset state
       setShowActionModal(false);
@@ -367,62 +340,24 @@ const BanRestrictUsers = () => {
 
     const button = event.currentTarget;
     const rect = button.getBoundingClientRect();
-    const dropdownHeight = 280; // Approximate height of dropdown menu
-    const dropdownWidth = 192; // 48 * 4 = 192px (w-48)
+    const dropdownWidth = 192;
     
-    // Check row position in the table
+    // Check row position
     const tableRow = button.closest('tr');
     const tableBody = tableRow?.closest('tbody');
     const allRows = tableBody?.querySelectorAll('tr') || [];
     const rowIndex = Array.from(allRows).indexOf(tableRow);
-    const totalRows = allRows.length;
+    const isBottomRow = rowIndex >= allRows.length - 2;
     
-    // Simple rule: bottom 2 rows go up, rest go down
-    const isBottomTwoRows = rowIndex >= totalRows - 2;
-    
-    // Calculate horizontal space
+    // Calculate positioning
     const spaceLeft = rect.left;
-    const spaceRight = window.innerWidth - rect.right;
+    const useLeftSide = spaceLeft > dropdownWidth + 8;
     
-    let position = {};
-    
-    // Determine horizontal positioning
-    const useLeftSide = spaceLeft > dropdownWidth + 8; // 8px buffer
-    
-    // Simple vertical positioning: bottom 2 rows up, others down
-    const useTopPosition = !isBottomTwoRows;
-    
-    if (useLeftSide) {
-      // Position to the left of button
-      if (useTopPosition) {
-        position = {
-          top: '0',
-          right: '100%',
-          marginRight: '4px'
-        };
-      } else {
-        position = {
-          bottom: '0',
-          right: '100%',
-          marginRight: '4px'
-        };
-      }
-    } else {
-      // Position to the right of button
-      if (useTopPosition) {
-        position = {
-          top: '0',
-          left: '100%',
-          marginLeft: '4px'
-        };
-      } else {
-        position = {
-          bottom: '0',
-          left: '100%',
-          marginLeft: '4px'
-        };
-      }
-    }
+    const position = {
+      [isBottomRow ? 'bottom' : 'top']: '0',
+      [useLeftSide ? 'right' : 'left']: '100%',
+      [useLeftSide ? 'marginRight' : 'marginLeft']: '4px'
+    };
     
     setDropdownPosition(position);
     setOpenDropdown(userId);
@@ -431,12 +366,10 @@ const BanRestrictUsers = () => {
   const openUserDetailsModal = async (user) => {
     setSelectedUser(user);
     setShowUserDetailsModal(true);
-    setLoadingDetails(true);
     setUserViolations([]);
     setUserSuspensions([]);
 
     try {
-      // Fetch user violations and suspensions
       const [violationsResponse, suspensionsResponse] = await Promise.all([
         adminModerationService.getUserViolations(user.id),
         adminModerationService.getUserSuspensions(user.id),
@@ -447,8 +380,6 @@ const BanRestrictUsers = () => {
     } catch (error) {
       console.error("Error fetching user details:", error);
       setError("Failed to load user details");
-    } finally {
-      setLoadingDetails(false);
     }
   };
 
@@ -500,14 +431,23 @@ const BanRestrictUsers = () => {
   };
 
   const getUserRiskLevel = (user) => {
-    // This would be calculated based on user behavior, reports, etc.
-    // For now, we'll simulate based on reject_count
-    if (user.reject_count >= 3) {
+    // Calculate risk based on strike_count, suspension_count, and account_status
+    // This function is called on every render, so risk level updates automatically
+    const strikes = user.strike_count || 0;
+    const suspensions = user.suspension_count || 0;
+    const status = user.account_status;
+    
+    // High risk: Banned users or users with 3 strikes or 2+ suspensions
+    if (status === "banned" || strikes >= 3 || suspensions >= 2) {
       return { level: "High", color: "text-red-600" };
     }
-    if (user.reject_count >= 1) {
+    
+    // Medium risk: Suspended users or users with 1-2 strikes or 1 suspension
+    if (status === "suspended" || strikes >= 1 || suspensions >= 1) {
       return { level: "Medium", color: "text-yellow-600" };
     }
+    
+    // Low risk: Active users with no violations
     return { level: "Low", color: "text-green-600" };
   };
 
@@ -519,13 +459,31 @@ const BanRestrictUsers = () => {
       render: (user) => (
         <div className="flex items-center">
           <div className="flex-shrink-0 h-10 w-10">
-            <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+            {user.profile_photo ? (
+              <img 
+                src={user.profile_photo} 
+                alt={user.full_name || 'User'}
+                className="h-10 w-10 rounded-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <div className={`h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center ${user.profile_photo ? 'hidden' : ''}`}>
               <User className="w-5 h-5 text-gray-600" />
             </div>
           </div>
           <div className="ml-4">
-            <div className="text-sm font-medium text-gray-900">
-              {user.full_name || "No name"}
+            <div className="flex items-center gap-2">
+              <div className="text-sm font-medium text-gray-900">
+                {user.full_name || "No name"}
+              </div>
+              {user.role === 'verified_lawyer' && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                  Lawyer
+                </span>
+              )}
             </div>
             <div className="text-sm text-gray-500">{user.email}</div>
             {user.username && (
@@ -545,6 +503,7 @@ const BanRestrictUsers = () => {
       header: "RISK LEVEL",
       align: "center",
       render: (user) => {
+        // Risk level recalculates on every render based on current user data
         const riskLevel = getUserRiskLevel(user);
         return (
           <div className="text-center">
@@ -560,31 +519,32 @@ const BanRestrictUsers = () => {
       header: "STRIKES",
       align: "center",
       render: (user) => {
-        // Use only strike_count from database (rejections are separate)
         const strikes = user.strike_count || 0;
         const maxStrikes = 3;
 
-        // Use suspension count from database
-        const suspensionCount = user.suspension_count || 0;
-        const isPermanentlyBanned = user.account_status === "banned";
-
-        // Get strike description
-        const getStrikeDescription = (strikeCount) => {
+        // Get strike description with suspension logic
+        const getStrikeDescription = (strikeCount, suspensionCount) => {
+          const suspensions = suspensionCount || 0;
+          
           switch (strikeCount) {
             case 0:
               return `${strikeCount}/3 Strikes — No violations. User is in good standing.`;
             case 1:
-              return `${strikeCount}/3 Strikes — Warning issued for guideline violation.`;
+              return `${strikeCount}/3 Strikes — First warning. 2 more strikes = suspension ${suspensions + 1}.`;
             case 2:
-              return `${strikeCount}/3 Strikes — Second warning. Next violation leads to 7-day suspension.`;
+              if (suspensions >= 2) {
+                return `${strikeCount}/3 Strikes — CRITICAL: Next strike = PERMANENT BAN (already had ${suspensions} suspensions).`;
+              }
+              return `${strikeCount}/3 Strikes — Final warning. Next strike = 7-day suspension ${suspensions + 1}.`;
             case 3:
-              return `${strikeCount}/3 Strikes — User receives 7-day suspension for repeated violations.`;
+              return `${strikeCount}/3 Strikes — User received suspension. Strikes reset after suspension.`;
             default:
-              return `${strikeCount}/3 Strikes — User has multiple violations and may face escalated disciplinary action.`;
+              return `${strikeCount}/3 Strikes — Multiple violations detected.`;
           }
         };
 
-        const tooltipContent = getStrikeDescription(strikes);
+        const tooltipContent = getStrikeDescription(strikes, user.suspension_count);
+
 
         return (
           <Tooltip
@@ -619,23 +579,6 @@ const BanRestrictUsers = () => {
       header: "SUSPENSION STARTS",
       align: "center",
       render: (user) => {
-        // Debug: Log user data for suspended users to see available fields
-        if (user.account_status === "suspended") {
-          console.log('Suspended user data:', {
-            id: user.id,
-            email: user.email,
-            account_status: user.account_status,
-            suspension_end: user.suspension_end,
-            suspension_start: user.suspension_start,
-            suspended_at: user.suspended_at,
-            suspension_started_at: user.suspension_started_at,
-            last_violation_at: user.last_violation_at,
-            created_at: user.created_at,
-            updated_at: user.updated_at,
-            allFields: Object.keys(user)
-          });
-        }
-
         // Check if user is currently suspended
         if (user.account_status !== "suspended") {
           return (
@@ -645,19 +588,16 @@ const BanRestrictUsers = () => {
           );
         }
 
-        // Get suspension start date from user data
-        // Try multiple possible field names for suspension start
-        const suspensionStartDate = user.suspension_start || 
-                                   user.suspended_at || 
-                                   user.suspension_started_at ||
-                                   user.last_violation_at;
+        // Get suspension start date from last_violation_at (when the violation that caused suspension occurred)
+        // Or calculate from suspension_end (7 days before end date)
+        const suspensionStartDate = user.last_violation_at;
         
         if (!suspensionStartDate) {
-          // If no start date available, show when the suspension ends minus 7 days (typical suspension length)
+          // If no start date available, calculate from suspension_end (7-day suspension)
           if (user.suspension_end) {
             const endDate = new Date(user.suspension_end);
             const startDate = new Date(endDate);
-            startDate.setDate(startDate.getDate() - 7); // Assume 7-day suspension
+            startDate.setDate(startDate.getDate() - 7);
             
             return (
               <div className="text-center">
@@ -901,25 +841,14 @@ const BanRestrictUsers = () => {
           onQueryChange={setSearchTerm}
           filter={{ 
             value: statusFilter, 
-            onChange: (value) => {
-              console.log("Filter changed to:", value);
-              setStatusFilter(value);
-            }, 
-            options: [
-              'All Users',
-              'Active Users', 
-              'Suspended Users', 
-              'Permanently Banned'
-            ], 
+            onChange: setStatusFilter, 
+            options: STATUS_FILTERS, 
             label: 'Filter users' 
           }}
           sort={{ 
             value: sortBy, 
-            onChange: (value) => {
-              console.log("Sort changed to:", value);
-              setSortBy(value);
-            }, 
-            options: ['Newest', 'Oldest', 'Name A-Z', 'Name Z-A', 'Most Strikes', 'Least Strikes'], 
+            onChange: setSortBy, 
+            options: SORT_OPTIONS, 
             label: 'Sort by' 
           }}
         />
@@ -1161,8 +1090,8 @@ const BanRestrictUsers = () => {
                         </h4>
                         <p className="text-sm text-green-700 mt-1">
                           {actionType === "lift_suspension"
-                            ? "User will be restored to active status and regain full access to the application."
-                            : "User will be restored to active status and regain full access to the application. All ban records will be cleared."}
+                            ? "User will be restored to active status. Strikes will be reset to 0."
+                            : "User will be restored to active status. Strikes reset to 0. Suspension history is preserved for audit purposes."}
                         </p>
                       </div>
                     </div>
@@ -1285,12 +1214,19 @@ const BanRestrictUsers = () => {
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
                         (selectedUser.suspension_count || 0) === 0 
                           ? 'bg-green-50 text-green-700 border border-green-200'
-                          : (selectedUser.suspension_count || 0) < 3
+                          : (selectedUser.suspension_count || 0) < 2
                           ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                          : (selectedUser.suspension_count || 0) === 2
+                          ? 'bg-orange-50 text-orange-700 border border-orange-200'
                           : 'bg-red-50 text-red-700 border border-red-200'
                       }`}>
-                        {selectedUser.suspension_count || 0} suspensions
+                        {selectedUser.suspension_count || 0} suspension{(selectedUser.suspension_count || 0) !== 1 ? 's' : ''}
                       </span>
+                      {(selectedUser.suspension_count || 0) >= 2 && selectedUser.account_status !== 'banned' && (
+                        <span className="text-[9px] text-red-600 font-medium">
+                          ⚠️ Next = Ban
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -1310,8 +1246,84 @@ const BanRestrictUsers = () => {
                     </div>
                   </div>
                   <div>
-                    <div className="text-[9px] text-gray-500">Last Login</div>
-                    <div className="text-xs text-gray-700">{selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never logged in'}</div>
+                    <div className="text-[9px] text-gray-500">User Role</div>
+                    <div className="text-xs font-medium text-gray-900">
+                      {selectedUser.role ? selectedUser.role.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'N/A'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-gray-500">Account Created</div>
+                    <div className="text-xs text-gray-700">{selectedUser.created_at ? formatDate(selectedUser.created_at) : 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-gray-500">Last Updated</div>
+                    <div className="text-xs text-gray-700">{selectedUser.updated_at ? formatDate(selectedUser.updated_at) : 'N/A'}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Suspension Logic Info */}
+              <div className="border-t border-gray-200 pt-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                  <h4 className="text-xs font-medium text-blue-900 mb-2">📋 Suspension System Logic</h4>
+                  <div className="space-y-1 text-[10px] text-blue-800">
+                    <div className="flex items-start gap-2">
+                      <span className="font-medium min-w-[60px]">Rule 1:</span>
+                      <span>3 strikes = 1 suspension (strikes reset after suspension)</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-medium min-w-[60px]">Rule 2:</span>
+                      <span>First 2 suspensions = 7-day temporary ban</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-medium min-w-[60px]">Rule 3:</span>
+                      <span className="text-red-700 font-medium">3rd suspension = PERMANENT BAN</span>
+                    </div>
+                    <div className="flex items-start gap-2 mt-2 pt-2 border-t border-blue-300">
+                      <span className="font-medium min-w-[60px]">Admin:</span>
+                      <span className="text-green-700 font-medium">Lift Suspension = strikes→0 | Lift Ban = strikes→0 (suspension history preserved)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Moderation Details */}
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Moderation Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <div className="text-[9px] text-gray-500">Last Violation</div>
+                    <div className="text-xs text-gray-700">{selectedUser.last_violation_at ? formatDate(selectedUser.last_violation_at) : 'No violations'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-gray-500">Banned At</div>
+                    <div className="text-xs text-gray-700">{selectedUser.banned_at ? formatDate(selectedUser.banned_at) : 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-gray-500">Ban Reason</div>
+                    <div className="text-xs text-gray-700 truncate" title={selectedUser.banned_reason || 'N/A'}>
+                      {selectedUser.banned_reason || 'N/A'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-gray-500">Suspension Ends</div>
+                    <div className="text-xs text-gray-700">{selectedUser.suspension_end ? formatDate(selectedUser.suspension_end) : 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-gray-500">Auth Provider</div>
+                    <div className="text-xs text-gray-700">{selectedUser.auth_provider || 'email'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-gray-500">Verified Status</div>
+                    <div className="text-xs">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        selectedUser.is_verified 
+                          ? 'bg-green-50 text-green-700 border border-green-200'
+                          : 'bg-gray-50 text-gray-700 border border-gray-200'
+                      }`}>
+                        {selectedUser.is_verified ? 'Verified' : 'Not Verified'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

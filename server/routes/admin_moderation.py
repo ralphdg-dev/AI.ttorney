@@ -570,13 +570,112 @@ async def lift_suspension(
             
             return LiftSuspensionResponse(
                 success=True,
-                message="Suspension lifted successfully"
+                message="Suspension lifted successfully. Strikes reset to 0."
             )
     
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Error lifting suspension: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+
+@router.post("/lift-ban/{user_id}", response_model=LiftSuspensionResponse)
+async def lift_ban(
+    user_id: str,
+    body: LiftSuspensionRequest,
+    current_user: Dict[str, Any] = Depends(require_role("admin"))
+):
+    """
+    Lift a user's permanent ban (admin override).
+    
+    Resets strikes to 0, suspension_count to 0, and account_status to active.
+    This gives the user a fresh start.
+    
+    Requires admin role.
+    """
+    try:
+        admin_id = current_user["user"]["id"]
+        supabase = SupabaseService()
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Check if user is actually banned
+            user_response = await client.get(
+                f"{supabase.rest_url}/users",
+                params={"id": f"eq.{user_id}", "select": "id,account_status,strike_count,suspension_count,banned_at"},
+                headers=supabase._get_headers(use_service_key=True)
+            )
+            
+            if user_response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            
+            users = user_response.json()
+            if not users:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            
+            user = users[0]
+            if user["account_status"] != "banned":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="User is not currently banned"
+                )
+            
+            # Update user status - Reset strikes only, keep suspension history
+            update_response = await client.patch(
+                f"{supabase.rest_url}/users",
+                params={"id": f"eq.{user_id}"},
+                json={
+                    "account_status": "active",
+                    "strike_count": 0,  # Reset strikes
+                    # suspension_count stays - permanent record of past suspensions
+                    "suspension_end": None,
+                    "banned_at": None,
+                    "banned_reason": None
+                },
+                headers=supabase._get_headers(use_service_key=True)
+            )
+            
+            if update_response.status_code not in [200, 204]:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to lift ban"
+                )
+            
+            # Mark all suspensions as lifted
+            suspension_update_response = await client.patch(
+                f"{supabase.rest_url}/user_suspensions",
+                params={"user_id": f"eq.{user_id}", "status": "eq.active"},
+                json={
+                    "status": "lifted",
+                    "lifted_at": datetime.utcnow().isoformat(),
+                    "lifted_by": admin_id,
+                    "lifted_reason": f"Ban lifted by admin: {body.reason}",
+                    "updated_at": datetime.utcnow().isoformat()
+                },
+                headers=supabase._get_headers(use_service_key=True)
+            )
+            
+            logger.info(f"✅ Admin {admin_id[:8]}... lifted PERMANENT BAN for user {user_id[:8]}... (reason: {body.reason})")
+            logger.info(f"🔄 User {user_id[:8]}... reset: strikes=0, status=active (suspension_count preserved)")
+            
+            return LiftSuspensionResponse(
+                success=True,
+                message="Ban lifted successfully. Strikes reset to 0. Suspension history preserved."
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error lifting ban: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
