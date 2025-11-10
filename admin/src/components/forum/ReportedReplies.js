@@ -193,14 +193,14 @@ const ReportedReplies = () => {
             <span className="text-xs text-gray-500">Reply</span>
           </div>
           <p className="text-sm text-gray-900 truncate">
-            {report.reply?.content || "Reply not found or has been deleted"}
+            {report.reply?.reply_body || "Reply not found or has been deleted"}
           </p>
           {report.reply?.user && (
             <p className="text-xs text-gray-500 mt-1">
               by{" "}
               {forumManagementService.formatUserDisplay(
                 report.reply.user,
-                report.reply.is_anonymous
+                false
               )}
             </p>
           )}
@@ -429,7 +429,7 @@ const ReportedReplies = () => {
                     <span className="text-sm font-medium text-gray-600">Reply</span>
                   </div>
                   <p className="text-gray-800">
-                    {selectedReport.reply?.content ||
+                    {selectedReport.reply?.reply_body ||
                       "Reply not found or has been deleted."}
                   </p>
                   {selectedReport.reply && (
@@ -437,7 +437,7 @@ const ReportedReplies = () => {
                       Reply by{" "}
                       {forumManagementService.formatUserDisplay(
                         selectedReport.reply.user,
-                        selectedReport.reply.is_anonymous
+                        false
                       )}
                     </p>
                   )}
@@ -454,13 +454,15 @@ const ReportedReplies = () => {
                     <p className="text-gray-800 text-sm">
                       {selectedReport.reply.post.body}
                     </p>
-                    <p className="text-xs text-gray-500 mt-2 pt-2 border-t">
-                      Original post by{" "}
-                      {forumManagementService.formatUserDisplay(
-                        selectedReport.reply.post.user,
-                        selectedReport.reply.post.is_anonymous
-                      )}
-                    </p>
+                    {selectedReport.reply.post.user && (
+                      <p className="text-xs text-gray-500 mt-2 pt-2 border-t">
+                        Original post by{" "}
+                        {forumManagementService.formatUserDisplay(
+                          selectedReport.reply.post.user,
+                          selectedReport.reply.post.is_anonymous
+                        )}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
