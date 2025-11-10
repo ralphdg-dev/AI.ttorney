@@ -1262,6 +1262,59 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
 
         console.log(`✅ User updated: ${actionTaken}, strikes: ${userUpdate.strike_count}`);
 
+        // Hide the reply
+        const { error: hideError } = await supabaseAdmin
+          .from("forum_replies")
+          .update({ hidden: true })
+          .eq("id", report.reply_id);
+
+        if (hideError) {
+          console.error("Error hiding reply:", hideError);
+        } else {
+          console.log("✅ Reply hidden");
+        }
+
+        // Send notification to violating user
+        try {
+          const notificationMessage = actionTaken === "banned" 
+            ? `Your reply has been removed and your account has been permanently banned for violating community guidelines: ${report.reason}.`
+            : actionTaken === "suspended"
+            ? `Your reply has been removed and your account has been suspended for 7 days for violating community guidelines: ${report.reason}. This is suspension #${newSuspensionCount}.`
+            : `Your reply has been removed for violating community guidelines: ${report.reason}. A strike has been added to your account (${newStrikeCount} total).`;
+
+          const notificationTitle = actionTaken === "banned" 
+            ? "Account Banned" 
+            : actionTaken === "suspended" 
+            ? "Account Suspended" 
+            : "Content Violation Warning";
+
+          const { data: notifData, error: notifError } = await supabaseAdmin
+            .from("notifications")
+            .insert({
+              user_id: report.reply.user_id,
+              type: "violation_warning",
+              title: notificationTitle,
+              message: notificationMessage,
+              data: JSON.stringify({
+                violation_type: report.reason,
+                content_id: report.reply_id,
+                strike_count: newStrikeCount,
+                action_taken: actionTaken,
+              }),
+              read: false,
+            })
+            .select();
+
+          if (notifError) {
+            console.error("❌ Error sending notification:", notifError);
+            throw notifError;
+          }
+          
+          console.log("✅ Notification sent to user:", notifData);
+        } catch (notifError) {
+          console.error("❌ Failed to send notification:", notifError.message || notifError);
+        }
+
         // Create suspension record if needed
         if (actionTaken === "suspended" || actionTaken === "banned") {
           const suspensionData = {

@@ -10,7 +10,7 @@ import { Button, ButtonText } from "@/components/ui/button/";
 import Navbar from "@/components/Navbar";
 import { SidebarWrapper } from "@/components/AppSidebar";
 import Colors from "@/constants/Colors";
-import { Bell, MessageSquare, Calendar, ChevronDown, MoreVertical, Trash2 } from "lucide-react-native";
+import { Bell, MessageSquare, Calendar, ChevronDown, MoreVertical, Trash2, ShieldAlert, AlertTriangle } from "lucide-react-native";
 import DropdownMenu from "@/components/common/DropdownMenu";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,6 +20,8 @@ export default function NotificationsScreen() {
   const { user } = useAuth();
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification, fetchNotifications } = useNotifications();
   const hasFetched = React.useRef(false);
+  const [selectedViolation, setSelectedViolation] = useState<any>(null);
+  const [showViolationModal, setShowViolationModal] = useState(false);
 
   React.useEffect(() => {
     if (!hasFetched.current) {
@@ -50,8 +52,18 @@ export default function NotificationsScreen() {
       return <Calendar size={18} color={color} strokeWidth={1.7} />;
     } else if (type.includes('reply')) {
       return <MessageSquare size={18} color={color} strokeWidth={1.7} />;
+    } else if (type.includes('violation') || type.includes('warning')) {
+      return <ShieldAlert size={18} color="#EF4444" strokeWidth={1.7} />;
     }
     return <Bell size={18} color={color} strokeWidth={1.7} />;
+  };
+
+  const formatViolationType = (type: string) => {
+    return type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  const formatMessage = (message: string) => {
+    return message.replace(/_/g, ' ');
   };
 
   const formatTime = (timestamp: string) => {
@@ -81,6 +93,7 @@ export default function NotificationsScreen() {
     const titleColor = Colors.text.head;
     const subColor = Colors.text.sub;
     const isMenuOpen = activeNotificationMenu === item.id;
+    const isViolation = item.type === 'violation_warning';
 
     return (
       <View style={[tw`rounded-xl mb-3`, { backgroundColor: isUnread ? '#F0F9FF' : '#FFFFFF', padding: 14, borderWidth: 1, borderColor, position: 'relative', zIndex: isMenuOpen ? 100 : 1 }]}>
@@ -88,6 +101,10 @@ export default function NotificationsScreen() {
           onPress={() => {
             if (isUnread) {
               markAsRead(item.id);
+            }
+            if (isViolation && item.data) {
+              setSelectedViolation(item);
+              setShowViolationModal(true);
             }
           }}
         >
@@ -97,7 +114,7 @@ export default function NotificationsScreen() {
             </View>
             <View style={tw`flex-1`}>
               <GSText size="sm" bold style={{ color: titleColor }}>{item.title}</GSText>
-              <GSText size="sm" className="mt-1" style={{ color: Colors.text.head }}>{item.message}</GSText>
+              <GSText size="sm" className="mt-1" style={{ color: Colors.text.head }}>{formatMessage(item.message)}</GSText>
               <HStack className="items-center mt-2">
                 <GSText size="xs" style={{ color: subColor }}>{formatTime(item.created_at)}</GSText>
                 {isUnread && (
@@ -226,6 +243,79 @@ export default function NotificationsScreen() {
         <Navbar />
       )}
       <SidebarWrapper />
+
+      {/* Violation Details Modal */}
+      {showViolationModal && selectedViolation && (
+        <Pressable
+          onPress={() => setShowViolationModal(false)}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 16,
+              padding: 24,
+              width: '90%',
+              maxWidth: 500,
+              maxHeight: '80%',
+            }}
+          >
+            <HStack className="items-center mb-4">
+              <ShieldAlert size={24} color="#EF4444" strokeWidth={1.7} />
+              <GSText size="lg" bold className="ml-2" style={{ color: Colors.text.head }}>
+                {selectedViolation.title}
+              </GSText>
+            </HStack>
+
+            <View style={{ marginBottom: 16 }}>
+              <GSText size="sm" bold style={{ color: Colors.text.sub, marginBottom: 8 }}>Violation Type</GSText>
+              <GSText size="sm" style={{ color: Colors.text.head }}>
+                {selectedViolation.data?.violation_type ? formatViolationType(selectedViolation.data.violation_type) : 'N/A'}
+              </GSText>
+            </View>
+
+            <View style={{ marginBottom: 16 }}>
+              <GSText size="sm" bold style={{ color: Colors.text.sub, marginBottom: 8 }}>Action Taken</GSText>
+              <GSText size="sm" style={{ color: Colors.text.head }}>
+                {selectedViolation.data?.action_taken ? formatViolationType(selectedViolation.data.action_taken) : 'N/A'}
+              </GSText>
+            </View>
+
+            <View style={{ marginBottom: 16 }}>
+              <GSText size="sm" bold style={{ color: Colors.text.sub, marginBottom: 8 }}>Strike Count</GSText>
+              <GSText size="sm" style={{ color: Colors.text.head }}>
+                {selectedViolation.data?.strike_count || 0} total strikes
+              </GSText>
+            </View>
+
+            <View style={{ marginBottom: 20 }}>
+              <GSText size="sm" bold style={{ color: Colors.text.sub, marginBottom: 8 }}>Message</GSText>
+              <GSText size="sm" style={{ color: Colors.text.head }}>
+                {formatMessage(selectedViolation.message)}
+              </GSText>
+            </View>
+
+            <Button
+              size="md"
+              onPress={() => setShowViolationModal(false)}
+              style={{ backgroundColor: Colors.primary.blue }}
+            >
+              <ButtonText>Close</ButtonText>
+            </Button>
+          </Pressable>
+        </Pressable>
+      )}
     </SafeAreaView>
   );
 }
