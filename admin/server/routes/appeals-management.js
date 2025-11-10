@@ -18,7 +18,13 @@ router.get("/", async (req, res) => {
 
     const { data: appeals, error: appealsError } = await supabaseAdmin
       .from("suspension_appeals")
-      .select("id,user_id,suspension_id,appeal_reason,status,reviewed_by,reviewed_at,rejection_reason,created_at,updated_at")
+      .select(
+        `
+        id,user_id,suspension_id,appeal_reason,status,reviewed_by,reviewed_at,rejection_reason,admin_notes,created_at,updated_at,
+        users ( id, full_name ),
+        user_suspensions ( id, reason )
+      `
+      )
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -40,15 +46,29 @@ router.get("/", async (req, res) => {
         .json({ success: false, error: countError.message });
     }
 
-    let formatted = appeals || [];
+    let formatted = (appeals || []).map((a) => ({
+      id: a.id,
+      user_id: a.user_id,
+      suspension_id: a.suspension_id,
+      appeal_reason: a.appeal_reason,
+      status: a.status,
+      reviewed_by: a.reviewed_by || null,
+      reviewed_at: a.reviewed_at,
+      admin_notes: a.admin_notes,
+      rejection_reason: a.rejection_reason,
+      created_at: a.created_at,
+      updated_at: a.updated_at,
+      user_full_name: a.users?.full_name || null,
+      suspension_reason: a.user_suspensions?.reason || null,
+    }));
 
     // 🔹 Filtering
     if (search.trim()) {
       const q = search.toLowerCase();
       formatted = formatted.filter(
         (a) =>
-          Object.values(a).some((v) => String(v).toLowerCase().includes(q)) ||
-          a.user_full_name.toLowerCase().includes(q)
+          Object.values(a).some((v) => String(v ?? "").toLowerCase().includes(q)) ||
+          (a.user_full_name ? a.user_full_name.toLowerCase().includes(q) : false)
       );
     }
 
@@ -90,7 +110,13 @@ router.get("/:id", async (req, res) => {
 
     const { data, error } = await supabaseAdmin
       .from("suspension_appeals")
-      .select("id,user_id,suspension_id,appeal_reason,status,reviewed_by,reviewed_at,rejection_reason,created_at,updated_at")
+      .select(
+        `
+        id,user_id,suspension_id,appeal_reason,status,reviewed_by,reviewed_at,rejection_reason,admin_notes,created_at,updated_at,
+        users ( id, full_name ),
+        user_suspensions ( id, reason )
+      `
+      )
       .eq("id", id)
       .single();
 
@@ -99,9 +125,24 @@ router.get("/:id", async (req, res) => {
       return res.status(500).json({ success: false, error: error.message });
     }
 
-    // Return raw appeal fields only (no additional context)
+    // Normalize shape for UI expectations
+    const normalized = {
+      id: data.id,
+      user_id: data.user_id,
+      suspension_id: data.suspension_id,
+      appeal_reason: data.appeal_reason,
+      status: data.status,
+      reviewed_by: data.reviewed_by || null,
+      reviewed_at: data.reviewed_at,
+      admin_notes: data.admin_notes,
+      rejection_reason: data.rejection_reason,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      user_full_name: data?.users?.full_name || null,
+      suspension_reason: data?.user_suspensions?.reason || null,
+    };
 
-    res.json({ success: true, data });
+    res.json({ success: true, data: normalized });
   } catch (error) {
     console.error("Error in get appeal by id:", error);
     res.status(500).json({ success: false, error: "Internal server error" });
