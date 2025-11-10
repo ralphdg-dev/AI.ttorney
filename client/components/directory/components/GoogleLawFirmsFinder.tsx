@@ -24,7 +24,7 @@ import {
   Star, 
   Locate, 
   Check
-} from 'lucide-react-native';
+} from "lucide-react-native";
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../../constants/Colors';
 import { NetworkConfig } from '../../../utils/networkConfig';
@@ -86,6 +86,10 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const [allFetchedFirms, setAllFetchedFirms] = useState<LawFirm[]>([]);
   const [searchCenter, setSearchCenter] = useState<{ lat: number; lng: number } | null>(null);
   
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  
   // Client-side filtering with memoization (FAANG pattern - instant, no API calls)
   const filteredLawFirms = useMemo(() => {
     if (!searchCenter || allFetchedFirms.length === 0) {
@@ -103,6 +107,20 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     console.log(`📍 Client-side filter: ${filtered.length}/${allFetchedFirms.length} firms within ${selectedRadius}km`);
     return filtered;
   }, [allFetchedFirms, searchCenter, selectedRadius, lawFirms]);
+  
+  // Paginated firms for display
+  const paginatedFirms = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredLawFirms.slice(startIndex, endIndex);
+  }, [filteredLawFirms, currentPage]);
+  
+  const totalPages = Math.ceil(filteredLawFirms.length / itemsPerPage);
+  
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedRadius, searchCenter]);
   
   // View states - Two dedicated views approach
   const [currentView, setCurrentView] = useState<'list' | 'map'>('list'); // Default to List View
@@ -297,7 +315,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     }
   }, [selectedRadius]);
 
-  // Search by location name using the new endpoint
+  // Search by location name using the new endpoint with pagination support
   const searchByLocationName = useCallback(async (locationName: string) => {
     try {
       setLoading(true);
@@ -312,7 +330,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         },
         body: JSON.stringify({
           location_name: locationName,
-          radius: 50000, // Fixed 50km radius - client-side filtering handles the rest
+          radius: 50000, // Fixed 50km radius - backend now handles pagination
           type: 'law_firm' // Search for law firms and offices
         }),
       });
@@ -352,31 +370,34 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         setRetryCount(0);
         
         // Log detailed search results
-        console.log(`Search Results for ${data.location.formatted_address}:`);
-        console.log(`- Total: ${firms.length} law firms`);
-        console.log(`- Very close (≤2km): ${data.very_close_count || 0}`);
-        console.log(`- Close (2-10km): ${data.close_count || 0}`);
-        console.log(`- Nearby (>10km): ${data.nearby_count || 0}`);
-        console.log(`- Search radius used: ${data.search_radius_km}km`);
-        console.log(`- Message: ${data.message}`);
+        console.log(`✅ Search Results for ${data.location.formatted_address}:`);
+        console.log(`📊 Total fetched: ${firms.length} law firms (backend pagination enabled)`);
+        console.log(`📍 Very close (≤2km): ${data.very_close_count || 0}`);
+        console.log(`📍 Close (2-10km): ${data.close_count || 0}`);
+        console.log(`📍 Nearby (>10km): ${data.nearby_count || 0}`);
+        console.log(`🔍 Search radius used: ${data.search_radius_km}km`);
+        console.log(`💬 ${data.message}`);
       } else if (data.success && data.results.length === 0) {
+        setAllFetchedFirms([]);
         setLawFirms([]);
         setCurrentLocationName(data.location?.formatted_address || locationName);
         console.log(`No law firms found within 50km of ${data.location?.formatted_address || locationName}`);
       } else {
         console.log(`Could not find location: ${locationName}`);
         setError(`Could not find location: ${locationName}. Please try a different search term.`);
+        setAllFetchedFirms([]);
         setLawFirms([]);
       }
     } catch (error) {
       console.error('Error searching by location:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to search for law firms. Please try again.';
       setError(errorMessage);
+      setAllFetchedFirms([]);
       setLawFirms([]);
     } finally {
       setLoading(false);
     }
-  }, []); // Removed selectedRadius - we filter client-side now
+  }, []);
 
   // Optimized prediction selection with session token renewal
   const handlePredictionSelectUpdated = useCallback(async (prediction: AutocompletePrediction) => {
@@ -406,14 +427,26 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       if (status === 'granted') {
         const location = await Location.getCurrentPositionAsync({});
         setUserLocation(location);
-        setCurrentLocationName('your location');
         
-        // Search law firms at user's location using coordinates
-        await searchLawFirmsViaProxy(
-          location.coords.latitude, 
-          location.coords.longitude, 
-          'your location'
-        );
+        // Use reverse geocoding to get location name, then search
+        try {
+          const apiUrl = await NetworkConfig.getBestApiUrl();
+          const geocodeResponse = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${location.coords.latitude},${location.coords.longitude}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`);
+          const geocodeData = await geocodeResponse.json();
+          
+          if (geocodeData.status === 'OK' && geocodeData.results[0]) {
+            const locationName = geocodeData.results[0].formatted_address;
+            setCurrentLocationName(locationName);
+            await searchByLocationName(locationName);
+          } else {
+            setCurrentLocationName('your location');
+            await searchByLocationName('Manila, Philippines');
+          }
+        } catch (error) {
+          console.error('Reverse geocoding error:', error);
+          setCurrentLocationName('your location');
+          await searchByLocationName('Manila, Philippines');
+        }
       } else {
         // Default to Manila using location search
         await searchByLocationName('Manila, Philippines');
@@ -423,7 +456,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       // Default to Manila using location search
       await searchByLocationName('Manila, Philippines');
     }
-  }, [searchByLocationName, searchLawFirmsViaProxy]);
+  }, [searchByLocationName]);
 
   // Initialize WebView dynamically for platform compatibility
   useEffect(() => {
@@ -490,17 +523,27 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
   const handleUseMyLocation = useCallback(async () => {
     if (userLocation) {
-      await searchLawFirmsViaProxy(
-        userLocation.coords.latitude, 
-        userLocation.coords.longitude, 
-        'your location'
-      );
+      // Use reverse geocoding to get location name, then search
+      try {
+        const geocodeResponse = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${userLocation.coords.latitude},${userLocation.coords.longitude}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`);
+        const geocodeData = await geocodeResponse.json();
+        
+        if (geocodeData.status === 'OK' && geocodeData.results[0]) {
+          const locationName = geocodeData.results[0].formatted_address;
+          await searchByLocationName(locationName);
+        } else {
+          await searchByLocationName('Manila, Philippines');
+        }
+      } catch (error) {
+        console.error('Reverse geocoding error:', error);
+        await searchByLocationName('Manila, Philippines');
+      }
       setSearchText('');
       searchTextRef.current = ''; // Keep ref in sync
     } else {
       await requestLocationPermission();
     }
-  }, [userLocation, requestLocationPermission, searchLawFirmsViaProxy]);
+  }, [userLocation, requestLocationPermission, searchByLocationName]);
 
   const handleCallPress = useCallback((phone: string) => {
     if (phone) {
@@ -666,10 +709,10 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     });
   }, [userLocation, calculateDistance]);
 
-  // Memoized sorted law firms for optimal performance
+  // Memoized sorted law firms for optimal performance - use filtered firms
   const sortedLawFirms = useMemo(() => {
-    return sortLawFirmsByQuality(lawFirms);
-  }, [lawFirms, sortLawFirmsByQuality]);
+    return sortLawFirmsByQuality(filteredLawFirms);
+  }, [filteredLawFirms, sortLawFirmsByQuality]);
 
   // Generate sorted map HTML for better marker ordering
   const generateSortedMapHTML = useCallback(() => {
@@ -1437,10 +1480,10 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         </Box>
       )}
 
-      {filteredLawFirms.length > 0 && (
+      {allFetchedFirms.length > 0 && (
         <Box className="px-1 pb-2">
           <Text className="text-sm" style={{ color: Colors.text.sub }}>
-            {filteredLawFirms.length} {filteredLawFirms.length === 1 ? 'law firm' : 'law firms'} found in {currentLocationName}
+            Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredLawFirms.length)} of {filteredLawFirms.length} {filteredLawFirms.length === 1 ? 'law firm' : 'law firms'} within {selectedRadius}km
           </Text>
         </Box>
       )}
@@ -1475,7 +1518,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
             fontWeight: '600',
             color: currentView === 'list' ? 'white' : Colors.text.sub
           }}>
-            List ({lawFirms.length})
+            List ({filteredLawFirms.length})
           </Text>
         </Pressable>
         
@@ -1503,18 +1546,158 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     </Box>
   );
 
+  // Pagination controls component - matching glossary.tsx design
+  const renderPaginationControls = () => {
+    if (totalPages <= 1) return null;
+    
+    const getVisiblePages = () => {
+      if (totalPages <= 5) {
+        return Array.from({ length: totalPages }, (_, i) => i + 1);
+      }
+
+      if (currentPage <= 3) {
+        return [1, 2, 3, 4, "...", totalPages];
+      }
+
+      if (currentPage >= totalPages - 2) {
+        return [1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+      }
+
+      return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
+    };
+
+    const visiblePages = getVisiblePages();
+    
+    return (
+      <Box style={{ 
+        paddingTop: 20,
+        paddingBottom: 100, // Extra space at bottom
+        paddingHorizontal: 20,
+        backgroundColor: '#f9fafb',
+        marginTop: 8,
+      }}>
+        <VStack space="md" className="items-center">
+          <HStack space="xs" className="flex-wrap items-center justify-center" style={{ marginBottom: 12 }}>
+            <Pressable
+              onPress={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              style={{
+                width: 40,
+                height: 40,
+                marginHorizontal: 4,
+                marginVertical: 4,
+                borderRadius: 9999,
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: currentPage === 1 ? '#E5E7EB' : 'white',
+                borderWidth: currentPage === 1 ? 0 : 1,
+                borderColor: '#D1D5DB',
+                opacity: currentPage === 1 ? 0.5 : 1,
+              }}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={18}
+                color={currentPage === 1 ? "#9CA3AF" : Colors.primary.blue}
+              />
+            </Pressable>
+
+            {visiblePages.map((page, index) =>
+              page === "..." ? (
+                <Box 
+                  key={`ellipsis-${index}`} 
+                  style={{
+                    width: 40,
+                    height: 40,
+                    marginHorizontal: 4,
+                    marginVertical: 4,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text className="text-gray-500" style={{ fontSize: 14 }}>...</Text>
+                </Box>
+              ) : (
+                <Pressable
+                  key={page}
+                  onPress={() => setCurrentPage(page as number)}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    marginHorizontal: 4,
+                    marginVertical: 4,
+                    borderRadius: 8,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: currentPage === page ? '#DBEAFE' : 'white',
+                    borderWidth: 1,
+                    borderColor: currentPage === page ? '#93C5FD' : '#D1D5DB',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: currentPage === page ? '700' : '500',
+                      color: currentPage === page ? '#1E40AF' : '#374151',
+                    }}
+                  >
+                    {page}
+                  </Text>
+                </Pressable>
+              )
+            )}
+
+            <Pressable
+              onPress={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              style={{
+                width: 40,
+                height: 40,
+                marginHorizontal: 4,
+                marginVertical: 4,
+                borderRadius: 9999,
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: currentPage === totalPages ? '#E5E7EB' : 'white',
+                borderWidth: currentPage === totalPages ? 0 : 1,
+                borderColor: '#D1D5DB',
+                opacity: currentPage === totalPages ? 0.5 : 1,
+              }}
+            >
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={currentPage === totalPages ? "#9CA3AF" : Colors.primary.blue}
+              />
+            </Pressable>
+          </HStack>
+
+          <Text 
+            style={{ 
+              fontSize: 13,
+              color: '#6B7280',
+            }}
+          >
+            Showing {Math.min(currentPage * itemsPerPage, filteredLawFirms.length)} of {filteredLawFirms.length} results
+          </Text>
+        </VStack>
+      </Box>
+    );
+  };
+
   // Render List View (Full Screen)
   const renderListView = () => (
     <ScrollView 
       className="flex-1" 
       style={{ backgroundColor: '#f9fafb' }}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 20 }}
+      contentContainerStyle={{ paddingBottom: 20, paddingHorizontal: 20 }}
       keyboardShouldPersistTaps="handled"
     >
       {filteredLawFirms.length > 0 ? (
         <VStack space="xs" style={{ paddingTop: 12 }}>
-          {filteredLawFirms.map(renderLawFirmCard)}
+          {paginatedFirms.map(renderLawFirmCard)}
+          {renderPaginationControls()}
         </VStack>
       ) : error ? (
         <Box className="px-4">
@@ -1532,7 +1715,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const renderMapView = () => (
     <Box className="relative flex-1">
       {/* Law Firm Counter - Top Right */}
-      {lawFirms.length > 0 && (
+      {filteredLawFirms.length > 0 && (
         <Box className="absolute top-3 right-3" style={{ zIndex: 1000 }}>
           <Box style={{
             backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -1548,7 +1731,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
               fontWeight: '600',
               color: Colors.text.head
             }}>
-              {lawFirms.length} locations
+              {filteredLawFirms.length} locations
             </Text>
           </Box>
         </Box>

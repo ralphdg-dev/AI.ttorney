@@ -181,6 +181,7 @@ async def search_by_location(request: LocationSearchRequest):
     """
     Industry-grade location-based search with distance optimization
     Uses progressive radius search and precise distance calculations
+    Now returns ALL results within max radius for client-side filtering
     """
     try:
         api_key = os.getenv("GOOGLE_MAPS_API_KEY")
@@ -223,10 +224,11 @@ async def search_by_location(request: LocationSearchRequest):
             location = geocode_data["results"][0]["geometry"]["location"]
             formatted_address = geocode_data["results"][0]["formatted_address"]
             
-            # Progressive radius search strategy with multiple search methods
-            search_radii = [5000, 10000, 20000, 50000]  # 5km, 10km, 20km, 50km
+            # Fixed max radius search - fetch all within 50km for client-side filtering
+            # This ensures consistent results regardless of selected filter
+            max_search_radius = 50000  # 50km - fetch everything within this range
             all_results = []
-            search_radius_used = None
+            search_radius_used = max_search_radius
             
             # Multiple search strategies for comprehensive law firm coverage
             search_strategies = [
@@ -237,54 +239,79 @@ async def search_by_location(request: LocationSearchRequest):
                 {"keyword": "attorney office", "description": "attorney offices"}
             ]
             
-            for radius in search_radii:
-                logger.info(f"Searching within {radius/1000}km radius of {formatted_address}")
+            # Search at max radius to get ALL results for client-side filtering
+            logger.info(f"Searching within {max_search_radius/1000}km radius of {formatted_address}")
+            
+            for strategy in search_strategies:
+                places_url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+                places_params = {
+                    "location": f"{location['lat']},{location['lng']}",
+                    "radius": max_search_radius,
+                    "key": api_key
+                }
                 
-                for strategy in search_strategies:
-                    places_url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-                    places_params = {
-                        "location": f"{location['lat']},{location['lng']}",
-                        "radius": radius,
-                        "key": api_key
-                    }
-                    
-                    # Add either type or keyword parameter
-                    if "type" in strategy:
-                        places_params["type"] = strategy["type"]
-                    else:
-                        places_params["keyword"] = strategy["keyword"]
-                    
-                    logger.info(f"Trying {strategy['description']} search")
-                    places_response = await client.get(places_url, params=places_params)
-                    
-                    if places_response.status_code != 200:
-                        continue  # Try next strategy
-                    
-                    places_data = places_response.json()
-                    
-                    if places_data.get("status") == "OK" and places_data.get("results"):
-                        # Combine results from all strategies, avoiding duplicates
-                        existing_place_ids = {result.get("place_id") for result in all_results}
-                        new_results = [
-                            result for result in places_data["results"] 
-                            if result.get("place_id") not in existing_place_ids
-                        ]
-                        all_results.extend(new_results)
-                        search_radius_used = radius
-                        logger.info(f"Found {len(new_results)} new results from {strategy['description']} (total: {len(all_results)})")
-                    elif places_data.get("status") == "ZERO_RESULTS":
-                        logger.info(f"No results for {strategy['description']} within {radius/1000}km")
-                        continue
-                    else:
-                        logger.warning(f"API error for {strategy['description']} at {radius/1000}km: {places_data.get('status')}")
-                        continue
-                
-                # If we found results at this radius, stop searching larger radii
-                if all_results:
-                    logger.info(f"Found total of {len(all_results)} law firms/offices within {radius/1000}km")
-                    break
+                # Add either type or keyword parameter
+                if "type" in strategy:
+                    places_params["type"] = strategy["type"]
                 else:
-                    logger.info(f"No law firms found within {radius/1000}km, trying larger radius")
+                    places_params["keyword"] = strategy["keyword"]
+                
+                logger.info(f"Trying {strategy['description']} search")
+                places_response = await client.get(places_url, params=places_params)
+                
+                if places_response.status_code != 200:
+                    continue  # Try next strategy
+                
+                places_data = places_response.json()
+                
+                if places_data.get("status") == "OK" and places_data.get("results"):
+                    # Combine results from all strategies, avoiding duplicates
+                    existing_place_ids = {result.get("place_id") for result in all_results}
+                    new_results = [
+                        result for result in places_data["results"] 
+                        if result.get("place_id") not in existing_place_ids
+                    ]
+                    all_results.extend(new_results)
+                    logger.info(f"Found {len(new_results)} new results from {strategy['description']} (total: {len(all_results)})")
+                    
+                    # Handle pagination - Google Places API returns max 20 results per request
+                    # Check if there's a next_page_token for more results
+                    next_page_token = places_data.get("next_page_token")
+                    while next_page_token and len(all_results) < 100:  # Limit to 100 total results
+                        # Wait 2 seconds before requesting next page (Google requirement)
+                        import asyncio
+                        await asyncio.sleep(2)
+                        
+                        next_page_params = {
+                            "pagetoken": next_page_token,
+                            "key": api_key
+                        }
+                        
+                        logger.info(f"Fetching next page of results for {strategy['description']}")
+                        next_page_response = await client.get(places_url, params=next_page_params)
+                        
+                        if next_page_response.status_code == 200:
+                            next_page_data = next_page_response.json()
+                            if next_page_data.get("status") == "OK" and next_page_data.get("results"):
+                                existing_place_ids = {result.get("place_id") for result in all_results}
+                                new_page_results = [
+                                    result for result in next_page_data["results"]
+                                    if result.get("place_id") not in existing_place_ids
+                                ]
+                                all_results.extend(new_page_results)
+                                logger.info(f"Found {len(new_page_results)} more results (total: {len(all_results)})")
+                                next_page_token = next_page_data.get("next_page_token")
+                            else:
+                                break
+                        else:
+                            break
+                            
+                elif places_data.get("status") == "ZERO_RESULTS":
+                    logger.info(f"No results for {strategy['description']} within {max_search_radius/1000}km")
+                    continue
+                else:
+                    logger.warning(f"API error for {strategy['description']}: {places_data.get('status')}")
+                    continue
             
             if not all_results:
                 return {
