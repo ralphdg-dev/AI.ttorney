@@ -11,6 +11,8 @@ import { useAuth } from "../contexts/AuthContext";
 export default function Login() {
   const toast = useToast();
   const { signIn, continueAsGuest, isLoading: authLoading, isAuthenticated } = useAuth();
+  const lastDeniedAtRef = useRef<number>(0);
+  const deniedToastInProgressRef = useRef<boolean>(false);
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -99,16 +101,35 @@ export default function Login() {
           ),
         });
       } else {
-        // Show error toast
-        toast.show({
-          placement: "top",
-          render: ({ id }) => (
-            <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-              <ToastTitle size="md">Login Failed</ToastTitle>
-              <ToastDescription size="sm">{result.error || "Invalid email or password"}</ToastDescription>
-            </Toast>
-          ),
-        });
+        // Show error toast (debounced for Access denied)
+        const now = Date.now();
+        const isAccessDenied = (result.error || "").toLowerCase().includes("access denied");
+        const recentlyShown = now - lastDeniedAtRef.current < 2000;
+        if (isAccessDenied) {
+          if (deniedToastInProgressRef.current) return;
+          if (recentlyShown) return;
+          deniedToastInProgressRef.current = true;
+          lastDeniedAtRef.current = now;
+          toast.show({
+            placement: "top",
+            render: ({ id }) => (
+              <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+                <ToastTitle size="md">Access denied</ToastTitle>
+              </Toast>
+            ),
+          });
+          setTimeout(() => { deniedToastInProgressRef.current = false; }, 2000);
+        } else {
+          toast.show({
+            placement: "top",
+            render: ({ id }) => (
+              <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+                <ToastTitle size="md">Login Failed</ToastTitle>
+                <ToastDescription size="sm">{result.error || "Invalid email or password"}</ToastDescription>
+              </Toast>
+            ),
+          });
+        }
       }
     } catch (error) {
       console.error('Login error:', error);
