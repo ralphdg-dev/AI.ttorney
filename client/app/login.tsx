@@ -84,6 +84,10 @@ export default function Login() {
     try {
       const result = await signIn(email.toLowerCase().trim(), password);
 
+      if (result.suppressToast) {
+        return;
+      }
+
       if (result.success) {
         toast.show({
           placement: "top",

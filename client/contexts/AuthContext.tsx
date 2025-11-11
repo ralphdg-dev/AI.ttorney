@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GUEST_SESSION_STORAGE_KEY, validateGuestSession, isSessionExpired } from '../config/guestConfig';
+import { useToast, Toast, ToastTitle, ToastDescription } from '../components/ui/toast';
 
 // Role hierarchy based on backend schema
 export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
@@ -36,7 +37,7 @@ export interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isGuestMode: boolean;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string; suppressToast?: boolean }>;
   signUp: (email: string, password: string, metadata: { username: string; first_name: string; last_name: string; birthdate: string }) => Promise<{ success: boolean; error?: string; user?: any }>;
   signOut: () => Promise<void>;
   continueAsGuest: () => void;
@@ -68,6 +69,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [hasRedirectedToStatus, setHasRedirectedToStatus] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false);
+  const toast = useToast();
+  const adminToastShownAtRef = React.useRef<number>(0);
+  const adminBlockInProgressRef = React.useRef<boolean>(false);
 
 
   const checkSuspensionStatus = React.useCallback(async (): Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null; needsLiftedAcknowledgment: boolean } | null> => {
@@ -138,7 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [authState.session?.access_token]);
 
-  const handleAuthStateChange = React.useCallback(async (session: Session, shouldNavigate = false) => {
+  const handleAuthStateChange = React.useCallback(async (session: Session, shouldNavigate = false): Promise<boolean> => {
     try {
       console.log('🔐 handleAuthStateChange called:', { shouldNavigate, userId: session.user.id });
       
@@ -157,23 +161,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (profileResult.status === 'rejected') {
         console.error('❌ Profile fetch rejected:', profileResult.reason);
         setIsLoading(false);
-        return;
+        return false;
       }
       
       if (profileResult.status === 'fulfilled' && profileResult.value.error) {
         console.error('❌ Profile fetch error:', profileResult.value.error);
         setIsLoading(false);
-        return;
+        return false;
       }
 
       const profile = profileResult.value.data;
       if (!profile) {
         console.error('❌ No profile data returned');
         setIsLoading(false);
-        return;
+        return false;
       }
 
       console.log('✅ Profile loaded:', { username: profile.username, role: profile.role });
+
+      if (profile.role === 'admin' || profile.role === 'superadmin') {
+        if (adminBlockInProgressRef.current) {
+          // Already handled this attempt; avoid duplicate toasts/actions
+          setIsLoading(false);
+          return false;
+        }
+        adminBlockInProgressRef.current = true;
+        // Do not show toast here; caller (login screen) will display a single toast
+        try { await supabase.auth.signOut({ scope: 'global' }); } catch {}
+        try { await clearAuthStorage(); } catch {}
+        setAuthState({ session: null, user: null, supabaseUser: null });
+        setHasRedirectedToStatus(false);
+        setIsGuestMode(false);
+        setIsLoading(false);
+        // Reset guard after short delay to allow future attempts
+        setTimeout(() => { adminBlockInProgressRef.current = false; }, 2000);
+        return false;
+      }
 
       // ⚡ FAANG OPTIMIZATION: Cache profile data in AsyncStorage for instant loads
       try {
@@ -205,7 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('🚫 User is suspended, redirecting to suspended screen');
           setIsLoading(false);
           router.replace('/suspended' as any);
-          return;
+          return true;
         }
         
         // Check if user needs to acknowledge suspension lifted
@@ -213,7 +236,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('✅ User suspension lifted, redirecting to suspension-lifted screen');
           setIsLoading(false);
           router.replace('/suspension-lifted' as any);
-          return;
+          return true;
         }
         
         let applicationStatus = null;
@@ -235,7 +258,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log('🎉 Application accepted! Redirecting to acceptance page');
             setIsLoading(false);
             router.replace('/onboarding/lawyer/lawyer-status/accepted' as any);
-            return;
+            return true;
           }
           
           const redirectPath = getRoleBasedRedirect(
@@ -248,20 +271,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('🔄 Redirecting pending lawyer to:', redirectPath);
           setIsLoading(false);
           router.replace(redirectPath as any);
+          return true;
         } else {
           // User doesn't have pending lawyer status, redirect normally
           const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
           console.log('🔄 Redirecting user to:', redirectPath);
           setIsLoading(false);
           router.replace(redirectPath as any);
+          return true;
         }
       } else {
         // Not navigating, just set loading to false
         setIsLoading(false);
+        return true;
       }
     } catch (error) {
       console.error('❌ Error handling auth state change:', error);
       setIsLoading(false);
+      return false;
     }
   }, [checkLawyerApplicationStatus, checkSuspensionStatus]);
 
@@ -338,7 +365,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (isSigningOut) return;
             
             if (event === 'SIGNED_IN' && session) {
-              await handleAuthStateChange(session, true);
+              await handleAuthStateChange(session, false);
             } else if (event === 'TOKEN_REFRESHED' && session) {
               await handleAuthStateChange(session, false);
             } else if (event === 'SIGNED_OUT') {
@@ -413,7 +440,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data.session) {
         console.log('✅ Login successful');
-        await handleAuthStateChange(data.session, true);
+        const allowed = await handleAuthStateChange(data.session, true);
+        if (!allowed) {
+          return { success: false, error: 'Access denied', suppressToast: false };
+        }
         return { success: true };
       }
 
