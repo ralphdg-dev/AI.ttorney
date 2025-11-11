@@ -465,7 +465,7 @@ async def list_recent_posts(
             async with httpx.AsyncClient(timeout=20.0) as client:
                 # First fetch posts with pagination
                 posts_response = await client.get(
-                    f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&order=created_at.desc&limit={limit}&offset={offset}",
+                    f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&order=created_at.desc&limit={limit}&offset={offset}&is_flagged=eq.false",
                     headers=supabase._get_headers(use_service_key=True)
                 )
 
@@ -600,7 +600,7 @@ async def get_post(post_id: str, current_user: Dict[str, Any] = Depends(get_curr
         # Increased timeout for better reliability
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
-                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&id=eq.{post_id}",
+                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&id=eq.{post_id}&is_flagged=eq.false",
                 headers=supabase._get_headers(use_service_key=True)
             )
 

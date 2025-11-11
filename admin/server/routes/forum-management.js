@@ -859,6 +859,16 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
             .maybeSingle();
 
           if (!postError && postRow && postRow.user_id) {
+            // Mark the post as flagged/hidden
+            const { error: flagUpdateErr } = await supabaseAdmin
+              .from("forum_posts")
+              .update({ is_flagged: true, updated_at: new Date().toISOString() })
+              .eq("id", postRow.id);
+
+            if (flagUpdateErr) {
+              console.warn("Failed to set is_flagged=true on forum_posts:", flagUpdateErr);
+            }
+
             // Get current user strike/suspension counts
             const { data: userRow } = await supabaseAdmin
               .from("users")
