@@ -878,6 +878,13 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
               .maybeSingle();
 
             const alreadyBanned = userRow?.account_status === 'banned';
+            const alreadySuspended = userRow?.account_status === 'suspended';
+            if (alreadyBanned || alreadySuspended) {
+              return res.status(409).json({
+                success: false,
+                error: 'User is already restricted. Further sanctions have no effect.'
+              });
+            }
             const currentStrikes = (userRow?.strike_count || 0);
             const currentSuspensions = (userRow?.suspension_count || 0);
             const newStrikeCount = alreadyBanned ? currentStrikes : currentStrikes + 1;
@@ -1287,6 +1294,13 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
         }
 
         const alreadyBanned = userData.account_status === 'banned';
+        const alreadySuspended = userData.account_status === 'suspended';
+        if (alreadyBanned || alreadySuspended) {
+          return res.status(409).json({
+            success: false,
+            error: 'User is already restricted. Further sanctions have no effect.'
+          });
+        }
         const currentStrikes = userData.strike_count || 0;
         const currentSuspensions = userData.suspension_count || 0;
         const prospectiveStrikeCount = alreadyBanned ? currentStrikes : currentStrikes + 1;
