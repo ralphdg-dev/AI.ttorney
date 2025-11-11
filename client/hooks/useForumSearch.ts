@@ -104,7 +104,14 @@ export const useForumSearch = (options: UseForumSearchOptions = {}): UseForumSea
   const search = useCallback(async (searchQuery?: string) => {
     const queryToSearch = searchQuery ?? query;
     
+    if (__DEV__) {
+      console.log('🔍 useForumSearch: Manual search triggered for:', queryToSearch);
+    }
+    
     if (queryToSearch.trim().length < minQueryLength) {
+      if (__DEV__) {
+        console.log('⚠️ useForumSearch: Query too short, clearing results');
+      }
       setResults([]);
       setTotal(0);
       setHasSearched(false);
@@ -122,11 +129,17 @@ export const useForumSearch = (options: UseForumSearchOptions = {}): UseForumSea
       });
 
       if (response.success) {
+        if (__DEV__) {
+          console.log('✅ useForumSearch: Search successful, found:', response.data.length, 'results');
+        }
         setResults(response.data);
         setTotal(response.total);
         setHasSearched(true);
         setError(null);
       } else {
+        if (__DEV__) {
+          console.log('❌ useForumSearch: Search failed:', response.message);
+        }
         setError(response.message || 'Search failed');
         setResults([]);
         setTotal(0);

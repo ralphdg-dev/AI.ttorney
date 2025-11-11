@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { Search, X, Hash, User } from 'lucide-react-native';
 import Colors from '../../constants/Colors';
+import { useAuth } from '../../contexts/AuthContext';
+import ForumSearchService from '../../services/forumSearchService';
 
 interface AnimatedSearchBarProps {
   visible: boolean;
@@ -27,10 +29,11 @@ const AnimatedSearchBar: React.FC<AnimatedSearchBarProps> = ({
   visible,
   onClose,
   onSearch,
-  placeholder = "Search forum posts...",
+  placeholder = "Search posts, users, or categories...",
   value = "",
   onChangeText
 }) => {
+  const { session } = useAuth();
   const [searchQuery, setSearchQuery] = useState(value);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -97,9 +100,8 @@ const AnimatedSearchBar: React.FC<AnimatedSearchBarProps> = ({
     // Show intelligent suggestions
     if (text.length >= 2) {
       try {
-        // Import the search service dynamically to avoid circular imports
-        const { default: ForumSearchService } = await import('../../services/forumSearchService');
-        const suggestions = await ForumSearchService.getSearchSuggestions(text);
+        // Get search suggestions with authentication
+        const suggestions = await ForumSearchService.getSearchSuggestions(text, session);
         
         if (suggestions.length > 0) {
           setSuggestions(suggestions);
@@ -110,7 +112,7 @@ const AnimatedSearchBar: React.FC<AnimatedSearchBarProps> = ({
           const textLower = text.toLowerCase();
           
           if (text.startsWith('@')) {
-            fallbackSuggestions.push('@john_doe', '@jane_smith', '@lawyer_mike');
+            // No fallback suggestions for user search - let API handle it
           } else {
             // Category suggestions
             const categories = ['Family Law', 'Labor Law', 'Civil Law', 'Consumer Law', 'Criminal Law', 'Others'];
@@ -140,6 +142,9 @@ const AnimatedSearchBar: React.FC<AnimatedSearchBarProps> = ({
     }
     
     // Trigger search as user types (debounced)
+    if (__DEV__) {
+      console.log('🔍 AnimatedSearchBar: Triggering search for:', text);
+    }
     onSearch(text);
   };
 
