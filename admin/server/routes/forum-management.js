@@ -840,6 +840,81 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
       });
     }
 
+    // If sanctioned, add a strike to the content author's account and create a violation record
+    if (action === "sanctioned") {
+      try {
+        // Fetch report to get target details
+        const { data: reportRow, error: reportFetchError } = await supabaseAdmin
+          .from("forum_reports")
+          .select("id, target_id, target_type")
+          .eq("id", id)
+          .maybeSingle();
+
+        if (!reportFetchError && reportRow && reportRow.target_type === "post" && reportRow.target_id) {
+          // Fetch the post to identify author and content
+          const { data: postRow, error: postError } = await supabaseAdmin
+            .from("forum_posts")
+            .select("id, user_id, body")
+            .eq("id", reportRow.target_id)
+            .maybeSingle();
+
+          if (!postError && postRow && postRow.user_id) {
+            // Get current user strike/suspension counts
+            const { data: userRow } = await supabaseAdmin
+              .from("users")
+              .select("id, strike_count, suspension_count")
+              .eq("id", postRow.user_id)
+              .maybeSingle();
+
+            const currentStrikes = (userRow?.strike_count || 0);
+            const currentSuspensions = (userRow?.suspension_count || 0);
+            const newStrikeCount = currentStrikes + 1;
+
+            // Increment strike count
+            const { error: userUpdateErr } = await supabaseAdmin
+              .from("users")
+              .update({
+                strike_count: newStrikeCount,
+                last_violation_at: new Date().toISOString(),
+              })
+              .eq("id", postRow.user_id);
+
+            if (userUpdateErr) {
+              console.warn("Failed to increment strike count:", userUpdateErr);
+            } else {
+              // Create violation record for audit/history
+              try {
+                const violationData = {
+                  user_id: postRow.user_id,
+                  violation_type: "forum_post",
+                  content_id: postRow.id,
+                  content_text: (postRow.body || "").slice(0, 1000),
+                  flagged_categories: { admin_action: true },
+                  category_scores: { admin_action: 1.0 },
+                  violation_summary: "Admin sanctioned reported post",
+                  action_taken: "strike_added",
+                  strike_count_after: newStrikeCount,
+                  suspension_count_after: currentSuspensions,
+                };
+
+                const { error: violationErr } = await supabaseAdmin
+                  .from("user_violations")
+                  .insert(violationData);
+
+                if (violationErr) {
+                  console.warn("Failed to create user violation record:", violationErr);
+                }
+              } catch (vioErr) {
+                console.warn("Exception creating violation record:", vioErr?.message || vioErr);
+              }
+            }
+          }
+        }
+      } catch (strikeErr) {
+        console.warn("Sanction side-effect (add strike) failed:", strikeErr?.message || strikeErr);
+      }
+    }
+
     // Log the resolution (simplified details)
     await supabaseAdmin.from("admin_audit_logs").insert({
       admin_id: adminId,
