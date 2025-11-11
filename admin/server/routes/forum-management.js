@@ -814,7 +814,7 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
     const { action } = req.body; // action: 'dismiss' | 'sanctioned'
     const adminId = req.adminId;
 
-    if (!action || !["dismiss", "sanctioned"].includes(action)) {
+    if (!action || !["dismiss", "dismissed", "sanctioned"].includes(action)) {
       return res.status(400).json({
         success: false,
         error: "Invalid action. Must be 'dismiss' or 'sanctioned'",
@@ -1434,10 +1434,12 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
     }
 
     // Update the report status
+    const newStatus = action === 'dismiss' ? 'dismissed' : action;
+
     const { data, error } = await supabaseAdmin
       .from("reported_replies")
       .update({
-        status: action,
+        status: newStatus,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
@@ -1471,7 +1473,7 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
 
     res.json({
       success: true,
-      message: `Report ${action === "dismiss" ? "dismissed" : "sanctioned"} successfully`,
+      message: `Report ${newStatus === "dismissed" ? "dismissed" : "sanctioned"} successfully`,
       data: data,
     });
   } catch (error) {

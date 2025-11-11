@@ -9,6 +9,7 @@ import {
   User,
   Search,
   X,
+  MoreVertical,
 } from "lucide-react";
 import forumManagementService from "../../services/forumManagementService";
 import DataTable from "../ui/DataTable";
@@ -36,6 +37,7 @@ const ReportedPosts = () => {
   const [resolutionAction, setResolutionAction] = useState("");
   // ✅ REMOVED: resolutionNotes state
   const [resolving, setResolving] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState(null);
 
   const statusOptions = [
     { value: "all", label: "All Reports" },
@@ -160,8 +162,7 @@ const ReportedPosts = () => {
   const getModalTitle = () => {
     if (resolutionAction === "view") return "View Report Details";
     if (resolutionAction === "dismiss") return "Dismiss Report";
-    if (resolutionAction === "sanctioned")
-      return "Mark Action Taken (Sanctioned)";
+    if (resolutionAction === "sanctioned") return "Sanction Report";
     return "Resolve Report";
   };
 
@@ -231,37 +232,51 @@ const ReportedPosts = () => {
     },
     {
       key: "actions",
-      header: "ACTIONS",
-      align: "center",
+      header: "Actions",
+      align: "right",
       render: (report) => (
-        <div className="flex items-center justify-center space-x-2">
-          <Tooltip content="View Details" placement="top">
-            <button
-              onClick={() => openResolutionModal(report, "view")}
-              className="text-gray-600 hover:text-gray-900 hover:scale-110 transition-all duration-200 p-1 rounded"
-            >
-              <Eye className="w-4 h-4" />
-            </button>
-          </Tooltip>
+        <div className="relative" style={{ position: 'static' }}>
+          <button
+            onClick={() => setOpenMenuId(openMenuId === report.id ? null : report.id)}
+            className="p-1 rounded hover:bg-gray-100 text-gray-600"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
 
-          {report.status === "pending" && (
+          {openMenuId === report.id && (
             <>
-              <Tooltip content="Dismiss Report" placement="top">
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setOpenMenuId(null)}
+              />
+              <div className="fixed mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[9999]" style={{ right: '20px' }}>
                 <button
-                  onClick={() => openResolutionModal(report, "dismiss")}
-                  className="text-gray-600 hover:text-gray-900 hover:scale-110 transition-all duration-200 p-1 rounded"
+                  onClick={() => { openResolutionModal(report, "view"); setOpenMenuId(null); }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center"
                 >
-                  <XCircle className="w-4 h-4" />
+                  <Eye className="w-4 h-4 mr-3 text-gray-600" />
+                  View Details
                 </button>
-              </Tooltip>
-              <Tooltip content="Mark Action Taken" placement="top">
-                <button
-                  onClick={() => openResolutionModal(report, "sanctioned")}
-                  className="text-gray-600 hover:text-gray-900 hover:scale-110 transition-all duration-200 p-1 rounded"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                </button>
-              </Tooltip>
+
+                {report.status === "pending" && (
+                  <>
+                    <button
+                      onClick={() => { openResolutionModal(report, "dismiss"); setOpenMenuId(null); }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                    >
+                      <XCircle className="w-4 h-4 mr-3 text-gray-600" />
+                      Dismiss Report
+                    </button>
+                    <button
+                      onClick={() => { openResolutionModal(report, "sanctioned"); setOpenMenuId(null); }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-3 text-gray-600" />
+                      Sanction Report
+                    </button>
+                  </>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -458,7 +473,7 @@ const ReportedPosts = () => {
                   disabled={resolving}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-300"
                 >
-                  {resolving ? "Confirming..." : "Confirm Action Taken"}
+                  {resolving ? "Sanctioning..." : "Sanction Report"}
                 </button>
               )}
             </div>

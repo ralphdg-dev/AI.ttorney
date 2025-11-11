@@ -121,7 +121,7 @@ const ReportedReplies = () => {
     setSelectedReport(report);
     setResolutionAction(action);
     setError(null);
-    
+
     // If action is 'view', open the ViewReportedReplyModal instead
     if (action === 'view') {
       setShowResolutionModal(true);
@@ -171,7 +171,7 @@ const ReportedReplies = () => {
     if (resolutionAction === "view") return "View Reply Report Details";
     if (resolutionAction === "dismiss") return "Dismiss Reply Report";
     if (resolutionAction === "sanctioned")
-      return "Approve Report";
+      return "Sanction Report";
     return "Resolve Reply Report";
   };
 
@@ -303,7 +303,7 @@ const ReportedReplies = () => {
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center"
                     >
                       <CheckCircle className="w-4 h-4 mr-3 text-gray-600" />
-                      Approve Report
+                      Sanction Report
                     </button>
                   </>
                 )}
@@ -336,27 +336,27 @@ const ReportedReplies = () => {
       {/* Toolbar */}
       <div className="w-full mb-3">
         <ListToolbar
-        query={searchTerm}
-        onQueryChange={setSearchTerm}
-        totalText={pagination.total ? `Total Reply Reports: ${pagination.total}` : null}
-        filter={{
-          value: statusOptions.find(s => s.value === statusFilter)?.label || "All Reports",
-          onChange: (label) => {
-            const status = statusOptions.find(s => s.label === label);
-            setStatusFilter(status?.value || "all");
-          },
-          options: statusOptions.map(s => s.label),
-          label: "Status Filter"
-        }}
-        secondaryFilter={{
-          value: categoryOptions.find(c => c.value === categoryFilter)?.label || "All Categories",
-          onChange: (label) => {
-            const category = categoryOptions.find(c => c.label === label);
-            setCategoryFilter(category?.value || "all");
-          },
-          options: categoryOptions.map(c => c.label),
-          label: "Category Filter"
-        }}
+          query={searchTerm}
+          onQueryChange={setSearchTerm}
+          totalText={pagination.total ? `Total Reply Reports: ${pagination.total}` : null}
+          filter={{
+            value: statusOptions.find(s => s.value === statusFilter)?.label || "All Reports",
+            onChange: (label) => {
+              const status = statusOptions.find(s => s.label === label);
+              setStatusFilter(status?.value || "all");
+            },
+            options: statusOptions.map(s => s.label),
+            label: "Status Filter"
+          }}
+          secondaryFilter={{
+            value: categoryOptions.find(c => c.value === categoryFilter)?.label || "All Categories",
+            onChange: (label) => {
+              const category = categoryOptions.find(c => c.label === label);
+              setCategoryFilter(category?.value || "all");
+            },
+            options: categoryOptions.map(c => c.label),
+            label: "Category Filter"
+          }}
         />
       </div>
 
@@ -551,7 +551,7 @@ const ReportedReplies = () => {
                   disabled={resolving}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-300"
                 >
-                  {resolving ? "Approving..." : "Approve Report"}
+                  {resolving ? "Sanctioning..." : "Sanction Report"}
                 </button>
               )}
             </div>
