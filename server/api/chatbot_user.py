@@ -324,6 +324,7 @@ class ChatResponse(BaseModel):
     simplified_summary: Optional[str] = None
     legal_disclaimer: str
     fallback_suggestions: Optional[List[FallbackSuggestion]] = None
+    follow_up_questions: Optional[List[str]] = Field(default_factory=list, description="Suggested follow-up questions for continued conversation")
     security_report: Optional[Dict] = Field(default=None, description="Guardrails AI security validation report")
     session_id: Optional[str] = Field(default=None, description="Chat session ID for tracking conversation")
     message_id: Optional[str] = Field(default=None, description="Message ID for the assistant's response")
@@ -696,6 +697,43 @@ def is_out_of_scope_topic(text: str) -> tuple[bool, str]:
     if max_matches >= 2:
         logger.info(f"Out of scope detected: {detected_topic} ({max_matches} matches)")
         return True, detected_topic
+    
+    return False, ""
+
+
+def needs_clarification(question: str) -> tuple[bool, str]:
+    """
+    Detect if a question is too vague or needs clarification.
+    Returns: (needs_clarification, clarification_type)
+    """
+    question_lower = question.lower().strip()
+    
+    # Very short or vague questions
+    if len(question_lower) < 10:
+        return True, "too_short"
+    
+    # Questions with only pronouns or vague terms
+    vague_patterns = [
+        r'^(what|how|when|where|why|can|is|are|do|does|will|would|should)\s+(this|that|it|they|them|he|she)\b',
+        r'^(tell me about|explain|what about)\s+(this|that|it)\b',
+        r'^(how to|what is|what are)\s*$',
+        r'^(yes|no|ok|okay|sure|maybe)\s*$'
+    ]
+    
+    for pattern in vague_patterns:
+        if re.search(pattern, question_lower):
+            return True, "vague_pronouns"
+    
+    # Questions without specific legal context
+    general_patterns = [
+        r'^(what|how)\s+(can|should|do)\s+i\s*$',
+        r'^(help|advice|suggestion)\s*$',
+        r'^(what|how)\s+(about|with)\s*$'
+    ]
+    
+    for pattern in general_patterns:
+        if re.search(pattern, question_lower):
+            return True, "too_general"
     
     return False, ""
 
@@ -1142,7 +1180,7 @@ def validate_response_quality(answer: str) -> tuple[bool, str]:
 
 
 def generate_answer(question: str, context: str, conversation_history: List[Dict[str, str]], 
-                   language: str, max_tokens: int = 1200, is_complex: bool = False) -> tuple[str, str, str]:
+                   language: str, max_tokens: int = 1200, is_complex: bool = False) -> tuple[str, str, str, List[str]]:
     """
     Generate high-quality answer using GPT with comprehensive system prompts.
     
@@ -1179,12 +1217,28 @@ def generate_answer(question: str, context: str, conversation_history: List[Dict
 
 User Question: {question}
 
-Please provide an informational response based on the legal context above. Remember to cite specific legal codes and use capital letters for key terms."""
+Please provide a comprehensive informational response with the following structure:
+
+1. **Direct Answer**: Start with a clear, direct answer to the question
+2. **Legal Explanation**: Provide detailed explanation citing specific legal codes (use CAPITAL LETTERS for key terms)
+3. **Practical Example**: Give a real-world example to illustrate the concept
+4. **Important Considerations**: Mention any important limitations, exceptions, or requirements
+5. **Follow-up Questions**: End with 2-3 relevant follow-up questions the user might want to ask
+
+Format your response clearly with proper headings and make it accessible to general users."""
     else:
         # No specific legal context found, use general knowledge
         user_message = f"""User Question: {question}
 
-Note: I don't have specific legal documents for this question in my database. Please provide a helpful answer based on your general knowledge of Philippine law (Civil, Criminal, Consumer, Family, or Labor Law). If you lack sufficient information, clearly state that and recommend consulting a licensed attorney."""
+Note: I don't have specific legal documents for this question in my database. Please provide a helpful answer based on your general knowledge of Philippine law with this structure:
+
+1. **Direct Answer**: Clear, direct response to the question
+2. **General Legal Information**: What you know about this topic in Philippine law
+3. **Limitations**: Clearly state what information you cannot provide
+4. **Recommendation**: Suggest consulting a licensed attorney for specific guidance
+5. **Follow-up Questions**: 2-3 related questions they might want to explore
+
+If you lack sufficient information, clearly state that and focus on the recommendation to consult a licensed attorney."""
     
     messages.append({"role": "user", "content": user_message})
     
@@ -1194,11 +1248,11 @@ Note: I don't have specific legal documents for this question in my database. Pl
             model=CHAT_MODEL,
             messages=messages,
             max_tokens=max_tokens,
-            temperature=0.5,  # Higher temp for faster generation
-            top_p=0.95,  # Wider sampling for speed
-            presence_penalty=0.0,  # Remove penalty for speed
-            frequency_penalty=0.0,  # Remove penalty for speed
-            timeout=10.0,  # Very fast timeout (reduced for speed)
+            temperature=0.3,  # Lower temp for more consistent, accurate responses
+            top_p=0.9,  # More focused sampling for better quality
+            presence_penalty=0.1,  # Slight penalty to encourage diverse vocabulary
+            frequency_penalty=0.1,  # Slight penalty to reduce repetition
+            timeout=15.0,  # Reasonable timeout for quality responses
         )
         
         answer = response.choices[0].message.content
@@ -1208,14 +1262,16 @@ Note: I don't have specific legal documents for this question in my database. Pl
             # Response too short or empty
             return ("I apologize, but I couldn't generate a proper response. Please try rephrasing your question.", 
                     "low", 
-                    "Response generation failed")
+                    "Response generation failed", 
+                    [])
         
     except Exception as e:
         print(f"❌ Error generating answer: {e}")
         # Return a graceful error message instead of crashing
         return ("I apologize, but I encountered an error while processing your question. Please try again.", 
                 "low", 
-                f"Error: {str(e)}")
+                f"Error: {str(e)}", 
+                [])
     
     # Industry standard: Post-response validation to catch advice-giving
     is_valid, validation_reason = validate_response_quality(answer)
@@ -1235,6 +1291,58 @@ Note: I don't have specific legal documents for this question in my database. Pl
             answer = "I apologize, but I can only provide general legal information, not personal legal advice. For specific guidance on your situation, please consult with a licensed attorney."
         confidence = "low"
     
+    # Extract follow-up questions from the response
+    follow_up_questions = []
+    if answer:
+        # Look for follow-up questions section in the response
+        import re
+        
+        # Pattern to match follow-up questions section
+        followup_patterns = [
+            r'(?:Follow-up Questions?|Related Questions?|You might also ask|Mga karagdagang tanong)[:\s]*\n((?:[-•*]\s*.+\n?)+)',
+            r'(?:\*\*Follow-up Questions?\*\*|##\s*Follow-up Questions?)[:\s]*\n((?:[-•*]\s*.+\n?)+)',
+            r'(?:Questions? you might want to ask|Tanong na maaari ninyong itanong)[:\s]*\n((?:[-•*]\s*.+\n?)+)'
+        ]
+        
+        for pattern in followup_patterns:
+            match = re.search(pattern, answer, re.IGNORECASE | re.MULTILINE)
+            if match:
+                questions_text = match.group(1)
+                # Extract individual questions
+                question_lines = re.findall(r'[-•*]\s*(.+)', questions_text)
+                follow_up_questions = [q.strip().rstrip('?') + '?' for q in question_lines if q.strip()]
+                break
+        
+        # If no structured follow-up questions found, generate some based on the topic
+        if not follow_up_questions and context:
+            # Generate contextual follow-up questions based on the legal domain
+            if any(keyword in answer.lower() for keyword in ['marriage', 'kasal', 'family', 'pamilya']):
+                if language == "tagalog":
+                    follow_up_questions = [
+                        "Ano ang mga requirements para sa kasal sa Pilipinas?",
+                        "Paano ang proseso ng annulment?",
+                        "Ano ang mga karapatan ng asawa sa property?"
+                    ]
+                else:
+                    follow_up_questions = [
+                        "What are the requirements for marriage in the Philippines?",
+                        "How does the annulment process work?",
+                        "What are spousal property rights?"
+                    ]
+            elif any(keyword in answer.lower() for keyword in ['employment', 'trabaho', 'labor', 'work']):
+                if language == "tagalog":
+                    follow_up_questions = [
+                        "Ano ang mga karapatan ng empleyado?",
+                        "Paano mag-file ng complaint sa DOLE?",
+                        "Ano ang tamang proseso sa termination?"
+                    ]
+                else:
+                    follow_up_questions = [
+                        "What are employee rights in the Philippines?",
+                        "How to file a complaint with DOLE?",
+                        "What is the proper termination process?"
+                    ]
+    
     # Calculate confidence based on source relevance scores (if available)
     confidence = "medium"  # default
     if context and context.strip():
@@ -1245,7 +1353,7 @@ Note: I don't have specific legal documents for this question in my database. Pl
     # Simplified summary (optional, for internal use only)
     simplified_summary = None
     
-    return answer, confidence, simplified_summary
+    return answer, confidence, simplified_summary, follow_up_questions
 
 
 def generate_ai_response(question: str, language: str, response_type: str, topic_type: str = None) -> str:
@@ -1554,6 +1662,7 @@ def create_chat_response(
     simplified_summary: str = None,
     legal_disclaimer: str = None,
     fallback_suggestions: List[FallbackSuggestion] = None,
+    follow_up_questions: List[str] = None,
     security_report: Dict = None,
     session_id: str = None,
     message_id: str = None,
@@ -1577,6 +1686,7 @@ def create_chat_response(
         simplified_summary=simplified_summary,
         legal_disclaimer=legal_disclaimer or get_legal_disclaimer("en"),
         fallback_suggestions=fallback_suggestions,
+        follow_up_questions=follow_up_questions or [],
         security_report=security_report,
         session_id=session_id,
         message_id=message_id,
@@ -2250,6 +2360,98 @@ async def ask_legal_question(
                 user_message_id=user_msg_id
             )
 
+        # Check if the legal question needs clarification
+        needs_clarify, clarification_type = needs_clarification(request.question)
+        if needs_clarify:
+            print(f"\n❓ [CLARIFICATION] Question needs clarification: {clarification_type}")
+            
+            # Generate helpful clarification response
+            if language == "tagalog":
+                if clarification_type == "too_short":
+                    clarification_response = (
+                        "Mukhang maikli ang inyong tanong. Maaari po ba kayong magbigay ng mas detalyadong legal na tanong? "
+                        "Halimbawa:\n\n"
+                        "• 'Ano ang mga karapatan ng empleyado sa illegal dismissal?'\n"
+                        "• 'Paano mag-file ng annulment case sa Pilipinas?'\n"
+                        "• 'Ano ang mga requirements para sa pag-adopt ng bata?'\n\n"
+                        "Ano pong specific na legal na tanong ang mayroon kayo?"
+                    )
+                elif clarification_type == "vague_pronouns":
+                    clarification_response = (
+                        "Hindi ko po maintindihan kung ano ang tinutukoy ninyo. Maaari po ba kayong maging mas specific? "
+                        "Sabihin po ninyo ang eksaktong legal na sitwasyon o tanong na mayroon kayo.\n\n"
+                        "Halimbawa, sa halip na 'Paano ito?' ay sabihin ninyo 'Paano mag-file ng small claims case?'"
+                    )
+                else:  # too_general
+                    clarification_response = (
+                        "Ang inyong tanong ay masyadong general. Maaari po ba kayong magbigay ng mas specific na legal na tanong? "
+                        "Anong particular na legal na isyu ang kailangan ninyong malaman?\n\n"
+                        "Mga halimbawa ng malinaw na tanong:\n"
+                        "• Tungkol sa Family Law: kasal, annulment, child custody\n"
+                        "• Tungkol sa Labor Law: trabaho, sahod, termination\n"
+                        "• Tungkol sa Consumer Law: produkto, serbisyo, warranty"
+                    )
+            else:
+                if clarification_type == "too_short":
+                    clarification_response = (
+                        "Your question seems quite brief. Could you provide a more detailed legal question? "
+                        "For example:\n\n"
+                        "• 'What are employee rights in cases of illegal dismissal?'\n"
+                        "• 'How do I file for annulment in the Philippines?'\n"
+                        "• 'What are the requirements for child adoption?'\n\n"
+                        "What specific legal question do you have?"
+                    )
+                elif clarification_type == "vague_pronouns":
+                    clarification_response = (
+                        "I'm not sure what you're referring to. Could you be more specific? "
+                        "Please tell me the exact legal situation or question you have.\n\n"
+                        "For example, instead of 'How do I do this?' please say 'How do I file a small claims case?'"
+                    )
+                else:  # too_general
+                    clarification_response = (
+                        "Your question is quite general. Could you provide a more specific legal question? "
+                        "What particular legal issue do you need to know about?\n\n"
+                        "Examples of clear questions:\n"
+                        "• About Family Law: marriage, annulment, child custody\n"
+                        "• About Labor Law: employment, wages, termination\n"
+                        "• About Consumer Law: products, services, warranties"
+                    )
+            
+            # Generate helpful follow-up questions for clarification
+            clarification_followups = []
+            if language == "tagalog":
+                clarification_followups = [
+                    "Anong specific na legal na problema ang kailangan ninyong solusyunan?",
+                    "Sa anong legal na kategorya kaya ito - Family, Labor, Consumer, Criminal, o Civil Law?",
+                    "Maaari po ba kayong magkwento ng mas detalyadong sitwasyon?"
+                ]
+            else:
+                clarification_followups = [
+                    "What specific legal problem do you need to solve?",
+                    "Which legal category might this fall under - Family, Labor, Consumer, Criminal, or Civil Law?",
+                    "Could you describe your situation in more detail?"
+                ]
+            
+            # Save clarification interaction
+            session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                chat_service=chat_history_service,
+                effective_user_id=effective_user_id,
+                session_id=request.session_id,
+                question=request.question,
+                answer=clarification_response,
+                language=language,
+                metadata={"type": "clarification", "clarification_type": clarification_type}
+            )
+            
+            return create_chat_response(
+                answer=clarification_response,
+                simplified_summary=f"Question needs clarification: {clarification_type}",
+                follow_up_questions=clarification_followups,
+                session_id=session_id,
+                message_id=assistant_msg_id,
+                user_message_id=user_msg_id
+            )
+
         # For legal questions, search Qdrant directly (like test_chatbot.py)
         # OPTIMIZATION: Skip expensive query normalization for speed
         # Only normalize if question is very informal/emotional (contains specific patterns)
@@ -2342,7 +2544,7 @@ async def ask_legal_question(
         print(f"   📡 Calling OpenAI API (model: {CHAT_MODEL})...")
         print(f"   Max tokens: {request.max_tokens}")
         print(f"   Conversation history: {len(conversation_history)} messages (from {'database' if db_conversation_history else 'client'})")
-        answer, _, simplified_summary = generate_answer(
+        answer, _, simplified_summary, follow_up_questions = generate_answer(
             request.question,
             context,
             conversation_history,
@@ -2445,6 +2647,7 @@ async def ask_legal_question(
             simplified_summary=simplified_summary,
             legal_disclaimer=legal_disclaimer,
             fallback_suggestions=fallback_suggestions,
+            follow_up_questions=follow_up_questions,
             security_report=security_report,
             session_id=session_id,
             message_id=assistant_msg_id,

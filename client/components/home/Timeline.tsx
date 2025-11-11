@@ -821,8 +821,17 @@ React.useEffect(() => {
       )}
 
       {/* Floating Create Post Button */}
-      <TouchableOpacity style={styles.createPostButton} onPress={handleCreatePost} activeOpacity={0.8}>
-        <Plus size={24} color="#FFFFFF" />
+      <TouchableOpacity 
+        style={styles.createPostButton} 
+        onPress={handleCreatePost} 
+        activeOpacity={0.7}
+        accessible={true}
+        accessibilityLabel="Create new post"
+        accessibilityRole="button"
+        accessibilityHint="Tap to create a new forum post"
+        testID="create-post-button"
+      >
+        <Plus size={26} color="#FFFFFF" strokeWidth={2.5} />
       </TouchableOpacity>
     </View>
   );
@@ -872,19 +881,23 @@ const styles = StyleSheet.create({
   },
   createPostButton: {
     position: 'absolute',
-    bottom: 90,
+    bottom: 90, // Positioned above bottom navigation
     right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60, // Slightly larger for better touch target
+    height: 60,
+    borderRadius: 30,
     backgroundColor: Colors.primary.blue,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    elevation: 12, // Higher elevation for better visibility
+    shadowColor: Colors.primary.blue,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    zIndex: 1000, // Explicit z-index for iOS
+    // Add subtle border for definition
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   searchHeader: {
     backgroundColor: '#f8f9fa',
