@@ -87,6 +87,19 @@ export const ForumCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [cacheData, setCacheData] = useState<CacheData | null>(null);
   const [postCache, setPostCache] = useState<Map<string, PostCacheData>>(new Map());
   const lastFetchTimeRef = useRef<number>(0);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Initialize the provider
+  React.useEffect(() => {
+    try {
+      setIsInitialized(true);
+      if (__DEV__) {
+        console.log('📦 ForumCacheProvider initialized');
+      }
+    } catch (error) {
+      console.error('❌ ForumCacheProvider initialization error:', error);
+    }
+  }, []);
 
   const getCachedPosts = useCallback((): PostData[] | null => {
     if (!cacheData) return null;
@@ -255,21 +268,42 @@ export const ForumCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [isPostCacheValid, getCachedPostFromForum, setCachedPost]);
 
-  const value: ForumCacheContextType = React.useMemo(() => ({
-    getCachedPosts,
-    setCachedPosts,
-    isCacheValid,
-    clearCache,
-    updatePostBookmark,
-    getLastFetchTime,
-    setLastFetchTime,
-    getCachedPost,
-    setCachedPost,
-    getCachedPostFromForum,
-    updatePostComments,
-    isPostCacheValid,
-    prefetchPost,
-  }), [getCachedPosts, setCachedPosts, isCacheValid, clearCache, updatePostBookmark, getLastFetchTime, setLastFetchTime, getCachedPost, setCachedPost, getCachedPostFromForum, updatePostComments, isPostCacheValid, prefetchPost]);
+  const value: ForumCacheContextType = React.useMemo(() => {
+    if (!isInitialized) {
+      // Return safe defaults while initializing
+      return {
+        getCachedPosts: () => null,
+        setCachedPosts: () => {},
+        isCacheValid: () => false,
+        clearCache: () => {},
+        updatePostBookmark: () => {},
+        getLastFetchTime: () => 0,
+        setLastFetchTime: () => {},
+        getCachedPost: () => null,
+        setCachedPost: () => {},
+        getCachedPostFromForum: () => null,
+        updatePostComments: () => {},
+        prefetchPost: async () => {},
+        isPostCacheValid: () => false
+      };
+    }
+
+    return {
+      getCachedPosts,
+      setCachedPosts,
+      isCacheValid,
+      clearCache,
+      updatePostBookmark,
+      getLastFetchTime,
+      setLastFetchTime,
+      getCachedPost,
+      setCachedPost,
+      getCachedPostFromForum,
+      updatePostComments,
+      isPostCacheValid,
+      prefetchPost,
+    };
+  }, [isInitialized, getCachedPosts, setCachedPosts, isCacheValid, clearCache, updatePostBookmark, getLastFetchTime, setLastFetchTime, getCachedPost, setCachedPost, getCachedPostFromForum, updatePostComments, isPostCacheValid, prefetchPost]);
 
   return (
     <ForumCacheContext.Provider value={value}>

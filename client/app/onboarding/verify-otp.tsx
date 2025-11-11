@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Alert, Platform, TextInput } from "react-native";
+import { Alert, Platform, TextInput, TouchableOpacity } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Box } from "../../components/ui/box";
@@ -104,13 +104,24 @@ export default function VerifyOTP() {
     setError("");
 
     try {
+      // Debug logging
+      console.log('🔍 Debug - Verifying OTP:', {
+        email: email,
+        otp_code: otpString,
+        otp_type: 'email_verification',
+        timestamp: new Date().toISOString()
+      });
+
       const result = await apiClient.verifyOTP({
         email,
         otp_code: otpString,
         otp_type: 'email_verification'
       });
 
+      console.log('🔍 Debug - API Result:', result);
+
       if (result.error) {
+        console.log('❌ Verification failed:', result.error);
         setError(result.error);
         
         // Handle lockout scenario
@@ -134,33 +145,46 @@ export default function VerifyOTP() {
       } else {
         // Success case - OTP verified successfully
         console.log('✅ Email verified successfully!');
+        console.log('🔍 Debug - Success result:', result);
         
         // Store verified email
         await AsyncStorage.setItem('user_email', email);
+        console.log('📱 Stored email in AsyncStorage');
         
         // Clear form states
         setOtp(["", "", "", "", "", ""]);
         setError("");
         setAttemptsRemaining(null);
         setIsLockedOut(false);
+        console.log('🧹 Cleared form states');
         
-        // Navigate to login page - user must sign in with their password
-        console.log('Redirecting to login page...');
-        Alert.alert(
-          "Email Verified!",
-          "Your email has been verified. Please sign in with your credentials.",
-          [
-            {
-              text: "Go to Login",
-              onPress: () => router.replace('/login')
-            }
-          ]
-        );
+        // Show success modal as intended
+        console.log('🎉 About to show success modal...');
+        
+        // Use original Alert approach
+        setTimeout(() => {
+          console.log('📢 Showing Alert modal now...');
+          Alert.alert(
+            "Email Verified!",
+            "Your email has been verified. Please sign in with your credentials.",
+            [
+              {
+                text: "Go to Login",
+                onPress: () => {
+                  console.log('🚀 Navigating to login...');
+                  router.replace('/login');
+                }
+              }
+            ]
+          );
+        }, 100);
       }
-    } catch {
+    } catch (error) {
+      console.error('❌ Verification exception:', error);
       setError("Verification failed. Please try again.");
     } finally {
       setIsLoading(false);
+      console.log('🏁 Verification process completed');
     }
   };
 
@@ -298,16 +322,21 @@ export default function VerifyOTP() {
           loading={isLoading}
         />
 
-        {/* Resend Code - Below button like ActionLink */}
-        <Box className="absolute right-0 left-0 bottom-8 items-center px-4 sm:px-6 md:px-8">
+        {/* Resend Code - Below button */}
+        <Box className="items-center px-4 sm:px-6 md:px-8 mt-4">
           <Text className="text-sm text-center sm:text-base" style={{ color: Colors.text.sub }}>
-            Didn&apos;t receive code?{" "}
+            Didn&apos;t receive code?
+          </Text>
+          <TouchableOpacity
+            onPress={!isLockedOut && canResend ? handleResendOTP : undefined}
+            disabled={isLockedOut || !canResend}
+            className="mt-2"
+          >
             <Text
-              className="text-sm font-bold sm:text-base"
+              className="text-sm font-bold sm:text-base text-center"
               style={{
                 color: (canResend && !isLockedOut) ? Colors.primary.blue : '#9ca3af'
               }}
-              onPress={!isLockedOut ? handleResendOTP : undefined}
             >
               {isLockedOut 
                 ? "Resend unavailable (locked out)" 
@@ -316,7 +345,7 @@ export default function VerifyOTP() {
                   : `Resend OTP (${Math.floor(resendTimer / 60)}:${(resendTimer % 60).toString().padStart(2, '0')})`
               }
             </Text>
-          </Text>
+          </TouchableOpacity>
         </Box>
       </Box>
     </KeyboardAvoidingView>

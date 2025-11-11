@@ -157,7 +157,8 @@ class AuthService:
             is_verified = profile.get("is_verified", False)
             
             # Debug logging
-            logger.info(f"Login attempt - Role: {user_role}, Verified: {is_verified}, Email: {credentials.email}")
+            logger.info(f"🔐 Login attempt - Role: {user_role}, Verified: {is_verified}, Email: {credentials.email}")
+            logger.info(f"📊 Full profile data: {profile}")
             
             # Case 1: Unverified guest with account - send OTP and route to verification
             if user_role == "guest" and not is_verified:
@@ -277,6 +278,14 @@ class AuthService:
     async def mark_user_verified(self, email: str) -> Dict[str, Any]:
         """Mark user as verified - role remains guest until role selection"""
         try:
+            logger.info(f"🔄 Marking user as verified: {email}")
+            
+            # First check current status
+            profile_response = await self.supabase.get_user_profile_by_email(email)
+            if profile_response["success"] and profile_response["data"]:
+                current_profile = profile_response["data"]
+                logger.info(f"📊 Current profile before update: role={current_profile.get('role')}, is_verified={current_profile.get('is_verified')}")
+            
             response = await self.supabase.update_user_profile(
                 {
                     "is_verified": True
@@ -284,6 +293,16 @@ class AuthService:
                 },
                 {"email": email}
             )
+            
+            logger.info(f"✅ Update response: {response}")
+            
+            # Verify the update worked
+            if response["success"]:
+                verify_response = await self.supabase.get_user_profile_by_email(email)
+                if verify_response["success"] and verify_response["data"]:
+                    updated_profile = verify_response["data"]
+                    logger.info(f"📊 Profile after update: role={updated_profile.get('role')}, is_verified={updated_profile.get('is_verified')}")
+            
             return response
         except Exception as e:
             logger.error(f"Mark user verified error: {str(e)}")

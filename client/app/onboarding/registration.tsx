@@ -248,6 +248,29 @@ export default function UserRegistration() {
     !validationLoading.username
   );
 
+  // Debug logging for Sign Up button state
+  if (__DEV__) {
+    console.log('🔍 Sign Up Button Debug:', {
+      firstName: !!firstName,
+      lastName: !!lastName, 
+      username: !!username,
+      email: !!email,
+      birthdate: !!birthdate,
+      password: !!password,
+      confirmPassword: !!confirmPassword,
+      passwordsMatch,
+      agree,
+      hasValidationErrors,
+      emailError,
+      usernameError,
+      passwordError,
+      validationLoadingEmail: validationLoading.email,
+      validationLoadingUsername: validationLoading.username,
+      isComplete,
+      loading
+    });
+  }
+
   return (
     <View className="flex-1 bg-white">
       <KeyboardAvoidingView
@@ -625,7 +648,7 @@ export default function UserRegistration() {
               
               // Step 3: Navigate to verify-otp with the email
               // Note: Password is NOT stored - user will sign in after verification
-              router.push(`./verify-otp?email=${encodeURIComponent(email)}` as any);
+              router.push(`/onboarding/verify-otp?email=${encodeURIComponent(email)}` as any);
               
             } catch (error) {
               console.error('Registration error:', error);

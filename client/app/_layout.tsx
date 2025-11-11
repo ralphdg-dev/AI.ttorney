@@ -18,6 +18,7 @@ import { BookmarksProvider } from "../contexts/BookmarksContext";
 import { PostBookmarksProvider } from "../contexts/PostBookmarksContext";
 import { ConsultationsProvider } from "../contexts/ConsultationsContext";
 import { ForumCacheProvider } from "../contexts/ForumCacheContext";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ModerationProvider } from "../contexts/ModerationContext";
 import { NotificationProvider } from "../contexts/NotificationContext";
 import { SidebarProvider } from "../components/AppSidebar";
@@ -73,8 +74,9 @@ function AppContent() {
               <BookmarksProvider>
                 <PostBookmarksProvider>
                   <ConsultationsProvider>
-                    <ForumCacheProvider>
-                      <AuthGuard>
+                    <ErrorBoundary fallbackRoute="/home">
+                      <ForumCacheProvider>
+                        <AuthGuard>
                         <SuspensionGuard>
                           <RouteErrorBoundary>
                             <SidebarProvider>
@@ -100,8 +102,9 @@ function AppContent() {
                             </SidebarProvider>
                           </RouteErrorBoundary>
                         </SuspensionGuard>
-                      </AuthGuard>
-                    </ForumCacheProvider>
+                        </AuthGuard>
+                      </ForumCacheProvider>
+                    </ErrorBoundary>
                   </ConsultationsProvider>
                 </PostBookmarksProvider>
               </BookmarksProvider>
