@@ -390,7 +390,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
         loadingMoreRef.current = false;
       }
     }
-  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, currentPage]);
+  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime]);
 
   // Initial load with cache check
   useEffect(() => {
@@ -547,7 +547,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
       if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage, hasMore: hasMoreRef.current });
       loadPosts(false, true); // Don't force, append to existing
     }, 300); // 300ms debounce
-  }, [loadPosts, currentPage, isSearchMode]);
+  }, [loadPosts, isSearchMode]);
 
   const handleCreatePost = useCallback(() => {
     const route = context === 'lawyer' ? '/lawyer/CreatePost' : '/home/CreatePost';

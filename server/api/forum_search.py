@@ -39,7 +39,7 @@ class ForumSearchAPI:
     def __init__(self):
         self.supabase = SupabaseService()
     
-    def calculate_relevance_score(self, post: Dict[str, Any], query: str, search_type: str) -> float:
+    def calculate_relevance_score(self, post: Dict[str, Any], query: str, search_type: str, is_category_focused: bool = False) -> float:
         """Calculate relevance score for search results."""
         score = 0.0
         body = (post.get("body") or "").lower()
@@ -92,6 +92,25 @@ class ForumSearchAPI:
             category = (post.get("category") or "").lower()
             if query_lower in category:
                 score += 90
+                
+        # Special boost for category matches when search is category-focused
+        if is_category_focused:
+            category = (post.get("category") or "").lower()
+            query_clean = query_lower.replace(" law", "").strip()
+            
+            # Exact category match gets massive boost
+            if query_clean == "family" and "family" in category:
+                score += 200  # Highest priority for exact category match
+            elif query_clean == "labor" and ("labor" in category or "labour" in category):
+                score += 200
+            elif query_clean == "civil" and "civil" in category:
+                score += 200
+            elif query_clean == "consumer" and "consumer" in category:
+                score += 200
+            elif query_clean == "criminal" and "criminal" in category:
+                score += 200
+            elif query_clean in category:
+                score += 150  # High boost for partial category match
                 
         # Boost recent posts slightly
         try:
@@ -327,7 +346,7 @@ search_api = ForumSearchAPI()
 @router.get("/search", response_model=SearchResponse)
 async def search_forum_posts(
     q: str = Query(..., description="Search query"),
-    limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
+    limit: int = Query(50, ge=1, le=100, description="Number of results to return"),
     category: Optional[str] = Query(None, description="Filter by category"),
     sort: str = Query("relevance", description="Sort by: relevance, date, replies"),
     current_user: Dict[str, Any] = Depends(get_current_user)
@@ -367,20 +386,35 @@ async def search_forum_posts(
             raw_results = await search_api.search_by_username(query, limit * 2)
         elif search_type == "category":
             raw_results = await search_api.search_by_category(query, limit * 2)
-        else:  # content search - also search usernames and categories for broader results
-            # Primary content search
-            content_results = await search_api.search_by_content(query, limit)
-            raw_results.extend(content_results)
-            
-            # Also search usernames (without @ prefix)
-            username_results = await search_api.search_by_username(query, limit // 2)
-            raw_results.extend(username_results)
-            
-            # Also search categories if query might be a category
+        else:  # content search - prioritize category matches, then content matches
+            # Check if query matches a category first
             query_lower = query.lower()
             category_keywords = ["family", "labor", "labour", "civil", "consumer", "criminal", "law"]
-            if any(keyword in query_lower for keyword in category_keywords):
-                category_results = await search_api.search_by_category(query, limit // 2)
+            is_likely_category = any(keyword in query_lower for keyword in category_keywords)
+            
+            if is_likely_category:
+                # Prioritize category search for category-like queries - get more results
+                category_results = await search_api.search_by_category(query, limit * 3)  # Get 3x more category results
+                raw_results.extend(category_results)
+                
+                # Add content search results but with lower priority
+                content_results = await search_api.search_by_content(query, limit // 2)
+                raw_results.extend(content_results)
+                
+                # Add username search for completeness
+                username_results = await search_api.search_by_username(query, limit // 4)
+                raw_results.extend(username_results)
+            else:
+                # For non-category queries, prioritize content search
+                content_results = await search_api.search_by_content(query, limit)
+                raw_results.extend(content_results)
+                
+                # Also search usernames
+                username_results = await search_api.search_by_username(query, limit // 2)
+                raw_results.extend(username_results)
+                
+                # Check categories as fallback
+                category_results = await search_api.search_by_category(query, limit // 4)
                 raw_results.extend(category_results)
                 
             # Remove duplicates from mixed search
@@ -402,12 +436,17 @@ async def search_forum_posts(
         
         # Calculate relevance scores and sort
         scored_results = []
+        
+        # Check if this is a category-focused search for scoring
+        query_lower = query.lower()
+        category_keywords = ["family", "labor", "labour", "civil", "consumer", "criminal", "law"]
+        is_category_focused = search_type == "category" or any(keyword in query_lower for keyword in category_keywords)
+        
         for post in raw_results:
             try:
-                relevance_score = search_api.calculate_relevance_score(post, query, search_type)
-                if relevance_score > 0:  # Only include relevant results
-                    post["relevance_score"] = relevance_score
-                    scored_results.append(post)
+                relevance_score = search_api.calculate_relevance_score(post, query, search_type, is_category_focused)
+                post["relevance_score"] = relevance_score
+                scored_results.append(post)
             except Exception as e:
                 logger.error(f"Error scoring post {post.get('id', 'unknown')}: {str(e)}")
                 continue
@@ -418,8 +457,9 @@ async def search_forum_posts(
         elif sort == "date":
             scored_results.sort(key=lambda x: x.get("created_at", ""), reverse=True)
         
-        # Limit results
-        final_results = scored_results[:limit]
+        # Return final results with proper pagination - increase limit for category searches
+        result_limit = limit * 2 if is_category_focused else limit
+        final_results = scored_results[:result_limit]
         
         # Get user bookmarks for the results
         user_id = current_user.get("id")

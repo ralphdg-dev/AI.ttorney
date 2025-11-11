@@ -71,12 +71,19 @@ const Post: React.FC<PostProps> = React.memo(({
 
   // Helper function to get initials from name
   const getInitials = (name: string) => {
-    return name
+    if (!name || typeof name !== 'string') {
+      return 'U'; // Default to 'U' for User
+    }
+    
+    const initials = name
+      .trim()
       .split(' ')
       .map(n => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
+    
+    return initials || 'U'; // Fallback to 'U' if no initials
   };
 
   // Format timestamp dynamically
@@ -311,13 +318,13 @@ const Post: React.FC<PostProps> = React.memo(({
             <View style={styles.userNameRow}>
               {isSearchResult && searchTerm && searchTerm.startsWith('@') ? (
                 <SearchHighlight
-                  text={user.name}
+                  text={user.name || 'User'}
                   searchTerm={searchTerm}
                   style={styles.userName}
                   isUsername={true}
                 />
               ) : (
-                <Text style={styles.userName}>{user.name}</Text>
+                <Text style={styles.userName}>{user.name || 'User'}</Text>
               )}
               
               {/* Category Badge */}
@@ -335,7 +342,7 @@ const Post: React.FC<PostProps> = React.memo(({
             <View style={styles.userMetaRow}>
               {!isAnonymous && (
                 <>
-                  <Text style={styles.userHandle}>@{user.username}</Text>
+                  <Text style={styles.userHandle}>@{user.username || 'user'}</Text>
                   <Text style={styles.metaSeparator}> • </Text>
                 </>
               )}
