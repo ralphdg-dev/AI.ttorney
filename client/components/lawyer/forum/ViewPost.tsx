@@ -243,29 +243,30 @@ const ViewPost: React.FC = () => {
     }
   }, [currentUser?.id, postId, session, bookmarked]);
 
-  const handleReportPress = async () => {
+  const handleReportPress = () => {
     setMenuOpen(false);
-    
-    // Check if user has already reported this post
-    if (post?.id && currentUser?.id) {
-      const checkResult = await ReportService.hasUserReported(
-        post.id,
-        'post',
-        currentUser.id,
-        session
-      );
-      
-      if (checkResult.success && checkResult.hasReported) {
-        // Show already reported modal immediately
-        setShowAlreadyReportedPost(true);
-        setReportModalVisible(true);
-        return;
-      }
-    }
-    
-    // User hasn't reported yet, show normal report form
+    // Open the modal immediately for instant feedback
     setShowAlreadyReportedPost(false);
     setReportModalVisible(true);
+
+    // Run the check in the background and update state if needed
+    (async () => {
+      if (post?.id && currentUser?.id) {
+        try {
+          const checkResult = await ReportService.hasUserReported(
+            post.id,
+            'post',
+            currentUser.id,
+            session
+          );
+          if (checkResult.success && checkResult.hasReported) {
+            setShowAlreadyReportedPost(true);
+          }
+        } catch {
+          // Silently ignore check errors
+        }
+      }
+    })();
   };
 
   const handleSubmitReport = async (reason: string, category: string, reasonContext?: string) => {
@@ -336,30 +337,31 @@ const ViewPost: React.FC = () => {
     }
   };
 
-  const handleReportReplyPress = async (replyId: string) => {
+  const handleReportReplyPress = (replyId: string) => {
     setSelectedReplyId(replyId);
     setReplyMenuOpen(null);
-    
-    // Check if user has already reported this reply
-    if (currentUser?.id) {
-      const checkResult = await ReportService.hasUserReported(
-        replyId,
-        'reply',
-        currentUser.id,
-        session
-      );
-      
-      if (checkResult.success && checkResult.hasReported) {
-        // Show already reported modal immediately
-        setShowAlreadyReportedReply(true);
-        setReportReplyModalVisible(true);
-        return;
-      }
-    }
-    
-    // User hasn't reported yet, show normal report form
+    // Open the modal immediately
     setShowAlreadyReportedReply(false);
     setReportReplyModalVisible(true);
+
+    // Run the check in the background
+    (async () => {
+      if (currentUser?.id) {
+        try {
+          const checkResult = await ReportService.hasUserReported(
+            replyId,
+            'reply',
+            currentUser.id,
+            session
+          );
+          if (checkResult.success && checkResult.hasReported) {
+            setShowAlreadyReportedReply(true);
+          }
+        } catch {
+          // Ignore check errors
+        }
+      }
+    })();
   };
 
   // Optimized post loading with cache-first approach

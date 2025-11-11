@@ -194,27 +194,29 @@ const Post: React.FC<PostProps> = React.memo(({
     onCommentPress?.();
   }, [onCommentPress]);
 
-  const handleReportPress = useCallback(async () => {
-    // Check if user has already reported this post
-    if (currentUser?.id) {
-      const checkResult = await ReportService.hasUserReported(
-        id,
-        'post',
-        currentUser.id,
-        session
-      );
-      
-      if (checkResult.success && checkResult.hasReported) {
-        // Show already reported modal immediately
-        setShowAlreadyReported(true);
-        setReportModalVisible(true);
-        return;
-      }
-    }
-    
-    // User hasn't reported yet, show normal report form
-    setShowAlreadyReported(false);
+  const handleReportPress = useCallback(() => {
+    // Open the modal immediately for instant feedback
     setReportModalVisible(true);
+    setShowAlreadyReported(false);
+
+    // Run the check in the background and update state if needed
+    (async () => {
+      if (currentUser?.id) {
+        try {
+          const checkResult = await ReportService.hasUserReported(
+            id,
+            'post',
+            currentUser.id,
+            session
+          );
+          if (checkResult.success && checkResult.hasReported) {
+            setShowAlreadyReported(true);
+          }
+        } catch {
+          // Silently ignore check errors; user can still submit
+        }
+      }
+    })();
   }, [currentUser?.id, id, session]);
 
   const handleReportSubmit = useCallback(async (reason: string, category: string, reasonContext?: string) => {
