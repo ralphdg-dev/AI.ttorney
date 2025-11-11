@@ -482,6 +482,56 @@ class LawyerApplicationService:
             logger.error(f"Clear pending lawyer status error: {str(e)}")
             return {"success": False, "error": str(e)}
 
+    async def get_user_application(self, user_id: str) -> Dict[str, Any]:
+        """Get user's current application"""
+        try:
+            result = await self._get_latest_user_application(user_id)
+            if result["success"]:
+                return result["data"]
+            return None
+        except Exception as e:
+            logger.error(f"Get user application error: {str(e)}")
+            return None
+
+    async def activate_verified_lawyer(self, user_id: str) -> Dict[str, Any]:
+        """Update user role to verified_lawyer after accepting application approval"""
+        try:
+            # First, verify the user has an accepted application
+            application = await self.get_user_application(user_id)
+            
+            if not application or application.get("status") != "accepted":
+                return {
+                    "success": False,
+                    "error": "No accepted application found for this user"
+                }
+            
+            # Update user: role = verified_lawyer, pending_lawyer = false
+            update_data = {
+                "role": "verified_lawyer",
+                "pending_lawyer": False,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            result = await self.supabase.update_user_profile(
+                update_data,
+                {"id": user_id}
+            )
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "message": "User role updated to verified lawyer successfully"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Failed to update user role"
+                }
+                
+        except Exception as e:
+            logger.error(f"Activate verified lawyer error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
     async def get_user_application_history(self, user_id: str) -> Dict[str, Any]:
         """Get user's complete application history"""
         try:

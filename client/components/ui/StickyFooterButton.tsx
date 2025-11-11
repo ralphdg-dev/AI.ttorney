@@ -31,16 +31,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: '#FFFFFF',
-    paddingBottom: 8,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 16,
   },
   divider: {
     height: 1,
     backgroundColor: '#E5E7EB',
+    marginHorizontal: 0,
   },
   innerPad: {
-    paddingHorizontal: 24,
-    marginTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 8,
+    paddingHorizontal: 20,
+    marginTop: 16,
+    paddingBottom: 0,
     backgroundColor: '#FFFFFF',
   },
 });

@@ -45,8 +45,8 @@ export default function StatusScreen({ image, title, description, buttonLabel, o
         </Box>
       )}
 
-      {/* Centered content */}
-      <Box className="flex-1 items-center justify-center px-6 -mt-44">
+      {/* Centered content with bottom padding to prevent overlap */}
+      <Box className="flex-1 items-center justify-center px-6 pb-32">
         <Image 
           source={image} 
           className="w-[180px] h-[180px] mb-5" 

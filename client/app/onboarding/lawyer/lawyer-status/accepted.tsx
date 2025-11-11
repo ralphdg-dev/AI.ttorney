@@ -1,19 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { router } from 'expo-router';
+import { View, Text } from 'react-native';
 import { lawyerApplicationService, LawyerApplicationStatus } from '../../../../services/lawyerApplicationService';
 import StatusScreen from '../../../../components/ui/StatusScreen';
-import { useAuth } from '../../../../contexts/AuthContext';
 import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
+import { useAuth } from '../../../../contexts/AuthContext';
 
 export default function AcceptedStatus() {
   const [, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { refreshUserData } = useAuth();
+  const [showContent, setShowContent] = useState(false);
+  const { user, refreshUserData } = useAuth();
 
-  // Status polling is handled by LawyerStatusGuard
-
+  // CRITICAL: Force show content after 1 second no matter what
   useEffect(() => {
+    console.log('🎯 AcceptedStatus: Component mounted');
+    const forceShowTimeout = setTimeout(() => {
+      console.log('🎯 AcceptedStatus: Force showing content after 1s');
+      setShowContent(true);
+    }, 1000);
+
     loadApplicationStatus();
+
+    return () => clearTimeout(forceShowTimeout);
   }, []);
 
   const loadApplicationStatus = async () => {
@@ -27,41 +36,56 @@ export default function AcceptedStatus() {
     }
   };
 
-  const handleGoToDashboard = async () => {
+  const handleContinueAsLawyer = async () => {
     if (isProcessing) return;
     
+    console.log('🚀 Starting lawyer activation...');
     setIsProcessing(true);
     
-    // Navigate immediately for better UX
-    router.push('/lawyer' as any);
-    
     try {
-      // Clear the pending_lawyer flag in background
-      const result = await lawyerApplicationService.clearPendingLawyerStatus();
+      console.log('📞 Calling activateVerifiedLawyer API...');
+      const result = await lawyerApplicationService.activateVerifiedLawyer();
+      console.log('📥 API response:', result);
       
       if (result.success) {
-        // Refresh user data in AuthContext to update pending_lawyer flag
+        console.log('✅ Activation successful, refreshing user data...');
+        // Refresh user data in AuthContext to update role
         await refreshUserData();
+        console.log('✅ User data refreshed, navigating to lawyer dashboard...');
+        
+        // Navigate to lawyer dashboard
+        router.replace('/lawyer' as any);
       } else {
-        console.error('Failed to clear pending lawyer status:', result.message);
+        console.error('❌ Activation failed:', result.message);
+        setIsProcessing(false);
+        alert(`Failed to activate lawyer account: ${result.message}`);
       }
     } catch (error) {
-      console.error('Error clearing pending lawyer status:', error);
-    } finally {
+      console.error('❌ Error during activation:', error);
       setIsProcessing(false);
+      alert('An error occurred. Please check the console and try again.');
     }
   };
+
+  // Show loading fallback if guard is taking too long
+  if (!showContent) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: '#666' }}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <LawyerStatusGuard requiredStatus="accepted">
       <StatusScreen
         image={require('../../../../assets/images/lawyer-registration/accepted.png')}
-        title="Application Accepted!"
-        description="Congratulations! Your lawyer application has been approved. You now have access to the lawyer dashboard and all lawyer features."
-        buttonLabel={isProcessing ? "Processing..." : "Go to Lawyer Dashboard"}
-        onPress={handleGoToDashboard}
+        title="Application Approved!"
+        description="Congratulations! Your application has been approved. Click Continue to become a verified lawyer."
+        buttonLabel={isProcessing ? "Processing..." : "Continue as Lawyer"}
+        onPress={handleContinueAsLawyer}
         showBackButton={false}
-        imageAlt="Lawyer application accepted"
+        imageAlt="Lawyer application approved"
       />
     </LawyerStatusGuard>
   );

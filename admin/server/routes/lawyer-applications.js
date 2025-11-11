@@ -154,9 +154,9 @@ router.get('/', authenticateAdmin, async (req, res) => {
       .in('id', searchFilteredIds)
       .order('submitted_at', { ascending: false });
 
-    // Add archived filter
+    // Add archived filter (handle null values - null means active/not archived)
     if (archived === 'active') {
-      query = query.eq('archived', false);
+      query = query.or('archived.is.null,archived.eq.false');
     } else if (archived === 'archived') {
       query = query.eq('archived', true);
     }
@@ -251,7 +251,7 @@ router.get('/', authenticateAdmin, async (req, res) => {
         .from('lawyer_applications')
         .select('id')
         .in('id', searchFilteredIds)
-        .eq('archived', false);
+        .or('archived.is.null,archived.eq.false');
       totalFilteredIds = archivedFilteredApps?.map(app => app.id) || [];
     } else if (archived === 'archived') {
       const { data: archivedFilteredApps } = await supabaseAdmin
@@ -553,18 +553,17 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
       const status = filteredUpdateData.status;
       
       if (status === 'approved') {
-        // Update user role to verified_lawyer
+        // Only update pending_lawyer flag, do not change role
         const { error: userError } = await supabaseAdmin
           .from('users')
           .update({ 
-            role: 'verified_lawyer',
             pending_lawyer: false,
             updated_at: new Date().toISOString()
           })
           .eq('id', application.user_id);
 
         if (userError) {
-          console.error('Failed to update user role:', userError);
+          console.error('Failed to update user pending_lawyer flag:', userError);
         }
       } else if (status === 'rejected') {
         // Get current user data to check rejection count
@@ -798,18 +797,17 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
 
     // Handle user table updates based on status
     if (status === 'approved') {
-      // Update user role to verified_lawyer
+      // Only update pending_lawyer flag, do not change role
       const { error: userError } = await supabaseAdmin
         .from('users')
         .update({ 
-          role: 'verified_lawyer',
           pending_lawyer: false,
           updated_at: new Date().toISOString()
         })
         .eq('id', application.user_id);
 
       if (userError) {
-        console.error('Failed to update user role:', userError);
+        console.error('Failed to update user pending_lawyer flag:', userError);
         // Don't fail the whole operation, just log the error
       }
     } else if (status === 'rejected') {

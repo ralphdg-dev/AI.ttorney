@@ -458,7 +458,9 @@ export const SidebarWrapper: React.FC<{
             if (appStatus === 'pending') {
               router.push('/onboarding/lawyer/lawyer-status/pending');
             } else if (appStatus === 'accepted') {
-              router.push('/onboarding/lawyer/lawyer-status/accepted');
+              // For accepted status, redirect to home - they should not see this in sidebar
+              // The accepted modal will be shown on login
+              router.push('/home');
             } else if (appStatus === 'rejected') {
               router.push('/onboarding/lawyer/lawyer-status/rejected');
             } else if (appStatus === 'resubmission') {

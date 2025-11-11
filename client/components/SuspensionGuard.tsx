@@ -42,8 +42,28 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
       // 4. Already checking
       // 5. Auth is still loading
       // 6. Already checked for this user
+      // 7. On lawyer status pages (they have their own guard)
       const publicRoutes = ['/login', '/register', '/suspended', '/suspension-lifted', '/forgot-password', '/onboarding'];
-      const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route));
+      const isLawyerStatusPage = pathname?.includes('/lawyer-status/');
+      const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route)) || isLawyerStatusPage;
+      
+      console.log('🛡️ SuspensionGuard: Check conditions', { 
+        pathname, 
+        isLawyerStatusPage, 
+        isPublicRoute,
+        hasUser: !!user,
+        hasSession: !!session,
+        isChecking,
+        isLoading,
+        hasChecked
+      });
+      
+      // CRITICAL: Mark as checked immediately for lawyer status pages
+      if (isLawyerStatusPage && !hasChecked) {
+        console.log('🛡️ SuspensionGuard: Lawyer status page detected, marking as checked');
+        setHasChecked(true);
+        return;
+      }
       
       if (isPublicRoute || !user || !session || isChecking || isLoading || hasChecked) {
         // ⚡ OPTIMIZATION: Mark as checked immediately on public routes or when auth is loading

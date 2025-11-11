@@ -28,14 +28,15 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     
     if (!routeConfig) return;
 
-    // Skip checks for lawyer status screens to prevent redirect loops
-    if (currentPath.includes('/lawyer-status/')) {
-      return;
-    }
-
     // Wait for initial auth check to complete (prevents race condition on hard refresh)
     if (!initialAuthCheck) {
       return; // Block ALL routes until we know if user is guest/authenticated/unauthenticated
+    }
+
+    // Skip permission checks for lawyer status screens to prevent redirect loops
+    // But still render the children (LawyerStatusGuard will handle access control)
+    if (currentPath.includes('/lawyer-status/')) {
+      return;
     }
 
     // ⚡ OPTIMIZATION: Allow public routes to render immediately after initial check

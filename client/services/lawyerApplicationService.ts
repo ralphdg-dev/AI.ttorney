@@ -487,6 +487,35 @@ class LawyerApplicationService {
     }
   }
 
+  // Activate verified lawyer role after user accepts application approval
+  async activateVerifiedLawyer(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.makeRequest('/api/lawyer-applications/activate-lawyer', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to activate verified lawyer role');
+      }
+
+      const data = await response.json();
+      
+      // Clear cache since user status has changed
+      this.clearStatusCache();
+      
+      return {
+        success: true,
+        message: data.message || 'Verified lawyer role activated successfully'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to activate verified lawyer role'
+      };
+    }
+  }
+
   // Resubmit application (creates new version)
   async resubmitApplication(applicationData: {
     full_name: string;

@@ -230,6 +230,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             applicationStatus = 'pending';
           }
           
+          // Special handling for accepted status - show approval modal
+          if (applicationStatus === 'accepted') {
+            console.log('🎉 Application accepted! Redirecting to acceptance page');
+            setIsLoading(false);
+            router.replace('/onboarding/lawyer/lawyer-status/accepted' as any);
+            return;
+          }
+          
           const redirectPath = getRoleBasedRedirect(
             profile.role, 
             profile.is_verified, 

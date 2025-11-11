@@ -278,6 +278,36 @@ async def clear_pending_lawyer_status(
             detail="Internal server error"
         )
 
+@router.post("/activate-lawyer", response_model=Dict[str, Any])
+async def activate_verified_lawyer(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Update user role to verified_lawyer after user accepts their application approval"""
+    try:
+        user_id = current_user["user"]["id"]
+        
+        result = await lawyer_service.activate_verified_lawyer(user_id)
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["error"]
+            )
+        
+        return {
+            "success": True,
+            "message": result["message"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Activate verified lawyer error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
 @router.post("/resubmit", response_model=Dict[str, Any])
 async def resubmit_lawyer_application(
     full_name: str = Form(...),
