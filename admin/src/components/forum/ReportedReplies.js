@@ -43,6 +43,7 @@ const ReportedReplies = () => {
   const [resolutionAction, setResolutionAction] = useState("");
   const [resolving, setResolving] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [openMenuPos, setOpenMenuPos] = useState({ right: 20, bottom: 20 });
 
   const statusOptions = [
     { value: "all", label: "All Reports" },
@@ -259,7 +260,17 @@ const ReportedReplies = () => {
       render: (report) => (
         <div className="relative" style={{ position: 'static' }}>
           <button
-            onClick={() => setOpenMenuId(openMenuId === report.id ? null : report.id)}
+            onClick={(e) => {
+              if (openMenuId === report.id) {
+                setOpenMenuId(null);
+                return;
+              }
+              const rect = e.currentTarget.getBoundingClientRect();
+              const right = Math.max(8, window.innerWidth - rect.right);
+              const bottom = Math.max(8, window.innerHeight - rect.top + 8); // place above trigger
+              setOpenMenuPos({ right, bottom });
+              setOpenMenuId(report.id);
+            }}
             className="p-1 rounded hover:bg-gray-100 text-gray-600"
           >
             <MoreVertical className="w-4 h-4" />
@@ -271,7 +282,7 @@ const ReportedReplies = () => {
                 className="fixed inset-0 z-10"
                 onClick={() => setOpenMenuId(null)}
               />
-              <div className="fixed mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[9999]" style={{ right: '20px' }}>
+              <div className="fixed w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[9999]" style={{ right: `${openMenuPos.right}px`, bottom: `${openMenuPos.bottom}px` }}>
                 <button
                   onClick={() => {
                     openResolutionModal(report, "view");
