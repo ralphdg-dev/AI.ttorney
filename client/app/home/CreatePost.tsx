@@ -53,16 +53,6 @@ const CreatePost: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={{ flex: 1 }}>
-          {/* Moderation Warning Banner */}
-          {moderationStatus && (
-            <ModerationWarningBanner
-              strikeCount={moderationStatus.strike_count}
-              suspensionCount={moderationStatus.suspension_count}
-              accountStatus={moderationStatus.account_status}
-              suspensionEnd={moderationStatus.suspension_end}
-            />
-          )}
-
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -118,6 +108,18 @@ const CreatePost: React.FC = () => {
           </View>
         </View>
       </KeyboardAvoidingView>
+      
+      {/* Moderation Warning Banner - Fixed at bottom */}
+      {moderationStatus && (
+        <View style={styles.bottomBannerContainer}>
+          <ModerationWarningBanner
+            strikeCount={moderationStatus.strike_count}
+            suspensionCount={moderationStatus.suspension_count}
+            accountStatus={moderationStatus.account_status}
+            suspensionEnd={moderationStatus.suspension_end}
+          />
+        </View>
+      )}
       
       <Navbar activeTab="home" />
     </SafeAreaView>
@@ -250,6 +252,13 @@ const styles = StyleSheet.create({
   },
   counterTextExceeded: {
     color: '#DC2626',
+  },
+  bottomBannerContainer: {
+    position: 'absolute',
+    bottom: 80,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
 });
 

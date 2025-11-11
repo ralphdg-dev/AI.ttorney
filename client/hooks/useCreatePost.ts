@@ -14,6 +14,7 @@ import { NetworkConfig } from '@/utils/networkConfig';
 import { useToast } from '@/components/ui/toast';
 import { parseModerationError } from '@/services/moderationService';
 import { showModerationToast, showStrikeAddedToast, showSuspendedToast, showBannedToast } from '@/utils/moderationToastUtils';
+import { validatePostContent } from '@/utils/contentValidation';
 
 // Constants
 const OPTIMISTIC_CONFIRM_DELAY = 500;
@@ -167,6 +168,19 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
     // Validation
     if (!isAuthenticated) {
       Alert.alert('Authentication Required', 'Please log in to create a post.', [{ text: 'OK' }]);
+      return;
+    }
+
+    // Validate content for prohibited material (links, promotional content)
+    const validation = validatePostContent(content);
+    if (!validation.isValid) {
+      showModerationToast(
+        toast,
+        'error',
+        validation.reason || 'Content Blocked',
+        validation.details || 'This post cannot be published.',
+        6000
+      );
       return;
     }
 

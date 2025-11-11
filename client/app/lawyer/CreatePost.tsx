@@ -52,16 +52,6 @@ const LawyerCreatePost: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
-          {/* Moderation Warning Banner */}
-          {moderationStatus && (
-            <ModerationWarningBanner
-              strikeCount={moderationStatus.strike_count}
-              suspensionCount={moderationStatus.suspension_count}
-              accountStatus={moderationStatus.account_status}
-              suspensionEnd={moderationStatus.suspension_end}
-            />
-          )}
-
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -82,11 +72,11 @@ const LawyerCreatePost: React.FC = () => {
           {/* Guidelines */}
           <View style={styles.guidelinesContainer}>
             <View style={styles.guidelinesHeader}>
-              <Shield size={16} color={Colors.primary.blue} />
+              <Shield size={14} color={Colors.primary.blue} />
               <Text style={styles.guidelinesTitle}>Professional Guidelines</Text>
             </View>
             <Text style={styles.guidelinesText}>
-              Follow ethics rules • Share general info only • Avoid specific case advice • No legal promotion
+              Adhere to professional ethics standards. Provide general legal information only. Do not promote your firm, solicit clients, or include external links. Posts with prohibited content will be automatically blocked.
             </Text>
           </View>
 
@@ -124,6 +114,18 @@ const LawyerCreatePost: React.FC = () => {
         </ScrollView>
       </KeyboardAvoidingView>
       
+      {/* Moderation Warning Banner - Fixed at bottom */}
+      {moderationStatus && (
+        <View style={styles.bottomBannerContainer}>
+          <ModerationWarningBanner
+            strikeCount={moderationStatus.strike_count}
+            suspensionCount={moderationStatus.suspension_count}
+            accountStatus={moderationStatus.account_status}
+            suspensionEnd={moderationStatus.suspension_end}
+          />
+        </View>
+      )}
+      
       <LawyerNavbar activeTab="forum" />
     </SafeAreaView>
   );
@@ -159,29 +161,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   guidelinesContainer: {
-    backgroundColor: '#E8F4FD',
-    borderColor: '#C1E4F7',
+    backgroundColor: '#F0F9FF',
+    borderColor: '#DBEAFE',
     borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 8,
+    padding: 10,
+    paddingHorizontal: 12,
     marginHorizontal: 16,
-    marginVertical: 8,
+    marginVertical: 6,
   },
   guidelinesHeader: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   guidelinesTitle: {
-    marginLeft: 8,
-    fontSize: 14,
+    marginLeft: 6,
+    fontSize: 11,
     fontWeight: '600' as const,
     color: '#023D7B',
+    letterSpacing: 0.2,
   },
   guidelinesText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#023D7B',
+    fontSize: 10,
+    lineHeight: 14,
+    color: '#1E40AF',
   },
   categoriesWrapper: {
     borderBottomWidth: 1,
@@ -237,6 +241,13 @@ const styles = StyleSheet.create({
   },
   counterTextExceeded: {
     color: '#DC2626',
+  },
+  bottomBannerContainer: {
+    position: 'absolute',
+    bottom: 80,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
 });
 
