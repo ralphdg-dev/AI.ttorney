@@ -1081,9 +1081,9 @@ def generate_answer(question: str, context: str, conversation_history: List[Dict
         {"role": "system", "content": system_prompt},
     ]
     
-    # Add conversation history (last 3 exchanges only, keep it natural)
-    # This provides the requested "Context Awareness"
-    for msg in conversation_history[-3:]:
+    # Add conversation history (last 8 exchanges for enhanced context awareness)
+    # This provides superior conversation continuity for professional legal analysis
+    for msg in conversation_history[-8:]:
         messages.append(msg)
     
     # === MODIFICATION: Updated User Message to pass context ===
@@ -1454,6 +1454,47 @@ async def save_chat_interaction(
         print(f"⚠️  Failed to save chat history: {e}")
         print(f"   Traceback: {traceback.format_exc()}")
         return (session_id, None, None)
+
+
+async def get_conversation_history_from_db(
+    chat_service: ChatHistoryService,
+    session_id: Optional[str],
+    limit: int = 16  # 8 exchanges = 16 messages (user + assistant pairs)
+) -> List[Dict[str, str]]:
+    """
+    Retrieve conversation history from database for enhanced professional context continuity.
+    Returns messages in OpenAI format: [{"role": "user", "content": "..."}, ...]
+    """
+    if not session_id:
+        return []
+    
+    try:
+        print(f"🔍 Retrieving conversation history from session: {session_id}")
+        
+        # Get recent messages from the session (excluding the current question)
+        messages = await chat_service.get_session_messages(
+            session_id=UUID(session_id),
+            limit=limit
+        )
+        
+        if not messages:
+            print(f"   ℹ️ No previous messages found in session")
+            return []
+        
+        # Convert to OpenAI format and exclude the very last message (current question)
+        conversation_history = []
+        for msg in messages[:-1]:  # Exclude last message (current question)
+            conversation_history.append({
+                "role": msg.role,
+                "content": msg.content[:800]  # Higher limit for lawyer context (800 chars)
+            })
+        
+        print(f"   ✅ Retrieved {len(conversation_history)} messages from database")
+        return conversation_history
+        
+    except Exception as e:
+        print(f"   ⚠️ Error retrieving conversation history: {e}")
+        return []
 
 
 @router.post("/ask/legacy", response_model=ChatResponse, deprecated=True)
@@ -1890,11 +1931,23 @@ async def ask_legal_question_legacy(
             # No sources found - using general knowledge
             confidence = "medium"
         
+        # Retrieve conversation history from database for enhanced professional context
+        print(f"\n💬 [STEP 8.5] Retrieving conversation history from database...")
+        db_conversation_history = await get_conversation_history_from_db(
+            chat_service=chat_service,
+            session_id=request.session_id,
+            limit=16  # Last 8 exchanges (16 messages)
+        )
+        
+        # Use database history if available, fallback to client-provided history
+        conversation_history = db_conversation_history if db_conversation_history else (request.conversation_history or [])
+        
         # Generate answer with proper complexity detection
+        print(f"   📊 Using {len(conversation_history)} messages for context (from {'database' if db_conversation_history else 'client'})")
         answer, _, simplified_summary = generate_answer(
             request.question,
             context,
-            request.conversation_history, # <-- This provides context awareness
+            conversation_history, # <-- Enhanced context awareness from database
             language,
             request.max_tokens, # <-- This passes the new 1500 default
             is_complex=is_complex  # Use actual complexity detection for production

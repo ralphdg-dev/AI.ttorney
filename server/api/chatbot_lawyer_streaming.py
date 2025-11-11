@@ -511,8 +511,8 @@ async def ask_legal_question(
             system_prompt = LAWYER_SYSTEM_PROMPT_ENGLISH if language in ["english", "taglish"] else LAWYER_SYSTEM_PROMPT_TAGALOG
             messages = [{"role": "system", "content": system_prompt}]
             
-            # Add conversation history (last 3 exchanges for context awareness)
-            for msg in request.conversation_history[-3:]:
+            # Add conversation history (last 8 exchanges for enhanced context awareness)
+            for msg in request.conversation_history[-8:]:
                 messages.append(msg)
             
             # Add current question with context

@@ -432,7 +432,7 @@ async def ask_legal_question(
             # Build messages
             system_prompt = ENGLISH_SYSTEM_PROMPT if language == "english" else TAGALOG_SYSTEM_PROMPT
             messages = [{"role": "system", "content": system_prompt}]
-            for msg in request.conversation_history[-1:]:
+            for msg in request.conversation_history[-6:]:
                 messages.append(msg)
             
             user_message = f"Legal Context:\n{context}\n\nUser Question: {request.question}\n\nProvide an informational response."
