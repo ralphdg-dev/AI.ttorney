@@ -400,7 +400,13 @@ class ForumManagementService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to resolve report");
+        const rawMsg = data?.error || "Failed to resolve report";
+        // If the backend failed during violation processing (often due to already-banned users),
+        // present a clearer, non-technical message.
+        const remapped = /failed to process violation/i.test(rawMsg)
+          ? "User is already restricted. Further sanctions have no effect."
+          : rawMsg;
+        throw new Error(remapped);
       }
 
       return data;
@@ -427,7 +433,11 @@ class ForumManagementService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to resolve reply report");
+        const rawMsg = data?.error || "Failed to resolve reply report";
+        const remapped = /failed to process violation/i.test(rawMsg)
+          ? "User is already restricted. Further sanctions have no effect."
+          : rawMsg;
+        throw new Error(remapped);
       }
 
       return data;

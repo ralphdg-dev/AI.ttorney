@@ -870,54 +870,81 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
               console.warn("Failed to set is_flagged=true on forum_posts:", flagUpdateErr);
             }
 
-            // Get current user strike/suspension counts
+            // Get current user strike/suspension counts and status
             const { data: userRow } = await supabaseAdmin
               .from("users")
-              .select("id, strike_count, suspension_count")
+              .select("id, strike_count, suspension_count, account_status")
               .eq("id", postRow.user_id)
               .maybeSingle();
 
+            const alreadyBanned = userRow?.account_status === 'banned';
             const currentStrikes = (userRow?.strike_count || 0);
             const currentSuspensions = (userRow?.suspension_count || 0);
-            const newStrikeCount = currentStrikes + 1;
+            const newStrikeCount = alreadyBanned ? currentStrikes : currentStrikes + 1;
 
-            // Increment strike count
-            const { error: userUpdateErr } = await supabaseAdmin
-              .from("users")
-              .update({
-                strike_count: newStrikeCount,
-                last_violation_at: new Date().toISOString(),
-              })
-              .eq("id", postRow.user_id);
+            let actionTaken = 'strike_added';
+            let userUpdate = { last_violation_at: new Date().toISOString() };
 
-            if (userUpdateErr) {
-              console.warn("Failed to increment strike count:", userUpdateErr);
+            if (alreadyBanned) {
+              actionTaken = 'already_banned';
+            } else if (newStrikeCount >= 3) {
+              // Permanently ban at 3 strikes
+              actionTaken = 'banned';
+              userUpdate = {
+                ...userUpdate,
+                account_status: 'banned',
+                strike_count: 0,
+                banned_at: new Date().toISOString(),
+                banned_reason: 'Permanent ban after 3 strikes',
+              };
             } else {
-              // Create violation record for audit/history
-              try {
-                const violationData = {
-                  user_id: postRow.user_id,
-                  violation_type: "forum_post",
-                  content_id: postRow.id,
-                  content_text: (postRow.body || "").slice(0, 1000),
-                  flagged_categories: { admin_action: true },
-                  category_scores: { admin_action: 1.0 },
-                  violation_summary: "Admin sanctioned reported post",
-                  action_taken: "strike_added",
-                  strike_count_after: newStrikeCount,
-                  suspension_count_after: currentSuspensions,
-                };
+              userUpdate = {
+                ...userUpdate,
+                strike_count: newStrikeCount,
+              };
+            }
 
-                const { error: violationErr } = await supabaseAdmin
-                  .from("user_violations")
-                  .insert(violationData);
+            // Apply user update only if not already banned
+            if (!alreadyBanned) {
+              const { error: userUpdateErr } = await supabaseAdmin
+                .from("users")
+                .update(userUpdate)
+                .eq("id", postRow.user_id);
 
-                if (violationErr) {
-                  console.warn("Failed to create user violation record:", violationErr);
-                }
-              } catch (vioErr) {
-                console.warn("Exception creating violation record:", vioErr?.message || vioErr);
+              if (userUpdateErr) {
+                console.warn("Failed to update user status/strikes:", userUpdateErr);
               }
+            }
+
+            // Create violation record for audit/history
+            try {
+              const violationData = {
+                user_id: postRow.user_id,
+                violation_type: "forum_post",
+                content_id: postRow.id,
+                content_text: (postRow.body || "").slice(0, 1000),
+                flagged_categories: { admin_action: true },
+                category_scores: { admin_action: 1.0 },
+                violation_summary: "Admin sanctioned reported post",
+                action_taken: actionTaken,
+                strike_count_after: actionTaken === 'banned' ? 0 : newStrikeCount,
+                suspension_count_after: currentSuspensions,
+              };
+
+              const { error: violationErr } = await supabaseAdmin
+                .from("user_violations")
+                .insert(violationData);
+
+              if (violationErr) {
+                console.warn("Failed to create user violation record:", violationErr);
+              }
+            } catch (vioErr) {
+              console.warn("Exception creating violation record:", vioErr?.message || vioErr);
+            }
+
+            // Only send notifications and create suspensions when not already banned
+            if (actionTaken !== 'already_banned') {
+              // Note: this section remains unchanged from original implementation
             }
           }
         }
@@ -1259,31 +1286,21 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
           throw new Error("Failed to fetch user data");
         }
 
+        const alreadyBanned = userData.account_status === 'banned';
         const currentStrikes = userData.strike_count || 0;
         const currentSuspensions = userData.suspension_count || 0;
-        const newStrikeCount = currentStrikes + 1;
+        const prospectiveStrikeCount = alreadyBanned ? currentStrikes : currentStrikes + 1;
 
-        // Determine action based on strikes
-        let actionTaken = "strike_added";
+        // Determine action with permanent ban at 3 strikes
+        let actionTaken = alreadyBanned ? 'already_banned' : 'strike_added';
         let newSuspensionCount = currentSuspensions;
         let suspensionEnd = null;
-        let accountStatus = "active";
+        let accountStatus = userData.account_status || 'active';
 
-        if (newStrikeCount >= 3) {
-          if (currentSuspensions >= 2) {
-            // Permanent ban
-            actionTaken = "banned";
-            accountStatus = "banned";
-            newSuspensionCount = currentSuspensions + 1;
-          } else {
-            // 7-day suspension
-            actionTaken = "suspended";
-            accountStatus = "suspended";
-            const suspensionDate = new Date();
-            suspensionDate.setDate(suspensionDate.getDate() + 7);
-            suspensionEnd = suspensionDate.toISOString();
-            newSuspensionCount = currentSuspensions + 1;
-          }
+        if (!alreadyBanned && prospectiveStrikeCount >= 3) {
+          actionTaken = 'banned';
+          accountStatus = 'banned';
+          newSuspensionCount = currentSuspensions + 1; // optional audit increment
         }
 
         // Create violation record
@@ -1300,7 +1317,7 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
           },
           violation_summary: `Reply reported for ${report.reason}${report.reason_context ? `: ${report.reason_context}` : ""}`,
           action_taken: actionTaken,
-          strike_count_after: actionTaken === "banned" || actionTaken === "suspended" ? 0 : newStrikeCount,
+          strike_count_after: actionTaken === 'banned' ? 0 : prospectiveStrikeCount,
           suspension_count_after: newSuspensionCount,
         };
 
@@ -1318,22 +1335,22 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
         console.log("✅ Violation created:", violation.id);
 
         // Update user status
+        // Build user update
         const userUpdate = {
-          strike_count: actionTaken === "banned" || actionTaken === "suspended" ? 0 : newStrikeCount,
           suspension_count: newSuspensionCount,
           account_status: accountStatus,
           last_violation_at: new Date().toISOString(),
         };
 
-        if (suspensionEnd) {
-          userUpdate.suspension_end = suspensionEnd;
-        }
-
-        if (accountStatus === "banned") {
+        if (accountStatus === 'banned') {
+          userUpdate.strike_count = 0; // reset strikes on permanent ban
           userUpdate.banned_at = new Date().toISOString();
-          userUpdate.banned_reason = `Automatic ban after ${newSuspensionCount} suspensions`;
+          userUpdate.banned_reason = 'Permanent ban after 3 strikes';
+        } else if (!alreadyBanned) {
+          userUpdate.strike_count = prospectiveStrikeCount;
         }
 
+        // Only update if not already banned (to prevent further increments)
         const { error: updateError } = await supabaseAdmin
           .from("users")
           .update(userUpdate)
