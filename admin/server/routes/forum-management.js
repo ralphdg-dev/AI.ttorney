@@ -822,10 +822,11 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
     }
 
     // ✅ UPDATED: This now *only* updates the 'status' column
+    const newStatusPost = action === 'dismiss' ? 'dismissed' : action;
     const { data, error } = await supabaseAdmin
       .from("forum_reports")
       .update({
-        status: action,
+        status: newStatusPost,
         // resolution, resolution_notes, resolved_at, resolved_by are all removed
       })
       .eq("id", id)
@@ -937,9 +938,7 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
 
     res.json({
       success: true,
-      message: `Report ${
-        action === "dismiss" ? "dismissed" : "sanctioned"
-      } successfully`,
+      message: `Report ${newStatusPost === "dismissed" ? "dismissed" : "sanctioned"} successfully`,
       data: data,
     });
   } catch (error) {
