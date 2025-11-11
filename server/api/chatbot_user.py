@@ -539,28 +539,27 @@ def is_conversation_context_question(text: str) -> bool:
     text_lower = text.lower().strip()
     
     conversation_patterns = [
-        # Past conversation references
+        # Past conversation retrieval requests (asking TO SEE conversation history)
         'past convos', 'past conversations', 'previous chats', 'chat history',
-        'our conversation', 'our chat', 'what we talked about', 'earlier discussion',
-        'last convo', 'last conversation', 'our last chat', 'our last talk',
-        'before', 'previously', 'last time', 'earlier', 'nakaraan', 'dati',
+        'bring up our conversation', 'show our chat', 'what we talked about before',
+        'our conversation history', 'our chat history', 'previous discussion',
         
         # Chatbot capability questions
         'can you remember', 'do you remember', 'can you recall',
         'what can you do', 'your capabilities', 'how do you work',
         'kaya mo ba', 'naaalala mo ba', 'ano kaya mo',
         
-        # Memory/recall questions
-        'remember', 'recall', 'bring up', 'show me', 'naaalala', 'ipakita',
-        'history', 'kasaysayan', 'nakaraan',
+        # Memory/recall requests (asking to RETRIEVE past conversations)
+        'bring up our', 'show me our', 'recall our', 'naaalala mo ba ang',
+        'ipakita ang aming', 'balikan natin ang',
         
-        # Search patterns
-        'search', 'find', 'look for', 'hanap', 'hanapin', 'search for',
-        'we discussed', 'we talked about', 'pinag-usapan natin', 'napag-usapan',
+        # Search for conversation history
+        'search our conversation', 'find our chat', 'look for our discussion',
+        'hanap ang usapan', 'hanapin ang pag-uusapan',
         
-        # Direct conversation references
-        'talk about our', 'discuss our', 'about our conversation',
-        'usapan natin', 'pag-uusapan natin'
+        # Direct conversation history requests
+        'talk about our conversation', 'discuss our chat history',
+        'usapan natin dati', 'mga pinag-usapan natin'
     ]
     
     return any(pattern in text_lower for pattern in conversation_patterns)
@@ -1166,8 +1165,9 @@ def generate_answer(question: str, context: str, conversation_history: List[Dict
         {"role": "system", "content": system_prompt},
     ]
     
-    # Add conversation history (last 1 exchange only for speed)
-    for msg in conversation_history[-1:]:
+    # Add conversation history (last 6 exchanges for better context)
+    # This provides much better conversation continuity and recall
+    for msg in conversation_history[-6:]:
         messages.append(msg)
     
     # Add current question with context
@@ -1718,6 +1718,47 @@ async def save_chat_interaction(
         print(f"⚠️  Failed to save chat history: {e}")
         print(f"   Traceback: {traceback.format_exc()}")
         return (session_id, None, None)
+
+
+async def get_conversation_history_from_db(
+    chat_service: ChatHistoryService,
+    session_id: Optional[str],
+    limit: int = 12  # 6 exchanges = 12 messages (user + assistant pairs)
+) -> List[Dict[str, str]]:
+    """
+    Retrieve conversation history from database for better context continuity.
+    Returns messages in OpenAI format: [{"role": "user", "content": "..."}, ...]
+    """
+    if not session_id:
+        return []
+    
+    try:
+        print(f"🔍 Retrieving conversation history from session: {session_id}")
+        
+        # Get recent messages from the session (excluding the current question)
+        messages = await chat_service.get_session_messages(
+            session_id=UUID(session_id),
+            limit=limit
+        )
+        
+        if not messages:
+            print(f"   ℹ️ No previous messages found in session")
+            return []
+        
+        # Convert to OpenAI format and exclude the very last message (current question)
+        conversation_history = []
+        for msg in messages[:-1]:  # Exclude last message (current question)
+            conversation_history.append({
+                "role": msg.role,
+                "content": msg.content[:500]  # Limit content length for efficiency
+            })
+        
+        print(f"   ✅ Retrieved {len(conversation_history)} messages from database")
+        return conversation_history
+        
+    except Exception as e:
+        print(f"   ⚠️ Error retrieving conversation history: {e}")
+        return []
 
 
 @router.post("/ask", response_model=ChatResponse)
@@ -2284,16 +2325,27 @@ async def ask_legal_question(
             # No sources found - using general knowledge
             confidence = "medium"
         
+        # Retrieve conversation history from database for better context
+        print(f"\n💬 [STEP 8.5] Retrieving conversation history from database...")
+        db_conversation_history = await get_conversation_history_from_db(
+            chat_service=chat_history_service,
+            session_id=request.session_id,
+            limit=12  # Last 6 exchanges (12 messages)
+        )
+        
+        # Use database history if available, fallback to client-provided history
+        conversation_history = db_conversation_history if db_conversation_history else (request.conversation_history or [])
+        
         # Generate answer with proper complexity detection
         gen_start = time.time()
         print(f"\n🤖 [STEP 9] Generating AI answer with OpenAI...")
         print(f"   📡 Calling OpenAI API (model: {CHAT_MODEL})...")
         print(f"   Max tokens: {request.max_tokens}")
-        print(f"   Conversation history: {len(request.conversation_history or [])} messages")
+        print(f"   Conversation history: {len(conversation_history)} messages (from {'database' if db_conversation_history else 'client'})")
         answer, _, simplified_summary = generate_answer(
             request.question,
             context,
-            request.conversation_history,
+            conversation_history,
             language,
             request.max_tokens,
             is_complex=is_complex  # Use actual complexity detection for production

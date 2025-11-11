@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import ForumSearchService, { ForumSearchResult } from '../services/forumSearchService';
 import { useAuth } from '../contexts/AuthContext';
+import { useForumCache } from '../contexts/ForumCacheContext';
 
 interface UseForumSearchOptions {
   debounceMs?: number;
@@ -35,6 +36,7 @@ export const useForumSearch = (options: UseForumSearchOptions = {}): UseForumSea
   } = options;
 
   const { session } = useAuth();
+  const { getCachedPosts } = useForumCache();
   
   // State
   const [query, setQueryState] = useState('');
@@ -64,9 +66,11 @@ export const useForumSearch = (options: UseForumSearchOptions = {}): UseForumSea
       setError(null);
 
       try {
+        const cachedPosts = getCachedPosts();
         const response = await ForumSearchService.searchPosts(searchQuery, {
           limit: 50,
-          session
+          session,
+          cachedPosts: cachedPosts || []
         });
 
         if (response.success) {
@@ -123,9 +127,11 @@ export const useForumSearch = (options: UseForumSearchOptions = {}): UseForumSea
     setError(null);
 
     try {
+      const cachedPosts = getCachedPosts();
       const response = await ForumSearchService.searchPosts(queryToSearch, {
         limit: 50,
-        session
+        session,
+        cachedPosts: cachedPosts || []
       });
 
       if (response.success) {
