@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 0,
-    pointerEvents: 'auto',
+    pointerEvents: 'box-none',
   },
   title: {
     fontSize: Platform.select({ ios: 17, android: 18, default: 17 }),
