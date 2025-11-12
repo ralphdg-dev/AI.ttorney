@@ -887,84 +887,15 @@ const ManageLawyerApplications = () => {
         <StatusBadge status={row.status} isArchived={row.archived === true} />
       ),
     },
-    {
-      key: "approval",
-      header: "Approval",
-      align: "left",
-      render: (row) => {
-        if (row.status === "accepted") {
-          return null;
-        }
-
-        const disabledResub = row.status === "resubmission";
-        const disabledReject = row.status === "rejected";
-
-        return (
-          <div className="relative" style={{ position: 'static' }}>
-            <button
-              onClick={(e) => {
-                if (openApprovalMenuId === row.id) {
-                  setOpenApprovalMenuId(null);
-                  return;
-                }
-                const rect = e.currentTarget.getBoundingClientRect();
-                const right = Math.max(8, window.innerWidth - rect.right);
-                const bottom = Math.max(8, window.innerHeight - rect.top + 10); // 10px above
-                setOpenApprovalMenuPos({ right, bottom });
-                setOpenApprovalMenuId(row.id);
-              }}
-              className="p-1 rounded hover:bg-gray-100 text-gray-600"
-              aria-label="Approval Actions"
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-
-            {openApprovalMenuId === row.id && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setOpenApprovalMenuId(null)}
-                />
-                <div
-                  className="fixed w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-[9999]"
-                  style={{ right: `${openApprovalMenuPos.right}px`, bottom: `${openApprovalMenuPos.bottom}px` }}
-                >
-                  <button
-                    onClick={() => { handleApprove(row.id, row.full_name); setOpenApprovalMenuId(null); }}
-                    className="w-full px-3 py-1.5 text-left text-xs text-emerald-700 hover:bg-emerald-50 flex items-center"
-                  >
-                    <Check size={14} className="mr-2" />
-                    Approve Application
-                  </button>
-                  <button
-                    onClick={() => { if (!disabledResub) handleResubmission(row.id, row.full_name); setOpenApprovalMenuId(null); }}
-                    disabled={disabledResub}
-                    className={`w-full px-3 py-1.5 text-left text-xs flex items-center ${disabledResub ? 'text-gray-400 cursor-not-allowed' : 'text-yellow-700 hover:bg-yellow-50'}`}
-                  >
-                    <RotateCcw size={14} className="mr-2" />
-                    Request Resubmission
-                  </button>
-                  <button
-                    onClick={() => { if (!disabledReject) handleReject(row.id, row.full_name); setOpenApprovalMenuId(null); }}
-                    disabled={disabledReject}
-                    className={`w-full px-3 py-1.5 text-left text-xs flex items-center ${disabledReject ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
-                  >
-                    <X size={14} className="mr-2" />
-                    Reject Application
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        );
-      },
-    },
+    
     {
       key: "actions",
       header: "Actions",
       align: "right",
       render: (row) => {
         const isArchived = row.archived === true;
+        const disabledResub = row.status === "resubmission";
+        const disabledReject = row.status === "rejected";
         return (
           <div className="relative" style={{ position: 'static' }}>
             <button
@@ -995,6 +926,34 @@ const ManageLawyerApplications = () => {
                   className="fixed w-44 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-[9999]"
                   style={{ right: `${openMenuPos.right}px`, bottom: `${openMenuPos.bottom}px` }}
                 >
+                  {row.status !== "accepted" && (
+                    <>
+                      <button
+                        onClick={() => { handleApprove(row.id, row.full_name); setOpenMenuId(null); }}
+                        className="w-full px-3 py-1.5 text-left text-xs text-emerald-700 hover:bg-emerald-50 flex items-center"
+                      >
+                        <Check size={14} className="mr-2" />
+                        Approve Application
+                      </button>
+                      <button
+                        onClick={() => { if (!disabledResub) handleResubmission(row.id, row.full_name); setOpenMenuId(null); }}
+                        disabled={disabledResub}
+                        className={`w-full px-3 py-1.5 text-left text-xs flex items-center ${disabledResub ? 'text-gray-400 cursor-not-allowed' : 'text-yellow-700 hover:bg-yellow-50'}`}
+                      >
+                        <RotateCcw size={14} className="mr-2" />
+                        Request Resubmission
+                      </button>
+                      <button
+                        onClick={() => { if (!disabledReject) handleReject(row.id, row.full_name); setOpenMenuId(null); }}
+                        disabled={disabledReject}
+                        className={`w-full px-3 py-1.5 text-left text-xs flex items-center ${disabledReject ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
+                      >
+                        <X size={14} className="mr-2" />
+                        Reject Application
+                      </button>
+                      <div className="my-1 border-t border-gray-100" />
+                    </>
+                  )}
                   <button
                     onClick={() => { openView(row); setOpenMenuId(null); }}
                     className="w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center"
