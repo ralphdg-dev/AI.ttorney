@@ -443,42 +443,7 @@ export const SidebarWrapper: React.FC<{
         router.push("/about");
         break;
       case "apply-lawyer":
-        // Check if user already has a pending application
-        try {
-          const { lawyerApplicationService } = await import('../services/lawyerApplicationService');
-          console.log('Checking application status...');
-          const status = await lawyerApplicationService.getApplicationStatus();
-          console.log('Application status:', status);
-          
-          if (status?.has_application && status.application) {
-            // Redirect to appropriate status page based on application status
-            const appStatus = status.application.status;
-            console.log('User has existing application with status:', appStatus);
-            
-            if (appStatus === 'pending') {
-              router.push('/onboarding/lawyer/lawyer-status/pending');
-            } else if (appStatus === 'accepted') {
-              // For accepted status, redirect to home - they should not see this in sidebar
-              // The accepted modal will be shown on login
-              router.push('/home');
-            } else if (appStatus === 'rejected') {
-              router.push('/onboarding/lawyer/lawyer-status/rejected');
-            } else if (appStatus === 'resubmission') {
-              router.push('/onboarding/lawyer/lawyer-status/resubmission');
-            } else {
-              // Default to upload documents if status is unknown
-              router.push("/onboarding/lawyer/upload-documents");
-            }
-          } else {
-            // No existing application, proceed to upload documents
-            console.log('No existing application found, proceeding to upload documents');
-            router.push("/onboarding/lawyer/upload-documents");
-          }
-        } catch (error) {
-          console.error('Error checking application status:', error);
-          // On error, default to upload documents
-          router.push("/onboarding/lawyer/upload-documents");
-        }
+        router.push("/apply-lawyer");
         break;
       case "profile":
         console.log("Profile page not implemented yet");
