@@ -560,7 +560,22 @@ def is_conversation_context_question(text: str) -> bool:
         
         # Direct conversation history requests
         'talk about our conversation', 'discuss our chat history',
-        'usapan natin dati', 'mga pinag-usapan natin'
+        'usapan natin dati', 'mga pinag-usapan natin',
+        
+        # Discussion about specific past topics
+        'remember when we talked about', 'you mentioned before',
+        'we discussed earlier', 'from our previous chat',
+        'nabanggit mo dati', 'pinag-usapan natin noon',
+        'sa nakaraang usapan', 'tuloy natin ang usapan',
+        
+        # Continuation requests
+        'continue our discussion', 'let\'s continue talking about',
+        'more about what we discussed', 'follow up on our conversation',
+        'ituloy natin ang', 'dagdag pa sa usapan natin',
+        
+        # Reference to past advice or information
+        'you told me before', 'you explained earlier',
+        'sinabi mo dati', 'ipinaliwanag mo noon'
     ]
     
     return any(pattern in text_lower for pattern in conversation_patterns)
@@ -1830,11 +1845,49 @@ async def save_chat_interaction(
         return (session_id, None, None)
 
 
-async def get_conversation_history_from_db(
-    chat_service: ChatHistoryService,
-    session_id: Optional[str],
-    limit: int = 12  # 6 exchanges = 12 messages (user + assistant pairs)
-) -> List[Dict[str, str]]:
+def extract_conversation_reference(question: str) -> tuple[bool, str]:
+    """
+    Check if the user is referencing a past conversation or topic.
+    Returns: (has_reference, reference_type)
+    """
+    question_lower = question.lower().strip()
+    
+    # Direct references to past conversations
+    past_references = [
+        'you said', 'you mentioned', 'you told me', 'you explained',
+        'we talked about', 'we discussed', 'from our conversation',
+        'sinabi mo', 'nabanggit mo', 'pinag-usapan natin', 'ipinaliwanag mo',
+        'sa usapan natin', 'noong nakaraan', 'dati mong sabi'
+    ]
+    
+    # Topic continuation patterns
+    continuation_patterns = [
+        'more about', 'tell me more', 'continue about', 'elaborate on',
+        'dagdag pa sa', 'mas detalyado pa', 'ituloy ang', 'explain further'
+    ]
+    
+    # Reference to previous advice
+    advice_references = [
+        'the advice you gave', 'your previous answer', 'what you recommended',
+        'ang payo mo', 'ang sagot mo dati', 'ang recommendation mo'
+    ]
+    
+    for pattern in past_references:
+        if pattern in question_lower:
+            return True, "past_reference"
+    
+    for pattern in continuation_patterns:
+        if pattern in question_lower:
+            return True, "continuation"
+    
+    for pattern in advice_references:
+        if pattern in question_lower:
+            return True, "advice_reference"
+    
+    return False, ""
+
+
+async def get_conversation_history_from_db(chat_service, session_id: str, limit: int = 12) -> List[Dict[str, str]]:
     """
     Retrieve conversation history from database for better context continuity.
     Returns messages in OpenAI format: [{"role": "user", "content": "..."}, ...]
@@ -2245,35 +2298,66 @@ async def ask_legal_question(
                 try:
                     print(f"   🔍 Retrieving past conversations for user {effective_user_id[:8]}...")
                     
-                    # Get recent sessions (last 5)
+                    # Get recent sessions (last 7 for better context)
                     user_sessions = await chat_history_service.get_user_sessions(
                         user_id=effective_user_id,
                         include_archived=False,
                         page=1,
-                        page_size=5
+                        page_size=7
                     )
                     
                     if user_sessions and user_sessions.sessions:
                         print(f"   ✅ Found {len(user_sessions.sessions)} recent conversations")
                         
-                        # Build summary of past conversations
+                        # Build detailed summary of past conversations
                         conversation_summaries = []
-                        for session in user_sessions.sessions[:3]:  # Show last 3 conversations
-                            # Get a few messages from each session for context
+                        detailed_context = []
+                        
+                        for i, session in enumerate(user_sessions.sessions[:4]):  # Show last 4 conversations
+                            # Get more messages from each session for better context
                             session_with_messages = await chat_history_service.get_session_with_messages(
                                 session_id=session.id,
-                                message_limit=4  # Get first 2 exchanges (user + assistant)
+                                message_limit=8  # Get first 4 exchanges for better context
                             )
                             
                             if session_with_messages and session_with_messages.messages:
                                 messages = session_with_messages.messages
-                                # Get the first user question
+                                
+                                # Get user questions and assistant responses
                                 user_questions = [msg for msg in messages if msg.role == 'user']
+                                assistant_responses = [msg for msg in messages if msg.role == 'assistant']
+                                
                                 if user_questions:
-                                    first_question = user_questions[0].content[:100]
-                                    conversation_summaries.append(
-                                        f"• **{session.title}**: {first_question}{'...' if len(user_questions[0].content) > 100 else ''}"
-                                    )
+                                    # Use session title if it's meaningful, otherwise use first question
+                                    if session.title and session.title.strip() and session.title != "New Chat":
+                                        # Session has a meaningful title, use it
+                                        summary_text = f"• **{session.title}**"
+                                    else:
+                                        # No meaningful title, use first question
+                                        first_question = user_questions[0].content[:120]
+                                        summary_text = f"• {first_question}{'...' if len(user_questions[0].content) > 120 else ''}"
+                                    
+                                    # Add topic indicators if we can detect them
+                                    question_lower = user_questions[0].content.lower()
+                                    if any(word in question_lower for word in ['marriage', 'kasal', 'wedding', 'annulment']):
+                                        summary_text += " (Family Law)"
+                                    elif any(word in question_lower for word in ['work', 'job', 'employment', 'trabaho', 'empleyado']):
+                                        summary_text += " (Labor Law)"
+                                    elif any(word in question_lower for word in ['contract', 'kontrata', 'agreement', 'kasunduan']):
+                                        summary_text += " (Contract Law)"
+                                    elif any(word in question_lower for word in ['crime', 'criminal', 'krimen', 'arrest']):
+                                        summary_text += " (Criminal Law)"
+                                    
+                                    conversation_summaries.append(summary_text)
+                                    
+                                    # Store detailed context for AI discussion
+                                    if i < 2:  # Only store detailed context for most recent 2 conversations
+                                        context_entry = {
+                                            'title': session.title,
+                                            'questions': [q.content[:300] for q in user_questions[:2]],
+                                            'responses': [r.content[:400] for r in assistant_responses[:2]]
+                                        }
+                                        detailed_context.append(context_entry)
                         
                         if conversation_summaries:
                             if language == "tagalog":
@@ -2288,34 +2372,88 @@ async def ask_legal_question(
                     logger.error(f"Error retrieving past conversations: {e}")
             
             # Generate intelligent response with actual conversation history
-            if language == "tagalog":
-                context_response = (
-                    "Ako si Ai.ttorney, ang inyong legal assistant para sa Philippine law! 😊\n\n"
-                    "Naaalala ko ang aming mga nakaraang usapan! Narito ang ilang sa mga pinag-usapan natin:"
-                    f"{past_conversations_summary}\n\n" if past_conversations_summary else 
-                    "Wala pa tayong nakaraang usapan sa sistema, pero handa akong tumulong sa anumang legal na tanong!\n\n"
-                    "Maaari ninyong itanong ang tungkol sa:\n"
-                    "• Family Law (kasal, annulment, child custody)\n"
-                    "• Labor Law (trabaho, sahod, termination)\n"
-                    "• Consumer Law (produkto, serbisyo, warranty)\n"
-                    "• Criminal Law (krimen, arrest, bail)\n"
-                    "• Civil Law (kontrata, property, utang)\n\n"
-                    "Ano pong legal na tanong ang mayroon kayo ngayon?"
-                )
+            if past_conversations_summary:
+                # We have conversation history - create a more engaging response
+                if language == "tagalog":
+                    context_response = (
+                        "Oo, naaalala ko ang aming mga nakaraang usapan! 😊\n\n"
+                        "Narito ang mga legal na topics na pinag-usapan natin:"
+                        f"{past_conversations_summary}\n\n"
+                        "Gusto ninyo bang:\n"
+                        "• **Ituloy** ang isa sa mga nakaraang topic na ito?\n"
+                        "• **Magdagdag** ng tanong tungkol sa mga nabanggit na?\n"
+                        "• **Magtanong** ng bagong legal na isyu?\n"
+                        "• **Pag-usapan** ang detalye ng mga nakaraang sagot ko?\n\n"
+                        "Sabihin lang ninyo kung alin sa mga nakaraang usapan ang gusto ninyong balikan, "
+                        "o magtanong ng bago. Handa akong magbigay ng mas detalyadong paliwanag!"
+                    )
+                else:
+                    context_response = (
+                        "Yes, I remember our past conversations! 😊\n\n"
+                        "Here are the legal topics we've discussed:"
+                        f"{past_conversations_summary}\n\n"
+                        "Would you like to:\n"
+                        "• **Continue** discussing any of these previous topics?\n"
+                        "• **Ask follow-up questions** about what we covered?\n"
+                        "• **Explore** a new legal issue?\n"
+                        "• **Discuss** the details of my previous responses?\n\n"
+                        "Just let me know which past conversation you'd like to revisit, "
+                        "or ask me something new. I'm ready to provide more detailed explanations!"
+                    )
+                
+                # Generate contextual follow-up questions based on past conversations
+                if language == "tagalog":
+                    context_followups = [
+                        "Alin sa mga nakaraang topic ang gusto ninyong pag-usapan ulit?",
+                        "May follow-up question ba kayo sa mga nabanggit ko dati?",
+                        "Gusto ninyo bang magdagdag ng detalye sa mga nakaraang sagot ko?"
+                    ]
+                else:
+                    context_followups = [
+                        "Which of our previous topics would you like to discuss further?",
+                        "Do you have follow-up questions about what I mentioned before?",
+                        "Would you like me to elaborate on any of my previous responses?"
+                    ]
             else:
-                context_response = (
-                    "I'm Ai.ttorney, your legal assistant for Philippine law! 😊\n\n"
-                    "I can remember our past conversations! Here are some topics we've discussed:"
-                    f"{past_conversations_summary}\n\n" if past_conversations_summary else 
-                    "We don't have any previous conversations in the system yet, but I'm ready to help with any legal questions!\n\n"
-                    "You can ask me about:\n"
-                    "• Family Law (marriage, annulment, child custody)\n"
-                    "• Labor Law (employment, wages, termination)\n"
-                    "• Consumer Law (products, services, warranties)\n"
-                    "• Criminal Law (crimes, arrest, bail)\n"
-                    "• Civil Law (contracts, property, debts)\n\n"
-                    "What legal question can I help you with today?"
-                )
+                # No conversation history - standard introduction
+                if language == "tagalog":
+                    context_response = (
+                        "Ako si Ai.ttorney, ang inyong legal assistant para sa Philippine law! 😊\n\n"
+                        "Wala pa tayong nakaraang usapan sa sistema, pero handa akong tumulong sa anumang legal na tanong!\n\n"
+                        "Maaari ninyong itanong ang tungkol sa:\n"
+                        "• **Family Law** (kasal, annulment, child custody)\n"
+                        "• **Labor Law** (trabaho, sahod, termination)\n"
+                        "• **Consumer Law** (produkto, serbisyo, warranty)\n"
+                        "• **Criminal Law** (krimen, arrest, bail)\n"
+                        "• **Civil Law** (kontrata, property, utang)\n\n"
+                        "Ano pong legal na tanong ang mayroon kayo ngayon? Naaalala ko ang lahat ng aming mga usapan!"
+                    )
+                else:
+                    context_response = (
+                        "I'm Ai.ttorney, your legal assistant for Philippine law! 😊\n\n"
+                        "We don't have any previous conversations in the system yet, but I'm ready to help with any legal questions!\n\n"
+                        "You can ask me about:\n"
+                        "• **Family Law** (marriage, annulment, child custody)\n"
+                        "• **Labor Law** (employment, wages, termination)\n"
+                        "• **Consumer Law** (products, services, warranties)\n"
+                        "• **Criminal Law** (crimes, arrest, bail)\n"
+                        "• **Civil Law** (contracts, property, debts)\n\n"
+                        "What legal question can I help you with today? I'll remember all our conversations!"
+                    )
+                
+                # Standard follow-up questions for new users
+                if language == "tagalog":
+                    context_followups = [
+                        "Anong legal na kategorya ang kailangan ninyong malaman?",
+                        "May specific na legal na problema ba kayong kailangang solusyunan?",
+                        "Gusto ninyo bang malaman ang tungkol sa mga karapatan ninyo?"
+                    ]
+                else:
+                    context_followups = [
+                        "Which legal category would you like to learn about?",
+                        "Do you have a specific legal problem that needs solving?",
+                        "Would you like to know about your legal rights?"
+                    ]
             
             # Save conversation context interaction
             session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
@@ -2331,6 +2469,7 @@ async def ask_legal_question(
             return create_chat_response(
                 answer=context_response,
                 simplified_summary="Retrieved and displayed past conversation history" if past_conversations_summary else "No past conversations found",
+                follow_up_questions=context_followups,
                 session_id=session_id,
                 message_id=assistant_msg_id,
                 user_message_id=user_msg_id
@@ -2537,6 +2676,22 @@ async def ask_legal_question(
         
         # Use database history if available, fallback to client-provided history
         conversation_history = db_conversation_history if db_conversation_history else (request.conversation_history or [])
+        
+        # Check if user is referencing past conversations
+        has_reference, reference_type = extract_conversation_reference(request.question)
+        if has_reference:
+            print(f"\n🔗 [CONVERSATION REFERENCE] Detected reference to past conversation: {reference_type}")
+            # Add more context from conversation history if available
+            if len(conversation_history) < 8 and effective_user_id:
+                # Try to get more conversation context for better reference understanding
+                extended_history = await get_conversation_history_from_db(
+                    chat_history_service, 
+                    request.session_id, 
+                    limit=16  # Get more messages for better context
+                )
+                if extended_history and len(extended_history) > len(conversation_history):
+                    conversation_history = extended_history
+                    print(f"   ✅ Extended conversation history to {len(conversation_history)} messages for better reference context")
         
         # Generate answer with proper complexity detection
         gen_start = time.time()
