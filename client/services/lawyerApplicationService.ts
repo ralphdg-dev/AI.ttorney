@@ -471,7 +471,15 @@ class LawyerApplicationService {
 
       console.log('📄 Parsing successful response...');
       const data = await response.json();
-      console.log('Application status data:', data);
+      console.log('🔍 Full API response data:', JSON.stringify(data, null, 2));
+      
+      if (data && data.application) {
+        console.log('🔍 Application object:', JSON.stringify(data.application, null, 2));
+        console.log('🔍 reviewed_at field:', data.application.reviewed_at);
+      } else {
+        console.log('🔍 No application data found in response');
+      }
+      
       return data;
     } catch (error) {
       console.error('❌ Direct API request failed:', error);
@@ -705,18 +713,42 @@ class LawyerApplicationService {
   // Acknowledge rejection - sets acknowledged flag to true
   async acknowledgeRejection(): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await this.makeRequest('/api/lawyer-applications/acknowledge-rejection', {
+      console.log('🔄 Starting acknowledge rejection request');
+      
+      // Get auth token directly
+      const token = await this.getAuthToken();
+      console.log('🔧 Auth token obtained:', token ? 'YES' : 'NO');
+      
+      // Use simple direct fetch with localhost for web
+      const apiUrl = 'http://localhost:8000';
+      const url = `${apiUrl}/api/lawyer-applications/acknowledge-rejection`;
+      console.log('🔧 Making direct fetch to:', url);
+      
+      const response = await fetch(url, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
       });
+
+      console.log('🔧 Response status:', response.status);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('🔧 Error response:', errorData);
         throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('🔧 Success response:', data);
+      
+      // Clear cache after successful acknowledgment
+      this.clearCache();
+      
       return data;
     } catch (error) {
+      console.error('🔧 Acknowledge rejection error:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Failed to acknowledge rejection',
