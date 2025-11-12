@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { View } from 'react-native';
 import { Toast, ToastTitle, ToastDescription } from '@/components/ui/toast';
 
 type ToastAction = 'error' | 'warning' | 'success' | 'info' | 'muted';
@@ -117,4 +118,40 @@ export const showBannedToast = (toast: ToastInstance, detail: string): void => {
  */
 export const showAccessDeniedToast = (toast: ToastInstance, detail: string): void => {
   showModerationToast(toast, 'error', 'Access Denied', detail, 7000);
+};
+
+/**
+ * Show a content validation toast at the bottom for promotional/external link warnings
+ * Positioned above the navbar to avoid blocking navigation
+ * @param toast - Toast instance from useToast()
+ * @param action - Toast action type (error, warning, etc.)
+ * @param title - Toast title
+ * @param description - Toast description/message
+ * @param duration - Duration in milliseconds (default: 5000)
+ */
+export const showContentValidationToast = (
+  toast: ToastInstance,
+  action: ToastAction,
+  title: string,
+  description: string,
+  duration: number = 5000
+): void => {
+  toast.show({
+    placement: 'bottom',
+    duration,
+    render: ({ id }) => {
+      return (
+        <View style={{ marginBottom: 80 }}>
+          <Toast 
+            nativeID={id} 
+            action={action} 
+            variant="solid"
+          >
+            <ToastTitle>{title}</ToastTitle>
+            <ToastDescription>{description}</ToastDescription>
+          </Toast>
+        </View>
+      );
+    },
+  });
 };

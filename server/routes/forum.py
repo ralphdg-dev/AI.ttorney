@@ -8,6 +8,7 @@ from services.report_service import ReportService
 from services.content_moderation_service import get_moderation_service
 from services.violation_tracking_service import get_violation_tracking_service
 from services.notification_service import NotificationService
+from services.promotional_content_validator import get_promotional_validator
 from models.violation_types import ViolationType
 import httpx
 import logging
@@ -174,7 +175,36 @@ async def create_post(
             # Fail-open: Allow post if status check fails
             logger.warning("⚠️  Proceeding with post creation (status check failed)")
         
-        # STEP 1: Content Moderation using OpenAI omni-moderation-latest
+        # STEP 1: Validate for promotional content and external links using AI
+        try:
+            logger.info(f"🔍 Validating post for promotional content and links from user {user_id[:8]}...")
+            promotional_validator = get_promotional_validator()
+            
+            # CRITICAL: Block promotional content and external links
+            validation_result = await promotional_validator.validate_content(body.body.strip())
+            
+            if not validation_result["is_valid"]:
+                logger.warning(f"🚫 Post blocked for user {user_id[:8]}: {validation_result['reason']}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "detail": validation_result["details"],
+                        "reason": validation_result["reason"],
+                        "violation_type": validation_result["violation_type"],
+                        "action_taken": "content_blocked"
+                    }
+                )
+            
+            logger.info(f"✅ Post passed promotional validation for user {user_id[:8]}...")
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Promotional validation failed: {str(e)}")
+            # Fail-open: Allow post if validation service fails
+            logger.warning("⚠️  Proceeding with post creation (promotional validation failed - fail-open strategy)")
+        
+        # STEP 2: Content Moderation using OpenAI omni-moderation-latest
         try:
             logger.info(f"🔍 Moderating forum post from user {user_id[:8]}...")
             moderation_service = get_moderation_service()
@@ -220,7 +250,7 @@ async def create_post(
             # Fail-open: Allow post if moderation service fails to initialize
             logger.warning("⚠️  Proceeding with post creation (moderation service failed - fail-open strategy)")
 
-        # STEP 2: Prepare row for insertion
+        # STEP 3: Prepare row for insertion
         post_row: Dict[str, Any] = {
             "user_id": user_id,
             "body": body.body.strip(),
@@ -757,7 +787,36 @@ async def create_reply(
             # Fail-open: Allow reply if status check fails
             logger.warning("⚠️  Proceeding with reply creation (status check failed)")
         
-        # STEP 1: Content Moderation using OpenAI omni-moderation-latest
+        # STEP 1: Validate for promotional content and external links using AI
+        try:
+            logger.info(f"🔍 Validating reply for promotional content and links from lawyer {user_id[:8]}...")
+            promotional_validator = get_promotional_validator()
+            
+            # CRITICAL: Block promotional content and external links
+            validation_result = await promotional_validator.validate_content(body.body.strip())
+            
+            if not validation_result["is_valid"]:
+                logger.warning(f"🚫 Reply blocked for lawyer {user_id[:8]}: {validation_result['reason']}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "detail": validation_result["details"],
+                        "reason": validation_result["reason"],
+                        "violation_type": validation_result["violation_type"],
+                        "action_taken": "content_blocked"
+                    }
+                )
+            
+            logger.info(f"✅ Reply passed promotional validation for lawyer {user_id[:8]}...")
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Promotional validation failed: {str(e)}")
+            # Fail-open: Allow reply if validation service fails
+            logger.warning("⚠️  Proceeding with reply creation (promotional validation failed - fail-open strategy)")
+        
+        # STEP 2: Content Moderation using OpenAI omni-moderation-latest
         try:
             logger.info(f"🔍 Moderating reply from lawyer {user_id[:8]}...")
             moderation_service = get_moderation_service()

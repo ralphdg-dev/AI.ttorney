@@ -20,10 +20,12 @@ export interface ModerationStatus {
 
 export interface ModerationError {
   detail: string;
+  reason?: string;
   strike_count?: number;
   suspension_count?: number;
   suspension_end?: string;
-  action_taken?: 'strike_added' | 'suspended' | 'banned';
+  action_taken?: 'strike_added' | 'suspended' | 'banned' | 'content_blocked';
+  violation_type?: string;
 }
 
 /**
@@ -66,10 +68,12 @@ export const parseModerationError = (errorText: string): ModerationError | null 
     if (parsed.detail && typeof parsed.detail === 'object') {
       return {
         detail: parsed.detail.detail || parsed.detail,
+        reason: parsed.detail.reason,
         action_taken: parsed.detail.action_taken,
         strike_count: parsed.detail.strike_count,
         suspension_count: parsed.detail.suspension_count,
         suspension_end: parsed.detail.suspension_end,
+        violation_type: parsed.detail.violation_type,
       };
     }
     

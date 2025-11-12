@@ -13,7 +13,7 @@ import { useModerationStatus } from '@/contexts/ModerationContext';
 import { NetworkConfig } from '@/utils/networkConfig';
 import { useToast } from '@/components/ui/toast';
 import { parseModerationError } from '@/services/moderationService';
-import { showModerationToast, showStrikeAddedToast, showSuspendedToast, showBannedToast } from '@/utils/moderationToastUtils';
+import { showModerationToast, showStrikeAddedToast, showSuspendedToast, showBannedToast, showContentValidationToast } from '@/utils/moderationToastUtils';
 import { validatePostContent } from '@/utils/contentValidation';
 
 // Constants
@@ -130,6 +130,20 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
     if (!moderationError) return false;
 
     removeOptimisticPost(optimisticId);
+    
+    // Check if this is a promotional/link validation error (no moderation status update needed)
+    if (moderationError.action_taken === 'content_blocked') {
+      showContentValidationToast(
+        toast, 
+        'error', 
+        moderationError.reason || 'Content Blocked', 
+        moderationError.detail, 
+        7000
+      );
+      return true;
+    }
+
+    // For actual moderation violations, update status
     await updateModerationStatus();
 
     // Show appropriate toast based on action taken with detailed strike/suspension info
@@ -174,7 +188,7 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
     // Validate content for prohibited material (links, promotional content)
     const validation = validatePostContent(content);
     if (!validation.isValid) {
-      showModerationToast(
+      showContentValidationToast(
         toast,
         'error',
         validation.reason || 'Content Blocked',
