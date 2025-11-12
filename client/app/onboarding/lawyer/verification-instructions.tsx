@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, Image, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, Image, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import tw from 'tailwind-react-native-classnames';
 import { router } from 'expo-router';
-import BackButton from '../../../components/ui/BackButton';
+import Header from '../../../components/Header';
 import credentialsImg from '../../../assets/images/lawyer-registration/credentials.png';
 import selfieImg from '../../../assets/images/lawyer-registration/selfie.png';
 import termsImg from '../../../assets/images/lawyer-registration/terms.png';
@@ -24,16 +25,18 @@ export default function LawyerStartingPage() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
-      <View style={tw`flex-row justify-between items-center px-6 pt-12 pb-4`}>
-        <BackButton onPress={handleBack} />
-      </View>
+      <Header 
+        showBackButton={true}
+        onBackPress={handleBack}
+        backgroundColor={Colors.background.primary}
+      />
       
       <View style={tw`flex-1 px-6 pb-32`}>
         {/* Heading */}
-        <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#0f172a' }}>
+        <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#0f172a', marginTop: 32 }}>
           Let&apos;s get started
         </Text>
 

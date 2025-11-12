@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { SafeAreaView, StatusBar, View, Text, TouchableOpacity, Image, Alert } from 'react-native';
+import { StatusBar, View, Text, TouchableOpacity, Image, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import BackButton from '../../../components/ui/BackButton';
+import Header from '../../../components/Header';
 import StickyFooterButton from '../../../components/ui/StickyFooterButton';
 import { lawyerApplicationService } from '../../../services/lawyerApplicationService';
 import Colors from '../../../constants/Colors';
@@ -73,17 +74,18 @@ export default function LawyerFaceVerification() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
 
-      {/* Header with BackButton */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 16 }}>
-        <BackButton onPress={() => router.back()} />
-      </View>
+      <Header 
+        showBackButton={true}
+        onBackPress={() => router.back()}
+        backgroundColor={Colors.background.primary}
+      />
 
       {/* Content */}
       <View style={{ flex: 1, paddingHorizontal: 24 }}>
-        <Text style={{ fontSize: 24, fontWeight: '700', color: '#111827', marginBottom: 8 }}>
+        <Text style={{ fontSize: 24, fontWeight: '700', color: '#111827', marginBottom: 8, marginTop: 32 }}>
           Take a selfie
         </Text>
         <Text style={{ fontSize: 16, color: '#6B7280', marginBottom: 16 }}>

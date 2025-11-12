@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { SafeAreaView, StatusBar, ScrollView, View, Text, TextInput, TouchableOpacity, Image, Alert, Modal, Platform } from 'react-native';
+import { StatusBar, ScrollView, View, Text, TextInput, TouchableOpacity, Image, Alert, Modal, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
-import BackButton from '../../../components/ui/BackButton';
+import Header from '../../../components/Header';
 import StickyFooterButton from '../../../components/ui/StickyFooterButton';
 import { lawyerApplicationService } from '../../../services/lawyerApplicationService';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -243,21 +244,14 @@ export default function LawyerReg() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
 
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingHorizontal: 24, // px-6
-          paddingTop: 48, // pt-12
-          paddingBottom: 16, // pb-4
-        }}
-      >
-        <BackButton onPress={() => router.back()} />
-      </View>
+      <Header 
+        showBackButton={true}
+        onBackPress={() => router.back()}
+        backgroundColor={Colors.background.primary}
+      />
 
       {/* Main Content */}
       <ScrollView
@@ -269,7 +263,7 @@ export default function LawyerReg() {
         <View style={{ alignItems: 'center', marginTop: 8, marginBottom: 10 }}>
           <Image
             source={require('../../../assets/images/logo.png')}
-            style={{ width: 110, height: 110 }}
+            style={{ width: 80, height: 80 }}
             resizeMode="contain"
           />
         </View>

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, SafeAreaView, StatusBar, Text, ScrollView, Alert } from 'react-native';
+import { View, StatusBar, Text, ScrollView, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import BackButton from '../../../components/ui/BackButton';
+import Header from '../../../components/Header';
 import StickyFooterButton from '../../../components/ui/StickyFooterButton';
 import { router } from 'expo-router';
 import Colors from '../../../constants/Colors';
@@ -103,13 +104,14 @@ export default function LawyerTerms() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
 
-      {/* Header with BackButton */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 16 }}>
-        <BackButton onPress={() => router.back()} />
-      </View>
+      <Header 
+        showBackButton={true}
+        onBackPress={() => router.back()}
+        backgroundColor={Colors.background.primary}
+      />
 
       {/* Terms content */}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 100 }}>
