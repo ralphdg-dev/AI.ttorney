@@ -106,8 +106,6 @@ const ManageLawyerApplications = () => {
   });
   const [openMenuId, setOpenMenuId] = React.useState(null);
   const [openMenuPos, setOpenMenuPos] = React.useState({ right: 20, bottom: 20 });
-  const [openApprovalMenuId, setOpenApprovalMenuId] = React.useState(null);
-  const [openApprovalMenuPos, setOpenApprovalMenuPos] = React.useState({ right: 20, bottom: 20 });
 
   // Debounce search query
   React.useEffect(() => {
