@@ -60,8 +60,8 @@ export default function ApplyLawyer() {
       }
     };
 
-    // Small delay to ensure loading screen renders first
-    setTimeout(checkApplicationStatus, 50);
+    // Execute immediately without delay to prevent double loading
+    checkApplicationStatus();
   }, [user, session, checkLawyerApplicationStatus]);
 
   // Show loading immediately to prevent white page flash

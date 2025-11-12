@@ -159,6 +159,13 @@ export default function UserProfilePage() {
               </View>
 
               <View style={[tw`py-3 border-b`, { borderColor: Colors.border.light }]}>
+                <Text style={[tw`text-sm font-medium mb-1`, { color: Colors.text.secondary }]}>Username</Text>
+                <Text style={[tw`text-base`, { color: Colors.text.primary }]}>
+                  @{user.username || "Not set"}
+                </Text>
+              </View>
+
+              <View style={[tw`py-3 border-b`, { borderColor: Colors.border.light }]}>
                 <Text style={[tw`text-sm font-medium mb-1`, { color: Colors.text.secondary }]}>Email Address</Text>
                 <Text style={[tw`text-base`, { color: Colors.text.primary }]}>
                   {user.email || "Not provided"}

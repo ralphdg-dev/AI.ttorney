@@ -5,6 +5,7 @@ import { lawyerApplicationService, LawyerApplicationStatus } from '../../../../s
 import StatusScreen from '../../../../components/ui/StatusScreen';
 import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
 import { useAuth } from '../../../../contexts/AuthContext';
+import { LoadingWithTrivia } from '../../../../components/LoadingWithTrivia';
 
 export default function AcceptedStatus() {
   const [, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
@@ -70,9 +71,7 @@ export default function AcceptedStatus() {
   // Show loading fallback if guard is taking too long
   if (!showContent) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: '#666' }}>Loading...</Text>
-      </View>
+      <LoadingWithTrivia message="Loading..." showTrivia={true} />
     );
   }
 

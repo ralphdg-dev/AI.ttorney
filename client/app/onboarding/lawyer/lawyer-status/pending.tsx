@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { router } from 'expo-router';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, Text } from 'react-native';
 import { lawyerApplicationService, LawyerApplicationStatus } from '../../../../services/lawyerApplicationService';
 import StatusScreen from '../../../../components/ui/StatusScreen';
 import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
+import { LoadingWithTrivia } from '../../../../components/LoadingWithTrivia';
 
 export default function PendingStatus() {
   const [applicationData, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Status polling is handled by LawyerStatusGuard
@@ -32,10 +33,7 @@ export default function PendingStatus() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text style={{ marginTop: 16, color: '#4B5563' }}>Loading application status...</Text>
-      </View>
+      <LoadingWithTrivia message="Loading application status..." showTrivia={true} />
     );
   }
 

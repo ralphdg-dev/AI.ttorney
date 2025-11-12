@@ -42,7 +42,7 @@ export default function Resubmission() {
         description={description}
         buttonLabel="Resubmit Documents"
         onPress={handleResubmit}
-        onBack={handleBackToHome}
+        showBackButton={false}
         imageAlt="Document resubmission required"
       />
     </LawyerStatusGuard>

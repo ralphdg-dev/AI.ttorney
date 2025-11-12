@@ -9,7 +9,7 @@ import { LoadingWithTrivia } from '../../../../components/LoadingWithTrivia';
 export default function RejectedStatus() {
   const [applicationData, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Status polling is handled by LawyerStatusGuard
 
@@ -105,14 +105,7 @@ export default function RejectedStatus() {
     description += ".";
   }
 
-  // Show loading screen while data is being fetched
-  if (isLoading || !applicationData) {
-    return (
-      <LawyerStatusGuard requiredStatus="rejected">
-        <LoadingWithTrivia message="Loading application details..." showTrivia={true} />
-      </LawyerStatusGuard>
-    );
-  }
+  // Don't show loading screen - let the main apply-lawyer.tsx handle loading
 
   // Check if user has already acknowledged the rejection
   const hasAcknowledged = applicationData?.application?.acknowledged;
@@ -125,7 +118,7 @@ export default function RejectedStatus() {
         description={description}
         buttonLabel={isAcknowledging ? "Acknowledging..." : (hasAcknowledged ? "Back to Home" : "Acknowledge & Continue")}
         onPress={hasAcknowledged ? () => router.push('/home') : handleAcknowledgeRejection}
-        onBack={handleBackButton}
+        showBackButton={false}
         imageAlt="Lawyer application rejected"
       />
     </LawyerStatusGuard>
