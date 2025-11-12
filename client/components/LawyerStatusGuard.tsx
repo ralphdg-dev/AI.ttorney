@@ -13,15 +13,15 @@ interface LawyerStatusGuardProps {
 
 export default function LawyerStatusGuard({ children, requiredStatus }: LawyerStatusGuardProps) {
   const { user, isLoading: authLoading, initialAuthCheck } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasAccess, setHasAccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasAccess, setHasAccess] = useState(true);
 
-  // CRITICAL: Ultimate fallback - ALWAYS allows access after 1 second no matter what
+  // CRITICAL: Ultimate fallback - ALWAYS allows access after 200ms no matter what
   useEffect(() => {
     const ultimateFallback = setTimeout(() => {
       setIsLoading(false);
       setHasAccess(true);
-    }, 1000); // 1 second - GUARANTEED to fire
+    }, 200); // 200ms - GUARANTEED to fire
 
     return () => clearTimeout(ultimateFallback);
   }, []); // Empty deps - runs once on mount
@@ -123,7 +123,7 @@ export default function LawyerStatusGuard({ children, requiredStatus }: LawyerSt
   };
 
   if (isLoading) {
-    return <LoadingWithTrivia />;
+    return <LoadingWithTrivia message="LOADING..." showTrivia={true} />;
   }
 
   if (!hasAccess) {

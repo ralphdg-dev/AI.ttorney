@@ -390,3 +390,33 @@ async def get_my_application_history(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get application history"
         )
+
+@router.post("/acknowledge-rejection", response_model=Dict[str, Any])
+async def acknowledge_rejection(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Acknowledge that user has seen their rejection"""
+    try:
+        user_id = current_user["user"]["id"]
+        
+        result = await lawyer_service.acknowledge_rejection(user_id)
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["error"]
+            )
+        
+        return {
+            "success": True,
+            "message": result["message"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Acknowledge rejection error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to acknowledge rejection"
+        )

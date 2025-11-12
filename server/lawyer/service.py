@@ -357,7 +357,7 @@ class LawyerApplicationService:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{self.supabase.rest_url}/lawyer_applications?user_id=eq.{user_id}&is_latest=eq.true&select=*",
+                    f"{self.supabase.rest_url}/lawyer_applications?user_id=eq.{user_id}&is_latest=eq.true&select=id,user_id,full_name,roll_signing_date,ibp_id,roll_number,selfie,status,reviewed_by,reviewed_at,admin_notes,matched_roll_id,matched_at,submitted_at,updated_at,version,parent_application_id,is_latest,acknowledged",
                     headers=self.supabase._get_headers()
                 )
                 
@@ -556,6 +556,42 @@ class LawyerApplicationService:
                     
         except Exception as e:
             logger.error(f"Get user application history error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def acknowledge_rejection(self, user_id: str) -> Dict[str, Any]:
+        """Acknowledge that user has seen their rejection"""
+        try:
+            # Get the latest application
+            app_result = await self._get_latest_user_application(user_id)
+            if not app_result["success"]:
+                return {"success": False, "error": "No application found"}
+            
+            application = app_result["data"]
+            
+            # Check if application is rejected
+            if application.get("status") != "rejected":
+                return {"success": False, "error": "Application is not rejected"}
+            
+            # Update acknowledged field
+            async with httpx.AsyncClient() as client:
+                response = await client.patch(
+                    f"{self.supabase.rest_url}/lawyer_applications?id=eq.{application['id']}",
+                    json={"acknowledged": True},
+                    headers=self.supabase._get_headers(use_service_key=True)
+                )
+                
+                if response.status_code in [200, 204]:
+                    logger.info(f"✅ User {user_id[:8]}... acknowledged rejection for application {application['id']}")
+                    return {
+                        "success": True,
+                        "message": "Rejection acknowledged successfully"
+                    }
+                else:
+                    logger.error(f"Failed to acknowledge rejection: {response.status_code}")
+                    return {"success": False, "error": "Failed to acknowledge rejection"}
+                    
+        except Exception as e:
+            logger.error(f"Acknowledge rejection error: {str(e)}")
             return {"success": False, "error": str(e)}
 
     # Helper methods for resubmission logic
