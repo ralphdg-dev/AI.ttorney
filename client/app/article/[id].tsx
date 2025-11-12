@@ -321,7 +321,8 @@ export default function ArticleViewScreen() {
           {/* Legal Disclaimer - Always appears */}
           <LegalDisclaimer showFilipino={showFilipino} />
 
-       
+          {/* Extra spacing to prevent navbar overlap */}
+          <View style={{ height: 60 }} />
         </View>
       </ScrollView>
 
