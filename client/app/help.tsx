@@ -90,6 +90,7 @@ export default function HelpAndSupport() {
   const [isLoading, setIsLoading] = useState(true);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [visibleFaqCount, setVisibleFaqCount] = useState(5);
 
   const [emailName, setEmailName] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
@@ -116,34 +117,79 @@ export default function HelpAndSupport() {
 
   const faqs = [
     {
+      question: "What is Ai.ttorney?",
+      answer:
+        "Ai.ttorney is a legal help app for the Philippines. It offers an AI legal assistant, curated guides and glossary, a community forum, verified-lawyer directory, consultations, and notifications for important updates.",
+    },
+    {
+      question: "What can I do without an account (Guest Mode)?",
+      answer:
+        "You can chat with the legal assistant (limited questions), browse legal guides and the glossary. To post in the forum, bookmark items, or book consultations, create a free account.",
+    },
+    {
+      question: "How do I search guides and posts effectively?",
+      answer:
+        "Use quotes for exact phrases (e.g., \"child custody\") or prefix with '=' for whole-word matches (e.g., =appeal). You can also toggle category chips like Family, Work, Civil, Criminal, Consumer to narrow results.",
+    },
+    {
+      question: "How do category chips work in search?",
+      answer:
+        "When a category chip is active, results must match BOTH your text and the selected category. You can also search like: Test #consumer.",
+    },
+    {
+      question: "How do I view newly published articles from notifications?",
+      answer:
+        "Tap the article notification to open the article directly. These appear under Notifications with a bell icon.",
+    },
+    {
+      question: "How do I report inappropriate forum content?",
+      answer:
+        "Open the post or reply, tap the three-dots (⋯), and choose Report. Our moderators review reports and may issue warnings, suspensions, or bans as needed.",
+    },
+    {
+      question: "What happens if my account is suspended or banned?",
+      answer:
+        "Repeated violations can lead to temporary suspension or a permanent ban. You'll receive a notification. If eligible, you can submit an appeal from the app.",
+    },
+    {
+      question: "How do I find and book a verified lawyer?",
+      answer:
+        "Go to the Legal Aid Directory, filter by specialization and location, then select a verified lawyer to view consultation options and availability.",
+    },
+    {
+      question: "How do I switch language for an article?",
+      answer:
+        "On an article page, use the FIL/EN toggle at the top to switch between Filipino and English (when both versions are available).",
+    },
+    {
+      question: "Can I bookmark guides or posts?",
+      answer:
+        "Yes. Tap the bookmark icon on guides and view them later in Bookmarked Guides. Forum posts support bookmarking if enabled in the post view."
+    },
+    {
+      question: "How do notifications work?",
+      answer:
+        "You'll receive updates for replies, consultations, moderation actions, and new content. Tap a notification to open the related item. Manage OS-level notification settings from your device.",
+    },
+    {
       question: "How do I reset my password?",
       answer:
-        "Go to the login screen and tap 'Forgot password'. Follow the steps to receive a reset link in your email.",
+        "On the login screen, tap Forgot Password to receive a reset link via email. Follow the instructions to set a new password.",
     },
     {
-      question: "Can I use the app as a guest?",
+      question: "Are the chatbot answers legal advice?",
       answer:
-        "Yes! Guests can ask up to 15 legal questions through the chatbot and browse the legal glossary. To access the full Legal Aid Directory, Community Forum, and save your history, you'll need to create an account.",
+        "No. Responses are for educational purposes based on Philippine law and do not create a lawyer–client relationship.",
     },
     {
-      question: "What legal topics does Ai.ttorney cover?",
+      question: "Which legal topics are covered?",
       answer:
-        "The platform focuses on five key areas: Family Law, Civil Law, Criminal Law, Labor Law, and Consumer Law.",
+        "Family, Civil, Criminal, Labor (Work), and Consumer law. Guides and glossary terms are organized under these categories.",
     },
     {
-      question: "Is the chatbot's advice legally binding?",
+      question: "How is my data used?",
       answer:
-        "No. The chatbot provides educational information based on Philippine law, but it does not constitute legal advice or create a lawyer-client relationship.",
-    },
-    {
-      question: "How do I find a lawyer near me?",
-      answer:
-        "Go to the Legal Aid Directory and use the filters to search by location, specialization, and consultation mode.",
-    },
-    {
-      question: "How does lawyer verification work?",
-      answer:
-        "All lawyers are verified through the Supreme Court Roll of Attorneys or IBP QR code validation.",
+        "We use your data to provide core features like saved items, consultations, and moderation. See our Privacy Policy for details and how to request deletion.",
     },
   ];
 
@@ -155,6 +201,12 @@ export default function HelpAndSupport() {
   const filteredFaqs = faqs.filter((item) =>
     item.question.toLowerCase().includes(search.toLowerCase())
   );
+  const displayedFaqs = filteredFaqs.slice(0, visibleFaqCount);
+
+  useEffect(() => {
+    setVisibleFaqCount(5);
+    setExpandedIndex(null);
+  }, [search]);
 
   const handleExpand = (index: number) => {
     setExpandedIndex(expandedIndex === index ? null : index);
@@ -295,10 +347,10 @@ export default function HelpAndSupport() {
                 >
                   Frequently Asked Questions
                 </Text>
-                {filteredFaqs.length > 0 ? (
-                  filteredFaqs.map((item, index) => (
+                {displayedFaqs.length > 0 ? (
+                  displayedFaqs.map((item, index) => (
                     <View
-                      key={index}
+                      key={`${item.question}-${index}`}
                       style={[
                         tw`mb-3 border rounded-xl p-4`,
                         {
@@ -352,6 +404,17 @@ export default function HelpAndSupport() {
                     </Text>
                   </View>
                 )}
+
+                {filteredFaqs.length > visibleFaqCount && (
+                  <View style={tw`items-center mt-1`}>
+                    <TouchableOpacity
+                      onPress={() => setVisibleFaqCount((c) => Math.min(c + 5, filteredFaqs.length))}
+                      style={[tw`px-4 py-2 rounded-lg`, { backgroundColor: Colors.primary.blue }]}
+                    >
+                      <Text style={tw`text-white font-semibold`}>See more</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
 
               {/* Contact Section */}
@@ -395,7 +458,7 @@ export default function HelpAndSupport() {
                     <Text
                       style={[tw`text-xs mt-1`, { color: Colors.text.sub }]}
                     >
-                      support@example.com
+                      aittorney.otp@gmail.com
                     </Text>
                   </TouchableOpacity>
 
