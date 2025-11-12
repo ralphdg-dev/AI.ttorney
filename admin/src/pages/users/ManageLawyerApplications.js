@@ -1,4 +1,5 @@
 import React from "react";
+import { MoreVertical } from "lucide-react";
 import {
   FileText,
   Eye,
@@ -103,6 +104,10 @@ const ManageLawyerApplications = () => {
     loading: false,
     changes: null,
   });
+  const [openMenuId, setOpenMenuId] = React.useState(null);
+  const [openMenuPos, setOpenMenuPos] = React.useState({ right: 20, bottom: 20 });
+  const [openApprovalMenuId, setOpenApprovalMenuId] = React.useState(null);
+  const [openApprovalMenuPos, setOpenApprovalMenuPos] = React.useState({ right: 20, bottom: 20 });
 
   // Debounce search query
   React.useEffect(() => {
@@ -891,37 +896,65 @@ const ManageLawyerApplications = () => {
           return null;
         }
 
+        const disabledResub = row.status === "resubmission";
+        const disabledReject = row.status === "rejected";
+
         return (
-          <div className="flex items-center gap-2 text-gray-600">
-            <Tooltip content="Approve">
-              <button
-                className="p-1 rounded hover:bg-emerald-50 text-emerald-700 border border-transparent hover:border-emerald-200"
-                aria-label="Approve"
-                onClick={() => handleApprove(row.id, row.full_name)}
-              >
-                <Check size={16} />
-              </button>
-            </Tooltip>
-            <Tooltip content="Request Resubmission">
-              <button
-                className="p-1 rounded hover:bg-yellow-50 text-yellow-700 border border-transparent hover:border-yellow-200"
-                aria-label="Request Resubmission"
-                onClick={() => handleResubmission(row.id, row.full_name)}
-                disabled={row.status === "resubmission"}
-              >
-                <RotateCcw size={16} />
-              </button>
-            </Tooltip>
-            <Tooltip content="Reject">
-              <button
-                className="p-1 rounded hover:bg-red-50 text-red-700 border border-transparent hover:border-red-200"
-                aria-label="Reject"
-                onClick={() => handleReject(row.id, row.full_name)}
-                disabled={row.status === "rejected"}
-              >
-                <X size={16} />
-              </button>
-            </Tooltip>
+          <div className="relative" style={{ position: 'static' }}>
+            <button
+              onClick={(e) => {
+                if (openApprovalMenuId === row.id) {
+                  setOpenApprovalMenuId(null);
+                  return;
+                }
+                const rect = e.currentTarget.getBoundingClientRect();
+                const right = Math.max(8, window.innerWidth - rect.right);
+                const bottom = Math.max(8, window.innerHeight - rect.top + 10); // 10px above
+                setOpenApprovalMenuPos({ right, bottom });
+                setOpenApprovalMenuId(row.id);
+              }}
+              className="p-1 rounded hover:bg-gray-100 text-gray-600"
+              aria-label="Approval Actions"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            {openApprovalMenuId === row.id && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setOpenApprovalMenuId(null)}
+                />
+                <div
+                  className="fixed w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-[9999]"
+                  style={{ right: `${openApprovalMenuPos.right}px`, bottom: `${openApprovalMenuPos.bottom}px` }}
+                >
+                  <button
+                    onClick={() => { handleApprove(row.id, row.full_name); setOpenApprovalMenuId(null); }}
+                    className="w-full px-3 py-1.5 text-left text-xs text-emerald-700 hover:bg-emerald-50 flex items-center"
+                  >
+                    <Check size={14} className="mr-2" />
+                    Approve Application
+                  </button>
+                  <button
+                    onClick={() => { if (!disabledResub) handleResubmission(row.id, row.full_name); setOpenApprovalMenuId(null); }}
+                    disabled={disabledResub}
+                    className={`w-full px-3 py-1.5 text-left text-xs flex items-center ${disabledResub ? 'text-gray-400 cursor-not-allowed' : 'text-yellow-700 hover:bg-yellow-50'}`}
+                  >
+                    <RotateCcw size={14} className="mr-2" />
+                    Request Resubmission
+                  </button>
+                  <button
+                    onClick={() => { if (!disabledReject) handleReject(row.id, row.full_name); setOpenApprovalMenuId(null); }}
+                    disabled={disabledReject}
+                    className={`w-full px-3 py-1.5 text-left text-xs flex items-center ${disabledReject ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
+                  >
+                    <X size={14} className="mr-2" />
+                    Reject Application
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         );
       },
@@ -933,49 +966,68 @@ const ManageLawyerApplications = () => {
       render: (row) => {
         const isArchived = row.archived === true;
         return (
-          <div className="flex items-center justify-end space-x-2 text-gray-600">
-            <Tooltip content="View">
-              <button
-                className="p-1 rounded hover:bg-gray-100"
-                aria-label="View"
-                onClick={() => openView(row)}
-              >
-                <Eye size={16} />
-              </button>
-            </Tooltip>
+          <div className="relative" style={{ position: 'static' }}>
+            <button
+              onClick={(e) => {
+                if (openMenuId === row.id) {
+                  setOpenMenuId(null);
+                  return;
+                }
+                const rect = e.currentTarget.getBoundingClientRect();
+                const right = Math.max(8, window.innerWidth - rect.right);
+                const bottom = Math.max(8, window.innerHeight - rect.top + 10); // 10px above trigger
+                setOpenMenuPos({ right, bottom });
+                setOpenMenuId(row.id);
+              }}
+              className="p-1 rounded hover:bg-gray-100 text-gray-600"
+              aria-label="Actions"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
 
-            <Tooltip content="Edit">
-              <button
-                className="p-1 rounded hover:bg-gray-100"
-                aria-label="Edit"
-                onClick={() => handleEdit(row)}
-              >
-                <Pencil size={16} />
-              </button>
-            </Tooltip>
-
-            {!isArchived && (
-              <Tooltip content="Archive">
-                <button
-                  className="p-1 rounded hover:bg-gray-100"
-                  aria-label="Archive"
-                  onClick={() => handleArchive(row)}
+            {openMenuId === row.id && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setOpenMenuId(null)}
+                />
+                <div
+                  className="fixed w-44 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-[9999]"
+                  style={{ right: `${openMenuPos.right}px`, bottom: `${openMenuPos.bottom}px` }}
                 >
-                  <Archive size={16} />
-                </button>
-              </Tooltip>
-            )}
-
-            {isArchived && (
-              <Tooltip content="Unarchive">
-                <button
-                  className="p-1 rounded hover:bg-green-100 text-green-600"
-                  aria-label="Unarchive"
-                  onClick={() => handleArchive(row)}
-                >
-                  <RefreshCw size={16} />
-                </button>
-              </Tooltip>
+                  <button
+                    onClick={() => { openView(row); setOpenMenuId(null); }}
+                    className="w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center"
+                  >
+                    <Eye className="w-4 h-4 mr-2 text-gray-600" />
+                    View Details
+                  </button>
+                  <button
+                    onClick={() => { handleEdit(row); setOpenMenuId(null); }}
+                    className="w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center"
+                  >
+                    <Pencil className="w-4 h-4 mr-2 text-gray-600" />
+                    Edit
+                  </button>
+                  {!isArchived ? (
+                    <button
+                      onClick={() => { handleArchive(row); setOpenMenuId(null); }}
+                      className="w-full px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 flex items-center"
+                    >
+                      <Archive className="w-4 h-4 mr-2 text-red-600" />
+                      Archive
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { handleArchive(row); setOpenMenuId(null); }}
+                      className="w-full px-3 py-1.5 text-left text-xs text-emerald-700 hover:bg-emerald-50 flex items-center"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2 text-emerald-700" />
+                      Unarchive
+                    </button>
+                  )}
+                </div>
+              </>
             )}
           </div>
         );
