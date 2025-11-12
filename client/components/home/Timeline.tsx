@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
+
 import { View, FlatList, RefreshControl, TouchableOpacity, Animated, StyleSheet, ListRenderItem, Text as RNText } from 'react-native';
 import { NetworkConfig } from '../../utils/networkConfig';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -52,7 +53,12 @@ interface TimelineProps {
   searchQuery?: string;
 }
 
-const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, isSearchMode = false, searchQuery }) => {
+export interface TimelineHandle {
+  scrollToTop: () => void;
+}
+
+const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', searchResults, isSearchMode = false, searchQuery }, ref) => {
+
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
   const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
@@ -62,20 +68,29 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
   const [initialLoading, setInitialLoading] = useState(true);
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
   const [, setError] = useState<string | null>(null);
-  
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const POSTS_PER_PAGE = 20;
-  
+
   // Refs for optimization
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isComponentMounted = useRef(true);
   const loadingMoreRef = useRef(false);
   const refreshingRef = useRef(false);
   const hasMoreRef = useRef(true);
-  
+  const listRef = useRef<FlatList>(null);
+
+  useImperativeHandle(ref, () => ({
+    scrollToTop: () => {
+      try {
+        listRef.current?.scrollToOffset?.({ offset: 0, animated: true });
+      } catch {}
+    },
+  }), []);
+
   // Force cache refresh to fix any lingering references
   React.useEffect(() => {
     // This ensures any old references are cleared
@@ -109,13 +124,13 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
     const isAnon = !!row?.is_anonymous;
     const created = row?.created_at || '';
     const userData = row?.users || {};
-    
+
     // Map replies data if available
     const replies = row?.replies || row?.forum_replies || [];
     const mappedReplies = replies.map((reply: any) => {
       const isReplyAnon = !!reply?.is_anonymous;
       const replyUserData = reply?.users || {};
-      
+
       return {
         id: String(reply?.id || ''),
         body: reply?.reply_body || reply?.body || '',
@@ -132,7 +147,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
         },
       };
     });
-    
+
     const postData: PostData = {
       id: String(row?.id ?? ''),
       user: isAnon
@@ -158,7 +173,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
       is_flagged: !!row?.is_flagged,
       users: userData,
     };
-    
+
     // Cache the complete post (with or without comments) for instant ViewPost loading
     const postWithComments = {
       ...postData,
@@ -166,14 +181,14 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
       commentsLoaded: true,
       commentsTimestamp: Date.now()
     };
-    
+
     // Use setCachedPost to cache the complete post
     setCachedPost(postData.id, postWithComments as any);
-    
+
     if (__DEV__) {
       console.log(`Cached post ${postData.id} with ${mappedReplies.length} comments from Timeline`);
     }
-    
+
     return postData;
   }, [formatTimeAgo, setCachedPost]);
 
@@ -189,7 +204,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
           'Authorization': `Bearer ${session.access_token}`
         };
       }
-      
+
       // Fallback to AsyncStorage
       const token = await AsyncStorage.getItem('access_token');
       if (token) {
@@ -198,7 +213,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
           'Authorization': `Bearer ${token}`
         };
       }
-      
+
       if (__DEV__) console.warn('Timeline: No authentication token available');
       return { 'Content-Type': 'application/json' };
     } catch (error) {
@@ -219,13 +234,13 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
         return;
       }
     }
-    
+
     // Close any open dropdown menus when refreshing
     if (!append) {
       setOpenMenuPostId(null);
     }
     setError(null);
-    
+
     if (!isAuthenticated) {
       if (__DEV__) console.warn('Timeline: User not authenticated, clearing posts');
       setPosts([]);
@@ -234,7 +249,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
       setLoadingMore(false);
       return;
     }
-    
+
     // Set loading state before making request
     if (append) {
       setLoadingMore(true);
@@ -246,33 +261,33 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
       setHasMore(true);
       hasMoreRef.current = true;
     }
-    
+
     const now = Date.now();
     if (!append) {
       setLastFetchTime(now);
     }
-    
+
     try {
       const headers = await getAuthHeaders();
       const API_BASE_URL = await NetworkConfig.getBestApiUrl();
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
-      
+
       // Use ref to get current page value to avoid stale closure
       const pageToFetch = append ? currentPage + 1 : 0;
       const offset = pageToFetch * POSTS_PER_PAGE;
-      
+
       if (__DEV__) {
         console.log('Timeline: Fetching posts', { append, pageToFetch, offset, limit: POSTS_PER_PAGE });
       }
-      
+
       const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent?limit=${POSTS_PER_PAGE}&offset=${offset}`, {
         method: 'GET',
         headers,
         signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
 
       if (!response.ok) {
@@ -289,7 +304,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
 
       const data = await response.json();
       let mapped: PostData[] = [];
-      
+
       if (__DEV__) {
         console.log('Timeline: Raw API response:', {
           success: data?.success,
@@ -301,20 +316,20 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
           append
         });
       }
-      
+
       if (Array.isArray(data?.data)) {
         mapped = data.data.map(mapApiToPost);
       } else if (Array.isArray(data)) {
         mapped = data.map(mapApiToPost);
       }
-      
+
       if (__DEV__) {
         console.log(`Timeline: Mapped ${mapped.length} posts from API response (append: ${append})`);
       }
-      
+
       // Check if we have more posts to load
       const hasMorePosts = mapped.length === POSTS_PER_PAGE;
-      
+
       // Only update if component is still mounted
       if (isComponentMounted.current) {
         if (append) {
@@ -322,14 +337,14 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
           setPosts(prev => {
             const existingIds = new Set(prev.map(p => p.id));
             const newPosts = mapped.filter(p => !existingIds.has(p.id));
-            
+
             // Mark new posts for staggered animation
             const newPostsWithAnimation = newPosts.map((post, idx) => ({
               ...post,
               isNewlyLoaded: true,
               loadedIndex: idx,
             }));
-            
+
             const combined = [...prev, ...newPostsWithAnimation];
             if (__DEV__) {
               console.log('Timeline: Appended posts', { 
@@ -339,7 +354,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
                 hasMore: hasMorePosts
               });
             }
-            
+
             // Clear the isNewlyLoaded flag after animation completes
             setTimeout(() => {
               setPosts(current => current.map(p => ({
@@ -348,7 +363,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
                 loadedIndex: undefined,
               })));
             }, newPosts.length * 80 + 500); // Animation duration + buffer
-            
+
             return combined;
           });
           setCurrentPage(pageToFetch);
@@ -362,11 +377,11 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
           setHasMore(hasMorePosts);
           hasMoreRef.current = hasMorePosts;
         }
-        
+
         if (__DEV__ && mapped.length === 0) {
           console.log('Timeline: No posts found after mapping');
         }
-        
+
         // Clear any error state on successful load
         setError(null);
       }
@@ -375,10 +390,10 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
         // Silent abort - don't log as it's expected behavior
         return;
       }
-      
+
       const errorMessage = error.message || 'Failed to load posts';
       if (__DEV__) console.error('Timeline load error:', errorMessage);
-      
+
       if (isComponentMounted.current) {
         setError(errorMessage);
         // Don't clear posts on error to maintain user experience
@@ -401,7 +416,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
   // Refresh posts when screen comes into focus (e.g., returning from CreatePost)
   const hasFocusedOnce = useRef(false);
   useFocusEffect(
@@ -413,7 +428,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
         if (__DEV__) console.log('📱 Timeline: First focus, skipping refresh');
         return;
       }
-      
+
       if (!isCacheValid()) {
         if (__DEV__) console.log('📱 Timeline: Screen focused, cache invalid - refreshing');
         loadPosts(true); // Force refresh
@@ -432,12 +447,12 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
     }
-    
+
     const scheduleNextFetch = () => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
       }
-      
+
       fetchTimeoutRef.current = setTimeout(() => {
         if (isComponentMounted.current && isAuthenticated) {
           // Only poll if the component is still mounted and user is on the page
@@ -446,11 +461,11 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
         }
       }, 120000); // 2 minutes - much less aggressive
     };
-    
+
     if (isAuthenticated) {
       scheduleNextFetch();
     }
-    
+
     return () => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
@@ -458,7 +473,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
       }
     };
   }, [isAuthenticated, loadPosts]);
-  
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -482,7 +497,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
     // The Post component handles the actual bookmark logic
     if (__DEV__) console.log('Bookmark toggled:', postId);
   }, []);
-  
+
   const handleBookmarkStatusChange = useCallback((postId: string, isBookmarked: boolean) => {
     // Update the post in the posts array directly
     setPosts(prev => prev.map(post => 
@@ -504,17 +519,17 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
   const handlePostPress = useCallback((postId: string) => {
     // Prefetch the post before navigation for instant loading
     prefetchPost(postId);
-    
+
     const route = context === 'lawyer' ? `/lawyer/ViewPost?postId=${postId}` : `/home/ViewPost?postId=${postId}`;
     router.push(route as any);
   }, [context, router, prefetchPost]);
-  
+
   // Manual refresh handler
   const handleRefresh = useCallback(() => {
     if (__DEV__) console.log('Timeline: Manual refresh triggered');
     loadPosts(true, false); // Force refresh, don't append
   }, [loadPosts]);
-  
+
   // Load more handler for infinite scrolling with debouncing
   const loadMoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleLoadMore = useCallback(() => {
@@ -522,7 +537,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
     if (loadMoreTimeoutRef.current) {
       clearTimeout(loadMoreTimeoutRef.current);
     }
-    
+
     // Debounce the load more call to prevent rapid firing
     loadMoreTimeoutRef.current = setTimeout(() => {
       // Use refs to check current state and prevent stale closures
@@ -530,22 +545,22 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
         if (__DEV__) console.log('Timeline: Already loading more, skipping');
         return;
       }
-      
+
       if (refreshingRef.current) {
         if (__DEV__) console.log('Timeline: Currently refreshing, skipping load more');
         return;
       }
-      
+
       if (!hasMoreRef.current) {
         if (__DEV__) console.log('Timeline: No more posts to load');
         return;
       }
-      
+
       if (isSearchMode) {
         if (__DEV__) console.log('Timeline: In search mode, skipping load more');
         return;
       }
-      
+
       if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage, hasMore: hasMoreRef.current });
       loadPosts(false, true); // Don't force, append to existing
     }, 300); // 300ms debounce
@@ -559,12 +574,12 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
   // Function to add optimistic post
   const addOptimisticPost = useCallback((postData: { body: string; category?: string; is_anonymous?: boolean }) => {
     const animatedOpacity = new Animated.Value(0); // Start completely transparent
-    
+
     // Get current user info for optimistic post
     const userName = currentUser?.full_name || currentUser?.username || currentUser?.email || 'You';
     const userUsername = currentUser?.username || currentUser?.email?.split('@')[0] || 'you';
     const isLawyer = currentUser?.role === 'verified_lawyer';
-    
+
     const optimisticPost: PostData = {
       id: `optimistic-${Date.now()}`,
       user: postData.is_anonymous 
@@ -585,14 +600,14 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
     };
 
     setOptimisticPosts(prev => [optimisticPost, ...prev]);
-    
+
     // Smooth fade in animation
     Animated.timing(animatedOpacity, {
       toValue: 0.7, // Semi-transparent while posting
       duration: 300,
       useNativeDriver: true,
     }).start();
-    
+
     return optimisticPost.id;
   }, [currentUser]);
 
@@ -607,7 +622,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
           duration: 200,
           useNativeDriver: true,
         }).start();
-        
+
         // Keep optimistic post visible and let duplicate detection handle seamless transition
         // The post will automatically be filtered out when the real post appears
         // Only remove it after a reasonable time to ensure the real post has loaded
@@ -658,7 +673,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
   const renderItem: ListRenderItem<PostData> = useCallback(({ item, index }: { item: PostData; index: number }) => {
     // Use loadedIndex for newly loaded posts to create staggered animation
     const animationIndex = item.isNewlyLoaded && item.loadedIndex !== undefined ? item.loadedIndex : 0;
-    
+
     const postComponent = (
       <Post
         key={item.id}
@@ -704,7 +719,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
       // Using search results
       return searchResults.map(mapApiToPost);
     }
-    
+
     // Filter out real posts that match optimistic posts to prevent duplicates
     const filteredRealPosts = posts.filter(realPost => {
       // Check if there's an optimistic post with similar content and timestamp
@@ -716,10 +731,10 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
         ) < 30000; // 30 seconds tolerance
         return contentMatch && timeMatch;
       });
-      
+
       return !hasOptimisticMatch;
     });
-    
+
     return [...optimisticPosts, ...filteredRealPosts];
   }, [optimisticPosts, posts, isSearchMode, searchResults, mapApiToPost]);
 
@@ -740,16 +755,16 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user', searchResults, is
     />
   );
 
-// Expose functions globally for CreatePost to use
-React.useEffect(() => {
-  if (context === 'user') {
-    (global as any).userForumActions = {
-      addOptimisticPost,
-      confirmOptimisticPost,
-      removeOptimisticPost,
-    };
-  }
-}, [addOptimisticPost, confirmOptimisticPost, removeOptimisticPost, context]);
+  // Expose functions globally for CreatePost to use
+  React.useEffect(() => {
+    if (context === 'user') {
+      (global as any).userForumActions = {
+        addOptimisticPost,
+        confirmOptimisticPost,
+        removeOptimisticPost,
+      };
+    }
+  }, [addOptimisticPost, confirmOptimisticPost, removeOptimisticPost, context]);
 
   // Render footer component
   const renderFooter = useCallback(() => {
@@ -760,7 +775,7 @@ React.useEffect(() => {
         </View>
       );
     }
-    
+
     if (!hasMore && allPosts.length > 0 && !loadingMore) {
       return (
         <View style={styles.endOfPostsContainer}>
@@ -768,11 +783,11 @@ React.useEffect(() => {
         </View>
       );
     }
-    
+
     if (allPosts.length > 0) {
       return <View style={styles.bottomSpacer} />;
     }
-    
+
     return null;
   }, [loadingMore, allPosts.length, hasMore]);
 
@@ -780,7 +795,7 @@ React.useEffect(() => {
     <View style={styles.container}>
       {/* Forum Loading Animation */}
       <ForumLoadingAnimation visible={initialLoading} />
-      
+
       {/* Show skeleton loading for initial load */}
       {initialLoading && allPosts.length === 0 ? (
         <View style={styles.skeletonContainer}>
@@ -788,6 +803,7 @@ React.useEffect(() => {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           {...listProps}
           style={styles.timeline}
           contentContainerStyle={allPosts.length === 0 ? styles.emptyContent : styles.timelineContent}
@@ -835,7 +851,7 @@ React.useEffect(() => {
       </TouchableOpacity>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

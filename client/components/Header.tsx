@@ -25,6 +25,7 @@ interface HeaderProps {
   variant?: 'home' | 'minimal';
   rightComponent?: React.ReactNode;
   backgroundColor?: string; // Allow custom background color
+  onLogoPress?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -45,6 +46,7 @@ const Header: React.FC<HeaderProps> = ({
   onChatHistoryToggle,
   variant = 'default',
   rightComponent,
+  onLogoPress,
 }) => {
   const { openSidebar } = useSidebar();
   const router = useRouter();
@@ -114,11 +116,18 @@ const Header: React.FC<HeaderProps> = ({
     if (variant === 'home' && !title) {
       return (
         <View style={styles.titleContainer}>
-          <Image 
-            source={require('../assets/images/logo.png')} 
-            style={{ width: logoWidth, height: logoHeight }}
-            resizeMode="contain"
-          />
+          <TouchableOpacity
+            onPress={onLogoPress}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Scroll to top"
+          >
+            <Image 
+              source={require('../assets/images/logo.png')} 
+              style={{ width: logoWidth, height: logoHeight }}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
         </View>
       );
     }
@@ -260,7 +269,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 0,
-    pointerEvents: 'none',
+    pointerEvents: 'auto',
   },
   title: {
     fontSize: Platform.select({ ios: 17, android: 18, default: 17 }),

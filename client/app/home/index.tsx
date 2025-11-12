@@ -3,7 +3,7 @@ import { View, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Navbar from '../../components/Navbar';
-import Timeline from '../../components/home/Timeline';
+import Timeline, { TimelineHandle } from '../../components/home/Timeline';
 import Header from '../../components/Header';
 import { SidebarWrapper } from '../../components/AppSidebar';
 import AnimatedSearchBar from '../../components/forum/AnimatedSearchBar';
@@ -24,6 +24,8 @@ const HomePage: React.FC = () => {
     hideSearch,
   } = useForumSearch();
 
+  const timelineRef = React.useRef<TimelineHandle>(null);
+
   const handleSearchPress = () => {
     showSearch();
   };
@@ -41,6 +43,7 @@ const HomePage: React.FC = () => {
           showNotifications={true}
           onSearchPress={handleSearchPress}
           onNotificationPress={handleNotificationPress}
+          onLogoPress={() => timelineRef.current?.scrollToTop()}
         />
         
         {/* Animated Search Bar - positioned below header */}
@@ -58,9 +61,9 @@ const HomePage: React.FC = () => {
         <View style={[styles.content, isSearchVisible && styles.contentSearchMode]}>
           {/* Show search results or timeline */}
           {hasSearched && isSearchVisible ? (
-            <Timeline searchResults={results} isSearchMode={true} searchQuery={query} />
+            <Timeline ref={timelineRef} searchResults={results} isSearchMode={true} searchQuery={query} />
           ) : (
-            <Timeline />
+            <Timeline ref={timelineRef} />
           )}
         </View>
         
