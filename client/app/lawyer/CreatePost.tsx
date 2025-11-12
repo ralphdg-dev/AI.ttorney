@@ -10,6 +10,9 @@ import { LawyerNavbar } from '../../components/lawyer/shared';
 import { ModerationWarningBanner } from '@/components/moderation/ModerationWarningBanner';
 import { useCreatePost } from '@/hooks/useCreatePost';
 import { useModerationStatus } from '@/contexts/ModerationContext';
+import { useToast } from '@/components/ui/toast';
+import { validatePostContent } from '@/utils/contentValidation';
+import { showContentValidationToast } from '@/utils/moderationToastUtils';
 
 // Constants
 const MAX_CONTENT_LENGTH = 500;
@@ -27,6 +30,9 @@ const LawyerCreatePost: React.FC = () => {
   
   // Get moderation status from context
   const { moderationStatus } = useModerationStatus();
+  
+  // Toast for validation messages
+  const toast = useToast();
 
   // Validation logic
   const isContentValid = useMemo(() => {
@@ -40,6 +46,20 @@ const LawyerCreatePost: React.FC = () => {
 
   const handlePostSubmit = async () => {
     if (isPostDisabled) return;
+    
+    // Validate content for prohibited material (links, promotional content)
+    const validation = validatePostContent(content);
+    if (!validation.isValid) {
+      showContentValidationToast(
+        toast,
+        'error',
+        validation.reason || 'Content Blocked',
+        validation.details || 'This post cannot be published.',
+        6000
+      );
+      return;
+    }
+    
     // Lawyers always post non-anonymously
     await createPost(content, categoryId, false);
   };

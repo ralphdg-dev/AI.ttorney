@@ -47,6 +47,14 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
       const isLawyerStatusPage = pathname?.includes('/lawyer-status/');
       const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route)) || isLawyerStatusPage;
       
+      // CRITICAL: Always skip check if on suspension-lifted page to prevent infinite loops
+      if (pathname === '/suspension-lifted') {
+        if (!hasChecked) {
+          setHasChecked(true);
+        }
+        return;
+      }
+      
       console.log('🛡️ SuspensionGuard: Check conditions', { 
         pathname, 
         isLawyerStatusPage, 

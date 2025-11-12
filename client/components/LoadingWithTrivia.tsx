@@ -76,7 +76,7 @@ export const LoadingWithTrivia: React.FC<LoadingWithTriviaProps> = ({
 
       {/* Trivia Section */}
       {showTrivia && currentTrivia && (
-        <Animated.View style={{ opacity: fadeAnim }}>
+        <Animated.View style={[styles.triviaContainer, { opacity: fadeAnim }]}>
           <Text style={styles.triviaText}>{currentTrivia}</Text>
         </Animated.View>
       )}
@@ -110,6 +110,10 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     marginTop: 10,
     marginBottom: 40,
+  },
+  triviaContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   triviaText: {
     fontSize: 15,

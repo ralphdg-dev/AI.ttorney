@@ -19,7 +19,8 @@ import { NetworkConfig } from '../../../utils/networkConfig';
 import { useModerationStatus } from '../../../contexts/ModerationContext';
 import { useToast } from '../../ui/toast';
 import { parseModerationError } from '../../../services/moderationService';
-import { showStrikeAddedToast, showSuspendedToast, showBannedToast, showAccessDeniedToast } from '../../../utils/moderationToastUtils';
+import { showStrikeAddedToast, showSuspendedToast, showBannedToast, showAccessDeniedToast, showContentValidationToast } from '../../../utils/moderationToastUtils';
+import { validatePostContent } from '../../../utils/contentValidation';
 
 
 interface PostData {
@@ -684,6 +685,19 @@ const ViewPost: React.FC = () => {
     const text = replyText.trim();
     if (!text || !postId) return;
     
+    // Validate content for prohibited material (links, promotional content)
+    const validation = validatePostContent(text);
+    if (!validation.isValid) {
+      showContentValidationToast(
+        toast,
+        'error',
+        validation.reason || 'Content Blocked',
+        validation.details || 'This reply cannot be published.',
+        6000
+      );
+      return;
+    }
+    
     const optimisticId = addOptimisticReply({ body: text });
     setReplyText('');
     
@@ -722,6 +736,19 @@ const ViewPost: React.FC = () => {
         if (response.status === 400) {
           const moderationError = parseModerationError(errorText);
           if (moderationError) {
+            // Check if this is a promotional/link validation error (no moderation status update needed)
+            if (moderationError.action_taken === 'content_blocked') {
+              showContentValidationToast(
+                toast, 
+                'error', 
+                moderationError.reason || 'Content Blocked', 
+                moderationError.detail, 
+                7000
+              );
+              return;
+            }
+
+            // For actual moderation violations, update status
             await refreshStatus();
             
             if (moderationError.action_taken === 'strike_added') {
