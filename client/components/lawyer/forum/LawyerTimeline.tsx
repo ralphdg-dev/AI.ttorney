@@ -104,7 +104,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
       
-      const response = await fetch(`${apiUrl}/api/forum/posts/recent?limit=50`, {
+      const response = await fetch(`${apiUrl}/api/forum/posts/recent`, {
         method: 'GET',
         headers,
         signal: controller.signal,

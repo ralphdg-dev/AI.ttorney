@@ -222,10 +222,10 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', 
     }
   }, [session?.access_token]);
 
-  // Optimized loadPosts with persistent caching and pagination support
-  const loadPosts = useCallback(async (force = false, append = false) => {
+  // Optimized loadPosts - now fetches all posts at once
+  const loadPosts = useCallback(async (force = false) => {
     // Check cache first (only for initial load)
-    if (!force && !append && isCacheValid()) {
+    if (!force && isCacheValid()) {
       const cachedPosts = getCachedPosts();
       if (cachedPosts && cachedPosts.length > 0) {
         if (__DEV__) console.log('Timeline: Using cached posts, skipping fetch');
@@ -236,9 +236,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', 
     }
 
     // Close any open dropdown menus when refreshing
-    if (!append) {
-      setOpenMenuPostId(null);
-    }
+    setOpenMenuPostId(null);
     setError(null);
 
     if (!isAuthenticated) {
@@ -251,21 +249,14 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', 
     }
 
     // Set loading state before making request
-    if (append) {
-      setLoadingMore(true);
-      loadingMoreRef.current = true;
-    } else {
-      setRefreshing(true);
-      refreshingRef.current = true;
-      setCurrentPage(0);
-      setHasMore(true);
-      hasMoreRef.current = true;
-    }
+    setRefreshing(true);
+    refreshingRef.current = true;
+    setCurrentPage(0);
+    setHasMore(false); // No more posts to load since we fetch all at once
+    hasMoreRef.current = false;
 
     const now = Date.now();
-    if (!append) {
-      setLastFetchTime(now);
-    }
+    setLastFetchTime(now);
 
     try {
       const headers = await getAuthHeaders();
@@ -274,15 +265,11 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
-      // Use ref to get current page value to avoid stale closure
-      const pageToFetch = append ? currentPage + 1 : 0;
-      const offset = pageToFetch * POSTS_PER_PAGE;
-
       if (__DEV__) {
-        console.log('Timeline: Fetching posts', { append, pageToFetch, offset, limit: POSTS_PER_PAGE });
+        console.log('Timeline: Fetching all posts from database');
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent?limit=${POSTS_PER_PAGE}&offset=${offset}`, {
+      const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`, {
         method: 'GET',
         headers,
         signal: controller.signal,
@@ -311,9 +298,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', 
           dataType: Array.isArray(data?.data) ? 'array' : typeof data?.data,
           dataLength: Array.isArray(data?.data) ? data.data.length : 'not array',
           directArray: Array.isArray(data),
-          directLength: Array.isArray(data) ? data.length : 'not array',
-          offset,
-          append
+          directLength: Array.isArray(data) ? data.length : 'not array'
         });
       }
 
@@ -324,59 +309,20 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', 
       }
 
       if (__DEV__) {
-        console.log(`Timeline: Mapped ${mapped.length} posts from API response (append: ${append})`);
+        console.log(`Timeline: Mapped ${mapped.length} posts from API response - all posts loaded`);
       }
 
-      // Check if we have more posts to load
-      const hasMorePosts = mapped.length === POSTS_PER_PAGE;
+      // Since we're fetching all posts, there are no more to load
+      const hasMorePosts = false;
 
       // Only update if component is still mounted
       if (isComponentMounted.current) {
-        if (append) {
-          // Append new posts and filter out duplicates
-          setPosts(prev => {
-            const existingIds = new Set(prev.map(p => p.id));
-            const newPosts = mapped.filter(p => !existingIds.has(p.id));
-
-            // Mark new posts for staggered animation
-            const newPostsWithAnimation = newPosts.map((post, idx) => ({
-              ...post,
-              isNewlyLoaded: true,
-              loadedIndex: idx,
-            }));
-
-            const combined = [...prev, ...newPostsWithAnimation];
-            if (__DEV__) {
-              console.log('Timeline: Appended posts', { 
-                previous: prev.length, 
-                new: newPosts.length, 
-                total: combined.length,
-                hasMore: hasMorePosts
-              });
-            }
-
-            // Clear the isNewlyLoaded flag after animation completes
-            setTimeout(() => {
-              setPosts(current => current.map(p => ({
-                ...p,
-                isNewlyLoaded: false,
-                loadedIndex: undefined,
-              })));
-            }, newPosts.length * 80 + 500); // Animation duration + buffer
-
-            return combined;
-          });
-          setCurrentPage(pageToFetch);
-          setHasMore(hasMorePosts);
-          hasMoreRef.current = hasMorePosts;
-        } else {
-          // Replace posts for refresh
-          setPosts(mapped);
-          setCachedPosts(mapped); // Cache the posts
-          setCurrentPage(0);
-          setHasMore(hasMorePosts);
-          hasMoreRef.current = hasMorePosts;
-        }
+        // Always replace posts since we fetch all posts at once
+        setPosts(mapped);
+        setCachedPosts(mapped); // Cache the posts
+        setCurrentPage(0);
+        setHasMore(hasMorePosts);
+        hasMoreRef.current = hasMorePosts;
 
         if (__DEV__ && mapped.length === 0) {
           console.log('Timeline: No posts found after mapping');
@@ -527,7 +473,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', 
   // Manual refresh handler
   const handleRefresh = useCallback(() => {
     if (__DEV__) console.log('Timeline: Manual refresh triggered');
-    loadPosts(true, false); // Force refresh, don't append
+    loadPosts(true); // Force refresh
   }, [loadPosts]);
 
   // Load more handler for infinite scrolling with debouncing
@@ -562,7 +508,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', 
       }
 
       if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage, hasMore: hasMoreRef.current });
-      loadPosts(false, true); // Don't force, append to existing
+      loadPosts(false); // Don't force refresh
     }, 300); // 300ms debounce
   }, [loadPosts, isSearchMode]);
 
