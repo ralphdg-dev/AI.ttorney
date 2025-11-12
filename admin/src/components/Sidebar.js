@@ -40,7 +40,7 @@ const Sidebar = ({ activeItem }) => {
   const { showSuccess, showError, ToastContainer } = useToast();
   const [collapsed, setCollapsed] = React.useState(false);
   const [openGroups, setOpenGroups] = React.useState({});
-  const { logout } = useAuth();
+  const { logout, hasRole } = useAuth();
   const navigate = useNavigate();
 
   // Map menu item IDs to routes
@@ -207,8 +207,8 @@ const Sidebar = ({ activeItem }) => {
               >
                 {section.title}
               </p>
-              {/* Dashboard button under MAIN */}
-              {section.id === "main" && (
+              {/* Dashboard button under MAIN (superadmin only) */}
+              {section.id === "main" && hasRole('superadmin') && (
                 <div className="mt-2">
                   <button
                     onClick={() => handleItemClick("dashboard")}
@@ -250,7 +250,16 @@ const Sidebar = ({ activeItem }) => {
                 </div>
               ) : (
                 <div className={`mt-2 ${collapsed ? "space-y-3" : ""}`}>
-                  {section.groups.map((g) => renderGroup(g))}
+                  {section.groups.map((g) => (
+                    g.label === 'Admin'
+                      ? {
+                          ...g,
+                          items: g.items.filter((item) =>
+                            item.id === 'manage-admins' ? hasRole('superadmin') : true
+                          ),
+                        }
+                      : g
+                  )).map((g) => renderGroup(g))}
                 </div>
               )}
               {/* Divider between MAIN and ACCOUNT */}

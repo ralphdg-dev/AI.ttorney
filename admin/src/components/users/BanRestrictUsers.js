@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import Modal from '../ui/Modal';
 import Tooltip from '../ui/Tooltip';
 import { 
@@ -330,38 +331,45 @@ const BanRestrictUsers = () => {
     setShowActionModal(true);
   };
 
-  // Smart dropdown positioning to prevent off-screen dropdowns
   const handleDropdownToggle = (userId, event) => {
     if (openDropdown === userId) {
       setOpenDropdown(null);
       setDropdownPosition({});
+      setDropdownAnchor(null);
       return;
     }
 
-    const button = event.currentTarget;
-    const rect = button.getBoundingClientRect();
-    const dropdownWidth = 192;
-    
-    // Check row position
-    const tableRow = button.closest('tr');
-    const tableBody = tableRow?.closest('tbody');
-    const allRows = tableBody?.querySelectorAll('tr') || [];
-    const rowIndex = Array.from(allRows).indexOf(tableRow);
-    const isBottomRow = rowIndex >= allRows.length - 2;
-    
-    // Calculate positioning
-    const spaceLeft = rect.left;
-    const useLeftSide = spaceLeft > dropdownWidth + 8;
-    
-    const position = {
-      [isBottomRow ? 'bottom' : 'top']: '0',
-      [useLeftSide ? 'right' : 'left']: '100%',
-      [useLeftSide ? 'marginRight' : 'marginLeft']: '4px'
-    };
-    
-    setDropdownPosition(position);
+    const rect = event.currentTarget.getBoundingClientRect();
+    const right = Math.max(8, window.innerWidth - rect.right);
+    const bottom = Math.max(8, window.innerHeight - rect.top + 10);
+    setDropdownPosition({ right, bottom });
+    setDropdownAnchor(event.currentTarget);
     setOpenDropdown(userId);
   };
+
+  const [dropdownAnchor, setDropdownAnchor] = useState(null);
+
+  useEffect(() => {
+    if (!openDropdown || !dropdownAnchor) return;
+
+    const updatePosition = () => {
+      const rect = dropdownAnchor.getBoundingClientRect();
+      const right = Math.max(8, window.innerWidth - rect.right);
+      const bottom = Math.max(8, window.innerHeight - rect.top + 10);
+      setDropdownPosition({ right, bottom });
+    };
+
+    updatePosition();
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    document.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+      document.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [openDropdown, dropdownAnchor]);
 
   const openUserDetailsModal = async (user) => {
     setSelectedUser(user);
@@ -688,13 +696,18 @@ const BanRestrictUsers = () => {
               <MoreVertical className="w-4 h-4" />
             </button>
 
-          {/* Dropdown Menu */}
-          {openDropdown === user.id && (
-            <div 
-              className="absolute w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-[9999]"
-              style={dropdownPosition}
-            >
-              <div className="py-2">
+          {/* Dropdown Menu (Portal, fixed outside table) */}
+          {openDropdown === user.id && ReactDOM.createPortal(
+            <>
+              <div
+                className="fixed inset-0 z-[9998]"
+                onClick={() => { setOpenDropdown(null); setDropdownPosition({}); }}
+              />
+              <div
+                className="fixed w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-[9999]"
+                style={{ right: dropdownPosition.right ?? 20, bottom: dropdownPosition.bottom ?? 20 }}
+              >
+                <div className="py-2">
                 {/* View Details - Always available */}
                 <button
                   onClick={() => {
@@ -808,9 +821,10 @@ const BanRestrictUsers = () => {
                     </div>
                   </button>
                 )}
-
+                </div>
               </div>
-            </div>
+            </>,
+            document.body
           )}
           </div>
         </div>
