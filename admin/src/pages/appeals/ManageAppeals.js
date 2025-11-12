@@ -197,7 +197,10 @@ const ManageAppeals = () => {
     event.stopPropagation();
     if (openMenuId === id) return setOpenMenuId(null);
     const rect = event.currentTarget.getBoundingClientRect();
-    setDropdownPosition({ top: rect.bottom + 4, left: rect.right - 130 });
+    // Place menu above the trigger by 10px, aligned to the right similar to ReportedReplies
+    const right = Math.max(8, window.innerWidth - rect.right);
+    const bottom = Math.max(8, window.innerHeight - rect.top + 10);
+    setDropdownPosition({ right, bottom });
     setOpenMenuId(id);
   };
 
@@ -301,8 +304,8 @@ const ManageAppeals = () => {
         className="absolute z-50 bg-white border border-gray-200 rounded-md shadow-md w-36 text-[11px]"
         style={{
           position: "fixed",
-          top: dropdownPosition?.top ?? 0,
-          left: dropdownPosition?.left ?? 0,
+          right: dropdownPosition?.right ?? 20,
+          bottom: dropdownPosition?.bottom ?? 20,
         }}
       >
         <button
