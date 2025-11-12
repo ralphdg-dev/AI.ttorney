@@ -15,6 +15,7 @@ import DropdownMenu from "@/components/common/DropdownMenu";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { LawyerNavbar } from "@/components/lawyer/shared";
+import { useRouter } from "expo-router";
 
 export default function NotificationsScreen() {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ export default function NotificationsScreen() {
   const hasFetched = React.useRef(false);
   const [selectedViolation, setSelectedViolation] = useState<any>(null);
   const [showViolationModal, setShowViolationModal] = useState(false);
+  const router = useRouter();
 
   React.useEffect(() => {
     if (!hasFetched.current) {
@@ -105,6 +107,16 @@ export default function NotificationsScreen() {
             if (isViolation && item.data) {
               setSelectedViolation(item);
               setShowViolationModal(true);
+              return;
+            }
+
+            // Navigate to legal article if notification represents a new article
+            const isArticleNotif = item.type === 'article_published' || item.type?.includes('article');
+            if (isArticleNotif) {
+              const articleId = item.data?.article_id || item.data?.articleId || item.data?.id;
+              if (articleId) {
+                router.push(`/article/${articleId}` as any);
+              }
             }
           }}
         >
