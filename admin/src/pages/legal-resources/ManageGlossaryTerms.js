@@ -1,5 +1,6 @@
 import React from "react";
-import { Book, Eye, Pencil, Archive, Upload, History } from "lucide-react";
+import ReactDOM from "react-dom";
+import { Book, Eye, Pencil, Archive, Upload, History, MoreVertical } from "lucide-react";
 import Tooltip from "../../components/ui/Tooltip";
 import ListToolbar from "../../components/ui/ListToolbar";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
@@ -40,6 +41,9 @@ const ManageGlossaryTerms = () => {
     loading: false,
   });
 
+  const [openMenuId, setOpenMenuId] = React.useState(null);
+  const [dropdownPosition, setDropdownPosition] = React.useState(null);
+
   // Get current admin info for audit logging
   const getCurrentAdmin = () => {
     try {
@@ -47,6 +51,59 @@ const ManageGlossaryTerms = () => {
     } catch {
       return { full_name: "Admin", role: "admin" };
     }
+  };
+
+  // Dropdown logic (kebab actions)
+  const toggleMenu = (id, event) => {
+    event.stopPropagation();
+    if (openMenuId === id) {
+      setOpenMenuId(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const right = Math.max(8, window.innerWidth - rect.right);
+    const bottom = Math.max(8, window.innerHeight - rect.top + 10); // 10px above the trigger
+    setDropdownPosition({ right, bottom });
+    setOpenMenuId(id);
+  };
+
+  const renderDropdown = (row) => {
+    if (openMenuId !== row.id) return null;
+    return ReactDOM.createPortal(
+      <div
+        className="absolute z-[9999] bg-white border border-gray-200 rounded-md shadow-md w-36 text-[11px]"
+        style={{ position: "fixed", right: dropdownPosition?.right ?? 20, bottom: dropdownPosition?.bottom ?? 20 }}
+      >
+        <button
+          className="flex items-center w-full px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+          onClick={() => {
+            handleView(row);
+            setOpenMenuId(null);
+          }}
+        >
+          <Eye size={12} className="mr-2 text-gray-500" /> View
+        </button>
+        <button
+          className="flex items-center w-full px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+          onClick={() => {
+            handleEdit(row);
+            setOpenMenuId(null);
+          }}
+        >
+          <Pencil size={12} className="mr-2 text-gray-500" /> Edit
+        </button>
+        <button
+          className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-red-50"
+          onClick={() => {
+            handleArchive(row);
+            setOpenMenuId(null);
+          }}
+        >
+          <Archive size={12} className="mr-2 text-red-500" /> Archive
+        </button>
+      </div>,
+      document.body
+    );
   };
 
   // Helper function to create audit log
@@ -578,34 +635,17 @@ const ManageGlossaryTerms = () => {
       header: "Actions",
       align: "right",
       render: (row) => (
-        <div className="flex items-center justify-end space-x-2 text-gray-600">
-          <Tooltip content="View">
+        <div className="relative flex justify-end">
+          <Tooltip content="Actions">
             <button
+              onClick={(e) => toggleMenu(row.id, e)}
               className="p-1 rounded hover:bg-gray-100"
-              aria-label="View"
-              onClick={() => handleView(row)}
+              aria-label="Actions"
             >
-              <Eye size={16} />
+              <MoreVertical size={16} />
             </button>
           </Tooltip>
-          <Tooltip content="Edit">
-            <button
-              className="p-1 rounded hover:bg-gray-100"
-              aria-label="Edit"
-              onClick={() => handleEdit(row)}
-            >
-              <Pencil size={16} />
-            </button>
-          </Tooltip>
-          <Tooltip content="Archive">
-            <button
-              className="p-1 rounded hover:bg-gray-100"
-              aria-label="Archive"
-              onClick={() => handleArchive(row)}
-            >
-              <Archive size={16} />
-            </button>
-          </Tooltip>
+          {renderDropdown(row)}
         </div>
       ),
     },

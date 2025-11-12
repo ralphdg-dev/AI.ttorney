@@ -18,6 +18,7 @@ const EditTermModal = ({ open, onClose, onSave, term }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
+  const [translating, setTranslating] = useState(false);
 
   // Initialize form with term data when modal opens
   useEffect(() => {
@@ -59,6 +60,46 @@ const EditTermModal = ({ open, onClose, onSave, term }) => {
       setLoading(false);
     }
   }, [open]);
+
+  const translateText = async (text, targetLang) => {
+    const res = await fetch('http://localhost:5001/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, targetLang }),
+    });
+    const data = await res.json();
+    return data.translation;
+  };
+
+  const handleAutoTranslate = async () => {
+    setTranslating(true);
+    try {
+      const next = { ...formData };
+      // Terms
+      if (formData.term_en && !formData.term_fil) {
+        next.term_fil = await translateText(formData.term_en, 'fil');
+      } else if (!formData.term_en && formData.term_fil) {
+        next.term_en = await translateText(formData.term_fil, 'en');
+      }
+      // Definitions
+      if (formData.definition_en && !formData.definition_fil) {
+        next.definition_fil = await translateText(formData.definition_en, 'fil');
+      } else if (!formData.definition_en && formData.definition_fil) {
+        next.definition_en = await translateText(formData.definition_fil, 'en');
+      }
+      // Examples
+      if (formData.example_en && !formData.example_fil) {
+        next.example_fil = await translateText(formData.example_en, 'fil');
+      } else if (!formData.example_en && formData.example_fil) {
+        next.example_en = await translateText(formData.example_fil, 'en');
+      }
+      setFormData(next);
+    } catch (e) {
+      setError(e.message || 'Translation failed');
+    } finally {
+      setTranslating(false);
+    }
+  };
 
   // Category options matching the database enum
   const categoryOptions = ['Family', 'Criminal', 'Civil', 'Labor', 'Consumer'];
@@ -233,6 +274,18 @@ const EditTermModal = ({ open, onClose, onSave, term }) => {
             <p className="text-xs text-red-600">{error}</p>
           </div>
         )}
+
+        {/* Auto Translate Button */}
+        <div>
+          <button
+            type="button"
+            onClick={handleAutoTranslate}
+            disabled={translating}
+            className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-60"
+          >
+            {translating ? 'Translating...' : 'Auto Translate'}
+          </button>
+        </div>
         
         {/* Category - First Row, Full Width */}
         <div>

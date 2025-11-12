@@ -15,6 +15,7 @@ const AddTermModal = ({ open, onClose, onSave }) => {
     category: '',
     is_verified: false
   });
+  const [translating, setTranslating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
@@ -41,6 +42,46 @@ const AddTermModal = ({ open, onClose, onSave }) => {
       setConfirmationLoading(false);
     }
   }, [open]);
+
+  const translateText = async (text, targetLang) => {
+    const res = await fetch('http://localhost:5001/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, targetLang }),
+    });
+    const data = await res.json();
+    return data.translation;
+  };
+
+  const handleAutoTranslate = async () => {
+    setTranslating(true);
+    try {
+      const next = { ...formData };
+      // Terms
+      if (formData.term_en && !formData.term_fil) {
+        next.term_fil = await translateText(formData.term_en, 'fil');
+      } else if (!formData.term_en && formData.term_fil) {
+        next.term_en = await translateText(formData.term_fil, 'en');
+      }
+      // Definitions
+      if (formData.definition_en && !formData.definition_fil) {
+        next.definition_fil = await translateText(formData.definition_en, 'fil');
+      } else if (!formData.definition_en && formData.definition_fil) {
+        next.definition_en = await translateText(formData.definition_fil, 'en');
+      }
+      // Examples
+      if (formData.example_en && !formData.example_fil) {
+        next.example_fil = await translateText(formData.example_en, 'fil');
+      } else if (!formData.example_en && formData.example_fil) {
+        next.example_en = await translateText(formData.example_fil, 'en');
+      }
+      setFormData(next);
+    } catch (e) {
+      setError(e.message || 'Translation failed');
+    } finally {
+      setTranslating(false);
+    }
+  };
 
   // Category options matching the database enum
   const categoryOptions = ['Family', 'Criminal', 'Civil', 'Labor', 'Consumer'];
@@ -361,6 +402,18 @@ const AddTermModal = ({ open, onClose, onSave }) => {
           <p className="text-[10px] text-gray-500 mt-1 ml-6">
             Check this box to mark the term as verified upon creation
           </p>
+        </div>
+
+        {/* Auto Translate Button */}
+        <div>
+          <button
+            type="button"
+            onClick={handleAutoTranslate}
+            disabled={translating}
+            className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-60"
+          >
+            {translating ? "Translating..." : "Auto Translate"}
+          </button>
         </div>
 
         {/* Action Buttons */}

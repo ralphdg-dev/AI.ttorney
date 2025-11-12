@@ -315,10 +315,9 @@ const ManageLegalArticles = () => {
       return;
     }
     const rect = event.currentTarget.getBoundingClientRect();
-    setDropdownPosition({
-      top: rect.bottom + 4,
-      left: rect.right - 130,
-    });
+    const right = Math.max(8, window.innerWidth - rect.right);
+    const bottom = Math.max(8, window.innerHeight - rect.top + 10); // 10px above the trigger
+    setDropdownPosition({ right, bottom });
     setOpenMenuId(id);
   };
 
@@ -329,8 +328,8 @@ const ManageLegalArticles = () => {
         className="absolute z-[9999] bg-white border border-gray-200 rounded-md shadow-md w-36 text-[11px]"
         style={{
           position: "fixed",
-          top: dropdownPosition?.top ?? 0,
-          left: dropdownPosition?.left ?? 0,
+          right: dropdownPosition?.right ?? 20,
+          bottom: dropdownPosition?.bottom ?? 20,
         }}
       >
         <button
