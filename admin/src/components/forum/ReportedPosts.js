@@ -336,36 +336,31 @@ const ReportedPosts = () => {
         </div>
       )}
 
-      {loading ? (
-        <div className="bg-white rounded-lg shadow-sm border p-8 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading reports...</p>
-        </div>
-      ) : (
-        <>
-          <DataTable
-            columns={columns}
-            data={reports}
-            keyField="id"
-            emptyMessage={
-              <div className="text-center text-gray-500 py-8">
-                <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p>No reports found matching your criteria.</p>
-              </div>
-            }
+      <>
+        <DataTable
+          columns={columns}
+          data={reports}
+          keyField="id"
+          loading={loading}
+          loadingMessage="Loading reports..."
+          emptyMessage={
+            <div className="text-center text-gray-500 py-8">
+              <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p>No reports found matching your criteria.</p>
+            </div>
+          }
+        />
+        {pagination.totalPages > 1 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.total}
+            itemsPerPage={20}
+            onPageChange={setCurrentPage}
+            itemName="reports"
           />
-          {pagination.totalPages > 1 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={pagination.totalPages}
-              totalItems={pagination.total}
-              itemsPerPage={20}
-              onPageChange={setCurrentPage}
-              itemName="reports"
-            />
-          )}
-        </>
-      )}
+        )}
+      </>
 
       {/* View Report Modal */}
       {showResolutionModal && selectedReport && resolutionAction === 'view' && (

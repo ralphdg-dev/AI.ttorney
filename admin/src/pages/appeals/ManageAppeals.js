@@ -456,68 +456,72 @@ const ManageAppeals = () => {
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-6 text-center text-sm text-gray-500">
-            Loading...
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 relative">
-              <thead className="bg-gray-50">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 relative">
+            <thead className="bg-gray-50">
+              <tr>
+                {columns.map((col) => (
+                  <th
+                    key={col.key}
+                    className={`px-4 py-2 text-[10px] font-medium text-gray-500 ${col.align === "center"
+                        ? "text-center"
+                        : col.align === "right"
+                          ? "text-right"
+                          : "text-left"
+                      }`}
+                  >
+                    {col.header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading && (
                 <tr>
-                  {columns.map((col) => (
-                    <th
-                      key={col.key}
-                      className={`px-4 py-2 text-[10px] font-medium text-gray-500 ${col.align === "center"
-                          ? "text-center"
-                          : col.align === "right"
-                            ? "text-right"
-                            : "text-left"
-                        }`}
-                    >
-                      {col.header}
-                    </th>
-                  ))}
+                  <td colSpan={columns.length} className="px-4 py-8 text-center text-[11px] text-gray-500">
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#023D7B] mr-2"></div>
+                      Loading appeals...
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredData.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={columns.length}
-                      className="px-4 py-8 text-center text-[11px] text-gray-500"
-                    >
-                      <div className="flex flex-col items-center">
-                        <FileText className="h-8 w-8 text-gray-400 mb-2" />
-                        <p>No appeals found</p>
-                      </div>
-                    </td>
+              )}
+              {!loading && filteredData.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    className="px-4 py-8 text-center text-[11px] text-gray-500"
+                  >
+                    <div className="flex flex-col items-center">
+                      <FileText className="h-8 w-8 text-gray-400 mb-2" />
+                      <p>No appeals found</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                !loading && filteredData.map((row) => (
+                  <tr key={row.id} className="hover:bg-gray-50 relative">
+                    {columns.map((col) => (
+                      <td
+                        key={col.key}
+                        className={`px-4 py-2 text-[11px] text-gray-700 ${col.align === "center"
+                            ? "text-center"
+                            : col.align === "right"
+                              ? "text-right"
+                              : ""
+                          }`}
+                      >
+                        {col.render
+                          ? col.render(row)
+                          : displayValue(row[col.key])}
+                      </td>
+                    ))}
                   </tr>
-                ) : (
-                  filteredData.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50 relative">
-                      {columns.map((col) => (
-                        <td
-                          key={col.key}
-                          className={`px-4 py-2 text-[11px] text-gray-700 ${col.align === "center"
-                              ? "text-center"
-                              : col.align === "right"
-                                ? "text-right"
-                                : ""
-                            }`}
-                        >
-                          {col.render
-                            ? col.render(row)
-                            : displayValue(row[col.key])}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <ViewAppealModal
