@@ -21,6 +21,8 @@ import ListToolbar from '../../components/ui/ListToolbar';
 import Modal from '../../components/ui/Modal';
 import { useToast } from '../../components/ui/Toast';
 import auditLogsService from '../../services/auditLogsService';
+import usersService from '../../services/usersService';
+import adminManagementService from '../../services/adminManagementService';
 
 const ActionTypeBadge = ({ actionType }) => {
   const getStyles = (type) => {
@@ -112,6 +114,8 @@ const ManageAuditLogs = () => {
   const [selectedLog, setSelectedLog] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // Cache of actor_id -> full_name
+  const [actorNameMap, setActorNameMap] = useState({});
 
   // Load audit logs
   const loadAuditLogs = useCallback(async () => {
@@ -130,8 +134,44 @@ const ManageAuditLogs = () => {
       };
 
       const response = await auditLogsService.getAuditLogs(params);
-      
-      setAuditLogs(response.data || []);
+
+      const logs = response.data || [];
+      setAuditLogs(logs);
+      // Resolve actor names on the client without backend changes
+      try {
+        const uniqueIds = Array.from(new Set((logs || []).map(l => l.actor_id).filter(Boolean)));
+        const missingIds = uniqueIds.filter(id => !actorNameMap[id]);
+        if (missingIds.length > 0) {
+          const results = await Promise.all(missingIds.map(async (id) => {
+            // Prefer existing actor_name if present in the log
+            const existingName = (logs.find(l => l.actor_id === id)?.actor_name) || null;
+            if (existingName) return [id, existingName];
+            // Try admin endpoint
+            try {
+              const adminRes = await adminManagementService.getAdmin(id);
+              const name = adminRes?.data?.full_name || adminRes?.data?.email || null;
+              if (name) return [id, name];
+            } catch {}
+            // Try users legal seeker
+            try {
+              const userRes = await usersService.getLegalSeeker(id);
+              const name = userRes?.data?.full_name || userRes?.data?.email || null;
+              if (name) return [id, name];
+            } catch {}
+            // Try users lawyer
+            try {
+              const lawyerRes = await usersService.getLawyer(id);
+              const name = lawyerRes?.data?.full_name || lawyerRes?.data?.email || null;
+              if (name) return [id, name];
+            } catch {}
+            return [id, null];
+          }));
+          const resolved = results.reduce((acc, [id, name]) => { if (name) acc[id] = name; return acc; }, {});
+          if (Object.keys(resolved).length > 0) {
+            setActorNameMap(prev => ({ ...prev, ...resolved }));
+          }
+        }
+      } catch {}
       setPagination(prev => ({
         ...prev,
         total: response.pagination?.total || 0,
@@ -153,6 +193,7 @@ const ManageAuditLogs = () => {
       setLoading(false);
     }
   }, [pagination.page, pagination.limit, searchTerm, tableFilter, actionFilter, dateRange, sortBy]);
+  // include actorNameMap in deps indirectly via load trigger from logs
 
   // Load data on component mount and when dependencies change
   useEffect(() => {
@@ -250,7 +291,7 @@ const ManageAuditLogs = () => {
       render: (log) => (
         <div className="space-y-1">
           <div className="text-xs font-medium text-gray-900">
-            {log.actor_id || 'Unknown'}
+            {actorNameMap[log.actor_id] || log.actor_name || log.actor_id || 'Unknown'}
           </div>
           <div className="text-[10px] text-gray-500 capitalize">
             {log.role || 'Unknown Role'}
@@ -549,8 +590,11 @@ INSERT INTO admin_audit_logs (action, target_table, target_id, actor_id, role, m
                   Performed By
                 </label>
                 <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
-                  <div className="font-medium">ID: {selectedLog.actor_id || 'Unknown'}</div>
-                  <div className="text-xs text-gray-500 capitalize">Role: {selectedLog.role || 'Unknown Role'}</div>
+                  <div className="font-medium">{actorNameMap[selectedLog.actor_id] || selectedLog.actor_name || selectedLog.actor_id || 'Unknown'}</div>
+                  {selectedLog.actor_id && (
+                    <div className="text-[11px] text-gray-500 font-mono break-all">{selectedLog.actor_id}</div>
+                  )}
+                  <div className="text-xs text-gray-500 capitalize mt-1">Role: {selectedLog.role || 'Unknown Role'}</div>
                 </div>
               </div>
 
