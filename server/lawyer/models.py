@@ -66,6 +66,8 @@ class LawyerApplicationResponse(BaseModel):
     version: Optional[int] = 1
     parent_application_id: Optional[UUID] = None
     is_latest: Optional[bool] = True
+    # Acknowledgment field for rejected applications
+    acknowledged: Optional[bool] = False
 
 class LawyerApplicationStatusResponse(BaseModel):
     has_application: bool

@@ -1,69 +1,76 @@
 import React, { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { router } from 'expo-router';
-import { lawyerApplicationService } from '../services/lawyerApplicationService';
+import { useAuth } from '../contexts/AuthContext';
+import { LoadingWithTrivia } from '../components/LoadingWithTrivia';
 
 export default function ApplyLawyer() {
-  const [isChecking, setIsChecking] = useState(true);
+  const { user, session, checkLawyerApplicationStatus } = useAuth();
 
   useEffect(() => {
     const checkApplicationStatus = async () => {
-      try {
-        const status = await lawyerApplicationService.getApplicationStatus();
+      console.log('Starting application status check...');
+      console.log('User data:', user);
+      console.log('Session data:', !!session);
+      
+      // Check if user is authenticated
+      if (!session || !user) {
+        console.log('No authenticated user, redirecting to verification instructions');
+        router.push('/onboarding/lawyer/verification-instructions');
+        return;
+      }
+
+      // Check if user has pending_lawyer flag
+      if (user.pending_lawyer) {
+        console.log('User has pending_lawyer flag, checking application status via AuthContext...');
         
-        if (status?.has_application) {
-          // User already has an application, redirect to appropriate status page
-          const applicationStatus = status.application?.status;
+        try {
+          // Use the AuthContext method which has proper token handling
+          const applicationData = await checkLawyerApplicationStatus();
           
-          switch (applicationStatus) {
-            case 'pending':
-              // Redirect to dedicated pending status page
-              router.replace('/onboarding/lawyer/lawyer-status/pending');
-              break;
-            case 'accepted':
-              // User is already a verified lawyer, redirect to main app
-              router.replace('/lawyer/forum');
-              break;
-            case 'rejected':
-              // Check if 1 year has passed since rejection date
-              const rejectionDate = status.application?.reviewed_at ? new Date(status.application.reviewed_at) : null;
-              const oneYearLater = rejectionDate ? new Date(rejectionDate.getTime() + 365 * 24 * 60 * 60 * 1000) : null;
-              const canReapplyAfterYear = oneYearLater ? new Date() >= oneYearLater : false;
-              
-              if (canReapplyAfterYear) {
-                // 1 year has passed since rejection, allow reapplication
-                router.replace('/onboarding/lawyer/verification-instructions');
-              } else if (status.application?.acknowledged) {
-                // Rejection acknowledged but still within 1 year restriction
-                router.replace('/onboarding/lawyer/lawyer-status/rejected-acknowledged');
-              } else {
-                // Rejection not acknowledged yet, show rejection page
-                router.replace('/onboarding/lawyer/lawyer-status/rejected');
-              }
-              break;
-            case 'resubmission':
-              // Allow resubmission, go to verification instructions
-              router.replace('/onboarding/lawyer/verification-instructions');
-              break;
-            default:
-              // Unknown status, go to verification instructions
-              router.replace('/onboarding/lawyer/verification-instructions');
+          if (applicationData && applicationData.has_application && applicationData.application) {
+            const status = applicationData.application.status;
+            console.log('Application status:', status);
+            
+            switch (status) {
+              case 'pending':
+                router.push('/onboarding/lawyer/lawyer-status/pending');
+                break;
+              case 'accepted':
+                router.push('/onboarding/lawyer/lawyer-status/accepted');
+                break;
+              case 'rejected':
+                router.push('/onboarding/lawyer/lawyer-status/rejected');
+                break;
+              default:
+                router.push('/onboarding/lawyer/verification-instructions');
+            }
+          } else {
+            console.log('No application found but user has pending_lawyer flag, redirecting to pending');
+            router.push('/onboarding/lawyer/lawyer-status/pending');
           }
-        } else {
-          // No existing application, start fresh
-          router.replace('/onboarding/lawyer/verification-instructions');
+        } catch (error) {
+          console.error('Error checking application status:', error);
+          // Fallback: go to pending status
+          router.push('/onboarding/lawyer/lawyer-status/pending');
         }
-      } catch (error) {
-        console.error('Error checking application status:', error);
-        // On error, default to verification instructions
-        router.replace('/onboarding/lawyer/verification-instructions');
-      } finally {
-        setIsChecking(false);
+      } else {
+        console.log('User does not have pending_lawyer flag, redirecting to verification instructions');
+        router.push('/onboarding/lawyer/verification-instructions');
       }
     };
 
-    checkApplicationStatus();
-  }, []);
+    // Small delay to ensure loading screen renders first
+    setTimeout(checkApplicationStatus, 50);
+  }, [user, session, checkLawyerApplicationStatus]);
 
-  // Return null since we're redirecting
-  return null;
+  // Show loading immediately to prevent white page flash
+  return (
+    <View style={{ flex: 1, backgroundColor: '#1F2937' }}>
+      <LoadingWithTrivia 
+        message="LOADING..."
+        showTrivia={true}
+      />
+    </View>
+  );
 }

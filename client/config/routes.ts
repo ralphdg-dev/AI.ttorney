@@ -354,25 +354,23 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
 
 // Get role-based redirect path with pending lawyer application check
 export const getRoleBasedRedirect = (role: UserRole, isVerified?: boolean, pendingLawyer?: boolean, applicationStatus?: string): string => {
-  // If user has pending lawyer application, redirect to appropriate status screen
+  // If user has pending lawyer application, only redirect to status page for accepted applications
+  // For rejected/pending/resubmission, redirect to forum instead
   if (pendingLawyer) {
     if (applicationStatus) {
       switch (applicationStatus) {
-        case 'pending':
-          return '/onboarding/lawyer/lawyer-status/pending';
-        case 'resubmission':
-          return '/onboarding/lawyer/lawyer-status/resubmission';
-        case 'rejected':
-          return '/onboarding/lawyer/lawyer-status/rejected';
         case 'accepted':
           return '/onboarding/lawyer/lawyer-status/accepted';
+        case 'pending':
+        case 'resubmission':
+        case 'rejected':
         default:
-          return '/onboarding/lawyer/lawyer-status/pending';
+          // Redirect to forum for non-accepted statuses
+          return '/home';
       }
     } else {
-      // If pending_lawyer is true but no application status, default to pending
-      // Don't return 'loading' as it's not a valid route
-      return '/onboarding/lawyer/lawyer-status/pending';
+      // If pending_lawyer is true but no application status, redirect to forum
+      return '/home';
     }
   }
 

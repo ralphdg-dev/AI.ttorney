@@ -105,7 +105,9 @@ class LawyerApplicationService {
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    console.log('🔧 makeRequest: Getting auth token...');
     const token = await this.getAuthToken();
+    console.log('🔧 makeRequest: Auth token obtained:', token ? 'YES' : 'NO');
     
     // Create abort controller for timeout
     const controller = new AbortController();
@@ -124,16 +126,29 @@ class LawyerApplicationService {
     }
 
     try {
-      const apiUrl = await NetworkConfig.getBestApiUrl();
+      console.log('🔧 makeRequest: Getting API URL...');
+      
+      // Add timeout to getBestApiUrl to prevent hanging
+      const apiUrlPromise = NetworkConfig.getBestApiUrl();
+      const apiUrlTimeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('API URL timeout')), 3000); // 3 second timeout
+      });
+      
+      const apiUrl = await Promise.race([apiUrlPromise, apiUrlTimeout]);
+      console.log('🔧 makeRequest: API URL obtained:', apiUrl);
+      console.log('🔧 makeRequest: Making fetch request to:', `${apiUrl}${endpoint}`);
+      
       const response = await fetch(`${apiUrl}${endpoint}`, {
         ...options,
         headers,
         signal: controller.signal,
       });
       
+      console.log('🔧 makeRequest: Fetch completed, response status:', response.status);
       clearTimeout(timeoutId);
       return response;
     } catch (error) {
+      console.log('🔧 makeRequest: Fetch failed with error:', error);
       clearTimeout(timeoutId);
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('Request timed out. Please check your connection and try again.');
@@ -424,16 +439,42 @@ class LawyerApplicationService {
 
   private async fetchApplicationStatus(): Promise<LawyerApplicationStatus | null> {
     try {
-      const response = await this.makeRequest('/api/lawyer-applications/me');
+      console.log('🔄 Starting direct API request to /api/lawyer-applications/me');
+      
+      // Get auth token directly
+      const token = await this.getAuthToken();
+      console.log('🔧 Auth token obtained:', token ? 'YES' : 'NO');
+      
+      // Use simple direct fetch with localhost for web
+      const apiUrl = 'http://localhost:8000';
+      const url = `${apiUrl}/api/lawyer-applications/me`;
+      console.log('🔧 Making direct fetch to:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+        // Add a shorter timeout
+        signal: AbortSignal.timeout(8000), // 8 second timeout
+      });
+      
+      console.log('✅ Direct API response received, status:', response.status);
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to get application status');
+        console.log('❌ API response not ok, parsing error...');
+        const errorText = await response.text();
+        console.log('Error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
-      return await response.json();
+      console.log('📄 Parsing successful response...');
+      const data = await response.json();
+      console.log('Application status data:', data);
+      return data;
     } catch (error) {
-      console.error('API request failed:', error);
+      console.error('❌ Direct API request failed:', error);
       return null;
     }
   }
@@ -595,6 +636,7 @@ class LawyerApplicationService {
       return null;
     }
   }
+
 
   // Real-time status monitoring
   startStatusPolling(): void {
