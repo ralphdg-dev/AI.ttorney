@@ -40,8 +40,16 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     }
 
     // ⚡ OPTIMIZATION: Allow public routes to render immediately after initial check
+    // But add timeout protection to prevent infinite loading on login page
     if (isLoading && routeConfig.isPublic) {
-      return; // Let public routes render without waiting for full auth load
+      // For login page specifically, add a timeout to prevent infinite loading
+      if (currentPath === '/login') {
+        const timeoutId = setTimeout(() => {
+          console.warn('⚠️ Login page loading timeout - forcing render');
+        }, 5000); // 5 second timeout
+        return () => clearTimeout(timeoutId);
+      }
+      return; // Let other public routes render without waiting for full auth load
     }
 
     // Wait for auth to finish loading before checking protected routes

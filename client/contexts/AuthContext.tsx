@@ -144,7 +144,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleAuthStateChange = React.useCallback(async (session: Session, shouldNavigate = false): Promise<boolean> => {
     try {
-      console.log('🔐 handleAuthStateChange called:', { shouldNavigate, userId: session.user.id });
+      console.log('🔐 handleAuthStateChange called:', { shouldNavigate, userId: session.user.id, isSigningOut });
+      
+      // Skip processing if we're in the middle of signing out
+      if (isSigningOut) {
+        console.log('🚫 Skipping auth state change during sign out');
+        return false;
+      }
       
       // ⚡ FAANG OPTIMIZATION: Run ALL API calls in PARALLEL + Cache profile data
       // This reduces login time from ~3-5 seconds to ~1 second
@@ -290,7 +296,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
       return false;
     }
-  }, [checkLawyerApplicationStatus, checkSuspensionStatus]);
+  }, [checkLawyerApplicationStatus, checkSuspensionStatus, isSigningOut]);
 
   useEffect(() => {
     // Initialize auth state and listen for auth changes
@@ -359,23 +365,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Auth state listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event: string, session: any) => {
-            console.log('🔔 Auth event:', event);
+            console.log('🔔 Auth event:', event, { hasSession: !!session, isSigningOut });
             
             // Ignore events during sign out (prevent race conditions)
-            if (isSigningOut) return;
-            
-            if (event === 'SIGNED_IN' && session) {
-              await handleAuthStateChange(session, false);
-            } else if (event === 'TOKEN_REFRESHED' && session) {
-              await handleAuthStateChange(session, false);
-            } else if (event === 'SIGNED_OUT') {
-              setAuthState({ session: null, user: null, supabaseUser: null });
-              setHasRedirectedToStatus(false);
-              setIsGuestMode(false);
-              setIsLoading(false);
+            if (isSigningOut) {
+              console.log('🚫 Ignoring auth event during sign out');
+              return;
             }
             
-            if (event !== 'SIGNED_OUT') setIsLoading(false);
+            if (event === 'SIGNED_IN' && session) {
+              console.log('✅ Processing SIGNED_IN event');
+              await handleAuthStateChange(session, false);
+            } else if (event === 'TOKEN_REFRESHED' && session) {
+              console.log('🔄 Processing TOKEN_REFRESHED event');
+              await handleAuthStateChange(session, false);
+            } else if (event === 'SIGNED_OUT') {
+              console.log('🚪 Processing SIGNED_OUT event');
+              // Only update state if we're not already in the process of signing out
+              if (!isSigningOut) {
+                setAuthState({ session: null, user: null, supabaseUser: null });
+                setHasRedirectedToStatus(false);
+                setIsGuestMode(false);
+                setIsLoading(false);
+              }
+            }
+            
+            // Ensure loading is turned off for all events except SIGNED_OUT (unless we're signing out)
+            if (event !== 'SIGNED_OUT' || !isSigningOut) {
+              setIsLoading(false);
+            }
           }
         );
 
@@ -402,14 +420,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🔐 Signing in:', email);
       setIsLoading(true);
       setHasRedirectedToStatus(false);
+      setIsSigningOut(false); // Ensure we're not in signing out state
       
       // Clear stale data before login
-      await clearAuthStorage();
-      const guestSession = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
-      if (guestSession) {
-        await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
-        setIsGuestMode(false);
+      try {
+        await clearAuthStorage();
+        const guestSession = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
+        if (guestSession) {
+          await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+          setIsGuestMode(false);
+        }
+        
+        // Clear any cached profile data from previous sessions
+        const allKeys = await AsyncStorage.getAllKeys();
+        const profileKeys = allKeys.filter(key => key.startsWith('profile_cache_'));
+        if (profileKeys.length > 0) await AsyncStorage.multiRemove(profileKeys);
+        
+      } catch (cleanupError) {
+        console.warn('⚠️ Pre-login cleanup error (non-critical):', cleanupError);
       }
+      
+      // Reset auth state before login attempt
+      setAuthState({ session: null, user: null, supabaseUser: null });
       
       // Fresh login attempt
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -439,7 +471,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.session) {
-        console.log('✅ Login successful');
+        console.log('✅ Login successful, processing auth state...');
         const allowed = await handleAuthStateChange(data.session, true);
         if (!allowed) {
           return { success: false, error: 'Access denied', suppressToast: false };
@@ -529,39 +561,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('🚪 Signing out...');
       setIsSigningOut(true);
+      setIsLoading(true); // Show loading during logout process
       
-      // Clear state & redirect immediately (optimistic UI)
-      setAuthState({ session: null, user: null, supabaseUser: null });
-      setHasRedirectedToStatus(false);
-      setIsGuestMode(false);
-      setIsLoading(false);
-      router.replace('/login');
-      
-      // Background cleanup (non-blocking)
-      const cleanup = async () => {
+      // Perform cleanup first (synchronously)
+      try {
+        // Clear all cached profile data
         const allKeys = await AsyncStorage.getAllKeys();
         const profileKeys = allKeys.filter(key => key.startsWith('profile_cache_'));
         if (profileKeys.length > 0) await AsyncStorage.multiRemove(profileKeys);
-      };
+        
+        // Clear guest session if any
+        await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+        
+        // Clear auth storage
+        await clearAuthStorage();
+        
+        // Sign out from Supabase
+        await supabase.auth.signOut({ scope: 'global' });
+        
+        console.log('✅ Cleanup complete');
+      } catch (cleanupError) {
+        console.warn('⚠️ Cleanup error (non-critical):', cleanupError);
+      }
       
-      Promise.all([
-        cleanup().catch(() => {}),
-        supabase.auth.signOut({ scope: 'global' }).catch(() => {}),
-        clearAuthStorage().catch(() => {}),
-      ]).finally(() => {
-        console.log('✅ Logout complete');
-        setTimeout(() => setIsSigningOut(false), 100);
-      });
-      
-    } catch (error) {
-      console.error('❌ Logout error:', error);
-      // Nuclear fallback
+      // Reset all auth state
       setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
       setIsGuestMode(false);
       setIsLoading(false);
+      setIsSigningOut(false);
+      
+      // Navigate to login
       router.replace('/login');
-      resetSupabaseClient().finally(() => setTimeout(() => setIsSigningOut(false), 100));
+      
+      console.log('✅ Logout complete');
+      
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+      
+      // Nuclear fallback - force reset everything
+      try {
+        await resetSupabaseClient();
+      } catch {}
+      
+      setAuthState({ session: null, user: null, supabaseUser: null });
+      setHasRedirectedToStatus(false);
+      setIsGuestMode(false);
+      setIsLoading(false);
+      setIsSigningOut(false);
+      router.replace('/login');
     }
   };
 
