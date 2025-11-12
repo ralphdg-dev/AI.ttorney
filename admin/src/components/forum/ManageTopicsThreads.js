@@ -384,8 +384,8 @@ const ManageTopicsThreads = () => {
       {/* Posts Timeline */}
       {loading ? (
         <div className="bg-white rounded-lg shadow-sm border p-8 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading posts...</p>
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#023D7B] mx-auto"></div>
+          <p className="mt-2 text-[11px] text-gray-500">Loading posts...</p>
         </div>
       ) : posts.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm border p-8 text-center">

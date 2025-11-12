@@ -610,7 +610,17 @@ const ManageLegalArticles = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {currentItems.length === 0 ? (
+              {loading && (
+                <tr>
+                  <td colSpan={columns.length} className="px-4 py-8 text-center text-[11px] text-gray-500">
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#023D7B] mr-2"></div>
+                      Loading articles...
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {!loading && currentItems.length === 0 ? (
                 <tr>
                   <td
                     colSpan={columns.length}

@@ -10,8 +10,10 @@ import React from 'react';
  * - rowClassName?: (row, index) => string
  * - dense?: boolean (smaller paddings)
  * - emptyMessage?: string
+ * - loading?: boolean (show standardized loading row in tbody)
+ * - loadingMessage?: string (message to display next to spinner)
  */
-const DataTable = ({ columns = [], data = [], keyField = 'id', rowKey, rowClassName, dense = true, emptyMessage = 'No records found.' }) => {
+const DataTable = ({ columns = [], data = [], keyField = 'id', rowKey, rowClassName, dense = true, emptyMessage = 'No records found.', loading = false, loadingMessage = 'Loading...' }) => {
   const cellPad = dense ? 'px-4 py-2' : 'px-6 py-3';
   const headerText = 'text-[10px] font-medium text-gray-500 tracking-wide';
   const cellText = 'text-[11px] text-gray-700';
@@ -33,14 +35,24 @@ const DataTable = ({ columns = [], data = [], keyField = 'id', rowKey, rowClassN
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {data.length === 0 && (
+            {loading && (
+              <tr>
+                <td colSpan={columns.length} className={`${cellPad} text-center text-[11px] text-gray-500`}>
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#023D7B] mr-2"></div>
+                    {loadingMessage}
+                  </div>
+                </td>
+              </tr>
+            )}
+            {!loading && data.length === 0 && (
               <tr>
                 <td colSpan={columns.length} className={`${cellPad} text-center text-[11px] text-gray-500`}>
                   {emptyMessage}
                 </td>
               </tr>
             )}
-            {data.map((row, index) => {
+            {!loading && data.map((row, index) => {
               const customRowClass = rowClassName ? rowClassName(row, index) : '';
               const isArchived = row.archived === true;
               const baseRowClass = isArchived ? 'bg-gray-100' : 'hover:bg-gray-50';

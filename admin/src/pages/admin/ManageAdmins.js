@@ -711,16 +711,7 @@ const ManageAdmins = () => {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-[#023D7B] mx-auto mb-4" />
-          <p className="text-sm text-gray-600">Loading admins...</p>
-        </div>
-      </div>
-    );
-  }
+  // Loading is now shown inside the table body via DataTable
 
   if (error) {
     return (
@@ -801,6 +792,8 @@ const ManageAdmins = () => {
         data={paginatedData.map(row => ({ ...row, archived: row.status === 'archived' }))}
         rowKey={(row) => row.id}
         dense
+        loading={loading}
+        loadingMessage="Loading admins..."
         emptyMessage="No admins found."
       />
 

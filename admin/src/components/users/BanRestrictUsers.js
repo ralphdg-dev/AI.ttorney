@@ -876,92 +876,85 @@ const BanRestrictUsers = () => {
       )}
 
       {/* Users Table */}
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#023D7B] mx-auto mb-4"></div>
-            <p className="text-sm text-gray-600">Loading users...</p>
-          </div>
-        </div>
-      ) : (
-        <>
-          <DataTable
-            columns={columns}
-            data={users}
-            rowKey={(row) => row.id}
-            dense
-            emptyMessage={
-              <div className="text-center text-gray-500 py-8">
-                <User className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p>No users found matching your criteria.</p>
-              </div>
-            }
-          />
-
-          {/* Pagination */}
-          {pagination.total > 0 && (
-            <div className="mt-4 flex items-center justify-between">
-              {/* Pagination Info */}
-              <div className="text-xs text-gray-500">
-                Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
-              </div>
-
-              {/* Pagination Buttons */}
-              <div className="flex items-center space-x-2">
-                {/* Previous Button */}
-                <button
-                  onClick={handlePrevPage}
-                  disabled={pagination.page <= 1}
-                  className="flex items-center px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-                >
-                  <ChevronLeft size={14} className="mr-1" />
-                  Previous
-                </button>
-
-                {/* Page Numbers */}
-                <div className="flex items-center space-x-1">
-                  {Array.from({ length: Math.min(pagination.pages, 5) }, (_, i) => {
-                    let pageNum;
-                    if (pagination.pages <= 5) {
-                      pageNum = i + 1;
-                    } else if (pagination.page <= 3) {
-                      pageNum = i + 1;
-                    } else if (pagination.page >= pagination.pages - 2) {
-                      pageNum = pagination.pages - 4 + i;
-                    } else {
-                      pageNum = pagination.page - 2 + i;
-                    }
-
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => handlePageChange(pageNum)}
-                        className={`px-3 py-1.5 text-xs border rounded-md ${
-                          pagination.page === pageNum
-                            ? 'bg-[#023D7B] text-white border-[#023D7B]'
-                            : 'border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Next Button */}
-                <button
-                  onClick={handleNextPage}
-                  disabled={pagination.page >= pagination.pages}
-                  className="flex items-center px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-                >
-                  Next
-                  <ChevronRight size={14} className="ml-1" />
-                </button>
-              </div>
+      <>
+        <DataTable
+          columns={columns}
+          data={users}
+          rowKey={(row) => row.id}
+          dense
+          loading={loading}
+          loadingMessage="Loading users..."
+          emptyMessage={
+            <div className="text-center text-gray-500 py-8">
+              <User className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p>No users found matching your criteria.</p>
             </div>
-          )}
-        </>
-      )}
+          }
+        />
+
+        {/* Pagination */}
+        {pagination.total > 0 && (
+          <div className="mt-4 flex items-center justify-between">
+            {/* Pagination Info */}
+            <div className="text-xs text-gray-500">
+              Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
+            </div>
+
+            {/* Pagination Buttons */}
+            <div className="flex items-center space-x-2">
+              {/* Previous Button */}
+              <button
+                onClick={handlePrevPage}
+                disabled={pagination.page <= 1}
+                className="flex items-center px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+              >
+                <ChevronLeft size={14} className="mr-1" />
+                Previous
+              </button>
+
+              {/* Page Numbers */}
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(pagination.pages, 5) }, (_, i) => {
+                  let pageNum;
+                  if (pagination.pages <= 5) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 3) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.pages - 2) {
+                    pageNum = pagination.pages - 4 + i;
+                  } else {
+                    pageNum = pagination.page - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`px-3 py-1.5 text-xs border rounded-md ${
+                        pagination.page === pageNum
+                          ? 'bg-[#023D7B] text-white border-[#023D7B]'
+                          : 'border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Next Button */}
+              <button
+                onClick={handleNextPage}
+                disabled={pagination.page >= pagination.pages}
+                className="flex items-center px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+              >
+                Next
+                <ChevronRight size={14} className="ml-1" />
+              </button>
+            </div>
+          </div>
+        )}
+      </>
 
       {/* Action Modal */}
       {showActionModal && selectedUser && (
