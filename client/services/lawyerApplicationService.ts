@@ -30,6 +30,8 @@ interface LawyerApplicationStatus {
     version?: number;
     parent_application_id?: string;
     is_latest?: boolean;
+    // Acknowledgment field
+    acknowledged?: boolean;
   };
   can_apply: boolean;
   reject_count: number;
@@ -656,6 +658,28 @@ class LawyerApplicationService {
       oldApp.version !== newApp.version ||
       oldApp.updated_at !== newApp.updated_at
     );
+  }
+
+  // Acknowledge rejection - sets acknowledged flag to true
+  async acknowledgeRejection(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.makeRequest('/api/lawyer-applications/acknowledge-rejection', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to acknowledge rejection',
+      };
+    }
   }
 }
 
