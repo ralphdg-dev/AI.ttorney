@@ -4,10 +4,12 @@ import { Alert } from 'react-native';
 import { lawyerApplicationService, LawyerApplicationStatus } from '../../../../services/lawyerApplicationService';
 import StatusScreen from '../../../../components/ui/StatusScreen';
 import LawyerStatusGuard from '../../../../components/LawyerStatusGuard';
+import { LoadingWithTrivia } from '../../../../components/LoadingWithTrivia';
 
 export default function RejectedStatus() {
   const [applicationData, setApplicationData] = useState<LawyerApplicationStatus | null>(null);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Status polling is handled by LawyerStatusGuard
 
@@ -17,6 +19,7 @@ export default function RejectedStatus() {
 
   const loadApplicationStatus = async () => {
     try {
+      setIsLoading(true);
       const status = await lawyerApplicationService.getApplicationStatus();
       if (status) {
         console.log('Application data received:', status);
@@ -25,6 +28,8 @@ export default function RejectedStatus() {
       }
     } catch (error) {
       console.error('Error loading application status:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -36,10 +41,13 @@ export default function RejectedStatus() {
       const result = await lawyerApplicationService.acknowledgeRejection();
       
       if (result.success) {
-        // Redirect to the acknowledged rejection page
-        router.replace('/onboarding/lawyer/lawyer-status/rejected-acknowledged');
+        // Refresh the application data to get updated acknowledged status
+        await loadApplicationStatus();
+        
+        // Navigate to home instead of a separate acknowledged page
+        router.replace('/home');
       } else {
-        Alert.alert('Error', 'Failed to acknowledge rejection. Please try again.');
+        Alert.alert('Error', result.message || 'Failed to acknowledge rejection. Please try again.');
       }
     } catch (error) {
       console.error('Error acknowledging rejection:', error);
@@ -95,6 +103,15 @@ export default function RejectedStatus() {
     description += " or reapply for lawyer verification when you're ready.";
   } else {
     description += ".";
+  }
+
+  // Show loading screen while data is being fetched
+  if (isLoading || !applicationData) {
+    return (
+      <LawyerStatusGuard requiredStatus="rejected">
+        <LoadingWithTrivia message="Loading application details..." showTrivia={true} />
+      </LawyerStatusGuard>
+    );
   }
 
   // Check if user has already acknowledged the rejection
