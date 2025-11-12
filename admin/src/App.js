@@ -1,6 +1,7 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -113,6 +114,7 @@ const App = () => {
 
 const AdminDashboard = () => {
   const location = useLocation();
+  const { hasRole } = useAuth();
 
   // Get active item from current path
   const getActiveItemFromPath = (pathname) => {
@@ -145,8 +147,14 @@ const AdminDashboard = () => {
           <Header activeItem={activeItem} />
           <main className="flex-1 p-6">
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route
+                path="/"
+                element={hasRole('superadmin') ? <Dashboard /> : <Navigate to="/admin/audit-logs" replace />}
+              />
+              <Route
+                path="/dashboard"
+                element={hasRole('superadmin') ? <Dashboard /> : <Navigate to="/admin/audit-logs" replace />}
+              />
 
               {/* Users Routes */}
               <Route
@@ -162,7 +170,7 @@ const AdminDashboard = () => {
               {/* Admin Routes */}
               <Route
                 path="/admin/manage-admins"
-                element={<ManageAdminsPage />}
+                element={hasRole('superadmin') ? <ManageAdminsPage /> : <Navigate to="/admin/audit-logs" replace />}
               />
               <Route path="/admin/audit-logs" element={<ManageAuditLogs />} />
 
