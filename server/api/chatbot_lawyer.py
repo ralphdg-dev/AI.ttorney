@@ -289,10 +289,102 @@ class ChatResponse(BaseModel):
     confidence: Optional[str] = Field(default=None, description="Confidence level (high, medium, or low) based on source relevance")
     simplified_summary: Optional[str] = Field(default=None, description="A high-level summary or 'TL;DR' of the analysis (for internal use)")
     fallback_suggestions: Optional[List[FallbackSuggestion]] = Field(default=None, description="Suggestions for further research if query is ambiguous")
+    follow_up_questions: Optional[List[str]] = Field(default_factory=list, description="Suggested follow-up questions for continued professional legal research")
     security_report: Optional[Dict] = Field(default=None, description="Guardrails AI security validation report")
     session_id: Optional[str] = Field(default=None, description="Chat session ID for tracking conversation")
     message_id: Optional[str] = Field(default=None, description="Message ID for the assistant's response")
     user_message_id: Optional[str] = Field(default=None, description="Message ID for the user's question")
+
+
+def is_conversation_context_question(text: str) -> bool:
+    """
+    Check if the query is asking about conversation history, past chats, or chatbot capabilities
+    These should be handled as valid conversational queries for professional legal research
+    """
+    text_lower = text.lower().strip()
+    
+    conversation_patterns = [
+        # Past conversation retrieval requests (asking TO SEE conversation history)
+        'past convos', 'past conversations', 'previous chats', 'chat history',
+        'bring up our conversation', 'show our chat', 'what we talked about before',
+        'our conversation history', 'our chat history', 'previous discussion',
+        
+        # Professional capability questions
+        'can you remember', 'do you remember', 'can you recall',
+        'what can you do', 'your capabilities', 'how do you work',
+        'kaya mo ba', 'naaalala mo ba', 'ano kaya mo',
+        
+        # Memory/recall requests (asking to RETRIEVE past conversations)
+        'bring up our', 'show me our', 'recall our', 'naaalala mo ba ang',
+        'ipakita ang aming', 'balikan natin ang',
+        
+        # Search for conversation history
+        'search our conversation', 'find our chat', 'look for our discussion',
+        'hanap ang usapan', 'hanapin ang pag-uusapan',
+        
+        # Direct conversation history requests
+        'talk about our conversation', 'discuss our chat history',
+        'usapan natin dati', 'mga pinag-usapan natin',
+        
+        # Discussion about specific past topics
+        'remember when we talked about', 'you mentioned before',
+        'we discussed earlier', 'from our previous chat',
+        'nabanggit mo dati', 'pinag-usapan natin noon',
+        'sa nakaraang usapan', 'tuloy natin ang usapan',
+        
+        # Continuation requests
+        'continue our discussion', 'let\'s continue talking about',
+        'more about what we discussed', 'follow up on our conversation',
+        'ituloy natin ang', 'dagdag pa sa usapan natin',
+        
+        # Reference to past advice or information
+        'you told me before', 'you explained earlier',
+        'sinabi mo dati', 'ipinaliwanag mo noon'
+    ]
+    
+    return any(pattern in text_lower for pattern in conversation_patterns)
+
+
+def extract_conversation_reference(question: str) -> tuple[bool, str]:
+    """
+    Check if the user is referencing a past conversation or topic.
+    Returns: (has_reference, reference_type)
+    """
+    question_lower = question.lower().strip()
+    
+    # Direct references to past conversations
+    past_references = [
+        'you said', 'you mentioned', 'you told me', 'you explained',
+        'we talked about', 'we discussed', 'from our conversation',
+        'sinabi mo', 'nabanggit mo', 'pinag-usapan natin', 'ipinaliwanag mo',
+        'sa usapan natin', 'noong nakaraan', 'dati mong sabi'
+    ]
+    
+    # Topic continuation patterns
+    continuation_patterns = [
+        'more about', 'tell me more', 'continue about', 'elaborate on',
+        'dagdag pa sa', 'mas detalyado pa', 'ituloy ang', 'explain further'
+    ]
+    
+    # Reference to previous advice
+    advice_references = [
+        'the advice you gave', 'your previous answer', 'what you recommended',
+        'ang payo mo', 'ang sagot mo dati', 'ang recommendation mo'
+    ]
+    
+    for pattern in past_references:
+        if pattern in question_lower:
+            return True, "past_reference"
+    
+    for pattern in continuation_patterns:
+        if pattern in question_lower:
+            return True, "continuation"
+    
+    for pattern in advice_references:
+        if pattern in question_lower:
+            return True, "advice_reference"
+    
+    return False, ""
 
 
 def detect_toxic_content(text: str) -> tuple[bool, Optional[str]]:
@@ -1056,7 +1148,7 @@ MGA ALITUNTUNIN:
 
 # === MODIFICATION 3: UPDATED generate_answer function ===
 def generate_answer(question: str, context: str, conversation_history: List[Dict[str, str]], 
-                    language: str, max_tokens: int = 1500, is_complex: bool = False) -> tuple[str, str, str]:
+                    language: str, max_tokens: int = 1500, is_complex: bool = False) -> tuple[str, str, str, List[str]]:
     """
     Generates a substantive, doctrinally-sound response using GPT with comprehensive 
     system prompts.
@@ -1163,7 +1255,52 @@ Note: No specific context was retrieved from the vector database. Proceed with t
     # Simplified summary (optional, for internal use only)
     simplified_summary = None
     
-    return answer, confidence, simplified_summary
+    # Extract follow-up questions from the response
+    follow_up_questions = []
+    try:
+        # Look for follow-up questions in the response
+        followup_patterns = [
+            r'Follow-up questions?:?\s*\n(.*?)(?:\n\n|\Z)',
+            r'Further research questions?:?\s*\n(.*?)(?:\n\n|\Z)',
+            r'Additional considerations?:?\s*\n(.*?)(?:\n\n|\Z)',
+            r'Related inquiries?:?\s*\n(.*?)(?:\n\n|\Z)'
+        ]
+        
+        for pattern in followup_patterns:
+            matches = re.findall(pattern, answer, re.DOTALL | re.IGNORECASE)
+            if matches:
+                # Split by bullet points or numbered lists
+                questions_text = matches[0]
+                questions = re.findall(r'[•\-\*]\s*(.+?)(?=\n|$)', questions_text)
+                if not questions:
+                    questions = re.findall(r'\d+\.\s*(.+?)(?=\n|$)', questions_text)
+                
+                follow_up_questions.extend([q.strip() for q in questions if q.strip()])
+                break
+        
+        # If no structured follow-ups found, generate professional legal follow-ups
+        if not follow_up_questions:
+            if language == "tagalog":
+                follow_up_questions = [
+                    "Ano ang mga kaugnay na jurisprudence sa kasong ito?",
+                    "Paano naiiba ang aplikasyon ng batas sa iba't ibang sitwasyon?",
+                    "Ano ang mga procedural requirements na dapat sundin?"
+                ]
+            else:
+                follow_up_questions = [
+                    "What related jurisprudence should be considered in this matter?",
+                    "How does the application of this law vary in different circumstances?",
+                    "What are the procedural requirements that must be followed?"
+                ]
+        
+        # Limit to 3 follow-up questions for professional focus
+        follow_up_questions = follow_up_questions[:3]
+        
+    except Exception as e:
+        print(f"   ⚠️ Error extracting follow-up questions: {e}")
+        follow_up_questions = []
+    
+    return answer, confidence, simplified_summary, follow_up_questions
 
 
 def generate_ai_response(question: str, language: str, response_type: str, topic_type: str = None) -> str:
@@ -1347,6 +1484,7 @@ def create_chat_response(
     confidence: str = None,
     simplified_summary: str = None,
     fallback_suggestions: List[FallbackSuggestion] = None,
+    follow_up_questions: List[str] = None,
     security_report: Dict = None,
     session_id: str = None,
     message_id: str = None,
@@ -1362,6 +1500,7 @@ def create_chat_response(
         confidence=confidence,
         simplified_summary=simplified_summary,
         fallback_suggestions=fallback_suggestions,
+        follow_up_questions=follow_up_questions or [],
         security_report=security_report,
         session_id=session_id,
         message_id=message_id,
@@ -1630,6 +1769,205 @@ async def ask_legal_question_legacy(
             return create_chat_response(
                 answer=greeting_response,
                 simplified_summary="Intelligent greeting response",
+                session_id=session_id,
+                message_id=assistant_msg_id,
+                user_message_id=user_msg_id
+            )
+        
+        # Check if this is a conversation context question (handle specially)
+        if is_conversation_context_question(request.question):
+            print(f"\n💬 [CONVERSATION CONTEXT] Detected conversation context question")
+            
+            # Try to retrieve past conversations if user is authenticated
+            past_conversations_summary = ""
+            if effective_user_id:
+                try:
+                    print(f"   🔍 Retrieving past conversations for user {effective_user_id[:8]}...")
+                    
+                    # Get recent sessions (last 7 for better context)
+                    user_sessions = await chat_service.get_user_sessions(
+                        user_id=effective_user_id,
+                        include_archived=False,
+                        page=1,
+                        page_size=7
+                    )
+                    
+                    if user_sessions and user_sessions.sessions:
+                        print(f"   ✅ Found {len(user_sessions.sessions)} recent conversations")
+                        
+                        # Build detailed summary of past conversations
+                        conversation_summaries = []
+                        detailed_context = []
+                        
+                        for i, session in enumerate(user_sessions.sessions[:4]):  # Show last 4 conversations
+                            # Get more messages from each session for better context
+                            session_with_messages = await chat_service.get_session_with_messages(
+                                session_id=session.id,
+                                message_limit=8  # Get first 4 exchanges for better context
+                            )
+                            
+                            if session_with_messages and session_with_messages.messages:
+                                messages = session_with_messages.messages
+                                
+                                # Get user questions and assistant responses
+                                user_questions = [msg for msg in messages if msg.role == 'user']
+                                assistant_responses = [msg for msg in messages if msg.role == 'assistant']
+                                
+                                if user_questions:
+                                    # Use session title if it's meaningful, otherwise use first question
+                                    if session.title and session.title.strip() and session.title != "New Chat":
+                                        # Session has a meaningful title, use it
+                                        summary_text = f"• **{session.title}**"
+                                    else:
+                                        # No meaningful title, use first question
+                                        first_question = user_questions[0].content[:120]
+                                        summary_text = f"• {first_question}{'...' if len(user_questions[0].content) > 120 else ''}"
+                                    
+                                    # Add topic indicators for professional legal categories
+                                    question_lower = user_questions[0].content.lower()
+                                    if any(word in question_lower for word in ['constitutional', 'constitution', 'bill of rights']):
+                                        summary_text += " (Constitutional Law)"
+                                    elif any(word in question_lower for word in ['contract', 'obligation', 'civil code', 'damages']):
+                                        summary_text += " (Civil Law)"
+                                    elif any(word in question_lower for word in ['criminal', 'revised penal code', 'felony', 'crime']):
+                                        summary_text += " (Criminal Law)"
+                                    elif any(word in question_lower for word in ['marriage', 'family code', 'annulment', 'custody']):
+                                        summary_text += " (Family Law)"
+                                    elif any(word in question_lower for word in ['labor', 'employment', 'labor code', 'termination']):
+                                        summary_text += " (Labor Law)"
+                                    elif any(word in question_lower for word in ['corporation', 'partnership', 'business', 'commercial']):
+                                        summary_text += " (Corporate Law)"
+                                    elif any(word in question_lower for word in ['tax', 'bir', 'revenue', 'taxation']):
+                                        summary_text += " (Tax Law)"
+                                    elif any(word in question_lower for word in ['property', 'land', 'real estate', 'ownership']):
+                                        summary_text += " (Property Law)"
+                                    
+                                    conversation_summaries.append(summary_text)
+                                    
+                                    # Store detailed context for AI discussion
+                                    if i < 2:  # Only store detailed context for most recent 2 conversations
+                                        context_entry = {
+                                            'title': session.title,
+                                            'questions': [q.content[:400] for q in user_questions[:2]],
+                                            'responses': [r.content[:500] for r in assistant_responses[:2]]
+                                        }
+                                        detailed_context.append(context_entry)
+                        
+                        if conversation_summaries:
+                            language = detect_language(request.question)
+                            if language == "tagalog":
+                                past_conversations_summary = f"\n\n**Mga Nakaraang Legal Research Sessions:**\n" + "\n".join(conversation_summaries)
+                            else:
+                                past_conversations_summary = f"\n\n**Recent Legal Research Sessions:**\n" + "\n".join(conversation_summaries)
+                    else:
+                        print(f"   ℹ️ No past conversations found for user")
+                        
+                except Exception as e:
+                    print(f"   ⚠️ Error retrieving past conversations: {e}")
+                    logger.error(f"Error retrieving past conversations: {e}")
+            
+            # Generate professional response with actual conversation history
+            language = detect_language(request.question)
+            if past_conversations_summary:
+                # We have conversation history - create a professional response
+                if language == "tagalog":
+                    context_response = (
+                        "Oo, naaalala ko ang aming mga nakaraang legal research sessions! 📚\n\n"
+                        "Narito ang mga legal na topics na pinag-aralan natin:"
+                        f"{past_conversations_summary}\n\n"
+                        "Gusto ninyo bang:\n"
+                        "• **Magpatuloy** sa isa sa mga nakaraang research topics?\n"
+                        "• **Magdagdag** ng tanong tungkol sa mga nabanggit na legal provisions?\n"
+                        "• **Mag-explore** ng bagong jurisprudential analysis?\n"
+                        "• **Pag-usapan** ang detalye ng mga nakaraang legal opinions ko?\n\n"
+                        "Sabihin lang ninyo kung alin sa mga nakaraang research ang gusto ninyong i-expand, "
+                        "o magtanong ng bagong complex legal matter. Handa akong magbigay ng mas malalim na doctrinal analysis!"
+                    )
+                else:
+                    context_response = (
+                        "Yes, I remember our previous legal research sessions! 📚\n\n"
+                        "Here are the legal topics we've analyzed:"
+                        f"{past_conversations_summary}\n\n"
+                        "Would you like to:\n"
+                        "• **Continue** researching any of these previous topics?\n"
+                        "• **Ask follow-up questions** about the legal provisions we covered?\n"
+                        "• **Explore** new jurisprudential analysis?\n"
+                        "• **Discuss** the details of my previous legal opinions?\n\n"
+                        "Just let me know which past research you'd like to expand upon, "
+                        "or present a new complex legal matter. I'm ready to provide deeper doctrinal analysis!"
+                    )
+                
+                # Generate professional follow-up questions based on past conversations
+                if language == "tagalog":
+                    context_followups = [
+                        "Alin sa mga nakaraang legal topics ang gusto ninyong i-expand pa?",
+                        "May follow-up jurisprudential analysis ba kayo sa mga nabanggit ko dati?",
+                        "Gusto ninyo bang mag-explore ng comparative legal doctrines?"
+                    ]
+                else:
+                    context_followups = [
+                        "Which of our previous legal topics would you like to expand upon?",
+                        "Do you have follow-up jurisprudential questions about my previous analysis?",
+                        "Would you like to explore comparative legal doctrines?"
+                    ]
+            else:
+                # No conversation history - professional introduction
+                if language == "tagalog":
+                    context_response = (
+                        "Ako si Ai.ttorney, ang inyong advanced legal research assistant para sa Philippine jurisprudence! ⚖️\n\n"
+                        "Wala pa tayong nakaraang research sessions sa sistema, pero handa akong tumulong sa anumang complex legal analysis!\n\n"
+                        "Maaari ninyong mag-research tungkol sa:\n"
+                        "• **Constitutional Law** (Bill of Rights, separation of powers)\n"
+                        "• **Civil Law** (obligations, contracts, property rights)\n"
+                        "• **Criminal Law** (Revised Penal Code, special laws)\n"
+                        "• **Family Law** (Family Code provisions, jurisprudence)\n"
+                        "• **Labor Law** (Labor Code, employment relations)\n"
+                        "• **Corporate Law** (Corporation Code, business law)\n\n"
+                        "Ano pong complex legal matter ang kailangan ninyong i-research? Naaalala ko ang lahat ng aming mga legal discussions!"
+                    )
+                else:
+                    context_response = (
+                        "I'm Ai.ttorney, your advanced legal research assistant for Philippine jurisprudence! ⚖️\n\n"
+                        "We don't have any previous research sessions in the system yet, but I'm ready to help with any complex legal analysis!\n\n"
+                        "You can research:\n"
+                        "• **Constitutional Law** (Bill of Rights, separation of powers)\n"
+                        "• **Civil Law** (obligations, contracts, property rights)\n"
+                        "• **Criminal Law** (Revised Penal Code, special laws)\n"
+                        "• **Family Law** (Family Code provisions, jurisprudence)\n"
+                        "• **Labor Law** (Labor Code, employment relations)\n"
+                        "• **Corporate Law** (Corporation Code, business law)\n\n"
+                        "What complex legal matter would you like to research today? I'll remember all our legal discussions!"
+                    )
+                
+                # Professional follow-up questions for new users
+                if language == "tagalog":
+                    context_followups = [
+                        "Anong legal na field ang kailangan ninyong i-research?",
+                        "May specific na jurisprudential analysis ba kayong kailangan?",
+                        "Gusto ninyo bang mag-explore ng constitutional doctrines?"
+                    ]
+                else:
+                    context_followups = [
+                        "Which legal field would you like to research?",
+                        "Do you need specific jurisprudential analysis?",
+                        "Would you like to explore constitutional doctrines?"
+                    ]
+            
+            # Save conversation context interaction
+            session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                chat_service=chat_service,
+                effective_user_id=effective_user_id,
+                session_id=request.session_id,
+                question=request.question,
+                answer=context_response,
+                language=language,
+                metadata={"type": "conversation_context", "past_conversations_found": len(past_conversations_summary) > 0}
+            )
+            
+            return create_chat_response(
+                answer=context_response,
+                simplified_summary="Retrieved and displayed past legal research sessions" if past_conversations_summary else "No past research sessions found",
+                follow_up_questions=context_followups,
                 session_id=session_id,
                 message_id=assistant_msg_id,
                 user_message_id=user_msg_id
@@ -1942,9 +2280,25 @@ async def ask_legal_question_legacy(
         # Use database history if available, fallback to client-provided history
         conversation_history = db_conversation_history if db_conversation_history else (request.conversation_history or [])
         
+        # Check if user is referencing past conversations
+        has_reference, reference_type = extract_conversation_reference(request.question)
+        if has_reference:
+            print(f"\n🔗 [CONVERSATION REFERENCE] Detected reference to past conversation: {reference_type}")
+            # Add more context from conversation history if available
+            if len(conversation_history) < 12 and effective_user_id:
+                # Try to get more conversation context for better reference understanding
+                extended_history = await get_conversation_history_from_db(
+                    chat_service, 
+                    request.session_id, 
+                    limit=24  # Get more messages for better context (12 exchanges)
+                )
+                if extended_history and len(extended_history) > len(conversation_history):
+                    conversation_history = extended_history
+                    print(f"   ✅ Extended conversation history to {len(conversation_history)} messages for better reference context")
+        
         # Generate answer with proper complexity detection
         print(f"   📊 Using {len(conversation_history)} messages for context (from {'database' if db_conversation_history else 'client'})")
-        answer, _, simplified_summary = generate_answer(
+        answer, _, simplified_summary, follow_up_questions = generate_answer(
             request.question,
             context,
             conversation_history, # <-- Enhanced context awareness from database
@@ -2097,6 +2451,7 @@ async def ask_legal_question_legacy(
             sources=source_citations,
             confidence=confidence,
             simplified_summary=simplified_summary,
+            follow_up_questions=follow_up_questions,
             security_report=security_report,
             session_id=session_id,
             message_id=assistant_message_id,

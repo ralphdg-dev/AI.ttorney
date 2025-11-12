@@ -4,7 +4,6 @@ import Tooltip from "../ui/Tooltip";
 import {
   Download,
   History,
-  Activity,
   Eye,
   AlertCircle,
   Loader2,
@@ -172,77 +171,8 @@ const ViewAppealModal = ({
 
         {/* Appeal History & Audit Trail Section */}
         <div className="border-t border-gray-200 pt-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent Activity Column */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Activity className="h-3 w-3 text-gray-600" />
-                  <h4 className="text-xs font-medium text-gray-900">
-                    Recent Activity
-                  </h4>
-                  <span className="text-[10px] text-gray-500">
-                    ({recentActivity.length} entries)
-                  </span>
-                </div>
-              </div>
-
-              {activityLoading ? (
-                <div className="text-center py-6">
-                  <Loader2 className="h-6 w-6 text-gray-400 mx-auto mb-1 animate-spin" />
-                  <p className="text-[10px] text-gray-500">
-                    Loading recent activity...
-                  </p>
-                </div>
-              ) : activityError ? (
-                <div className="text-center py-6">
-                  <AlertCircle className="h-6 w-6 text-red-400 mx-auto mb-1" />
-                  <p className="text-[10px] text-red-500 mb-2">
-                    {activityError}
-                  </p>
-                </div>
-              ) : recentActivity.length > 0 ? (
-                <div className="overflow-hidden border border-gray-200 rounded-lg">
-                  <div className="max-h-32 overflow-y-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50 sticky top-0">
-                        <tr>
-                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                            Action
-                          </th>
-                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                            Date
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {recentActivity.map((activity) => (
-                          <tr key={activity.id} className="hover:bg-gray-50">
-                            <td className="px-2 py-1.5">
-                              <div className="text-[9px] font-medium text-gray-900">
-                                {activity.action}
-                              </div>
-                            </td>
-                            <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
-                              {formatDate(activity.created_at)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <Activity className="h-6 w-6 text-gray-400 mx-auto mb-1" />
-                  <p className="text-[10px] text-gray-500">
-                    No recent activity found
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Audit Trail Column */}
+          <div className="grid grid-cols-1 gap-6">
+            {/* Audit Trail */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
