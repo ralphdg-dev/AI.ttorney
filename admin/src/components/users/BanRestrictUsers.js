@@ -55,7 +55,11 @@ const BanRestrictUsers = () => {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (openDropdown && !event.target.closest('.dropdown-container')) {
+      if (
+        openDropdown &&
+        !event.target.closest('.dropdown-container') &&
+        !event.target.closest('.dropdown-portal')
+      ) {
         setOpenDropdown(null);
         setDropdownPosition({});
       }
@@ -87,10 +91,14 @@ const BanRestrictUsers = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, statusFilter, sortBy]);
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside (redundant safety, also ignore clicks within portal menu)
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (openDropdown && !event.target.closest('.relative')) {
+      if (
+        openDropdown &&
+        !event.target.closest('.relative') &&
+        !event.target.closest('.dropdown-portal')
+      ) {
         setOpenDropdown(null);
         setDropdownPosition({});
       }
@@ -704,7 +712,7 @@ const BanRestrictUsers = () => {
                 onClick={() => { setOpenDropdown(null); setDropdownPosition({}); }}
               />
               <div
-                className="fixed w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-[9999]"
+                className="fixed w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] dropdown-portal"
                 style={{ right: dropdownPosition.right ?? 20, bottom: dropdownPosition.bottom ?? 20 }}
               >
                 <div className="py-2">
