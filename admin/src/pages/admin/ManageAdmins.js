@@ -17,7 +17,7 @@ const RoleBadge = ({ role, isArchived = false }) => {
     if (isArchived) {
       return 'bg-gray-200 text-gray-600 border border-gray-300';
     }
-    
+
     return role === 'superadmin'
       ? 'bg-purple-50 text-purple-700 border border-purple-200'
       : 'bg-blue-50 text-blue-700 border border-blue-200';
@@ -184,6 +184,7 @@ const ManageAdmins = () => {
           case 'All Roles': return 'all';
           case 'Superadmin': return 'superadmin';
           case 'Admin': return 'admin';
+          case 'Archived': return 'all';
           default: return 'all';
         }
       };
@@ -459,6 +460,13 @@ const ManageAdmins = () => {
           (item.email || '').toLowerCase().includes(searchTerm)
         );
       });
+    }
+
+    // Status-based Archived filter
+    if (roleFilter === 'Archived') {
+      filteredArray = filteredArray.filter(item => item.status === 'archived');
+    } else {
+      filteredArray = filteredArray.filter(item => item.status !== 'archived');
     }
 
     // Apply column sorting if active
@@ -842,7 +850,7 @@ const ManageAdmins = () => {
           filter={{
             value: roleFilter,
             onChange: setRoleFilter,
-            options: ['All Roles', 'Superadmin', 'Admin'],
+            options: ['All Roles', 'Superadmin', 'Admin', 'Archived'],
             label: 'Filter by role',
           }}
           sort={{
