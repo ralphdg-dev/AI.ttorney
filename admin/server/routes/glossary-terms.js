@@ -983,6 +983,22 @@ router.get("/:id/audit-logs", authenticateAdmin, async (req, res) => {
       });
     }
 
+    // Enrich with actor full names
+    let enrichedLogs = auditLogs || [];
+    try {
+      const actorIds = [...new Set((auditLogs || []).map(l => l.actor_id).filter(Boolean))];
+      if (actorIds.length > 0) {
+        const { data: users, error: usersErr } = await supabaseAdmin
+          .from('users')
+          .select('id, full_name')
+          .in('id', actorIds);
+        if (!usersErr && Array.isArray(users)) {
+          const map = new Map(users.map(u => [u.id, u.full_name]));
+          enrichedLogs = (auditLogs || []).map(l => ({ ...l, actor_name: map.get(l.actor_id) || null }));
+        }
+      }
+    } catch {}
+
     // Get total count for pagination
     const { count: totalCount } = await supabaseAdmin
       .from("admin_audit_logs")
@@ -992,7 +1008,7 @@ router.get("/:id/audit-logs", authenticateAdmin, async (req, res) => {
 
     res.json({
       success: true,
-      data: auditLogs || [],
+      data: enrichedLogs,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
