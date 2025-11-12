@@ -22,7 +22,7 @@ export default function LawyerFaceVerification() {
       return;
     }
     const res = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: "images",
       quality: 0.9,
     });
     if (!res.canceled && res.assets && res.assets.length > 0) {
@@ -38,36 +38,49 @@ export default function LawyerFaceVerification() {
       
       // Upload selfie to backend immediately (like IBP card)
       setIsUploading(true);
+      console.log('Starting selfie upload...', { uri: a.uri, fileName: a.fileName, fileSize: a.fileSize });
+      
       try {
         let uploadResult;
         
-        // Check if we're on web and have a File object
-        if (typeof window !== 'undefined' && a.file) {
-          // On web, use the File object directly
-          uploadResult = await lawyerApplicationService.uploadSelfie(a.file);
-        } else {
-          // On native, use the URI-based approach
-          uploadResult = await lawyerApplicationService.uploadSelfie({
-            uri: a.uri,
-            name: a.fileName || 'selfie.jpg',
-            type: 'image/jpeg',
-          });
-        }
+        // Add timeout to prevent infinite uploads
+        const uploadPromise = (async () => {
+          // Check if we're on web and have a File object
+          if (typeof window !== 'undefined' && a.file) {
+            console.log('Using web File object for upload');
+            return await lawyerApplicationService.uploadSelfie(a.file);
+          } else {
+            console.log('Using URI-based upload for native');
+            return await lawyerApplicationService.uploadSelfie({
+              uri: a.uri,
+              name: a.fileName || 'selfie.jpg',
+              type: 'image/jpeg',
+            });
+          }
+        })();
+        
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Upload timeout after 30 seconds')), 30000);
+        });
+        
+        uploadResult = await Promise.race([uploadPromise, timeoutPromise]);
         
         console.log('Selfie upload result:', uploadResult);
         
         if (uploadResult.success && uploadResult.file_path) {
           setSelfiePath(uploadResult.file_path);
+          console.log('Selfie upload successful, file path:', uploadResult.file_path);
         } else {
           // Keep the preview but show warning
-          console.warn('Selfie upload failed:', uploadResult.message);
-          Alert.alert('Upload Warning', 'Selfie captured but upload failed. You can continue and try again later.');
+          console.warn('Selfie upload failed:', uploadResult.message, uploadResult.error);
+          Alert.alert('Upload Warning', `Selfie captured but upload failed: ${uploadResult.error || uploadResult.message}. You can continue and try again later.`);
         }
       } catch (error) {
         // Keep the preview but show warning
         console.error('Selfie upload error:', error);
-        Alert.alert('Upload Warning', 'Selfie captured but upload failed. You can continue and try again later.');
+        Alert.alert('Upload Warning', `Selfie captured but upload failed: ${error instanceof Error ? error.message : 'Unknown error'}. You can continue and try again later.`);
       } finally {
+        console.log('Selfie upload process completed, setting isUploading to false');
         setIsUploading(false);
       }
     }

@@ -48,6 +48,7 @@ export default function LawyerTerms() {
 
       if (!rollNumber || !rollSignDate || !fullName) {
         Alert.alert('Missing Information', 'Some required information is missing. Please go back and complete all steps.');
+        setIsSubmitting(false);
         return;
       }
 
@@ -61,44 +62,54 @@ export default function LawyerTerms() {
 
       console.log('Submitting application data:', applicationData);
 
-      // Check if user has existing application to determine if this is a resubmission
-      const currentStatus = await lawyerApplicationService.getApplicationStatus();
-      const isResubmission = currentStatus?.has_application && 
-                            (currentStatus.application?.status === 'rejected' || 
-                             currentStatus.application?.status === 'resubmission');
+      // Optimistic UI: Navigate to success page immediately
+      router.push('/onboarding/lawyer/documents-success');
+      
+      // Clear stored data immediately for better UX
+      await AsyncStorage.multiRemove([
+        'lawyer_roll_number',
+        'lawyer_roll_sign_date', 
+        'lawyer_full_name',
+        'lawyer_ibp_card_path',
+        'lawyer_selfie_path'
+      ]);
 
-      console.log('Current application status:', currentStatus);
-      console.log('Is resubmission:', isResubmission);
+      // Process submission in background
+      (async () => {
+        try {
+          // Check if user has existing application to determine if this is a resubmission
+          const currentStatus = await lawyerApplicationService.getApplicationStatus();
+          const isResubmission = currentStatus?.has_application && 
+                                (currentStatus.application?.status === 'rejected' || 
+                                 currentStatus.application?.status === 'resubmission');
 
-      let result;
-      if (isResubmission) {
-        console.log('Calling resubmitApplication...');
-        result = await lawyerApplicationService.resubmitApplication(applicationData);
-      } else {
-        console.log('Calling submitApplication...');
-        result = await lawyerApplicationService.submitApplication(applicationData);
-      }
+          console.log('Current application status:', currentStatus);
+          console.log('Is resubmission:', isResubmission);
 
-      console.log('Submission result:', result);
+          let result;
+          if (isResubmission) {
+            console.log('Calling resubmitApplication...');
+            result = await lawyerApplicationService.resubmitApplication(applicationData);
+          } else {
+            console.log('Calling submitApplication...');
+            result = await lawyerApplicationService.submitApplication(applicationData);
+          }
 
-      if (result.success) {
-        // Clear stored data
-        await AsyncStorage.multiRemove([
-          'lawyer_roll_number',
-          'lawyer_roll_sign_date', 
-          'lawyer_full_name',
-          'lawyer_ibp_card_path',
-          'lawyer_selfie_path'
-        ]);
-        
-        router.push('/onboarding/lawyer/documents-success');
-      } else {
-        Alert.alert('Submission Failed', result.message || 'Failed to submit application');
-      }
+          console.log('Background submission result:', result);
+
+          if (!result.success) {
+            console.error('Background submission failed:', result.message);
+            // Could optionally show a toast notification here if needed
+          }
+        } catch (error) {
+          console.error('Background submit application error:', error);
+          // Could optionally show a toast notification here if needed
+        }
+      })();
+
     } catch (error) {
       console.error('Submit application error:', error);
       Alert.alert('Error', `An error occurred while submitting your application: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -267,9 +278,6 @@ export default function LawyerTerms() {
           </View>
         </View>
 
-        <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 8 }}>
-          The button below will be enabled after you have viewed this page for 5 seconds.
-        </Text>
       </ScrollView>
 
       {/* Sticky footer button */}
