@@ -95,11 +95,7 @@ const ViewArticleModal = ({ open, onClose, article }) => {
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState(null);
-  const [recentActivity, setRecentActivity] = useState([]);
-  const [activityLoading, setActivityLoading] = useState(false);
-  const [activityError, setActivityError] = useState(null);
-  const [selectedActivity, setSelectedActivity] = useState(null);
-  const [showActivityModal, setShowActivityModal] = useState(false);
+  // Removed recent activity state; only audit trail remains
   const { admin: currentAdmin } = useAuth();
 
   // Helper function to get auth headers
@@ -114,7 +110,6 @@ const ViewArticleModal = ({ open, onClose, article }) => {
   useEffect(() => {
     if (open && article?.id) {
       loadAuditLogs();
-      loadRecentActivity();
     }
   }, [open, article?.id]);
 
@@ -219,45 +214,7 @@ const ViewArticleModal = ({ open, onClose, article }) => {
     })(),
   }));
 
-  const loadRecentActivity = async () => {
-    try {
-      setActivityLoading(true);
-      setActivityError(null);
-
-      const response = await fetch(
-        `http://localhost:5001/api/legal-articles/${article.id}/recent-activity`,
-        {
-          headers: getAuthHeaders(),
-        }
-      );
-
-      if (response.status === 401) {
-        throw new Error("Unauthorized. Please log in again.");
-      }
-
-      const json = await response.json();
-
-      if (json.success) {
-        setRecentActivity(json.data || []);
-      } else {
-        throw new Error(json.message || "Failed to load recent activity");
-      }
-    } catch (error) {
-      console.error("Failed to load recent activity:", error);
-      setActivityError(error.message);
-      setRecentActivity([
-        {
-          id: 1,
-          action: "Article viewed",
-          target_table: "legal_articles",
-          created_at: new Date().toISOString(),
-          metadata: { action_type: "view" },
-        },
-      ]);
-    } finally {
-      setActivityLoading(false);
-    }
-  };
+  // Removed recent activity loader
 
   const handleExportAuditTrail = async () => {
     try {
@@ -272,49 +229,11 @@ const ViewArticleModal = ({ open, onClose, article }) => {
 
       setTimeout(() => {
         loadAuditLogs();
-        loadRecentActivity();
       }, 1000);
     } catch (error) {
       console.error("Failed to export audit trail PDF:", error);
       alert("Failed to export audit trail PDF. Please try again.");
     }
-  };
-
-  const handleExportActivity = async () => {
-    try {
-      const activityData = recentActivity.map((activity) => ({
-        action: activity.action,
-        date: activity.created_at,
-        details: activity.metadata?.action_type || activity.action,
-      }));
-
-      await exportArticleActivityPDF(
-        activityData,
-        article.enTitle,
-        article.category,
-        currentAdmin,
-        article.id
-      );
-      console.log("Article activity PDF exported and logged successfully");
-
-      setTimeout(() => {
-        loadAuditLogs();
-        loadRecentActivity();
-      }, 1000);
-    } catch (error) {
-      console.error("Failed to export activity PDF:", error);
-      alert("Failed to export activity PDF. Please try again.");
-    }
-  };
-
-  const handleViewActivity = (activity) => {
-    setSelectedActivity(activity);
-    setShowActivityModal(true);
-  };
-
-  const handleCloseActivityModal = () => {
-    setShowActivityModal(false);
-    setSelectedActivity(null);
   };
 
   return (
@@ -415,122 +334,8 @@ const ViewArticleModal = ({ open, onClose, article }) => {
 
         {/* Article History & Audit Trail Section */}
         <div className="border-t border-gray-200 pt-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent Activity Column */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Activity className="h-3 w-3 text-gray-600" />
-                  <h4 className="text-xs font-medium text-gray-900">
-                    Recent Activity
-                  </h4>
-                  <span className="text-[10px] text-gray-500">
-                    ({recentActivity.length} entries)
-                  </span>
-                </div>
-                <Tooltip content="Download as PDF">
-                  <button
-                    onClick={handleExportActivity}
-                    disabled={!recentActivity || recentActivity.length === 0}
-                    className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Download size={14} />
-                  </button>
-                </Tooltip>
-              </div>
-
-              {activityLoading ? (
-                <div className="text-center py-6">
-                  <Loader2 className="h-6 w-6 text-gray-400 mx-auto mb-1 animate-spin" />
-                  <p className="text-[10px] text-gray-500">
-                    Loading recent activity...
-                  </p>
-                </div>
-              ) : activityError ? (
-                <div className="text-center py-6">
-                  <AlertCircle className="h-6 w-6 text-red-400 mx-auto mb-1" />
-                  <p className="text-[10px] text-red-500 mb-2">
-                    {activityError}
-                  </p>
-                  <button
-                    onClick={loadRecentActivity}
-                    className="text-[9px] text-blue-600 hover:text-blue-800 underline"
-                  >
-                    Try again
-                  </button>
-                </div>
-              ) : recentActivity.length > 0 ? (
-                <div className="overflow-hidden border border-gray-200 rounded-lg">
-                  <div className="max-h-32 overflow-y-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50 sticky top-0">
-                        <tr>
-                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                            Action
-                          </th>
-                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                            Date
-                          </th>
-                          <th className="px-2 py-1.5 text-left text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                            Details
-                          </th>
-                          <th className="px-2 py-1.5 text-right text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {recentActivity.map((activity) => (
-                          <tr key={activity.id} className="hover:bg-gray-50">
-                            <td className="px-2 py-1.5">
-                              <div className="text-[9px] font-medium text-gray-900">
-                                {activity.action}
-                              </div>
-                            </td>
-                            <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
-                              {formatDate(activity.created_at)}
-                            </td>
-                            <td className="px-2 py-1.5 max-w-32">
-                              <div
-                                className="text-[9px] text-gray-700 truncate"
-                                title={
-                                  activity.metadata?.action_type ||
-                                  activity.action ||
-                                  "-"
-                                }
-                              >
-                                {activity.metadata?.action_type ||
-                                  activity.action ||
-                                  "-"}
-                              </div>
-                            </td>
-                            <td className="px-2 py-1.5 text-right">
-                              <Tooltip content="View Details">
-                                <button
-                                  onClick={() => handleViewActivity(activity)}
-                                  className="p-1 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-800"
-                                >
-                                  <Eye size={12} />
-                                </button>
-                              </Tooltip>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <Activity className="h-6 w-6 text-gray-400 mx-auto mb-1" />
-                  <p className="text-[10px] text-gray-500">
-                    No recent activity found
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Audit Trail Column */}
+          <div className="grid grid-cols-1 gap-6">
+            {/* Audit Trail */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -644,98 +449,6 @@ const ViewArticleModal = ({ open, onClose, article }) => {
         </div>
       </div>
 
-      {/* Activity Detail Modal */}
-      {showActivityModal && selectedActivity && (
-        <Modal
-          open={showActivityModal}
-          onClose={handleCloseActivityModal}
-          title="Activity Details"
-          width="max-w-2xl"
-        >
-          <div className="space-y-4">
-            <div className="border-b border-gray-200 pb-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-gray-900">
-                  {selectedActivity.action}
-                </h3>
-                <span className="text-xs text-gray-500">
-                  {formatDate(selectedActivity.created_at)}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  Action Type
-                </label>
-                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
-                  {selectedActivity.action}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  Date & Time
-                </label>
-                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
-                  {formatDate(selectedActivity.created_at)}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  Details
-                </label>
-                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md min-h-[60px]">
-                  {selectedActivity.metadata?.action_type ||
-                    selectedActivity.action ||
-                    "No additional details available"}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  Article Information
-                </label>
-                <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
-                  <div className="flex items-center justify-between">
-                    <span>{article.enTitle}</span>
-                    <div className="flex items-center gap-2">
-                      <CategoryBadge category={article.category} />
-                      <StatusBadge status={article.status} />
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {article.category} • Created:{" "}
-                    {formatDate(article.createdAt)}
-                  </div>
-                </div>
-              </div>
-
-              {selectedActivity.id && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">
-                    Activity ID
-                  </label>
-                  <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md font-mono">
-                    {selectedActivity.id}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end pt-4 border-t border-gray-200">
-              <button
-                onClick={handleCloseActivityModal}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
     </Modal>
   );
 };
