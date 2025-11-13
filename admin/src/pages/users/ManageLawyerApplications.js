@@ -992,18 +992,7 @@ const ManageLawyerApplications = () => {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-[#023D7B] mx-auto mb-4" />
-          <p className="text-sm text-gray-600">
-            Loading lawyer applications...
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Loading handled by DataTable's built-in loading row
 
   if (error) {
     return (
@@ -1081,6 +1070,8 @@ const ManageLawyerApplications = () => {
         data={paginatedData}
         rowKey={(row) => row.id}
         dense
+        loading={loading}
+        loadingMessage="Loading lawyer applications..."
       />
 
       {pagination.total > 0 && (
