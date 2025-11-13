@@ -52,9 +52,21 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
 
   // Load conversations immediately when component mounts and when userId/sessionToken change
   useEffect(() => {
+    console.log('🔄 ChatHistorySidebar: Effect triggered', { 
+      userId: userId ? `${userId.substring(0, 8)}...` : 'undefined',
+      hasSessionToken: !!sessionToken,
+      sessionTokenLength: sessionToken?.length || 0
+    });
+    
     if (userId && sessionToken) {
       console.log('🔄 ChatHistorySidebar: Auto-loading conversations on mount/change');
       loadConversations();
+    } else {
+      console.warn('⚠️ ChatHistorySidebar: Missing authentication', { 
+        hasUserId: !!userId, 
+        hasSessionToken: !!sessionToken 
+      });
+      setError('Authentication required for chat history');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, sessionToken]);
@@ -84,12 +96,30 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
     try {
       setIsLoading(true);
       setError(null);
+      
+      console.log('📡 ChatHistorySidebar: Loading conversations...', {
+        userId: userId ? `${userId.substring(0, 8)}...` : 'undefined',
+        hasSessionToken: !!sessionToken
+      });
+      
       const convos = await ChatHistoryService.getConversationsList(userId, false, sessionToken);
       setConversations(convos);
-      console.log('✅ Loaded', convos.length, 'conversations');
-    } catch (err) {
-      console.error('❌ Error loading conversations:', err);
-      setError('Failed to load chat history');
+      console.log('✅ ChatHistorySidebar: Loaded', convos.length, 'conversations');
+    } catch (err: any) {
+      console.error('❌ ChatHistorySidebar: Error loading conversations:', err);
+      
+      // More specific error messages
+      if (err.response?.status === 401) {
+        setError('Authentication expired. Please log in again.');
+      } else if (err.response?.status === 403) {
+        setError('Access denied. Please check your permissions.');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Connection timeout. Please try again.');
+      } else if (!navigator.onLine) {
+        setError('No internet connection. Please check your network.');
+      } else {
+        setError('Failed to load chat history. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

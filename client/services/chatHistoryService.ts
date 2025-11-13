@@ -46,10 +46,30 @@ const CACHE_DURATION = 30000; // 30 seconds cache
 export class ChatHistoryService {
   private static conversationsCache: { data: Conversation[]; timestamp: number } | null = null;
   
-  private static getHeaders(token?: string): Record<string, string> {
+  private static async getHeaders(token?: string): Promise<Record<string, string>> {
+    // Try provided token first
+    if (token) {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+    }
+    
+    // Fallback to AsyncStorage token
+    try {
+      const storedToken = await AsyncStorage.getItem('access_token');
+      if (storedToken) {
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${storedToken}`
+        };
+      }
+    } catch (error) {
+      console.warn('Failed to get token from AsyncStorage:', error);
+    }
+    
     return {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      'Content-Type': 'application/json'
     };
   }
   
@@ -83,7 +103,7 @@ export class ChatHistoryService {
       
       // Create a new session via the backend API
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      const headers = this.getHeaders(token);
+      const headers = await this.getHeaders(token);
       const response = await axios.post(
         `${apiUrl}/api/chat-history/sessions`,
         { title, language: 'en' },
@@ -154,7 +174,7 @@ export class ChatHistoryService {
       }
 
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      const headers = this.getHeaders(token);
+      const headers = await this.getHeaders(token);
       const url = `${apiUrl}/api/chat-history/sessions/${conversationId}`;
       
       const response = await axios.get(url, { 
@@ -215,7 +235,7 @@ export class ChatHistoryService {
 
       console.log('📜 Fetching conversations list for user:', userId);
       const startTime = Date.now();
-      const headers = this.getHeaders(token);
+      const headers = await this.getHeaders(token);
       
       // Optimized request with reasonable timeout and page size
       const apiUrl = await NetworkConfig.getBestApiUrl();
@@ -282,7 +302,7 @@ export class ChatHistoryService {
     try {
       console.log('🗑️ Deleting conversation:', conversationId);
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      const headers = this.getHeaders(token);
+      const headers = await this.getHeaders(token);
       
       const response = await axios.delete(
         `${apiUrl}/api/chat-history/sessions/${conversationId}`,
@@ -316,7 +336,7 @@ export class ChatHistoryService {
   static async archiveConversation(conversationId: string, token?: string): Promise<boolean> {
     try {
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      const headers = this.getHeaders(token);
+      const headers = await this.getHeaders(token);
       await axios.post(
         `${apiUrl}/api/chat-history/sessions/${conversationId}/archive`,
         {},
@@ -345,7 +365,7 @@ export class ChatHistoryService {
   static async updateConversationTitle(conversationId: string, title: string, token?: string): Promise<boolean> {
     try {
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      const headers = this.getHeaders(token);
+      const headers = await this.getHeaders(token);
       await axios.patch(
         `${apiUrl}/api/chat-history/sessions/${conversationId}`,
         { title },

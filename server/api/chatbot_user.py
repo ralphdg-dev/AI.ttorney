@@ -281,9 +281,13 @@ router = APIRouter(prefix="/api/chatbot/user", tags=["Legal Chatbot - User"])
 
 
 # Request/Response Models
+class ConversationMessage(BaseModel):
+    role: str = Field(..., description="Message role: 'user' or 'assistant'")
+    content: str = Field(..., description="Message content")
+
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=500, description="User's legal question or greeting")
-    conversation_history: Optional[List[Dict[str, str]]] = Field(default=[], max_items=10, description="Previous conversation (max 10 messages)")
+    conversation_history: Optional[List[ConversationMessage]] = Field(default=[], max_items=10, description="Previous conversation (max 10 messages)")
     max_tokens: Optional[int] = Field(default=400, ge=100, le=1500, description="Max response tokens (reduced for speed)")
     user_id: Optional[str] = Field(default=None, description="User ID for authenticated users")
     session_id: Optional[str] = Field(default=None, description="Session ID for conversation tracking")
@@ -585,6 +589,352 @@ def is_conversation_context_question(text: str) -> bool:
     ]
     
     return any(pattern in text_lower for pattern in conversation_patterns)
+
+
+def is_translation_request(text: str) -> bool:
+    """
+    Check if the query is asking to translate or repeat the previous response
+    """
+    text_lower = text.lower().strip()
+    
+    translation_patterns = [
+        # English translation requests
+        'repeat that in english', 'can you repeat that in english', 'translate to english',
+        'say that in english', 'in english please', 'english version',
+        'repeat in english', 'can you say that in english',
+        
+        # Tagalog translation requests  
+        'ulitin mo sa tagalog', 'sabihin mo sa tagalog', 'tagalog naman',
+        'sa tagalog please', 'tagalog version', 'translate sa tagalog',
+        
+        # General repeat requests
+        'repeat that', 'can you repeat', 'say that again', 'ulitin mo',
+        'repeat please', 'can you say that again'
+    ]
+    
+    return any(pattern in text_lower for pattern in translation_patterns)
+
+
+def is_legal_category_request(text: str) -> bool:
+    """
+    Check if the query is asking about a specific legal category
+    These should provide comprehensive information about that area of law
+    """
+    text_lower = text.lower().strip()
+    
+    # Single word or simple category requests
+    category_patterns = [
+        # English categories
+        'family', 'family law', 'labor', 'labor law', 'labour', 'labour law',
+        'consumer', 'consumer law', 'criminal', 'criminal law', 'civil', 'civil law',
+        
+        # Filipino categories  
+        'pamilya', 'family law', 'trabaho', 'labor law', 'empleyado',
+        'consumer', 'mamimili', 'krimen', 'criminal law', 'civil law'
+    ]
+    
+    # Check if it's exactly one of these categories or very close
+    return text_lower in category_patterns or any(
+        text_lower == pattern or text_lower == pattern + '?' 
+        for pattern in category_patterns
+    )
+
+
+def get_legal_category_response(text: str, language: str) -> tuple[str, list[str]]:
+    """
+    Generate comprehensive response for legal category requests
+    Returns (response_text, follow_up_questions)
+    """
+    text_lower = text.lower().strip()
+    
+    if 'family' in text_lower or 'pamilya' in text_lower:
+        if language == "tagalog":
+            response = (
+                "**Family Law** - Mga Batas Tungkol sa Pamilya 👨‍👩‍👧‍👦\n\n"
+                "Ang Family Law ay sumasaklaw sa lahat ng legal na usapin ng pamilya sa Pilipinas:\n\n"
+                "**📋 Mga Pangunahing Paksa:**\n"
+                "• **Kasal** - Legal requirements, civil at religious marriage\n"
+                "• **Annulment** - Pagpapawalang-bisa ng kasal\n"
+                "• **Legal Separation** - Paghihiwalay ng mag-asawa\n"
+                "• **Child Custody** - Pag-aalaga sa mga anak\n"
+                "• **Inheritance** - Pamana at estate planning\n"
+                "• **Adoption** - Legal na pag-aampon\n"
+                "• **VAWC** - Violence Against Women and Children\n\n"
+                "**⚖️ Mga Batas na Ginagamit:**\n"
+                "• Family Code of the Philippines\n"
+                "• Anti-VAWC Act (RA 9262)\n"
+                "• Domestic Adoption Act\n"
+                "• Rules on Custody of Minors\n\n"
+                "Ano sa mga topics na ito ang gusto ninyong malaman nang detalyado?"
+            )
+            followups = [
+                "Paano mag-file ng annulment case?",
+                "Ano ang requirements para sa kasal?",
+                "Paano makakuha ng child custody?",
+                "Ano ang karapatan ko sa inheritance?"
+            ]
+        else:
+            response = (
+                "**Family Law** - Legal Matters Concerning Family 👨‍👩‍👧‍👦\n\n"
+                "Family Law covers all legal issues related to family relationships in the Philippines:\n\n"
+                "**📋 Main Topics:**\n"
+                "• **Marriage** - Legal requirements, civil and religious ceremonies\n"
+                "• **Annulment** - Declaring a marriage null and void\n"
+                "• **Legal Separation** - Formal separation of spouses\n"
+                "• **Child Custody** - Care and guardianship of children\n"
+                "• **Inheritance** - Estate planning and succession rights\n"
+                "• **Adoption** - Legal adoption procedures\n"
+                "• **VAWC** - Violence Against Women and Children protection\n\n"
+                "**⚖️ Governing Laws:**\n"
+                "• Family Code of the Philippines\n"
+                "• Anti-VAWC Act (RA 9262)\n"
+                "• Domestic Adoption Act\n"
+                "• Rules on Custody of Minors\n\n"
+                "Which of these topics would you like to know more about?"
+            )
+            followups = [
+                "How to file for annulment?",
+                "What are the requirements for marriage?",
+                "How to get child custody?",
+                "What are my inheritance rights?"
+            ]
+    
+    elif 'labor' in text_lower or 'labour' in text_lower or 'trabaho' in text_lower or 'empleyado' in text_lower:
+        if language == "tagalog":
+            response = (
+                "**Labor Law** - Mga Batas sa Trabaho 👷‍♂️👷‍♀️\n\n"
+                "Ang Labor Law ay nangangalaga sa karapatan ng mga manggagawa sa Pilipinas:\n\n"
+                "**📋 Mga Pangunahing Paksa:**\n"
+                "• **Employment Rights** - Karapatan ng empleyado\n"
+                "• **Wages & Benefits** - Sahod, overtime, 13th month pay\n"
+                "• **Termination** - Legal na pagtatanggal sa trabaho\n"
+                "• **Illegal Dismissal** - Walang-katarungang pagtanggal\n"
+                "• **Resignation** - Tamang paraan ng pag-resign\n"
+                "• **SSS, PhilHealth, Pag-IBIG** - Mandatory contributions\n"
+                "• **Workplace Safety** - Kaligtasan sa trabaho\n\n"
+                "**⚖️ Mga Batas na Ginagamit:**\n"
+                "• Labor Code of the Philippines\n"
+                "• Social Security Act\n"
+                "• Occupational Safety and Health Standards\n"
+                "• Anti-Sexual Harassment Act\n\n"
+                "Ano sa mga topics na ito ang kailangan ninyong malaman?"
+            )
+            followups = [
+                "Paano mag-file ng illegal dismissal case?",
+                "Ano ang tamang proseso ng resignation?",
+                "Magkano ang overtime pay ko?",
+                "Ano ang mga mandatory benefits?"
+            ]
+        else:
+            response = (
+                "**Labor Law** - Employment and Workers' Rights 👷‍♂️👷‍♀️\n\n"
+                "Labor Law protects the rights of workers and employees in the Philippines:\n\n"
+                "**📋 Main Topics:**\n"
+                "• **Employment Rights** - Worker protections and entitlements\n"
+                "• **Wages & Benefits** - Salary, overtime, 13th month pay\n"
+                "• **Termination** - Legal grounds for dismissal\n"
+                "• **Illegal Dismissal** - Wrongful termination cases\n"
+                "• **Resignation** - Proper resignation procedures\n"
+                "• **SSS, PhilHealth, Pag-IBIG** - Mandatory contributions\n"
+                "• **Workplace Safety** - Occupational health and safety\n\n"
+                "**⚖️ Governing Laws:**\n"
+                "• Labor Code of the Philippines\n"
+                "• Social Security Act\n"
+                "• Occupational Safety and Health Standards\n"
+                "• Anti-Sexual Harassment Act\n\n"
+                "Which of these topics would you like to learn more about?"
+            )
+            followups = [
+                "How to file an illegal dismissal case?",
+                "What's the proper resignation process?",
+                "How much should my overtime pay be?",
+                "What are the mandatory employee benefits?"
+            ]
+    
+    elif 'consumer' in text_lower or 'mamimili' in text_lower:
+        if language == "tagalog":
+            response = (
+                "**Consumer Law** - Mga Batas para sa Mamimili 🛒\n\n"
+                "Ang Consumer Law ay nagpoprotekta sa karapatan ng mga mamimili:\n\n"
+                "**📋 Mga Pangunahing Paksa:**\n"
+                "• **Product Warranties** - Warranty ng mga produkto\n"
+                "• **Refunds & Returns** - Pagbabalik ng bayad\n"
+                "• **False Advertising** - Maling pag-advertise\n"
+                "• **Defective Products** - Sirang produkto\n"
+                "• **Service Complaints** - Reklamo sa serbisyo\n"
+                "• **Online Shopping** - E-commerce protection\n"
+                "• **Credit & Loans** - Utang at credit cards\n\n"
+                "**⚖️ Mga Batas na Ginagamit:**\n"
+                "• Consumer Act of the Philippines (RA 7394)\n"
+                "• E-Commerce Act\n"
+                "• Truth in Lending Act\n"
+                "• Lemon Law (RA 10642)\n\n"
+                "Ano sa mga consumer issues na ito ang problema ninyo?"
+            )
+            followups = [
+                "Paano mag-file ng complaint sa DTI?",
+                "Ano ang karapatan ko sa warranty?",
+                "Paano makakuha ng refund?",
+                "Ano ang pwede kong gawin sa defective product?"
+            ]
+        else:
+            response = (
+                "**Consumer Law** - Consumer Rights and Protection 🛒\n\n"
+                "Consumer Law protects the rights of buyers and consumers:\n\n"
+                "**📋 Main Topics:**\n"
+                "• **Product Warranties** - Manufacturer and seller guarantees\n"
+                "• **Refunds & Returns** - Getting your money back\n"
+                "• **False Advertising** - Misleading marketing claims\n"
+                "• **Defective Products** - Faulty or dangerous items\n"
+                "• **Service Complaints** - Poor service quality\n"
+                "• **Online Shopping** - E-commerce consumer protection\n"
+                "• **Credit & Loans** - Lending and credit card issues\n\n"
+                "**⚖️ Governing Laws:**\n"
+                "• Consumer Act of the Philippines (RA 7394)\n"
+                "• E-Commerce Act\n"
+                "• Truth in Lending Act\n"
+                "• Lemon Law (RA 10642)\n\n"
+                "Which consumer issue would you like help with?"
+            )
+            followups = [
+                "How to file a complaint with DTI?",
+                "What are my warranty rights?",
+                "How to get a refund for defective products?",
+                "What can I do about false advertising?"
+            ]
+    
+    elif 'criminal' in text_lower or 'krimen' in text_lower:
+        if language == "tagalog":
+            response = (
+                "**Criminal Law** - Mga Batas sa Krimen ⚖️\n\n"
+                "Ang Criminal Law ay tumutukoy sa mga krimen at parusa sa Pilipinas:\n\n"
+                "**📋 Mga Pangunahing Paksa:**\n"
+                "• **Crimes & Penalties** - Mga krimen at parusa\n"
+                "• **Arrest Procedures** - Tamang proseso ng pag-aresto\n"
+                "• **Bail & Detention** - Piyansa at pagkakakulong\n"
+                "• **Self-Defense** - Pagtatanggol sa sarili\n"
+                "• **Cybercrime** - Krimen sa internet\n"
+                "• **Drug Cases** - Kaso tungkol sa droga\n"
+                "• **Theft & Robbery** - Pagnanakaw at holdap\n\n"
+                "**⚖️ Mga Batas na Ginagamit:**\n"
+                "• Revised Penal Code\n"
+                "• Cybercrime Prevention Act\n"
+                "• Comprehensive Dangerous Drugs Act\n"
+                "• Anti-Carnapping Act\n\n"
+                "Ano sa mga criminal law topics na ito ang kailangan ninyong malaman?"
+            )
+            followups = [
+                "Ano ang mga karapatan ko kapag naaresto?",
+                "Paano mag-file ng criminal case?",
+                "Ano ang self-defense sa batas?",
+                "Magkano ang bail para sa case ko?"
+            ]
+        else:
+            response = (
+                "**Criminal Law** - Crimes and Criminal Justice ⚖️\n\n"
+                "Criminal Law defines crimes and punishments in the Philippines:\n\n"
+                "**📋 Main Topics:**\n"
+                "• **Crimes & Penalties** - Types of crimes and their punishments\n"
+                "• **Arrest Procedures** - Legal arrest and detention procedures\n"
+                "• **Bail & Detention** - Getting released from custody\n"
+                "• **Self-Defense** - Legal justification for protecting yourself\n"
+                "• **Cybercrime** - Internet-related criminal offenses\n"
+                "• **Drug Cases** - Drug-related criminal charges\n"
+                "• **Theft & Robbery** - Property crimes and penalties\n\n"
+                "**⚖️ Governing Laws:**\n"
+                "• Revised Penal Code\n"
+                "• Cybercrime Prevention Act\n"
+                "• Comprehensive Dangerous Drugs Act\n"
+                "• Anti-Carnapping Act\n\n"
+                "Which criminal law topic do you need help with?"
+            )
+            followups = [
+                "What are my rights when arrested?",
+                "How to file a criminal case?",
+                "What constitutes self-defense under law?",
+                "How much is bail for my case?"
+            ]
+    
+    elif 'civil' in text_lower:
+        if language == "tagalog":
+            response = (
+                "**Civil Law** - Mga Batas sa Civil Cases 📋\n\n"
+                "Ang Civil Law ay sumasaklaw sa mga pribadong usapin at karapatan:\n\n"
+                "**📋 Mga Pangunahing Paksa:**\n"
+                "• **Contracts** - Mga kasunduan at kontrata\n"
+                "• **Property Rights** - Karapatan sa ari-arian\n"
+                "• **Obligations** - Mga tungkulin at responsibilidad\n"
+                "• **Damages** - Bayad-pinsala\n"
+                "• **Torts** - Civil wrongs at negligence\n"
+                "• **Debt Collection** - Pagsingil ng utang\n"
+                "• **Small Claims** - Maliliit na kaso\n\n"
+                "**⚖️ Mga Batas na Ginagamit:**\n"
+                "• Civil Code of the Philippines\n"
+                "• Rules of Court\n"
+                "• Small Claims Rules\n"
+                "• Property Registration Decree\n\n"
+                "Ano sa mga civil law matters na ito ang kailangan ninyong tulong?"
+            )
+            followups = [
+                "Paano mag-file ng small claims case?",
+                "Ano ang pwede kong gawin sa breach of contract?",
+                "Paano makakuha ng damages?",
+                "Ano ang proseso sa debt collection?"
+            ]
+        else:
+            response = (
+                "**Civil Law** - Private Rights and Civil Matters 📋\n\n"
+                "Civil Law covers private disputes and individual rights:\n\n"
+                "**📋 Main Topics:**\n"
+                "• **Contracts** - Agreements and contractual obligations\n"
+                "• **Property Rights** - Real estate and personal property\n"
+                "• **Obligations** - Legal duties and responsibilities\n"
+                "• **Damages** - Compensation for losses\n"
+                "• **Torts** - Civil wrongs and negligence\n"
+                "• **Debt Collection** - Recovering money owed\n"
+                "• **Small Claims** - Minor civil disputes\n\n"
+                "**⚖️ Governing Laws:**\n"
+                "• Civil Code of the Philippines\n"
+                "• Rules of Court\n"
+                "• Small Claims Rules\n"
+                "• Property Registration Decree\n\n"
+                "Which civil law matter do you need assistance with?"
+            )
+            followups = [
+                "How to file a small claims case?",
+                "What can I do about breach of contract?",
+                "How to claim damages for losses?",
+                "What's the process for debt collection?"
+            ]
+    
+    else:
+        # Default response if category not recognized
+        if language == "tagalog":
+            response = (
+                "Salamat sa inyong tanong! Ako ay tumutulong sa mga legal na usapin sa Pilipinas. "
+                "Maaari ninyong itanong ang tungkol sa Family Law, Labor Law, Consumer Law, Criminal Law, o Civil Law. "
+                "Ano sa mga ito ang kailangan ninyong tulong?"
+            )
+            followups = [
+                "Family Law - kasal, annulment, custody",
+                "Labor Law - trabaho, sahod, termination", 
+                "Consumer Law - warranty, refund, complaints",
+                "Criminal Law - krimen, arrest, bail"
+            ]
+        else:
+            response = (
+                "Thank you for your question! I help with legal matters in the Philippines. "
+                "You can ask me about Family Law, Labor Law, Consumer Law, Criminal Law, or Civil Law. "
+                "Which area would you like help with?"
+            )
+            followups = [
+                "Family Law - marriage, annulment, custody",
+                "Labor Law - employment, wages, termination",
+                "Consumer Law - warranties, refunds, complaints", 
+                "Criminal Law - crimes, arrest, bail"
+            ]
+    
+    return response, followups
 
 
 def is_app_information_question(text: str) -> bool:
@@ -2194,6 +2544,149 @@ async def ask_legal_question(
                 answer=app_response,
                 simplified_summary="App information and features explained",
                 follow_up_questions=app_followups,
+                session_id=session_id,
+                message_id=assistant_msg_id,
+                user_message_id=user_msg_id
+            )
+        
+        # Check if this is a translation/repeat request
+        if is_translation_request(request.question):
+            print(f"\n🔄 [TRANSLATION] Detected translation/repeat request: {request.question}")
+            
+            # Detect target language
+            text_lower = request.question.lower()
+            target_language = "english" if "english" in text_lower else "tagalog" if "tagalog" in text_lower else "english"
+            
+            # Get the last assistant message from conversation history
+            last_response = None
+            if request.conversation_history:
+                for msg in reversed(request.conversation_history):
+                    # Handle both dict and object formats
+                    msg_role = msg.role if hasattr(msg, 'role') else msg.get('role')
+                    msg_content = msg.content if hasattr(msg, 'content') else msg.get('content')
+                    
+                    if msg_role == "assistant":
+                        last_response = msg_content
+                        break
+            
+            if not last_response:
+                # Try to get from database if no conversation history provided
+                if effective_user_id and request.session_id:
+                    try:
+                        recent_messages = await chat_history_service.get_recent_messages(
+                            user_id=effective_user_id,
+                            session_id=request.session_id,
+                            limit=2
+                        )
+                        if recent_messages:
+                            # Find the most recent assistant message
+                            for msg in reversed(recent_messages):
+                                if msg.get('role') == 'assistant':
+                                    last_response = msg.get('content', '')
+                                    break
+                    except Exception as e:
+                        print(f"Failed to get recent messages for translation: {e}")
+            
+            if last_response:
+                # Generate translation/repeat response
+                if target_language == "tagalog":
+                    translation_response = (
+                        f"Narito ang sagot ko sa Tagalog:\n\n{last_response}\n\n"
+                        "Kung may iba pa kayong tanong, huwag mag-atubiling magtanong!"
+                    )
+                else:
+                    translation_response = (
+                        f"Here's my response in English:\n\n{last_response}\n\n"
+                        "If you have any other questions, feel free to ask!"
+                    )
+                
+                # Save translation interaction
+                session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                    chat_service=chat_history_service,
+                    effective_user_id=effective_user_id,
+                    session_id=request.session_id,
+                    question=request.question,
+                    answer=translation_response,
+                    language=target_language,
+                    metadata={"type": "translation_repeat"}
+                )
+                
+                return create_chat_response(
+                    answer=translation_response,
+                    simplified_summary=f"Previous response repeated in {target_language}",
+                    follow_up_questions=[
+                        "Do you need clarification on any part?",
+                        "Would you like more details about this topic?",
+                        "Is there anything else I can help you with?"
+                    ] if target_language == "english" else [
+                        "Kailangan ba ninyo ng karagdagang paliwanag?",
+                        "Gusto ba ninyo ng mas detalyadong impormasyon?",
+                        "May iba pa ba akong matutulungan sa inyo?"
+                    ],
+                    session_id=session_id,
+                    message_id=assistant_msg_id,
+                    user_message_id=user_msg_id
+                )
+            else:
+                # No previous response found
+                no_previous_response = (
+                    "I don't see a previous response to repeat. Could you please ask your legal question again?" 
+                    if target_language == "english" else
+                    "Wala akong nakitang nakaraang sagot na pwedeng ulitin. Maaari ba ninyong itanong ulit ang inyong legal na katanungan?"
+                )
+                
+                session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                    chat_service=chat_history_service,
+                    effective_user_id=effective_user_id,
+                    session_id=request.session_id,
+                    question=request.question,
+                    answer=no_previous_response,
+                    language=target_language,
+                    metadata={"type": "translation_no_previous"}
+                )
+                
+                return create_chat_response(
+                    answer=no_previous_response,
+                    simplified_summary="No previous response to repeat",
+                    follow_up_questions=[
+                        "What legal topic would you like help with?",
+                        "Do you have a specific legal question?",
+                        "Which area of law interests you?"
+                    ] if target_language == "english" else [
+                        "Anong legal na paksa ang kailangan ninyong tulong?",
+                        "May specific ba kayong legal na tanong?",
+                        "Aling larangan ng batas ang interesado kayo?"
+                    ],
+                    session_id=session_id,
+                    message_id=assistant_msg_id,
+                    user_message_id=user_msg_id
+                )
+        
+        # Check if this is a legal category request (e.g., "family", "labor", etc.)
+        if is_legal_category_request(request.question):
+            print(f"\n⚖️ [LEGAL CATEGORY] Detected legal category request: {request.question}")
+            
+            # Detect language for appropriate response
+            language = detect_language(request.question)
+            
+            # Generate comprehensive legal category response
+            category_response, category_followups = get_legal_category_response(request.question, language)
+            
+            # Save legal category interaction
+            session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                chat_service=chat_history_service,
+                effective_user_id=effective_user_id,
+                session_id=request.session_id,
+                question=request.question,
+                answer=category_response,
+                language=language,
+                metadata={"type": "legal_category"}
+            )
+            
+            return create_chat_response(
+                answer=category_response,
+                simplified_summary=f"Legal category information provided for {request.question}",
+                follow_up_questions=category_followups,
                 session_id=session_id,
                 message_id=assistant_msg_id,
                 user_message_id=user_msg_id

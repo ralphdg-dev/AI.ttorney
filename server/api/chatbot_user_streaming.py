@@ -26,6 +26,9 @@ from api.chatbot_user import (
     is_simple_greeting,
     is_conversation_context_question,
     is_app_information_question,
+    is_translation_request,
+    is_legal_category_request,
+    get_legal_category_response,
     
     # Configuration
     CHAT_MODEL,
@@ -348,6 +351,139 @@ async def ask_legal_question(
                 
                 # Send app information response
                 yield format_sse({'content': app_response})
+                
+                # Send metadata with session info
+                yield format_sse({
+                    'type': 'metadata',
+                    'language': language,
+                    'session_id': session_id,
+                    'user_message_id': user_msg_id,
+                    'assistant_message_id': assistant_msg_id
+                })
+                
+                yield format_sse({'done': True})
+                return
+            
+            # Check if this is a translation/repeat request
+            if is_translation_request(request.question):
+                print(f"\n🔄 [TRANSLATION] Detected translation/repeat request: {request.question}")
+                
+                # Detect target language
+                text_lower = request.question.lower()
+                target_language = "english" if "english" in text_lower else "tagalog" if "tagalog" in text_lower else "english"
+                
+                # Get the last assistant message from conversation history
+                last_response = None
+                if request.conversation_history:
+                    for msg in reversed(request.conversation_history):
+                        # Handle both dict and object formats
+                        msg_role = msg.role if hasattr(msg, 'role') else msg.get('role')
+                        msg_content = msg.content if hasattr(msg, 'content') else msg.get('content')
+                        
+                        if msg_role == "assistant":
+                            last_response = msg_content
+                            break
+                
+                if not last_response:
+                    # Try to get from database if no conversation history provided
+                    if effective_user_id and request.session_id:
+                        try:
+                            recent_messages = await chat_service.get_recent_messages(
+                                user_id=effective_user_id,
+                                session_id=request.session_id,
+                                limit=2
+                            )
+                            if recent_messages:
+                                # Find the most recent assistant message
+                                for msg in reversed(recent_messages):
+                                    if msg.get('role') == 'assistant':
+                                        last_response = msg.get('content', '')
+                                        break
+                        except Exception as e:
+                            print(f"Failed to get recent messages for translation: {e}")
+                
+                if last_response:
+                    # Generate translation/repeat response
+                    if target_language == "tagalog":
+                        translation_response = (
+                            f"Narito ang sagot ko sa Tagalog:\n\n{last_response}\n\n"
+                            "Kung may iba pa kayong tanong, huwag mag-atubiling magtanong!"
+                        )
+                    else:
+                        translation_response = (
+                            f"Here's my response in English:\n\n{last_response}\n\n"
+                            "If you have any other questions, feel free to ask!"
+                        )
+                else:
+                    # No previous response found
+                    translation_response = (
+                        "I don't see a previous response to repeat. Could you please ask your legal question again?" 
+                        if target_language == "english" else
+                        "Wala akong nakitang nakaraang sagot na pwedeng ulitin. Maaari ba ninyong itanong ulit ang inyong legal na katanungan?"
+                    )
+                
+                # Save translation interaction
+                session_id = None
+                user_msg_id = None
+                assistant_msg_id = None
+                
+                if effective_user_id:
+                    try:
+                        session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                            chat_service=chat_service,
+                            effective_user_id=effective_user_id,
+                            session_id=request.session_id,
+                            question=request.question,
+                            answer=translation_response,
+                            language=target_language,
+                            metadata={"type": "translation_repeat", "streaming": True}
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to save translation to history: {e}")
+                
+                # Send translation response
+                yield format_sse({'content': translation_response})
+                
+                # Send metadata with session info
+                yield format_sse({
+                    'type': 'metadata',
+                    'language': target_language,
+                    'session_id': session_id,
+                    'user_message_id': user_msg_id,
+                    'assistant_message_id': assistant_msg_id
+                })
+                
+                yield format_sse({'done': True})
+                return
+            
+            # Check if this is a legal category request (e.g., "family", "labor", etc.)
+            if is_legal_category_request(request.question):
+                print(f"\n⚖️ [LEGAL CATEGORY] Detected legal category request: {request.question}")
+                
+                # Generate comprehensive legal category response
+                category_response, category_followups = get_legal_category_response(request.question, language)
+                
+                # Save legal category interaction
+                session_id = None
+                user_msg_id = None
+                assistant_msg_id = None
+                
+                if effective_user_id:
+                    try:
+                        session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                            chat_service=chat_service,
+                            effective_user_id=effective_user_id,
+                            session_id=request.session_id,
+                            question=request.question,
+                            answer=category_response,
+                            language=language,
+                            metadata={"type": "legal_category", "streaming": True}
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to save legal category to history: {e}")
+                
+                # Send legal category response
+                yield format_sse({'content': category_response})
                 
                 # Send metadata with session info
                 yield format_sse({
