@@ -545,6 +545,9 @@ def is_conversation_context_question(text: str) -> bool:
         'bring up our conversation', 'bring up the past', 'bring up past', 'show our chat', 
         'what we talked about before', 'our conversation history', 'our chat history', 
         'previous discussion', 'show me past', 'show past',
+        # More Tagalog variations
+        'ano usapan natin dati', 'ano pag-uusapan natin dati', 'nakaraan nating usapan',
+        'mga naging usapan natin', 'dating pag-uusapan natin',
         
         # Chatbot capability questions
         'can you remember', 'do you remember', 'can you recall',
@@ -562,6 +565,8 @@ def is_conversation_context_question(text: str) -> bool:
         # Direct conversation history requests
         'talk about our conversation', 'discuss our chat history',
         'usapan natin dati', 'mga pinag-usapan natin',
+        'pinag-usapan natin', 'pinag-usapan natin nung nakaraan',
+        'ano pinag-usapan natin', 'ano ba pinag-usapan natin',
         
         # Discussion about specific past topics
         'remember when we talked about', 'you mentioned before',
@@ -580,6 +585,43 @@ def is_conversation_context_question(text: str) -> bool:
     ]
     
     return any(pattern in text_lower for pattern in conversation_patterns)
+
+
+def is_app_information_question(text: str) -> bool:
+    """
+    Check if the query is asking about the app itself, its features, or general information
+    These should be handled with built-in app knowledge, not legal database search
+    """
+    text_lower = text.lower().strip()
+    
+    app_patterns = [
+        # Direct app questions
+        'this app', 'about this app', 'what is this app', 'tell me about this app',
+        'about the app', 'what does this app do', 'how does this app work',
+        'app features', 'app capabilities', 'what can this app do',
+        
+        # AI.ttorney specific
+        'ai.ttorney', 'ai ttorney', 'ai attorney', 'what is ai.ttorney',
+        'about ai.ttorney', 'ai.ttorney features',
+        
+        # General app info
+        'how to use this', 'how to use the app', 'app instructions',
+        'what is this for', 'what is this platform', 'about this platform',
+        'how does this work', 'what can i do here', 'app guide',
+        
+        # Filipino equivalents
+        'ano ang app na ito', 'tungkol sa app', 'paano gamitin ang app',
+        'ano ang ai.ttorney', 'para saan ang app na ito',
+        'paano gumagana ang app', 'mga feature ng app',
+        'ano purpose ng app', 'purpose ng app na to', 'ano purpose ng app na ito',
+        'para saan ito', 'para saan ang app', 'ano ginagawa ng app',
+        'ano function ng app', 'ano trabaho ng app',
+        # More specific patterns
+        'ano ang purpose ng app', 'purpose ng app', 'layunin ng app',
+        'ano ang layunin ng app', 'bakit ginawa ang app', 'para saan ginawa ang app'
+    ]
+    
+    return any(pattern in text_lower for pattern in app_patterns)
 
 
 def is_simple_greeting(text: str) -> bool:
@@ -2077,6 +2119,85 @@ async def ask_legal_question(
             except Exception as e:
                 print(f"⚠️  Guardrails input validation error: {e}")
                 # Continue without Guardrails if it fails
+        
+        # Check if this is an app information question FIRST (before greeting check)
+        if is_app_information_question(request.question):
+            print(f"\n📱 [APP INFO] Detected app information question: {request.question}")
+            
+            # Detect language for appropriate response
+            language = detect_language(request.question)
+            
+            # Generate comprehensive app information response
+            if language == "tagalog":
+                app_response = (
+                    "Ako si **Ai.ttorney** - ang inyong AI legal assistant para sa Philippine law! 🏛️⚖️\n\n"
+                    "**Ano ang Ai.ttorney?**\n"
+                    "Ako ay isang advanced na AI chatbot na specially designed para sa mga Pilipinong nangangailangan ng legal na tulong at impormasyon. Hindi ako abogado, pero may access ako sa comprehensive database ng Philippine laws.\n\n"
+                    "**Mga Features ko:**\n"
+                    "• **📚 Legal Knowledge Base** - May access ako sa Family Code, Labor Code, Revised Penal Code, at iba pang Philippine laws\n"
+                    "• **🗣️ Bilingual Support** - Makakausap ninyo ako sa English, Tagalog, o Taglish\n"
+                    "• **💬 Conversation Memory** - Naaalala ko ang lahat ng aming mga usapan\n"
+                    "• **📖 Source Citations** - Nagbibigay ako ng mga links sa actual na legal documents\n"
+                    "• **🔍 Smart Search** - Hinahanap ko ang pinaka-relevant na legal information para sa inyong tanong\n\n"
+                    "**Ano ang pwede ninyong itanong?**\n"
+                    "• **Family Law** - Kasal, annulment, child custody, inheritance\n"
+                    "• **Labor Law** - Employment rights, termination, wages, benefits\n"
+                    "• **Consumer Law** - Product warranties, refunds, consumer rights\n"
+                    "• **Criminal Law** - Crimes, penalties, arrest procedures\n"
+                    "• **Civil Law** - Contracts, property, obligations\n\n"
+                    "**⚠️ Important:** Ang mga sagot ko ay para sa general information lang. Para sa specific legal advice, kailangan pa rin ninyong makipag-consult sa licensed lawyer."
+                )
+                
+                app_followups = [
+                    "Anong legal na kategorya ang gusto ninyong malaman?",
+                    "May specific na legal na problema ba kayong kailangang solusyunan?",
+                    "Paano ko kayo matutulungan sa inyong legal concerns ngayon?"
+                ]
+            else:
+                app_response = (
+                    "I'm **Ai.ttorney** - your AI legal assistant for Philippine law! 🏛️⚖️\n\n"
+                    "**What is Ai.ttorney?**\n"
+                    "I'm an advanced AI chatbot specifically designed to help Filipinos who need legal information and guidance. While I'm not a lawyer, I have access to a comprehensive database of Philippine laws.\n\n"
+                    "**My Features:**\n"
+                    "• **📚 Legal Knowledge Base** - I have access to the Family Code, Labor Code, Revised Penal Code, and other Philippine laws\n"
+                    "• **🗣️ Bilingual Support** - You can talk to me in English, Tagalog, or Taglish\n"
+                    "• **💬 Conversation Memory** - I remember all our conversations\n"
+                    "• **📖 Source Citations** - I provide links to actual legal documents\n"
+                    "• **🔍 Smart Search** - I find the most relevant legal information for your questions\n\n"
+                    "**What can you ask me about?**\n"
+                    "• **Family Law** - Marriage, annulment, child custody, inheritance\n"
+                    "• **Labor Law** - Employment rights, termination, wages, benefits\n"
+                    "• **Consumer Law** - Product warranties, refunds, consumer rights\n"
+                    "• **Criminal Law** - Crimes, penalties, arrest procedures\n"
+                    "• **Civil Law** - Contracts, property, obligations\n\n"
+                    "**⚠️ Important:** My responses are for general information only. For specific legal advice, you still need to consult with a licensed lawyer."
+                )
+                
+                app_followups = [
+                    "Which legal category would you like to learn about?",
+                    "Do you have a specific legal problem that needs solving?",
+                    "How can I help you with your legal concerns today?"
+                ]
+            
+            # Save app information interaction
+            session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                chat_service=chat_history_service,
+                effective_user_id=effective_user_id,
+                session_id=request.session_id,
+                question=request.question,
+                answer=app_response,
+                language=language,
+                metadata={"type": "app_information"}
+            )
+            
+            return create_chat_response(
+                answer=app_response,
+                simplified_summary="App information and features explained",
+                follow_up_questions=app_followups,
+                session_id=session_id,
+                message_id=assistant_msg_id,
+                user_message_id=user_msg_id
+            )
         
         # Check if query is a simple greeting BEFORE validation
         step_start = time.time()

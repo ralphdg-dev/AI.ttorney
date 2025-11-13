@@ -25,6 +25,7 @@ from api.chatbot_user import (
     # Greeting detection
     is_simple_greeting,
     is_conversation_context_question,
+    is_app_information_question,
     
     # Configuration
     CHAT_MODEL,
@@ -271,6 +272,84 @@ async def ask_legal_question(
                 yield format_sse({'content': greeting_response})
                 
                 # Send metadata with session info (for both authenticated and guest users)
+                yield format_sse({
+                    'type': 'metadata',
+                    'language': language,
+                    'session_id': session_id,
+                    'user_message_id': user_msg_id,
+                    'assistant_message_id': assistant_msg_id
+                })
+                
+                yield format_sse({'done': True})
+                return
+            
+            # Check if this is an app information question (handle specially)
+            if is_app_information_question(request.question):
+                print(f"\n📱 [APP INFO] Detected app information question: {request.question}")
+                
+                # Generate comprehensive app information response
+                if language == "tagalog":
+                    app_response = (
+                        "Ako si **Ai.ttorney** - ang inyong AI legal assistant para sa Philippine law! 🏛️⚖️\n\n"
+                        "**Ano ang Ai.ttorney?**\n"
+                        "Ako ay isang advanced na AI chatbot na specially designed para sa mga Pilipinong nangangailangan ng legal na tulong at impormasyon. Hindi ako abogado, pero may access ako sa comprehensive database ng Philippine laws.\n\n"
+                        "**Mga Features ko:**\n"
+                        "• **📚 Legal Knowledge Base** - May access ako sa Family Code, Labor Code, Revised Penal Code, at iba pang Philippine laws\n"
+                        "• **🗣️ Bilingual Support** - Makakausap ninyo ako sa English, Tagalog, o Taglish\n"
+                        "• **💬 Conversation Memory** - Naaalala ko ang lahat ng aming mga usapan\n"
+                        "• **📖 Source Citations** - Nagbibigay ako ng mga links sa actual na legal documents\n"
+                        "• **🔍 Smart Search** - Hinahanap ko ang pinaka-relevant na legal information para sa inyong tanong\n\n"
+                        "**Ano ang pwede ninyong itanong?**\n"
+                        "• **Family Law** - Kasal, annulment, child custody, inheritance\n"
+                        "• **Labor Law** - Employment rights, termination, wages, benefits\n"
+                        "• **Consumer Law** - Product warranties, refunds, consumer rights\n"
+                        "• **Criminal Law** - Crimes, penalties, arrest procedures\n"
+                        "• **Civil Law** - Contracts, property, obligations\n\n"
+                        "**⚠️ Important:** Ang mga sagot ko ay para sa general information lang. Para sa specific legal advice, kailangan pa rin ninyong makipag-consult sa licensed lawyer."
+                    )
+                else:
+                    app_response = (
+                        "I'm **Ai.ttorney** - your AI legal assistant for Philippine law! 🏛️⚖️\n\n"
+                        "**What is Ai.ttorney?**\n"
+                        "I'm an advanced AI chatbot specifically designed to help Filipinos who need legal information and guidance. While I'm not a lawyer, I have access to a comprehensive database of Philippine laws.\n\n"
+                        "**My Features:**\n"
+                        "• **📚 Legal Knowledge Base** - I have access to the Family Code, Labor Code, Revised Penal Code, and other Philippine laws\n"
+                        "• **🗣️ Bilingual Support** - You can talk to me in English, Tagalog, or Taglish\n"
+                        "• **💬 Conversation Memory** - I remember all our conversations\n"
+                        "• **📖 Source Citations** - I provide links to actual legal documents\n"
+                        "• **🔍 Smart Search** - I find the most relevant legal information for your questions\n\n"
+                        "**What can you ask me about?**\n"
+                        "• **Family Law** - Marriage, annulment, child custody, inheritance\n"
+                        "• **Labor Law** - Employment rights, termination, wages, benefits\n"
+                        "• **Consumer Law** - Product warranties, refunds, consumer rights\n"
+                        "• **Criminal Law** - Crimes, penalties, arrest procedures\n"
+                        "• **Civil Law** - Contracts, property, obligations\n\n"
+                        "**⚠️ Important:** My responses are for general information only. For specific legal advice, you still need to consult with a licensed lawyer."
+                    )
+                
+                # Save app information interaction
+                session_id = None
+                user_msg_id = None
+                assistant_msg_id = None
+                
+                if effective_user_id:
+                    try:
+                        session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                            chat_service=chat_service,
+                            effective_user_id=effective_user_id,
+                            session_id=request.session_id,
+                            question=request.question,
+                            answer=app_response,
+                            language=language,
+                            metadata={"type": "app_information", "streaming": True}
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to save app info to history: {e}")
+                
+                # Send app information response
+                yield format_sse({'content': app_response})
+                
+                # Send metadata with session info
                 yield format_sse({
                     'type': 'metadata',
                     'language': language,
