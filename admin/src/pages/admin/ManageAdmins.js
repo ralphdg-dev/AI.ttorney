@@ -511,10 +511,13 @@ const ManageAdmins = () => {
       });
     }
 
-    // Status-based Archived filter
+    // Status-based filter
     if (roleFilter === 'Archived') {
       filteredArray = filteredArray.filter(item => item.status === 'archived');
+    } else if (roleFilter === 'Disabled') {
+      filteredArray = filteredArray.filter(item => (item.status || '').toLowerCase() === 'disabled');
     } else {
+      // Default: exclude archived; include active and disabled
       filteredArray = filteredArray.filter(item => item.status !== 'archived');
     }
 
@@ -925,7 +928,7 @@ const ManageAdmins = () => {
           filter={{
             value: roleFilter,
             onChange: setRoleFilter,
-            options: ['All Roles', 'Superadmin', 'Admin', 'Archived'],
+            options: ['All Roles', 'Superadmin', 'Admin', 'Archived', 'Disabled'],
             label: 'Filter by role',
           }}
           sort={{

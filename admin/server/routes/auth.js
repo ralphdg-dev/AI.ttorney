@@ -52,8 +52,8 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Block disabled admins from proceeding
-    if (admin.status && admin.status.toLowerCase() === 'disabled') {
+    // Block disabled or archived admins from proceeding
+    if (admin.status && ['disabled','archived'].includes(admin.status.toLowerCase())) {
       await supabase.auth.signOut();
       return res.status(403).json({
         error: "You're account has been disabled. Contact superadmin"
@@ -260,8 +260,8 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-    // Block disabled admins at OTP verification step as well
-    if (admin.status && admin.status.toLowerCase() === 'disabled') {
+    // Block disabled or archived admins at OTP verification step as well
+    if (admin.status && ['disabled','archived'].includes(admin.status.toLowerCase())) {
       return res.status(403).json({
         error: "You're account has been disabled. Contact superadmin"
       });
