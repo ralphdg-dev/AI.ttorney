@@ -126,7 +126,13 @@ const Login = () => {
             </div>
 
             <div className="flex items-center justify-end">
-              <button type="button" className="text-[11px] text-[#023D7B] hover:underline bg-transparent border-none cursor-pointer">Forgot password?</button>
+              <button
+                type="button"
+                onClick={() => navigate('/forgot-password')}
+                className="text-[11px] text-[#023D7B] hover:underline bg-transparent border-none cursor-pointer"
+              >
+                Forgot password?
+              </button>
             </div>
 
             <button
