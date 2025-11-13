@@ -32,13 +32,9 @@ import ManageAppealsPage from "./pages/appeals/ManageAppeals"
 import Settings from "./pages/Settings";
 
 // Placeholder components for missing pages
+import Help from './pages/help/Help';
 
-const Help = () => (
-  <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Help & Support</h1>
-    <p className="text-gray-600">Help documentation coming soon...</p>
-  </div>
-);
+
 
 const LegalArticles = () => (
   <div className="p-6">
