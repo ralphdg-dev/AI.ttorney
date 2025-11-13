@@ -248,9 +248,13 @@ router = APIRouter(prefix="/api/chatbot/lawyer", tags=["Legal Practice & Researc
 
 
 # Request/Response Models
+class ConversationMessage(BaseModel):
+    role: str = Field(..., description="Message role: 'user' or 'assistant'")
+    content: str = Field(..., description="Message content")
+
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=1000, description="Practitioner's legal interrogatory or research query")
-    conversation_history: Optional[List[Dict[str, str]]] = Field(default=[], max_items=10, description="Prior conversation context (max 10 messages)")
+    conversation_history: Optional[List[ConversationMessage]] = Field(default=[], max_items=10, description="Prior conversation context (max 10 messages)")
     # === MODIFICATION 1: Increased max_tokens for longer, legalese answers ===
     max_tokens: Optional[int] = Field(default=1500, ge=100, le=4000, description="Max response tokens for complex analysis (Increased for legalese format)")
     user_id: Optional[str] = Field(default=None, description="User ID for logging")
