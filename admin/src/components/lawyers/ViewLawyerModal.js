@@ -17,7 +17,7 @@ const StatusBadge = ({ status }) => {
   };
 
   return (
-    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStyles(status)}`}>
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${getStyles(status)}`}>
       {status || 'Active'}
     </span>
   );
@@ -29,7 +29,7 @@ const ConsultationBadge = ({ accepting }) => {
     : 'bg-gray-50 text-gray-700 border border-gray-200';
 
   return (
-    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${styles}`}>
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
       {accepting ? (
         <>
           <CheckCircle size={12} className="mr-1" />
@@ -102,15 +102,14 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
       width="max-w-4xl"
       showCloseButton={false}
     >
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Header with Status */}
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">{lawyerData.full_name || 'Unknown Lawyer'}</h3>
-            <p className="text-sm text-gray-500 mt-1">{lawyerData.email || 'No email provided'}</p>
+            <h3 className="text-sm font-medium text-gray-900">{lawyerData.full_name || 'Unknown Lawyer'}</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">{lawyerData.email || 'No email provided'}</p>
           </div>
-          <div className="flex flex-col items-end gap-2">
-            <StatusBadge status={lawyerData.status} />
+          <div className="flex flex-col items-end gap-1.5">
             <ConsultationBadge accepting={lawyerData.accepting_consultations} />
           </div>
         </div>
@@ -121,30 +120,30 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
             <User size={16} className="mr-2 text-[#023D7B]" />
             Basic Information
           </h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <div className="text-xs text-gray-500">Full Name</div>
-              <div className="text-sm font-medium text-gray-900">{lawyerData.full_name || '-'}</div>
+              <div className="text-[9px] text-gray-500">Full Name</div>
+              <div className="text-xs font-medium text-gray-900">{lawyerData.full_name || '-'}</div>
             </div>
             <div>
-              <div className="text-xs text-gray-500">Username</div>
-              <div className="text-sm font-medium text-gray-900">{lawyerData.username || '-'}</div>
+              <div className="text-[9px] text-gray-500">Username</div>
+              <div className="text-xs font-medium text-gray-900">{lawyerData.username || '-'}</div>
             </div>
             <div>
-              <div className="text-xs text-gray-500">Email</div>
-              <div className="text-sm font-medium text-gray-900">{lawyerData.email || '-'}</div>
+              <div className="text-[9px] text-gray-500">Email</div>
+              <div className="text-xs font-medium text-gray-900">{lawyerData.email || '-'}</div>
             </div>
             <div>
-              <div className="text-xs text-gray-500">Phone Number</div>
-              <div className="text-sm font-medium text-gray-900">{lawyerData.phone_number || 'Not provided'}</div>
+              <div className="text-[9px] text-gray-500">Phone Number</div>
+              <div className="text-xs font-medium text-gray-900">{lawyerData.phone_number || 'Not provided'}</div>
             </div>
             <div>
-              <div className="text-xs text-gray-500">Registration Date</div>
-              <div className="text-sm text-gray-700">{formatDate(lawyerData.registration_date)}</div>
+              <div className="text-[9px] text-gray-500">Registration Date</div>
+              <div className="text-xs text-gray-700">{formatDate(lawyerData.registration_date)}</div>
             </div>
             <div>
-              <div className="text-xs text-gray-500">Last Updated</div>
-              <div className="text-sm text-gray-700">
+              <div className="text-[9px] text-gray-500">Last Updated</div>
+              <div className="text-xs text-gray-700">
                 {lawyerData.updated_at ? formatDate(lawyerData.updated_at) : 
                  lawyerData.registration_date ? formatDate(lawyerData.registration_date) : 'Never'}
               </div>
@@ -158,24 +157,24 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
             <Shield size={16} className="mr-2 text-[#023D7B]" />
             Professional Information
           </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <div className="text-xs text-gray-500">Roll Number</div>
-              <div className="text-sm font-medium text-gray-900">{lawyerData.roll_number || 'Not provided'}</div>
+              <div className="text-[9px] text-gray-500">Roll Number</div>
+              <div className="text-xs font-medium text-gray-900">{lawyerData.roll_number || 'Not provided'}</div>
             </div>
             <div>
-              <div className="text-xs text-gray-500">Roll Sign Date</div>
-              <div className="text-sm text-gray-700">{formatDate(lawyerData.roll_sign_date, false)}</div>
+              <div className="text-[9px] text-gray-500">Roll Sign Date</div>
+              <div className="text-xs text-gray-700">{formatDate(lawyerData.roll_sign_date, false)}</div>
             </div>
             <div>
-              <div className="text-xs text-gray-500">Years of Experience</div>
-              <div className="text-sm text-gray-700">
+              <div className="text-[9px] text-gray-500">Years of Experience</div>
+              <div className="text-xs text-gray-700">
                 {lawyerData.years_of_experience ? `${lawyerData.years_of_experience} years` : 'Not specified'}
               </div>
             </div>
             <div>
-              <div className="text-xs text-gray-500">Verification Status</div>
-              <div className="text-sm text-gray-700">
+              <div className="text-[9px] text-gray-500">Verification Status</div>
+              <div className="text-xs text-gray-700">
                 {lawyerData.is_verified ? (
                   <span className="text-green-600 font-medium">✓ Verified</span>
                 ) : (
@@ -192,10 +191,10 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
             <Calendar size={16} className="mr-2 text-[#023D7B]" />
             Consultation Information
           </h4>
-          <div className="grid grid-cols-1 gap-4 bg-gray-50 p-4 rounded-lg">
+          <div className="grid grid-cols-1 gap-3">
             <div>
-              <div className="text-xs text-gray-500">Accepting Consultations</div>
-              <div className="text-sm text-gray-700 mt-1">
+              <div className="text-[9px] text-gray-500">Accepting Consultations</div>
+              <div className="text-xs text-gray-700 mt-1">
                 <ConsultationBadge accepting={lawyerData.accepting_consultations} />
               </div>
             </div>
@@ -209,20 +208,20 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
               <FileText size={16} className="mr-2 text-[#023D7B]" />
               Specializations
             </h4>
-            <div className="bg-gray-50 p-4 rounded-lg">
+            <div>
               {Array.isArray(lawyerData.specializations) && lawyerData.specializations.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {lawyerData.specializations.map((spec, index) => (
                     <span 
                       key={index}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
+                      className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 border border-blue-200"
                     >
                       {spec}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">No specializations listed</p>
+                <p className="text-xs text-gray-500">No specializations listed</p>
               )}
             </div>
           </div>
@@ -235,8 +234,8 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
               <FileText size={16} className="mr-2 text-[#023D7B]" />
               Professional Bio
             </h4>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">
+            <div>
+              <p className="text-xs text-gray-700 whitespace-pre-wrap">
                 {lawyerData.bio}
               </p>
             </div>
@@ -249,20 +248,20 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
             <Clock size={16} className="mr-2 text-[#023D7B]" />
             Account Statistics
           </h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <div className="text-xs text-gray-500">Account Status</div>
-              <div className="text-sm text-gray-700 mt-1">
+              <div className="text-[9px] text-gray-500">Account Status</div>
+              <div className="text-xs text-gray-700 mt-1">
                 <StatusBadge status={lawyerData.status} />
               </div>
             </div>
             <div>
-              <div className="text-xs text-gray-500">Total Forum Posts</div>
-              <div className="text-sm font-medium text-gray-900">{lawyerData.post_count || 0}</div>
+              <div className="text-[9px] text-gray-500">Total Forum Posts</div>
+              <div className="text-xs font-medium text-gray-900">{lawyerData.post_count || 0}</div>
             </div>
             <div>
-              <div className="text-xs text-gray-500">Total Consultations</div>
-              <div className="text-sm font-medium text-gray-900">{lawyerData.consultation_count || 0}</div>
+              <div className="text-[9px] text-gray-500">Total Consultations</div>
+              <div className="text-xs font-medium text-gray-900">{lawyerData.consultation_count || 0}</div>
             </div>
           </div>
         </div>
@@ -271,7 +270,7 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
         <div className="flex justify-end pt-4 border-t border-gray-200">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#023D7B]"
           >
             Close
           </button>
