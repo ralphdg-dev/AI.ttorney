@@ -152,7 +152,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         : { 
             name: userData?.full_name || userData?.username || 'User', 
             username: userData?.username || 'user', 
-            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon
+            avatar: userData?.photo_url || userData?.profile_photo || undefined,
             isLawyer: userData?.role === 'verified_lawyer',
             lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
           },
@@ -526,7 +526,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         : { 
             name: userName,
             username: userUsername,
-            avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+            avatar: (currentUser as any)?.photo_url || (currentUser as any)?.profile_photo || undefined,
             isLawyer: isLawyer,
             lawyerBadge: isLawyer ? 'Verified' : undefined
           },

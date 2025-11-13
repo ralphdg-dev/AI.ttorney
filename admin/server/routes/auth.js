@@ -500,48 +500,141 @@ router.post('/refresh', authenticateAdmin, async (req, res) => {
 
 // Change password (requires current password)
 router.post('/change-password', authenticateAdmin, async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body || {};
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Current password and new password are required.' });
-    }
-
-    if (typeof newPassword !== 'string' || newPassword.length < 8 || !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
-      return res.status(400).json({
-        error: 'Password must be at least 8 characters and include uppercase, lowercase, and a number.'
-      });
-    }
-
-    // Validate current password by attempting sign-in
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: req.admin.email,
-      password: currentPassword
-    });
-
-    // Immediately sign out this temporary session
-    if (authData?.session) {
-      await supabase.auth.signOut();
-    }
-
-    if (authError || !authData?.user) {
-      return res.status(401).json({ error: 'Current password is incorrect.' });
-    }
-
-    // Update password
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(req.admin.id, {
-      password: newPassword
-    });
-
-    if (updateError) {
-      console.error('Change password update error:', updateError);
-      return res.status(500).json({ error: 'Failed to update password.' });
-    }
-
-    return res.json({ success: true, message: 'Password updated successfully.' });
-  } catch (error) {
-    console.error('Change password error:', error);
-    return res.status(500).json({ error: 'Internal server error.' });
+try {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current password and new password are required.' });
   }
+
+  if (typeof newPassword !== 'string' || newPassword.length < 8 || !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
+    return res.status(400).json({
+      error: 'Password must be at least 8 characters and include uppercase, lowercase, and a number.'
+    });
+  }
+
+  // Validate current password by attempting sign-in
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    email: req.admin.email,
+    password: currentPassword
+  });
+
+  // Immediately sign out this temporary session
+  if (authData?.session) {
+    await supabase.auth.signOut();
+  }
+
+  if (authError || !authData?.user) {
+    return res.status(401).json({ error: 'Current password is incorrect.' });
+  }
+
+  // Update password
+  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(req.admin.id, {
+    password: newPassword
+  });
+
+  if (updateError) {
+    console.error('Change password update error:', updateError);
+    return res.status(500).json({ error: 'Failed to update password.' });
+  }
+
+  return res.json({ success: true, message: 'Password updated successfully.' });
+} catch (error) {
+  console.error('Change password error:', error);
+  return res.status(500).json({ error: 'Internal server error.' });
+}
+});
+
+// Get current system maintenance settings
+router.get('/maintenance', authenticateAdmin, async (_req, res) => {
+try {
+  const { data, error } = await supabaseAdmin
+    .from('system_maintenance')
+    .select('id, is_active, message, start_time, end_time, allow_admin, created_at')
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    return res.status(500).json({ error: 'Failed to fetch maintenance settings.' });
+  }
+
+  const row = Array.isArray(data) ? data[0] : null;
+  return res.json({
+    success: true,
+    maintenance: row || {
+      is_active: false,
+      message: '',
+      start_time: null,
+      end_time: null,
+      allow_admin: true,
+    },
+  });
+} catch (err) {
+  console.error('Get maintenance error:', err);
+  return res.status(500).json({ error: 'Internal server error.' });
+}
+});
+
+// Update system maintenance settings (upsert single row)
+router.put('/maintenance', authenticateAdmin, async (req, res) => {
+try {
+  const {
+    is_active = false,
+    message = '',
+    start_time = null,
+    end_time = null,
+    allow_admin = true,
+  } = req.body || {};
+
+  // Coerce to proper types
+  const payload = {
+    is_active: Boolean(is_active),
+    message: typeof message === 'string' ? message : '',
+    start_time: start_time ? new Date(start_time).toISOString() : null,
+    end_time: end_time ? new Date(end_time).toISOString() : null,
+    allow_admin: Boolean(allow_admin),
+  };
+
+  // Find latest row
+  const { data: rows, error: getErr } = await supabaseAdmin
+    .from('system_maintenance')
+    .select('id')
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (getErr) {
+    return res.status(500).json({ error: 'Failed to load current maintenance row.' });
+  }
+
+  let result;
+  if (rows && rows.length > 0) {
+    const id = rows[0].id;
+    const { data, error } = await supabaseAdmin
+      .from('system_maintenance')
+      .update(payload)
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) {
+      return res.status(500).json({ error: 'Failed to update maintenance settings.' });
+    }
+    result = data;
+  } else {
+    const { data, error } = await supabaseAdmin
+      .from('system_maintenance')
+      .insert(payload)
+      .select('*')
+      .single();
+    if (error) {
+      return res.status(500).json({ error: 'Failed to create maintenance settings.' });
+    }
+    result = data;
+  }
+
+  return res.json({ success: true, maintenance: result });
+} catch (err) {
+  console.error('Update maintenance error:', err);
+  return res.status(500).json({ error: 'Internal server error.' });
+}
 });
 
 module.exports = router;

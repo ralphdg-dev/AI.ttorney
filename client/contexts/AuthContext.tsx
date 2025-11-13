@@ -21,6 +21,7 @@ export interface User {
   pending_lawyer?: boolean;
   birthdate?: string;
   profile_photo?: string;
+  photo_url?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -155,8 +156,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ⚡ FAANG OPTIMIZATION: Run ALL API calls in PARALLEL + Cache profile data
       // This reduces login time from ~3-5 seconds to ~1 second
       const [profileResult, suspensionResult, lawyerStatusResult] = await Promise.allSettled([
-        // 1. Fetch FULL user profile (including birthdate, profile_photo)
-        supabase.from('users').select('id,email,username,full_name,role,is_verified,pending_lawyer,birthdate,profile_photo,created_at,updated_at').eq('id', session.user.id).single(),
+        // 1. Fetch FULL user profile (including birthdate, profile_photo, photo_url)
+        supabase.from('users').select('id,email,username,full_name,role,is_verified,pending_lawyer,birthdate,profile_photo,photo_url,created_at,updated_at').eq('id', session.user.id).single(),
         // 2. Check suspension status (only if we have a token)
         session?.access_token ? checkSuspensionStatus() : Promise.resolve(null),
         // 3. Pre-fetch lawyer status (we'll use it if needed)
@@ -653,7 +654,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data: profile, error } = await supabase
         .from('users')
-        .select('id,email,username,full_name,role,is_verified,pending_lawyer,birthdate,profile_photo,created_at,updated_at')
+        .select('id,email,username,full_name,role,is_verified,pending_lawyer,birthdate,profile_photo,photo_url,created_at,updated_at')
         .eq('id', userId)
         .single();
 

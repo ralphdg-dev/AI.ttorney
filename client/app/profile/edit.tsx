@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, StatusBar } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, StatusBar, Image } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Save,
   X,
   User,
+  Camera,
+  Image as ImageIcon,
 } from "lucide-react-native";
+import * as ImagePicker from 'expo-image-picker';
 import Navbar from "../../components/Navbar";
 import Colors from "../../constants/Colors";
 import { useAuth } from "../../contexts/AuthContext";
@@ -35,7 +38,7 @@ interface EditFormData extends UserProfileData {
 interface ApiRequestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   endpoint: string;
-  body?: any;
+  body?: any | FormData;
   timeout?: number;
 }
 
@@ -70,13 +73,23 @@ const makeApiRequest = async ({ method, endpoint, body, timeout = DEFAULT_TIMEOU
 
   try {
     const apiUrl = await NetworkConfig.getBestApiUrl();
+    
+    // Determine if body is FormData
+    const isFormData = body instanceof FormData;
+    
+    const headers: HeadersInit = {
+      'Authorization': `Bearer ${session.access_token}`,
+    };
+    
+    // Only add Content-Type for JSON, let browser set it for FormData
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
     const response = await fetch(`${apiUrl}${endpoint}`, {
       method,
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: body ? JSON.stringify(body) : undefined,
+      headers,
+      body: isFormData ? body : (body ? JSON.stringify(body) : undefined),
       signal: controller.signal,
     });
 
@@ -92,7 +105,7 @@ const makeApiRequest = async ({ method, endpoint, body, timeout = DEFAULT_TIMEOU
 };
 
 export default function EditProfilePage() {
-  const { user, refreshUserData } = useAuth();
+  const { user, isAuthenticated, refreshProfile } = useAuth();
   const router = useRouter();
   const toast = useToast();
   
@@ -130,6 +143,8 @@ export default function EditProfilePage() {
   const [emailChecking, setEmailChecking] = useState(false);
   const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
   const [emailError, setEmailError] = useState<string>("");
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   
   // Debounce timers to prevent infinite loops
   const usernameTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -155,7 +170,7 @@ export default function EditProfilePage() {
 
   // Check if save button should be enabled
   const canSave = () => {
-    if (!hasChanges()) return false;
+    if (!hasChanges() && !selectedImageUri) return false;
     
     // If email changed, must be verified
     if (editFormData.email !== profileData.email && !emailVerified) {
@@ -163,6 +178,142 @@ export default function EditProfilePage() {
     }
     
     return true;
+  };
+
+  // Image picker functions
+  const requestPermissions = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Required',
+        'Sorry, we need camera roll permissions to change your profile photo.',
+        [{ text: 'OK' }]
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const showImagePickerOptions = () => {
+    Alert.alert(
+      'Change Profile Photo',
+      'Choose how you want to update your profile photo',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Camera', onPress: pickImageFromCamera },
+        { text: 'Photo Library', onPress: pickImageFromLibrary },
+        { text: 'Remove Photo', onPress: removeProfilePhoto, style: 'destructive' },
+      ]
+    );
+  };
+
+  const pickImageFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Camera permission is required to take photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setSelectedImageUri(result.assets[0].uri);
+      setEditFormData(prev => ({ ...prev, profile_photo: result.assets[0].uri }));
+    }
+  };
+
+  const pickImageFromLibrary = async () => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setSelectedImageUri(result.assets[0].uri);
+      setEditFormData(prev => ({ ...prev, profile_photo: result.assets[0].uri }));
+    }
+  };
+
+  const removeProfilePhoto = () => {
+    setSelectedImageUri(null);
+    setEditFormData(prev => ({ ...prev, profile_photo: '' }));
+  };
+
+  const uploadProfilePhoto = async (imageUri: string): Promise<string | null> => {
+    try {
+      setIsUploadingPhoto(true);
+      
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      // Delete old profile photo if it exists
+      const currentPhotoUrl = (user as any).photo_url || profileData.profile_photo;
+      if (currentPhotoUrl && currentPhotoUrl.includes('user-profile-pics')) {
+        try {
+          // Extract the full path including photo_url folder
+          const urlParts = currentPhotoUrl.split('/user-profile-pics/');
+          if (urlParts.length > 1) {
+            const fullPath = urlParts[1].split('?')[0]; // Remove query parameters
+            if (fullPath.includes('photo_url/')) {
+              await supabase.storage
+                .from('user-profile-pics')
+                .remove([fullPath]);
+            }
+          }
+        } catch (error) {
+          console.log('Could not delete old photo:', error);
+          // Continue with upload even if deletion fails
+        }
+      }
+
+      // Create filename with photo_url folder structure
+      const fileExtension = imageUri.split('.').pop() || 'jpg';
+      const fileName = `photo_url/profile_${user.id}_${Date.now()}.${fileExtension}`;
+      
+      // Read the file as ArrayBuffer for React Native
+      const response = await fetch(imageUri);
+      const arrayBuffer = await response.arrayBuffer();
+      
+      // Upload to Supabase storage using ArrayBuffer
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('user-profile-pics')
+        .upload(fileName, arrayBuffer, {
+          contentType: `image/${fileExtension}`,
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Supabase upload error:', uploadError);
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('user-profile-pics')
+        .getPublicUrl(fileName);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get public URL');
+      }
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Photo upload error:', error);
+      throw error;
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   // Load profile data on mount
@@ -173,7 +324,7 @@ export default function EditProfilePage() {
         email: user.email || "",
         username: (user as any).username || "",
         birthdate: (user as any).birthdate || "",
-        profile_photo: DEFAULT_PROFILE_PHOTO,
+        profile_photo: (user as any).photo_url || (user as any).profile_photo || DEFAULT_PROFILE_PHOTO,
       };
       setProfileData(fallbackProfile);
       setEditFormData({
@@ -499,20 +650,44 @@ export default function EditProfilePage() {
     setShowConfirmModal(false);
     setIsSaving(true);
 
+    let profilePhotoUrl = profileData.profile_photo;
+
+    // Upload photo if a new one was selected
+    if (selectedImageUri) {
+      try {
+        const uploadedUrl = await uploadProfilePhoto(selectedImageUri);
+        if (uploadedUrl) {
+          profilePhotoUrl = uploadedUrl;
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Failed to upload profile photo. Please try again.');
+        setIsSaving(false);
+        return;
+      }
+    }
+
     const updatedData = {
       full_name: editFormData.full_name,
       username: editFormData.username,
       email: emailVerified ? newEmail : profileData.email,
       birthdate: editFormData.birthdate,
+      profile_photo: profilePhotoUrl, // Use existing profile_photo field that server recognizes
     };
+
 
     // Optimistic update - update local state immediately
     const previousData = profileData;
     setProfileData({
       ...editFormData,
       email: emailVerified ? newEmail : profileData.email,
-      profile_photo: editFormData.profile_photo || DEFAULT_PROFILE_PHOTO,
+      profile_photo: profilePhotoUrl || editFormData.profile_photo || DEFAULT_PROFILE_PHOTO,
     });
+
+    // Also update the user context if available
+    if (user && profilePhotoUrl) {
+      (user as any).profile_photo = profilePhotoUrl;
+      (user as any).photo_url = profilePhotoUrl; // Update both fields for compatibility
+    }
 
     try {
       const response = await makeApiRequest({
@@ -524,6 +699,13 @@ export default function EditProfilePage() {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Failed to update profile');
+      }
+
+      const responseData = await response.json();
+
+      // Refresh the user profile to get updated data
+      if (refreshProfile) {
+        await refreshProfile();
       }
 
       toast.show({
@@ -543,7 +725,7 @@ export default function EditProfilePage() {
       setNewEmail("");
 
       // Refresh context in background
-      await refreshUserData();
+      await refreshProfile();
 
       setTimeout(() => {
         if (router.canGoBack()) {
@@ -621,26 +803,83 @@ export default function EditProfilePage() {
           </View>
 
           <View style={tw`items-center`}>
-            <Avatar 
-              size="xl" 
-              style={[
-                tw`mb-3`,
-                { backgroundColor: Colors.background.tertiary }
-              ]}
-            >
-              <AvatarFallbackText style={{ color: Colors.text.primary }}>
-                {editFormData.full_name || profileData.full_name || "User"}
-              </AvatarFallbackText>
-              <AvatarImage 
-                source={{ uri: editFormData.profile_photo || profileData.profile_photo || undefined }} 
-                alt="Profile"
-              />
-            </Avatar>
-            <TouchableOpacity>
-              <Text style={[tw`text-sm font-medium`, { color: Colors.primary.blue }]}>
-                Change Photo
-              </Text>
-            </TouchableOpacity>
+            <View style={tw`relative`}>
+              {(selectedImageUri || editFormData.profile_photo || profileData.profile_photo) ? (
+                <View style={[
+                  tw`w-24 h-24 rounded-full mb-3 overflow-hidden`,
+                  { backgroundColor: Colors.background.tertiary }
+                ]}>
+                  <Image
+                    source={{ 
+                      uri: selectedImageUri || 
+                           editFormData.profile_photo || 
+                           profileData.profile_photo
+                    }}
+                    style={tw`w-full h-full`}
+                  />
+                </View>
+              ) : (
+                <Avatar 
+                  size="xl" 
+                  style={[
+                    tw`mb-3`,
+                    { backgroundColor: Colors.background.tertiary }
+                  ]}
+                >
+                  <AvatarFallbackText style={{ color: Colors.text.primary }}>
+                    {editFormData.full_name || profileData.full_name || "User"}
+                  </AvatarFallbackText>
+                </Avatar>
+              )}
+              {isUploadingPhoto && (
+                <View style={[
+                  tw`absolute inset-0 rounded-full flex items-center justify-center`,
+                  { backgroundColor: 'rgba(0,0,0,0.5)' }
+                ]}>
+                  <ActivityIndicator size="large" color="white" />
+                </View>
+              )}
+            </View>
+            
+            <View style={tw`flex-row items-center justify-center mt-4 px-4`}>
+              <TouchableOpacity
+                style={[
+                  tw`flex-row items-center justify-center px-4 py-3 rounded-lg mr-2`,
+                  { 
+                    backgroundColor: Colors.primary.blue,
+                    flex: 1,
+                    maxWidth: 140
+                  }
+                ]}
+                onPress={showImagePickerOptions}
+                disabled={isUploadingPhoto}
+              >
+                <Camera size={16} color="white" />
+                <Text style={[tw`text-sm font-medium ml-2`, { color: Colors.text.white }]}>
+                  Change
+                </Text>
+              </TouchableOpacity>
+              
+              {(selectedImageUri || editFormData.profile_photo) && (
+                <TouchableOpacity
+                  style={[
+                    tw`flex-row items-center justify-center px-4 py-3 rounded-lg ml-2`,
+                    { 
+                      backgroundColor: Colors.status.error,
+                      flex: 1,
+                      maxWidth: 140
+                    }
+                  ]}
+                  onPress={removeProfilePhoto}
+                  disabled={isUploadingPhoto}
+                >
+                  <X size={16} color="white" />
+                  <Text style={[tw`text-sm font-medium ml-2`, { color: Colors.text.white }]}>
+                    Remove
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
 
