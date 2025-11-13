@@ -13,24 +13,32 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../components/ui/Toast";
+import Modal from "../components/ui/Modal";
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("profile");
+  const { admin, getAuthHeader, refreshToken } = useAuth();
+  const { showSuccess, showError, ToastContainer } = useToast();
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [profilePicture, setProfilePicture] = useState(null);
   const [profileData, setProfileData] = useState({
-    firstName: "Admin",
-    lastName: "User",
-    email: "admin@aittorney.com",
-    birthday: "1990-01-01",
-    joinedDate: "2024-01-15",
+    firstName: "",
+    lastName: "",
+    email: "",
+    joinedDate: "",
+    role: "",
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const [maintenanceSettings, setMaintenanceSettings] = useState({
     maintenanceMode: false,
     maintenanceMessage:
@@ -46,19 +54,96 @@ const Settings = () => {
     { id: "maintenance", label: "Maintenance Mode", icon: Wrench },
   ];
 
-  const handleSave = async () => {
-    setLoading(true);
+  const handleSave = () => {
+    setConfirmOpen(true);
+  };
+
+  const performSave = async () => {
+    setConfirmBusy(true);
     try {
-      // Here you would typically save to your backend
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
+      const firstName = (profileData.firstName || '').trim();
+      const lastName = (profileData.lastName || '').trim();
+      const wantPasswordChange = Boolean(profileData.currentPassword || profileData.newPassword || profileData.confirmPassword);
+      if (wantPasswordChange) {
+        if (!profileData.currentPassword || !profileData.newPassword || !profileData.confirmPassword) {
+          throw new Error('Please fill out all password fields.');
+        }
+        if (profileData.newPassword !== profileData.confirmPassword) {
+          throw new Error('New password and confirm password do not match.');
+        }
+        if (profileData.newPassword.length < 8 || !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(profileData.newPassword)) {
+          throw new Error('Password must be at least 8 characters and include uppercase, lowercase, and a number.');
+        }
+      }
+
+      const updates = [];
+      if (firstName || lastName) {
+        updates.push(
+          fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/auth/me`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            body: JSON.stringify({ firstName, lastName }),
+          })
+        );
+      }
+      if (wantPasswordChange) {
+        updates.push(
+          fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/auth/change-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            body: JSON.stringify({ currentPassword: profileData.currentPassword, newPassword: profileData.newPassword }),
+          })
+        );
+      }
+
+      for (const p of updates) {
+        const resp = await p;
+        const data = await resp.json();
+        if (!resp.ok || data?.success !== true) {
+          throw new Error(data?.error || 'Update failed');
+        }
+      }
+
+      await refreshToken();
       setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch (error) {
-      console.error("Error saving settings:", error);
+      showSuccess(wantPasswordChange ? 'Profile and password updated.' : 'Profile updated successfully.');
+      setTimeout(() => setSaved(false), 1500);
+      setConfirmOpen(false);
+      setProfileData((prev) => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
+    } catch (e) {
+      showError(e.message || 'Failed to save settings.');
     } finally {
+      setConfirmBusy(false);
       setLoading(false);
     }
   };
+
+  // Load current admin into profileData
+  useEffect(() => {
+    if (!admin) return;
+    const fullName = admin.full_name || "";
+    const firstName = admin.first_name || fullName.split(" ")[0] || "";
+    const lastName = admin.last_name || (fullName.split(" ").slice(1).join(" ") || "");
+    setProfileData((prev) => ({
+      ...prev,
+      firstName,
+      lastName,
+      email: admin.email || "",
+      joinedDate: admin.created_at || admin.createdAt || "",
+      role: admin.role || "admin",
+    }));
+    (async () => {
+      try {
+        const resp = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/auth/joined`, {
+          headers: { 'Content-Type': 'application/json', ...getAuthHeader() }
+        });
+        const data = await resp.json();
+        if (resp.ok && data?.success && data.created_at) {
+          setProfileData((prev) => ({ ...prev, joinedDate: data.created_at }));
+        }
+      } catch {}
+    })();
+  }, [admin]);
 
   const updateProfileData = (key, value) => {
     setProfileData((prev) => ({
@@ -74,6 +159,17 @@ const Settings = () => {
     }));
   };
 
+  const getRoleLabel = (role) => {
+    if (!role) return '-';
+    const r = String(role).toLowerCase();
+    if (r === 'admin') return 'Administrator';
+    if (r === 'superadmin') return 'Super Admin';
+    return r
+      .split('_')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  };
+
   const handleProfilePictureChange = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -87,6 +183,7 @@ const Settings = () => {
 
   const renderProfileManagement = () => (
     <div className="space-y-8">
+      <ToastContainer />
       {/* Profile Picture Section */}
       <div>
         <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -107,7 +204,7 @@ const Settings = () => {
             </div>
             <label
               htmlFor="profile-picture"
-              className="absolute bottom-0 right-0 bg-blue-600 rounded-full p-1 cursor-pointer hover:bg-blue-700 transition-colors"
+              className="absolute bottom-0 right-0 bg-[#023D7B] rounded-full p-1 cursor-pointer hover:bg-[#013964] transition-colors"
             >
               <Camera className="w-4 h-4 text-white" />
             </label>
@@ -137,41 +234,36 @@ const Settings = () => {
         </h3>
         <div className="bg-gray-50 rounded-lg p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">
-                First Name
-              </span>
-              <span className="text-sm text-gray-900">
-                {profileData.firstName}
-              </span>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+              <input
+                type="text"
+                value={profileData.firstName}
+                onChange={(e) => updateProfileData("firstName", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#023D7B] focus:border-transparent"
+                placeholder="Enter first name"
+              />
             </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">
-                Last Name
-              </span>
-              <span className="text-sm text-gray-900">
-                {profileData.lastName}
-              </span>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+              <input
+                type="text"
+                value={profileData.lastName}
+                onChange={(e) => updateProfileData("lastName", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#023D7B] focus:border-transparent"
+                placeholder="Enter last name"
+              />
             </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">
-                Email Address
-              </span>
-              <span className="text-sm text-gray-900">{profileData.email}</span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">
-                Birthday
-              </span>
-              <div className="flex items-center space-x-2 text-sm text-gray-900">
-                <Calendar className="w-4 h-4" />
-                <span>
-                  {new Date(profileData.birthday).toLocaleDateString()}
-                </span>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+              <input
+                type="email"
+                value={profileData.email}
+                disabled
+                className="w-full px-3 py-2 border border-gray-200 bg-gray-100 rounded-lg text-gray-600 cursor-not-allowed"
+              />
             </div>
           </div>
         </div>
@@ -190,7 +282,7 @@ const Settings = () => {
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <Calendar className="w-4 h-4" />
               <span>
-                {new Date(profileData.joinedDate).toLocaleDateString()}
+                {profileData.joinedDate ? new Date(profileData.joinedDate).toLocaleDateString() : "-"}
               </span>
             </div>
           </div>
@@ -198,8 +290,8 @@ const Settings = () => {
             <span className="text-sm font-medium text-gray-700">
               Account Type
             </span>
-            <span className="text-sm text-blue-600 font-medium">
-              Administrator
+            <span className="text-sm text-[#023D7B] font-medium">
+              {getRoleLabel(profileData.role)}
             </span>
           </div>
         </div>
@@ -222,7 +314,7 @@ const Settings = () => {
                 onChange={(e) =>
                   updateProfileData("currentPassword", e.target.value)
                 }
-                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#023D7B] focus:border-transparent"
                 placeholder="Enter current password"
               />
               <button
@@ -244,15 +336,28 @@ const Settings = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 New Password
               </label>
-              <input
-                type="password"
-                value={profileData.newPassword}
-                onChange={(e) =>
-                  updateProfileData("newPassword", e.target.value)
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter new password"
-              />
+              <div className="relative">
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  value={profileData.newPassword}
+                  onChange={(e) =>
+                    updateProfileData("newPassword", e.target.value)
+                  }
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#023D7B] focus:border-transparent"
+                  placeholder="Enter new password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-400" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div>
@@ -266,7 +371,7 @@ const Settings = () => {
                   onChange={(e) =>
                     updateProfileData("confirmPassword", e.target.value)
                   }
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#023D7B] focus:border-transparent"
                   placeholder="Confirm new password"
                 />
                 <button
@@ -284,14 +389,14 @@ const Settings = () => {
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-[#023D7B]/10 border border-[#023D7B]/30 rounded-lg p-4">
             <div className="flex">
-              <Info className="h-5 w-5 text-blue-400" />
+              <Info className="h-5 w-5 text-[#023D7B]" />
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-blue-800">
+                <h3 className="text-sm font-medium text-[#023D7B]">
                   Password Requirements
                 </h3>
-                <p className="mt-1 text-sm text-blue-700">
+                <p className="mt-1 text-sm text-[#023D7B]">
                   Password must be at least 8 characters long and contain
                   uppercase, lowercase, numbers, and special characters.
                 </p>
@@ -554,7 +659,7 @@ const Settings = () => {
         <button
           onClick={handleSave}
           disabled={loading}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+          className="flex items-center space-x-2 bg-[#023D7B] text-white px-4 py-2 rounded-lg hover:bg-[#013964] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
         >
           {loading ? (
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
@@ -581,7 +686,7 @@ const Settings = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
                     activeTab === tab.id
-                      ? "border-blue-500 text-blue-600"
+                      ? "border-[#023D7B] text-[#023D7B]"
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   }`}
                 >
@@ -596,6 +701,33 @@ const Settings = () => {
         {/* Tab Content */}
         <div className="p-6">{renderTabContent()}</div>
       </div>
+
+      <Modal
+        open={confirmOpen}
+        onClose={() => (confirmBusy ? null : setConfirmOpen(false))}
+        title="Confirm Save"
+        showCloseButton={!confirmBusy}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-700">Save the changes to your profile{(profileData.currentPassword || profileData.newPassword || profileData.confirmPassword) ? ' and update your password' : ''}?</p>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={() => setConfirmOpen(false)}
+              disabled={confirmBusy}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={performSave}
+              disabled={confirmBusy}
+              className="px-3 py-2 text-sm bg-[#023D7B] text-white rounded-md hover:bg-[#013964] disabled:opacity-50"
+            >
+              {confirmBusy ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

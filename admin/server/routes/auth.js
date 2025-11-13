@@ -90,6 +90,45 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Update current admin profile (first/last name -> full_name)
+router.put('/me', authenticateAdmin, async (req, res) => {
+  try {
+    const { firstName, lastName } = req.body || {};
+
+    const fn = typeof firstName === 'string' ? firstName.trim() : '';
+    const ln = typeof lastName === 'string' ? lastName.trim() : '';
+    const fullName = `${fn} ${ln}`.trim();
+
+    if (!fullName) {
+      return res.status(400).json({ error: 'First name or last name is required.' });
+    }
+
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('admin')
+      .update({ full_name: fullName })
+      .eq('id', req.admin.id)
+      .select('*')
+      .single();
+
+    if (updateError || !updated) {
+      return res.status(500).json({ error: 'Failed to update profile.' });
+    }
+
+    const adminResponse = {
+      id: updated.id,
+      email: updated.email,
+      full_name: updated.full_name,
+      role: updated.role,
+      created_at: updated.created_at
+    };
+
+    return res.json({ success: true, admin: adminResponse });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    return res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
 // Forgot Password - Step 1: Send password reset OTP
 router.post('/forgot-password', async (req, res) => {
   try {
@@ -404,6 +443,29 @@ router.get('/verify', authenticateAdmin, (req, res) => {
   });
 });
 
+// Get joined date from users table based on current admin's email
+router.get('/joined', authenticateAdmin, async (req, res) => {
+  try {
+    const email = req.admin.email;
+    if (!email) return res.json({ success: true, created_at: null });
+
+    const { data: userRow, error } = await supabaseAdmin
+      .from('users')
+      .select('created_at')
+      .eq('email', email.toLowerCase())
+      .single();
+
+    if (error || !userRow) {
+      return res.json({ success: true, created_at: null });
+    }
+
+    return res.json({ success: true, created_at: userRow.created_at });
+  } catch (error) {
+    console.error('Get joined date error:', error);
+    return res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
 // Refresh token
 router.post('/refresh', authenticateAdmin, async (req, res) => {
   try {
@@ -433,6 +495,52 @@ router.post('/refresh', authenticateAdmin, async (req, res) => {
     res.status(500).json({ 
       error: 'Internal server error during token refresh.' 
     });
+  }
+});
+
+// Change password (requires current password)
+router.post('/change-password', authenticateAdmin, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required.' });
+    }
+
+    if (typeof newPassword !== 'string' || newPassword.length < 8 || !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
+      return res.status(400).json({
+        error: 'Password must be at least 8 characters and include uppercase, lowercase, and a number.'
+      });
+    }
+
+    // Validate current password by attempting sign-in
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: req.admin.email,
+      password: currentPassword
+    });
+
+    // Immediately sign out this temporary session
+    if (authData?.session) {
+      await supabase.auth.signOut();
+    }
+
+    if (authError || !authData?.user) {
+      return res.status(401).json({ error: 'Current password is incorrect.' });
+    }
+
+    // Update password
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(req.admin.id, {
+      password: newPassword
+    });
+
+    if (updateError) {
+      console.error('Change password update error:', updateError);
+      return res.status(500).json({ error: 'Failed to update password.' });
+    }
+
+    return res.json({ success: true, message: 'Password updated successfully.' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    return res.status(500).json({ error: 'Internal server error.' });
   }
 });
 
