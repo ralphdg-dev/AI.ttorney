@@ -96,6 +96,26 @@ const Settings = () => {
         );
       }
 
+      // Maintenance settings update
+      const maintenancePayload = {
+        is_active: Boolean(maintenanceSettings.maintenanceMode),
+        message: maintenanceSettings.maintenanceMessage || '',
+        allow_admin: Boolean(maintenanceSettings.allowAdminAccess),
+        start_time: maintenanceSettings.scheduledMaintenance && maintenanceSettings.maintenanceStart
+          ? new Date(maintenanceSettings.maintenanceStart).toISOString()
+          : null,
+        end_time: maintenanceSettings.scheduledMaintenance && maintenanceSettings.maintenanceEnd
+          ? new Date(maintenanceSettings.maintenanceEnd).toISOString()
+          : null,
+      };
+      updates.push(
+        fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/auth/maintenance`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+          body: JSON.stringify(maintenancePayload),
+        })
+      );
+
       for (const p of updates) {
         const resp = await p;
         const data = await resp.json();
@@ -106,7 +126,7 @@ const Settings = () => {
 
       await refreshToken();
       setSaved(true);
-      showSuccess(wantPasswordChange ? 'Profile and password updated.' : 'Profile updated successfully.');
+      showSuccess(wantPasswordChange ? 'Profile, password, and maintenance settings updated.' : 'Settings saved successfully.');
       setTimeout(() => setSaved(false), 1500);
       setConfirmOpen(false);
       setProfileData((prev) => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
@@ -144,6 +164,33 @@ const Settings = () => {
       } catch {}
     })();
   }, [admin]);
+
+  // Load maintenance settings
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/auth/maintenance`, {
+          headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        });
+        const data = await resp.json();
+        if (resp.ok && data?.success && data.maintenance) {
+          const m = data.maintenance;
+          setMaintenanceSettings((prev) => ({
+            ...prev,
+            maintenanceMode: Boolean(m.is_active),
+            maintenanceMessage: m.message || '',
+            allowAdminAccess: m.allow_admin !== undefined ? Boolean(m.allow_admin) : true,
+            scheduledMaintenance: Boolean(m.start_time || m.end_time),
+            maintenanceStart: m.start_time ? new Date(m.start_time).toISOString().slice(0,16) : '',
+            maintenanceEnd: m.end_time ? new Date(m.end_time).toISOString().slice(0,16) : '',
+          }));
+        }
+      } catch (err) {
+        // ignore load errors, UI remains editable
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const updateProfileData = (key, value) => {
     setProfileData((prev) => ({
