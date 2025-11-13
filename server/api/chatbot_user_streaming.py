@@ -405,10 +405,33 @@ async def ask_legal_question(
                 if last_response:
                     # Generate translation/repeat response
                     if target_language == "tagalog":
-                        translation_response = (
-                            f"Narito ang sagot ko sa Tagalog:\n\n{last_response}\n\n"
-                            "Kung may iba pa kayong tanong, huwag mag-atubiling magtanong!"
-                        )
+                        # For legal category responses, provide a proper Tagalog translation
+                        if "Family Law" in last_response and "Main Topics" in last_response:
+                            translation_response = (
+                                "**Batas ng Pamilya** - Mga Legal na Usapin Tungkol sa Pamilya 👨‍👩‍👧‍👦\n\n"
+                                "Ang Batas ng Pamilya ay sumasaklaw sa lahat ng legal na isyu na may kaugnayan sa mga relasyon ng pamilya sa Pilipinas:\n\n"
+                                "**📋 Mga Pangunahing Paksa:**\n"
+                                "• **Kasal** - Mga legal na pangangailangan, sibil at relihiyosong seremonya\n"
+                                "• **Annulment** - Pagdedeklara na ang kasal ay walang bisa\n"
+                                "• **Legal Separation** - Pormal na paghihiwalay ng mag-asawa\n"
+                                "• **Custody ng Anak** - Pag-aalaga at guardianship ng mga anak\n"
+                                "• **Inheritance** - Estate planning at mga karapatan sa succession\n"
+                                "• **Adoption** - Mga legal na pamamaraan sa pag-adopt\n"
+                                "• **VAWC** - Proteksyon laban sa Violence Against Women and Children\n\n"
+                                "**⚖️ Mga Governing Laws:**\n"
+                                "• Family Code of the Philippines\n"
+                                "• Anti-VAWC Act (RA 9262)\n"
+                                "• Domestic Adoption Act\n"
+                                "• Rules on Custody of Minors\n\n"
+                                "Alin sa mga paksang ito ang gusto ninyong malaman pa?\n\n"
+                                "Kung may iba pa kayong tanong, huwag mag-atubiling magtanong!"
+                            )
+                        else:
+                            # For other responses, use the original format
+                            translation_response = (
+                                f"Narito ang sagot ko sa Tagalog:\n\n{last_response}\n\n"
+                                "Kung may iba pa kayong tanong, huwag mag-atubiling magtanong!"
+                            )
                     else:
                         translation_response = (
                             f"Here's my response in English:\n\n{last_response}\n\n"

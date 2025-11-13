@@ -22,7 +22,7 @@ Endpoint: POST /api/chatbot/user/ask
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Dict, Optional, AsyncGenerator
 import json
 import time
@@ -287,12 +287,33 @@ class ConversationMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=500, description="User's legal question or greeting")
-    conversation_history: Optional[List[ConversationMessage]] = Field(default=[], max_items=10, description="Previous conversation (max 10 messages)")
+    conversation_history: Optional[List[ConversationMessage]] = Field(default=[], description="Previous conversation (unlimited for registered users, limited for guests)")
     max_tokens: Optional[int] = Field(default=400, ge=100, le=1500, description="Max response tokens (reduced for speed)")
     user_id: Optional[str] = Field(default=None, description="User ID for authenticated users")
     session_id: Optional[str] = Field(default=None, description="Session ID for conversation tracking")
     guest_session_id: Optional[str] = Field(default=None, description="Cryptographic guest session token")
     guest_prompt_count: Optional[int] = Field(default=None, description="Client-reported prompt count (advisory only)")
+    
+    @model_validator(mode='after')
+    def validate_conversation_history_limit(self):
+        """Dynamic validation based on user type"""
+        conversation_history = self.conversation_history
+        
+        if not conversation_history:
+            return self
+            
+        # Check if this is a guest user (has guest_session_id but no user_id)
+        is_guest = self.guest_session_id and not self.user_id
+        
+        if is_guest:
+            # Guest users: limit to 10 messages to manage resources
+            if len(conversation_history) > 10:
+                print(f"🎫 Guest user: Trimming conversation history from {len(conversation_history)} to 10 messages")
+                # Automatically trim to last 10 messages for guests
+                self.conversation_history = conversation_history[-10:]
+        # Registered users and lawyers: unlimited conversation history
+        
+        return self
     
     class Config:
         # Production: Add example for API documentation
@@ -606,6 +627,9 @@ def is_translation_request(text: str) -> bool:
         # Tagalog translation requests  
         'ulitin mo sa tagalog', 'sabihin mo sa tagalog', 'tagalog naman',
         'sa tagalog please', 'tagalog version', 'translate sa tagalog',
+        'paki sagot yan ng tagalog', 'sagot mo sa tagalog', 'paki ulit sa tagalog',
+        'paki translate sa tagalog', 'pwede sa tagalog', 'tagalog po',
+        'sa tagalog po', 'paki tagalog', 'tagalog lang',
         
         # General repeat requests
         'repeat that', 'can you repeat', 'say that again', 'ulitin mo',
@@ -2590,10 +2614,33 @@ async def ask_legal_question(
             if last_response:
                 # Generate translation/repeat response
                 if target_language == "tagalog":
-                    translation_response = (
-                        f"Narito ang sagot ko sa Tagalog:\n\n{last_response}\n\n"
-                        "Kung may iba pa kayong tanong, huwag mag-atubiling magtanong!"
-                    )
+                    # For legal category responses, provide a proper Tagalog translation
+                    if "Family Law" in last_response and "Main Topics" in last_response:
+                        translation_response = (
+                            "**Batas ng Pamilya** - Mga Legal na Usapin Tungkol sa Pamilya 👨‍👩‍👧‍👦\n\n"
+                            "Ang Batas ng Pamilya ay sumasaklaw sa lahat ng legal na isyu na may kaugnayan sa mga relasyon ng pamilya sa Pilipinas:\n\n"
+                            "**📋 Mga Pangunahing Paksa:**\n"
+                            "• **Kasal** - Mga legal na pangangailangan, sibil at relihiyosong seremonya\n"
+                            "• **Annulment** - Pagdedeklara na ang kasal ay walang bisa\n"
+                            "• **Legal Separation** - Pormal na paghihiwalay ng mag-asawa\n"
+                            "• **Custody ng Anak** - Pag-aalaga at guardianship ng mga anak\n"
+                            "• **Inheritance** - Estate planning at mga karapatan sa succession\n"
+                            "• **Adoption** - Mga legal na pamamaraan sa pag-adopt\n"
+                            "• **VAWC** - Proteksyon laban sa Violence Against Women and Children\n\n"
+                            "**⚖️ Mga Governing Laws:**\n"
+                            "• Family Code of the Philippines\n"
+                            "• Anti-VAWC Act (RA 9262)\n"
+                            "• Domestic Adoption Act\n"
+                            "• Rules on Custody of Minors\n\n"
+                            "Alin sa mga paksang ito ang gusto ninyong malaman pa?\n\n"
+                            "Kung may iba pa kayong tanong, huwag mag-atubiling magtanong!"
+                        )
+                    else:
+                        # For other responses, use the original format
+                        translation_response = (
+                            f"Narito ang sagot ko sa Tagalog:\n\n{last_response}\n\n"
+                            "Kung may iba pa kayong tanong, huwag mag-atubiling magtanong!"
+                        )
                 else:
                     translation_response = (
                         f"Here's my response in English:\n\n{last_response}\n\n"

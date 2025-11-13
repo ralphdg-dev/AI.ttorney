@@ -140,7 +140,33 @@ const streamChatResponse = (params: StreamChatResponseParams): Promise<void> => 
     
     // Handle completion
     xhr.onload = () => {
-      console.log('✅ XHR completed');
+      console.log('✅ XHR completed with status:', xhr.status);
+      
+      // Handle 422 validation errors specifically
+      if (xhr.status === 422) {
+        console.error('❌ 422 Validation Error - Response:', xhr.responseText);
+        try {
+          const errorData = JSON.parse(xhr.responseText);
+          console.error('❌ Validation details:', JSON.stringify(errorData, null, 2));
+        } catch (e) {
+          console.error('❌ Could not parse error response');
+        }
+        onError();
+        onFinish();
+        reject(new Error(`Validation error (422): ${xhr.responseText}`));
+        return;
+      }
+      
+      // Handle other HTTP errors
+      if (xhr.status >= 400) {
+        console.error(`❌ HTTP Error ${xhr.status}:`, xhr.responseText);
+        onError();
+        onFinish();
+        reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText}`));
+        return;
+      }
+      
+      onComplete();
       onFinish();
       resolve();
     };
@@ -770,10 +796,21 @@ export default function ChatbotScreen() {
       console.log('🎫 Has auth token:', !!session?.access_token);
 
       // Prepare conversation history in the format expected by backend
-      const formattedHistory = conversationHistory.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
+      // Smart limits based on user type:
+      // - Guest users: 10 messages (resource management)
+      // - Registered users: unlimited (full context)
+      // - Lawyers: unlimited (need full context for legal analysis)
+      let formattedHistory = conversationHistory;
+      
+      if (isGuestMode) {
+        // Guest users: limit to 10 messages to manage server resources
+        const maxGuestHistoryItems = 10;
+        formattedHistory = conversationHistory.slice(-maxGuestHistoryItems);
+        console.log(`🎫 Guest mode: Limited to last ${maxGuestHistoryItems} messages`);
+      } else {
+        // Registered users and lawyers: unlimited conversation history
+        console.log(`👤 Registered user: Unlimited conversation history (${conversationHistory.length} messages)`);
+      }
 
       // Prepare headers with authentication token if available
       const headers: Record<string, string> = {
@@ -833,6 +870,11 @@ export default function ChatbotScreen() {
             isGuestMode,
             guestSession
           );
+          
+          // Debug: Log the actual request body being sent
+          console.log('📤 Request body being sent:', JSON.stringify(requestBody, null, 2));
+          console.log('📜 Conversation history length:', formattedHistory.length);
+          console.log('📜 Conversation history:', formattedHistory);
           
           // DRY: Centralized logging
           logGuestRequest(guestSession, endpoint);
