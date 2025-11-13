@@ -254,7 +254,7 @@ class ConversationMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=1000, description="Practitioner's legal interrogatory or research query")
-    conversation_history: Optional[List[ConversationMessage]] = Field(default=[], max_items=10, description="Prior conversation context (max 10 messages)")
+    conversation_history: Optional[List[ConversationMessage]] = Field(default=[], description="Prior conversation context (unlimited for lawyers)")
     # === MODIFICATION 1: Increased max_tokens for longer, legalese answers ===
     max_tokens: Optional[int] = Field(default=1500, ge=100, le=4000, description="Max response tokens for complex analysis (Increased for legalese format)")
     user_id: Optional[str] = Field(default=None, description="User ID for logging")
