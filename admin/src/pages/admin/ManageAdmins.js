@@ -244,6 +244,20 @@ const ManageAdmins = () => {
     });
   };
 
+  // Handle disable/enable admin
+  const handleDisable = (admin) => {
+    const isCurrentlyDisabled = (admin.status || '').toLowerCase() === 'disabled';
+    const modalType = isCurrentlyDisabled ? 'enable' : 'disable';
+
+    setConfirmationModal({
+      open: true,
+      type: modalType,
+      adminId: admin.id,
+      adminName: admin.full_name || admin.email || 'Unknown',
+      loading: false
+    });
+  };
+
   // Handle unarchive admin (for backward compatibility)
   const handleUnarchive = (admin) => {
     setConfirmationModal({
@@ -265,14 +279,28 @@ const ManageAdmins = () => {
           title: 'Archive Admin',
           message: `Are you sure you want to archive ${adminName}? Archived admins will be hidden from the main list but can be accessed through the "Archived" filter.`,
           confirmText: 'Archive Admin',
-          onConfirm: confirmArchive
+          onConfirm: confirmStatusChange
         };
       case 'unarchive':
         return {
           title: 'Unarchive Admin',
           message: `Are you sure you want to unarchive ${adminName}? They will be restored to the active admins list.`,
           confirmText: 'Unarchive Admin',
-          onConfirm: confirmArchive
+          onConfirm: confirmStatusChange
+        };
+      case 'disable':
+        return {
+          title: 'Disable Admin',
+          message: `Are you sure you want to disable ${adminName}? They will not be able to log in until enabled again.`,
+          confirmText: 'Disable Admin',
+          onConfirm: confirmStatusChange
+        };
+      case 'enable':
+        return {
+          title: 'Enable Admin',
+          message: `Are you sure you want to enable ${adminName}? They will be able to log in again.`,
+          confirmText: 'Enable Admin',
+          onConfirm: confirmStatusChange
         };
       case 'edit':
         return {
@@ -291,24 +319,43 @@ const ManageAdmins = () => {
     setConfirmationModal({ open: false, type: '', adminId: null, adminName: '', loading: false, changes: null });
   };
 
-  // Handle archive/unarchive admin
-  const confirmArchive = async () => {
+  // Handle archive/unarchive/disable/enable admin status changes
+  const confirmStatusChange = async () => {
     const { adminId, adminName, type } = confirmationModal;
-    const isArchiving = type === 'archive';
-    
     try {
       setConfirmationModal(prev => ({ ...prev, loading: true }));
-      
-      const newStatus = isArchiving ? 'archived' : 'active';
+
+      let newStatus = 'active';
+      let successAction = '';
+      switch (type) {
+        case 'archive':
+          newStatus = 'archived';
+          successAction = 'archived';
+          break;
+        case 'unarchive':
+          newStatus = 'active';
+          successAction = 'unarchived';
+          break;
+        case 'disable':
+          newStatus = 'disabled';
+          successAction = 'disabled';
+          break;
+        case 'enable':
+          newStatus = 'active';
+          successAction = 'enabled';
+          break;
+        default:
+          newStatus = 'active';
+          successAction = 'updated';
+      }
+
       await adminManagementService.updateAdmin(adminId, { status: newStatus });
-      await loadData(); // Reload data
+      await loadData();
       setConfirmationModal({ open: false, type: '', adminId: null, adminName: '', loading: false, changes: null });
-      
-      showSuccess(`Admin "${adminName}" ${isArchiving ? 'archived' : 'unarchived'} successfully!`);
-      
+      showSuccess(`Admin "${adminName}" ${successAction} successfully!`);
     } catch (err) {
-      console.error(`Failed to ${isArchiving ? 'archive' : 'unarchive'} admin:`, err);
-      showError(`Failed to ${isArchiving ? 'archive' : 'unarchive'} admin: ` + err.message);
+      console.error('Failed to update admin status:', err);
+      showError('Failed to update admin status: ' + err.message);
       setConfirmationModal(prev => ({ ...prev, loading: false }));
     }
   };
@@ -789,6 +836,28 @@ const ManageAdmins = () => {
                         <div className="flex items-center">
                           <Archive className="w-4 h-4 mr-3 text-red-500" />
                           <span>Archive</span>
+                        </div>
+                      </button>
+                    )}
+                    <div className="border-t border-gray-200 my-1"></div>
+                    {row.status === 'disabled' ? (
+                      <button
+                        onClick={() => { handleDisable(row); setOpenDropdown(null); setDropdownPosition({}); }}
+                        className="flex items-center justify-between w-full px-3 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
+                      >
+                        <div className="flex items-center">
+                          <RefreshCw className="w-4 h-4 mr-3 text-green-600" />
+                          <span>Enable</span>
+                        </div>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => { handleDisable(row); setOpenDropdown(null); setDropdownPosition({}); }}
+                        className="flex items-center justify-between w-full px-3 py-2 text-sm text-yellow-700 hover:bg-yellow-50 transition-colors"
+                      >
+                        <div className="flex items-center">
+                          <Shield className="w-4 h-4 mr-3 text-yellow-600" />
+                          <span>Disable</span>
                         </div>
                       </button>
                     )}

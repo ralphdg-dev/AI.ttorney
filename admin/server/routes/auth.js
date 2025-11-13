@@ -52,6 +52,14 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Block disabled admins from proceeding
+    if (admin.status && admin.status.toLowerCase() === 'disabled') {
+      await supabase.auth.signOut();
+      return res.status(403).json({
+        error: "You're account has been disabled. Contact superadmin"
+      });
+    }
+
     // Credentials are valid - send OTP for 2FA
     const otpResult = await otpService.sendLoginOTP(admin.email, admin.full_name || 'Admin');
 
@@ -249,6 +257,13 @@ router.post('/verify-otp', async (req, res) => {
     if (adminError || !admin) {
       return res.status(403).json({
         error: 'Admin not found.'
+      });
+    }
+
+    // Block disabled admins at OTP verification step as well
+    if (admin.status && admin.status.toLowerCase() === 'disabled') {
+      return res.status(403).json({
+        error: "You're account has been disabled. Contact superadmin"
       });
     }
 
