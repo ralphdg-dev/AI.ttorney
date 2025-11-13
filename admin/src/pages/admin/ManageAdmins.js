@@ -553,7 +553,7 @@ const ManageAdmins = () => {
       key: 'full_name', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('full_name')}
         >
           <span>Full Name</span>
@@ -573,7 +573,7 @@ const ManageAdmins = () => {
       key: 'email', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('email')}
         >
           <span>Email</span>
@@ -593,7 +593,7 @@ const ManageAdmins = () => {
       key: 'role',
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('role')}
         >
           <span>Role</span>
@@ -614,7 +614,7 @@ const ManageAdmins = () => {
       key: 'created_at', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('created_at')}
         >
           <span>Created Date</span>
@@ -643,7 +643,7 @@ const ManageAdmins = () => {
       key: 'updated_at', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('updated_at')}
         >
           <span>Last Updated</span>
@@ -673,7 +673,7 @@ const ManageAdmins = () => {
       key: 'last_login', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('last_login')}
         >
           <span>Last Login</span>

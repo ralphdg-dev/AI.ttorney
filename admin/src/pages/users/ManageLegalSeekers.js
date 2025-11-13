@@ -466,7 +466,7 @@ const ManageLegalSeekers = () => {
       key: 'full_name', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('full_name')}
         >
           <span>Full Name</span>
@@ -486,7 +486,7 @@ const ManageLegalSeekers = () => {
       key: 'email', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('email')}
         >
           <span>Email</span>
@@ -506,7 +506,7 @@ const ManageLegalSeekers = () => {
       key: 'username', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('username')}
         >
           <span>Username</span>
@@ -526,7 +526,7 @@ const ManageLegalSeekers = () => {
       key: 'birthdate', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('birthdate')}
         >
           <span>Birthdate</span>
@@ -557,7 +557,7 @@ const ManageLegalSeekers = () => {
       key: 'registration_date', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('registration_date')}
         >
           <span>Registration Date</span>
@@ -588,7 +588,7 @@ const ManageLegalSeekers = () => {
       key: 'account_status',
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('account_status')}
         >
           <span>Account Status</span>
@@ -609,7 +609,7 @@ const ManageLegalSeekers = () => {
       key: 'has_lawyer_application',
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('has_lawyer_application')}
         >
           <span>Lawyer Application</span>

@@ -254,7 +254,7 @@ const ManageLawyers = () => {
       key: 'full_name', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('full_name')}
         >
           <span>Full Name</span>
@@ -274,7 +274,7 @@ const ManageLawyers = () => {
       key: 'email', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('email')}
         >
           <span>Email</span>
@@ -294,7 +294,7 @@ const ManageLawyers = () => {
       key: 'username', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('username')}
         >
           <span>Username</span>
@@ -314,7 +314,7 @@ const ManageLawyers = () => {
       key: 'roll_number', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('roll_number')}
         >
           <span>Roll Number</span>
@@ -334,7 +334,7 @@ const ManageLawyers = () => {
       key: 'roll_sign_date', 
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('roll_sign_date')}
         >
           <span>Roll Sign Date</span>
@@ -365,7 +365,7 @@ const ManageLawyers = () => {
       key: 'accepting_consultations',
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('accepting_consultations')}
         >
           <span>Accepting Consultations</span>
@@ -394,7 +394,7 @@ const ManageLawyers = () => {
       key: 'status',
       header: (
         <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-700 hover:text-gray-900"
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
           onClick={() => handleSort('status')}
         >
           <span>Status</span>
