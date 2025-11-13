@@ -3,8 +3,49 @@ const jwt = require('jsonwebtoken');
 const { supabase, supabaseAdmin } = require('../config/supabase');
 const { authenticateAdmin } = require('../middleware/auth');
 const otpService = require('../services/otpService');
+const { notifyMaintenanceScheduled } = require('../utils/notificationHelper');
 
 const router = express.Router();
+
+// --- Maintenance auto-toggle helper (start -> on, end -> off) ---
+const AUTO_TOGGLE_INTERVAL_MS = 60 * 1000;
+async function autoApplyMaintenanceSchedule() {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('system_maintenance')
+      .select('id, is_active, start_time, end_time')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error || !data || !data.length) return;
+    const row = data[0];
+    if (!row) return;
+    const now = Date.now();
+    const startMs = row.start_time ? new Date(row.start_time).getTime() : NaN;
+    const endMs = row.end_time ? new Date(row.end_time).getTime() : NaN;
+
+    const hasStarted = !Number.isNaN(startMs) && now >= startMs;
+    const hasEnded = !Number.isNaN(endMs) && now >= endMs;
+    const desiredActive = hasStarted && !hasEnded;
+
+    if (row.is_active !== desiredActive || hasEnded) {
+      const updatePayload = hasEnded
+        ? { is_active: false, start_time: null, end_time: null }
+        : { is_active: desiredActive };
+      await supabaseAdmin
+        .from('system_maintenance')
+        .update(updatePayload)
+        .eq('id', row.id);
+    }
+  } catch (_) {
+    // swallow errors; best-effort background check
+  }
+}
+
+if (!globalThis.__maintenanceAutoToggleStarted) {
+  globalThis.__maintenanceAutoToggleStarted = true;
+  autoApplyMaintenanceSchedule();
+  setInterval(autoApplyMaintenanceSchedule, AUTO_TOGGLE_INTERVAL_MS).unref?.();
+}
 
 // Admin login - Step 1: Verify credentials and send OTP
 router.post('/login', async (req, res) => {
@@ -546,95 +587,111 @@ try {
 
 // Get current system maintenance settings
 router.get('/maintenance', authenticateAdmin, async (_req, res) => {
-try {
-  const { data, error } = await supabaseAdmin
-    .from('system_maintenance')
-    .select('id, is_active, message, start_time, end_time, allow_admin, created_at')
-    .order('created_at', { ascending: false })
-    .limit(1);
+  try {
+    await autoApplyMaintenanceSchedule();
+    const { data, error } = await supabaseAdmin
+      .from('system_maintenance')
+      .select('id, is_active, message, start_time, end_time, allow_admin, created_at')
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-  if (error) {
-    return res.status(500).json({ error: 'Failed to fetch maintenance settings.' });
+    if (error) {
+      return res.status(500).json({ error: 'Failed to fetch maintenance settings.' });
+    }
+
+    const row = Array.isArray(data) ? data[0] : null;
+    return res.json({
+      success: true,
+      maintenance: row || {
+        is_active: false,
+        message: '',
+        start_time: null,
+        end_time: null,
+        allow_admin: true,
+      },
+    });
+  } catch (err) {
+    console.error('Get maintenance error:', err);
+    return res.status(500).json({ error: 'Internal server error.' });
   }
-
-  const row = Array.isArray(data) ? data[0] : null;
-  return res.json({
-    success: true,
-    maintenance: row || {
-      is_active: false,
-      message: '',
-      start_time: null,
-      end_time: null,
-      allow_admin: true,
-    },
-  });
-} catch (err) {
-  console.error('Get maintenance error:', err);
-  return res.status(500).json({ error: 'Internal server error.' });
-}
 });
 
 // Update system maintenance settings (upsert single row)
 router.put('/maintenance', authenticateAdmin, async (req, res) => {
-try {
-  const {
-    is_active = false,
-    message = '',
-    start_time = null,
-    end_time = null,
-    allow_admin = true,
-  } = req.body || {};
+  try {
+    const {
+      is_active = false,
+      message = '',
+      start_time = null,
+      end_time = null,
+      allow_admin = true,
+    } = req.body || {};
 
-  // Coerce to proper types
-  const payload = {
-    is_active: Boolean(is_active),
-    message: typeof message === 'string' ? message : '',
-    start_time: start_time ? new Date(start_time).toISOString() : null,
-    end_time: end_time ? new Date(end_time).toISOString() : null,
-    allow_admin: Boolean(allow_admin),
-  };
+    // Coerce to proper types
+    const payload = {
+      is_active: Boolean(is_active),
+      message: typeof message === 'string' ? message : '',
+      // Store exactly what client sends so values match between DB and UI
+      start_time: start_time || null,
+      end_time: end_time || null,
+      allow_admin: Boolean(allow_admin),
+    };
 
-  // Find latest row
-  const { data: rows, error: getErr } = await supabaseAdmin
-    .from('system_maintenance')
-    .select('id')
-    .order('created_at', { ascending: false })
-    .limit(1);
-
-  if (getErr) {
-    return res.status(500).json({ error: 'Failed to load current maintenance row.' });
-  }
-
-  let result;
-  if (rows && rows.length > 0) {
-    const id = rows[0].id;
-    const { data, error } = await supabaseAdmin
+    // Find latest row
+    const { data: rows, error: getErr } = await supabaseAdmin
       .from('system_maintenance')
-      .update(payload)
-      .eq('id', id)
-      .select('*')
-      .single();
-    if (error) {
-      return res.status(500).json({ error: 'Failed to update maintenance settings.' });
-    }
-    result = data;
-  } else {
-    const { data, error } = await supabaseAdmin
-      .from('system_maintenance')
-      .insert(payload)
-      .select('*')
-      .single();
-    if (error) {
-      return res.status(500).json({ error: 'Failed to create maintenance settings.' });
-    }
-    result = data;
-  }
+      .select('id')
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-  return res.json({ success: true, maintenance: result });
-} catch (err) {
-  console.error('Update maintenance error:', err);
-  return res.status(500).json({ error: 'Internal server error.' });
-}
+    if (getErr) {
+      return res.status(500).json({ error: 'Failed to load current maintenance row.' });
+    }
+
+    let result;
+    if (rows && rows.length > 0) {
+      const id = rows[0].id;
+      const { data, error } = await supabaseAdmin
+        .from('system_maintenance')
+        .update(payload)
+        .eq('id', id)
+        .select('*')
+        .single();
+      if (error) {
+        return res.status(500).json({ error: 'Failed to update maintenance settings.' });
+      }
+      result = data;
+    } else {
+      const { data, error } = await supabaseAdmin
+        .from('system_maintenance')
+        .insert(payload)
+        .select('*')
+        .single();
+      if (error) {
+        return res.status(500).json({ error: 'Failed to create maintenance settings.' });
+      }
+      result = data;
+    }
+
+    // Immediate auto toggle after save (apply start/end logic)
+    await autoApplyMaintenanceSchedule();
+    const { data: fresh } = await supabaseAdmin
+      .from('system_maintenance')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (fresh && fresh.length) result = fresh[0];
+
+    // Fire notification if a schedule exists (helper will dedupe identical windows)
+    if (result?.start_time && result?.end_time) {
+      notifyMaintenanceScheduled(result.start_time, result.end_time);
+    }
+
+    return res.json({ success: true, maintenance: result });
+  } catch (err) {
+    console.error('Update maintenance error:', err);
+    return res.status(500).json({ error: 'Internal server error.' });
+  }
 });
 
 module.exports = router;

@@ -101,11 +101,12 @@ const Settings = () => {
         is_active: Boolean(maintenanceSettings.maintenanceMode),
         message: maintenanceSettings.maintenanceMessage || '',
         allow_admin: Boolean(maintenanceSettings.allowAdminAccess),
+        // Send exactly what the input holds so DB and UI match
         start_time: maintenanceSettings.scheduledMaintenance && maintenanceSettings.maintenanceStart
-          ? new Date(maintenanceSettings.maintenanceStart).toISOString()
+          ? maintenanceSettings.maintenanceStart
           : null,
         end_time: maintenanceSettings.scheduledMaintenance && maintenanceSettings.maintenanceEnd
-          ? new Date(maintenanceSettings.maintenanceEnd).toISOString()
+          ? maintenanceSettings.maintenanceEnd
           : null,
       };
       updates.push(
@@ -181,8 +182,9 @@ const Settings = () => {
             maintenanceMessage: m.message || '',
             allowAdminAccess: m.allow_admin !== undefined ? Boolean(m.allow_admin) : true,
             scheduledMaintenance: Boolean(m.start_time || m.end_time),
-            maintenanceStart: m.start_time ? new Date(m.start_time).toISOString().slice(0,16) : '',
-            maintenanceEnd: m.end_time ? new Date(m.end_time).toISOString().slice(0,16) : '',
+            // Use values from DB exactly as-is to match datetime-local expected format
+            maintenanceStart: m.start_time || '',
+            maintenanceEnd: m.end_time || '',
           }));
         }
       } catch (err) {
@@ -664,15 +666,11 @@ const Settings = () => {
             <p className="text-gray-600 max-w-md mx-auto">
               {maintenanceSettings.maintenanceMessage}
             </p>
-            {maintenanceSettings.scheduledMaintenance &&
-              maintenanceSettings.maintenanceEnd && (
-                <p className="text-sm text-gray-500 mt-4">
-                  Expected to be back online:{" "}
-                  {new Date(
-                    maintenanceSettings.maintenanceEnd
-                  ).toLocaleString()}
-                </p>
-              )}
+            {maintenanceSettings.scheduledMaintenance && maintenanceSettings.maintenanceEnd && (
+              <p className="text-sm text-gray-500 mt-4">
+                Expected to be back online: {maintenanceSettings.maintenanceEnd}
+              </p>
+            )}
           </div>
         </div>
       </div>
