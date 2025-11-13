@@ -736,7 +736,16 @@ export default function ChatbotScreen() {
 
     // Don't create session here - let backend create it on first message
     // This is the industry-standard approach (ChatGPT/Claude)
+    // IMPORTANT: Use the current session ID to maintain conversation continuity
     let sessionId = currentConversationId;
+    
+    // Debug: Log session state to identify conversation continuity issues
+    console.log('🔍 Session Debug:', {
+      currentConversationId,
+      sessionId,
+      isFirstMessage: isFirstMessageRef.current,
+      messageCount: conversationHistory.length
+    });
 
     try {
       // Get API URL dynamically using NetworkConfig
@@ -928,6 +937,9 @@ export default function ChatbotScreen() {
         
         if (isNewSession) {
           console.log("🆕 New session created:", returnedSessionId);
+          console.log("🔗 Ensuring conversation continuity for future messages");
+          
+          // CRITICAL: Update both state and local variable immediately
           setCurrentConversationId(returnedSessionId);
           sessionId = returnedSessionId;
 
@@ -937,10 +949,14 @@ export default function ChatbotScreen() {
               returnedSessionId,
               user.id
             );
+            console.log("💾 Session ID saved to AsyncStorage for persistence");
           }
+        } else {
+          console.log("🔄 Continuing existing session:", returnedSessionId);
+        }
 
-          // Optimistic UI update: Add conversation to sidebar immediately (first message only)
-          if (isFirstMessageRef.current) {
+        // Optimistic UI update: Add conversation to sidebar immediately (first message only)
+        if (isFirstMessageRef.current) {
             const title = generateConversationTitle(userMessage);
             console.log("⚡ Optimistically adding conversation to sidebar:", title);
             console.log("   Session ID:", returnedSessionId);
@@ -957,7 +973,6 @@ export default function ChatbotScreen() {
             
             isFirstMessageRef.current = false;
           }
-        }
       } else if (isFirstMessageRef.current && user?.id) {
         // FALLBACK: Backend didn't return session_id, refresh sidebar to show new conversation
         console.warn("⚠️ Backend didn't return session_id, refreshing sidebar as fallback");
