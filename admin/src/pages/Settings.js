@@ -101,12 +101,11 @@ const Settings = () => {
         is_active: Boolean(maintenanceSettings.maintenanceMode),
         message: maintenanceSettings.maintenanceMessage || '',
         allow_admin: Boolean(maintenanceSettings.allowAdminAccess),
-        // Send exactly what the input holds so DB and UI match
         start_time: maintenanceSettings.scheduledMaintenance && maintenanceSettings.maintenanceStart
-          ? maintenanceSettings.maintenanceStart
+          ? new Date(maintenanceSettings.maintenanceStart).toISOString()
           : null,
         end_time: maintenanceSettings.scheduledMaintenance && maintenanceSettings.maintenanceEnd
-          ? maintenanceSettings.maintenanceEnd
+          ? new Date(maintenanceSettings.maintenanceEnd).toISOString()
           : null,
       };
       updates.push(
@@ -182,9 +181,8 @@ const Settings = () => {
             maintenanceMessage: m.message || '',
             allowAdminAccess: m.allow_admin !== undefined ? Boolean(m.allow_admin) : true,
             scheduledMaintenance: Boolean(m.start_time || m.end_time),
-            // Use values from DB exactly as-is to match datetime-local expected format
-            maintenanceStart: m.start_time || '',
-            maintenanceEnd: m.end_time || '',
+            maintenanceStart: m.start_time ? new Date(m.start_time).toISOString().slice(0,16) : '',
+            maintenanceEnd: m.end_time ? new Date(m.end_time).toISOString().slice(0,16) : '',
           }));
         }
       } catch (err) {
@@ -666,11 +664,15 @@ const Settings = () => {
             <p className="text-gray-600 max-w-md mx-auto">
               {maintenanceSettings.maintenanceMessage}
             </p>
-            {maintenanceSettings.scheduledMaintenance && maintenanceSettings.maintenanceEnd && (
-              <p className="text-sm text-gray-500 mt-4">
-                Expected to be back online: {maintenanceSettings.maintenanceEnd}
-              </p>
-            )}
+            {maintenanceSettings.scheduledMaintenance &&
+              maintenanceSettings.maintenanceEnd && (
+                <p className="text-sm text-gray-500 mt-4">
+                  Expected to be back online:{" "}
+                  {new Date(
+                    maintenanceSettings.maintenanceEnd
+                  ).toLocaleString()}
+                </p>
+              )}
           </div>
         </div>
       </div>

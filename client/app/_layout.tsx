@@ -24,7 +24,6 @@ import { NotificationProvider } from "../contexts/NotificationContext";
 import { SidebarProvider } from "../components/AppSidebar";
 import { AuthGuard } from "../components/AuthGuard";
 import { SuspensionGuard } from "../components/SuspensionGuard";
-import { MaintenanceGuard } from "../components/MaintenanceGuard";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 import NoInternetModal from "../components/common/NoInternetModal";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
@@ -78,7 +77,6 @@ function AppContent() {
                     <ErrorBoundary fallbackRoute="/home">
                       <ForumCacheProvider>
                         <AuthGuard>
-                        <MaintenanceGuard>
                         <SuspensionGuard>
                           <RouteErrorBoundary>
                             <SidebarProvider>
@@ -99,13 +97,11 @@ function AppContent() {
                                 <Stack.Screen name="bookmarked-guides" options={{ headerShown: false, title: "Bookmarked Guides" }} />
                                 <Stack.Screen name="favorite-terms" options={{ headerShown: false, title: "Favorite Terms" }} />
                                 <Stack.Screen name="help" options={{ headerShown: false, title: "Help" }} />
-                                <Stack.Screen name="maintenance" options={{ headerShown: false, title: "Maintenance" }} />
                                 <Stack.Screen name="profile" options={{ headerShown: false, title: "Profile" }} />
                               </Stack>
                             </SidebarProvider>
                           </RouteErrorBoundary>
                         </SuspensionGuard>
-                        </MaintenanceGuard>
                         </AuthGuard>
                       </ForumCacheProvider>
                     </ErrorBoundary>
