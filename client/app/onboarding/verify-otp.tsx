@@ -131,8 +131,16 @@ export default function VerifyOTP() {
           setOtp(["", "", "", "", "", ""]); // Clear OTP inputs
         }
         
-        // Handle OTP expiration - enable resend immediately
-        if (result.error.includes("expired") || result.error.includes("not found")) {
+        // Handle OTP expiration - enable resend immediately (only for actual expiration, not incorrect codes)
+        const isExpiredOrNotFound = result.error.includes("expired") || 
+                                   result.error.includes("OTP not found") ||
+                                   result.error.includes("OTP has expired");
+        const isIncorrectCode = result.error.includes("incorrect") || 
+                               result.error.includes("invalid") || 
+                               result.error.includes("wrong");
+        
+        // Only enable immediate resend for expired/not found OTPs, not for incorrect codes
+        if (isExpiredOrNotFound && !isIncorrectCode) {
           setCanResend(true);
           setResendTimer(0);
           setOtp(["", "", "", "", "", ""]); // Clear OTP inputs
