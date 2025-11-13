@@ -511,7 +511,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
                 username: post.user.username,
                 avatar: post.is_anonymous 
                   ? 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png' // Detective/incognito icon for anonymous users
-                  : 'https://cdn-icons-png.flaticon.com/512/847/847969.png', // Gray default person icon for regular users
+                  : (post.user as any).photo_url || (post.user as any).profile_photo || undefined, // Use actual profile photo or fallback to initials
               }}
               timestamp={getRelativeTime(post.created_at || '')}
               category={getCategoryDisplayName(post.category)}

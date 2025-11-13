@@ -457,7 +457,7 @@ const ViewPost: React.FC = () => {
                 user: isReplyAnon ? undefined : {
                   name: replyUserData?.full_name || replyUserData?.username || 'User',
                   username: replyUserData?.username || 'user',
-                  avatar: replyUserData?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+                  avatar: replyUserData?.photo_url || replyUserData?.profile_photo || undefined,
                   isLawyer: replyUserData?.role === 'verified_lawyer',
                   lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
                 }
@@ -500,7 +500,7 @@ const ViewPost: React.FC = () => {
       user: {
         name: currentUser?.full_name || 'You',
         username: currentUser?.username || 'you',
-        avatar: (currentUser as any)?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+        avatar: (currentUser as any)?.photo_url || (currentUser as any)?.profile_photo || undefined,
         isLawyer: true,
         lawyerBadge: 'Verified'
       },
@@ -580,7 +580,7 @@ const ViewPost: React.FC = () => {
           user: isAnon ? undefined : {
             name: userData?.full_name || userData?.username || 'User',
             username: userData?.username || 'user',
-            avatar: userData?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+            avatar: userData?.photo_url || userData?.profile_photo || undefined,
             isLawyer: userData?.role === 'verified_lawyer',
             lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
           },
@@ -618,7 +618,7 @@ const ViewPost: React.FC = () => {
                   user: isReplyAnon ? undefined : {
                     name: replyUserData?.full_name || replyUserData?.username || 'User',
                     username: replyUserData?.username || 'user',
-                    avatar: replyUserData?.profile_photo || 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+                    avatar: replyUserData?.photo_url || replyUserData?.profile_photo || undefined,
                     isLawyer: replyUserData?.role === 'verified_lawyer',
                     lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
                   }
