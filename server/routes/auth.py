@@ -142,9 +142,9 @@ async def send_otp(request: SendOTPRequest):
     """Send OTP for email verification or password reset"""
     try:
         if request.otp_type == "email_verification":
-            result = await otp_service.send_verification_otp(request.email, "User")
+            result = await otp_service.send_verification_otp(request.email, request.user_name)
         elif request.otp_type == "password_reset":
-            result = await otp_service.send_password_reset_otp(request.email, "User")
+            result = await otp_service.send_password_reset_otp(request.email, request.user_name)
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

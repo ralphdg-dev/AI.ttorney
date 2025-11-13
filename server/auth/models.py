@@ -52,6 +52,7 @@ class OTPRequest(BaseModel):
 class SendOTPRequest(BaseModel):
     email: EmailStr
     otp_type: Literal["email_verification", "password_reset"]
+    user_name: Optional[str] = "User"
 
 class VerifyOTPRequest(BaseModel):
     email: EmailStr

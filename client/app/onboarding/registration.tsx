@@ -355,8 +355,8 @@ export default function UserRegistration() {
               Last Name <Text className="text-red-500">*</Text>
             </Text>
             <TextInput
-              className={`w-full border border-gray-300 rounded-lg p-3 bg-white text-gray-900 mb-3 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'}`}
-              placeholder="Last name"
+              className={`w-full border rounded-lg p-3 bg-white text-gray-900 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'} border-gray-300`}
+              placeholder="Enter your last name"
               placeholderTextColor="#9ca3af"
               value={lastName}
               onChangeText={setLastName}
@@ -460,19 +460,18 @@ export default function UserRegistration() {
             onPress={() => {
               const now = new Date();
               now.setHours(0,0,0,0);
-              const minDate = getMinimumBirthdate();
-              const base0 = (birthdate ? new Date(birthdate) : minDate);
-              base0.setHours(0,0,0,0);
-              const base = base0.getTime() > now.getTime() ? minDate : base0;
-              setTempDate(base);
-              setCalendarCursor(new Date(base.getFullYear(), base.getMonth(), 1));
+              // Default to today's date if no birthdate is selected, otherwise use existing birthdate
+              const defaultDate = birthdate ? new Date(birthdate) : now;
+              defaultDate.setHours(0,0,0,0);
+              setTempDate(defaultDate);
+              setCalendarCursor(new Date(defaultDate.getFullYear(), defaultDate.getMonth(), 1));
               setShowDatePicker(true);
             }}
             activeOpacity={0.8}
             className={`p-3 w-full bg-white rounded-lg border ${birthdateError ? 'border-red-500' : 'border-gray-300'}`}
           >
             <Text className={`${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'} ${birthdate ? 'text-gray-900' : 'text-gray-400'}`}>
-              {birthdate ? formatDate(birthdate) : 'Select date (must be 18+)'}
+              {birthdate ? formatDate(birthdate) : 'Select date'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -660,7 +659,7 @@ export default function UserRegistration() {
               const otpResult = await apiClient.sendOTP({
                 email,
                 otp_type: 'email_verification'
-              });
+              } as any);
               
               if (otpResult.error) {
                 toast.show({
@@ -755,8 +754,16 @@ export default function UserRegistration() {
         animationType="fade"
         onRequestClose={() => setShowDatePicker(false)}
       >
-        <View className="flex-1 justify-end bg-black/40">
-          <View className={`bg-white rounded-t-2xl max-h-4/5 ${isDesktop ? 'px-15' : isTablet ? 'px-10' : 'px-6'}`}>
+        <TouchableOpacity 
+          className="flex-1 justify-end bg-black/40"
+          activeOpacity={1}
+          onPress={() => setShowDatePicker(false)}
+        >
+          <TouchableOpacity 
+            className={`bg-white rounded-t-2xl max-h-4/5 ${isDesktop ? 'px-15' : isTablet ? 'px-10' : 'px-6'} pt-6`}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
             <Text className="mb-2 text-base font-semibold text-gray-900">Select Date</Text>
 
             {/* Header with month navigation */}
@@ -791,7 +798,12 @@ export default function UserRegistration() {
                   const y = calendarCursor.getFullYear();
                   const m = calendarCursor.getMonth();
                   const next = new Date(y, m + 1, 1);
-                  setCalendarCursor(next);
+                  const today = new Date();
+                  // Only allow navigation if next month is not in the future
+                  if (next.getFullYear() < today.getFullYear() || 
+                      (next.getFullYear() === today.getFullYear() && next.getMonth() <= today.getMonth())) {
+                    setCalendarCursor(next);
+                  }
                   setShowMonthSelect(false);
                   setShowYearSelect(false);
                 }}
@@ -847,9 +859,8 @@ export default function UserRegistration() {
                 <ScrollView>
                   {(() => {
                     const currentYear = new Date().getFullYear();
-                    const maxYear = currentYear - 18; // Only allow years that make user 18+
                     const years: number[] = [];
-                    for (let y = maxYear; y >= 1950; y--) years.push(y);
+                    for (let y = currentYear; y >= 1950; y--) years.push(y);
                     return years.map((y) => {
                       const isActive = y === calendarCursor.getFullYear();
                       return (
@@ -857,7 +868,13 @@ export default function UserRegistration() {
                           key={y}
                           onPress={() => {
                             const m = calendarCursor.getMonth();
-                            setCalendarCursor(new Date(y, m, 1));
+                            const today = new Date();
+                            // If selecting current year, ensure month is not in the future
+                            let targetMonth = m;
+                            if (y === today.getFullYear() && m > today.getMonth()) {
+                              targetMonth = today.getMonth();
+                            }
+                            setCalendarCursor(new Date(y, targetMonth, 1));
                             setShowYearSelect(false);
                           }}
                           className={`py-2.5 px-3 ${isActive ? 'bg-blue-600' : 'bg-transparent'}`}
@@ -903,8 +920,8 @@ export default function UserRegistration() {
                         date.getFullYear() === tempDate.getFullYear() &&
                         date.getMonth() === tempDate.getMonth() &&
                         date.getDate() === tempDate.getDate();
-                      const minBirthdate = getMinimumBirthdate();
-                      const isDisabled = !date || (new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() > minBirthdate.getTime());
+                      const isFutureDate = date ? date.getTime() > today0.getTime() : false;
+                      const isDisabled = !date || isFutureDate;
                       return (
                         <TouchableOpacity
                           key={idx}
@@ -930,12 +947,8 @@ export default function UserRegistration() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
-                  const minBirthdate = getMinimumBirthdate();
-                  const sel0 = new Date(tempDate);
-                  sel0.setHours(0,0,0,0);
-                  const finalDate = sel0.getTime() > minBirthdate.getTime() ? minBirthdate : sel0;
-                  setBirthdate(finalDate);
-                  validateAge(finalDate);
+                  setBirthdate(tempDate);
+                  validateAge(tempDate);
                   setShowDatePicker(false);
                 }}
                 className="py-2.5 px-3"
@@ -943,8 +956,8 @@ export default function UserRegistration() {
                 <Text className="font-bold text-blue-600">Done</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

@@ -443,21 +443,21 @@ class OTPService:
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h2 style="color: #2563eb;">Welcome to AI.ttorney!</h2>
+                <h2 style="color: #1e3a8a;">Welcome to AI.ttorney!</h2>
                 <p>Hi {user_name},</p>
                 <p>Thank you for registering with AI.ttorney. To complete your account verification, please use the following OTP code:</p>
                 
-                <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
-                    <h1 style="color: #2563eb; font-size: 32px; margin: 0; letter-spacing: 8px;">{otp_code}</h1>
+                <div style="background-color: #f1f5f9; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; border: 1px solid #cbd5e1;">
+                    <h1 style="color: #1e3a8a; font-size: 32px; margin: 0; letter-spacing: 8px;">{otp_code}</h1>
                 </div>
                 
-                <p>This code will expire in <strong>2 minutes</strong>.</p>
+                <p>This code will expire in <strong>10 minutes</strong>.</p>
                 <p>If you didn't create an account with AI.ttorney, please ignore this email.</p>
                 
                 <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
                 <p style="font-size: 14px; color: #6b7280;">
                     Best regards,<br>
-                    The AI.ttorney Team
+                    AI.ttorney
                 </p>
             </div>
         </body>
@@ -475,21 +475,21 @@ class OTPService:
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h2 style="color: #dc2626;">Password Reset Request</h2>
+                <h2 style="color: #1e3a8a;">Password Reset Request</h2>
                 <p>Hi {user_name},</p>
                 <p>We received a request to reset your AI.ttorney account password. Use the following OTP code to proceed:</p>
                 
-                <div style="background-color: #fef2f2; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; border: 1px solid #fecaca;">
-                    <h1 style="color: #dc2626; font-size: 32px; margin: 0; letter-spacing: 8px;">{otp_code}</h1>
+                <div style="background-color: #f1f5f9; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; border: 1px solid #cbd5e1;">
+                    <h1 style="color: #1e3a8a; font-size: 32px; margin: 0; letter-spacing: 8px;">{otp_code}</h1>
                 </div>
                 
-                <p>This code will expire in <strong>2 minutes</strong>.</p>
+                <p>This code will expire in <strong>10 minutes</strong>.</p>
                 <p>If you didn't request a password reset, please ignore this email and your password will remain unchanged.</p>
                 
                 <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
                 <p style="font-size: 14px; color: #6b7280;">
                     Best regards,<br>
-                    The AI.ttorney Team
+                    AI.ttorney
                 </p>
             </div>
         </body>
@@ -507,21 +507,21 @@ class OTPService:
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h2 style="color: #2563eb;">Email Address Change</h2>
+                <h2 style="color: #1e3a8a;">Email Address Change</h2>
                 <p>Hi {user_name},</p>
                 <p>We received a request to change your email address for your AI.ttorney account. To verify this new email address, please use the following OTP code:</p>
                 
-                <div style="background-color: #eff6ff; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; border: 1px solid #bfdbfe;">
-                    <h1 style="color: #2563eb; font-size: 32px; margin: 0; letter-spacing: 8px;">{otp_code}</h1>
+                <div style="background-color: #f1f5f9; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; border: 1px solid #cbd5e1;">
+                    <h1 style="color: #1e3a8a; font-size: 32px; margin: 0; letter-spacing: 8px;">{otp_code}</h1>
                 </div>
                 
-                <p>This code will expire in <strong>2 minutes</strong>.</p>
+                <p>This code will expire in <strong>10 minutes</strong>.</p>
                 <p>If you didn't request this email change, please ignore this email and contact our support team immediately.</p>
                 
                 <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
                 <p style="font-size: 14px; color: #6b7280;">
                     Best regards,<br>
-                    The AI.ttorney Team
+                    AI.ttorney
                 </p>
             </div>
         </body>
