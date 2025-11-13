@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Lock, AlertCircle, Loader2, Mail } from 'lucide-react';
+import { Lock, AlertCircle, Loader2, Mail, ArrowLeft } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
@@ -296,7 +296,7 @@ const VerifyOTP = () => {
           </button>
 
           {/* Resend Code */}
-          <div className="text-center mb-2">
+          <div className="text-center mb-1">
             <p className="text-[12px] text-gray-600">
               Didn't receive the code?{' '}
               <button
@@ -317,15 +317,14 @@ const VerifyOTP = () => {
             </p>
           </div>
 
-          {/* Back to Login */}
-          <div className="text-center">
-            <button
-              onClick={() => navigate('/login')}
-              className="text-[12px] text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              ← Back to Login
-            </button>
-          </div>
+          {/* Back to Login (aligned like Forgot Password's link) */}
+          <button
+            onClick={() => navigate('/login')}
+            className="flex items-center gap-1 text-[11px] text-gray-600 hover:text-gray-800 bg-transparent border-none"
+            type="button"
+          >
+            <ArrowLeft size={14} /> Back to sign in
+          </button>
         </div>
       </div>
     </div>
