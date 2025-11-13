@@ -18,6 +18,11 @@ const DataTable = ({ columns = [], data = [], keyField = 'id', rowKey, rowClassN
   const headerText = 'text-[10px] font-medium text-gray-500 tracking-wide';
   const cellText = 'text-[11px] text-gray-700';
 
+  const formatHeader = (text) => {
+    if (typeof text !== 'string') return text;
+    return text.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  };
+
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="overflow-x-auto">
@@ -29,7 +34,7 @@ const DataTable = ({ columns = [], data = [], keyField = 'id', rowKey, rowClassN
                   key={col.key}
                   className={`${cellPad} ${headerText} ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${col.headerClassName || ''}`}
                 >
-                  {col.header}
+                  {typeof col.header === 'string' ? formatHeader(col.header) : col.header}
                 </th>
               ))}
             </tr>
