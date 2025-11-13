@@ -8,7 +8,7 @@ import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePostBookmarks } from '../../contexts/PostBookmarksContext';
 import FadeInView from '../ui/FadeInView';
-import SearchHighlight from '../forum/SearchHighlight';
+ 
 
 interface PostProps {
   id: string;
@@ -35,9 +35,7 @@ interface PostProps {
   // Bookmark status passed from parent to prevent individual API calls
   isBookmarked?: boolean;
   onBookmarkStatusChange?: (postId: string, isBookmarked: boolean) => void;
-  // Search highlighting
-  searchTerm?: string;
-  isSearchResult?: boolean;
+  // Removed search highlighting props
 }
 
 const Post: React.FC<PostProps> = React.memo(({
@@ -59,8 +57,6 @@ const Post: React.FC<PostProps> = React.memo(({
   onMenuToggle,
   isBookmarked: propIsBookmarked,
   onBookmarkStatusChange,
-  searchTerm,
-  isSearchResult = false,
 }) => {
   const { user: currentUser, session } = useAuth();
   const { loadBookmarks: refreshBookmarkContext } = usePostBookmarks();
@@ -318,16 +314,7 @@ const Post: React.FC<PostProps> = React.memo(({
           <View style={styles.userInfo}>
             {/* User Name and Category Row */}
             <View style={styles.userNameRow}>
-              {isSearchResult && searchTerm && searchTerm.startsWith('@') ? (
-                <SearchHighlight
-                  text={user.name || 'User'}
-                  searchTerm={searchTerm}
-                  style={styles.userName}
-                  isUsername={true}
-                />
-              ) : (
-                <Text style={styles.userName}>{user.name || 'User'}</Text>
-              )}
+              <Text style={styles.userName}>{user.name || 'User'}</Text>
               
               {/* Category Badge */}
               <View style={[styles.categoryBadge, { 
@@ -361,15 +348,7 @@ const Post: React.FC<PostProps> = React.memo(({
         </View>
 
         {/* Post Content */}
-        {isSearchResult && searchTerm ? (
-          <SearchHighlight
-            text={content}
-            searchTerm={searchTerm}
-            style={styles.content}
-          />
-        ) : (
-          <Text style={styles.content}>{content}</Text>
-        )}
+        <Text style={styles.content}>{content}</Text>
 
         {/* More Menu */}
         {isMenuOpen && (

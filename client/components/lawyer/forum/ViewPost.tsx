@@ -73,7 +73,7 @@ interface Reply {
 
 const ViewPost: React.FC = () => {
   const router = useRouter();
-  const { postId } = useLocalSearchParams();
+  const { postId, from, query } = useLocalSearchParams<{ postId?: string; from?: string; query?: string }>();
   const { user: currentUser, session } = useAuth();
   const { getCachedPost, getCachedPostFromForum, prefetchPost } = useForumCache();
   const { refreshStatus } = useModerationStatus();
@@ -884,7 +884,13 @@ const ViewPost: React.FC = () => {
       <Header 
         title="Post"
         showBackButton={true}
-        onBackPress={() => router.push('/home' as any)}
+        onBackPress={() => {
+          if (from === 'search' && query) {
+            router.push(`/search?query=${encodeURIComponent(query)}` as any);
+          } else {
+            router.push('/home' as any);
+          }
+        }}
         rightComponent={
           !loading ? (
             <TouchableOpacity
