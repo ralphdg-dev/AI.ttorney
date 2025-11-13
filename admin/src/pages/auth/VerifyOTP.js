@@ -212,21 +212,22 @@ const VerifyOTP = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
+    <div className="min-h-[calc(100vh-0px)] grid place-items-center bg-gray-50">
       <ToastContainer />
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+      <div className="w-full max-w-sm">
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-6">
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-3">2-Factor Authentication</h1>
-            <p className="text-sm text-gray-600">
-              Enter the OTP sent to <span className="font-semibold text-gray-900">{email}</span> to verify your identity.
-            </p>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="inline-flex items-center justify-center rounded-md bg-[#023D7B]/10 text-[#023D7B] w-8 h-8"><Lock size={16} /></div>
+            <div>
+              <h1 className="text-sm font-semibold text-gray-900">Verify code</h1>
+              <p className="text-[11px] text-gray-500">Enter the 6-digit code sent to {email}.</p>
+            </div>
           </div>
 
           {/* OTP Input */}
-          <div className="mb-6">
-            <div className="flex justify-center gap-3 mb-4">
+          <div className="mb-3">
+            <div className="flex justify-center gap-3 mb-2">
               {otp.map((digit, index) => (
                 <input
                   key={index}
@@ -236,7 +237,7 @@ const VerifyOTP = () => {
                   value={digit}
                   onChange={(e) => handleOtpChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
-                  className={`w-12 h-14 text-center text-xl font-bold rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-[#023D7B]/50 transition-all ${
+                  className={`w-10 h-12 text-center text-base font-semibold rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-[#023D7B]/50 transition-all ${
                     error
                       ? 'border-red-500 bg-red-50'
                       : digit
@@ -250,7 +251,7 @@ const VerifyOTP = () => {
 
             {/* Error Message */}
             {error && (
-              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-md mb-3">
+              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-md mb-2">
                 <AlertCircle size={16} className="text-red-600 mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-red-700">{error}</p>
               </div>
@@ -258,21 +259,21 @@ const VerifyOTP = () => {
 
             {/* Attempts Remaining */}
             {attemptsRemaining !== null && attemptsRemaining > 0 && !isLockedOut && (
-              <p className="text-xs text-orange-600 text-center mb-2">
+              <p className="text-[11px] text-orange-600 text-center mb-1">
                 {attemptsRemaining} attempt(s) remaining
               </p>
             )}
 
             {/* Lockout Timer */}
             {isLockedOut && lockoutTimer > 0 && (
-              <p className="text-xs font-semibold text-red-600 text-center mb-2">
+              <p className="text-[11px] font-semibold text-red-600 text-center mb-1">
                 Account temporarily locked. Try again in {formatTime(lockoutTimer)}
               </p>
             )}
 
             {/* OTP Expiration Timer */}
             {!isLockedOut && (
-              <p className="text-xs text-gray-500 text-center">
+              <p className="text-[11px] text-gray-500 text-center">
                 OTP expires in: <span className="font-semibold text-gray-700">{formatTime(resendTimer)}</span>
               </p>
             )}
@@ -282,11 +283,11 @@ const VerifyOTP = () => {
           <button
             onClick={handleVerifyOTP}
             disabled={isLoading || !isOtpComplete || isLockedOut}
-            className="w-full inline-flex items-center justify-center gap-2 bg-[#023D7B] text-white text-base font-semibold px-4 py-3.5 rounded-lg hover:bg-[#013462] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg mb-4"
+            className="w-full inline-flex items-center justify-center gap-2 bg-[#023D7B] text-white text-[12px] px-3 py-2 rounded-md hover:bg-[#013462] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors mb-3"
           >
             {isLoading ? (
               <>
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
                 Verifying...
               </>
             ) : (
@@ -295,8 +296,8 @@ const VerifyOTP = () => {
           </button>
 
           {/* Resend Code */}
-          <div className="text-center mb-4">
-            <p className="text-sm text-gray-600">
+          <div className="text-center mb-2">
+            <p className="text-[12px] text-gray-600">
               Didn't receive the code?{' '}
               <button
                 onClick={handleResendOTP}
@@ -320,7 +321,7 @@ const VerifyOTP = () => {
           <div className="text-center">
             <button
               onClick={() => navigate('/login')}
-              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              className="text-[12px] text-gray-500 hover:text-gray-700 transition-colors"
             >
               ← Back to Login
             </button>

@@ -82,6 +82,140 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Forgot Password - Step 1: Send password reset OTP
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required.' });
+    }
+
+    // Find admin by email
+    const { data: admin, error: adminError } = await supabaseAdmin
+      .from('admin')
+      .select('*')
+      .eq('email', email.toLowerCase())
+      .single();
+
+    // Always respond 200 to avoid user enumeration, but only send OTP if admin exists
+    if (adminError || !admin) {
+      return res.json({ success: true, message: 'If the email exists, a reset code has been sent.' });
+    }
+
+    const otpResult = await otpService.sendPasswordResetOTP(admin.email, admin.full_name || 'Admin');
+    if (!otpResult.success) {
+      // Still return generic success to avoid enumeration
+      return res.json({ success: true, message: 'If the email exists, a reset code has been sent.' });
+    }
+
+    res.json({ success: true, message: 'Reset code sent to your email', expiresInMinutes: otpResult.expiresInMinutes || 2 });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    // Do not leak internals
+    res.json({ success: true, message: 'If the email exists, a reset code has been sent.' });
+  }
+});
+
+// Forgot Password - Step 2: Verify OTP and issue password reset token
+router.post('/verify-reset-otp', async (req, res) => {
+  try {
+    const { email, otpCode } = req.body;
+    if (!email || !otpCode) {
+      return res.status(400).json({ error: 'Email and OTP code are required.' });
+    }
+
+    // Verify OTP for password reset
+    const otpResult = await otpService.verifyOTPFor(email, otpCode, 'password_reset');
+    if (!otpResult.success) {
+      return res.status(400).json({
+        error: otpResult.error,
+        lockedOut: otpResult.lockedOut,
+        retryAfter: otpResult.retryAfter,
+        attemptsRemaining: otpResult.attemptsRemaining
+      });
+    }
+
+    // Get admin by email to include id in token
+    const { data: admin, error: adminError } = await supabaseAdmin
+      .from('admin')
+      .select('*')
+      .eq('email', email.toLowerCase())
+      .single();
+
+    if (adminError || !admin) {
+      return res.status(404).json({ error: 'Admin not found.' });
+    }
+
+    // Issue short-lived password reset token
+    const passwordResetToken = jwt.sign(
+      {
+        type: 'password_reset',
+        adminId: admin.id,
+        email: admin.email
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '10m' }
+    );
+
+    res.json({ success: true, message: 'OTP verified', passwordResetToken });
+  } catch (error) {
+    console.error('Verify reset OTP error:', error);
+    res.status(500).json({ error: 'Internal server error during OTP verification.' });
+  }
+});
+
+// Forgot Password - Step 3: Reset password using password reset token
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { passwordResetToken, newPassword } = req.body;
+    if (!passwordResetToken || !newPassword) {
+      return res.status(400).json({ error: 'Reset token and new password are required.' });
+    }
+
+    if (typeof newPassword !== 'string' || newPassword.length < 8 || !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
+      return res.status(400).json({
+        error: 'Password must be at least 8 characters and include uppercase, lowercase, and a number.'
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(passwordResetToken, process.env.JWT_SECRET);
+      if (!decoded || decoded.type !== 'password_reset') {
+        return res.status(400).json({ error: 'Invalid reset token.' });
+      }
+    } catch (err) {
+      return res.status(400).json({ error: 'Invalid or expired reset token.' });
+    }
+
+    // Confirm admin exists
+    const { data: admin, error: adminError } = await supabaseAdmin
+      .from('admin')
+      .select('*')
+      .eq('id', decoded.adminId)
+      .single();
+
+    if (adminError || !admin) {
+      return res.status(404).json({ error: 'Admin not found.' });
+    }
+
+    // Update password in Supabase Auth
+    const { data: updatedUser, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(decoded.adminId, {
+      password: newPassword
+    });
+
+    if (updateError) {
+      console.error('Supabase update password error:', updateError);
+      return res.status(500).json({ error: 'Failed to update password.' });
+    }
+
+    res.json({ success: true, message: 'Password has been reset successfully.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Internal server error during password reset.' });
+  }
+});
+
 // Admin login - Step 2: Verify OTP and complete login
 router.post('/verify-otp', async (req, res) => {
   try {

@@ -91,6 +91,36 @@ class OTPService {
   }
 
   /**
+   * Send OTP for password reset via email
+   */
+  async sendPasswordResetEmail(email, otpCode, adminName = 'Admin') {
+    try {
+      if (!this.transporter.options.auth || !this.transporter.options.auth.user || !this.transporter.options.auth.pass) {
+        console.error('❌ SMTP credentials not configured. Please set SMTP_USERNAME and SMTP_PASSWORD in .env file');
+        console.log('\n📧 For testing, the password reset OTP code is:', otpCode);
+        console.log('⚠️  Configure SMTP to send real emails\n');
+        return { success: false, error: 'SMTP not configured. Check server logs for OTP code.' };
+      }
+
+      const mailOptions = {
+        from: `"${this.fromName}" <${this.fromEmail}>`,
+        to: email,
+        subject: 'Admin Password Reset Code',
+        html: this.getPasswordResetEmailTemplate(otpCode, adminName)
+      };
+
+      await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Password reset OTP email sent successfully to ${email}`);
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Send Password Reset email error:', error.message);
+      console.log('\n📧 For testing, the password reset OTP code is:', otpCode);
+      console.log('⚠️  Configure SMTP credentials in .env file to send real emails\n');
+      return { success: false, error: 'Failed to send email. Check server logs for OTP code.' };
+    }
+  }
+
+  /**
    * Generate and send OTP for admin login
    */
   async sendLoginOTP(email, adminName = 'Admin') {
@@ -131,6 +161,38 @@ class OTPService {
         success: false,
         error: error.message
       };
+    }
+  }
+
+  /**
+   * Generate and send OTP for password reset
+   */
+  async sendPasswordResetOTP(email, adminName = 'Admin') {
+    try {
+      const otpCode = this.generateOTP();
+      const otpHash = this.hashOTP(otpCode);
+      const otpKey = this.getOTPKey(email, 'password_reset');
+
+      otpStore.set(otpKey, {
+        hash: otpHash,
+        email: email,
+        expiresAt: Date.now() + (this.OTP_TTL_SECONDS * 1000),
+        attempts: 0,
+        lockedUntil: null
+      });
+
+      console.log(`Password reset OTP stored for: ${email}, expires in: ${this.OTP_TTL_SECONDS}s`);
+
+      const emailResult = await this.sendPasswordResetEmail(email, otpCode, adminName);
+
+      if (emailResult.success) {
+        return { success: true, message: 'Password reset code sent successfully to your email', expiresInMinutes: 2 };
+      } else {
+        return { success: false, error: 'Failed to send OTP email' };
+      }
+    } catch (error) {
+      console.error('Send password reset OTP error:', error);
+      return { success: false, error: error.message };
     }
   }
 
@@ -218,6 +280,58 @@ class OTPService {
   }
 
   /**
+   * Verify OTP code for a specific flow (e.g., 'password_reset')
+   */
+  async verifyOTPFor(email, otpCode, otpType = 'admin_login') {
+    try {
+      const otpKey = this.getOTPKey(email, otpType);
+      const otpData = otpStore.get(otpKey);
+
+      if (!otpData) {
+        return { success: false, error: 'OTP not found or expired' };
+      }
+
+      if (Date.now() > otpData.expiresAt) {
+        otpStore.delete(otpKey);
+        return { success: false, error: 'OTP has expired' };
+      }
+
+      if (otpData.lockedUntil && Date.now() < otpData.lockedUntil) {
+        const remainingSeconds = Math.ceil((otpData.lockedUntil - Date.now()) / 1000);
+        return {
+          success: false,
+          error: `Too many failed attempts. Please try again in ${Math.floor(remainingSeconds / 60)} minutes and ${remainingSeconds % 60} seconds.`,
+          lockedOut: true,
+          retryAfter: remainingSeconds
+        };
+      }
+
+      const providedHash = this.hashOTP(otpCode);
+      if (otpData.hash !== providedHash) {
+        otpData.attempts += 1;
+        if (otpData.attempts >= this.MAX_ATTEMPTS) {
+          otpData.lockedUntil = Date.now() + (this.LOCKOUT_DURATION * 1000);
+          return {
+            success: false,
+            error: 'Too many failed attempts. Your account has been temporarily locked for 15 minutes.',
+            lockedOut: true,
+            retryAfter: this.LOCKOUT_DURATION
+          };
+        }
+        const remainingAttempts = this.MAX_ATTEMPTS - otpData.attempts;
+        return { success: false, error: `Invalid OTP code. ${remainingAttempts} attempt(s) remaining.`, attemptsRemaining: remainingAttempts };
+      }
+
+      otpStore.delete(otpKey);
+      console.log(`OTP (${otpType}) verified successfully for: ${email}`);
+      return { success: true, message: 'OTP verified successfully' };
+    } catch (error) {
+      console.error('Verify OTP error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Email template for OTP
    */
   getEmailTemplate(otpCode, adminName) {
@@ -241,6 +355,38 @@ class OTPService {
           <p>This code will expire in <strong>2 minutes</strong>.</p>
           <p><strong>Security Notice:</strong> If you didn't attempt to sign in, please ignore this email and ensure your account credentials are secure.</p>
           
+          <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
+          <p style="font-size: 14px; color: #6b7280;">
+            Best regards,<br>
+            The AI.ttorney Admin Team
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Email template for password reset OTP
+   */
+  getPasswordResetEmailTemplate(otpCode, adminName) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Admin Password Reset</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #023D7B;">Admin Password Reset</h2>
+          <p>Hi ${adminName},</p>
+          <p>You requested to reset your AI.ttorney Admin password. Use the following verification code to continue:</p>
+          <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; border: 2px solid #023D7B;">
+            <h1 style="color: #023D7B; font-size: 32px; margin: 0; letter-spacing: 8px;">${otpCode}</h1>
+          </div>
+          <p>This code will expire in <strong>2 minutes</strong>.</p>
+          <p><strong>Security Notice:</strong> If you didn't request a password reset, you can safely ignore this message.</p>
           <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
           <p style="font-size: 14px; color: #6b7280;">
             Best regards,<br>
