@@ -496,7 +496,7 @@ async def list_recent_posts(
             async with httpx.AsyncClient(timeout=20.0) as client:
                 # Fetch all posts without limits (set very high limit to override Supabase defaults)
                 posts_response = await client.get(
-                    f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&order=created_at.desc&is_flagged=eq.false&limit=10000",
+                    f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url)&order=created_at.desc&is_flagged=eq.false&limit=10000",
                     headers=supabase._get_headers(use_service_key=True)
                 )
 
@@ -514,7 +514,7 @@ async def list_recent_posts(
                         # Fetch all replies for these posts
                         ids_param = ",".join(post_ids)
                         # Include user data with proper join syntax
-                        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=in.({ids_param})&hidden=eq.false&order=created_at.asc"
+                        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role,profile_photo,photo_url)&post_id=in.({ids_param})&hidden=eq.false&order=created_at.asc"
                         
                         logger.info(f"🔍 Fetching replies with URL: {replies_url}")
                         
@@ -630,7 +630,7 @@ async def get_post(post_id: str, current_user: Dict[str, Any] = Depends(get_curr
         # Increased timeout for better reliability
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
-                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role)&id=eq.{post_id}&is_flagged=eq.false",
+                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url)&id=eq.{post_id}&is_flagged=eq.false",
                 headers=supabase._get_headers(use_service_key=True)
             )
 
@@ -674,7 +674,7 @@ async def list_replies(post_id: str, current_user: Dict[str, Any] = Depends(get_
         supabase = SupabaseService()
         # Increased timeout for better reliability
         # Include user data with proper join syntax
-        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role)&post_id=eq.{post_id}&hidden=eq.false&order=created_at.desc"
+        replies_url = f"{supabase.rest_url}/forum_replies?select=*,users(id,username,full_name,role,profile_photo,photo_url)&post_id=eq.{post_id}&hidden=eq.false&order=created_at.desc"
         logger.info(f"🔍 Individual replies URL: {replies_url}")
         
         async with httpx.AsyncClient(timeout=20.0) as client:
@@ -929,7 +929,7 @@ async def _send_forum_reply_notifications(supabase_service: SupabaseService, pos
         post_author_id = post_result.data[0]["user_id"]
         post_title = post_result.data[0]["title"]
         
-        replier_result = supabase.table("users").select("full_name, username").eq("id", replier_id).execute()
+        replier_result = supabase.table("users").select("full_name, username, profile_photo, photo_url").eq("id", replier_id).execute()
         replier_name = "A lawyer"
         if replier_result.data:
             replier_name = replier_result.data[0].get("full_name") or replier_result.data[0].get("username") or "A lawyer"
@@ -1291,7 +1291,7 @@ async def search_forum_posts(
         limit_param = f"&limit={limit}" if limit is not None else "&limit=10000"
         base_query = (
             f"{supabase.rest_url}/forum_posts?"
-            f"select=*,users(id,username,full_name,role),"
+            f"select=*,users(id,username,full_name,role,profile_photo,photo_url),"
             f"forum_replies(count)"
             f"{category_filter}"
             f"{sort_param}"
@@ -1308,7 +1308,7 @@ async def search_forum_posts(
                 # Search by username - use proper PostgREST syntax
                 username_response = await client.get(
                     f"{supabase.rest_url}/forum_posts?"
-                    f"select=*,users!inner(id,username,full_name,role)"
+                    f"select=*,users!inner(id,username,full_name,role,profile_photo,photo_url)"
                     f"&users.username.ilike.*{username}*"
                     f"{category_filter}"
                     f"{sort_param}"
@@ -1329,7 +1329,7 @@ async def search_forum_posts(
                 # Also search by full name
                 fullname_response = await client.get(
                     f"{supabase.rest_url}/forum_posts?"
-                    f"select=*,users!inner(id,username,full_name,role)"
+                    f"select=*,users!inner(id,username,full_name,role,profile_photo,photo_url)"
                     f"&users.full_name.ilike.*{username}*"
                     f"{category_filter}"
                     f"{sort_param}"
@@ -1351,7 +1351,7 @@ async def search_forum_posts(
                 # Search in post body - use proper PostgREST syntax
                 content_response = await client.get(
                     f"{supabase.rest_url}/forum_posts?"
-                    f"select=*,users(id,username,full_name,role)"
+                    f"select=*,users(id,username,full_name,role,profile_photo,photo_url)"
                     f"&body.ilike.*{query}*"
                     f"{category_filter}"
                     f"{sort_param}"
@@ -1565,7 +1565,7 @@ async def debug_search_test():
             
             # Test 2: Get posts with users
             posts_with_users_response = await client.get(
-                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name)&limit=5",
+                f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,profile_photo,photo_url)&limit=5",
                 headers=supabase._get_headers(use_service_key=True)
             )
             
