@@ -164,8 +164,8 @@ class OTPService:
         return f"otp:{otp_type}:{normalized_email}"
     
     # OTP Configuration Constants
-    OTP_TTL_SECONDS = 120  # 2 minutes for all OTP types
-    OTP_TTL_MINUTES = 2
+    OTP_TTL_SECONDS = 600  # 10 minutes for all OTP types
+    OTP_TTL_MINUTES = 10
     
     # OTP Type Configuration
     OTP_TYPES = {
@@ -213,6 +213,11 @@ class OTPService:
             # Store in memory
             self.otp_store.store_otp(otp_key, otp_data)
             logger.info(f"{config['log_prefix']} OTP stored with key: {otp_key}, expires in: {self.OTP_TTL_SECONDS}s")
+            
+            # Debug: Log current store state
+            with self.otp_store._lock:
+                store_keys = list(self.otp_store._store.keys())
+                logger.info(f"OTP store now contains {len(store_keys)} keys: {store_keys}")
             
             # Send email
             email_response = await self.send_otp_email(email, otp_code, user_name, config["email_template"])

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../lib/api-client';
 import { useToast, Toast, ToastTitle, ToastDescription } from '../../components/ui/toast';
 import { useAuth } from '../../contexts/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function UserRegistration() {
   const toast = useToast();
@@ -47,6 +48,7 @@ export default function UserRegistration() {
   const [usernameError, setUsernameError] = useState('');
   const [usernameStatus, setUsernameStatus] = useState<'none' | 'checking' | 'available' | 'taken' | 'invalid'>('none');
   const [passwordError, setPasswordError] = useState('');
+  const [birthdateError, setBirthdateError] = useState('');
   const [validationLoading, setValidationLoading] = useState({ email: false, username: false });
   
   // Debounce timers for validation
@@ -66,6 +68,32 @@ export default function UserRegistration() {
     const dd = String(d.getDate()).padStart(2, '0');
     const yyyy = d.getFullYear();
     return `${mm}/${dd}/${yyyy}`;
+  };
+
+  // Age validation function
+  const validateAge = (selectedDate: Date) => {
+    const today = new Date();
+    const age = today.getFullYear() - selectedDate.getFullYear();
+    const monthDiff = today.getMonth() - selectedDate.getMonth();
+    const dayDiff = today.getDate() - selectedDate.getDate();
+    
+    // Calculate exact age
+    const exactAge = age - (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0) ? 1 : 0);
+    
+    if (exactAge < 18) {
+      setBirthdateError('You must be at least 18 years old to register');
+      return false;
+    } else {
+      setBirthdateError('');
+      return true;
+    }
+  };
+
+  // Calculate minimum allowed birthdate (18 years ago)
+  const getMinimumBirthdate = () => {
+    const today = new Date();
+    const minDate = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+    return minDate;
   };
 
   // Validation functions
@@ -232,7 +260,7 @@ export default function UserRegistration() {
 
   const passwordStrength = getPasswordStrength(password);
   const passwordsMatch = password.length > 0 && password === confirmPassword;
-  const hasValidationErrors = !!emailError || !!usernameError || !!passwordError || (confirmPassword && !passwordsMatch);
+  const hasValidationErrors = !!emailError || !!usernameError || !!passwordError || !!birthdateError || (confirmPassword && !passwordsMatch);
   const isComplete = Boolean(
     firstName && 
     lastName && 
@@ -427,24 +455,32 @@ export default function UserRegistration() {
         <Text className={`font-semibold text-gray-900 mb-1.5 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'}`}>
           Birthdate <Text className="text-red-500">*</Text>
         </Text>
-        <TouchableOpacity
-          onPress={() => {
-            const now = new Date();
-            now.setHours(0,0,0,0);
-            const base0 = (birthdate ? new Date(birthdate) : new Date());
-            base0.setHours(0,0,0,0);
-            const base = base0.getTime() > now.getTime() ? now : base0;
-            setTempDate(base);
-            setCalendarCursor(new Date(base.getFullYear(), base.getMonth(), 1));
-            setShowDatePicker(true);
-          }}
-          activeOpacity={0.8}
-          className="p-3 mb-3 w-full bg-white rounded-lg border border-gray-300"
-        >
-          <Text className={`${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'} ${birthdate ? 'text-gray-900' : 'text-gray-400'}`}>
-            {birthdate ? formatDate(birthdate) : 'Select date'}
+        <View className={`${birthdateError ? 'mb-1' : 'mb-3'}`}>
+          <TouchableOpacity
+            onPress={() => {
+              const now = new Date();
+              now.setHours(0,0,0,0);
+              const minDate = getMinimumBirthdate();
+              const base0 = (birthdate ? new Date(birthdate) : minDate);
+              base0.setHours(0,0,0,0);
+              const base = base0.getTime() > now.getTime() ? minDate : base0;
+              setTempDate(base);
+              setCalendarCursor(new Date(base.getFullYear(), base.getMonth(), 1));
+              setShowDatePicker(true);
+            }}
+            activeOpacity={0.8}
+            className={`p-3 w-full bg-white rounded-lg border ${birthdateError ? 'border-red-500' : 'border-gray-300'}`}
+          >
+            <Text className={`${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'} ${birthdate ? 'text-gray-900' : 'text-gray-400'}`}>
+              {birthdate ? formatDate(birthdate) : 'Select date (must be 18+)'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {birthdateError ? (
+          <Text className="mb-3 text-xs text-red-500">
+            {birthdateError}
           </Text>
-        </TouchableOpacity>
+        ) : null}
 
         {/* Password */}
         <Text className={`font-semibold text-gray-900 mb-1.5 ${isDesktop ? 'text-base' : isTablet ? 'text-sm' : 'text-sm'}`}>
@@ -593,12 +629,14 @@ export default function UserRegistration() {
             
             setLoading(true);
             try {
-              // Step 1: Create user account with Supabase (industry standard)
-              const signUpResult = await signUp(email, password, {
+              // Step 1: Create user account via server-side API (prevents Supabase auto-confirmation)
+              const signUpResult = await apiClient.signUp({
+                email,
+                password,
                 username,
                 first_name: firstName,
                 last_name: lastName,
-                birthdate: birthdate?.toISOString().split('T')[0] || '',
+                birthdate: birthdate?.toISOString().split('T')[0] || ''
               });
               
               if (!signUpResult.success) {
@@ -614,6 +652,9 @@ export default function UserRegistration() {
                 setLoading(false);
                 return;
               }
+              
+              // Store password temporarily for auto sign-in after OTP verification
+              await AsyncStorage.setItem('temp_registration_password', password);
               
               // Step 2: Send OTP for email verification
               const otpResult = await apiClient.sendOTP({
@@ -806,7 +847,7 @@ export default function UserRegistration() {
                 <ScrollView>
                   {(() => {
                     const currentYear = new Date().getFullYear();
-                    const maxYear = Math.min(2025, currentYear);
+                    const maxYear = currentYear - 18; // Only allow years that make user 18+
                     const years: number[] = [];
                     for (let y = maxYear; y >= 1950; y--) years.push(y);
                     return years.map((y) => {
@@ -862,7 +903,8 @@ export default function UserRegistration() {
                         date.getFullYear() === tempDate.getFullYear() &&
                         date.getMonth() === tempDate.getMonth() &&
                         date.getDate() === tempDate.getDate();
-                      const isDisabled = !date || (new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() > today0.getTime());
+                      const minBirthdate = getMinimumBirthdate();
+                      const isDisabled = !date || (new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() > minBirthdate.getTime());
                       return (
                         <TouchableOpacity
                           key={idx}
@@ -888,12 +930,12 @@ export default function UserRegistration() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
-                  const today0 = new Date();
-                  today0.setHours(0,0,0,0);
+                  const minBirthdate = getMinimumBirthdate();
                   const sel0 = new Date(tempDate);
                   sel0.setHours(0,0,0,0);
-                  const finalDate = sel0.getTime() > today0.getTime() ? today0 : sel0;
+                  const finalDate = sel0.getTime() > minBirthdate.getTime() ? minBirthdate : sel0;
                   setBirthdate(finalDate);
+                  validateAge(finalDate);
                   setShowDatePicker(false);
                 }}
                 className="py-2.5 px-3"

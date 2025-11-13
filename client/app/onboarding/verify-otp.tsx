@@ -14,11 +14,13 @@ import PrimaryButton from "../../components/ui/PrimaryButton";
 import BackButton from "../../components/ui/BackButton";
 import Colors from "../../constants/Colors";
 import { apiClient } from "../../lib/api-client";
+import { useAuth } from "../../contexts/AuthContext";
 import otpsent from "../../assets/images/otpsent.png";
 
 export default function VerifyOTP() {
   const params = useLocalSearchParams();
   const email = typeof params.email === 'string' ? params.email : "user@example.com";
+  const { refreshUserData, signIn } = useAuth();
 
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
@@ -166,26 +168,35 @@ export default function VerifyOTP() {
         setIsLockedOut(false);
         console.log('🧹 Cleared form states');
         
-        // Show success modal as intended
-        console.log('🎉 About to show success modal...');
+        // Get password from AsyncStorage (stored during registration)
+        const storedPassword = await AsyncStorage.getItem('temp_registration_password');
         
-        // Use original Alert approach
-        setTimeout(() => {
-          console.log('📢 Showing Alert modal now...');
-          Alert.alert(
-            "Email Verified!",
-            "Your email has been verified. Please sign in with your credentials.",
-            [
-              {
-                text: "Go to Login",
-                onPress: () => {
-                  console.log('🚀 Navigating to login...');
-                  router.replace('/login');
-                }
-              }
-            ]
-          );
-        }, 100);
+        if (storedPassword) {
+          console.log('🔐 Found stored password, signing in user...');
+          
+          // Sign in the user automatically after verification
+          const signInResult = await signIn(email, storedPassword);
+          
+          if (signInResult.success) {
+            console.log('✅ User signed in successfully after verification');
+            
+            // Clean up temporary password
+            await AsyncStorage.removeItem('temp_registration_password');
+            
+            // Navigate to role selection
+            setTimeout(() => {
+              console.log('🚀 Navigating to role selection...');
+              router.replace('/role-selection');
+            }, 500);
+          } else {
+            console.error('❌ Auto sign-in failed:', signInResult.error);
+            // Fallback: navigate to login
+            router.replace('/login');
+          }
+        } else {
+          console.log('⚠️ No stored password found, redirecting to login');
+          router.replace('/login');
+        }
       }
     } catch (error) {
       console.error('❌ Verification exception:', error);

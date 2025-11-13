@@ -22,6 +22,8 @@ const createSupabaseClient = () => {
       storage: Platform.OS === 'web' ? undefined : AsyncStorage,
       // Add storage key to prevent conflicts between multiple instances
       storageKey: STORAGE_KEYS.AUTH,
+      // Disable automatic email confirmation - we use custom OTP system
+      flowType: 'pkce',
     },
   });
 
