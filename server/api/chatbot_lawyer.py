@@ -1173,9 +1173,10 @@ def generate_answer(question: str, context: str, conversation_history: List[Dict
         {"role": "system", "content": system_prompt},
     ]
     
-    # Add conversation history (last 8 exchanges for enhanced context awareness)
-    # This provides superior conversation continuity for professional legal analysis
-    for msg in conversation_history[-8:]:
+    # Add ALL conversation history for complete context retention
+    # No message limit - this prevents the chatbot from losing context in long legal discussions
+    # Professional legal analysis requires full conversation context for accurate advice
+    for msg in conversation_history:
         messages.append(msg)
     
     # === MODIFICATION: Updated User Message to pass context ===

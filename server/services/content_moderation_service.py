@@ -109,8 +109,8 @@ class ContentModerationService:
             "self-harm/instructions": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM_INSTRUCTIONS", "0.1")),  # Very sensitive
             "sexual": float(os.getenv("MODERATION_THRESHOLD_SEXUAL", "0.25")),  # More sensitive
             "sexual/minors": float(os.getenv("MODERATION_THRESHOLD_SEXUAL_MINORS", "0.01")),  # CRITICAL: Near-zero tolerance
-            "violence": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE", "0.3")),  # More sensitive
-            "violence/graphic": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE_GRAPHIC", "0.2")),  # More sensitive
+            "violence": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE", "0.6")),  # Less sensitive for legal discussions
+            "violence/graphic": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE_GRAPHIC", "0.4")),  # Less sensitive for legal discussions
         }
         
         logger.info(f"✅ Content moderation service initialized with model: {self.model}")

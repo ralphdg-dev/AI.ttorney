@@ -541,9 +541,10 @@ def is_conversation_context_question(text: str) -> bool:
     
     conversation_patterns = [
         # Past conversation retrieval requests (asking TO SEE conversation history)
-        'past convos', 'past conversations', 'previous chats', 'chat history',
-        'bring up our conversation', 'show our chat', 'what we talked about before',
-        'our conversation history', 'our chat history', 'previous discussion',
+        'past convos', 'past conversations', 'past convo', 'previous chats', 'chat history',
+        'bring up our conversation', 'bring up the past', 'bring up past', 'show our chat', 
+        'what we talked about before', 'our conversation history', 'our chat history', 
+        'previous discussion', 'show me past', 'show past',
         
         # Chatbot capability questions
         'can you remember', 'do you remember', 'can you recall',
@@ -1218,9 +1219,10 @@ def generate_answer(question: str, context: str, conversation_history: List[Dict
         {"role": "system", "content": system_prompt},
     ]
     
-    # Add conversation history (last 6 exchanges for better context)
-    # This provides much better conversation continuity and recall
-    for msg in conversation_history[-6:]:
+    # Add ALL conversation history for complete context retention
+    # No message limit - this prevents the chatbot from "giving up" or losing context
+    # The AI model can handle the full conversation history for better continuity
+    for msg in conversation_history:
         messages.append(msg)
     
     # Add current question with context
