@@ -109,9 +109,6 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
             <h3 className="text-sm font-medium text-gray-900">{lawyerData.full_name || 'Unknown Lawyer'}</h3>
             <p className="text-[11px] text-gray-500 mt-0.5">{lawyerData.email || 'No email provided'}</p>
           </div>
-          <div className="flex flex-col items-end gap-1.5">
-            <ConsultationBadge accepting={lawyerData.accepting_consultations} />
-          </div>
         </div>
 
         {/* Basic Information */}
