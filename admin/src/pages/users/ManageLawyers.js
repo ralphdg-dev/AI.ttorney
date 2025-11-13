@@ -1,5 +1,6 @@
 import React from 'react';
-import { Users, Eye, Pencil, UserX, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
+import ReactDOM from 'react-dom';
+import { Users, Eye, Pencil, UserX, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Archive, MoreVertical } from 'lucide-react';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
@@ -46,6 +47,62 @@ const ManageLawyers = () => {
   const [selectedLawyer, setSelectedLawyer] = React.useState(null);
   const [editModalOpen, setEditModalOpen] = React.useState(false);
   const [editingLawyer, setEditingLawyer] = React.useState(null);
+
+  // Kebab dropdown state (like ManageAdmins)
+  const [openDropdown, setOpenDropdown] = React.useState(null);
+  const [dropdownPosition, setDropdownPosition] = React.useState({});
+  const [dropdownAnchor, setDropdownAnchor] = React.useState(null);
+
+  const handleDropdownToggle = (rowId, event) => {
+    if (openDropdown === rowId) {
+      setOpenDropdown(null);
+      setDropdownPosition({});
+      setDropdownAnchor(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const right = Math.max(8, window.innerWidth - rect.right);
+    const bottom = Math.max(8, window.innerHeight - rect.top + 10);
+    setDropdownPosition({ right, bottom });
+    setDropdownAnchor(event.currentTarget);
+    setOpenDropdown(rowId);
+  };
+
+  // Close on outside click (ignore clicks within portal)
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        openDropdown &&
+        !event.target.closest('.dropdown-container') &&
+        !event.target.closest('.dropdown-portal')
+      ) {
+        setOpenDropdown(null);
+        setDropdownPosition({});
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openDropdown]);
+
+  // Recompute position on scroll/resize
+  React.useEffect(() => {
+    if (!openDropdown || !dropdownAnchor) return;
+    const updatePosition = () => {
+      const rect = dropdownAnchor.getBoundingClientRect();
+      const right = Math.max(8, window.innerWidth - rect.right);
+      const bottom = Math.max(8, window.innerHeight - rect.top + 10);
+      setDropdownPosition({ right, bottom });
+    };
+    updatePosition();
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    document.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+      document.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [openDropdown, dropdownAnchor]);
 
   // Load data from API
   const loadData = React.useCallback(async () => {
@@ -416,39 +473,66 @@ const ManageLawyers = () => {
       header: 'Actions',
       align: 'right',
       render: (row) => (
-        <div className="flex items-center justify-end space-x-2 text-gray-600">
-          <Tooltip content="View">
-            <button 
-              className="p-1 rounded hover:bg-gray-100" 
-              aria-label="View"
-              onClick={() => handleView(row)}
+        <div className="flex items-center justify-end">
+          <div className="relative dropdown-container">
+            <button
+              onClick={(e) => handleDropdownToggle(row.id, e)}
+              className={`flex items-center justify-center w-8 h-8 text-gray-600 hover:text-gray-900 rounded-full transition-all duration-200 ${openDropdown === row.id ? 'bg-gray-200' : 'hover:bg-gray-100'}`}
+              aria-label="Actions"
             >
-              <Eye size={16} />
+              <MoreVertical className="w-4 h-4" />
             </button>
-          </Tooltip>
-          <Tooltip content="Edit">
-            <button 
-              className="p-1 rounded hover:bg-gray-100" 
-              aria-label="Edit"
-              onClick={() => handleEdit(row)}
-            >
-              <Pencil size={16} />
-            </button>
-          </Tooltip>
-          <Tooltip content="Suspend">
-            <button 
-              className="p-1 rounded hover:bg-gray-100" 
-              aria-label="Suspend"
-              onClick={() => handleSuspend(row.id, row.full_name)}
-              disabled={actionLoading[row.id]}
-            >
-              {actionLoading[row.id] ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Archive size={16} />
-              )}
-            </button>
-          </Tooltip>
+
+            {openDropdown === row.id && ReactDOM.createPortal(
+              <>
+                <div
+                  className="fixed inset-0 z-[9998]"
+                  onClick={() => { setOpenDropdown(null); setDropdownPosition({}); }}
+                />
+                <div
+                  className="fixed w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] dropdown-portal"
+                  style={{ right: dropdownPosition.right ?? 20, bottom: dropdownPosition.bottom ?? 20 }}
+                >
+                  <div className="py-2">
+                    <button
+                      onClick={() => { handleView(row); setOpenDropdown(null); setDropdownPosition({}); }}
+                      className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center">
+                        <Eye className="w-4 h-4 mr-3 text-gray-500" />
+                        <span>View</span>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => { handleEdit(row); setOpenDropdown(null); setDropdownPosition({}); }}
+                      className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center">
+                        <Pencil className="w-4 h-4 mr-3 text-gray-500" />
+                        <span>Edit</span>
+                      </div>
+                    </button>
+                    <div className="border-t border-gray-200 my-1"></div>
+                    <button
+                      onClick={() => { handleSuspend(row.id, row.full_name); setOpenDropdown(null); setDropdownPosition({}); }}
+                      className="flex items-center justify-between w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      disabled={actionLoading[row.id]}
+                    >
+                      <div className="flex items-center">
+                        {actionLoading[row.id] ? (
+                          <Loader2 className="w-4 h-4 mr-3 animate-spin" />
+                        ) : (
+                          <Archive className="w-4 h-4 mr-3 text-red-500" />
+                        )}
+                        <span>Suspend</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </>,
+              document.body
+            )}
+          </div>
         </div>
       ),
     },
