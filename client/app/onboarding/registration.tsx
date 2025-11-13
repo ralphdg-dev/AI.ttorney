@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Image, KeyboardAvoidingView, Platform, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Image, KeyboardAvoidingView, Platform, ActivityIndicator, Dimensions, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import BackButton from '../../components/ui/BackButton';
+import Header from '../../components/Header';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../lib/api-client';
 import { useToast, Toast, ToastTitle, ToastDescription } from '../../components/ui/toast';
 import { useAuth } from '../../contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Colors from '../../constants/Colors';
 
 export default function UserRegistration() {
   const toast = useToast();
@@ -299,16 +301,29 @@ export default function UserRegistration() {
     });
   }
 
+  const handleBack = () => {
+    // @ts-ignore: canGoBack may not exist on some expo-router versions
+    if (typeof (router as any).canGoBack === 'function' && (router as any).canGoBack()) {
+      router.back();
+    } else {
+      router.push('/role-selection');
+    }
+  };
+
   return (
-    <View className="flex-1 bg-white">
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      
+      <Header 
+        showBackButton={true}
+        onBackPress={handleBack}
+        backgroundColor={Colors.background.primary}
+      />
+      
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.select({ ios: 'padding', android: undefined })}
       >
-        {/* Header with BackButton */}
-        <View className={`flex-row items-center pt-12 pb-4 ${isDesktop ? 'px-15' : isTablet ? 'px-10' : 'px-6'}`}>
-          <BackButton onPress={() => router.back()} />
-        </View>
 
         {/* Main Content */}
         <ScrollView
@@ -745,7 +760,6 @@ export default function UserRegistration() {
         </View>
         </View>
         </ScrollView>
-      </KeyboardAvoidingView>
 
       {/* Date Picker Modal */}
       <Modal
@@ -959,6 +973,7 @@ export default function UserRegistration() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-    </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

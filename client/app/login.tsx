@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, KeyboardAvoidingView, Platform, StatusBar } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../constants/Colors";
+import Header from "../components/Header";
 import { Ionicons } from "@expo/vector-icons";
 import logo from "../assets/images/logo.png";
 import { useToast, Toast, ToastTitle, ToastDescription } from "../components/ui/toast";
@@ -150,23 +152,35 @@ export default function Login() {
     console.log("Google login pressed");
   };
 
+  const handleBack = () => {
+    // @ts-ignore: canGoBack may not exist on some expo-router versions
+    if (typeof (router as any).canGoBack === 'function' && (router as any).canGoBack()) {
+      router.back();
+    } else {
+      router.push('/role-selection');
+    }
+  };
+
   return (
-    <View style={tw`flex-1 bg-white`}>
-      <KeyboardAvoidingView
-        style={tw`flex-1`}
-        behavior={Platform.select({ ios: 'padding', android: undefined })}
-      >
-        <ScrollView
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      
+      <Header 
+        showBackButton={true}
+        onBackPress={handleBack}
+        backgroundColor={Colors.background.primary}
+      />
+      
+      <View style={tw`flex-1 bg-white`}>
+        <KeyboardAvoidingView
           style={tw`flex-1`}
-          contentContainerStyle={tw`flex-grow`}
-          keyboardShouldPersistTaps="handled"
+          behavior={Platform.select({ ios: 'padding', android: undefined })}
         >
-          {/* Top Navigation */}
-          <View style={tw`flex-row items-center px-6 pt-12 pb-4`}>
-            <TouchableOpacity onPress={() => router.back()} style={tw`p-2`}>
-              <Ionicons name="arrow-back" size={24} color="#A0A0A0" />
-            </TouchableOpacity>
-          </View>
+          <ScrollView
+            style={tw`flex-1`}
+            contentContainerStyle={tw`flex-grow`}
+            keyboardShouldPersistTaps="handled"
+          >
 
           {/* Main Content */}
           <View style={tw`flex-1 justify-center items-center px-6`}>
@@ -364,8 +378,9 @@ export default function Login() {
           </Text>
         </Text>
       </View>
-    </ScrollView>
-  </KeyboardAvoidingView>
-</View>
-);
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    </SafeAreaView>
+  );
 }
