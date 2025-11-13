@@ -11,6 +11,7 @@ import Pagination from '../../components/ui/Pagination';
 import DataTable from '../../components/ui/DataTable';
 import { useToast } from '../../components/ui/Toast';
 import adminManagementService from '../../services/adminManagementService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const RoleBadge = ({ role, isArchived = false }) => {
   const getStyles = () => {
@@ -75,6 +76,7 @@ const StatusBadge = ({ status, isArchived = false }) => {
 
 const ManageAdmins = () => {
   const { showSuccess, showError, showWarning, ToastContainer } = useToast();
+  const { admin: currentAdmin } = useAuth();
   const [query, setQuery] = React.useState('');
   const [debouncedQuery, setDebouncedQuery] = React.useState('');
   const [status, setStatus] = React.useState('All');
@@ -808,58 +810,62 @@ const ManageAdmins = () => {
                         <span>View</span>
                       </div>
                     </button>
-                    <button
-                      onClick={() => { handleEdit(row); setOpenDropdown(null); setDropdownPosition({}); }}
-                      className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-center">
-                        <Pencil className="w-4 h-4 mr-3 text-gray-500" />
-                        <span>Edit</span>
-                      </div>
-                    </button>
-                    <div className="border-t border-gray-200 my-1"></div>
-                    {row.status === 'archived' ? (
-                      <button
-                        onClick={() => { handleUnarchive(row); setOpenDropdown(null); setDropdownPosition({}); }}
-                        className="flex items-center justify-between w-full px-3 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors"
-                      >
-                        <div className="flex items-center">
-                          <ArchiveRestore className="w-4 h-4 mr-3 text-green-500" />
-                          <span>Unarchive</span>
-                        </div>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => { handleArchive(row); setOpenDropdown(null); setDropdownPosition({}); }}
-                        className="flex items-center justify-between w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <div className="flex items-center">
-                          <Archive className="w-4 h-4 mr-3 text-red-500" />
-                          <span>Archive</span>
-                        </div>
-                      </button>
-                    )}
-                    <div className="border-t border-gray-200 my-1"></div>
-                    {row.status === 'disabled' ? (
-                      <button
-                        onClick={() => { handleDisable(row); setOpenDropdown(null); setDropdownPosition({}); }}
-                        className="flex items-center justify-between w-full px-3 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
-                      >
-                        <div className="flex items-center">
-                          <RefreshCw className="w-4 h-4 mr-3 text-green-600" />
-                          <span>Enable</span>
-                        </div>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => { handleDisable(row); setOpenDropdown(null); setDropdownPosition({}); }}
-                        className="flex items-center justify-between w-full px-3 py-2 text-sm text-yellow-700 hover:bg-yellow-50 transition-colors"
-                      >
-                        <div className="flex items-center">
-                          <Shield className="w-4 h-4 mr-3 text-yellow-600" />
-                          <span>Disable</span>
-                        </div>
-                      </button>
+                    {row.id !== (currentAdmin && currentAdmin.id) && (
+                      <>
+                        <button
+                          onClick={() => { handleEdit(row); setOpenDropdown(null); setDropdownPosition({}); }}
+                          className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center">
+                            <Pencil className="w-4 h-4 mr-3 text-gray-500" />
+                            <span>Edit</span>
+                          </div>
+                        </button>
+                        <div className="border-t border-gray-200 my-1"></div>
+                        {row.status === 'archived' ? (
+                          <button
+                            onClick={() => { handleUnarchive(row); setOpenDropdown(null); setDropdownPosition({}); }}
+                            className="flex items-center justify-between w-full px-3 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <ArchiveRestore className="w-4 h-4 mr-3 text-green-500" />
+                              <span>Unarchive</span>
+                            </div>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => { handleArchive(row); setOpenDropdown(null); setDropdownPosition({}); }}
+                            className="flex items-center justify-between w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <Archive className="w-4 h-4 mr-3 text-red-500" />
+                              <span>Archive</span>
+                            </div>
+                          </button>
+                        )}
+                        <div className="border-t border-gray-200 my-1"></div>
+                        {row.status === 'disabled' ? (
+                          <button
+                            onClick={() => { handleDisable(row); setOpenDropdown(null); setDropdownPosition({}); }}
+                            className="flex items-center justify-between w-full px-3 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <RefreshCw className="w-4 h-4 mr-3 text-green-600" />
+                              <span>Enable</span>
+                            </div>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => { handleDisable(row); setOpenDropdown(null); setDropdownPosition({}); }}
+                            className="flex items-center justify-between w-full px-3 py-2 text-sm text-yellow-700 hover:bg-yellow-50 transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <Shield className="w-4 h-4 mr-3 text-yellow-600" />
+                              <span>Disable</span>
+                            </div>
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
