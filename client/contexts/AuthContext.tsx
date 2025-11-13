@@ -506,7 +506,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsGuestMode(false);
       }
       
-      // Supabase best practice: Use signUp with email confirmation
+      // Create user account without Supabase's automatic email confirmation
+      // We handle email verification through our custom OTP system
       const { data, error } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
         password,
@@ -518,7 +519,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             full_name: `${metadata.first_name} ${metadata.last_name}`,
             birthdate: metadata.birthdate,
           },
-          emailRedirectTo: undefined, // We handle verification via OTP
+          // Completely disable Supabase's email confirmation system
+          emailRedirectTo: undefined,
+          captchaToken: undefined,
         },
       });
 

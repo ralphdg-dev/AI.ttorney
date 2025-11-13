@@ -43,9 +43,9 @@ class SupabaseService:
                     "email": email,
                     "password": password,
                     "user_metadata": user_metadata or {},
-                    "email_confirm": True,    # Mark email as already confirmed
+                    "email_confirm": False,   # Email will be confirmed via custom OTP
                     "phone_confirm": False,   # Disable phone confirmation
-                    "confirm": True           # Skip confirmation process entirely
+                    "confirm": False          # User must verify via custom OTP system
                 }
                 
                 # Use service role key to bypass email confirmation entirely
@@ -341,6 +341,34 @@ class SupabaseService:
             logger.error(f"Delete auth user error: {str(e)}")
             return {"success": False, "error": str(e)}
     
+    async def confirm_user_email(self, user_id: str) -> Dict[str, Any]:
+        """Confirm user email in Supabase Auth after OTP verification"""
+        try:
+            async with httpx.AsyncClient() as client:
+                payload = {
+                    "email_confirm": True,
+                    "confirm": True
+                }
+                
+                response = await client.put(
+                    f"{self.auth_url}/admin/users/{user_id}",
+                    json=payload,
+                    headers=self._get_headers(use_service_key=True)
+                )
+                
+                if response.status_code == 200:
+                    logger.info(f"Successfully confirmed email for user: {user_id}")
+                    return {"success": True, "message": "Email confirmed successfully"}
+                else:
+                    error_data = response.json() if response.content else {}
+                    error_msg = error_data.get("message") or f"Confirmation failed: {response.status_code}"
+                    logger.error(f"Failed to confirm email for user {user_id}: {error_data}")
+                    return {"success": False, "error": error_msg}
+                    
+        except Exception as e:
+            logger.error(f"Confirm user email error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
     async def update_user_email(self, user_id: str, new_email: str) -> Dict[str, Any]:
         """Update user email in Supabase Auth"""
         try:

@@ -276,17 +276,21 @@ class AuthService:
             return {"success": False, "error": str(e)}
     
     async def mark_user_verified(self, email: str) -> Dict[str, Any]:
-        """Mark user as verified - role remains guest until role selection"""
+        """Mark user as verified and confirm email in Supabase Auth"""
         try:
             logger.info(f"🔄 Marking user as verified: {email}")
             
-            # First check current status
+            # First check current status and get user ID
             profile_response = await self.supabase.get_user_profile_by_email(email)
-            if profile_response["success"] and profile_response["data"]:
-                current_profile = profile_response["data"]
-                logger.info(f"📊 Current profile before update: role={current_profile.get('role')}, is_verified={current_profile.get('is_verified')}")
+            if not profile_response["success"] or not profile_response["data"]:
+                return {"success": False, "error": "User profile not found"}
             
-            response = await self.supabase.update_user_profile(
+            current_profile = profile_response["data"]
+            user_id = current_profile.get("id")
+            logger.info(f"📊 Current profile before update: role={current_profile.get('role')}, is_verified={current_profile.get('is_verified')}")
+            
+            # Step 1: Update user profile to mark as verified
+            profile_update_response = await self.supabase.update_user_profile(
                 {
                     "is_verified": True
                     # Keep role as guest until user selects role
@@ -294,16 +298,27 @@ class AuthService:
                 {"email": email}
             )
             
-            logger.info(f"✅ Update response: {response}")
+            if not profile_update_response["success"]:
+                return profile_update_response
+            
+            # Step 2: Confirm email in Supabase Auth to complete the verification process
+            if user_id:
+                auth_confirm_response = await self.supabase.confirm_user_email(user_id)
+                if not auth_confirm_response["success"]:
+                    logger.warning(f"Failed to confirm email in Supabase Auth: {auth_confirm_response['error']}")
+                    # Don't fail the entire process if auth confirmation fails
+                else:
+                    logger.info(f"✅ Email confirmed in Supabase Auth for user: {user_id}")
+            
+            logger.info(f"✅ Profile update response: {profile_update_response}")
             
             # Verify the update worked
-            if response["success"]:
-                verify_response = await self.supabase.get_user_profile_by_email(email)
-                if verify_response["success"] and verify_response["data"]:
-                    updated_profile = verify_response["data"]
-                    logger.info(f"📊 Profile after update: role={updated_profile.get('role')}, is_verified={updated_profile.get('is_verified')}")
+            verify_response = await self.supabase.get_user_profile_by_email(email)
+            if verify_response["success"] and verify_response["data"]:
+                updated_profile = verify_response["data"]
+                logger.info(f"📊 Profile after update: role={updated_profile.get('role')}, is_verified={updated_profile.get('is_verified')}")
             
-            return response
+            return profile_update_response
         except Exception as e:
             logger.error(f"Mark user verified error: {str(e)}")
             return {"success": False, "error": str(e)}
