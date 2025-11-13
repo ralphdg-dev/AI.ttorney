@@ -393,6 +393,177 @@ class SupabaseService:
             logger.error(f"Update user email error: {str(e)}")
             return {"success": False, "error": str(e)}
     
+    # Forum Posts Operations
+    async def create_forum_post(self, post_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new forum post"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.rest_url}/forum_posts",
+                    json=post_data,
+                    headers=self._get_headers(use_service_key=True)
+                )
+                
+                if response.status_code in [200, 201]:
+                    data = response.json()
+                    return {"success": True, "data": data[0] if isinstance(data, list) else data}
+                else:
+                    error_data = response.json() if response.content else {}
+                    logger.error(f"Create forum post failed: {response.status_code}, {error_data}")
+                    return {"success": False, "error": error_data}
+                    
+        except Exception as e:
+            logger.error(f"Create forum post error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def get_forum_posts(self, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
+        """Get forum posts with pagination"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.rest_url}/forum_posts?select=*,users(username,full_name)&order=created_at.desc&limit={limit}&offset={offset}",
+                    headers=self._get_headers()
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {"success": True, "data": data}
+                else:
+                    error_data = response.json() if response.content else {}
+                    return {"success": False, "error": error_data}
+                    
+        except Exception as e:
+            logger.error(f"Get forum posts error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def get_forum_post_by_id(self, post_id: str) -> Dict[str, Any]:
+        """Get a specific forum post by ID"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.rest_url}/forum_posts?select=*,users(username,full_name)&id=eq.{post_id}",
+                    headers=self._get_headers()
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data:
+                        return {"success": True, "data": data[0]}
+                    else:
+                        return {"success": False, "error": "Post not found"}
+                else:
+                    error_data = response.json() if response.content else {}
+                    return {"success": False, "error": error_data}
+                    
+        except Exception as e:
+            logger.error(f"Get forum post error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    # Bookmark Operations
+    async def create_bookmark(self, bookmark_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new bookmark"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.rest_url}/bookmarks",
+                    json=bookmark_data,
+                    headers=self._get_headers(use_service_key=True)
+                )
+                
+                if response.status_code in [200, 201]:
+                    data = response.json()
+                    return {"success": True, "data": data[0] if isinstance(data, list) else data}
+                else:
+                    error_data = response.json() if response.content else {}
+                    logger.error(f"Create bookmark failed: {response.status_code}, {error_data}")
+                    return {"success": False, "error": error_data}
+                    
+        except Exception as e:
+            logger.error(f"Create bookmark error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def delete_bookmark(self, user_id: str, post_id: str) -> Dict[str, Any]:
+        """Delete a bookmark"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    f"{self.rest_url}/bookmarks?user_id=eq.{user_id}&post_id=eq.{post_id}",
+                    headers=self._get_headers(use_service_key=True)
+                )
+                
+                if response.status_code in [200, 204]:
+                    return {"success": True}
+                else:
+                    error_data = response.json() if response.content else {}
+                    return {"success": False, "error": error_data}
+                    
+        except Exception as e:
+            logger.error(f"Delete bookmark error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def check_bookmark_exists(self, user_id: str, post_id: str) -> Dict[str, Any]:
+        """Check if a bookmark exists"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.rest_url}/bookmarks?select=id&user_id=eq.{user_id}&post_id=eq.{post_id}",
+                    headers=self._get_headers()
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    exists = len(data) > 0
+                    return {"success": True, "exists": exists}
+                else:
+                    return {"success": False, "error": "Failed to check bookmark"}
+                    
+        except Exception as e:
+            logger.error(f"Check bookmark error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    # Report Operations
+    async def create_report(self, report_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new report"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.rest_url}/reports",
+                    json=report_data,
+                    headers=self._get_headers(use_service_key=True)
+                )
+                
+                if response.status_code in [200, 201]:
+                    data = response.json()
+                    return {"success": True, "data": data[0] if isinstance(data, list) else data}
+                else:
+                    error_data = response.json() if response.content else {}
+                    logger.error(f"Create report failed: {response.status_code}, {error_data}")
+                    return {"success": False, "error": error_data}
+                    
+        except Exception as e:
+            logger.error(f"Create report error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def check_user_reported_post(self, user_id: str, post_id: str) -> Dict[str, Any]:
+        """Check if user has already reported a post"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.rest_url}/reports?select=id&user_id=eq.{user_id}&post_id=eq.{post_id}",
+                    headers=self._get_headers()
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    has_reported = len(data) > 0
+                    return {"success": True, "has_reported": has_reported}
+                else:
+                    return {"success": False, "error": "Failed to check report status"}
+                    
+        except Exception as e:
+            logger.error(f"Check user reported post error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
     async def test_connection(self) -> Dict[str, Any]:
         """Test Supabase connection"""
         try:
