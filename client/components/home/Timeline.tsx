@@ -48,16 +48,13 @@ interface PostData {
 
 interface TimelineProps {
   context?: 'user' | 'lawyer';
-  searchResults?: any[];
-  isSearchMode?: boolean;
-  searchQuery?: string;
 }
 
 export interface TimelineHandle {
   scrollToTop: () => void;
 }
 
-const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', searchResults, isSearchMode = false, searchQuery }, ref) => {
+const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }, ref) => {
 
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
@@ -502,15 +499,11 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', 
         return;
       }
 
-      if (isSearchMode) {
-        if (__DEV__) console.log('Timeline: In search mode, skipping load more');
-        return;
-      }
 
       if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage, hasMore: hasMoreRef.current });
       loadPosts(false); // Don't force refresh
     }, 300); // 300ms debounce
-  }, [loadPosts, isSearchMode]);
+  }, [loadPosts]);
 
   const handleCreatePost = useCallback(() => {
     const route = context === 'lawyer' ? '/lawyer/CreatePost' : '/home/CreatePost';
@@ -641,8 +634,6 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', 
         onMenuToggle={handleMenuToggle}
         isBookmarked={item.isBookmarked || false}
         onBookmarkStatusChange={handleBookmarkStatusChange}
-        searchTerm={searchQuery}
-        isSearchResult={isSearchMode}
       />
     );
 
@@ -656,16 +647,10 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', 
     }
 
     return postComponent;
-  }, [handleCommentPress, handleBookmarkPress, handleReportPress, handlePostPress, handleMenuToggle, openMenuPostId, handleBookmarkStatusChange, searchQuery, isSearchMode]);
+  }, [handleCommentPress, handleBookmarkPress, handleReportPress, handlePostPress, handleMenuToggle, openMenuPostId, handleBookmarkStatusChange]);
 
   // Combined posts data with duplicate detection for seamless transition
   const allPosts = useMemo(() => {
-    // If in search mode, use search results
-    if (isSearchMode && searchResults) {
-      // Using search results
-      return searchResults.map(mapApiToPost);
-    }
-
     // Filter out real posts that match optimistic posts to prevent duplicates
     const filteredRealPosts = posts.filter(realPost => {
       // Check if there's an optimistic post with similar content and timestamp
@@ -682,7 +667,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', 
     });
 
     return [...optimisticPosts, ...filteredRealPosts];
-  }, [optimisticPosts, posts, isSearchMode, searchResults, mapApiToPost]);
+  }, [optimisticPosts, posts, mapApiToPost]);
 
   // Use optimized list hook
   const listProps = useList({
@@ -755,19 +740,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user', 
           contentContainerStyle={allPosts.length === 0 ? styles.emptyContent : styles.timelineContent}
           showsVerticalScrollIndicator={false}
           refreshControl={refreshControl}
-          ListHeaderComponent={isSearchMode && searchQuery && allPosts.length === 0 ? (
-            <View style={styles.searchHeader}>
-              <Text style={styles.searchHeaderText}>
-                No results found for "{searchQuery}"
-              </Text>
-              <Text style={styles.searchHelpText}>
-                Try searching for:
-                {'\n'}• Content keywords (e.g., "contract", "employment")
-                {'\n'}• Usernames (e.g., "lyanna" or "@lyanna")
-                {'\n'}• Categories (e.g., "family" or "#family")
-              </Text>
-            </View>
-          ) : null}
+          ListHeaderComponent={null}
           ListFooterComponent={renderFooter}
           onScroll={() => setOpenMenuPostId(null)}
           scrollEventThrottle={400}
@@ -860,25 +833,6 @@ const styles = StyleSheet.create({
     // Add subtle border for definition
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  searchHeader: {
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    marginBottom: 8,
-    borderRadius: 8,
-    marginHorizontal: 16,
-    marginTop: 8,
-  },
-  searchHeaderText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text.head,
-    marginBottom: 8,
-  },
-  searchHelpText: {
-    fontSize: 14,
-    color: Colors.text.sub,
-    lineHeight: 20,
   },
   loadingContainer: {
     paddingVertical: 20,

@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Platform, useWindowDimensions } from 'react-native';
-import { Menu, Search, Bell, ArrowLeft, Settings, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Platform, useWindowDimensions, TextInput, Animated } from 'react-native';
+import { Menu, Bell, ArrowLeft, Settings, ChevronLeft, ChevronRight, Search } from 'lucide-react-native';
 import { useSidebar } from './AppSidebar';
 import { useRouter } from 'expo-router';
 import Colors from '../constants/Colors';
@@ -18,11 +18,10 @@ interface HeaderProps {
   isChatHistoryOpen?: boolean;
   onBackPress?: () => void;
   onMenuPress?: () => void;
-  onSearchPress?: () => void;
   onNotificationPress?: () => void;
   onSettingsPress?: () => void;
   onChatHistoryToggle?: () => void;
-  variant?: 'home' | 'minimal';
+  variant?: 'home' | 'minimal' | 'default' | 'lawyer-home' | 'lawyer-cases' | 'lawyer-consult' | 'lawyer-clients' | 'lawyer-profile';
   rightComponent?: React.ReactNode;
   backgroundColor?: string; // Allow custom background color
   onLogoPress?: () => void;
@@ -32,7 +31,6 @@ const Header: React.FC<HeaderProps> = ({
   title,
   showBackButton = false,
   showMenu = true,
-  showSearch = false,
   showNotifications = false,
   backgroundColor = Colors.background.primary,
   showSettings = false,
@@ -40,18 +38,24 @@ const Header: React.FC<HeaderProps> = ({
   isChatHistoryOpen = false,
   onBackPress,
   onMenuPress,
-  onSearchPress,
   onNotificationPress,
   onSettingsPress,
   onChatHistoryToggle,
-  variant = 'default',
+  variant,
   rightComponent,
   onLogoPress,
+  showSearch = false,
 }) => {
   const { openSidebar } = useSidebar();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { unreadCount } = useNotifications();
+  
+  // Search state (Facebook-style expandable search)
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchAnim = useRef(new Animated.Value(0)).current; // 0 (collapsed) -> 1 (expanded)
+  const inputRef = useRef<TextInput>(null);
   
   // Dynamic sizing based on screen width (responsive)
   const isSmallScreen = width < 375;
@@ -67,19 +71,50 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const handleSearchPress = () => {
-    if (onSearchPress) {
-      onSearchPress();
-    } else {
-      console.log('Search pressed');
-    }
-  };
 
   const handleNotificationPress = () => {
     if (onNotificationPress) {
       onNotificationPress();
     } else {
       router.push('/notifications');
+    }
+  };
+
+  const expandSearch = () => {
+    setIsSearchOpen(true);
+    Animated.timing(searchAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: false,
+    }).start(() => inputRef.current?.focus());
+  };
+
+  const collapseSearch = () => {
+    Animated.timing(searchAnim, {
+      toValue: 0,
+      duration: 160,
+      useNativeDriver: false,
+    }).start(() => {
+      setIsSearchOpen(false);
+      setSearchQuery('');
+    });
+  };
+
+  const handleSearchSubmit = () => {
+    const q = searchQuery.trim();
+    if (!q) {
+      collapseSearch();
+      return;
+    }
+    router.push({ pathname: '/search', params: { query: q } } as any);
+    collapseSearch();
+  };
+
+  const handleSearchIconPress = () => {
+    if (!isSearchOpen) {
+      expandSearch();
+    } else {
+      handleSearchSubmit();
     }
   };
 
@@ -153,32 +188,64 @@ const Header: React.FC<HeaderProps> = ({
     if (showSearch || showNotifications || showSettings || showChatHistoryToggle) {
       return (
         <View style={styles.rightActions}>
+          {/* Expandable input first, then search icon, then bell (rightmost) */}
+          {showSearch && (
+            <Animated.View
+              style={[
+                styles.searchContainer,
+                {
+                  width: searchAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, Math.min(width * 0.55, 280)],
+                  }),
+                  opacity: searchAnim,
+                  marginRight: 8,
+                },
+              ]}
+            >
+              <TextInput
+                ref={inputRef}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search…"
+                placeholderTextColor="#9CA3AF"
+                returnKeyType="search"
+                onSubmitEditing={handleSearchSubmit}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.searchInput}
+                accessibilityLabel="Search input"
+              />
+            </Animated.View>
+          )}
+          
           {showSearch && (
             <TouchableOpacity
               style={styles.iconButton}
-              onPress={handleSearchPress}
+              onPress={handleSearchIconPress}
               activeOpacity={0.7}
+              accessibilityLabel={isSearchOpen ? 'Submit search' : 'Open search'}
             >
               <Search size={iconSize - 2} color={Colors.text.sub} strokeWidth={1.5} />
             </TouchableOpacity>
           )}
-          
+
           {showNotifications && (
             <TouchableOpacity
-              style={[styles.iconButton, styles.notificationButton]}
+              style={styles.iconButton}
               onPress={handleNotificationPress}
               activeOpacity={0.7}
             >
               <Bell size={iconSize - 2} color={Colors.text.sub} strokeWidth={1.5} />
               {/* Notification badge */}
               {unreadCount > 0 && (
-                <View style={styles.notificationBadge}>
+                <View style={[styles.notificationBadge, { right: '15%', top: '15%' }]}>
                   <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
                 </View>
               )}
             </TouchableOpacity>
           )}
-
+        
           {showChatHistoryToggle && (
             <TouchableOpacity
               style={styles.chatHistoryButton}
@@ -283,9 +350,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    height: 36,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  searchInput: {
+    flex: 1,
+    color: '#111827',
+    fontSize: 14,
+    paddingVertical: 0,
+    marginLeft: 6,
+  },
   notificationButton: {
     position: 'relative',
-    marginLeft: 8,
+    marginLeft: 4,
   },
   notificationBadge: {
     position: 'absolute',

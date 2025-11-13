@@ -5,10 +5,8 @@ import Header from '../Header';
 interface RoleBasedHeaderProps {
   variant?: string;
   title?: string;
-  showSearch?: boolean;
   showNotifications?: boolean;
   showSettings?: boolean;
-  onSearchPress?: () => void;
   onNotificationPress?: () => void;
   onSettingsPress?: () => void;
 }
@@ -16,10 +14,8 @@ interface RoleBasedHeaderProps {
 const RoleBasedHeader: React.FC<RoleBasedHeaderProps> = ({
   variant,
   title,
-  showSearch,
   showNotifications,
   showSettings,
-  onSearchPress,
   onNotificationPress,
   onSettingsPress,
 }) => {
@@ -30,10 +26,8 @@ const RoleBasedHeader: React.FC<RoleBasedHeaderProps> = ({
       <Header 
         variant="default"
         title={title}
-        showSearch={showSearch}
         showNotifications={showNotifications}
         showSettings={showSettings}
-        onSearchPress={onSearchPress}
         onNotificationPress={onNotificationPress}
         onSettingsPress={onSettingsPress}
       />
@@ -54,10 +48,8 @@ const RoleBasedHeader: React.FC<RoleBasedHeaderProps> = ({
     <Header 
       variant={headerVariant}
       title={title}
-      showSearch={showSearch}
       showNotifications={showNotifications}
       showSettings={showSettings}
-      onSearchPress={onSearchPress}
       onNotificationPress={onNotificationPress}
       onSettingsPress={onSettingsPress}
     />

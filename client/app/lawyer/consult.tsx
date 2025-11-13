@@ -489,7 +489,6 @@ const LawyerConsultPage: React.FC = () => {
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header
           title="Consultations"
-          showSearch={false}
         />
         <ScrollView
           style={tw`flex-1`}
@@ -550,7 +549,6 @@ const LawyerConsultPage: React.FC = () => {
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header
         title="Consultations"
-        showSearch={false}
       />
 
       <ScrollView
