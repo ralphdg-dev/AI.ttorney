@@ -16,6 +16,8 @@ const ForgotPassword = () => {
   const [newPassword, setNewPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+  const [resendTimer, setResendTimer] = React.useState(120);
+  const [canResend, setCanResend] = React.useState(false);
 
   const goBackToLogin = () => navigate('/login');
 
@@ -28,6 +30,30 @@ const ForgotPassword = () => {
     }
   }, [step]);
 
+  // Countdown for OTP expiry / resend availability
+  useEffect(() => {
+    if (step !== 'otp') return;
+    let interval;
+    if (resendTimer > 0 && !canResend) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => {
+          if (prev <= 1) {
+            setCanResend(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [step, resendTimer, canResend]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
     const newOtp = [...otp];
@@ -36,6 +62,28 @@ const ForgotPassword = () => {
     // Auto-focus next on input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleResendResetCode = async () => {
+    if (!canResend || loading) return;
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      await res.json();
+      showSuccess('A new reset code has been sent to your email.');
+      setCanResend(false);
+      setResendTimer(120);
+      setOtp(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+    } catch (err) {
+      showError('Failed to resend code. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -61,6 +109,10 @@ const ForgotPassword = () => {
       await res.json(); // always returns success generic
       showSuccess('If the email exists, a reset code has been sent.');
       setStep('otp');
+      // reset timer each time we send
+      setCanResend(false);
+      setResendTimer(120);
+      setOtp(['', '', '', '', '', '']);
     } catch (err) {
       showError('Failed to send reset code. Please try again.');
     } finally {
@@ -211,6 +263,9 @@ const ForgotPassword = () => {
                     />
                   ))}
                 </div>
+                <p className="text-[11px] text-gray-500 text-center">
+                  OTP expires in: <span className="font-semibold text-gray-700">{formatTime(resendTimer)}</span>
+                </p>
               </div>
 
               <button
@@ -220,6 +275,22 @@ const ForgotPassword = () => {
               >
                 {loading ? (<><Loader2 size={16} className="animate-spin" />Verifying...</>) : 'Verify code'}
               </button>
+
+              <div className="text-center mb-1">
+                <p className="text-[12px] text-gray-600">
+                  Didn't receive the code?{' '}
+                  <button
+                    type="button"
+                    onClick={handleResendResetCode}
+                    disabled={!canResend}
+                    className={`font-semibold ${
+                      canResend ? 'text-[#023D7B] hover:text-[#013462] hover:underline cursor-pointer' : 'text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {canResend ? 'Resend Code' : `Resend (${formatTime(resendTimer)})`}
+                  </button>
+                </p>
+              </div>
 
               <button type="button" onClick={() => setStep('email')} className="flex items-center gap-1 text-[11px] text-gray-600 hover:text-gray-800 bg-transparent border-none">
                 <ArrowLeft size={14} /> Use a different email
