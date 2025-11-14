@@ -48,6 +48,8 @@ from api.chatbot_user import (
     retrieve_relevant_context,
     get_legal_disclaimer,
     save_chat_interaction,
+    is_professional_advice_roleplay_request,
+    build_professional_referral_response,
     
     # Moderation
     get_moderation_service,
@@ -107,6 +109,41 @@ async def ask_legal_question(
             # Detect language first
             language = detect_language(request.question)
             yield format_sse({'type': 'metadata', 'language': language})
+            
+            # Block professional legal advice roleplay/simulation requests
+            if is_professional_advice_roleplay_request(request.question):
+                referral_response, referral_followups = build_professional_referral_response(language)
+                session_id = None
+                user_msg_id = None
+                assistant_msg_id = None
+                if effective_user_id:
+                    try:
+                        session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                            chat_service=chat_service,
+                            effective_user_id=effective_user_id,
+                            session_id=request.session_id,
+                            question=request.question,
+                            answer=referral_response,
+                            language=language,
+                            metadata={"type": "referral", "reason": "professional_roleplay_block", "streaming": True}
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to save referral to history: {e}")
+                
+                # Send referral response
+                yield format_sse({'content': referral_response})
+                
+                # Send metadata with session info
+                yield format_sse({
+                    'type': 'metadata',
+                    'language': language,
+                    'session_id': session_id,
+                    'user_message_id': user_msg_id,
+                    'assistant_message_id': assistant_msg_id
+                })
+                
+                yield format_sse({'done': True})
+                return
             
             # Content Moderation using OpenAI omni-moderation-latest
             # STRICT APPROACH: Show violation message and DO NOT answer the question
@@ -639,7 +676,39 @@ async def ask_legal_question(
             # Check if legal question
             if not is_legal_question(request.question):
                 casual_response = generate_ai_response(request.question, language, 'casual')
-                yield format_sse({'content': casual_response, 'done': True})
+                
+                # Persist interaction and emit metadata so the client can capture session_id
+                session_id = None
+                user_msg_id = None
+                assistant_msg_id = None
+                if effective_user_id:
+                    try:
+                        session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                            chat_service=chat_service,
+                            effective_user_id=effective_user_id,
+                            session_id=request.session_id,
+                            question=request.question,
+                            answer=casual_response,
+                            language=language,
+                            metadata={"type": "casual", "streaming": True}
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to save casual message to history: {e}")
+                
+                # Send response
+                yield format_sse({'content': casual_response})
+                
+                # Send metadata (session/message IDs) BEFORE done
+                yield format_sse({
+                    'type': 'metadata',
+                    'language': language,
+                    'session_id': session_id,
+                    'user_message_id': user_msg_id,
+                    'assistant_message_id': assistant_msg_id
+                })
+                
+                # Done
+                yield format_sse({'done': True})
                 return
             
             # Query normalization
@@ -724,13 +793,13 @@ async def ask_legal_question(
             if legal_disclaimer:
                 yield format_sse({'type': 'disclaimer', 'disclaimer': legal_disclaimer})
             
-            # Done
-            yield format_sse({'done': True})
-            
-            # Save to history (async)
+            # Persist interaction and emit metadata BEFORE finishing stream
+            session_id = None
+            user_msg_id = None
+            assistant_msg_id = None
             if effective_user_id:
                 try:
-                    await save_chat_interaction(
+                    session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
                         chat_service=chat_service,
                         effective_user_id=effective_user_id,
                         session_id=request.session_id,
@@ -741,6 +810,18 @@ async def ask_legal_question(
                     )
                 except Exception as e:
                     print(f"Failed to save: {e}")
+            
+            # Send metadata (session/message IDs) BEFORE done so frontend can capture session_id
+            yield format_sse({
+                'type': 'metadata',
+                'language': language,
+                'session_id': session_id,
+                'user_message_id': user_msg_id,
+                'assistant_message_id': assistant_msg_id
+            })
+            
+            # Done
+            yield format_sse({'done': True})
             
         except Exception as e:
             logger.error(f"Streaming error: {e}")

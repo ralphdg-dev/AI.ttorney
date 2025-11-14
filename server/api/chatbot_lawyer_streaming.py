@@ -59,6 +59,9 @@ from api.chatbot_lawyer import (
     retrieve_relevant_context,
     generate_ai_response,
     save_chat_interaction,
+    # New roleplay detection & referral
+    is_professional_advice_roleplay_request,
+    build_professional_referral_response,
     
     # Logging
     logger
@@ -413,6 +416,41 @@ async def ask_legal_question(
             
             # Send initial metadata
             yield format_sse({'type': 'metadata', 'language': language})
+            
+            # Block professional legal advice roleplay/simulation requests
+            if is_professional_advice_roleplay_request(request.question):
+                referral_response, referral_followups = build_professional_referral_response(language)
+                session_id = None
+                user_msg_id = None
+                assistant_msg_id = None
+                if effective_user_id:
+                    try:
+                        session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                            chat_service=chat_service,
+                            effective_user_id=effective_user_id,
+                            session_id=request.session_id,
+                            question=request.question,
+                            answer=referral_response,
+                            language=language,
+                            metadata={"type": "referral", "reason": "professional_roleplay_block", "streaming": True, "user_type": "lawyer"}
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to save referral to history (lawyer): {e}")
+                
+                # Send referral response
+                yield format_sse({'content': referral_response})
+                
+                # Send metadata with session info
+                yield format_sse({
+                    'type': 'metadata',
+                    'language': language,
+                    'session_id': session_id,
+                    'user_message_id': user_msg_id,
+                    'assistant_message_id': assistant_msg_id
+                })
+                
+                yield format_sse({'done': True})
+                return
             
             # Check for unsupported language
             if language == "unsupported":

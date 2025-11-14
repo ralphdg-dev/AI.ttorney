@@ -81,34 +81,60 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ text, style, isUserM
  * Render inline markdown (bold text)
  * Converts **text** to bold, removes asterisks
  */
-const renderInlineMarkdown = (text: string, textColor: string, boldColor: string): (string | ReactElement)[] => {
-  const parts: (string | ReactElement)[] = [];
-  let currentIndex = 0;
+const renderInlineMarkdown = (text: string, textColor: string, boldColor: string): (string | React.ReactElement)[] => {
+  const parts: (string | React.ReactElement)[] = [];
   let partIndex = 0;
 
-  // Find all **bold** patterns
-  const boldRegex = /\*\*(.+?)\*\*/g;
-  let match;
-
-  while ((match = boldRegex.exec(text)) !== null) {
-    // Add text before the bold part
-    if (match.index > currentIndex) {
-      parts.push(text.substring(currentIndex, match.index));
+  const renderBold = (input: string): (string | React.ReactElement)[] => {
+    const boldParts: (string | React.ReactElement)[] = [];
+    let currentIndex = 0;
+    const boldRegex = /\*\*(.+?)\*\*/g;
+    let boldMatch: RegExpExecArray | null;
+    while ((boldMatch = boldRegex.exec(input)) !== null) {
+      if (boldMatch.index > currentIndex) {
+        boldParts.push(input.substring(currentIndex, boldMatch.index));
+      }
+      boldParts.push(
+        <Text key={`bold-${partIndex++}`} style={[styles.bold, { color: boldColor }]}>
+          {boldMatch[1]}
+        </Text>
+      );
+      currentIndex = boldMatch.index + boldMatch[0].length;
     }
+    if (currentIndex < input.length) {
+      boldParts.push(input.substring(currentIndex));
+    }
+    return boldParts.length > 0 ? boldParts : [input];
+  };
 
-    // Add bold text (without asterisks)
+  // Handle in-app links: [text](/path or /path?query)
+  const linkRegex = /\[([^\]]+)\]\((\/[^)]+)\)/g;
+  let lastIndex = 0;
+  let linkMatch: RegExpExecArray | null;
+  while ((linkMatch = linkRegex.exec(text)) !== null) {
+    if (linkMatch.index > lastIndex) {
+      const before = text.substring(lastIndex, linkMatch.index);
+      parts.push(...renderBold(before));
+    }
+    const linkText = linkMatch[1];
+    const linkPath = linkMatch[2];
     parts.push(
-      <Text key={`bold-${partIndex++}`} style={[styles.bold, { color: boldColor }]}>
-        {match[1]}
+      <Text
+        key={`link-${partIndex++}`}
+        style={styles.link}
+        onPress={() => {
+          const router = require('expo-router').router;
+          router.push(linkPath);
+        }}
+      >
+        {renderBold(linkText)}
       </Text>
     );
-
-    currentIndex = match.index + match[0].length;
+    lastIndex = linkMatch.index + linkMatch[0].length;
   }
-
-  // Add remaining text
-  if (currentIndex < text.length) {
-    parts.push(text.substring(currentIndex));
+  if (lastIndex < text.length) {
+    const tail = text.substring(lastIndex);
+    parts.push(...renderBold(tail));
   }
 
   return parts.length > 0 ? parts : [text];
@@ -146,5 +172,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     lineHeight: 26,
+  },
+  link: {
+    color: Colors.primary.blue,
+    textDecorationLine: 'underline',
   },
 });

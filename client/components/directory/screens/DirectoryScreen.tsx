@@ -13,7 +13,7 @@ import { LawyerListSkeleton } from "../components/LawyerListSkeleton";
 import Colors from "@/constants/Colors";
 
 import FilterModal from "../components/FilterModal";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import GoogleLawFirmsFinder from "../components/GoogleLawFirmsFinder";
 import { VStack } from "@/components/ui/vstack";
 import { Text as UIText } from "@/components/ui/text";
@@ -63,6 +63,20 @@ export default function DirectoryScreen() {
 
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(300));
+
+  // Read query param to select initial tab (e.g., /directory?tab=lawyers)
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
+
+  useEffect(() => {
+    if (typeof tab === 'string') {
+      const normalized = tab.toLowerCase();
+      if (normalized === 'lawyers' || normalized === 'law-firms') {
+        setActiveTab(normalized);
+      }
+    }
+    // Only respond to changes in `tab`
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   useEffect(() => {
     if (filterVisible) {

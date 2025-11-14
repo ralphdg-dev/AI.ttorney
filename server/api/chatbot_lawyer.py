@@ -757,6 +757,74 @@ def is_personal_advice_question(text: str) -> bool:
     return any(pattern in text_lower for pattern in PERSONAL_ADVICE_PATTERNS)
 
 
+def is_professional_advice_roleplay_request(text: str) -> bool:
+    """
+    Detect prompts that ask the bot to roleplay or act as the user's lawyer/legal advisor
+    (e.g., "simulate a consultation", "you're my legal advisor", "act as my lawyer").
+    These should be declined with a referral to the Legal Help page.
+    """
+    text_lower = text.lower().strip()
+    patterns = [
+        # English roleplay/simulation
+        "simulate a consultation",
+        "simulate consultation",
+        "let's simulate a consultation",
+        "roleplay",
+        "role play",
+        "pretend to be my lawyer",
+        "act as my lawyer",
+        "act as my legal advisor",
+        "you are my legal advisor",
+        "you're my legal advisor",
+        "be my lawyer",
+        "be my legal advisor",
+        "assume you're my lawyer",
+        "assume you are my lawyer",
+        "you are my lawyer",
+        "you're my lawyer",
+        # Filipino/Tagalog variants
+        "magpanggap kang abogado",
+        "maging abogado ko",
+        "kunwari abogado ka",
+        "kunwaring konsultasyon",
+        "simulate konsultasyon",
+        "ikaw ang aking abogado",
+        "ikaw ang aking legal na tagapayo",
+    ]
+    return any(p in text_lower for p in patterns)
+
+
+def build_professional_referral_response(language: str) -> tuple[str, list[str]]:
+    """
+    Build a bilingual referral response instructing the user to consult a licensed lawyer
+    and directing them to the in-app Legal Help page (Lawyers tab).
+    Returns (response_text, follow_up_questions)
+    """
+    if language == "tagalog":
+        response = (
+            "Upang sumunod sa aming mga patakaran, hindi ako maaaring magsagawa ng ‘simulated consultation’ "
+            "o gumanap bilang iyong legal advisor. Para sa personal na legal advice tungkol sa iyong partikular "
+            "na sitwasyon, pinakamainam na kumonsulta sa lisensyadong abogado.\n\n"
+            "Maaari kang maghanap ng verified na abogado sa aming [Legal Help directory](/directory?tab=lawyers)."
+        )
+        followups = [
+            "Buksan ang Legal Help directory",
+            "Tingnan ang mga abogado malapit sa akin",
+            "Alamin kung paano gumagana ang legal consultations",
+        ]
+    else:
+        response = (
+            "To comply with our policies, I can’t simulate a consultation or act as your legal advisor. "
+            "For personalized legal advice about your specific situation, please consult a licensed lawyer.\n\n"
+            "You can browse verified lawyers in our [Legal Help directory](/directory?tab=lawyers)."
+        )
+        followups = [
+            "Open the Legal Help directory",
+            "View lawyers near me",
+            "Learn how legal consultations work",
+        ]
+    return response, followups
+
 def is_legal_question(text: str) -> bool:
     """
     Validates if the input constitutes a bona fide legal interrogatory.
@@ -2036,6 +2104,27 @@ async def ask_legal_question_legacy(
                 answer=unsupported_response,
                 simplified_summary="Language not supported. Advised user to use English or Filipino.",
                 confidence="low"
+            )
+        
+        # Block professional legal advice roleplay/simulation requests
+        if is_professional_advice_roleplay_request(request.question):
+            referral_response, referral_followups = build_professional_referral_response(language)
+            session_id, user_msg_id, assistant_msg_id = await save_chat_interaction(
+                chat_service=chat_service,
+                effective_user_id=effective_user_id,
+                session_id=request.session_id,
+                question=request.question,
+                answer=referral_response,
+                language=language,
+                metadata={"type": "referral", "reason": "professional_roleplay_block"}
+            )
+            return create_chat_response(
+                answer=referral_response,
+                simplified_summary="Referral to Legal Help for professional consultation",
+                follow_up_questions=referral_followups,
+                session_id=session_id,
+                message_id=assistant_msg_id,
+                user_message_id=user_msg_id
             )
         
         # 🔒 CHECK FOR PERSONAL ADVICE QUESTIONS (even if they contain legal keywords)
