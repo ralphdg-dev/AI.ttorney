@@ -144,23 +144,28 @@ export default function RoleSelection() {
       });
 
 
-      if (response.success && response.data) {
+      if (response.success) {
         // Refresh user data in AuthContext to update role
         await refreshUserData();
         
         // Navigate based on selected role
+        console.log('✅ Role updated successfully, navigating...');
         
         if (selectedRole === "seeker") {
           // Legal seeker goes to home page - use replace to prevent back navigation
+          console.log('🏠 Navigating to home for legal seeker');
           router.replace("/home");
         } else if (selectedRole === "lawyer") {
           // Lawyer goes to verification instructions - use replace to prevent back navigation
+          console.log('⚖️ Navigating to lawyer verification for lawyer');
           router.replace("/onboarding/lawyer/verification-instructions");
         } else {
           // Fallback
+          console.log('🔄 Fallback navigation to home');
           router.replace("/home");
         }
       } else {
+        console.error('❌ Role selection failed:', response.error);
         Alert.alert('Error', response.error || 'Failed to update role');
       }
     } catch {
