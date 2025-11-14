@@ -1,10 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { router, usePathname } from 'expo-router';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { LoadingWithTrivia } from './LoadingWithTrivia';
 import { normalizePath } from '../utils/path';
-import NavigationHelper from '../utils/navigationHelper';
 
 /**
  * SuspensionGuard Component
@@ -18,101 +15,52 @@ import NavigationHelper from '../utils/navigationHelper';
 export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, session, isLoading, checkSuspensionStatus, isSigningOut } = useAuth();
   const pathname = usePathname();
-  const [isChecking, setIsChecking] = useState(false);
-  const [hasChecked, setHasChecked] = useState(false);
-  const [lastUserId, setLastUserId] = useState<string | null>(null);
-
-  const safeReplace = React.useCallback((targetPath: string) => {
-    if (!targetPath) return;
-    NavigationHelper.replaceIfDifferent(router, pathname, targetPath);
-  }, [pathname]);
-
-  // Reset hasChecked when user changes (login/logout)
-  React.useEffect(() => {
-    if (user?.id !== lastUserId) {
-      setHasChecked(false);
-      setLastUserId(user?.id || null);
-    }
-  }, [user?.id, lastUserId]);
+  const checkedUsersRef = React.useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    const checkSuspension = async () => {
-      // CRITICAL: Skip check if user is signing out to prevent infinite loading after logout
-      if (isSigningOut) {
-        return;
-      }
+    // CRITICAL: Skip check if user is signing out
+    if (isSigningOut || isLoading || !user || !session) {
+      return;
+    }
 
-      // Skip check if:
-      // 1. Already on suspended screen or suspension-lifted screen
-      // 2. On login/register screens
-      // 3. No user session (CRITICAL: prevents check after logout when user/session are null)
-      // 4. Already checking
-      // 5. Auth is still loading
-      // 6. Already checked for this user
-      // 7. On lawyer status pages (they have their own guard)
-      const publicRoutes = ['/login', '/register', '/suspended', '/suspension-lifted', '/forgot-password', '/onboarding'];
-      const isLawyerStatusPage = pathname?.includes('/lawyer-status/');
-      const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route)) || isLawyerStatusPage;
-      
-      // CRITICAL: Always skip check if on suspension-lifted page to prevent infinite loops
-      if (pathname === '/suspension-lifted') {
-        if (!hasChecked) {
-          setHasChecked(true);
-        }
-        return;
-      }
-      
-      console.log('🛡️ SuspensionGuard: Check conditions', { 
-        pathname, 
-        isLawyerStatusPage, 
-        isPublicRoute,
-        hasUser: !!user,
-        hasSession: !!session,
-        isChecking,
-        isLoading,
-        hasChecked
-      });
-      
-      // CRITICAL: Mark as checked immediately for lawyer status pages
-      if (isLawyerStatusPage && !hasChecked) {
-        console.log('🛡️ SuspensionGuard: Lawyer status page detected, marking as checked');
-        setHasChecked(true);
-        return;
-      }
-      
-      if (isPublicRoute || !user || !session || isChecking || isLoading || hasChecked) {
-        // ⚡ OPTIMIZATION: Mark as checked immediately on public routes or when auth is loading
-        // This prevents redundant checks since AuthContext already handles suspension on login
-        if (!hasChecked && !isPublicRoute && user && session && !isLoading) {
-          setHasChecked(true);
-        }
-        return;
-      }
+    // Skip if we already checked this user in this session
+    const userId = user.id;
+    if (checkedUsersRef.current.has(userId)) {
+      return;
+    }
 
+    const publicRoutes = ['/login', '/register', '/suspended', '/suspension-lifted', '/forgot-password', '/onboarding'];
+    const isLawyerStatusPage = pathname?.includes('/lawyer-status/');
+    const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route)) || isLawyerStatusPage;
+    
+    if (isPublicRoute) {
+      return;
+    }
+
+    // Mark as checked immediately to prevent re-runs
+    checkedUsersRef.current.add(userId);
+
+    (async () => {
       try {
-        setIsChecking(true);
         const suspensionStatus = await checkSuspensionStatus();
         
         if (suspensionStatus && suspensionStatus.isSuspended) {
-          console.log('🚫 User is suspended, redirecting to suspended screen from guard');
-          router.replace('/suspended');
+          console.log('🚫 User is suspended, redirecting to suspended screen');
+          if (normalizePath(pathname || '/') !== '/suspended') {
+            router.replace('/suspended');
+          }
         } else if (suspensionStatus && suspensionStatus.needsLiftedAcknowledgment) {
-          console.log('✅ User suspension lifted, redirecting to suspension-lifted screen from guard');
-          router.replace('/suspension-lifted');
-        } else {
-          setHasChecked(true);
+          console.log('✅ User suspension lifted, redirecting to suspension-lifted screen');
+          if (normalizePath(pathname || '/') !== '/suspension-lifted') {
+            router.replace('/suspension-lifted');
+          }
         }
       } catch (error) {
         console.error('Error checking suspension status:', error);
-        // On error, allow access (fail-open for better UX)
-        setHasChecked(true);
-      } finally {
-        setIsChecking(false);
       }
-    };
-
-    checkSuspension();
-  }, [pathname, user?.id, hasChecked, isLoading, isSigningOut]);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isLoading, isSigningOut]);
 
   // Don't show loading if user is signing out
   if (isSigningOut) {

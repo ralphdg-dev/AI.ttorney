@@ -83,8 +83,8 @@ function AppContent() {
                           <MaintenanceGuard>
                             <AuthGuard>
                               <SuspensionGuard>
-                                <RouteErrorBoundary>
-                                  <SidebarProvider>
+                              <RouteErrorBoundary>
+                                <SidebarProvider>
                                     <Stack screenOptions={{ headerShown: false }}>
                                       <Stack.Screen name="index" options={{ headerShown: false }} />
                                       <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -102,10 +102,10 @@ function AppContent() {
                                       <Stack.Screen name="bookmarked-guides" options={{ headerShown: false, title: "Bookmarked Guides" }} />
                                       <Stack.Screen name="favorite-terms" options={{ headerShown: false, title: "Favorite Terms" }} />
                                       <Stack.Screen name="help" options={{ headerShown: false, title: "Help" }} />
-                                      <Stack.Screen name="profile" options={{ headerShown: false, title: "Profile" }} />
+                                      <Stack.Screen name="profile" options={{ headerShown: false }} />
                                     </Stack>
-                                  </SidebarProvider>
-                                </RouteErrorBoundary>
+                                </SidebarProvider>
+                              </RouteErrorBoundary>
                               </SuspensionGuard>
                             </AuthGuard>
                           </MaintenanceGuard>

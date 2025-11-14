@@ -111,15 +111,21 @@ type IModalCloseButtonProps = React.ComponentProps<typeof UIModal.CloseButton> &
   VariantProps<typeof modalCloseButtonStyle> & { className?: string };
 
 const Modal = React.forwardRef<React.ComponentRef<typeof UIModal>, IModalProps>(
-  ({ className, size = 'md', style, ...props }, ref) => (
-    <UIModal
-      ref={ref}
-      {...props}
-      style={{ pointerEvents: 'box-none', ...(style || {}) }}
-      className={modalStyle({ size, class: className })}
-      context={{ size }}
-    />
-  )
+  ({ className, size = 'md', style, ...props }, ref) => {
+    // Memoize the context value to avoid creating a new object each render,
+    // which can trigger downstream layout effects and cause re-render loops.
+    const contextValue = React.useMemo(() => ({ size }), [size]);
+
+    return (
+      <UIModal
+        ref={ref}
+        {...props}
+        style={{ pointerEvents: 'box-none', ...(style || {}) }}
+        className={modalStyle({ size, class: className })}
+        context={contextValue}
+      />
+    );
+  }
 );
 
 const ModalBackdrop = React.forwardRef<

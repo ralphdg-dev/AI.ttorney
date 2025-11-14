@@ -9,7 +9,7 @@ import {
 } from '../config/routes';
 import { LoadingWithTrivia } from './LoadingWithTrivia';
 import { normalizePath } from '../utils/path';
-import NavigationHelper from '../utils/navigationHelper';
+import { NavigationHelper } from '../utils/navigationHelper';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -27,7 +27,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   // Prevent redundant redirects that can cause navigation loops
   const lastRedirectRef = React.useRef<string | null>(null);
   const redirectInProgressRef = React.useRef<boolean>(false);
-  const redirectIfNeeded = React.useCallback((targetPath: string) => {
+  
+  const redirectIfNeeded = (targetPath: string) => {
     if (!targetPath) return;
     // Only redirect if target differs and we didn't just redirect to it
     const currentPath = normalizePath(`/${segments.join('/')}`);
@@ -37,8 +38,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       redirectInProgressRef.current = true;
       NavigationHelper.replaceIfDifferent(router, currentPath, target, lastRedirectRef);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, segments]);
+  };
 
   // Clear last redirect marker when path actually changes to avoid locking
   React.useEffect(() => {
@@ -70,11 +70,15 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     // Compute path/config once per effect run
     const currentPath = normalizePath(`/${segments.join('/')}`);
     const routeConfig = getRouteConfig(currentPath);
+    // Do not interfere with maintenance route; MaintenanceGuard manages it
+    if (currentPath === '/maintenance') {
+      return;
+    }
 
     // During sign out: proactively force redirect to /login if current route is protected
     if (isSigningOut) {
       const isPublic = !!routeConfig?.isPublic;
-      if (!isPublic && currentPath !== '/login') {
+      if (!isPublic && currentPath !== '/login' && currentPath !== '/maintenance') {
         redirectIfNeeded('/login');
       }
       return;
@@ -168,6 +172,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       // Log public access
       logRouteAccess(currentPath, null, 'granted', 'Public route');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, user, isLoading, isSigningOut, initialAuthCheck, isGuestMode, session, router, segments]);
 
   // CRITICAL: For protected routes, block UI until initial auth check completes
@@ -178,8 +183,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
 
   // Show loading screen while checking authentication for PROTECTED routes only
   // For public routes (e.g., /login, /onboarding/registration), render children to avoid blinking
-  const currentPath = currentPathRender;
-  const routeConfig = routeConfigRender;
   const isPublicRoute = isPublicRouteRender;
 
   // During sign out, we want immediate redirect without loading screen
