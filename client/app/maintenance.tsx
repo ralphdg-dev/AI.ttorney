@@ -87,9 +87,9 @@ export default function MaintenanceScreen() {
     : 'AI.ttorney is currently undergoing scheduled maintenance to enhance your experience.';
 
   const timeCopy =
-    startTime || endTime
-      ? `We anticipate being back online around ${endTime || startTime}.`
-      : 'We anticipate being back online shortly.';
+    !endTime
+      ? 'We anticipate being back online in a while.'
+      : `We anticipate being back online around ${endTime}.`;
 
   return (
     <View className="flex-1 bg-white">

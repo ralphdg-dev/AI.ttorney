@@ -2,6 +2,7 @@ import httpx
 import os
 import json
 from typing import Dict, Any, Optional
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 import logging
 from supabase import create_client, Client
@@ -597,13 +598,47 @@ class SupabaseService:
                 if response.status_code == 200:
                     data = response.json()
                     row = data[0] if isinstance(data, list) and len(data) > 0 else None
-                    maintenance = row or {
-                        "is_active": False,
-                        "message": "",
-                        "start_time": None,
-                        "end_time": None,
-                        "allow_admin": True,
-                    }
+
+                    if row:
+                        # Compute effective maintenance status based on schedule window in UTC
+                        now = datetime.now(timezone.utc)
+
+                        def parse_dt(value):
+                            if not value:
+                                return None
+                            try:
+                                # Supabase returns ISO8601 with offset, which fromisoformat can parse
+                                return datetime.fromisoformat(value)
+                            except Exception:
+                                return None
+
+                        start = parse_dt(row.get("start_time"))
+                        end = parse_dt(row.get("end_time"))
+
+                        has_schedule = start is not None or end is not None
+                        within_window = has_schedule and (
+                            (start is not None and end is not None and start <= now < end)
+                            or (start is not None and end is None and now >= start)
+                            or (start is None and end is not None and now < end)
+                        )
+
+                        stored_is_active = bool(row.get("is_active"))
+                        effective_is_active = within_window if has_schedule else stored_is_active
+
+                        maintenance = {
+                            **row,
+                            "is_active": effective_is_active,
+                            "effective_is_active": effective_is_active,
+                        }
+                    else:
+                        maintenance = {
+                            "is_active": False,
+                            "message": "",
+                            "start_time": None,
+                            "end_time": None,
+                            "allow_admin": True,
+                        }
+
                     return {"success": True, "data": maintenance}
                 else:
                     return {"success": False, "error": "Failed to fetch maintenance status"}
