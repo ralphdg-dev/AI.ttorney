@@ -581,3 +581,32 @@ class SupabaseService:
         except Exception as e:
             logger.error(f"Connection test error: {str(e)}")
             return {"success": False, "error": str(e)}
+
+    async def get_system_maintenance(self) -> Dict[str, Any]:
+        """Fetch the latest system maintenance settings.
+
+        Returns a payload with fields: is_active, message, allow_admin, start_time, end_time.
+        """
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.rest_url}/system_maintenance?select=id,is_active,message,start_time,end_time,allow_admin,created_at&order=created_at.desc&limit=1",
+                    headers=self._get_headers()
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    row = data[0] if isinstance(data, list) and len(data) > 0 else None
+                    maintenance = row or {
+                        "is_active": False,
+                        "message": "",
+                        "start_time": None,
+                        "end_time": None,
+                        "allow_admin": True,
+                    }
+                    return {"success": True, "data": maintenance}
+                else:
+                    return {"success": False, "error": "Failed to fetch maintenance status"}
+        except Exception as e:
+            logger.error(f"Get system maintenance error: {str(e)}")
+            return {"success": False, "error": str(e)}

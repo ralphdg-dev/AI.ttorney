@@ -18,6 +18,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   '/': { path: '/', isPublic: true },
   '/index': { path: '/index', isPublic: true },
   '/unauthorized': { path: '/unauthorized', isPublic: true },
+  '/maintenance': { path: '/maintenance', isPublic: true, errorBoundary: true },
 
   // Auth routes (redirect authenticated users)
   '/login': { 
