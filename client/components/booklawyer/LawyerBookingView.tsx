@@ -8,6 +8,7 @@ import { LawyerNavbar } from "@/components/lawyer/shared";
 import Header from "@/components/Header";
 import { SidebarWrapper } from "@/components/AppSidebar";
 import { useAuth } from "@/contexts/AuthContext";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Box } from "@/components/ui/box";
@@ -64,7 +65,7 @@ export default function LawyerBookingView() {
   const params = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 375;
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const toast = useToast();
 
   const [lawyerData, setLawyerData] = useState<LawyerData | null>(null);
@@ -82,6 +83,13 @@ export default function LawyerBookingView() {
     {}
   );
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [consultationBanStatus, setConsultationBanStatus] = useState<{
+    can_book: boolean;
+    ban_status: string;
+    ban_end: string | null;
+    message: string | null;
+  } | null>(null);
+  const [isCheckingBanStatus, setIsCheckingBanStatus] = useState(false);
 
   const today = new Date();
   const currentMonth = today.getMonth();
@@ -312,6 +320,91 @@ export default function LawyerBookingView() {
       .padStart(2, "0")}-${selectedDay.toString().padStart(2, "0")}`;
   };
 
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    
+    // First try AuthContext session token
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+      return headers;
+    }
+    
+    // Fallback to AsyncStorage
+    const token = await AsyncStorage.getItem('access_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return headers;
+  };
+
+  const checkConsultationBanStatus = async (): Promise<boolean> => {
+    if (!user?.id) {
+      console.log("No user ID available for ban check");
+      return true; // Allow booking if no user (shouldn't happen in authenticated flow)
+    }
+
+    setIsCheckingBanStatus(true);
+    
+    try {
+      const { NetworkConfig } = await import('@/utils/networkConfig');
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const headers = await getAuthHeaders();
+      
+      const response = await fetch(
+        `${apiUrl}/consultation-requests/ban-status/${user.id}`,
+        {
+          method: "GET",
+          headers,
+        }
+      );
+
+      // If forbidden, treat as restricted and show message
+      if (response.status === 403) {
+        let payload: any = null;
+        try { payload = await response.json(); } catch {}
+        const msg = payload?.detail || payload?.message || "Your account is temporarily restricted from booking consultations.";
+        setConsultationBanStatus({ can_book: false, ban_status: "active", ban_end: null, message: msg });
+        Alert.alert(
+          "Booking Temporarily Restricted",
+          msg,
+          [{ text: "OK" }]
+        );
+        return false;
+      }
+
+      if (!response.ok) {
+        console.error("Failed to check ban status:", response.status);
+        // Network/other error: do not block, but do not overwrite any prior status
+        return true;
+      }
+
+      const banStatus = await response.json();
+      console.log("📋 Consultation ban status:", banStatus);
+      
+      setConsultationBanStatus(banStatus);
+      
+      if (!banStatus.can_book) {
+        // Show ban message to user
+        Alert.alert(
+          "Booking Temporarily Restricted",
+          banStatus.message || "You are temporarily unable to book consultations.",
+          [{ text: "OK" }]
+        );
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error checking consultation ban status:", error);
+      return true; // Fail-open: allow booking if check fails
+    } finally {
+      setIsCheckingBanStatus(false);
+    }
+  };
+
   // Initialize lawyer data from params immediately - no API call needed
   const initializeLawyerData = () => {
     try {
@@ -499,7 +592,7 @@ export default function LawyerBookingView() {
     router.back();
   };
 
-  const handleBookConsultation = () => {
+  const handleBookConsultation = async () => {
     const errors = validateBookingForm();
 
     if (Object.keys(errors).length > 0) {
@@ -507,6 +600,12 @@ export default function LawyerBookingView() {
       const firstError = Object.values(errors)[0];
       Alert.alert("Validation Error", firstError);
       return;
+    }
+
+    // Check consultation ban status before proceeding
+    const canBook = await checkConsultationBanStatus();
+    if (!canBook) {
+      return; // Ban check already shows alert to user
     }
 
     setValidationErrors({});
@@ -546,12 +645,13 @@ export default function LawyerBookingView() {
 
       const { NetworkConfig } = await import('@/utils/networkConfig');
       const apiUrl = await NetworkConfig.getBestApiUrl();
+      const headers = await getAuthHeaders();
       const response = await fetch(
         `${apiUrl}/consultation-requests/`,
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            ...headers,
           },
           body: JSON.stringify(consultationRequestData),
         }
@@ -563,6 +663,16 @@ export default function LawyerBookingView() {
       console.log("Response data:", result);
       
       if (!response.ok) {
+        if (response.status === 403) {
+          const msg = result?.detail || result?.message || 'Your account is temporarily restricted from booking consultations.';
+          Alert.alert(
+            'Booking Temporarily Restricted',
+            msg,
+            [{ text: 'OK' }]
+          );
+          setIsSubmitting(false);
+          return;
+        }
         throw new Error(result.detail || result.message || 'Failed to submit consultation request');
       }
       
@@ -1258,16 +1368,16 @@ export default function LawyerBookingView() {
         <Box className={`${isSmallScreen ? 'mx-3' : 'mx-4'} mb-6`}>
           <TouchableOpacity
             onPress={handleBookConsultation}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isCheckingBanStatus}
             style={{
-              backgroundColor: isSubmitting ? '#9CA3AF' : Colors.primary.blue,
+              backgroundColor: (isSubmitting || isCheckingBanStatus) ? '#9CA3AF' : Colors.primary.blue,
               paddingVertical: 16,
               borderRadius: 16,
               opacity: isSubmitting ? 0.7 : 1,
             }}
           >
             <HStack className="items-center justify-center">
-              {isSubmitting ? (
+              {(isSubmitting || isCheckingBanStatus) ? (
                 <ActivityIndicator size="small" color="white" />
               ) : (
                 <Calendar size={22} color="white" strokeWidth={2.5} />
@@ -1275,6 +1385,8 @@ export default function LawyerBookingView() {
               <Text className="ml-2 text-lg font-bold text-white">
                 {isSubmitting
                   ? "Processing..."
+                  : isCheckingBanStatus
+                  ? "Checking eligibility..."
                   : `Book Consultation`}
               </Text>
             </HStack>

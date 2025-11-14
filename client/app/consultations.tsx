@@ -9,6 +9,7 @@ import { SidebarWrapper } from "../components/AppSidebar";
 import Colors from "../constants/Colors";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../config/supabase";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { shouldUseNativeDriver } from "@/utils/animations";
 
 // Import consultation types and utilities
@@ -33,7 +34,27 @@ export default function ConsultationsScreen() {
   const [filterModalVisible, setFilterModalVisible] = useState<boolean>(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
   const scaleAnim = useState(new Animated.Value(0.8))[0];
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, session, isAuthenticated, isLoading: authLoading } = useAuth();
+
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    
+    // First try AuthContext session token
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+      return headers;
+    }
+    
+    // Fallback to AsyncStorage
+    const token = await AsyncStorage.getItem('access_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return headers;
+  };
 
   const fetchConsultations = useCallback(async () => {
     if (!user?.id) {
@@ -186,7 +207,7 @@ export default function ConsultationsScreen() {
       console.log("❌ Cannot cancel - status:", consultation.status);
       Alert.alert(
         "Cannot Cancel",
-        "This consultation cannot be cancelled. Only pending consultations can be cancelled.",
+        "This consultation cannot be cancelled. Only pending and accepted consultations can be cancelled.",
         [{ text: "OK" }]
       );
       return;
@@ -202,17 +223,21 @@ export default function ConsultationsScreen() {
         console.log("📡 Consultation ID:", consultationId);
         console.log("📡 User ID:", user?.id);
         
-        const { data, error } = await supabase
-          .from("consultation_requests")
-          .update({ status: "cancelled" })
-          .eq("id", consultationId)
-          .single();
+        // Use the backend API that handles ban logic
+        const { NetworkConfig } = await import('@/utils/networkConfig');
+        const apiUrl = await NetworkConfig.getBestApiUrl();
+        const headers = await getAuthHeaders();
+        
+        const response = await fetch(`${apiUrl}/api/consult-actions/${consultationId}/cancel`, {
+          method: 'POST',
+          headers,
+        });
 
-        console.log("📡 Database response:", { data, error });
+        const result = await response.json();
+        console.log("📡 API response:", { status: response.status, result });
 
-        if (error) {
-          console.error("❌ Database error:", error);
-          throw error;
+        if (!response.ok) {
+          throw new Error(result.detail || result.message || 'Failed to cancel consultation');
         }
 
         console.log("✅ Database updated successfully");
