@@ -20,6 +20,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Refs for input fields
   const passwordInputRef = useRef<TextInput>(null);
@@ -80,11 +81,12 @@ export default function Login() {
     }
 
     // Prevent double submission
-    if (authLoading) {
+    if (isSubmitting) {
       return;
     }
     
     try {
+      setIsSubmitting(true);
       const result = await signIn(email.toLowerCase().trim(), password);
 
       if (result.suppressToast) {
@@ -143,6 +145,8 @@ export default function Login() {
           </Toast>
         ),
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -315,15 +319,15 @@ export default function Login() {
             style={[
               tw`py-3 rounded-lg items-center justify-center mb-3`,
               { 
-                backgroundColor: authLoading ? '#9CA3AF' : Colors.primary.blue,
-                opacity: authLoading ? 0.7 : 1
+                backgroundColor: isSubmitting ? '#9CA3AF' : Colors.primary.blue,
+                opacity: isSubmitting ? 0.7 : 1
               },
             ]}
             onPress={handleLogin}
-            disabled={authLoading}
+            disabled={isSubmitting}
           >
             <Text style={tw`text-white font-semibold text-lg`}>
-              {authLoading ? 'Signing In...' : 'Login'}
+              {isSubmitting ? 'Signing In...' : 'Login'}
             </Text>
           </TouchableOpacity>
 
