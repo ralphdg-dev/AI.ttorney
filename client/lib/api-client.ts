@@ -13,16 +13,16 @@ interface ApiResponse<T = any> {
 
 class ApiClient {
   private async getBaseUrl(): Promise<string> {
-    if (__DEV__) {
-      return await NetworkConfig.getBestApiUrl();
-    }
-    return 'https://your-production-api.com';
+    // Use unified network configuration for both dev and prod
+    // NetworkConfig will choose the correct URL based on environment
+    return await NetworkConfig.getBestApiUrl();
   }
 
   private async getAuthHeaders(): Promise<Record<string, string>> {
     const token = await AsyncStorage.getItem('access_token');
     return {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
     };
   }
@@ -43,13 +43,44 @@ class ApiClient {
         },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || data.message || 'Request failed');
+      let data: any = null;
+      let text: string | null = null;
+      try {
+        data = await response.json();
+      } catch (_) {
+        try {
+          text = await response.text();
+        } catch {}
       }
 
-      return { data, success: true };
+      if (!response.ok) {
+        const errorMessage = (data && (data.detail || data.message)) || text || `Request failed (${response.status})`;
+        const errorResponse: ApiResponse = {
+          success: false,
+          error: errorMessage,
+        };
+
+        // Surface OTP-specific fields when backend returns them
+        if (data && typeof data === 'object') {
+          if (Object.prototype.hasOwnProperty.call(data, 'locked_out')) {
+            (errorResponse as any).locked_out = data.locked_out;
+          }
+          if (Object.prototype.hasOwnProperty.call(data, 'retry_after')) {
+            (errorResponse as any).retry_after = data.retry_after;
+          }
+          if (Object.prototype.hasOwnProperty.call(data, 'attempts_remaining')) {
+            (errorResponse as any).attempts_remaining = data.attempts_remaining;
+          }
+        }
+
+        return errorResponse;
+      }
+
+      const successResponse: ApiResponse<T> = { data, success: true };
+      if (data && typeof data === 'object' && typeof (data as any).message === 'string') {
+        successResponse.message = (data as any).message;
+      }
+      return successResponse;
     } catch (error) {
       console.error('API request failed:', error);
       return { error: error instanceof Error ? error.message : 'Unknown error', success: false };
@@ -158,14 +189,24 @@ class ApiClient {
 
   async getLegalArticleCategories(): Promise<ApiResponse> {
     return this.request('/api/legal/categories');
-  }  // OTP endpoints
+  }
+
+  // OTP endpoints
   async sendOTP(data: {
     email: string;
     otp_type: 'email_verification' | 'password_reset';
+    user_name?: string;
   }): Promise<ApiResponse> {
+    const payload: any = {
+      email: data.email,
+      otp_type: data.otp_type,
+    };
+    if (data.user_name) {
+      payload.user_name = data.user_name;
+    }
     return this.request('/auth/send-otp', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
   }
 

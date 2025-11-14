@@ -24,8 +24,10 @@ export default function VerifyOTP() {
 
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [resendTimer, setResendTimer] = useState(120); // 2 minutes
   const [canResend, setCanResend] = useState(false);
+  const resendRequestRef = useRef<Promise<any> | null>(null);
   const [error, setError] = useState("");
   const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
   const [isLockedOut, setIsLockedOut] = useState(false);
@@ -208,31 +210,59 @@ export default function VerifyOTP() {
   };
 
   const handleResendOTP = async () => {
-    if (!canResend) return;
+    if (!canResend || isResending || resendRequestRef.current) return;
 
+    // Prevent multiple simultaneous requests
+    setIsResending(true);
+    setCanResend(false); // Immediately disable to prevent rapid clicks
+    
     try {
-      const result = await apiClient.sendOTP({
+      console.log('🔄 Resending OTP for email:', email);
+      
+      // Create and store the request promise to prevent duplicates
+      const requestPromise = apiClient.sendOTP({
         email,
-        otp_type: 'email_verification'
+        otp_type: 'email_verification',
+        user_name: 'User'
       });
+      
+      resendRequestRef.current = requestPromise;
+      const result = await requestPromise;
+
+      console.log('📤 Resend OTP result:', result);
 
       if (result.error) {
+        console.error('❌ Resend OTP failed:', result.error);
         Alert.alert("Error", result.error);
+        // Re-enable resend on error
+        setCanResend(true);
         return;
       }
 
-      setCanResend(false);
-      setResendTimer(120); // 2 minutes
+      // Success - update UI state
+      setResendTimer(120); // 2 minutes - this will trigger the timer to start
       setOtp(["", "", "", "", "", ""]);
       setError("");
       setAttemptsRemaining(null);
       setIsLockedOut(false);
       setLockoutTimer(0);
 
+      console.log('✅ OTP resent successfully');
       Alert.alert("Code Sent", "A new verification code has been sent to your email.");
-      inputRefs.current[0]?.focus();
-    } catch {
+      
+      // Focus first input after a short delay to ensure state is updated
+      setTimeout(() => {
+        inputRefs.current[0]?.focus();
+      }, 100);
+      
+    } catch (error) {
+      console.error('❌ Resend OTP exception:', error);
       Alert.alert("Error", "Failed to resend code. Please try again.");
+      // Re-enable resend on error
+      setCanResend(true);
+    } finally {
+      setIsResending(false);
+      resendRequestRef.current = null; // Clear the request reference
     }
   };
 
@@ -347,21 +377,23 @@ export default function VerifyOTP() {
             Didn&apos;t receive code?
           </Text>
           <TouchableOpacity
-            onPress={!isLockedOut && canResend ? handleResendOTP : undefined}
-            disabled={isLockedOut || !canResend}
+            onPress={!isLockedOut && canResend && !isResending ? handleResendOTP : undefined}
+            disabled={isLockedOut || !canResend || isResending}
             className="mt-2"
           >
             <Text
               className="text-sm font-bold sm:text-base text-center"
               style={{
-                color: (canResend && !isLockedOut) ? Colors.primary.blue : '#9ca3af'
+                color: (canResend && !isLockedOut && !isResending) ? Colors.primary.blue : '#9ca3af'
               }}
             >
               {isLockedOut 
                 ? "Resend unavailable (locked out)" 
-                : canResend 
-                  ? "Resend OTP" 
-                  : `Resend OTP (${Math.floor(resendTimer / 60)}:${(resendTimer % 60).toString().padStart(2, '0')})`
+                : isResending
+                  ? "Sending..."
+                  : canResend 
+                    ? "Resend OTP" 
+                    : `Resend OTP (${Math.floor(resendTimer / 60)}:${(resendTimer % 60).toString().padStart(2, '0')})`
               }
             </Text>
           </TouchableOpacity>
