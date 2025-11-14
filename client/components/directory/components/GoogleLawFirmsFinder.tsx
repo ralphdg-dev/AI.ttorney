@@ -296,6 +296,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
         // Store all firms and search center for client-side filtering
         setAllFetchedFirms(firms);
+        setLawFirms(firms); // CRITICAL: Set lawFirms so radius filter works
         setSearchCenter({
           lat: data.location.latitude,
           lng: data.location.longitude
@@ -1155,25 +1156,16 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     handleSearchTextChangeWithAutocomplete(text);
   };
 
-  // Search header with autocomplete dropdown
+  // Search header with autocomplete dropdown - Unified with lawyer directory style
   const renderSearchHeader = () => (
-    <VStack space="md" className="px-5 py-3 bg-white" style={{ zIndex: 999 }}>
+    <VStack space="md" className="px-5 py-4 bg-white" style={{ zIndex: 999 }}>
       <Box className="relative" style={{ zIndex: 1000 }}>
-        <Box className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" style={{ 
-          minHeight: 48,
-          maxHeight: 48,
-          height: 48
-        }}>
-          <HStack style={{ 
-            height: 48, 
-            alignItems: 'center', 
-            paddingLeft: 20,
-            paddingRight: 16
-          }}>
-            <Ionicons name="search" size={20} color="#9CA3AF" style={{ marginRight: 14 }} />
-            
+        {/* Unified search input matching lawyer directory */}
+        <Box className="bg-white rounded-lg border border-gray-300" style={{ minHeight: 48 }}>
+          <HStack className="items-center px-3">
+            <Ionicons name="search" size={18} color="#6B7280" />
             <TextInput
-              className="flex-1 text-base"
+              className="flex-1 py-3 px-3 text-base"
               placeholder="Search by street, barangay, or city"
               placeholderTextColor="#9CA3AF"
               value={searchText}
@@ -1185,57 +1177,30 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
               editable={!searching}
               style={{ 
                 color: Colors.text.head,
-                height: 48,
                 fontSize: 16,
-                lineHeight: 20,
-                textAlignVertical: 'center',
-                includeFontPadding: false
+                minHeight: 42
               }}
               autoCorrect={false}
               autoCapitalize="words"
               blurOnSubmit={false}
               maxLength={100}
-              multiline={false}
-              numberOfLines={1}
             />
-            
-            <Box style={{ 
-              width: 24, 
-              height: 48, 
-              justifyContent: 'center', 
-              alignItems: 'center', 
-              flexShrink: 0 
-            }}>
-              {searchText.length > 0 && !searching && (
-                <Pressable 
-                  onPress={() => {
-                    setSearchText('');
-                    searchTextRef.current = '';
-                    setShowPredictions(false);
-                    setPredictions([]);
-                  }}
-                  style={{ 
-                    width: 24, 
-                    height: 24, 
-                    justifyContent: 'center', 
-                    alignItems: 'center',
-                    borderRadius: 12
-                  }}
-                >
-                  <Ionicons name="close" size={18} color="#6B7280" />
-                </Pressable>
-              )}
-              {searching && (
-                <Box style={{ 
-                  width: 18, 
-                  height: 18, 
-                  justifyContent: 'center', 
-                  alignItems: 'center' 
-                }}>
-                  <Spinner size="small" color={Colors.primary.blue} />
-                </Box>
-              )}
-            </Box>
+            {searchText.length > 0 && !searching && (
+              <Pressable 
+                onPress={() => {
+                  setSearchText('');
+                  searchTextRef.current = '';
+                  setShowPredictions(false);
+                  setPredictions([]);
+                }}
+                style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' }}
+              >
+                <Ionicons name="close" size={16} color="#6B7280" />
+              </Pressable>
+            )}
+            {searching && (
+              <Spinner size="small" color={Colors.primary.blue} />
+            )}
           </HStack>
         </Box>
         
