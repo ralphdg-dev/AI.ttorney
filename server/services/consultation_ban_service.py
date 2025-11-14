@@ -17,7 +17,7 @@ Date: 2024-11-14
 
 import logging
 from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import httpx
 from services.supabase_service import SupabaseService
 
@@ -81,7 +81,7 @@ class ConsultationBanService:
             
             # Step 2: Determine ban duration based on cancellation history
             ban_duration_days = self._calculate_ban_duration(recent_cancellations)
-            ban_end = datetime.utcnow() + timedelta(days=ban_duration_days)
+            ban_end = datetime.now(timezone.utc) + timedelta(days=ban_duration_days)
             
             logger.info(f"⏰ Ban duration: {ban_duration_days} days (until {ban_end.strftime('%Y-%m-%d %H:%M UTC')})")
             
@@ -145,7 +145,9 @@ class ConsultationBanService:
             
             if consultation_ban_end:
                 ban_end_dt = datetime.fromisoformat(consultation_ban_end.replace('Z', '+00:00'))
-                if ban_end_dt > datetime.utcnow():
+                if ban_end_dt.tzinfo is None:
+                    ban_end_dt = ban_end_dt.replace(tzinfo=timezone.utc)
+                if ban_end_dt > datetime.now(timezone.utc):
                     # Ban is still active
                     return {
                         "can_book": False,
@@ -163,12 +165,12 @@ class ConsultationBanService:
             
         except Exception as e:
             logger.error(f"❌ Failed to check booking eligibility: {str(e)}")
-            # Fail-open: allow booking if check fails
+            # Fail-closed: disallow booking if we cannot verify eligibility
             return {
-                "can_book": True,
-                "ban_status": "none",
+                "can_book": False,
+                "ban_status": "unknown",
                 "ban_end": None,
-                "message": None
+                "message": "Unable to verify booking eligibility at the moment. Please try again later."
             }
     
     async def lift_ban(self, user_id: str, admin_id: str, reason: str = "Admin override") -> Dict[str, Any]:
@@ -206,7 +208,7 @@ class ConsultationBanService:
     async def _count_recent_cancellations(self, user_id: str) -> int:
         """Count accepted consultation cancellations within the tracking period."""
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=self.CANCELLATION_TRACKING_DAYS)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=self.CANCELLATION_TRACKING_DAYS)
             
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
@@ -271,7 +273,7 @@ class ConsultationBanService:
         """Update user's consultation ban status."""
         try:
             update_data = {
-                "consultation_ban_end": ban_end.isoformat() if ban_end else None
+                "consultation_ban_end": (ban_end.astimezone(timezone.utc).isoformat() if ban_end else None)
             }
             
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -321,7 +323,9 @@ class ConsultationBanService:
             consultation_ban_end = user_data.get("consultation_ban_end")
             if consultation_ban_end:
                 ban_end_dt = datetime.fromisoformat(consultation_ban_end.replace('Z', '+00:00'))
-                if ban_end_dt <= datetime.utcnow():
+                if ban_end_dt.tzinfo is None:
+                    ban_end_dt = ban_end_dt.replace(tzinfo=timezone.utc)
+                if ban_end_dt <= datetime.now(timezone.utc):
                     # Ban has expired, clear it
                     logger.info(f"⏰ Clearing expired consultation ban for user {user_id[:8]}...")
                     await self._update_user_ban_status(user_id, None)
