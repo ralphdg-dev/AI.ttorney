@@ -515,6 +515,8 @@ export default function ChatbotScreen() {
   const initializeConversation = useCallback(async () => {
     try {
       console.log('🔄 Initializing conversation - always starting fresh');
+      console.log('   Previous currentConversationId:', currentConversationId);
+      console.log('   Setting isFirstMessage to true for new conversation');
       // Always start with greeting screen, don't auto-load last conversation
       setCurrentConversationId("");
       isFirstMessageRef.current = true; // New conversation
@@ -602,6 +604,8 @@ export default function ChatbotScreen() {
     // Industry-standard approach (ChatGPT/Claude): Don't create session until first message
     // This prevents "New Conversation" titles from appearing
     console.log('✨ Starting new chat - will create session on first message');
+    console.log('   Previous currentConversationId:', currentConversationId);
+    console.log('   Setting isFirstMessage to true for new chat');
     try {
       setCurrentConversationId("");
       isFirstMessageRef.current = true;
@@ -620,6 +624,8 @@ export default function ChatbotScreen() {
 
   const handleConversationSelect = async (conversationId: string) => {
     console.log("🔄 Switching to conversation:", conversationId);
+    console.log("   Previous currentConversationId:", currentConversationId);
+    console.log("   Setting isFirstMessage to false for existing conversation");
 
     // Update current conversation ID first
     setCurrentConversationId(conversationId);
@@ -770,8 +776,18 @@ export default function ChatbotScreen() {
       currentConversationId,
       sessionId,
       isFirstMessage: isFirstMessageRef.current,
-      messageCount: conversationHistory.length
+      messageCount: conversationHistory.length,
+      messagesInUI: messages.length,
+      userMessage: userMessage.substring(0, 50) + '...'
     });
+    
+    // Additional debug: Check if session ID is being lost
+    if (!sessionId && conversationHistory.length > 0) {
+      console.warn('⚠️ ISSUE: Session ID is empty but conversation history exists!');
+      console.warn('   This will cause each message to create a new conversation');
+      console.warn('   Conversation history length:', conversationHistory.length);
+      console.warn('   Messages in UI:', messages.length);
+    }
 
     try {
       // Get API URL dynamically using NetworkConfig
@@ -980,6 +996,9 @@ export default function ChatbotScreen() {
         if (isNewSession) {
           console.log("🆕 New session created:", returnedSessionId);
           console.log("🔗 Ensuring conversation continuity for future messages");
+          console.log("   Previous sessionId:", sessionId);
+          console.log("   New sessionId:", returnedSessionId);
+          console.log("   isFirstMessage:", isFirstMessageRef.current);
           
           // CRITICAL: Update both state and local variable immediately
           setCurrentConversationId(returnedSessionId);
@@ -1013,14 +1032,17 @@ export default function ChatbotScreen() {
               sidebarRef.current?.refreshConversations();
             }
             
+            console.log("✅ Setting isFirstMessage to false - conversation established");
             isFirstMessageRef.current = false;
           }
       } else if (isFirstMessageRef.current && user?.id) {
         // FALLBACK: Backend didn't return session_id, refresh sidebar to show new conversation
         console.warn("⚠️ Backend didn't return session_id, refreshing sidebar as fallback");
+        console.warn("   This might cause conversation splitting issues");
         setTimeout(() => {
           sidebarRef.current?.refreshConversations();
         }, 500); // Small delay to let backend finish saving
+        console.log("✅ Setting isFirstMessage to false - fallback case");
         isFirstMessageRef.current = false;
       }
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Modal,
   TouchableOpacity,
@@ -6,6 +6,7 @@ import {
   Dimensions,
   ScrollView,
   View,
+  Alert,
 } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import { VStack } from "@/components/ui/vstack";
@@ -53,6 +54,33 @@ export default function ConsultationDetailModal({
   onCancel,
 }: ConsultationDetailModalProps) {
   if (!consultation) return null;
+
+  const handleCancelWithWarning = () => {
+    if (consultation.status === "accepted") {
+      Alert.alert(
+        "Cancel Accepted Consultation",
+        "⚠️ Warning: Cancelling this accepted consultation will result in a temporary ban from booking new consultations.\n\n" +
+        "• 1st cancellation: 1 day ban\n" +
+        "• 2nd cancellation: 3 day ban\n" +
+        "• 3rd+ cancellation: 7 day ban\n\n" +
+        "Are you sure you want to proceed?",
+        [
+          {
+            text: "Keep Consultation",
+            style: "cancel",
+          },
+          {
+            text: "Cancel Anyway",
+            style: "destructive",
+            onPress: () => onCancel(consultation.id),
+          },
+        ]
+      );
+    } else {
+      // For pending consultations, no warning needed
+      onCancel(consultation.id);
+    }
+  };
 
   return (
     <Modal
@@ -270,39 +298,19 @@ export default function ConsultationDetailModal({
           </ScrollView>
 
           {/* Action Buttons */}
-          {consultation.status === "pending" && (
+          {(consultation.status === "pending" || consultation.status === "accepted") && (
             <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: "#E5E7EB" }}>
-              <HStack space="sm">
-                <UIPressable
-                  className="flex-1 py-2.5 rounded-lg items-center justify-center border"
-                  style={{
-                    borderColor: Colors.primary.blue,
-                    backgroundColor: "white",
-                  }}
-                  onPress={onClose}
-                >
-                  <UIText className="font-semibold" style={{ fontSize: 13, color: Colors.primary.blue }}>
-                    Close
-                  </UIText>
-                </UIPressable>
-
-                <UIPressable
-                  className="flex-1 py-2.5 rounded-lg items-center justify-center"
-                  style={{
-                    backgroundColor: "#EF4444",
-                  }}
-                  onPress={() => {
-                    console.log("🟢 Cancel button pressed in modal");
-                    console.log("🟢 Consultation ID:", consultation.id);
-                    console.log("🟢 onCancel function exists:", typeof onCancel);
-                    onCancel(consultation.id);
-                  }}
-                >
-                  <UIText className="font-semibold" style={{ fontSize: 13, color: "white" }}>
-                    Cancel Consultation
-                  </UIText>
-                </UIPressable>
-              </HStack>
+              <UIPressable
+                className="w-full py-3 rounded-lg items-center justify-center"
+                style={{
+                  backgroundColor: "#EF4444",
+                }}
+                onPress={handleCancelWithWarning}
+              >
+                <UIText className="font-semibold" style={{ fontSize: 14, color: "white" }}>
+                  Cancel Consultation
+                </UIText>
+              </UIPressable>
             </View>
           )}
         </Animated.View>

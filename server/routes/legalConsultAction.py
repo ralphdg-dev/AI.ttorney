@@ -6,10 +6,14 @@ from pydantic import BaseModel
 from datetime import datetime, date
 from config.dependencies import get_current_user as get_auth_user, get_supabase
 from services.notification_service import NotificationService
+from services.consultation_service import ConsultationService
+from services.consultation_request_service import ConsultationRequestService
+from services.consultation_ban_service import get_consultation_ban_service
+
+logger = logging.getLogger(__name__)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/api/consult-actions", tags=["consultation-actions"])
@@ -424,6 +428,7 @@ async def cancel_consultation(
             raise HTTPException(status_code=404, detail="Consultation not found")
         
         current_status = consultations[0].get("status")
+        consultation_data = consultations[0]
         
         # Only allow cancellation for pending and accepted consultations
         if current_status not in ["pending", "accepted"]:
@@ -431,6 +436,12 @@ async def cancel_consultation(
                 status_code=400, 
                 detail=f"Cannot cancel consultation with status: {current_status}"
             )
+        
+        # Check if this is an accepted consultation (has responded_at)
+        is_accepted_consultation = (
+            current_status == "accepted" or 
+            consultation_data.get("responded_at") is not None
+        )
         
         # Update the consultation status
         update_data = {
@@ -445,9 +456,30 @@ async def cancel_consultation(
             logger.error(f"Supabase update error: {update_response.error}")
             raise HTTPException(status_code=500, detail="Database error")
         
-        await _send_consultation_notification(supabase, consultations[0], "cancelled")
+        # Apply consultation ban if this was an accepted consultation
+        ban_message = None
+        if is_accepted_consultation:
+            try:
+                ban_service = get_consultation_ban_service()
+                ban_result = await ban_service.apply_cancellation_ban(
+                    user_id=user_id,
+                    consultation_id=consultation_id,
+                    consultation_data=consultation_data
+                )
+                ban_message = ban_result.get("message")
+                logger.info(f"Applied consultation ban for user {user_id[:8]}... - {ban_result.get('ban_duration_days')} days")
+            except Exception as e:
+                logger.error(f"Failed to apply consultation ban: {str(e)}")
+                # Don't fail the cancellation if ban application fails
         
-        return SuccessResponse(success=True, message="Consultation cancelled successfully")
+        await _send_consultation_notification(supabase, consultation_data, "cancelled")
+        
+        # Include ban information in response if applicable
+        response_message = "Consultation cancelled successfully"
+        if ban_message:
+            response_message += f"\n\nImportant: {ban_message}"
+        
+        return SuccessResponse(success=True, message=response_message)
         
     except HTTPException:
         raise

@@ -219,10 +219,10 @@ export function redactConsultationForLogging(consultation: ConsultationRow): Par
 
 /**
  * Check if consultation can be cancelled by user
- * Business rule: Can only cancel pending consultations
+ * Business rule: Can cancel pending and accepted consultations
  */
 export function canCancelConsultation(consultation: ConsultationRow): boolean {
-  return consultation.status === 'pending' && !consultation.deleted_at;
+  return (consultation.status === 'pending' || consultation.status === 'accepted') && !consultation.deleted_at;
 }
 
 /**
