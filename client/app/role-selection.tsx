@@ -13,9 +13,7 @@ import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { useState } from "react";
 import Colors from "../constants/Colors";
-import BackButton from "../components/ui/BackButton";
-import PrimaryButton from "../components/ui/PrimaryButton";
-import BottomActions from "../components/ui/BottomActions";
+import StickyFooterButton from "../components/ui/StickyFooterButton";
 import { apiClient } from "../lib/api-client";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -93,29 +91,6 @@ export default function RoleSelection() {
   const [isLoading, setIsLoading] = useState(false);
   const { refreshUserData, user } = useAuth();
 
-  const handleBack = async () => {
-    try {
-      // Get user email from AuthContext instead of AsyncStorage
-      const userEmail = user?.email;
-      
-      if (userEmail) {
-        // Revert user role to guest when going back
-        await apiClient.selectRole({
-          email: userEmail,
-          selected_role: "guest"
-        });
-        
-        // Refresh user data to update role in context
-        await refreshUserData();
-      }
-      
-      // Navigate back
-      router.back();
-    } catch {
-      // Still navigate back even if API call fails
-      router.back();
-    }
-  };
 
   const handleContinue = async () => {
     if (!selectedRole) return;
@@ -389,24 +364,11 @@ export default function RoleSelection() {
         </TouchableOpacity>
       </View>
 
-                           {/* Bottom Section */}
-        <BottomActions>
-          <PrimaryButton
-            title={isLoading ? "Updating..." : "Continue"}
-            onPress={handleContinue}
-            disabled={!selectedRole || isLoading}
-          />
-        </BottomActions>
     </View>
   );
 
   return (
     <View style={tw`flex-1 bg-white`}>
-      {/* Static Header - Same as Onboarding */}
-      <View style={tw`flex-row justify-between items-center px-6 pt-12 pb-4`}>
-        <BackButton onPress={handleBack} />
-      </View>
-
       {/* Responsive, scrollable content */}
       <KeyboardAvoidingView
         style={tw`flex-1`}
@@ -421,6 +383,14 @@ export default function RoleSelection() {
           {renderContent()}
         </ScrollView>
       </KeyboardAvoidingView>
+      
+      {/* Sticky footer button */}
+      <StickyFooterButton
+        title={isLoading ? "Updating..." : "Continue"}
+        onPress={handleContinue}
+        disabled={!selectedRole || isLoading}
+        bottomOffset={0}
+      />
     </View>
   );
 }

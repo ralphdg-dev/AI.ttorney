@@ -595,8 +595,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
       setIsSigningOut(false);
       
-      // Navigate to login
-      router.replace('/login');
+      // Force navigation to login with multiple attempts
+      console.log('🔄 Forcing navigation to login...');
+      try {
+        // Try immediate navigation
+        router.replace('/login');
+        
+        // Backup navigation after short delay
+        setTimeout(() => {
+          console.log('🔄 Backup navigation attempt...');
+          router.replace('/login');
+        }, 100);
+        
+        // Nuclear option - reload page for web
+        if (typeof window !== 'undefined') {
+          setTimeout(() => {
+            console.log('🔄 Web reload fallback...');
+            window.location.href = '/login';
+          }, 500);
+        }
+      } catch (navError) {
+        console.error('❌ Navigation error:', navError);
+      }
       
       console.log('✅ Logout complete');
       
@@ -613,7 +633,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsGuestMode(false);
       setIsLoading(false);
       setIsSigningOut(false);
-      router.replace('/login');
+      
+      // Force navigation with fallbacks
+      try {
+        router.replace('/login');
+        if (typeof window !== 'undefined') {
+          setTimeout(() => window.location.href = '/login', 200);
+        }
+      } catch (navError) {
+        console.error('❌ Fallback navigation error:', navError);
+      }
     }
   };
 
