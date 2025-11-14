@@ -22,6 +22,7 @@ import { parseModerationError } from '../../../services/moderationService';
 import { showStrikeAddedToast, showSuspendedToast, showBannedToast, showAccessDeniedToast, showContentValidationToast } from '../../../utils/moderationToastUtils';
 import { validatePostContent } from '../../../utils/contentValidation';
 import { VerifiedLawyerBadge } from '../../common/VerifiedLawyerBadge';
+import { getCategoryColors, getCategoryDisplayText } from '@/utils/categoryUtils';
 
 
 interface PostData {
@@ -831,14 +832,8 @@ const ViewPost: React.FC = () => {
     }
   }, [postId, loading, prefetchPost]);
 
-  const categoryColors = {
-    family: { bg: '#FEF2F2', text: '#BE123C', border: '#FECACA' },
-    criminal: { bg: '#FFF7ED', text: '#EA580C', border: '#FED7AA' },
-    civil: { bg: '#F5F3FF', text: '#7C3AED', border: '#DDD6FE' },
-    labor: { bg: '#EFF6FF', text: '#1D4ED8', border: '#BFDBFE' },
-    consumer: { bg: '#ECFDF5', text: '#047857', border: '#A7F3D0' },
-    others: { bg: '#F9FAFB', text: '#374151', border: '#E5E7EB' }
-  } as const;
+  // Use shared category utilities for consistent colors and display text
+  const categoryColors = getCategoryColors(post?.domain || 'others');
 
   const contentPreview = displayContent.length > 280 ? displayContent.substring(0, 280) + '...' : displayContent;
   const shouldShowReadMore = displayContent.length > 280;
@@ -1058,15 +1053,15 @@ const ViewPost: React.FC = () => {
                         <View style={[
                           tw`px-3 py-1 rounded-full border`,
                           { 
-                            backgroundColor: post.domain && categoryColors[post.domain] ? categoryColors[post.domain].bg : categoryColors.others.bg,
-                            borderColor: post.domain && categoryColors[post.domain] ? categoryColors[post.domain].border : categoryColors.others.border 
+                            backgroundColor: categoryColors.bg,
+                            borderColor: categoryColors.border
                           }
                         ]}>
                           <Text style={[
                             tw`text-xs font-semibold`, 
-                            { color: post.domain && categoryColors[post.domain] ? categoryColors[post.domain].text : categoryColors.others.text }
-                          ]}> 
-                            {post.domain ? post.domain.charAt(0).toUpperCase() + post.domain.slice(1) : 'Others'}
+                            { color: categoryColors.text }
+                          ]}>
+                            {getCategoryDisplayText(post?.domain)}
                           </Text>
                         </View>
                       )}

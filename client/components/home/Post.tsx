@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
+import { getCategoryColors, getCategoryDisplayText } from '@/utils/categoryUtils';
 import ReportModal from '../common/ReportModal';
 import { ReportService } from '../../services/reportService';
 import Colors from '@/constants/Colors';
@@ -274,43 +275,11 @@ const Post: React.FC<PostProps> = React.memo(({
   }, [currentUser?.id, id, onReportPress, session]);
 
   // Clean category text by removing "Related Post" and simplifying names
-  const cleanCategory = category.replace(' Related Post', '').replace(' Law', '').toUpperCase();
+  const cleanCategory = category?.trim() || '';
 
-  // Get category colors based on category type
-  const getCategoryColors = (category: string) => {
-    const lowerCategory = (category || '').toLowerCase();
-    
-    if (lowerCategory.includes('family')) {
-      return { backgroundColor: '#FEF2F2', borderColor: '#FECACA', textColor: '#BE123C' };
-    } else if (lowerCategory.includes('labor') || lowerCategory.includes('work')) {
-      return { backgroundColor: '#FEF3C7', borderColor: '#FDE68A', textColor: '#D97706' };
-    } else if (lowerCategory.includes('civil')) {
-      return { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', textColor: '#2563EB' };
-    } else if (lowerCategory.includes('criminal')) {
-      return { backgroundColor: '#F3E8FF', borderColor: '#C4B5FD', textColor: '#7C3AED' };
-    } else if (lowerCategory.includes('consumer')) {
-      return { backgroundColor: '#ECFDF5', borderColor: '#BBF7D0', textColor: '#059669' };
-    } else {
-      return { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB', textColor: '#6B7280' };
-    }
-  };
-
+  // Get category colors and display text using shared utility
   const categoryColors = getCategoryColors(cleanCategory);
-  
-  // Determine display text - show "OTHERS" for non-matching categories
-  const getDisplayText = (category: string) => {
-    const lowerCategory = category.toLowerCase();
-    
-    if (lowerCategory.includes('family')) return 'FAMILY';
-    if (lowerCategory.includes('labor') || lowerCategory.includes('work')) return 'LABOR';
-    if (lowerCategory.includes('civil')) return 'CIVIL';
-    if (lowerCategory.includes('criminal')) return 'CRIMINAL';
-    if (lowerCategory.includes('consumer')) return 'CONSUMER';
-    
-    return 'OTHERS';
-  };
-
-  const displayText = getDisplayText(cleanCategory);
+  const displayText = getCategoryDisplayText(cleanCategory);
 
   // Determine if the user is anonymous
   const isAnonymous = (user.username || '').toLowerCase() === 'anonymous' || (user.name || '').toLowerCase().includes('anonymous');
@@ -355,10 +324,10 @@ const Post: React.FC<PostProps> = React.memo(({
               
               {/* Category Badge */}
               <View style={[styles.categoryBadge, { 
-                backgroundColor: categoryColors.backgroundColor,
-                borderColor: categoryColors.borderColor 
+                backgroundColor: categoryColors.bg,
+                borderColor: categoryColors.border 
               }]}>
-                <Text style={[styles.categoryText, { color: categoryColors.textColor }]}>
+                <Text style={[styles.categoryText, { color: categoryColors.text }]}>
                   {displayText}
                 </Text>
               </View>
