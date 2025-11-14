@@ -72,6 +72,38 @@ export const MaintenanceGuard: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [initialAuthCheck, hasChecked, isChecking]);
 
   useEffect(() => {
+    if (!initialAuthCheck) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      // Fire-and-forget; internal state guards against overlapping checks
+      setHasChecked((prev) => prev); // no-op state touch to keep hook deps simple
+      (async () => {
+        try {
+          const apiUrl = await NetworkConfig.getBestApiUrl();
+          const response = await fetch(`${apiUrl}/api/maintenance/status`);
+
+          if (response.ok) {
+            const data = await response.json();
+            setStatus({
+              is_active: !!data.is_active,
+              message: data.message || '',
+              allow_admin: data.allow_admin !== false,
+              start_time: data.start_time || null,
+              end_time: data.end_time || null,
+            });
+          }
+        } catch (error) {
+          // keep last known status on polling errors
+        }
+      })();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [initialAuthCheck]);
+
+  useEffect(() => {
     if (!status || isSigningOut) {
       return;
     }

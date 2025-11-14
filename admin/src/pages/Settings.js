@@ -49,6 +49,19 @@ const Settings = () => {
     maintenanceEnd: "",
   });
 
+  const formatDateTimeLocal = (value) => {
+    if (!value) return "";
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n) => String(n).padStart(2, "0");
+    const year = d.getFullYear();
+    const month = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   const tabs = [
     { id: "profile", label: "Profile Management", icon: User },
     { id: "maintenance", label: "Maintenance Mode", icon: Wrench },
@@ -102,10 +115,10 @@ const Settings = () => {
         message: maintenanceSettings.maintenanceMessage || '',
         allow_admin: Boolean(maintenanceSettings.allowAdminAccess),
         start_time: maintenanceSettings.scheduledMaintenance && maintenanceSettings.maintenanceStart
-          ? new Date(maintenanceSettings.maintenanceStart).toISOString()
+          ? maintenanceSettings.maintenanceStart
           : null,
         end_time: maintenanceSettings.scheduledMaintenance && maintenanceSettings.maintenanceEnd
-          ? new Date(maintenanceSettings.maintenanceEnd).toISOString()
+          ? maintenanceSettings.maintenanceEnd
           : null,
       };
       updates.push(
@@ -181,8 +194,8 @@ const Settings = () => {
             maintenanceMessage: m.message || '',
             allowAdminAccess: m.allow_admin !== undefined ? Boolean(m.allow_admin) : true,
             scheduledMaintenance: Boolean(m.start_time || m.end_time),
-            maintenanceStart: m.start_time ? new Date(m.start_time).toISOString().slice(0,16) : '',
-            maintenanceEnd: m.end_time ? new Date(m.end_time).toISOString().slice(0,16) : '',
+            maintenanceStart: formatDateTimeLocal(m.start_time),
+            maintenanceEnd: formatDateTimeLocal(m.end_time),
           }));
         }
       } catch (err) {
