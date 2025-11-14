@@ -10,6 +10,7 @@ import { useToast, Toast, ToastTitle, ToastDescription } from '../../components/
 import { useAuth } from '../../contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../constants/Colors';
+import TermsOfServiceModal from '../../components/common/TermsOfServiceModal';
 
 export default function UserRegistration() {
   const toast = useToast();
@@ -43,6 +44,7 @@ export default function UserRegistration() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   
   // Validation states
   const [emailError, setEmailError] = useState('');
@@ -601,8 +603,7 @@ export default function UserRegistration() {
             <Text 
               className="font-semibold text-blue-600 underline"
               onPress={() => {
-                // TODO: Navigate to Terms of Service page/modal
-                console.log('Navigate to Terms of Service');
+                setShowTerms(true);
               }}
             >
               Terms of Service
@@ -760,6 +761,9 @@ export default function UserRegistration() {
         </View>
         </View>
         </ScrollView>
+
+      {/* Terms of Service Modal */}
+      <TermsOfServiceModal visible={showTerms} onClose={() => setShowTerms(false)} />
 
       {/* Date Picker Modal */}
       <Modal

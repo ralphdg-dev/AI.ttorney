@@ -11,7 +11,6 @@ import { ScrollView } from "../../components/ui/scroll-view";
 import { StatusBar } from "../../components/ui/status-bar";
 import { Image } from "../../components/ui/image";
 import PrimaryButton from "../../components/ui/PrimaryButton";
-import BackButton from "../../components/ui/BackButton";
 import Colors from "../../constants/Colors";
 import { apiClient } from "../../lib/api-client";
 import { useAuth } from "../../contexts/AuthContext";
@@ -282,10 +281,7 @@ export default function VerifyOTP() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header */}
-        <Box className="flex-row justify-between items-center px-6 pt-12 pb-4 md:pt-16">
-          <BackButton onPress={() => router.push("/onboarding/registration")} />
-        </Box>
+        {/* Header removed: Back navigation is disabled on Verify OTP page */}
 
         {/* Main Content */}
         <VStack className="flex-1 justify-center px-6 mx-auto w-full max-w-md">
