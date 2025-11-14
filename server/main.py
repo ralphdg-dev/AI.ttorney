@@ -148,6 +148,10 @@ app.include_router(lawyer_chatbot_router)  # Legacy/fallback
 from routes.chat_history import router as chat_history_router
 app.include_router(chat_history_router)
 
+# Import and include maintenance routes
+from routes.maintenance import router as maintenance_router
+app.include_router(maintenance_router)
+
 # Import and include admin moderation routes
 from routes.admin_moderation import router as admin_moderation_router
 app.include_router(admin_moderation_router, prefix="/api")

@@ -4,6 +4,7 @@ import logging
 from supabase import Client
 from config.dependencies import get_current_user, get_supabase
 from services.consultation_service import ConsultationService, ConsultationError
+from services.consultation_ban_service import get_consultation_ban_service
 from models.consultation_models import ConsultationRequestCreate, ConsultationStatusUpdate
 
 logger = logging.getLogger(__name__)
@@ -17,13 +18,31 @@ def get_consultation_service(supabase: Client = Depends(get_supabase)) -> Consul
 @router.post("/")
 async def create_consultation_request(
     request: ConsultationRequestCreate,
+    current_user = Depends(get_current_user),
     service: ConsultationService = Depends(get_consultation_service)
 ):
     """Create a new consultation request with validation"""
     try:
-        logger.info(f"📝 Creating consultation request: user={request.user_id}, lawyer={request.lawyer_id}, mode={request.consultation_mode}")
+        # Always derive the user_id from the authenticated user to prevent spoofing
+        req_user_id = getattr(current_user, 'id', None)
+        if not req_user_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+
+        logger.info(f"📝 Creating consultation request: user={req_user_id}, lawyer={request.lawyer_id}, mode={request.consultation_mode}")
+        
+        # Check if user is banned from booking consultations
+        ban_service = get_consultation_ban_service()
+        eligibility = await ban_service.check_booking_eligibility(req_user_id)
+        
+        if not eligibility["can_book"]:
+            logger.warning(f"🚫 User {req_user_id[:8]}... is banned from booking consultations")
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Booking temporarily restricted: {eligibility['message']}"
+            )
+        
         result = await service.create_consultation_request(
-            user_id=request.user_id,
+            user_id=req_user_id,
             lawyer_id=request.lawyer_id,
             message=request.message,
             email=request.email,
@@ -146,5 +165,32 @@ async def delete_consultation_request(
 
 # Statistics endpoints removed - use pagination metadata instead
 # Total counts available in pagination response
+
+@router.get("/ban-status/{user_id}")
+async def check_consultation_ban_status(
+    user_id: str,
+    current_user = Depends(get_current_user)
+):
+    """Check if user is banned from booking consultations"""
+    try:
+        # Ensure user can only check their own ban status (or admin can check any)
+        if current_user.id != user_id and not getattr(current_user, 'is_admin', False):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        ban_service = get_consultation_ban_service()
+        eligibility = await ban_service.check_booking_eligibility(user_id)
+        
+        return {
+            "user_id": user_id,
+            "can_book": eligibility["can_book"],
+            "ban_status": eligibility["ban_status"],
+            "ban_end": eligibility["ban_end"],
+            "message": eligibility["message"]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking ban status: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 

@@ -1146,4 +1146,202 @@ router.patch('/legal-seekers/:id/moderation', authenticateAdmin, async (req, res
   }
 });
 
+// Get consultation bans
+router.get('/consultation-bans', authenticateAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 50, search = '' } = req.query;
+    const offset = (page - 1) * limit;
+
+    // Get users with consultation ban information
+    let query = supabaseAdmin
+      .from('users')
+      .select(`
+        id,
+        full_name,
+        email,
+        consultation_ban_end,
+        created_at
+      `)
+      .order('consultation_ban_end', { ascending: false, nullsLast: true });
+
+    // Add search filter if provided
+    if (search) {
+      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,id.eq.${search}`);
+    }
+
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: users, error: usersError } = await query;
+
+    if (usersError) {
+      console.error('Error fetching users:', usersError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch users'
+      });
+    }
+
+    // Get consultation cancellation counts for each user
+    const userIds = users.map(user => user.id);
+    const { data: cancellations, error: cancellationsError } = await supabaseAdmin
+      .from('consultation_requests')
+      .select('user_id')
+      .eq('status', 'cancelled')
+      .in('user_id', userIds)
+      .gte('updated_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()); // Last 30 days
+
+    if (cancellationsError) {
+      console.warn('Error fetching cancellations:', cancellationsError);
+    }
+
+    // Count cancellations per user
+    const cancellationCounts = {};
+    if (cancellations) {
+      cancellations.forEach(c => {
+        cancellationCounts[c.user_id] = (cancellationCounts[c.user_id] || 0) + 1;
+      });
+    }
+
+    // Add cancellation counts to users
+    const usersWithCounts = users.map(user => ({
+      ...user,
+      recent_cancellations: cancellationCounts[user.id] || 0
+    }));
+
+    // Get statistics
+    const now = new Date().toISOString();
+    
+    const { data: statsData, error: statsError } = await supabaseAdmin
+      .from('users')
+      .select('consultation_ban_end')
+      .not('consultation_ban_end', 'is', null);
+
+    let stats = {
+      totalBanned: 0,
+      activeBans: 0,
+      expiredBans: 0,
+      totalCancellations: 0
+    };
+
+    if (statsData && !statsError) {
+      stats.totalBanned = statsData.length;
+      stats.activeBans = statsData.filter(u => u.consultation_ban_end > now).length;
+      stats.expiredBans = statsData.filter(u => u.consultation_ban_end <= now).length;
+    }
+
+    // Get total cancellations count
+    const { count: totalCancellations } = await supabaseAdmin
+      .from('consultation_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'cancelled');
+
+    stats.totalCancellations = totalCancellations || 0;
+
+    res.json({
+      success: true,
+      users: usersWithCounts,
+      stats,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: users.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Consultation bans fetch error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Lift consultation ban
+router.post('/consultation-bans/:userId/lift', authenticateAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { reason, admin_id } = req.body;
+    const adminId = req.user?.id || admin_id;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Reason is required'
+      });
+    }
+
+    // Get user info first
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id, full_name, consultation_ban_end')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    if (!user.consultation_ban_end) {
+      return res.status(400).json({
+        success: false,
+        error: 'User is not currently banned from consultations'
+      });
+    }
+
+    // Lift the ban
+    const { error: updateError } = await supabaseAdmin
+      .from('users')
+      .update({ consultation_ban_end: null })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('Error lifting ban:', updateError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to lift consultation ban'
+      });
+    }
+
+    // Log the action
+    try {
+      await supabaseAdmin.from('admin_audit_logs').insert({
+        admin_id: adminId,
+        action: 'consultation_ban_lifted',
+        target_type: 'user',
+        target_id: userId,
+        details: { 
+          reason: reason.trim(),
+          previous_ban_end: user.consultation_ban_end,
+          user_name: user.full_name
+        }
+      });
+    } catch (auditError) {
+      console.warn('Failed to log ban lift action:', auditError.message);
+    }
+
+    res.json({
+      success: true,
+      message: `Consultation ban lifted for ${user.full_name}`,
+      data: {
+        user_id: userId,
+        user_name: user.full_name,
+        action: 'ban_lifted',
+        reason: reason.trim()
+      }
+    });
+
+  } catch (error) {
+    console.error('Lift consultation ban error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 module.exports = router;
