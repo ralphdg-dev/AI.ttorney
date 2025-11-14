@@ -9,6 +9,7 @@
  */
 
 import { Router } from 'expo-router';
+import { normalizePath } from './path';
 
 /**
  * Navigation context for determining appropriate fallback routes
@@ -271,6 +272,25 @@ export const NavigationHelper = {
   GUEST_SAFE_ROUTES,
   AUTH_SAFE_ROUTES,
   PUBLIC_SAFE_ROUTES,
+  /**
+   * Replace only when path actually differs after normalization.
+   * Optionally provide a ref to avoid repeated redirects on the same target.
+   */
+  replaceIfDifferent:
+    (
+      router: Router,
+      currentPathRaw: string | undefined | null,
+      targetPath: string,
+      lastRedirectRef?: { current: string | null }
+    ) => {
+      if (!targetPath) return;
+      const current = normalizePath(currentPathRaw || '/');
+      const target = normalizePath(targetPath);
+      if (target !== current && (!lastRedirectRef || lastRedirectRef.current !== target)) {
+        if (lastRedirectRef) lastRedirectRef.current = target;
+        router.replace(target as any);
+      }
+    }
 } as const;
 
 export default NavigationHelper;

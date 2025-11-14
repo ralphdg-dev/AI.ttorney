@@ -8,6 +8,8 @@ import {
   getRoleBasedRedirect 
 } from '../config/routes';
 import { LoadingWithTrivia } from './LoadingWithTrivia';
+import { normalizePath } from '../utils/path';
+import NavigationHelper from '../utils/navigationHelper';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -22,6 +24,33 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const routeConfigRender = getRouteConfig(currentPathRender);
   const isPublicRouteRender = !!routeConfigRender?.isPublic;
   const [showDelayedLoader, setShowDelayedLoader] = React.useState(false);
+  // Prevent redundant redirects that can cause navigation loops
+  const lastRedirectRef = React.useRef<string | null>(null);
+  const redirectInProgressRef = React.useRef<boolean>(false);
+  const redirectIfNeeded = React.useCallback((targetPath: string) => {
+    if (!targetPath) return;
+    // Only redirect if target differs and we didn't just redirect to it
+    const currentPath = normalizePath(`/${segments.join('/')}`);
+    const target = normalizePath(targetPath);
+    if (redirectInProgressRef.current) return;
+    if (target !== currentPath && lastRedirectRef.current !== target) {
+      redirectInProgressRef.current = true;
+      NavigationHelper.replaceIfDifferent(router, currentPath, target, lastRedirectRef);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, segments]);
+
+  // Clear last redirect marker when path actually changes to avoid locking
+  React.useEffect(() => {
+    const path = normalizePath(`/${segments.join('/')}`);
+    if (lastRedirectRef.current === path) {
+      lastRedirectRef.current = null;
+    }
+    // Clear re-entrancy lock once URL updates
+    if (redirectInProgressRef.current) {
+      redirectInProgressRef.current = false;
+    }
+  }, [segments]);
 
   // Avoid flash-of-loader by delaying loader display on protected routes
   useEffect(() => {
@@ -36,15 +65,17 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   }, [isLoading, isSigningOut, isPublicRouteRender, segments]);
 
   useEffect(() => {
+    // Skip logic while a redirect we initiated is still pending
+    if (redirectInProgressRef.current) return;
     // Compute path/config once per effect run
-    const currentPath = `/${segments.join('/')}`;
+    const currentPath = normalizePath(`/${segments.join('/')}`);
     const routeConfig = getRouteConfig(currentPath);
 
     // During sign out: proactively force redirect to /login if current route is protected
     if (isSigningOut) {
       const isPublic = !!routeConfig?.isPublic;
       if (!isPublic && currentPath !== '/login') {
-        router.replace('/login' as any);
+        redirectIfNeeded('/login');
       }
       return;
     }
@@ -94,7 +125,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
         // Redirect authenticated users away from login/registration
         const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
         logRouteAccess(currentPath, user, 'denied', 'Already authenticated');
-        router.replace(redirectPath as any);
+        redirectIfNeeded(redirectPath);
         return;
       }
 
@@ -108,7 +139,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
         
         const redirectPath = routeConfig.fallbackRoute || getRoleBasedRedirect(user.role, user.is_verified, false);
         logRouteAccess(currentPath, user, 'denied', 'Insufficient permissions');
-        router.replace(redirectPath as any);
+        if (redirectPath) redirectIfNeeded(redirectPath);
         return;
       }
 
@@ -119,7 +150,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       if (!routeConfig.isPublic) {
         const redirectPath = '/chatbot'; // Redirect to chatbot (guest index page)
         logRouteAccess(currentPath, null, 'denied', 'Guest mode restricted');
-        router.replace(redirectPath as any);
+        redirectIfNeeded(redirectPath);
         return;
       }
 
@@ -130,7 +161,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       if (!routeConfig.isPublic) {
         const redirectPath = '/login';
         logRouteAccess(currentPath, null, 'denied', 'Authentication required');
-        router.replace(redirectPath as any);
+        redirectIfNeeded(redirectPath);
         return;
       }
 

@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { LoadingWithTrivia } from './LoadingWithTrivia';
 import { NetworkConfig } from '../utils/networkConfig';
 import { getRoleBasedRedirect, getRouteConfig } from '../config/routes';
+import { normalizePath } from '../utils/path';
+import NavigationHelper from '../utils/navigationHelper';
 
 interface MaintenanceStatus {
   is_active: boolean;
@@ -19,9 +21,10 @@ export const MaintenanceGuard: React.FC<{ children: React.ReactNode }> = ({ chil
   const [status, setStatus] = useState<MaintenanceStatus | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
-  const currentPath = pathname || '/';
+  const currentPath = normalizePath(pathname || '/');
   const routeConfig = getRouteConfig(currentPath);
   const isPublicRoute = !!routeConfig?.isPublic;
+  const lastRedirectRef = React.useRef<string | null>(null);
 
   useEffect(() => {
     if (!initialAuthCheck) {
@@ -104,19 +107,31 @@ export const MaintenanceGuard: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [initialAuthCheck]);
 
   useEffect(() => {
+    const current = normalizePath(pathname || '/');
+    if (lastRedirectRef.current === current) {
+      lastRedirectRef.current = null;
+    }
+  }, [pathname]);
+
+  const safeReplace = React.useCallback((targetPath: string) => {
+    if (!targetPath) return;
+    NavigationHelper.replaceIfDifferent(router, pathname, targetPath, lastRedirectRef);
+  }, [pathname]);
+
+  useEffect(() => {
     if (!status || isSigningOut) {
       return;
     }
 
-    const isMaintenancePage = pathname === '/maintenance';
+    const isMaintenancePage = normalizePath(pathname || '/') === '/maintenance';
 
     if (!status.is_active) {
       if (isMaintenancePage) {
         if (user && session) {
           const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
-          router.replace(redirectPath as any);
+          safeReplace(redirectPath);
         } else {
-          router.replace('/login' as any);
+          safeReplace('/login');
         }
       }
       return;

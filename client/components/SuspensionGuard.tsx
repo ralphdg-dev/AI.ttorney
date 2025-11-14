@@ -3,6 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { router, usePathname } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { LoadingWithTrivia } from './LoadingWithTrivia';
+import { normalizePath } from '../utils/path';
+import NavigationHelper from '../utils/navigationHelper';
 
 /**
  * SuspensionGuard Component
@@ -19,6 +21,11 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
   const [isChecking, setIsChecking] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
   const [lastUserId, setLastUserId] = useState<string | null>(null);
+
+  const safeReplace = React.useCallback((targetPath: string) => {
+    if (!targetPath) return;
+    NavigationHelper.replaceIfDifferent(router, pathname, targetPath);
+  }, [pathname]);
 
   // Reset hasChecked when user changes (login/logout)
   React.useEffect(() => {

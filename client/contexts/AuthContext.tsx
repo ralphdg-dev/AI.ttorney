@@ -6,6 +6,8 @@ import { getRoleBasedRedirect } from '../config/routes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GUEST_SESSION_STORAGE_KEY, validateGuestSession, isSessionExpired } from '../config/guestConfig';
 import { useToast, Toast, ToastTitle, ToastDescription } from '../components/ui/toast';
+import { normalizePath } from '../utils/path';
+import NavigationHelper from '../utils/navigationHelper';
 
 // Role hierarchy based on backend schema
 export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
@@ -73,6 +75,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const toast = useToast();
   const adminToastShownAtRef = React.useRef<number>(0);
   const adminBlockInProgressRef = React.useRef<boolean>(false);
+  const lastRedirectRef = React.useRef<string | null>(null);
+
+  const safeReplace = React.useCallback((targetPath: string) => {
+    if (!targetPath) return;
+    const currentPathRaw = typeof window !== 'undefined' ? (window.location?.pathname || '') : '';
+    NavigationHelper.replaceIfDifferent(router, currentPathRaw, targetPath, lastRedirectRef);
+  }, []);
+
+  // Clear marker when current URL equals last redirect
+  React.useEffect(() => {
+    const pathRaw = typeof window !== 'undefined' ? (window.location?.pathname || '') : '';
+    const path = normalizePath(pathRaw);
+    if (lastRedirectRef.current === path) {
+      lastRedirectRef.current = null;
+    }
+  });
 
 
   const checkSuspensionStatus = React.useCallback(async (): Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null; needsLiftedAcknowledgment: boolean } | null> => {
@@ -234,7 +252,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (suspensionStatus && suspensionStatus.isSuspended) {
           console.log('🚫 User is suspended, redirecting to suspended screen');
           setIsLoading(false);
-          router.replace('/suspended' as any);
+          safeReplace('/suspended' as any);
           return true;
         }
         
@@ -242,7 +260,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (suspensionStatus && suspensionStatus.needsLiftedAcknowledgment) {
           console.log('✅ User suspension lifted, redirecting to suspension-lifted screen');
           setIsLoading(false);
-          router.replace('/suspension-lifted' as any);
+          safeReplace('/suspension-lifted' as any);
           return true;
         }
         
@@ -264,7 +282,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (applicationStatus === 'accepted') {
             console.log('🎉 Application accepted! Redirecting to acceptance page');
             setIsLoading(false);
-            router.replace('/onboarding/lawyer/lawyer-status/accepted' as any);
+            safeReplace('/onboarding/lawyer/lawyer-status/accepted' as any);
             return true;
           }
           
@@ -277,14 +295,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           console.log('🔄 Redirecting pending lawyer to:', redirectPath);
           setIsLoading(false);
-          router.replace(redirectPath as any);
+          safeReplace(redirectPath as any);
           return true;
         } else {
           // User doesn't have pending lawyer status, redirect normally
           const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
           console.log('🔄 Redirecting user to:', redirectPath);
           setIsLoading(false);
-          router.replace(redirectPath as any);
+          safeReplace(redirectPath as any);
           return true;
         }
       } else {
@@ -597,7 +615,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🔄 Forcing navigation to login...');
       try {
         // Try immediate navigation
-        router.replace('/login');
+        safeReplace('/login');
         
         // Backup navigation after short delay (WEB ONLY)
         if (typeof window !== 'undefined') {
@@ -606,7 +624,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const path = window.location?.pathname || '';
               if (!path.startsWith('/login')) {
                 console.log('🔄 Backup navigation attempt...');
-                router.replace('/login');
+                safeReplace('/login');
               }
             } catch {}
           }, 100);
@@ -651,7 +669,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Force navigation with fallbacks
       try {
-        router.replace('/login');
+        safeReplace('/login');
         if (typeof window !== 'undefined') {
           setTimeout(() => window.location.href = '/login', 200);
         }
