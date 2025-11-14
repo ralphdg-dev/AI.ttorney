@@ -588,37 +588,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('⚠️ Cleanup error (non-critical):', cleanupError);
       }
       
-      // Reset all auth state
+      // Reset all auth state BEFORE navigation, but keep isSigningOut=true until nav settles
       setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
       setIsGuestMode(false);
-      setIsLoading(false);
-      setIsSigningOut(false);
-      
-      // Force navigation to login with multiple attempts
+
+      // Force navigation to login with multiple attempts while isSigningOut is still true
       console.log('🔄 Forcing navigation to login...');
       try {
         // Try immediate navigation
         router.replace('/login');
         
-        // Backup navigation after short delay
-        setTimeout(() => {
-          console.log('🔄 Backup navigation attempt...');
-          router.replace('/login');
-        }, 100);
-        
-        // Nuclear option - reload page for web
+        // Backup navigation after short delay (WEB ONLY)
         if (typeof window !== 'undefined') {
           setTimeout(() => {
-            console.log('🔄 Web reload fallback...');
-            window.location.href = '/login';
-          }, 500);
+            try {
+              const path = window.location?.pathname || '';
+              if (!path.startsWith('/login')) {
+                console.log('🔄 Backup navigation attempt...');
+                router.replace('/login');
+              }
+            } catch {}
+          }, 100);
+        }
+        
+        // Nuclear option - reload page for web ONLY if navigation didn't take effect
+        if (typeof window !== 'undefined') {
+          setTimeout(() => {
+            try {
+              const path = window.location?.pathname || '';
+              if (!path.startsWith('/login')) {
+                console.log('🔄 Web reload fallback...');
+                window.location.replace('/login');
+              }
+            } catch {}
+          }, 800);
         }
       } catch (navError) {
         console.error('❌ Navigation error:', navError);
       }
-      
-      console.log('✅ Logout complete');
+
+      // Turn off loading and release signingOut flag slightly after nav to avoid guard races
+      setTimeout(() => {
+        setIsLoading(false);
+        setIsSigningOut(false);
+        console.log('✅ Logout complete');
+      }, 200);
       
     } catch (error) {
       console.error('❌ Logout error:', error);

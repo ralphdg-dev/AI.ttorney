@@ -3,7 +3,7 @@ import { router, usePathname } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { LoadingWithTrivia } from './LoadingWithTrivia';
 import { NetworkConfig } from '../utils/networkConfig';
-import { getRoleBasedRedirect } from '../config/routes';
+import { getRoleBasedRedirect, getRouteConfig } from '../config/routes';
 
 interface MaintenanceStatus {
   is_active: boolean;
@@ -19,6 +19,9 @@ export const MaintenanceGuard: React.FC<{ children: React.ReactNode }> = ({ chil
   const [status, setStatus] = useState<MaintenanceStatus | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
+  const currentPath = pathname || '/';
+  const routeConfig = getRouteConfig(currentPath);
+  const isPublicRoute = !!routeConfig?.isPublic;
 
   useEffect(() => {
     if (!initialAuthCheck) {
@@ -106,7 +109,20 @@ export const MaintenanceGuard: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [status, pathname, isSigningOut, user, session, isAdmin]);
 
-  if (!initialAuthCheck || isChecking || !hasChecked) {
+  // Never block UI during sign out - allow AuthGuard/AuthContext to navigate
+  if (isSigningOut) {
+    return <>{children}</>;
+  }
+
+  if (!initialAuthCheck) {
+    // Do not block public routes while auth initializes
+    if (isPublicRoute) return <>{children}</>;
+    return <LoadingWithTrivia />;
+  }
+
+  if (isChecking || !hasChecked) {
+    // Run check in background for public routes to avoid UI blink
+    if (isPublicRoute) return <>{children}</>;
     return <LoadingWithTrivia />;
   }
 

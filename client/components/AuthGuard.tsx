@@ -36,19 +36,26 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   }, [isLoading, isSigningOut, isPublicRouteRender, segments]);
 
   useEffect(() => {
-    // ⚡ OPTIMIZATION: Skip checks during sign out for immediate redirect
-    if (isSigningOut) return;
-    
-    // ⚡ OPTIMIZATION: Don't block on loading for public routes (login, register)
+    // Compute path/config once per effect run
     const currentPath = `/${segments.join('/')}`;
     const routeConfig = getRouteConfig(currentPath);
-    
-    if (!routeConfig) return;
+
+    // During sign out: proactively force redirect to /login if current route is protected
+    if (isSigningOut) {
+      const isPublic = !!routeConfig?.isPublic;
+      if (!isPublic && currentPath !== '/login') {
+        router.replace('/login' as any);
+      }
+      return;
+    }
 
     // Wait for initial auth check to complete (prevents race condition on hard refresh)
     if (!initialAuthCheck) {
       return; // Block ALL routes until we know if user is guest/authenticated/unauthenticated
     }
+
+    // ⚡ OPTIMIZATION: Don't block on loading for public routes (login, register)
+    if (!routeConfig) return;
 
     // Skip permission checks for lawyer status screens to prevent redirect loops
     // But still render the children (LawyerStatusGuard will handle access control)
