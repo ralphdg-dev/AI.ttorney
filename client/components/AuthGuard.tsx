@@ -17,6 +17,23 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const { user, session, isLoading, isAuthenticated, isGuestMode, isSigningOut, initialAuthCheck } = useAuth();
   const router = useRouter();
   const segments = useSegments();
+  // Compute route info for render-time gating
+  const currentPathRender = `/${segments.join('/')}`;
+  const routeConfigRender = getRouteConfig(currentPathRender);
+  const isPublicRouteRender = !!routeConfigRender?.isPublic;
+  const [showDelayedLoader, setShowDelayedLoader] = React.useState(false);
+
+  // Avoid flash-of-loader by delaying loader display on protected routes
+  useEffect(() => {
+    if (isLoading && !isSigningOut && !isPublicRouteRender) {
+      const t = setTimeout(() => setShowDelayedLoader(true), 250);
+      return () => {
+        clearTimeout(t);
+        setShowDelayedLoader(false);
+      };
+    }
+    setShowDelayedLoader(false);
+  }, [isLoading, isSigningOut, isPublicRouteRender, segments]);
 
   useEffect(() => {
     // ⚡ OPTIMIZATION: Skip checks during sign out for immediate redirect
@@ -115,15 +132,20 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     }
   }, [isAuthenticated, user, isLoading, isSigningOut, initialAuthCheck, isGuestMode, session, router, segments]);
 
-  // CRITICAL: Show loading until initial auth check completes
-  // This prevents race condition where UI renders before we know if user is guest/authenticated
-  if (!initialAuthCheck) {
+  // CRITICAL: For protected routes, block UI until initial auth check completes
+  // For public routes (e.g., /login), render immediately to avoid initial blink
+  if (!initialAuthCheck && !isPublicRouteRender) {
     return <LoadingWithTrivia />;
   }
 
-  // Show loading screen while checking authentication (but NOT during sign out)
+  // Show loading screen while checking authentication for PROTECTED routes only
+  // For public routes (e.g., /login, /onboarding/registration), render children to avoid blinking
+  const currentPath = currentPathRender;
+  const routeConfig = routeConfigRender;
+  const isPublicRoute = isPublicRouteRender;
+
   // During sign out, we want immediate redirect without loading screen
-  if (isLoading && !isSigningOut) {
+  if (showDelayedLoader && !isSigningOut && !isPublicRoute && !isAuthenticated) {
     return <LoadingWithTrivia />;
   }
 

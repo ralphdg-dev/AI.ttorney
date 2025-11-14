@@ -1,35 +1,22 @@
 import { Redirect } from "expo-router";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { getRoleBasedRedirect } from "../config/routes";
-import { LoadingWithTrivia } from "../components/LoadingWithTrivia";
 
 export default function SplashScreen() {
-  const [redirectPath, setRedirectPath] = useState<string | null>(null);
   const { user, isLoading, isAuthenticated, isGuestMode, initialAuthCheck } = useAuth();
+  const redirectPath = useMemo(() => {
+    if (!initialAuthCheck || isLoading) return null;
+    if (isGuestMode) return "/chatbot";
+    if (isAuthenticated && user) return getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
+    return "/login";
+  }, [initialAuthCheck, isLoading, isGuestMode, isAuthenticated, user]);
 
-  useEffect(() => {
-    // Only redirect when auth check is complete
-    if (!isLoading && initialAuthCheck) {
-      let targetPath = "/login";
-      
-      // Check for guest mode first
-      if (isGuestMode) {
-        console.log('🎯 Redirecting guest to /chatbot');
-        targetPath = "/chatbot";
-      } else if (isAuthenticated && user) {
-        targetPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
-      }
-      
-      setRedirectPath(targetPath);
-    }
-  }, [isLoading, isAuthenticated, isGuestMode, user, initialAuthCheck]);
-
-  // Redirect when ready
-  if (redirectPath && !isLoading) {
+  if (redirectPath) {
     return <Redirect href={redirectPath as any} />;
   }
 
-  // Show unified loading screen for entire app
-  return <LoadingWithTrivia />;
+  // While waiting for initial auth check, AppContent keeps the splash screen up.
+  // Once ready, we immediately redirect without rendering an intermediate loader.
+  return null;
 }

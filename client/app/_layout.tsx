@@ -42,7 +42,10 @@ function AppContent() {
     // Only hide splash screen when auth check is complete
     if (initialAuthCheck) {
       setIsReady(true);
-      SplashScreen.hideAsync();
+      const t = setTimeout(() => {
+        SplashScreen.hideAsync();
+      }, 150);
+      return () => clearTimeout(t);
     }
   }, [initialAuthCheck]);
 

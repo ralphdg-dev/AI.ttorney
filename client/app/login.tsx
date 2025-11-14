@@ -28,14 +28,13 @@ export default function Login() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   
-  // Clear form on mount & auto-redirect if authenticated
+  // Clear form on mount and when auth state changes; let AuthGuard handle redirects
   useEffect(() => {
     setEmail("");
     setPassword("");
     setEmailError("");
     setPasswordError("");
     setShowPassword(false);
-    if (isAuthenticated) router.replace('/home');
   }, [isAuthenticated]);
 
 

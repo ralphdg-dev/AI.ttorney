@@ -112,15 +112,9 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
     return <>{children}</>;
   }
 
-  // Show loading indicator while checking suspension status
-  // CRITICAL: Never show loading on login page, suspended page, or suspension-lifted page
-  const isLoginPage = pathname === '/login';
-  const isSuspendedPage = pathname === '/suspended';
-  const isSuspensionLiftedPage = pathname === '/suspension-lifted';
-  
-  if ((isChecking || !hasChecked) && user && session && !isSuspendedPage && !isSuspensionLiftedPage && !isLoginPage) {
-    return <LoadingWithTrivia />;
-  }
+  // Do not block UI with a full-screen loader; perform checks in background
+  // This prevents a visible blink for non-suspended users right after login
+  // If suspended, we still redirect immediately when the check resolves
 
   return <>{children}</>;
 };
