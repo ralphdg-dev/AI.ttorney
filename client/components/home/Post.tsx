@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
 import ReportModal from '../common/ReportModal';
 import { ReportService } from '../../services/reportService';
@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePostBookmarks } from '../../contexts/PostBookmarksContext';
 import FadeInView from '../ui/FadeInView';
  
+import { VerifiedLawyerBadge } from '../common/VerifiedLawyerBadge';
 
 interface PostProps {
   id: string;
@@ -16,6 +17,7 @@ interface PostProps {
     name: string;
     username: string;
     avatar: string;
+    isLawyer?: boolean;
   };
   timestamp: string;
   created_at?: string; // Raw timestamp for dynamic formatting
@@ -35,7 +37,9 @@ interface PostProps {
   // Bookmark status passed from parent to prevent individual API calls
   isBookmarked?: boolean;
   onBookmarkStatusChange?: (postId: string, isBookmarked: boolean) => void;
-  // Removed search highlighting props
+  // Search highlighting props
+  isSearchResult?: boolean;
+  searchTerm?: string;
 }
 
 const Post: React.FC<PostProps> = React.memo(({
@@ -57,12 +61,39 @@ const Post: React.FC<PostProps> = React.memo(({
   onMenuToggle,
   isBookmarked: propIsBookmarked,
   onBookmarkStatusChange,
+  isSearchResult = false,
+  searchTerm = '',
 }) => {
   const { user: currentUser, session } = useAuth();
   const { loadBookmarks: refreshBookmarkContext } = usePostBookmarks();
   const [isBookmarked, setIsBookmarked] = useState(propIsBookmarked || false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
-  const [displayTime, setDisplayTime] = useState(timestamp);
+  const [displayTime, setDisplayTime] = useState(() => {
+    // Initialize with formatted time
+    const dateToFormat = created_at || timestamp;
+    if (!dateToFormat) return 'now';
+    try {
+      const createdMs = new Date(dateToFormat).getTime();
+      if (Number.isNaN(createdMs)) return 'now';
+      const now = Date.now();
+      const diffSec = Math.max(0, Math.floor((now - createdMs) / 1000));
+      if (diffSec < 60) return `${diffSec}s`;
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin}m`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr}h`;
+      const diffDay = Math.floor(diffHr / 24);
+      if (diffDay < 7) return `${diffDay}d`;
+      const diffWeek = Math.floor(diffDay / 7);
+      if (diffWeek < 4) return `${diffWeek}w`;
+      const diffMonth = Math.floor(diffDay / 30);
+      if (diffMonth < 12) return `${diffMonth}mo`;
+      const diffYear = Math.floor(diffDay / 365);
+      return `${diffYear}y`;
+    } catch {
+      return 'now';
+    }
+  });
   const [showAlreadyReported, setShowAlreadyReported] = useState(false);
 
   // Helper function to get initials from name
@@ -82,46 +113,45 @@ const Post: React.FC<PostProps> = React.memo(({
     return initials || 'U'; // Fallback to 'U' if no initials
   };
 
-  // Format timestamp dynamically
-  const formatTimeAgo = useCallback((isoDate: string): string => {
-    if (!isoDate) return '';
-    try {
-      const createdMs = new Date(isoDate).getTime();
-      if (Number.isNaN(createdMs)) return timestamp; // Fallback to static timestamp
-      const now = Date.now();
-      const diffSec = Math.max(0, Math.floor((now - createdMs) / 1000));
-      if (diffSec < 60) return `${diffSec}s`;
-      const diffMin = Math.floor(diffSec / 60);
-      if (diffMin < 60) return `${diffMin}m`;
-      const diffHr = Math.floor(diffMin / 60);
-      if (diffHr < 24) return `${diffHr}h`;
-      const diffDay = Math.floor(diffHr / 24);
-      if (diffDay < 7) return `${diffDay}d`;
-      const diffWeek = Math.floor(diffDay / 7);
-      if (diffWeek < 4) return `${diffWeek}w`;
-      const diffMonth = Math.floor(diffDay / 30);
-      if (diffMonth < 12) return `${diffMonth}mo`;
-      const diffYear = Math.floor(diffDay / 365);
-      return `${diffYear}y`;
-    } catch {
-      return timestamp; // Fallback to static timestamp
-    }
-  }, [timestamp]);
 
   // Update display time periodically if we have raw timestamp
   useEffect(() => {
     if (!created_at) return;
     
+    const updateTime = () => {
+      try {
+        const createdMs = new Date(created_at).getTime();
+        if (Number.isNaN(createdMs)) return 'now';
+        const now = Date.now();
+        const diffSec = Math.max(0, Math.floor((now - createdMs) / 1000));
+        if (diffSec < 60) return `${diffSec}s`;
+        const diffMin = Math.floor(diffSec / 60);
+        if (diffMin < 60) return `${diffMin}m`;
+        const diffHr = Math.floor(diffMin / 60);
+        if (diffHr < 24) return `${diffHr}h`;
+        const diffDay = Math.floor(diffHr / 24);
+        if (diffDay < 7) return `${diffDay}d`;
+        const diffWeek = Math.floor(diffDay / 7);
+        if (diffWeek < 4) return `${diffWeek}w`;
+        const diffMonth = Math.floor(diffDay / 30);
+        if (diffMonth < 12) return `${diffMonth}mo`;
+        const diffYear = Math.floor(diffDay / 365);
+        return `${diffYear}y`;
+      } catch {
+        return 'now';
+      }
+    };
+    
     // Update immediately
-    setDisplayTime(formatTimeAgo(created_at));
+    setDisplayTime(updateTime());
     
     // Update every 30 seconds for real-time feel
     const timer = setInterval(() => {
-      setDisplayTime(formatTimeAgo(created_at));
+      setDisplayTime(updateTime());
     }, 30000);
     
     return () => clearInterval(timer);
-  }, [created_at, formatTimeAgo]);
+  }, [created_at]);
   
   // Update local state when prop changes
   useEffect(() => {
@@ -315,6 +345,13 @@ const Post: React.FC<PostProps> = React.memo(({
             {/* User Name and Category Row */}
             <View style={styles.userNameRow}>
               <Text style={styles.userName}>{user.name || 'User'}</Text>
+
+              {/* Verified Lawyer Badge (unified across app) */}
+              {!isAnonymous && user?.isLawyer && (
+                <View style={{ marginRight: 6 }}>
+                  <VerifiedLawyerBadge size="sm" />
+                </View>
+              )}
               
               {/* Category Badge */}
               <View style={[styles.categoryBadge, { 
@@ -348,7 +385,15 @@ const Post: React.FC<PostProps> = React.memo(({
         </View>
 
         {/* Post Content */}
-        <Text style={styles.content}>{content}</Text>
+        <View style={styles.contentContainer}>
+          <Text style={styles.content}>{content}</Text>
+          {isLoading && (
+            <View style={styles.loadingIndicator}>
+              <ActivityIndicator size="small" color={Colors.primary.blue} />
+              <Text style={styles.loadingText}>Publishing...</Text>
+            </View>
+          )}
+        </View>
 
         {/* More Menu */}
         {isMenuOpen && (
@@ -496,11 +541,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
   },
+  contentContainer: {
+    marginBottom: 16,
+  },
   content: {
     fontSize: 14,
     lineHeight: 20,
     color: '#0F1419',
-    marginBottom: 16,
+  },
+  loadingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+  },
+  loadingText: {
+    fontSize: 12,
+    color: Colors.primary.blue,
+    marginLeft: 6,
+    fontWeight: '500',
   },
   moreMenu: {
     position: 'absolute',

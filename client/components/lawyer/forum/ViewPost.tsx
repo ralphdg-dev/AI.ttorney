@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, Animated, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { User, Bookmark, MoreHorizontal, Flag, Send, Shield } from 'lucide-react-native';
+import { User, Bookmark, MoreHorizontal, Flag, Send } from 'lucide-react-native';
 import ReportModal from '../../common/ReportModal';
 import { ReportService } from '../../../services/reportService';
 import tw from 'tailwind-react-native-classnames';
@@ -21,6 +21,7 @@ import { useToast } from '../../ui/toast';
 import { parseModerationError } from '../../../services/moderationService';
 import { showStrikeAddedToast, showSuspendedToast, showBannedToast, showAccessDeniedToast, showContentValidationToast } from '../../../utils/moderationToastUtils';
 import { validatePostContent } from '../../../utils/contentValidation';
+import { VerifiedLawyerBadge } from '../../common/VerifiedLawyerBadge';
 
 
 interface PostData {
@@ -651,29 +652,48 @@ const ViewPost: React.FC = () => {
     }
   }, [getAuthHeaders]);
 
-  // Function to confirm optimistic reply
-  const confirmOptimisticReply = useCallback((optimisticId: string, reloadPost: (id: string) => Promise<void>) => {
-    setOptimisticReplies(prev => {
-      const reply = prev.find(r => r.id === optimisticId);
-      if (reply?.animatedOpacity) {
-        Animated.timing(reply.animatedOpacity, {
-          toValue: 1,
-          duration: 150,
-          useNativeDriver: shouldUseNativeDriver('opacity'),
-        }).start();
-        
-        setTimeout(() => {
-          if (postId) {
-            reloadPost(String(postId));
-          }
-          setTimeout(() => {
-            setOptimisticReplies(current => current.filter(r => r.id !== optimisticId));
-          }, 200);
-        }, 300);
-      }
-      return prev;
-    });
-  }, [postId]);
+  // Function to confirm/promote optimistic reply (no flicker)
+  const confirmOptimisticReply = useCallback(
+    (
+      optimisticId: string,
+      opts?: { replyId?: string; created_at?: string; backgroundRefresh?: boolean }
+    ) => {
+      setOptimisticReplies(prev => {
+        const idx = prev.findIndex(r => r.id === optimisticId);
+        if (idx === -1) return prev;
+        const target = prev[idx];
+
+        // Animate to full opacity
+        if (target.animatedOpacity) {
+          Animated.timing(target.animatedOpacity, {
+            toValue: 1,
+            duration: 150,
+            useNativeDriver: shouldUseNativeDriver('opacity'),
+          }).start();
+        }
+
+        // Promote optimistic to real by swapping id and clearing flag (prevents disappearance)
+        const promoted: Reply = {
+          ...target,
+          id: opts?.replyId || target.id,
+          created_at: opts?.created_at || target.created_at,
+          isOptimistic: false,
+        };
+
+        const next = [...prev];
+        next[idx] = promoted;
+
+        // Optionally refresh in background to sync other metadata
+        if (opts?.backgroundRefresh && postId) {
+          // Fire-and-forget
+          loadFromAPI(String(postId)).catch(() => {});
+        }
+
+        return next;
+      });
+    },
+    [postId, loadFromAPI]
+  );
 
   // Function to remove failed optimistic reply
   const removeOptimisticReply = useCallback((optimisticId: string) => {
@@ -713,7 +733,13 @@ const ViewPost: React.FC = () => {
       });
       
       if (response.ok) {
-        confirmOptimisticReply(optimisticId, loadFromAPI);
+        let replyId: string | undefined;
+        try {
+          const respJson = await response.json();
+          replyId = String(respJson?.reply_id || respJson?.data?.reply_id || '');
+        } catch {}
+        // Promote without full reload to prevent flicker
+        confirmOptimisticReply(optimisticId, { replyId, backgroundRefresh: true });
       } else {
         const errorText = await response.text();
         removeOptimisticReply(optimisticId);
@@ -778,7 +804,7 @@ const ViewPost: React.FC = () => {
     } finally {
       setIsReplying(false);
     }
-  }, [replyText, postId, addOptimisticReply, confirmOptimisticReply, removeOptimisticReply, getAuthHeaders, loadFromAPI, refreshStatus, toast]);
+  }, [replyText, postId, addOptimisticReply, confirmOptimisticReply, removeOptimisticReply, getAuthHeaders, refreshStatus, toast]);
 
   // Replies are now loaded with the post in loadPost and loadFromAPI
   // No separate loadReplies function needed
@@ -1016,15 +1042,7 @@ const ViewPost: React.FC = () => {
                         {displayUser.name}
                       </Text>
                       {displayUser.isLawyer && (
-                        <View style={tw`px-2 py-0.5 bg-green-50 rounded-full border border-green-100`}>
-                          <View style={tw`flex-row items-center`}>
-                            <Image 
-                              source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3472/3472620.png' }}
-                              style={[tw`w-3 h-3 mr-1`, { tintColor: '#15803d' }]}
-                            />
-                            <Text style={tw`text-xs font-medium text-green-700`}>Verified Lawyer</Text>
-                          </View>
-                        </View>
+                        <VerifiedLawyerBadge size="sm" />
                       )}
                     </View>
                     
@@ -1093,9 +1111,23 @@ const ViewPost: React.FC = () => {
                       </View>
                   </View>
                 ))
-              ) : [...replies, ...optimisticReplies].length > 0 ? (
-                // Display actual replies and optimistic replies
-                [...replies, ...optimisticReplies].map((reply) => {
+              ) : (
+                // Filter out real replies that match optimistic replies to prevent duplicates
+                (() => {
+                  const filteredReplies = replies.filter(realReply => {
+                    const hasOptimisticMatch = optimisticReplies.some(optReply => {
+                      // Match by body and approximate timestamp (within 30 seconds)
+                      const contentMatch = (optReply as any).body?.trim() === (realReply as any).body?.trim();
+                      const timeMatch = optReply.created_at && realReply.created_at ? Math.abs(
+                        new Date(optReply.created_at).getTime() - new Date(realReply.created_at).getTime()
+                      ) < 30000 : false; // 30 seconds tolerance
+                      return contentMatch && timeMatch;
+                    });
+                    return !hasOptimisticMatch;
+                  });
+                  
+                  const allReplies = [...filteredReplies, ...optimisticReplies];
+                  return allReplies.length > 0 ? allReplies.map((reply) => {
                   const isReplyAnonymous = reply.is_anonymous || false;
                   const replyUser = isReplyAnonymous 
                     ? { name: 'Anonymous User', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png', isLawyer: false }
@@ -1130,12 +1162,7 @@ const ViewPost: React.FC = () => {
                                   {replyUser.name}
                                 </Text>
                                 {replyUser.isLawyer && (
-                                  <View style={tw`px-2 py-0.5 bg-green-50 rounded-full border border-green-100`}>
-                                    <View style={tw`flex-row items-center`}>
-                                      <Shield size={10} color="#15803d" fill="#15803d" />
-                                      <Text style={tw`text-xs font-medium text-green-700 ml-1`}>Verified Lawyer</Text>
-                                    </View>
-                                  </View>
+                                  <VerifiedLawyerBadge size="sm" />
                                 )}
                               </View>
                               {!reply.isOptimistic && (
@@ -1160,54 +1187,23 @@ const ViewPost: React.FC = () => {
                           <Text style={tw`text-gray-900 mb-2`}>{reply.body}</Text>
                           
                           {/* [timestamp] */}
-                          <Text style={tw`text-xs text-gray-500`}>
+                          <Text style={tw`text-xs text-gray-500 mb-1`}>
                             {replyTimestamp}
                           </Text>
                         </View>
                       </View>
                       
                       {/* Reply Menu Dropdown */}
-                      {replyMenuOpen === reply.id && (
-                        <>
-                          <TouchableOpacity 
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              bottom: 0,
-                              zIndex: 998
-                            }} 
-                            activeOpacity={1} 
-                            onPress={() => setReplyMenuOpen(null)} 
-                          />
-                          <View style={{
-                            position: 'absolute',
-                            top: 30,
-                            right: 0,
-                            backgroundColor: 'white',
-                            borderWidth: 1,
-                            borderColor: '#E5E7EB',
-                            borderRadius: 8,
-                            ...createShadowStyle({
-                              shadowColor: '#000',
-                              shadowOffset: { width: 0, height: 2 },
-                              shadowOpacity: 0.1,
-                              shadowRadius: 6,
-                              elevation: 3,
-                            }),
-                            zIndex: 999,
-                            width: 160
-                          }}>
-                            <TouchableOpacity
-                              style={tw`flex-row items-center px-4 py-3`}
-                              onPress={() => handleReportReplyPress(reply.id)}
-                            >
-                              <Flag size={16} color="#B91C1C" />
-                              <Text style={tw`ml-3 text-red-700`}>Report reply</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </>
+                      {replyMenuOpen === reply.id && !reply.isOptimistic && (
+                        <View style={tw`absolute top-8 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-32`}>
+                          <TouchableOpacity
+                            onPress={() => handleReportReplyPress(reply.id)}
+                            style={tw`flex-row items-center px-3 py-2`}
+                          >
+                            <Flag size={14} color="#EF4444" style={tw`mr-2`} />
+                            <Text style={tw`text-sm text-red-600`}>Report</Text>
+                          </TouchableOpacity>
+                        </View>
                       )}
                     </View>
                   );
@@ -1225,12 +1221,13 @@ const ViewPost: React.FC = () => {
                   }
                   
                   return replyComponent;
-                })
-              ) : (
-                // No replies message
-                <View style={tw`py-4 items-center bg-white`}>
-                  <Text style={tw`text-gray-500 text-center italic`}>No replies yet</Text>
-                </View>
+                }) : (
+                  // No replies message
+                  <View style={tw`py-4 items-center bg-white`}>
+                    <Text style={tw`text-gray-500 text-center italic`}>No replies yet</Text>
+                  </View>
+                );
+                })()
               )}
             </View>
           </View>

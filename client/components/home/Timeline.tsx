@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
 
-import { View, FlatList, RefreshControl, TouchableOpacity, Animated, StyleSheet, ListRenderItem, Text as RNText } from 'react-native';
+import { View, FlatList, RefreshControl, TouchableOpacity, Animated, StyleSheet, ListRenderItem } from 'react-native';
 import { NetworkConfig } from '../../utils/networkConfig';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Plus } from 'lucide-react-native';
@@ -70,7 +70,6 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const POSTS_PER_PAGE = 20;
 
   // Refs for optimization
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,29 +92,6 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     // This ensures any old references are cleared
   }, []);
 
-  const formatTimeAgo = useCallback((isoDate?: string): string => {
-    if (!isoDate) return '';
-    // Treat timestamps without timezone as UTC to avoid local offset issues
-    const hasTz = /Z|[+-]\d{2}:?\d{2}$/.test(isoDate);
-    const normalized = hasTz ? isoDate : `${isoDate}Z`;
-    const createdMs = new Date(normalized).getTime();
-    if (Number.isNaN(createdMs)) return '';
-    const now = Date.now();
-    const diffSec = Math.max(0, Math.floor((now - createdMs) / 1000));
-    if (diffSec < 60) return `${diffSec}s`;
-    const diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) return `${diffMin}m`;
-    const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) return `${diffHr}h`;
-    const diffDay = Math.floor(diffHr / 24);
-    if (diffDay < 7) return `${diffDay}d`;
-    const diffWeek = Math.floor(diffDay / 7);
-    if (diffWeek < 4) return `${diffWeek}w`;
-    const diffMonth = Math.floor(diffDay / 30);
-    if (diffMonth < 12) return `${diffMonth}mo`;
-    const diffYear = Math.floor(diffDay / 365);
-    return `${diffYear}y`;
-  }, []);
 
   const mapApiToPost = useCallback((row: any): PostData => {
     const isAnon = !!row?.is_anonymous;
@@ -156,7 +132,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
             isLawyer: userData?.role === 'verified_lawyer',
             lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
           },
-      timestamp: formatTimeAgo(created),
+      timestamp: created || '',
       category: row?.category || 'Others',
       content: row?.body || '',
       comments: mappedReplies.length,
@@ -187,7 +163,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     }
 
     return postData;
-  }, [formatTimeAgo, setCachedPost]);
+  }, [setCachedPost]);
 
   // Remove complex batching - bookmark status now comes from API
 
@@ -503,7 +479,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage, hasMore: hasMoreRef.current });
       loadPosts(false); // Don't force refresh
     }, 300); // 300ms debounce
-  }, [loadPosts]);
+  }, [loadPosts, currentPage]);
 
   const handleCreatePost = useCallback(() => {
     const route = context === 'lawyer' ? '/lawyer/CreatePost' : '/home/CreatePost';
@@ -531,10 +507,12 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
             lawyerBadge: isLawyer ? 'Verified' : undefined
           },
       timestamp: 'now',
+      created_at: new Date().toISOString(),
       category: postData.category || 'Others',
       content: postData.body,
       comments: 0,
       isOptimistic: true,
+      isLoading: true, // Add loading state for Facebook-style indicator
       animatedOpacity,
     };
 
@@ -551,27 +529,47 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   }, [currentUser]);
 
   // Function to confirm optimistic post (make it fully opaque and keep it seamless)
-  const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: PostData) => {
-    setOptimisticPosts(prev => {
-      const post = prev.find(p => p.id === optimisticId);
-      if (post?.animatedOpacity) {
-        // Animate to full opacity to show success
-        Animated.timing(post.animatedOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
+  const confirmOptimisticPost = useCallback(
+    (optimisticId: string, realPost?: Partial<PostData> & { id: string }) => {
+      setOptimisticPosts(prev => {
+        const opt = prev.find(p => p.id === optimisticId);
+        if (!opt) return prev;
 
-        // Keep optimistic post visible and let duplicate detection handle seamless transition
-        // The post will automatically be filtered out when the real post appears
-        // Only remove it after a reasonable time to ensure the real post has loaded
-        setTimeout(() => {
-          setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
-        }, 3000); // Extended delay - duplicate detection prevents visual duplicates
-      }
-      return prev;
-    });
-  }, []);
+        // If server returned a real ID, promote optimistic post to a real one immediately
+        if (realPost?.id) {
+          const promoted: PostData = {
+            ...opt,
+            id: realPost.id,
+            isOptimistic: false,
+            isLoading: false, // Remove loading state when confirmed
+            animatedOpacity: undefined,
+            created_at: realPost.created_at || opt.created_at || new Date().toISOString(),
+          } as PostData;
+
+          // Insert promoted post at the top of the real posts list and remove optimistic
+          setPosts(current => [promoted, ...current.filter(p => p.id !== realPost.id)]);
+          // Remove from optimistic list
+          return prev.filter(p => p.id !== optimisticId);
+        }
+
+        // Fallback: remove loading state and animate in, then remove after delay
+        const updatedOpt = { ...opt, isLoading: false };
+        if (opt.animatedOpacity) {
+          Animated.timing(opt.animatedOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+
+          setTimeout(() => {
+            setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+          }, 1000);
+        }
+        return prev.map(p => p.id === optimisticId ? updatedOpt : p);
+      });
+    },
+    []
+  );
 
   // Function to remove failed optimistic post
   const removeOptimisticPost = useCallback((optimisticId: string) => {
@@ -594,7 +592,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     });
   }, []);
 
-  // Expose functions globally for CreatePost to use
+  // Expose functions globally for CreatePost to use (only once)
   React.useEffect(() => {
     if (context === 'user') {
       (global as any).userForumActions = {
@@ -624,15 +622,15 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         content={item.content}
         comments={item.comments}
         onCommentPress={() => handleCommentPress(item.id)}
-        onBookmarkPress={() => handleBookmarkPress(item.id)}
         onReportPress={() => handleReportPress(item.id)}
+        onBookmarkPress={() => handleBookmarkPress(item.id)}
         onPostPress={() => handlePostPress(item.id)}
-        index={item.isNewlyLoaded ? animationIndex : 0}
+        index={animationIndex}
         isLoading={item.isLoading}
         isOptimistic={item.isOptimistic}
         isMenuOpen={openMenuPostId === item.id}
         onMenuToggle={handleMenuToggle}
-        isBookmarked={item.isBookmarked || false}
+        isBookmarked={item.isBookmarked}
         onBookmarkStatusChange={handleBookmarkStatusChange}
       />
     );
@@ -647,7 +645,15 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     }
 
     return postComponent;
-  }, [handleCommentPress, handleBookmarkPress, handleReportPress, handlePostPress, handleMenuToggle, openMenuPostId, handleBookmarkStatusChange]);
+  }, [
+    handleCommentPress,
+    handleReportPress,
+    handleBookmarkPress,
+    handlePostPress,
+    openMenuPostId,
+    handleMenuToggle,
+    handleBookmarkStatusChange,
+  ]);
 
   // Combined posts data with duplicate detection for seamless transition
   const allPosts = useMemo(() => {
@@ -655,11 +661,11 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     const filteredRealPosts = posts.filter(realPost => {
       // Check if there's an optimistic post with similar content and timestamp
       const hasOptimisticMatch = optimisticPosts.some(optPost => {
-        // Match by content and approximate timestamp (within 30 seconds)
-        const contentMatch = optPost.content.trim() === realPost.content.trim();
-        const timeMatch = Math.abs(
-          new Date(optPost.timestamp).getTime() - new Date(realPost.timestamp).getTime()
-        ) < 30000; // 30 seconds tolerance
+        // Match by content and approximate created_at timestamp (within 30 seconds)
+        const contentMatch = (optPost.content || '').trim() === (realPost.content || '').trim();
+        const t1 = optPost.created_at ? Date.parse(optPost.created_at) : NaN;
+        const t2 = realPost.created_at ? Date.parse(realPost.created_at) : NaN;
+        const timeMatch = Number.isFinite(t1) && Number.isFinite(t2) && Math.abs(t1 - t2) < 30000;
         return contentMatch && timeMatch;
       });
 
@@ -667,7 +673,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     });
 
     return [...optimisticPosts, ...filteredRealPosts];
-  }, [optimisticPosts, posts, mapApiToPost]);
+  }, [optimisticPosts, posts]);
 
   // Use optimized list hook
   const listProps = useList({
@@ -710,7 +716,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     if (!hasMore && allPosts.length > 0 && !loadingMore) {
       return (
         <View style={styles.endOfPostsContainer}>
-          <Text style={styles.endOfPostsText}>You've reached the end</Text>
+          <Text style={styles.endOfPostsText}>You&apos;ve reached the end</Text>
         </View>
       );
     }
@@ -840,5 +846,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+
+Timeline.displayName = 'Timeline';
 
 export default Timeline;

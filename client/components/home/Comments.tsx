@@ -1,12 +1,13 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TextInput, FlatList, ListRenderItem } from 'react-native';
-import { Send, User, Shield } from 'lucide-react-native';
+import { Send, User } from 'lucide-react-native';
 import Colors from '../../constants/Colors';
 import { useAuth } from '../../contexts/AuthContext';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import FadeInView from '../ui/FadeInView';
 import { SkeletonCard } from '../ui/SkeletonLoader';
+import { VerifiedLawyerBadge } from '../common/VerifiedLawyerBadge';
 import { useOptimizedList } from '../../hooks/useOptimizedList';
 
 interface Comment {
@@ -52,7 +53,7 @@ const Comments: React.FC<CommentsProps> = React.memo(({
     try {
       await onAddComment(newComment.trim());
       setNewComment('');
-    } catch (error) {
+    } catch {
       // Error handled by parent component
     } finally {
       setIsSubmitting(false);
@@ -78,9 +79,8 @@ const Comments: React.FC<CommentsProps> = React.memo(({
               )}
             </View>
             {item.user?.isLawyer && (
-              <View style={styles.verifiedBadge}>
-                <Shield size={12} color="#10B981" fill="#10B981" stroke="none" strokeWidth={0} />
-                <Text style={styles.verifiedText}>Verified Lawyer</Text>
+              <View style={{ marginTop: 2, marginBottom: 2 }}>
+                <VerifiedLawyerBadge size="sm" />
               </View>
             )}
             <Text style={styles.commentTimestamp}>
@@ -249,18 +249,7 @@ const styles = {
     fontSize: 12,
     color: Colors.text.secondary,
   },
-  verifiedBadge: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    marginTop: 2,
-    marginBottom: 2,
-  },
-  verifiedText: {
-    fontSize: 10,
-    fontWeight: '600' as const,
-    color: '#10B981',
-    marginLeft: 4,
-  },
+  
   commentTimestamp: {
     fontSize: 12,
     color: Colors.text.tertiary,

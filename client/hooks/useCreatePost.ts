@@ -92,12 +92,19 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
   /**
    * Handle optimistic post confirmation
    */
-  const confirmOptimisticPost = useCallback((optimisticId?: string) => {
-    if (optimisticId) {
-      const globalActions = (global as any)[globalActionsKey];
-      globalActions?.confirmOptimisticPost(optimisticId);
-    }
-  }, [globalActionsKey]);
+  const confirmOptimisticPost = useCallback(
+    (optimisticId?: string, realPost?: { id: string; created_at?: string }) => {
+      if (optimisticId) {
+        const globalActions = (global as any)[globalActionsKey];
+        if (realPost) {
+          globalActions?.confirmOptimisticPost(optimisticId, realPost);
+        } else {
+          globalActions?.confirmOptimisticPost(optimisticId);
+        }
+      }
+    },
+    [globalActionsKey]
+  );
 
   /**
    * Update moderation status after violation
@@ -256,10 +263,14 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
         return;
       }
 
-      // Clear cache and confirm optimistic post after delay
+      // Clear cache and confirm optimistic post after delay, promoting with real post id
       clearCache();
       timeoutRef.current = setTimeout(() => {
-        confirmOptimisticPost(optimisticId);
+        if (resp?.post_id) {
+          confirmOptimisticPost(optimisticId, { id: String(resp.post_id) });
+        } else {
+          confirmOptimisticPost(optimisticId);
+        }
       }, OPTIMISTIC_CONFIRM_DELAY);
 
     } catch (e: any) {
@@ -286,6 +297,7 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
     clearCache,
     handle403Error,
     handleModerationError,
+    toast,
   ]);
 
   return {

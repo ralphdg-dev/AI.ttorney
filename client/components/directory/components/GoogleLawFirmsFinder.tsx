@@ -62,7 +62,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const [searching, setSearching] = useState(false);
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [searchText, setSearchText] = useState('');
-  const [currentLocationName, setCurrentLocationName] = useState('Manila, Philippines');
+  const [, setCurrentLocationName] = useState('Manila, Philippines');
   const [mapCenter, setMapCenter] = useState({ lat: 14.5995, lng: 120.9842 });
   const [WebView, setWebView] = useState<any>(null);
   const [webViewSupported, setWebViewSupported] = useState(false);
@@ -252,68 +252,6 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     }, 150);
   }, []);
 
-  // Search law firms using backend proxy (avoids CORS issues)
-  const searchLawFirmsViaProxy = useCallback(async (latitude: number, longitude: number, locationName: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log(`Searching law firms at: ${latitude}, ${longitude} for ${locationName}`);
-
-      // Use backend proxy to avoid CORS issues
-      const apiUrl = await NetworkConfig.getBestApiUrl();
-      const response = await fetch(`${apiUrl}/api/places/nearby`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          latitude: latitude,
-          longitude: longitude,
-          radius: selectedRadius * 1000, // Convert km to meters
-          type: 'lawyer'
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Network error: ${response.status}. Please check your internet connection.`);
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.results && data.results.length > 0) {
-        const firms: LawFirm[] = data.results.map((place: any) => ({
-          id: place.place_id,
-          name: place.name,
-          address: place.vicinity || place.formatted_address || 'Address not available',
-          phone: place.formatted_phone_number,
-          rating: place.rating,
-          user_ratings_total: place.user_ratings_total, // Real review count from Google
-          types: place.types || [],
-          latitude: place.geometry.location.lat,
-          longitude: place.geometry.location.lng,
-          place_id: place.place_id
-        }));
-
-        // Set initial display (will be filtered by useMemo)
-        setAllFetchedFirms(firms);
-        setSearchCenter({ lat: latitude, lng: longitude });
-        setLawFirms(firms);
-        setCurrentLocationName(locationName);
-        setRetryCount(0);
-        console.log(`Found ${firms.length} law firms in ${locationName}`);
-      } else {
-        console.log(`No law firms found in ${locationName}`);
-        setLawFirms([]);
-      }
-    } catch (error) {
-      console.error('Error fetching law firms:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to search for law firms. Please try again.';
-      setError(errorMessage);
-      setLawFirms([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedRadius]);
 
   // Search by location name using the new endpoint with pagination support
   const searchByLocationName = useCallback(async (locationName: string) => {
@@ -322,8 +260,8 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       setError(null);
       console.log(`Searching for law firms in: ${locationName}`);
       
-      const apiUrl = await NetworkConfig.getBestApiUrl();
-      const response = await fetch(`${apiUrl}/api/places/search-by-location`, {
+      const API_BASE_URL = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${API_BASE_URL}/api/places/search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -430,7 +368,6 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
         
         // Use reverse geocoding to get location name, then search
         try {
-          const apiUrl = await NetworkConfig.getBestApiUrl();
           const geocodeResponse = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${location.coords.latitude},${location.coords.longitude}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`);
           const geocodeData = await geocodeResponse.json();
           
