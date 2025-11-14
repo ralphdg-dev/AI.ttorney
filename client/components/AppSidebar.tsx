@@ -264,9 +264,16 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: LogOut,
       action: async () => {
         try {
+          console.log('🚪 Sidebar logout initiated');
+          // Close sidebar immediately to prevent UI conflicts
+          onClose();
+          // Wait a moment for sidebar animation to start
+          await new Promise(resolve => setTimeout(resolve, 100));
+          // Then perform logout
           await signOut();
+          console.log('✅ Sidebar logout completed');
         } catch (error) {
-          console.error("Logout error:", error);
+          console.error("❌ Sidebar logout error:", error);
         }
       },
     },
@@ -277,8 +284,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       item.action();
     } else if (item.route && onNavigate) {
       onNavigate(item.route);
+      onClose();
     }
-    onClose();
   };
 
   const renderMenuItem = (item: MenuItem) => {
