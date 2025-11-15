@@ -119,63 +119,124 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [authState.session?.access_token]);
 
   const handleAuthStateChange = React.useCallback(async (session: any, shouldNavigate: boolean = true) => {
+    console.log('🔐 handleAuthStateChange called:', { session: !!session, shouldNavigate });
+    
+    // Add timeout protection to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('🚨 Auth state change timeout - forcing isLoading to false');
+      setIsLoading(false);
+    }, 10000); // 10 second timeout
+    
     try {
       if (!session) {
+        console.log('🔐 No session, clearing auth state');
         setAuthState({ session: null, user: null, supabaseUser: null });
         setIsLoading(false);
+        clearTimeout(timeoutId);
         return;
       }
 
       // Get user profile from database
-      const { data: profile, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
+      console.log('🔐 Fetching user profile for ID:', session.user.id);
+      
+      let profile = null;
+      
+      try {
+        const { data: profileData, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
 
-      if (error) {
-        console.error('Error fetching user profile:', error);
+        console.log('🔐 Supabase query result:', { profile: !!profileData, error: error?.message });
+
+        if (error) {
+          console.error('Error fetching user profile:', error);
+          setAuthState({
+            session,
+            user: null,
+            supabaseUser: session.user,
+          });
+          setIsLoading(false);
+          clearTimeout(timeoutId);
+          return;
+        }
+
+        profile = profileData;
+        console.log('🔐 User profile fetched:', { role: profile.role, account_status: profile.account_status });
+        setAuthState({
+          session,
+          user: profile,
+          supabaseUser: session.user,
+        });
+
+      } catch (dbError) {
+        console.error('Database query error:', dbError);
         setAuthState({
           session,
           user: null,
           supabaseUser: session.user,
         });
         setIsLoading(false);
+        clearTimeout(timeoutId);
         return;
       }
 
-      setAuthState({
-        session,
-        user: profile,
-        supabaseUser: session.user,
-      });
+      console.log('🔐 Profile fetch completed, checking account status...');
 
       // ALWAYS check if user is deactivated - this takes priority over everything
       if (profile && profile.account_status === 'deactivated') {
+        console.log('🔐 User is deactivated, checking current route');
         // Only redirect if not already on deactivated page to prevent infinite loops
         const currentRoute = window.location.pathname || '';
         if (!currentRoute.includes('/deactivated')) {
+          console.log('🔐 Redirecting to deactivated page');
           setIsLoading(false);
+          clearTimeout(timeoutId);
           router.replace('/deactivated' as any);
         } else {
+          console.log('🔐 Already on deactivated page, not redirecting');
           setIsLoading(false);
+          clearTimeout(timeoutId);
+        }
+        return;
+      }
+
+      // Check if user is banned FIRST - this takes priority over everything
+      if (profile.account_status === 'banned') {
+        console.log('🚫 User is banned, checking current route');
+        // Only redirect if not already on banned page to prevent infinite loops
+        const currentRoute = window.location.pathname || '';
+        if (!currentRoute.includes('/banned')) {
+          console.log('🚫 Redirecting to banned screen');
+          setIsLoading(false);
+          clearTimeout(timeoutId);
+          router.replace('/banned' as any);
+        } else {
+          console.log('🚫 Already on banned page, not redirecting');
+          setIsLoading(false);
+          clearTimeout(timeoutId);
         }
         return;
       }
 
       // Only handle navigation on explicit login attempts
       if (shouldNavigate && profile) {
+        console.log('🔐 Handling navigation for login');
+        
         // Check if user is suspended - this takes priority over everything
         const suspensionStatus = await checkSuspensionStatus();
         if (suspensionStatus && suspensionStatus.isSuspended) {
           console.log('🚫 User is suspended, redirecting to suspended screen');
           setIsLoading(false);
+          clearTimeout(timeoutId);
           router.replace('/suspended' as any);
           return;
         }
         
         let applicationStatus = null;
         if (profile.role === 'lawyer' || profile.pending_lawyer) {
+          console.log('🔐 Checking lawyer application status');
           applicationStatus = await checkLawyerApplicationStatus();
         }
         
@@ -187,22 +248,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           console.log('🔄 Redirecting pending lawyer to:', redirectPath);
           setIsLoading(false);
+          clearTimeout(timeoutId);
           router.replace(redirectPath as any);
         } else {
           // User doesn't have pending lawyer status, redirect normally
           const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
-          console.log('🔄 Redirecting user to:', redirectPath);
+          console.log('🔄 Redirecting normal user to:', redirectPath);
           setIsLoading(false);
+          clearTimeout(timeoutId);
           router.replace(redirectPath as any);
         }
       } else {
         // Not navigating, just set loading to false
+        console.log('🔐 Not navigating, setting loading to false. shouldNavigate:', shouldNavigate, 'profile exists:', !!profile);
         setIsLoading(false);
+        clearTimeout(timeoutId);
       }
     } catch (error) {
       console.error('Error handling auth state change:', error);
       setAuthState({ session: null, user: null, supabaseUser: null });
       setIsLoading(false);
+      clearTimeout(timeoutId);
     }
   }, [checkLawyerApplicationStatus, checkSuspensionStatus]);
 
@@ -275,6 +341,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
   const signIn = async (email: string, password: string) => {
+    console.log('🔑 signIn called:', { email });
+    
     try {
       setIsLoading(true);
       setHasRedirectedToStatus(false);
@@ -297,24 +365,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           errorMessage = 'Network error. Please check your connection';
         }
         
-        // Don't call handleAuthStateChange on error - let the listener handle it
+        setIsLoading(false); // Ensure loading is set to false on error
         return { success: false, error: errorMessage };
       }
 
       if (data.session) {
+        console.log('🔑 Sign in successful, session created');
         // The onAuthStateChange listener will handle navigation
-        // We just need to wait for it to complete
+        // But we also call handleAuthStateChange directly for immediate response
         await handleAuthStateChange(data.session, true);
         return { success: true };
       }
 
+      setIsLoading(false); // Ensure loading is set to false if no session
       return { success: false, error: 'Login failed. Please try again' };
     } catch (error: any) {
       console.error('Sign in catch:', error);
+      setIsLoading(false); // Ensure loading is set to false on catch
       return { success: false, error: 'Network error. Please check your connection' };
-    } finally {
-      setIsLoading(false);
     }
+    // Note: Don't set isLoading(false) here since handleAuthStateChange manages it
   };
 
   const signOut = async () => {
