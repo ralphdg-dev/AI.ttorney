@@ -10,6 +10,7 @@ import {
   StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import ConfirmationModal from "../../components/ui/ConfirmationModal";
 import {
   Settings,
   Edit,
@@ -628,15 +629,19 @@ const LawyerProfilePage: React.FC = () => {
     router.push('/settings');
   };
 
+  const [showSignoutModal, setShowSignoutModal] = useState(false);
+  
   const handleLogout = async () => {
-    const confirmed = window.confirm("Are you sure you want to logout?");
+    setShowSignoutModal(true);
+  };
 
-    if (confirmed) {
-      try {
-        await signOut();
-      } catch (error) {
-        console.error("Logout error:", error);
-      }
+  const confirmLogout = async () => {
+    try {
+      await signOut();
+      setShowSignoutModal(false);
+    } catch (error) {
+      console.error("Logout error:", error);
+      setShowSignoutModal(false);
     }
   };
 
@@ -649,7 +654,7 @@ const LawyerProfilePage: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={tw`pb-24`}
       >
-        <View style={tw`bg-white p-4 border-b border-gray-200`}>
+        <View style={tw`p-4 bg-white border-b border-gray-200`}>
           <View style={tw`flex-row items-center`}>
             <View style={tw`relative mr-4`}>
               {profileData.avatar && !profileData.avatar.includes('unsplash') ? (
@@ -658,15 +663,15 @@ const LawyerProfilePage: React.FC = () => {
                   style={tw`w-20 h-20 rounded-full`}
                 />
               ) : (
-                <View style={[tw`w-20 h-20 rounded-full items-center justify-center`, { backgroundColor: Colors.primary.blue }]}>
-                  <Text style={tw`text-white font-bold text-2xl`}>
+                <View style={[tw`items-center justify-center w-20 h-20 rounded-full`, { backgroundColor: Colors.primary.blue }]}>
+                  <Text style={tw`text-2xl font-bold text-white`}>
                     {getInitials(profileData.name || 'User')}
                   </Text>
                 </View>
               )}
               <View
                 style={[
-                  tw`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center`,
+                  tw`absolute flex items-center justify-center w-6 h-6 border-2 border-white rounded-full -bottom-1 -right-1`,
                   { backgroundColor: "#ECFDF5" },
                 ]}
               >
@@ -675,7 +680,7 @@ const LawyerProfilePage: React.FC = () => {
             </View>
 
             <View style={tw`flex-1`}>
-              <Text style={tw`text-xl font-bold text-gray-900 mb-1`}>
+              <Text style={tw`mb-1 text-xl font-bold text-gray-900`}>
                 {profileData.name}
               </Text>
 
@@ -685,7 +690,7 @@ const LawyerProfilePage: React.FC = () => {
                 }
                 style={tw`mb-2`}
               >
-                <View style={tw`flex-row items-center flex-wrap`}>
+                <View style={tw`flex-row flex-wrap items-center`}>
                   <Text style={tw`text-sm text-gray-600`}>
                     {lawyerContactInfo.specializations
                       ? lawyerContactInfo.specializations.split(",")[0].trim()
@@ -695,7 +700,7 @@ const LawyerProfilePage: React.FC = () => {
                     lawyerContactInfo.specializations.split(",").length > 1 && (
                       <Text
                         style={[
-                          tw`text-sm ml-1`,
+                          tw`ml-1 text-sm`,
                           { color: Colors.primary.blue },
                         ]}
                       >
@@ -709,8 +714,8 @@ const LawyerProfilePage: React.FC = () => {
               </TouchableOpacity>
 
               {showAllSpecializations && lawyerContactInfo.specializations && (
-                <View style={tw`mb-2 mr-2 p-2 bg-gray-100 rounded-lg`}>
-                  <Text style={tw`text-xs font-semibold mb-1 text-gray-900`}>
+                <View style={tw`p-2 mb-2 mr-2 bg-gray-100 rounded-lg`}>
+                  <Text style={tw`mb-1 text-xs font-semibold text-gray-900`}>
                     All Specializations:
                   </Text>
                   {lawyerContactInfo.specializations
@@ -725,7 +730,7 @@ const LawyerProfilePage: React.FC = () => {
 
               <View
                 style={[
-                  tw`px-2 py-1 rounded-md self-start`,
+                  tw`self-start px-2 py-1 rounded-md`,
                   { backgroundColor: "#ECFDF5" },
                 ]}
               >
@@ -737,77 +742,77 @@ const LawyerProfilePage: React.FC = () => {
 
             <TouchableOpacity
               style={[
-                tw`px-4 py-2 rounded-lg flex-row items-center`,
+                tw`flex-row items-center px-4 py-2 rounded-lg`,
                 { backgroundColor: Colors.primary.blue },
               ]}
               onPress={handleEditProfile}
             >
               <Edit size={16} color="white" />
-              <Text style={tw`text-white font-medium text-sm ml-2`}>Edit</Text>
+              <Text style={tw`ml-2 text-sm font-medium text-white`}>Edit</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={tw`mt-4 pt-4 border-t border-gray-100`}>
-            <Text style={tw`text-sm text-gray-700 leading-5`}>
+          <View style={tw`pt-4 mt-4 border-t border-gray-100`}>
+            <Text style={tw`text-sm leading-5 text-gray-700`}>
               {lawyerContactInfo.bio}
             </Text>
           </View>
         </View>
 
-        <View style={tw`bg-white mt-3 p-4`}>
-          <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
+        <View style={tw`p-4 mt-3 bg-white`}>
+          <Text style={tw`mb-4 text-lg font-bold text-gray-900`}>
             Contact Information
           </Text>
           <View style={tw`flex flex-col`}>
             <View style={tw`flex-row items-center mb-4`}>
               <View
                 style={[
-                  tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`,
+                  tw`flex items-center justify-center w-10 h-10 mr-3 rounded-lg`,
                   { backgroundColor: "#F3F4F6" },
                 ]}
               >
                 <Mail size={18} color="#6B7280" />
               </View>
-              <Text style={tw`text-sm text-gray-700 flex-1`}>
+              <Text style={tw`flex-1 text-sm text-gray-700`}>
                 {profileData.email}
               </Text>
             </View>
             <View style={tw`flex-row items-center mb-4`}>
               <View
                 style={[
-                  tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`,
+                  tw`flex items-center justify-center w-10 h-10 mr-3 rounded-lg`,
                   { backgroundColor: "#F3F4F6" },
                 ]}
               >
                 <Phone size={18} color="#6B7280" />
               </View>
-              <Text style={tw`text-sm text-gray-700 flex-1`}>
+              <Text style={tw`flex-1 text-sm text-gray-700`}>
                 {lawyerContactInfo.phone_number || "Not provided"}
               </Text>
             </View>
             <View style={tw`flex-row items-center`}>
               <View
                 style={[
-                  tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`,
+                  tw`flex items-center justify-center w-10 h-10 mr-3 rounded-lg`,
                   { backgroundColor: "#F3F4F6" },
                 ]}
               >
                 <MapPin size={18} color="#6B7280" />
               </View>
-              <Text style={tw`text-sm text-gray-700 flex-1`}>
+              <Text style={tw`flex-1 text-sm text-gray-700`}>
                 {lawyerContactInfo.location || "Not provided"}
               </Text>
             </View>
           </View>
         </View>
 
-        <View style={tw`bg-white mt-3 p-4`}>
-          <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
+        <View style={tw`p-4 mt-3 bg-white`}>
+          <Text style={tw`mb-4 text-lg font-bold text-gray-900`}>
             Professional Information
           </Text>
           <View style={tw`flex-row flex-wrap -mx-2`}>
             <View style={tw`w-1/2 px-2 mb-4`}>
-              <Text style={tw`text-xs text-gray-500 mb-1`}>
+              <Text style={tw`mb-1 text-xs text-gray-500`}>
                 Roll Signing Date
               </Text>
               <Text style={tw`text-sm font-semibold text-gray-900`}>
@@ -823,7 +828,7 @@ const LawyerProfilePage: React.FC = () => {
               </Text>
             </View>
             <View style={tw`w-1/2 px-2 mb-4`}>
-              <Text style={tw`text-xs text-gray-500 mb-1`}>
+              <Text style={tw`mb-1 text-xs text-gray-500`}>
                 Supreme Court Roll Number
               </Text>
               <Text style={tw`text-sm font-semibold text-gray-900`}>
@@ -834,10 +839,10 @@ const LawyerProfilePage: React.FC = () => {
         </View>
 
         <View
-          style={tw`bg-white mt-3 p-4 flex-row items-center justify-between rounded-xl`}
+          style={tw`flex-row items-center justify-between p-4 mt-3 bg-white rounded-xl`}
         >
           <View style={tw`flex-1 mr-4`}>
-            <Text style={tw`text-lg font-bold text-gray-900 mb-1`}>
+            <Text style={tw`mb-1 text-lg font-bold text-gray-900`}>
               Accepting Consultations
             </Text>
             <Text style={tw`text-sm text-gray-500`}>
@@ -863,42 +868,42 @@ const LawyerProfilePage: React.FC = () => {
               },
             ]}
           >
-            <View style={[tw`w-7 h-7 bg-white rounded-full`]} />
+            <View style={[tw`bg-white rounded-full w-7 h-7`]} />
           </TouchableOpacity>
         </View>
 
-        <View style={tw`bg-white mt-3 p-4`}>
-          <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
+        <View style={tw`p-4 mt-3 bg-white`}>
+          <Text style={tw`mb-4 text-lg font-bold text-gray-900`}>
             Consultation Availability
           </Text>
 
           {selectedDays.length > 0 ? (
             <View>
-              <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+              <Text style={tw`mb-2 text-sm font-medium text-gray-700`}>
                 Available Days:
               </Text>
-              <Text style={tw`text-sm text-gray-600 mb-4`}>
+              <Text style={tw`mb-4 text-sm text-gray-600`}>
                 {selectedDays.join(", ")}
               </Text>
 
-              <Text style={tw`text-sm font-medium text-gray-700 mb-2`}>
+              <Text style={tw`mb-2 text-sm font-medium text-gray-700`}>
                 Time Slots:
               </Text>
               {selectedDays.map((day) => (
                 <View key={day} style={tw`mb-3`}>
-                  <Text style={tw`text-sm font-medium text-gray-900 mb-1`}>
+                  <Text style={tw`mb-1 text-sm font-medium text-gray-900`}>
                     {day}:
                   </Text>
                   <View style={tw`flex-row flex-wrap`}>
                     {(dayTimeSlots[day] || []).map((time, index) => (
                       <View
                         key={`${day}-${time}-${index}`}
-                        style={tw`flex-row items-center mr-2 mb-1 px-3 py-2 bg-blue-50 rounded-lg`}
+                        style={tw`flex-row items-center px-3 py-2 mb-1 mr-2 rounded-lg bg-blue-50`}
                       >
                         <Clock size={14} color={Colors.primary.blue} />
                         <Text
                           style={[
-                            tw`text-sm ml-2`,
+                            tw`ml-2 text-sm`,
                             { color: Colors.primary.blue },
                           ]}
                         >
@@ -907,7 +912,7 @@ const LawyerProfilePage: React.FC = () => {
                       </View>
                     ))}
                     {(!dayTimeSlots[day] || dayTimeSlots[day].length === 0) && (
-                      <Text style={tw`text-xs text-gray-500 italic`}>
+                      <Text style={tw`text-xs italic text-gray-500`}>
                         No times set
                       </Text>
                     )}
@@ -916,8 +921,8 @@ const LawyerProfilePage: React.FC = () => {
               ))}
             </View>
           ) : (
-            <View style={tw`p-4 bg-gray-50 rounded-lg`}>
-              <Text style={tw`text-sm text-gray-600 text-center`}>
+            <View style={tw`p-4 rounded-lg bg-gray-50`}>
+              <Text style={tw`text-sm text-center text-gray-600`}>
                 No availability set. Click Edit to configure your consultation
                 hours.
               </Text>
@@ -925,8 +930,8 @@ const LawyerProfilePage: React.FC = () => {
           )}
         </View>
 
-        <View style={tw`bg-white mt-3 p-4`}>
-          <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>Account</Text>
+        <View style={tw`p-4 mt-3 bg-white`}>
+          <Text style={tw`mb-4 text-lg font-bold text-gray-900`}>Account</Text>
 
           <TouchableOpacity
             style={tw`flex-row items-center py-4 border-b border-gray-100`}
@@ -934,13 +939,13 @@ const LawyerProfilePage: React.FC = () => {
           >
             <View
               style={[
-                tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`,
+                tw`flex items-center justify-center w-10 h-10 mr-3 rounded-lg`,
                 { backgroundColor: "#F3F4F6" },
               ]}
             >
               <Settings size={18} color="#374151" />
             </View>
-            <Text style={tw`text-base text-gray-900 flex-1`}>
+            <Text style={tw`flex-1 text-base text-gray-900`}>
               Settings & Preferences
             </Text>
           </TouchableOpacity>
@@ -951,13 +956,13 @@ const LawyerProfilePage: React.FC = () => {
           >
             <View
               style={[
-                tw`w-10 h-10 rounded-lg flex items-center justify-center mr-3`,
+                tw`flex items-center justify-center w-10 h-10 mr-3 rounded-lg`,
                 { backgroundColor: "#FEE2E2" },
               ]}
             >
               <LogOut size={18} color="#DC2626" />
             </View>
-            <Text style={tw`text-base text-red-600 flex-1`}>Sign Out</Text>
+            <Text style={tw`flex-1 text-base text-red-600`}>Sign Out</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -985,6 +990,15 @@ const LawyerProfilePage: React.FC = () => {
         }}
         availabilitySlots={availabilitySlots}
         onAvailabilityChange={(slots) => setAvailabilitySlots(slots)}
+      />
+      <ConfirmationModal
+        isOpen={showSignoutModal}
+        onClose={() => setShowSignoutModal(false)}
+        onConfirm={confirmLogout}
+        title="Sign Out"
+        message="Are you sure you want to sign out? You will need to login again to access your account."
+        confirmText="Sign Out"
+        type="warning"
       />
       <LawyerNavbar activeTab="profile" />
       <SidebarWrapper />

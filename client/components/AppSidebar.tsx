@@ -7,6 +7,7 @@ import { usePostBookmarks } from "../contexts/PostBookmarksContext";
 import { useConsultations } from "../contexts/ConsultationsContext";
 import { shouldUseNativeDriver } from '@/utils/animations';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import ConfirmationModal from "./ui/ConfirmationModal";
 import {
   Bookmark,
   Settings,
@@ -115,6 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { bookmarkedPostIds } = usePostBookmarks();
   const { consultationsCount } = useConsultations();
 
+  const [showSignoutModal, setShowSignoutModal] = useState(false);
 
   // Animation effect - SIMPLE and CLEAN with smooth slide-back
   useEffect(() => {
@@ -161,7 +163,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible]);
-  
+
   // FAANG OPTIMIZATION: Direct Set.size and primitive access - O(1) constant time
   // All data pre-loaded from contexts, zero API calls on sidebar open
   // Instant badge updates with no network latency
@@ -263,21 +265,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: "Sign Out",
       icon: LogOut,
       action: async () => {
-        try {
-          console.log('🚪 Sidebar logout initiated');
-          // Close sidebar immediately to prevent UI conflicts
-          onClose();
-          // Wait a moment for sidebar animation to start
-          await new Promise(resolve => setTimeout(resolve, 100));
-          // Then perform logout
-          await signOut();
-          console.log('✅ Sidebar logout completed');
-        } catch (error) {
-          console.error("❌ Sidebar logout error:", error);
-        }
+        setShowSignoutModal(true);
       },
     },
-  ], [badgeCounts, signOut, isLawyer]);
+  ], [badgeCounts, isLawyer]);
 
   const handleMenuItemPress = (item: MenuItem) => {
     if (item.action) {
@@ -322,6 +313,21 @@ const Sidebar: React.FC<SidebarProps> = ({
         )}
       </TouchableOpacity>
     );
+  };
+
+  const confirmLogout = async () => {
+    try {
+      console.log('🚪 Sidebar logout initiated');
+      // Close sidebar immediately to prevent UI conflicts
+      onClose();
+      // Wait a moment for sidebar animation to start
+      await new Promise(resolve => setTimeout(resolve, 100));
+      // Then perform logout
+      await signOut();
+      console.log('✅ Sidebar logout completed');
+    } catch (error) {
+      console.error("❌ Sidebar logout error:", error);
+    }
   };
 
   return (
@@ -401,6 +407,16 @@ const Sidebar: React.FC<SidebarProps> = ({
           <Text style={styles.footerSubtext}>Justice at Your Fingertips</Text>
         </View>
       </Animated.View>
+      
+      <ConfirmationModal
+        isOpen={showSignoutModal}
+        onClose={() => setShowSignoutModal(false)}
+        onConfirm={confirmLogout}
+        title="Sign Out"
+        message="Are you sure you want to sign out? You will need to login again to access your account."
+        confirmText="Sign Out"
+        type="warning"
+      />
     </View>
   );
 };
