@@ -475,9 +475,9 @@ const BanRestrictUsers = () => {
       render: (user) => (
         <div className="flex items-center">
           <div className="flex-shrink-0 h-10 w-10">
-            {user.profile_photo ? (
+            {(user.photo_url || user.profile_photo) ? (
               <img 
-                src={user.profile_photo} 
+                src={user.photo_url || user.profile_photo} 
                 alt={user.full_name || 'User'}
                 className="h-10 w-10 rounded-full object-cover"
                 onError={(e) => {
@@ -486,7 +486,7 @@ const BanRestrictUsers = () => {
                 }}
               />
             ) : null}
-            <div className={`h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center ${user.profile_photo ? 'hidden' : ''}`}>
+            <div className={`h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center ${(user.photo_url || user.profile_photo) ? 'hidden' : ''}`}>
               <User className="w-5 h-5 text-gray-600" />
             </div>
           </div>

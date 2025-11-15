@@ -109,6 +109,17 @@ const Settings = () => {
         );
       }
 
+      // Upload profile picture if a new image was selected (data URL)
+      if (profilePicture && typeof profilePicture === 'string' && profilePicture.startsWith('data:')) {
+        updates.push(
+          fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/auth/photo`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            body: JSON.stringify({ image: profilePicture })
+          })
+        );
+      }
+
       // Maintenance settings update
       const maintenancePayload = {
         is_active: Boolean(maintenanceSettings.maintenanceMode),
@@ -165,6 +176,10 @@ const Settings = () => {
       joinedDate: admin.created_at || admin.createdAt || "",
       role: admin.role || "admin",
     }));
+    // Set initial profile picture preview from stored admin photo if available
+    if ((admin.photo_url || admin.profile_photo) && !profilePicture) {
+      setProfilePicture(admin.photo_url || admin.profile_photo);
+    }
     (async () => {
       try {
         const resp = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/auth/joined`, {

@@ -19,11 +19,24 @@ const Avatar = () => {
 
   return (
     <div className="flex items-center space-x-3">
-      <img
-        src="https://i.pravatar.cc/100?img=5"
-        alt="avatar"
-        className="h-10 w-10 rounded-full object-cover"
-      />
+      <div className="h-10 w-10 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+        {admin && (admin.photo_url || admin.profile_photo) ? (
+          <img
+            src={admin.photo_url || admin.profile_photo}
+            alt={admin?.full_name || 'avatar'}
+            className="h-10 w-10 rounded-full object-cover"
+          />
+        ) : (
+          <span className="text-xs font-semibold text-gray-600">
+            {((admin?.full_name || admin?.email || 'A')
+              .split(' ')
+              .map((p) => p[0])
+              .slice(0, 2)
+              .join('') || 'A')
+              .toUpperCase()}
+          </span>
+        )}
+      </div>
       <div className="leading-tight">
         <p className="text-[10px] text-gray-500 uppercase">
           {admin?.role || "ADMIN"}
@@ -40,7 +53,7 @@ const Sidebar = ({ activeItem }) => {
   const { showSuccess, showError, ToastContainer } = useToast();
   const [collapsed, setCollapsed] = React.useState(false);
   const [openGroups, setOpenGroups] = React.useState({});
-  const { logout, hasRole } = useAuth();
+  const { logout, hasRole, admin } = useAuth();
   const navigate = useNavigate();
 
   // Map menu item IDs to routes
@@ -186,8 +199,23 @@ const Sidebar = ({ activeItem }) => {
         {/* Header */}
         <div className="p-3 flex items-center justify-between">
           {collapsed ? (
-            <div className="h-10 w-10 rounded-full overflow-hidden">
-              <img src="https://i.pravatar.cc/100?img=5" alt="avatar" />
+            <div className="h-10 w-10 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+              {admin && (admin.photo_url || admin.profile_photo) ? (
+                <img
+                  src={admin.photo_url || admin.profile_photo}
+                  alt="avatar"
+                  className="h-10 w-10 object-cover"
+                />
+              ) : (
+                <span className="text-xs font-semibold text-gray-600">
+                  {((admin?.full_name || admin?.email || 'A')
+                    .split(' ')
+                    .map((p) => p[0])
+                    .slice(0, 2)
+                    .join('') || 'A')
+                    .toUpperCase()}
+                </span>
+              )}
             </div>
           ) : (
             <Avatar />

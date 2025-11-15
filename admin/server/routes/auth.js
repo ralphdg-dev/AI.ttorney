@@ -318,12 +318,24 @@ router.post('/verify-otp', async (req, res) => {
     );
 
     // Return admin data (excluding sensitive info)
+    let userRow = null;
+    try {
+      const { data: u } = await supabaseAdmin
+        .from('users')
+        .select('photo_url, profile_photo')
+        .eq('id', admin.id)
+        .single();
+      userRow = u || null;
+    } catch (_) {}
+
     const adminResponse = {
       id: admin.id,
       email: admin.email,
       full_name: admin.full_name,
       role: admin.role,
-      created_at: admin.created_at
+      created_at: admin.created_at,
+      photo_url: userRow?.photo_url || null,
+      profile_photo: userRow?.profile_photo || null
     };
 
     res.json({
@@ -409,12 +421,24 @@ router.post('/logout', authenticateAdmin, async (req, res) => {
 // Get current admin profile
 router.get('/me', authenticateAdmin, async (req, res) => {
   try {
+    let userRow = null;
+    try {
+      const { data: u } = await supabaseAdmin
+        .from('users')
+        .select('photo_url, profile_photo')
+        .eq('id', req.admin.id)
+        .single();
+      userRow = u || null;
+    } catch (_) {}
+
     const adminResponse = {
       id: req.admin.id,
       email: req.admin.email,
       full_name: req.admin.full_name,
       role: req.admin.role,
-      created_at: req.admin.created_at
+      created_at: req.admin.created_at,
+      photo_url: userRow?.photo_url || null,
+      profile_photo: userRow?.profile_photo || null
     };
 
     res.json({
@@ -431,15 +455,43 @@ router.get('/me', authenticateAdmin, async (req, res) => {
 
 // Verify token (for frontend to check if token is still valid)
 router.get('/verify', authenticateAdmin, (req, res) => {
-  res.json({
-    success: true,
-    valid: true,
-    admin: {
-      id: req.admin.id,
-      email: req.admin.email,
-      full_name: req.admin.full_name,
-      role: req.admin.role
+  const fetchUser = async () => {
+    try {
+      const { data: u } = await supabaseAdmin
+        .from('users')
+        .select('photo_url, profile_photo')
+        .eq('id', req.admin.id)
+        .single();
+      return u || null;
+    } catch (_) {
+      return null;
     }
+  };
+
+  fetchUser().then((userRow) => {
+    res.json({
+      success: true,
+      valid: true,
+      admin: {
+        id: req.admin.id,
+        email: req.admin.email,
+        full_name: req.admin.full_name,
+        role: req.admin.role,
+        photo_url: userRow?.photo_url || null,
+        profile_photo: userRow?.profile_photo || null
+      }
+    });
+  }).catch(() => {
+    res.json({
+      success: true,
+      valid: true,
+      admin: {
+        id: req.admin.id,
+        email: req.admin.email,
+        full_name: req.admin.full_name,
+        role: req.admin.role,
+      }
+    });
   });
 });
 
@@ -480,6 +532,16 @@ router.post('/refresh', authenticateAdmin, async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
 
+    let userRow = null;
+    try {
+      const { data: u } = await supabaseAdmin
+        .from('users')
+        .select('photo_url, profile_photo')
+        .eq('id', req.admin.id)
+        .single();
+      userRow = u || null;
+    } catch (_) {}
+
     res.json({
       success: true,
       token,
@@ -487,7 +549,9 @@ router.post('/refresh', authenticateAdmin, async (req, res) => {
         id: req.admin.id,
         email: req.admin.email,
         full_name: req.admin.full_name,
-        role: req.admin.role
+        role: req.admin.role,
+        photo_url: userRow?.photo_url || null,
+        profile_photo: userRow?.profile_photo || null
       }
     });
   } catch (error) {
@@ -771,6 +835,101 @@ try {
   console.error('Update maintenance error:', err);
   return res.status(500).json({ error: 'Internal server error.' });
 }
+});
+
+// Update admin profile photo (top-level route)
+router.put('/photo', authenticateAdmin, async (req, res) => {
+  try {
+    const { image } = req.body || {};
+    if (!image || typeof image !== 'string' || !image.startsWith('data:')) {
+      return res.status(400).json({ error: 'Invalid image data.' });
+    }
+
+    const match = image.match(/^data:(image\/[^;]+);base64,(.+)$/);
+    if (!match) {
+      return res.status(400).json({ error: 'Invalid image format.' });
+    }
+    const contentType = match[1];
+    const base64Data = match[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+    const ext = contentType.split('/')[1].replace('jpeg', 'jpg');
+
+    let oldPath = null;
+    try {
+      const { data: current } = await supabaseAdmin
+        .from('users')
+        .select('photo_url, profile_photo')
+        .eq('id', req.admin.id)
+        .single();
+      const currentUrl = current?.photo_url || current?.profile_photo || null;
+      if (currentUrl && typeof currentUrl === 'string') {
+        const marker = '/user-profile-pics/';
+        const idx = currentUrl.indexOf(marker);
+        if (idx !== -1) {
+          const rel = currentUrl.substring(idx + marker.length);
+          if (rel && rel.startsWith('photo_url/')) {
+            oldPath = rel;
+          }
+        }
+      }
+    } catch (_) {}
+
+    if (oldPath) {
+      try {
+        await supabaseAdmin.storage
+          .from('user-profile-pics')
+          .remove([oldPath]);
+      } catch (_) {}
+    }
+
+    const fileName = `admin_${req.admin.id}_${Date.now()}.${ext}`;
+    const storagePath = `photo_url/${fileName}`;
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('user-profile-pics')
+      .upload(storagePath, buffer, { contentType });
+    if (uploadError) {
+      return res.status(500).json({ error: 'Failed to upload photo.' });
+    }
+
+    const { data: publicData } = supabaseAdmin.storage
+      .from('user-profile-pics')
+      .getPublicUrl(storagePath);
+    const publicUrl = publicData?.publicUrl || null;
+
+    let updatedRow = null;
+    let updateError = null;
+    try {
+      const { data: updated, error } = await supabaseAdmin
+        .from('users')
+        .update({ photo_url: publicUrl, profile_photo: publicUrl })
+        .eq('id', req.admin.id)
+        .select('photo_url, profile_photo')
+        .single();
+      updatedRow = updated || null;
+      updateError = error || null;
+    } catch (e) {
+      updateError = e;
+    }
+
+    if (!updatedRow) {
+      // If no existing row, create it
+      const { data: upserted, error: upsertError } = await supabaseAdmin
+        .from('users')
+        .upsert({ id: req.admin.id, email: req.admin.email, full_name: req.admin.full_name, role: req.admin.role, photo_url: publicUrl, profile_photo: publicUrl }, { onConflict: 'id' })
+        .select('photo_url, profile_photo')
+        .single();
+      if (upsertError || !upserted) {
+        return res.status(500).json({ error: 'Failed to save photo.' });
+      }
+      updatedRow = upserted;
+    }
+
+    return res.json({ success: true, photo_url: updatedRow.photo_url, profile_photo: updatedRow.profile_photo });
+  } catch (error) {
+    console.error('Update photo error:', error);
+    return res.status(500).json({ error: 'Internal server error.' });
+  }
 });
 
 module.exports = router;
