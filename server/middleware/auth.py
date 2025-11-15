@@ -50,6 +50,17 @@ async def get_current_active_user(current_user: Dict[str, Any] = Depends(get_cur
     if not profile:
         raise HTTPException(status_code=400, detail="User profile not found")
     
+    # Check for permanent ban - this must block ALL access
+    if profile.get("account_status") == "banned":
+        logger.warning(f"🚫 PERMANENTLY_BANNED user attempted access: {profile.get('id', 'unknown')[:8]}...")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "PERMANENTLY_BANNED",
+                "message": "This account has been permanently banned."
+            }
+        )
+    
     return current_user
 
 def require_role(required_role: str):
