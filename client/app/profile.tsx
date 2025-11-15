@@ -73,7 +73,7 @@ const ProfileCard: React.FC<{
 );
 
 export default function UserProfilePage() {
-  const { user, signOut, refreshProfile } = useAuth();
+  const { user, signOut, refreshUserData } = useAuth();
   const router = useRouter();
   const hasRefreshed = useRef(false);
 
@@ -81,9 +81,9 @@ export default function UserProfilePage() {
   useEffect(() => {
     if (user && !hasRefreshed.current) {
       hasRefreshed.current = true;
-      refreshProfile().catch(() => {});
+      refreshUserData().catch(() => {});
     }
-  }, [user, refreshProfile]);
+  }, [user, refreshUserData]);
 
   const handleEditProfile = () => {
     router.push('/profile/edit');
@@ -98,11 +98,11 @@ export default function UserProfilePage() {
     }
     
     const timer = setTimeout(() => {
-      refreshProfile().catch(() => {});
+      refreshUserData().catch(() => {});
     }, 500);
-    
+      
     return () => clearTimeout(timer);
-  }, [user, refreshProfile]);
+  }, [user, refreshUserData]);
   
   const handleLogout = async () => {
     setShowSignoutModal(true);
@@ -130,14 +130,14 @@ export default function UserProfilePage() {
             <Avatar 
               size="xl" 
               style={{ 
-                backgroundColor: Colors.background.tertiary 
+                backgroundColor: '#023D7B'
               }}
             >
-              <AvatarFallbackText style={{ color: Colors.text.primary }}>
-                {user.full_name || "User"}
+              <AvatarFallbackText style={{ color: '#FFFFFF' }}>
+                {user?.full_name || "User"}
               </AvatarFallbackText>
               <AvatarImage 
-                source={{ uri: user.profile_photo || undefined }} 
+                source={{ uri: user?.profile_photo || undefined }} 
                 alt="Profile"
               />
             </Avatar>
@@ -145,10 +145,10 @@ export default function UserProfilePage() {
           
           {/* User Info */}
           <Text style={[tw`text-2xl font-bold text-center`, { color: Colors.text.primary }]}>
-            {user.full_name || "User"}
+            {user?.full_name || "User"}
           </Text>
           <Text style={[tw`text-base mt-2 text-center`, { color: Colors.text.secondary }]}>
-            @{user.username || "username"}
+            @{user?.username || "username"}
           </Text>
           
           {/* Edit Profile Button */}
@@ -177,28 +177,28 @@ export default function UserProfilePage() {
               <View style={[tw`py-3 border-b`, { borderColor: Colors.border.light }]}>
                 <Text style={[tw`text-sm font-medium mb-1`, { color: Colors.text.secondary }]}>Full Name</Text>
                 <Text style={[tw`text-base`, { color: Colors.text.primary }]}>
-                  {user.full_name || "Not provided"}
+                  {user?.full_name || "Not provided"}
                 </Text>
               </View>
 
               <View style={[tw`py-3 border-b`, { borderColor: Colors.border.light }]}>
                 <Text style={[tw`text-sm font-medium mb-1`, { color: Colors.text.secondary }]}>Username</Text>
                 <Text style={[tw`text-base`, { color: Colors.text.primary }]}>
-                  @{user.username || "Not set"}
+                  @{user?.username || "Not set"}
                 </Text>
               </View>
 
               <View style={[tw`py-3 border-b`, { borderColor: Colors.border.light }]}>
                 <Text style={[tw`text-sm font-medium mb-1`, { color: Colors.text.secondary }]}>Email Address</Text>
                 <Text style={[tw`text-base`, { color: Colors.text.primary }]}>
-                  {user.email || "Not provided"}
+                  {user?.email || "Not provided"}
                 </Text>
               </View>
 
               <View style={tw`py-3`}>
                 <Text style={[tw`text-sm font-medium mb-1`, { color: Colors.text.secondary }]}>Birth Date</Text>
                 <Text style={[tw`text-base`, { color: Colors.text.primary }]}>
-                  {formatDate(user.birthdate || "")}
+                  {formatDate(user?.birthdate || "")}
                 </Text>
               </View>
             </View>

@@ -10,6 +10,7 @@ import { Box } from "@/components/ui/box";
 import { Text as GSText } from "@/components/ui/text";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarImage, AvatarFallbackText } from "@/components/ui/avatar";
+import CustomToggle from "@/components/common/CustomToggle";
 import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import { LawyerNavbar } from "@/components/lawyer/shared";
@@ -108,7 +109,7 @@ export default function SettingsScreen() {
               {item.title}
             </GSText>
           </HStack>
-          <Switch
+          <CustomToggle
             value={item.value || false}
             onValueChange={item.onToggle || (() => {})}
             size="md"
@@ -169,9 +170,9 @@ export default function SettingsScreen() {
             <HStack className="items-center" space="md">
               <Avatar 
                 size="lg"
-                style={{ backgroundColor: Colors.background.tertiary }}
+                style={{ backgroundColor: '#023D7B' }}
               >
-                <AvatarFallbackText style={{ color: Colors.text.primary }}>
+                <AvatarFallbackText style={{ color: '#FFFFFF' }}>
                   {user?.full_name || "User"}
                 </AvatarFallbackText>
                 <AvatarImage 

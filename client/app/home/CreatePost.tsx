@@ -7,6 +7,7 @@ import CategoryScroller from '@/components/glossary/CategoryScroller';
 import Colors from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import ToggleSwitch from '@/components/ui/ToggleSwitch';
+import CustomToggle from '@/components/common/CustomToggle';
 import Navbar from '@/components/Navbar';
 import { ModerationWarningBanner } from '@/components/moderation/ModerationWarningBanner';
 import { useCreatePost } from '@/hooks/useCreatePost';
@@ -86,7 +87,7 @@ const CreatePost: React.FC = () => {
           {/* Anonymous toggle */}
           <View style={styles.anonRow}>
             <Text style={styles.anonLabel}>Post anonymously</Text>
-            <ToggleSwitch value={isAnonymous} onValueChange={setIsAnonymous} />
+            <CustomToggle value={isAnonymous} onValueChange={setIsAnonymous} size="md" />
           </View>
 
           {/* Composer */}

@@ -27,6 +27,7 @@ import { GlobalStyles } from "../constants/GlobalStyles";
 import { useAuth } from "../contexts/AuthContext";
 import { createShadowStyle } from "../utils/shadowUtils";
 import { LAYOUT } from "../constants/LayoutConstants";
+import { Image } from "react-native";
 
 const { width: screenWidth } = Dimensions.get("window");
 const SIDEBAR_WIDTH = Math.min(screenWidth * 0.75, 320);
@@ -117,6 +118,24 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { consultationsCount } = useConsultations();
 
   const [showSignoutModal, setShowSignoutModal] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
+
+  // Helper function to get initials from name
+  const getInitials = (name: string) => {
+    if (!name || typeof name !== 'string') {
+      return 'U'; // Default to 'U' for User
+    }
+    
+    const initials = name
+      .trim()
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+    
+    return initials || 'U'; // Fallback to 'U' if no initials
+  };
 
   // Animation effect - SIMPLE and CLEAN with smooth slide-back
   useEffect(() => {
@@ -376,9 +395,19 @@ const Sidebar: React.FC<SidebarProps> = ({
             }
             activeOpacity={0.7}
           >
-            <View style={styles.avatar}>
-              <User size={24} color={Colors.primary.blue} strokeWidth={1.5} />
-            </View>
+            {userInfo.avatar && !userInfo.avatar.includes('flaticon') && !imageLoadError ? (
+              <Image 
+                source={{ uri: userInfo.avatar }} 
+                style={styles.avatar}
+                onError={() => setImageLoadError(true)}
+              />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: Colors.primary.blue, justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={{ color: 'white', fontWeight: '600', fontSize: 16 }}>
+                  {getInitials(userInfo.name || 'User')}
+                </Text>
+              </View>
+            )}
             <View style={styles.userDetails}>
               <Text style={styles.userName}>{userInfo.name}</Text>
               <Text style={styles.userEmail}>{userInfo.email}</Text>

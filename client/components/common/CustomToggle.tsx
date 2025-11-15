@@ -40,7 +40,7 @@ const CustomToggle: React.FC<CustomToggleProps> = ({
 
   const trackColor = animatedValue.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#E5E7EB', '#3B82F6'], // Gray to Blue
+    outputRange: ['#E5E7EB', '#87CEEB'], // Gray to Light Blue
   });
 
   const thumbTranslateX = animatedValue.interpolate({
