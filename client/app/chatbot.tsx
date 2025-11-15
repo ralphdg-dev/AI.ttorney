@@ -407,20 +407,25 @@ export default function ChatbotScreen() {
 
   // Dynamic greeting that changes per session
   const greeting = useMemo(() => {
-    // Handle guest users differently
+    const guestGreetings = [
+      "Guest mode activated! Ready to decode some laws?",
+      "Welcome, mystery legal scholar! What's your case?",
+      "Uy! Anonymous legal warrior, anong tanong natin?",
+      "Guest here! Let's solve a legal puzzle together.",
+      "Kamusta! No name needed—just brilliant questions!",
+      "Hey there! Let's make Philippine law make sense.",
+      "Welcome, legal explorer! Time for some wisdom?",
+      "Mabuhay! Guest mode: unlimited curiosity, 15 prompts.",
+      "Hello, legal detective! Ready to crack the case?",
+      "Guest vibes! Let's navigate some legal waters.",
+      "Anonymous but brilliant! What legal mystery today?",
+      "Welcome to the legal arena, mysterious friend!",
+      "Guest mode: where curiosity meets Philippine law.",
+      "Uy! No login needed—just pure legal questions!",
+      "Hello! Guest or not, you're in good legal hands.",
+    ];
+    
     if (isGuestMode) {
-      const guestGreetings = [
-        "Welcome! May legal puzzle ba tayo ngayon?",
-        "Hello! Ready to decode some laws?",
-        "Uy! Anong legal tanong natin today?",
-        "Welcome! What legal mystery shall we solve?",
-        "Kamusta! May kaso ba o chismis lang? Joke!",
-        "Hey! Let's make Philippine law make sense.",
-        "Welcome! Time for some legal wisdom?",
-        "Mabuhay! Ano'ng legal concern natin?",
-        "Hello! Ready to tackle the law?",
-        "Welcome! Let's navigate some legal waters.",
-      ];
       return guestGreetings[Math.floor(Math.random() * guestGreetings.length)];
     }
     
@@ -429,7 +434,7 @@ export default function ChatbotScreen() {
       user?.username ||
       user?.email?.split("@")[0] ||
       "there";
-    const firstName = fullName.split(" ")[0]; // Extract first name only
+    const firstName = fullName.split(" ")[0];
     const greetings = [
       `${firstName} returns! May legal puzzle ba tayo ngayon?`,
       `Welcome back, ${firstName}! Ready to decode some laws?`,
@@ -443,7 +448,7 @@ export default function ChatbotScreen() {
       `${firstName} returns! Let's navigate some legal waters.`,
     ];
     return greetings[Math.floor(Math.random() * greetings.length)];
-  }, [user, isGuestMode]); // Changes when user or guest mode changes
+  }, [user, isGuestMode]);
 
   // OpenAI-style smooth continuous scrolling
   // Automatically keeps bottom visible as content grows, mimicking human scrolling
