@@ -16,9 +16,22 @@ export default function SplashScreen() {
 
   const redirectPath = useMemo(() => {
     if (!initialAuthCheck || isLoading || hasSeenOnboarding === null) return null;
-    if (isAuthenticated && user) return getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
-    if (!hasSeenOnboarding) return "/onboarding/onboarding";
-    return isGuestMode ? "/chatbot" : "/login";
+    if (isAuthenticated && user) {
+      return getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
+    }
+
+    // Guests should always bypass onboarding and go straight to chatbot
+    if (isGuestMode) {
+      return "/chatbot";
+    }
+
+    // For non-guest unauthenticated users, show onboarding if they haven't seen it yet
+    if (!hasSeenOnboarding) {
+      return "/onboarding/onboarding";
+    }
+
+    // Default unauthenticated entry point
+    return "/login";
   }, [initialAuthCheck, isLoading, isAuthenticated, isGuestMode, user, hasSeenOnboarding]);
 
   return redirectPath ? <Redirect href={redirectPath as any} /> : null;
