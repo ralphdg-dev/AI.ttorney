@@ -103,6 +103,8 @@ const ViewPost: React.FC = () => {
   const [optimisticReplies, setOptimisticReplies] = useState<Reply[]>([]);
   const [replyText, setReplyText] = useState('');
   const [isReplying, setIsReplying] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
+  const [replyImageErrors, setReplyImageErrors] = useState<Set<string>>(new Set());
   
   // Check if current user is a lawyer
   const isLawyer = currentUser?.role === 'verified_lawyer';
@@ -1018,14 +1020,15 @@ const ViewPost: React.FC = () => {
         {post && (
           <View style={tw`px-5 py-6`}>
             <View style={tw`flex-row items-start mb-4`}>
-                {isAnonymous ? (
+                {isAnonymous || isDeactivated ? (
                   <View style={tw`w-12 h-12 rounded-full border border-gray-200 items-center justify-center mr-3`}>
                     <User size={20} color="#6B7280" />
                   </View>
-                ) : displayUser.avatar && !displayUser.avatar.includes('flaticon') ? (
+                ) : displayUser.avatar && !displayUser.avatar.includes('flaticon') && !imageLoadError ? (
                   <Image 
                     source={{ uri: displayUser.avatar }} 
                     style={tw`w-12 h-12 rounded-full mr-3`}
+                    onError={() => setImageLoadError(true)}
                   />
                 ) : (
                   <View style={[tw`w-12 h-12 rounded-full items-center justify-center mr-3`, { backgroundColor: Colors.primary.blue }]}>
@@ -1143,10 +1146,13 @@ const ViewPost: React.FC = () => {
                           <View style={tw`w-10 h-10 rounded-full bg-gray-100 border border-gray-200 items-center justify-center mr-3`}>
                             <User size={16} color="#6B7280" />
                           </View>
-                        ) : replyUser.avatar && !replyUser.avatar.includes('flaticon') ? (
+                        ) : replyUser.avatar && !replyUser.avatar.includes('flaticon') && !replyImageErrors.has(reply.id) ? (
                           <Image 
                             source={{ uri: replyUser.avatar }} 
                             style={tw`w-10 h-10 rounded-full mr-3`}
+                            onError={() => {
+                              setReplyImageErrors(prev => new Set(prev).add(reply.id));
+                            }}
                           />
                         ) : (
                           <View style={[tw`w-10 h-10 rounded-full items-center justify-center mr-3`, { backgroundColor: Colors.primary.blue }]}>

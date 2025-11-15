@@ -72,6 +72,7 @@ const Post: React.FC<PostProps> = React.memo(({
   const { loadBookmarks: refreshBookmarkContext } = usePostBookmarks();
   const [isBookmarked, setIsBookmarked] = useState(propIsBookmarked || false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
   const [displayTime, setDisplayTime] = useState(() => {
     // Initialize with formatted time
     const dateToFormat = created_at || timestamp;
@@ -319,14 +320,15 @@ const Post: React.FC<PostProps> = React.memo(({
       >
         {/* User Info Row */}
         <View style={styles.userRow}>
-          {isAnonymous ? (
+          {isAnonymous || isDeactivated ? (
             <View style={[styles.avatar, styles.anonymousAvatar]}>
               <User size={20} color="#6B7280" />
             </View>
-          ) : user.avatar && !user.avatar.includes('flaticon') ? (
+          ) : user.avatar && !user.avatar.includes('flaticon') && !imageLoadError ? (
             <Image 
               source={{ uri: user.avatar }} 
               style={styles.avatar}
+              onError={() => setImageLoadError(true)}
             />
           ) : (
             <View style={[styles.avatar, { backgroundColor: Colors.primary.blue, justifyContent: 'center', alignItems: 'center' }]}>
