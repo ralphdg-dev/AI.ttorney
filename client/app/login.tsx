@@ -19,7 +19,6 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Refs for input fields
@@ -186,9 +185,9 @@ export default function Login() {
           >
 
           {/* Main Content */}
-          <View style={tw`flex-1 justify-center items-center px-6`}>
+          <View style={tw`items-center justify-center flex-1 px-6`}>
             {/* Logo Image */}
-            <View style={tw`mb-0 -mt-16 items-center`}>
+            <View style={tw`items-center mb-0 -mt-16`}>
               <Image
                 source={logo}
                 style={tw`w-32 h-32 mb-1`}
@@ -200,12 +199,12 @@ export default function Login() {
             <View style={tw`w-full max-w-sm`}>
           {/* Email Input */}
           <View style={tw`mb-4`}>
-            <Text style={[tw`font-bold mb-2`, { color: Colors.text.head }]}>
+            <Text style={[tw`mb-2 font-bold`, { color: Colors.text.head }]}>
               Email
             </Text>
             <TextInput
               style={[
-                tw`border rounded-lg px-4 py-3 bg-white`,
+                tw`px-4 py-3 bg-white border rounded-lg`,
                 {
                   color: Colors.text.head,
                   borderColor: emailError ? '#ef4444' : '#d1d5db',
@@ -227,7 +226,7 @@ export default function Login() {
               autoCorrect={false}
             />
             {emailError ? (
-              <Text style={[tw`text-sm mt-1`, { color: '#ef4444' }]}>
+              <Text style={[tw`mt-1 text-sm`, { color: '#ef4444' }]}>
                 {emailError}
               </Text>
             ) : null}
@@ -235,14 +234,14 @@ export default function Login() {
 
           {/* Password Input */}
           <View style={tw`mb-4`}>
-            <Text style={[tw`font-bold mb-2`, { color: Colors.text.head }]}>
+            <Text style={[tw`mb-2 font-bold`, { color: Colors.text.head }]}>
               Password
             </Text>
             <View style={tw`relative`}>
               <TextInput
                 ref={passwordInputRef}
                 style={[
-                  tw`border rounded-lg px-4 py-3 bg-white pr-12`,
+                  tw`px-4 py-3 pr-12 bg-white border rounded-lg`,
                   {
                     color: Colors.text.head,
                     borderColor: passwordError ? '#ef4444' : '#d1d5db',
@@ -275,38 +274,14 @@ export default function Login() {
               </TouchableOpacity>
             </View>
             {passwordError ? (
-              <Text style={[tw`text-sm mt-1`, { color: '#ef4444' }]}>
+              <Text style={[tw`mt-1 text-sm`, { color: '#ef4444' }]}>
                 {passwordError}
               </Text>
             ) : null}
           </View>
 
-          {/* Remember Me & Forgot Password */}
-          <View style={tw`flex-row justify-between items-center mb-6`}>
-            <TouchableOpacity
-              onPress={() => setRememberMe(!rememberMe)}
-              style={tw`flex-row items-center`}
-            >
-              <View
-                style={[
-                  tw`w-4 h-4 border rounded mr-2 items-center justify-center`,
-                  {
-                    borderColor: rememberMe ? Colors.primary.blue : "#D1D5DB",
-                    backgroundColor: rememberMe
-                      ? Colors.primary.blue
-                      : "transparent",
-                  },
-                ]}
-              >
-                {rememberMe && (
-                  <Ionicons name="checkmark" size={12} color="white" />
-                )}
-              </View>
-              <Text style={[tw`text-sm`, { color: Colors.text.head }]}>
-                Remember me
-              </Text>
-            </TouchableOpacity>
-
+          {/* Forgot Password */}
+          <View style={tw`flex-row items-center justify-end mb-6`}>
             <TouchableOpacity>
               <Text style={[tw`text-sm`, { color: Colors.primary.blue }]}>
                 Forgot password?
@@ -317,7 +292,7 @@ export default function Login() {
           {/* Login Button */}
           <TouchableOpacity
             style={[
-              tw`py-3 rounded-lg items-center justify-center mb-3`,
+              tw`items-center justify-center py-3 mb-3 rounded-lg`,
               { 
                 backgroundColor: isSubmitting ? '#9CA3AF' : Colors.primary.blue,
                 opacity: isSubmitting ? 0.7 : 1
@@ -326,7 +301,7 @@ export default function Login() {
             onPress={handleLogin}
             disabled={isSubmitting}
           >
-            <Text style={tw`text-white font-semibold text-lg`}>
+            <Text style={tw`text-lg font-semibold text-white`}>
               {isSubmitting ? 'Signing In...' : 'Login'}
             </Text>
           </TouchableOpacity>
@@ -342,7 +317,7 @@ export default function Login() {
 
           {/* Google Button */}
           <TouchableOpacity
-            style={tw`py-3 rounded-lg items-center justify-center border border-gray-300 bg-white flex-row`}
+            style={tw`flex-row items-center justify-center py-3 bg-white border border-gray-300 rounded-lg`}
             onPress={handleGoogleLogin}
           >
             <Image
@@ -351,7 +326,7 @@ export default function Login() {
               resizeMode="contain"
             />
             <Text
-              style={[tw`font-semibold text-lg`]}
+              style={[tw`text-lg font-semibold`]}
             >
               Login with Google
             </Text>
@@ -370,7 +345,7 @@ export default function Login() {
       </View>
 
       {/* Bottom Section */}
-      <View style={tw`px-6 pb-8 items-center`}>
+      <View style={tw`items-center px-6 pb-8`}>
         <Text style={[tw`text-center`, { color: Colors.text.sub }]}>
           Don&apos;t have an account?{" "}
           <Text
