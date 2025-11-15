@@ -70,15 +70,11 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     // Compute path/config once per effect run
     const currentPath = normalizePath(`/${segments.join('/')}`);
     const routeConfig = getRouteConfig(currentPath);
-    // Do not interfere with maintenance route; MaintenanceGuard manages it
-    if (currentPath === '/maintenance') {
-      return;
-    }
 
     // During sign out: proactively force redirect to /login if current route is protected
     if (isSigningOut) {
       const isPublic = !!routeConfig?.isPublic;
-      if (!isPublic && currentPath !== '/login' && currentPath !== '/maintenance') {
+      if (!isPublic && currentPath !== '/login') {
         redirectIfNeeded('/login');
       }
       return;
