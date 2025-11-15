@@ -43,7 +43,13 @@ async def sign_in(credentials: UserSignIn):
         if result.get("error") == "account_not_verified":
             # Automatically send OTP for unverified users
             if result.get("requires_verification") and result.get("email"):
-                otp_result = await otp_service.send_verification_otp(result["email"], "User")
+                # Fetch user's name for personalization
+                supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+                user_check = supabase.table('users').select('full_name').eq('email', result["email"]).execute()
+                user_name = user_check.data[0].get('full_name', 'User') if user_check.data else 'User'
+                logger.info(f"🔍 Email verification OTP for email: {result['email']}, fetched user_name: '{user_name}'")
+                
+                otp_result = await otp_service.send_verification_otp(result["email"], user_name)
                 return {
                     "success": False,
                     "error": "account_not_verified",
@@ -129,7 +135,9 @@ async def forgot_password(request: Dict[str, str] = Body(...)):
         
         # Check if user exists in database before sending OTP
         supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
-        user_check = supabase.table('users').select('id').eq('email', email).execute()
+        user_check = supabase.table('users').select('id, full_name').eq('email', email).execute()
+        logger.info(f"🔍 Password reset query for email: {email}")
+        logger.info(f"🔍 User check result: {user_check.data}")
         
         if not user_check.data or len(user_check.data) == 0:
             # Return success message but don't send OTP (prevents enumeration)
@@ -140,7 +148,9 @@ async def forgot_password(request: Dict[str, str] = Body(...)):
             }
         
         # User exists, send OTP
-        result = await otp_service.send_password_reset_otp(email, "User")
+        user_name = user_check.data[0].get('full_name', 'User')
+        logger.info(f"🔍 Password reset OTP for email: {email}, fetched user_name: '{user_name}'")
+        result = await otp_service.send_password_reset_otp(email, user_name)
         
         # Always return success to prevent user enumeration
         return {
