@@ -210,7 +210,7 @@ export default function LawyerCard({
 
         {/* All Specializations Dropdown */}
         {showAllSpecialization && (
-          <Box className="p-3 mb-3 bg-white rounded-lg border border-gray-200" style={{ elevation: 0.5 }}>
+          <Box className="p-4 mb-3 bg-white rounded-lg border border-gray-200" style={{ elevation: 0.5 }}>
             <Text
               className="text-sm font-semibold mb-2"
               style={{ color: Colors.text.head }}
