@@ -50,8 +50,10 @@ async def get_current_active_user(current_user: Dict[str, Any] = Depends(get_cur
     if not profile:
         raise HTTPException(status_code=400, detail="User profile not found")
     
+    account_status = profile.get("account_status")
+    
     # Check for permanent ban - this must block ALL access
-    if profile.get("account_status") == "banned":
+    if account_status == "banned":
         logger.warning(f"🚫 PERMANENTLY_BANNED user attempted access: {profile.get('id', 'unknown')[:8]}...")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -61,6 +63,13 @@ async def get_current_active_user(current_user: Dict[str, Any] = Depends(get_cur
             }
         )
     
+    # Check for deactivated status - allow auth but return special status
+    if account_status == "deactivated":
+        logger.info(f"⏸️ DEACTIVATED user accessed: {profile.get('id', 'unknown')[:8]}...")
+        # Add status to user data for frontend handling
+        current_user["deactivated"] = True
+        return current_user
+    
     return current_user
 
 def require_role(required_role: str):
@@ -68,6 +77,17 @@ def require_role(required_role: str):
     def role_checker(current_user: Dict[str, Any] = Depends(get_current_active_user)):
         profile = current_user.get("profile", {})
         user_role = profile.get("role")
+        
+        # Block deactivated users from accessing protected routes
+        if current_user.get("deactivated") or profile.get("account_status") == "deactivated":
+            logger.warning(f"⏸️ DEACTIVATED user attempted protected route: {profile.get('id', 'unknown')[:8]}...")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": "ACCOUNT_DEACTIVATED", 
+                    "message": "Account is deactivated. Please reactivate to access this feature."
+                }
+            )
         
         # Role hierarchy: guest < registered_user < verified_lawyer < admin < superadmin
         role_hierarchy = {

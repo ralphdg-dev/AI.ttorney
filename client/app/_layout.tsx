@@ -88,6 +88,7 @@ function AppContent() {
                                     <Stack.Screen name="login" options={{ headerShown: false }} />
                                     <Stack.Screen name="role-selection" options={{ headerShown: false }} />
                                     <Stack.Screen name="banned" options={{ headerShown: false }} />
+                                    <Stack.Screen name="deactivated" options={{ headerShown: false }} />
                                     <Stack.Screen name="lawyer/index" options={{ headerShown: false }} />
                                     <Stack.Screen name="lawyer/forum" options={{ headerShown: false }} />
                                     <Stack.Screen name="lawyer/consult" options={{ headerShown: false }} />
