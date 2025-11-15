@@ -99,12 +99,10 @@ async def ask_legal_question(
             # Never trust client-side data - validate everything on server
             if not effective_user_id:  # Guest user (no authentication)
                 from middleware.guest_rate_limiter import GuestRateLimiter
-                from fastapi import Request as FastAPIRequest
                 
-                # Get the FastAPI request object from context
-                # For streaming, we need to validate guest rate limit
+                # Validate guest rate limit without Request object (no IP logging needed)
                 rate_limit_result = await GuestRateLimiter.validate_guest_request(
-                    request=request,  # This is the ChatRequest, not FastAPI Request
+                    request=None,  # No Request object available in streaming
                     session_id=request.guest_session_id,
                     client_prompt_count=request.guest_prompt_count
                 )
@@ -143,7 +141,18 @@ async def ask_legal_question(
             
             # Detect language first
             language = detect_language(request.question)
-            yield format_sse({'type': 'metadata', 'language': language})
+            
+            # Check if session was refreshed (for guest users)
+            new_session_id = None
+            if not effective_user_id and rate_limit_result.get("session_id") != request.guest_session_id:
+                new_session_id = rate_limit_result.get("session_id")
+                print(f"🔄 Guest session refreshed: {request.guest_session_id} -> {new_session_id}")
+            
+            yield format_sse({
+                'type': 'metadata', 
+                'language': language,
+                'new_session_id': new_session_id
+            })
             
             # Block professional legal advice roleplay/simulation requests
             if is_professional_advice_roleplay_request(request.question):

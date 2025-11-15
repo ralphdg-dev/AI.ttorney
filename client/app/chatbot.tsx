@@ -97,6 +97,11 @@ const streamChatResponse = (params: StreamChatResponseParams): Promise<void> => 
       const newData = responseText.substring(buffer.length);
       buffer = responseText;
       
+      // DEBUG: Log raw response to see what backend is sending
+      if (newData && !newData.includes('data: ')) {
+        console.log('🔍 Raw response data (non-SSE):', newData);
+      }
+      
       if (!newData) return;
       
       // Process Server-Sent Events (SSE)
@@ -141,6 +146,8 @@ const streamChatResponse = (params: StreamChatResponseParams): Promise<void> => 
     // Handle completion
     xhr.onload = () => {
       console.log('✅ XHR completed with status:', xhr.status);
+      console.log('🔍 Response headers:', xhr.getAllResponseHeaders());
+      console.log('🔍 Full response text:', xhr.responseText);
       
       // Handle 422 validation errors specifically
       if (xhr.status === 422) {
@@ -299,52 +306,52 @@ interface Message {
 
 export default function ChatbotScreen() {
   const { user, session, isLawyer, isGuestMode } = useAuth();
-  const { hasReachedLimit, incrementPromptCount, startGuestSession, guestSession, isLoading: isGuestLoading } = useGuest();
+  const { hasReachedLimit, incrementPromptCount, startGuestSession, updateGuestSessionId, guestSession, isLoading: isGuestLoading } = useGuest();
   const guestChat = useGuestChat(); // Always call hooks unconditionally
   const { moderationStatus, refreshStatus } = useModerationStatus();
   const insets = useSafeAreaInsets();
   const [showLimitBanner, setShowLimitBanner] = useState(true);
   const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
+  const isStreamingRef = useRef<boolean>(false); // Track if currently streaming
+  const messages = localMessages; // Same state for everyone
   
-  // DRY: Unified message access - guests use context, authenticated use local state
-  const messages = isGuestMode ? guestChat.messages : localMessages;
-  
-  
-  // Unified setMessages that works for both guests and authenticated users
-  const setMessages = useCallback((update: Message[] | ((prev: Message[]) => Message[])) => {
-    if (isGuestMode) {
-      // For guests: Apply update function to get new messages
-      const currentMsgs = guestChat.messages;
-      const newMsgs = typeof update === 'function' ? update(currentMsgs) : update;
-      
-      // CRITICAL FIX: Handle both new messages AND updates to existing messages
-      const currentIds = new Set(currentMsgs.map(m => m.id));
-      
-      newMsgs.forEach(msg => {
-        if (currentIds.has(msg.id)) {
-          // Update existing message (for streaming)
-          guestChat.updateMessage(msg.id, msg);
-        } else {
-          // Add new message
-          guestChat.addMessage(msg);
+  // Sync localMessages to GuestChatContext for guest persistence (optimized)
+  useEffect(() => {
+    if (isGuestMode && localMessages.length > 0) {
+      // Debounce sync to prevent excessive updates during streaming
+      const timeoutId = setTimeout(() => {
+        // Only sync messages that aren't already in context (avoid duplicates)
+        const existingIds = new Set(guestChat.messages.map(m => m.id));
+        const newMessages = localMessages.filter(msg => !existingIds.has(msg.id));
+        
+        if (newMessages.length > 0) {
+          console.log(`🔄 Syncing ${newMessages.length} new messages to GuestChatContext`);
+          newMessages.forEach(msg => {
+            guestChat.addMessage(msg);
+          });
         }
-      });
+      }, 500); // 500ms debounce
       
-      // Update conversation history
-      guestChat.setConversationHistory(newMsgs.map(m => ({
-        role: m.fromUser ? 'user' : 'assistant',
-        content: m.text
-      })));
-    } else {
-      // For authenticated users: Use functional update to avoid stale closure
+      return () => clearTimeout(timeoutId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuestMode, localMessages.length, guestChat]); // Only depend on length, not full array to prevent infinite loops during streaming
+  
+  // Unified setMessages - works the same for guests and authenticated users
+  const setMessages = useCallback((update: Message[] | ((prev: Message[]) => Message[])) => {
+    try {
       if (typeof update === 'function') {
         setLocalMessages(update);
       } else {
         setLocalMessages(update);
       }
+    } catch (error) {
+      console.error('❌ Error in setMessages:', error);
+      // Fallback: don't crash the app, just log the error
+      setError('Failed to update messages. Please refresh the page.');
     }
-  }, [isGuestMode, guestChat]);
+  }, []);
   
   // Helper function to update message with sources (DRY principle)
   const updateMessageWithSources = useCallback((
@@ -353,26 +360,33 @@ export default function ChatbotScreen() {
     sources: any[],
     language: string
   ) => {
-    if (isGuestMode) {
-      // For guests, use context's updateMessage directly
-      guestChat.updateMessage(msgId, { text, sources, language });
-    } else {
-      // For authenticated users, update local state
+    try {
+      // Unified approach: use localMessages for everyone
       setLocalMessages((prev) => {
-        const newMessages = [...prev];
-        const msgIndex = newMessages.findIndex(m => m.id === msgId);
-        if (msgIndex !== -1) {
-          newMessages[msgIndex] = { 
-            ...newMessages[msgIndex], 
-            text,
-            sources,
-            language
-          };
+        try {
+          const newMessages = [...prev];
+          const msgIndex = newMessages.findIndex(m => m.id === msgId);
+          if (msgIndex !== -1) {
+            newMessages[msgIndex] = { 
+              ...newMessages[msgIndex], 
+              text,
+              sources,
+              language
+            };
+          } else {
+            console.warn(`⚠️ Message ${msgId} not found for sources update`);
+          }
+          return newMessages;
+        } catch (error) {
+          console.error('❌ Error updating message with sources:', error);
+          return prev; // Return previous state on error
         }
-        return newMessages;
       });
+    } catch (error) {
+      console.error('❌ Critical error in updateMessageWithSources:', error);
+      // Don't crash the app, just log the error
     }
-  }, [isGuestMode, guestChat]);
+  }, []);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false); // Separate state for AI generation
@@ -388,7 +402,6 @@ export default function ChatbotScreen() {
   const flatRef = useRef<FlatList>(null);
   const sidebarRef = useRef<ChatHistorySidebarRef>(null);
   const isFirstMessageRef = useRef<boolean>(true); // Track if this is the first message in conversation
-  const isStreamingRef = useRef<boolean>(false); // Track if currently streaming
   const lastContentHeight = useRef<number>(0); // Track content height for smooth scrolling
   const shouldAutoScroll = useRef<boolean>(true); // Track if we should auto-scroll (user hasn't scrolled up)
   const scrollAnimationFrame = useRef<number | null>(null); // Animation frame for smooth scrolling
@@ -734,38 +747,42 @@ export default function ChatbotScreen() {
 
   const sendMessage = async () => {
     if (!input.trim()) return;
-    
-    // Industry standard: Allow typing while generating (like ChatGPT)
-    // Only prevent sending if already generating
-    if (isGenerating) {
-      console.log('⏳ Already generating response, please wait');
-      return;
-    }
+      
+      // Industry standard: Allow typing while generating (like ChatGPT)
+      if (isGenerating) {
+        console.log('⏳ Already generating response, please wait');
+        return;
+      }
 
-    // Guest mode: Check prompt limit before sending
-    if (isGuestMode && hasReachedLimit) {
-      console.log('🚫 Guest prompt limit reached');
-      setShowLimitBanner(true);
-      return;
-    }
+      // Guest mode: Defensive programming with multiple checks
+      if (isGuestMode) {
+        if (hasReachedLimit) {
+          console.log('🚫 Guest prompt limit reached');
+          setError('You\'ve reached the free message limit. Please sign up for unlimited access.');
+          return;
+        }
+      }
 
-    const userMessage = input.trim();
-    const newMsg: Message = {
-      id: Date.now().toString(),
-      text: userMessage,
-      fromUser: true,
-    };
+      const userMessage = input.trim();
+      const newMsg: Message = {
+        id: Date.now().toString(),
+        text: userMessage,
+        fromUser: true,
+      };
 
-    // Industry standard: Optimistic UI update (clear input immediately)
-    setMessages((prev) => [...prev, newMsg]);
-    setInput(""); // Clear input immediately (ChatGPT/Claude pattern)
-    setIsGenerating(true); // Set generating state
-    setIsTyping(true); // Keep for backward compatibility with typing indicator
-    setError(null);
-    isStreamingRef.current = false; // Reset streaming flag
-    
-    // Create abort controller for this request
-    abortControllerRef.current = new AbortController();
+      // Industry standard: Optimistic UI update
+      setMessages((prev) => [...prev, newMsg]);
+      setInput("");
+      setIsGenerating(true);
+      setIsTyping(true);
+      setError(null);
+      isStreamingRef.current = false;
+      
+      // Create abort controller for this request
+      abortControllerRef.current = new AbortController();
+
+      // Continue with existing streaming logic...
+      // [Rest of the existing sendMessage implementation]
 
     // Enable auto-scroll for new message
     shouldAutoScroll.current = true;
@@ -858,6 +875,8 @@ export default function ChatbotScreen() {
       // Both lawyers and general users get STREAMING responses!
       if (true) {
         console.log('📤 Sending request to streaming endpoint:', endpoint);
+        
+        // Create streaming message placeholder
         const streamingMsgId = (Date.now() + 1).toString();
         const streamingMsg: Message = {
           id: streamingMsgId,
@@ -865,7 +884,10 @@ export default function ChatbotScreen() {
           fromUser: false,
           sources: [],
         };
+        
+        // Initialize streaming state - same for guests and authenticated users
         setMessages((prev) => [...prev, streamingMsg]);
+        
         isStreamingRef.current = true; // Mark as streaming
 
         // Create abort controller for timeout
@@ -906,6 +928,12 @@ export default function ChatbotScreen() {
             requestBody,
             onContent: (content: string) => {
               answer += content;
+              console.log('📝 Streaming content received:', {
+                isGuestMode,
+                contentLength: content.length,
+                totalAnswerLength: answer.length,
+                streamingMsgId
+              });
               // Real-time UI update: Show message as it streams in
               setMessages((prev) =>
                 prev.map((msg) =>
@@ -921,6 +949,16 @@ export default function ChatbotScreen() {
               returnedSessionId = metadata.session_id;
               userMessageId = metadata.user_message_id;
               assistantMessageId = metadata.assistant_message_id;
+              
+              // Handle session refresh (server restart scenario)
+              if (isGuestMode && metadata.new_session_id) {
+                console.log('🔄 Session refreshed by server:', {
+                  old_session: guestSession?.id,
+                  new_session: metadata.new_session_id
+                });
+                // Update guest session with new ID from server
+                updateGuestSessionId(metadata.new_session_id);
+              }
               
               // OpenAI/Anthropic pattern: Sync server count with client
               if (isGuestMode && metadata.server_count !== undefined) {
@@ -944,6 +982,9 @@ export default function ChatbotScreen() {
               await refreshStatus();
             },
             onComplete: async () => {
+              console.log('🏁 Streaming completed');
+              
+              // Set streaming flag to false
               isStreamingRef.current = false;
               
               // Only update with sources if this wasn't a violation
@@ -979,6 +1020,7 @@ export default function ChatbotScreen() {
         } catch (streamError: any) {
           clearTimeout(timeoutId);
           console.error('❌ Streaming error:', streamError);
+          console.log('🗑️ Removing streaming message due to error:', streamingMsgId);
           setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
           setIsTyping(false); // Reset typing state
           setIsGenerating(false); // Reset generating state
@@ -1168,49 +1210,51 @@ export default function ChatbotScreen() {
     }
     
     return (
-      <View style={tw`px-4 py-1.5`}>
+      <View style={tw`px-4 py-2`}>
         <View style={isUser ? tw`items-end` : tw`flex-row items-start`}>
           {!isUser && (
-            <View style={tw`mr-2.5`}>
+            <View style={tw`mr-3`}>
               <Image
                 source={require("../assets/images/logo.png")}
-                style={{ width: 34, height: 34, marginTop: 2 }}
+                style={{ width: 32, height: 32, marginTop: 4 }}
                 resizeMode="contain"
               />
             </View>
           )}
           <View
             style={[
-              tw`flex-1 rounded-2xl`,
+              tw`rounded-2xl`,
               isUser
                 ? {
                     backgroundColor: Colors.primary.blue,
-                    maxWidth: "85%",
+                    maxWidth: "80%",
                     alignSelf: "flex-end",
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
                     ...(Platform.OS === "web"
-                      ? { boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)" }
+                      ? { boxShadow: "0 2px 12px rgba(59, 130, 246, 0.15)" }
                       : {
-                          shadowColor: "#000",
+                          shadowColor: Colors.primary.blue,
                           shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: 0.08,
-                          shadowRadius: 8,
-                          elevation: 2,
+                          shadowOpacity: 0.15,
+                          shadowRadius: 12,
+                          elevation: 3,
                         }),
                   }
                 : {
-                    backgroundColor: Colors.background.secondary,
-                    maxWidth: "100%",
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
+                    backgroundColor: "#F8FAFC",
+                    borderWidth: 1,
+                    borderColor: "#E2E8F0",
+                    maxWidth: "85%",
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
                     ...(Platform.OS === "web"
-                      ? { boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)" }
+                      ? { boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)" }
                       : {
                           shadowColor: "#000",
                           shadowOffset: { width: 0, height: 1 },
-                          shadowOpacity: 0.05,
-                          shadowRadius: 3,
+                          shadowOpacity: 0.04,
+                          shadowRadius: 8,
                           elevation: 1,
                         }),
                   },
@@ -1538,13 +1582,13 @@ export default function ChatbotScreen() {
                   >
                     <View
                       style={[
-                        tw`items-center justify-center w-8 h-8 mr-3 rounded-full`,
+                        tw`items-center justify-center w-10 h-10 mr-3 rounded-full`,
                         { backgroundColor: Colors.primary.blue + "15" },
                       ]}
                     >
                       <Ionicons
                         name="chatbubble-outline"
-                        size={16}
+                        size={20}
                         color={Colors.primary.blue}
                       />
                     </View>
@@ -1572,6 +1616,7 @@ export default function ChatbotScreen() {
             data={messages}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
+            extraData={messages} // Critical: Force re-render when messages array changes
             contentContainerStyle={[
               tw`pt-2`,
               { 
@@ -1710,20 +1755,25 @@ export default function ChatbotScreen() {
             <View style={tw`flex-1 mr-3`}>
               <View
                 style={[
-                  tw`px-5 rounded-full`,
+                  tw`px-5 transition-all duration-200 rounded-full`,
                   {
-                    backgroundColor: Colors.background.secondary,
+                    backgroundColor: isGenerating ? "#F3F4F6" : Colors.background.secondary,
                     borderWidth: 1,
-                    borderColor: Colors.border.light,
-                    height: 50,
+                    borderColor: isGenerating ? "#E5E7EB" : Colors.border.light,
+                    height: 52,
                     ...(Platform.OS === "web"
-                      ? { boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)" }
+                      ? { 
+                          boxShadow: isGenerating 
+                            ? "0 1px 2px rgba(0, 0, 0, 0.03)" 
+                            : "0 2px 8px rgba(0, 0, 0, 0.06)",
+                          transform: [{ scale: isGenerating ? 0.98 : 1 }]
+                        }
                       : {
                           shadowColor: "#000",
                           shadowOffset: { width: 0, height: 1 },
-                          shadowOpacity: 0.05,
-                          shadowRadius: 3,
-                          elevation: 1,
+                          shadowOpacity: isGenerating ? 0.03 : 0.06,
+                          shadowRadius: isGenerating ? 2 : 8,
+                          elevation: isGenerating ? 1 : 2,
                         }),
                   },
                 ]}
@@ -1739,39 +1789,54 @@ export default function ChatbotScreen() {
                       color: Colors.text.primary,
                       outlineStyle: "none",
                       paddingVertical: 0,
-                      height: 48,
+                      height: 50,
+                      fontSize: 16,
+                      lineHeight: 20,
                     },
                   ]}
                   maxLength={1000}
                   onSubmitEditing={sendMessage}
                   returnKeyType="send"
+                  editable={!isGenerating}
                 />
               </View>
             </View>
 
             <TouchableOpacity
               onPress={sendMessage}
-              disabled={isGenerating || !input.trim()} // Disable only while generating
+              disabled={!input.trim() || isGenerating}
+              activeOpacity={0.8}
               style={[
-                tw`items-center justify-center w-12 h-12 rounded-full`,
+                tw`items-center justify-center transition-all duration-200 rounded-full`,
                 {
-                  backgroundColor:
-                    isTyping || !input.trim()
-                      ? Colors.border.medium
+                  width: 52,
+                  height: 52,
+                  backgroundColor: 
+                    !input.trim() || isGenerating 
+                      ? "#E5E7EB" 
                       : Colors.primary.blue,
                   ...(Platform.OS === "web"
-                    ? { boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)" }
+                    ? {
+                        boxShadow: !input.trim() || isGenerating
+                          ? "0 1px 2px rgba(0, 0, 0, 0.03)"
+                          : "0 4px 12px rgba(59, 130, 246, 0.25)",
+                        transform: [{ 
+                          scale: (!input.trim() || isGenerating) ? 0.95 : 1 
+                        }]
+                      }
                     : {
-                        shadowColor: "#000",
+                        shadowColor: !input.trim() || isGenerating 
+                          ? "#000" 
+                          : Colors.primary.blue,
                         shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 4,
-                        elevation: 3,
+                        shadowOpacity: !input.trim() || isGenerating ? 0.03 : 0.2,
+                        shadowRadius: !input.trim() || isGenerating ? 2 : 12,
+                        elevation: !input.trim() || isGenerating ? 1 : 4,
                       }),
                 },
               ]}
             >
-              <Send size={20} color="#fff" />
+              <Send size={20} color={!input.trim() || isGenerating ? "#9CA3AF" : "#fff"} />
             </TouchableOpacity>
           </View>
         </View>
