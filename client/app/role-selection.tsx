@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { useState } from "react";
@@ -368,12 +369,13 @@ export default function RoleSelection() {
   );
 
   return (
-    <View style={tw`flex-1 bg-white`}>
-      {/* Responsive, scrollable content */}
-      <KeyboardAvoidingView
-        style={tw`flex-1`}
-        behavior={Platform.select({ ios: 'padding', android: undefined })}
-      >
+    <SafeAreaView style={tw`flex-1`} edges={['top', 'left', 'right']}>
+      <View style={tw`flex-1 bg-white`}>
+        {/* Responsive, scrollable content */}
+        <KeyboardAvoidingView
+          style={tw`flex-1`}
+          behavior={Platform.select({ ios: 'padding', android: undefined })}
+        >
         <ScrollView
           style={tw`flex-1`}
           contentContainerStyle={{ flexGrow: 1 }}
@@ -392,5 +394,6 @@ export default function RoleSelection() {
         bottomOffset={0}
       />
     </View>
+    </SafeAreaView>
   );
 }

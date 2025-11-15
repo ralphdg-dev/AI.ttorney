@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from routes.auth import router as auth_router
+from routes.auth_reset import router as auth_reset_router
 from routes.legalGuides import router as legal_router
 from routes.route_validation import router as route_validation_router
 from routes.consultationRequest import router as consultation_router
@@ -114,6 +115,8 @@ app.include_router(lawyer_info_router)
 app.include_router(consult_action)
 app.include_router(route_validation_router, prefix="/api")
 app.include_router(support.router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
+app.include_router(auth_reset_router, prefix="/api")
 
 # Import and include lawyer application router
 from routes.lawyer_applications import router as lawyer_applications_router

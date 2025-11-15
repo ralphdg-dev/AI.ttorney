@@ -32,6 +32,13 @@ export class NetworkConfig {
 
     // Development: Auto-detect from Expo's development server
     const detectedIP = this.detectIPFromExpo();
+    
+    // Web development: Force port 8000 to avoid confusion
+    if (Platform.OS === 'web') {
+      console.log('🌐 Web development detected, forcing port 8000');
+      return `http://localhost:8000`;
+    }
+    
     return `http://${detectedIP}:${this.DEFAULT_PORT}`;
   }
 
@@ -109,7 +116,7 @@ export class NetworkConfig {
       clearTimeout(timeoutId);
       return response.ok;
       
-    } catch (error) {
+    } catch {
       clearTimeout(timeoutId);
       return false;
     }

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Image, TextInput, Alert, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { AlertTriangle, LogOut, Hourglass, Info, EyeOff, ShieldAlert, MessageSquare, CheckCircle, XCircle, Clock } from 'lucide-react-native';
@@ -13,18 +14,16 @@ interface SuspensionInfo {
 }
 
 export default function SuspendedScreen() {
-  const { user, signOut, session, isLoading: authLoading } = useAuth();
+  const { signOut, session, isLoading: authLoading } = useAuth();
   const [suspensionInfo, setSuspensionInfo] = useState<SuspensionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  
-  // Appeal state
-  const [showAppealForm, setShowAppealForm] = useState(false);
   const [appealReason, setAppealReason] = useState('');
   const [submittingAppeal, setSubmittingAppeal] = useState(false);
   const [existingAppeal, setExistingAppeal] = useState<Appeal | null>(null);
   const [loadingAppeal, setLoadingAppeal] = useState(true);
   const [showAppealModal, setShowAppealModal] = useState(false);
+  const [showAppealForm, setShowAppealForm] = useState(false);
 
   useEffect(() => {
     // Wait for auth context to finish loading
@@ -65,7 +64,7 @@ export default function SuspendedScreen() {
           account_status: data.account_status,
         });
       } else {
-        const errorText = await response.text();
+        await response.text();
         // Set default suspension info to stop loading
         setSuspensionInfo({
           suspension_count: 1,
@@ -73,7 +72,8 @@ export default function SuspendedScreen() {
           account_status: 'suspended',
         });
       }
-    } catch (error) {
+    } catch {
+      console.error('Failed to fetch suspension info');
       // Set default suspension info to stop loading
       setSuspensionInfo({
         suspension_count: 1,
@@ -147,8 +147,8 @@ export default function SuspendedScreen() {
       setIsLoggingOut(true);
       await signOut();
       router.replace('/login');
-    } catch (error) {
-      console.error('Error logging out:', error);
+    } catch {
+      console.error('Failed to fetch suspension info');
       setIsLoggingOut(false);
     }
   };
@@ -238,9 +238,11 @@ export default function SuspendedScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-white justify-center items-center">
-        <ActivityIndicator size="large" color="#3B82F6" />
-      </View>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+        <View className="flex-1 bg-white justify-center items-center">
+          <ActivityIndicator size="large" color="#3B82F6" />
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -248,7 +250,8 @@ export default function SuspendedScreen() {
   const suspensionMessage = getSuspensionMessage(suspensionCount);
 
   return (
-    <View className="flex-1 bg-white">
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+      <View className="flex-1 bg-white">
       {/* Simple Header with Logo Only */}
       <View className="bg-white px-4 pt-6 pb-3 border-b border-gray-200 items-center">
         <Image
@@ -299,7 +302,7 @@ export default function SuspendedScreen() {
               <Info size={20} color="#023D7B" />
             </View>
             <Text className="flex-1 text-sm text-gray-700 leading-5">
-              You'll be notified each time you get a strike. Three strikes leads to suspension. Your strikes reset after each suspension. Three suspensions leads to permanent ban.
+              You&apos;ll be notified each time you get a strike. Three strikes leads to suspension. Your strikes reset after each suspension. Three suspensions leads to permanent ban.
             </Text>
           </View>
 
@@ -473,5 +476,6 @@ export default function SuspendedScreen() {
       </View>
     </ScrollView>
     </View>
+    </SafeAreaView>
   );
 }

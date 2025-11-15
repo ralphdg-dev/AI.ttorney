@@ -24,7 +24,7 @@ class Lawyer(BaseModel):
     lawyer_id: uuid.UUID
     name: str
     bio: str
-    specialization: Optional[str] = None
+    specialization: Optional[List[str]] = None  # Fixed: Array to match frontend
     location: Optional[str] = None
     hours: Optional[str] = None  # Deprecated
     days: Optional[str] = None  # Deprecated
@@ -41,6 +41,20 @@ class LawyerResponse(BaseModel):
     error: Optional[str] = None
     cached: bool = False
     timestamp: Optional[float] = None
+
+def normalize_specialization(specialization):
+    """Normalize specialization data from database to frontend format"""
+    if not specialization:
+        return []
+    
+    if isinstance(specialization, list):
+        return [spec.strip() for spec in specialization if spec.strip()]
+    
+    if isinstance(specialization, str):
+        # Split by comma and clean up whitespace
+        return [spec.strip() for spec in specialization.split(',') if spec.strip()]
+    
+    return []
 
 def get_cache_key(*args):
     """Generate a cache key from arguments"""
@@ -126,7 +140,7 @@ async def fetch_lawyers_from_db(supabase_service):
                         id=lawyer_data.get("id"),
                         lawyer_id=lawyer_data.get("lawyer_id"),
                         name=lawyer_data.get("name", "Unknown Lawyer"),
-                        specialization=lawyer_data.get("specialization"),
+                        specialization=normalize_specialization(lawyer_data.get("specialization")),
                         location=lawyer_data.get("location"),
                         hours=lawyer_data.get("hours"),
                         days=lawyer_data.get("days"),
