@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-route
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import PublicRoute from './components/PublicRoute';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Login from './pages/auth/Login';
@@ -32,6 +33,7 @@ import Settings from "./pages/Settings";
 
 // Placeholder components for missing pages
 import Help from './pages/help/Help';
+import NotFound from './pages/NotFound';
 
 
 
@@ -92,9 +94,30 @@ const App = () => {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/verify-otp" element={<VerifyOTP />} />
+          <Route 
+            path="/login" 
+            element={
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            } 
+          />
+          <Route 
+            path="/forgot-password" 
+            element={
+              <PublicRoute>
+                <ForgotPassword />
+              </PublicRoute>
+            } 
+          />
+          <Route 
+            path="/verify-otp" 
+            element={
+              <PublicRoute>
+                <VerifyOTP />
+              </PublicRoute>
+            } 
+          />
           <Route
             path="/*"
             element={
@@ -202,6 +225,9 @@ const AdminDashboard = () => {
               {/* Other Routes */}
               <Route path="/settings" element={<Settings />} />
               <Route path="/help" element={<Help />} />
+              
+              {/* 404 Catch-all Route */}
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
         </div>
