@@ -1510,9 +1510,10 @@ export default function ChatbotScreen() {
                   "Compare grounds for annulment vs legal separation",
                   "Summarize employer obligations under DOLE DO 174",
                 ] : [
-                  "What are my rights as a tenant?",
+                  // Use single-word legal categories to trigger deterministic, comprehensive answers
                   "How do I file a small claims case?",
-                  "What is the legal age of consent?",
+                  "What are my rights if I'm fired from work?",
+                  "How can I get a refund for a defective product?",
                 ]).map((suggestion, idx) => (
                   <TouchableOpacity
                     key={idx}
