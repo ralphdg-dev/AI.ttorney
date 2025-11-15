@@ -148,7 +148,7 @@ const streamChatResponse = (params: StreamChatResponseParams): Promise<void> => 
         try {
           const errorData = JSON.parse(xhr.responseText);
           console.error('❌ Validation details:', JSON.stringify(errorData, null, 2));
-        } catch (e) {
+        } catch {
           console.error('❌ Could not parse error response');
         }
         onError();
@@ -299,7 +299,7 @@ interface Message {
 
 export default function ChatbotScreen() {
   const { user, session, isLawyer, isGuestMode } = useAuth();
-  const { hasReachedLimit, promptsRemaining, incrementPromptCount, startGuestSession, guestSession, isLoading: isGuestLoading } = useGuest();
+  const { hasReachedLimit, incrementPromptCount, startGuestSession, guestSession, isLoading: isGuestLoading } = useGuest();
   const guestChat = useGuestChat(); // Always call hooks unconditionally
   const { moderationStatus, refreshStatus } = useModerationStatus();
   const insets = useSafeAreaInsets();
@@ -510,12 +510,12 @@ export default function ChatbotScreen() {
         // Session will be synced on next render when guestSession updates
       });
     }
-  }, [isGuestMode, isGuestLoading, guestSession, startGuestSession, guestChat]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuestMode, isGuestLoading, guestSession?.id, startGuestSession]);
 
   const initializeConversation = useCallback(async () => {
     try {
       console.log('🔄 Initializing conversation - always starting fresh');
-      console.log('   Previous currentConversationId:', currentConversationId);
       console.log('   Setting isFirstMessage to true for new conversation');
       // Always start with greeting screen, don't auto-load last conversation
       setCurrentConversationId("");
@@ -534,7 +534,7 @@ export default function ChatbotScreen() {
       setMessages([]);
       setConversationHistory([]);
     }
-  }, [user?.id]);
+  }, [user?.id, setMessages]);
 
   const loadConversation = async (conversationId: string) => {
     if (!conversationId) {
