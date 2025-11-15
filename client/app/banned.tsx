@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Image, StyleSheet } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, ShieldAlert, Info, Trash2, XCircle } from 'lucide-react-native';
+import { AlertTriangle, Info, Trash2 } from 'lucide-react-native';
 
 const BannedPage: React.FC = () => {
   const { signOut } = useAuth();
@@ -18,52 +18,52 @@ const BannedPage: React.FC = () => {
   };
 
   return (
-    <View className="flex-1 bg-white">
+    <View style={styles.container}>
       {/* Simple Header with Logo Only */}
-      <View className="bg-white px-4 pt-6 pb-3 border-b border-gray-200 items-center">
+      <View style={styles.header}>
         <Image
           source={require('../assets/images/logo.png')}
-          style={{ width: 140, height: 35 }}
+          style={styles.logo}
           resizeMode="contain"
         />
       </View>
 
-      <View className="flex-1 p-6 pt-8">
+      <View style={styles.content}>
         {/* Header */}
-        <View className="mb-6">
-          <Text className="text-2xl font-bold text-gray-900 mb-3">Your account was permanently banned</Text>
-          <Text className="text-sm text-gray-600 leading-5">
+        <View style={styles.headerSection}>
+          <Text style={styles.title}>Your account was permanently banned</Text>
+          <Text style={styles.subtitle}>
             This action is permanent and cannot be appealed.
           </Text>
         </View>
 
         {/* What does this mean? */}
-        <View className="mb-8">
-          <Text className="text-base font-bold text-gray-900 mb-4">What does this mean?</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>What does this mean?</Text>
           
-          <View className="flex-row mb-5 items-center">
-            <View className="w-10 h-10 rounded-full bg-red-50 justify-center items-center mr-3">
-              <ShieldAlert size={20} color="#DC2626" />
+          <View style={styles.item}>
+            <View style={styles.iconContainer}>
+              <AlertTriangle size={20} color="#023D7B" />
             </View>
-            <Text className="flex-1 text-sm text-gray-700 leading-5">
+            <Text style={styles.itemText}>
               Your account has been permanently removed for severe or repeated violations of our Community Guidelines.
             </Text>
           </View>
 
-          <View className="flex-row mb-5 items-center">
-            <View className="w-10 h-10 rounded-full bg-red-50 justify-center items-center mr-3">
-              <Info size={20} color="#DC2626" />
+          <View style={styles.item}>
+            <View style={styles.iconContainer}>
+              <Info size={20} color="#023D7B" />
             </View>
-            <Text className="flex-1 text-sm text-gray-700 leading-5">
+            <Text style={styles.itemText}>
               You will no longer have access to any features of Ai.ttorney, including chatbot, forum, and legal consultations.
             </Text>
           </View>
 
-          <View className="flex-row mb-5 items-center">
-            <View className="w-10 h-10 rounded-full bg-red-50 justify-center items-center mr-3">
-              <Trash2 size={20} color="#DC2626" />
+          <View style={styles.item}>
+            <View style={styles.iconContainer}>
+              <Trash2 size={20} color="#023D7B" />
             </View>
-            <Text className="flex-1 text-sm text-gray-700 leading-5">
+            <Text style={styles.itemText}>
               Your content is no longer visible to other users in the app.
             </Text>
           </View>
@@ -71,22 +71,104 @@ const BannedPage: React.FC = () => {
 
         {/* Logout Button */}
         <TouchableOpacity
-          className={`flex-row items-center justify-center bg-[#023D7B] py-3.5 px-6 rounded-lg gap-2 ${isLoggingOut ? 'opacity-60' : ''}`}
+          style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}
           onPress={handleLogout}
           disabled={isLoggingOut}
         >
           {isLoggingOut ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <>
-              <LogOut size={18} color="#FFFFFF" />
-              <Text className="text-white text-base font-semibold">Logout</Text>
-            </>
+            <Text style={styles.logoutButtonText}>Logout</Text>
           )}
         </TouchableOpacity>
       </View>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  header: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    alignItems: 'center',
+  },
+  logo: {
+    width: 140,
+    height: 35,
+  },
+  content: {
+    flex: 1,
+    padding: 24,
+    paddingTop: 32,
+  },
+  headerSection: {
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+  },
+  section: {
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  item: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    alignItems: 'flex-start',
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EFF6FF', // blue-50 equivalent
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  itemText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#023D7B',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  logoutButtonDisabled: {
+    opacity: 0.6,
+  },
+  logoutButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
 
 export default BannedPage;
