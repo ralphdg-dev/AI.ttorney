@@ -509,8 +509,8 @@ export const SidebarWrapper: React.FC<{
   const actualUserInfo = React.useMemo(() => ({
     name: user?.full_name || "User",
     email: user?.email || "user@example.com",
-    avatar: userInfo?.avatar,
-  }), [user?.full_name, user?.email, userInfo?.avatar]);
+    avatar: user?.profile_photo || userInfo?.avatar || undefined,
+  }), [user?.full_name, user?.email, user?.profile_photo, userInfo?.avatar]);
 
   return (
     <Sidebar
