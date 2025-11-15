@@ -194,7 +194,16 @@ export default function SettingsScreen() {
                 <GSText size="lg" bold style={{ color: Colors.text.primary }}>
                   {user?.full_name || "User"}
                 </GSText>
-                <GSText size="sm" style={{ color: Colors.text.secondary }}>
+                <GSText 
+                  size="sm" 
+                  style={{ 
+                    color: Colors.text.secondary,
+                    flexShrink: 1,
+                    maxWidth: '100%'
+                  }}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
                   {user?.email || "user@example.com"}
                 </GSText>
               </VStack>
