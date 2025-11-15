@@ -11,6 +11,7 @@ import {
 } from 'lucide-react-native';
 import Colors from '../constants/Colors';
 import { LAYOUT } from '../constants/LayoutConstants';
+import { useAuth } from '../contexts/AuthContext';
 
 interface NavbarProps {
   activeTab?: 'home' | 'learn' | 'ask' | 'find' | 'profile';
@@ -24,6 +25,7 @@ const Navbar: React.FC<NavbarProps> = ({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
+  const { user } = useAuth();
   const { width } = useWindowDimensions();
   
   // Dynamic sizing based on screen width
@@ -81,7 +83,9 @@ const Navbar: React.FC<NavbarProps> = ({
         router.push('/directory');
         break;
       case 'profile':
-        router.push('/profile');
+        // Use role-based routing for profile
+        const profileRoute = user?.role === 'verified_lawyer' ? '/lawyer/profile' : '/profile';
+        router.push(profileRoute);
         break;
       default:
         console.log(`Unknown tab: ${tabId}`);
