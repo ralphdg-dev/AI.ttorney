@@ -1437,8 +1437,8 @@ export default function ChatbotScreen() {
         />
       )}
 
-      {/* Moderation Warning Banner */}
-      {moderationStatus && (
+      {/* Moderation Warning Banner - Only for authenticated users */}
+      {!isGuestMode && moderationStatus && (
         <ModerationWarningBanner
           strikeCount={moderationStatus.strike_count}
           suspensionCount={moderationStatus.suspension_count}

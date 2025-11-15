@@ -90,6 +90,41 @@ async def ask_legal_question(
             if current_user and "user" in current_user:
                 authenticated_user_id = current_user["user"]["id"]
             effective_user_id = authenticated_user_id or request.user_id
+            guest_session_token = None
+            
+            # ============================================================================
+            # GUEST RATE LIMITING - OpenAI/Anthropic Security Pattern
+            # ============================================================================
+            # CRITICAL: Server-side validation for guest users
+            # Never trust client-side data - validate everything on server
+            if not effective_user_id:  # Guest user (no authentication)
+                from middleware.guest_rate_limiter import GuestRateLimiter
+                from fastapi import Request as FastAPIRequest
+                
+                # Get the FastAPI request object from context
+                # For streaming, we need to validate guest rate limit
+                rate_limit_result = await GuestRateLimiter.validate_guest_request(
+                    request=request,  # This is the ChatRequest, not FastAPI Request
+                    session_id=request.guest_session_id,
+                    client_prompt_count=request.guest_prompt_count
+                )
+                
+                if not rate_limit_result["allowed"]:
+                    logger.warning(
+                        f"🚫 Guest rate limit exceeded: {rate_limit_result['reason']} - "
+                        f"Message: {rate_limit_result.get('message', 'Rate limit reached')}"
+                    )
+                    yield format_sse({
+                        'content': rate_limit_result["message"],
+                        'type': 'error',
+                        'done': True
+                    })
+                    return
+                
+                # Rate limit passed - store session token for response
+                guest_session_token = rate_limit_result.get("session_id")
+                logger.info(f"✅ Guest rate limit check passed - Server count: {rate_limit_result['server_count']}/15")
+            # ============================================================================
             
             # Check if user is allowed to use chatbot (not suspended/banned)
             if effective_user_id:
@@ -812,13 +847,19 @@ async def ask_legal_question(
                     print(f"Failed to save: {e}")
             
             # Send metadata (session/message IDs) BEFORE done so frontend can capture session_id
-            yield format_sse({
+            metadata_response = {
                 'type': 'metadata',
                 'language': language,
                 'session_id': session_id,
                 'user_message_id': user_msg_id,
                 'assistant_message_id': assistant_msg_id
-            })
+            }
+            
+            # Add guest session token if this was a guest request
+            if guest_session_token:
+                metadata_response['guest_session_token'] = guest_session_token
+            
+            yield format_sse(metadata_response)
             
             # Done
             yield format_sse({'done': True})

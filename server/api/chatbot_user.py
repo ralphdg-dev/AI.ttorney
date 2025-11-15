@@ -3560,7 +3560,8 @@ async def ask_legal_question(
             security_report=security_report,
             session_id=session_id,
             message_id=assistant_msg_id,
-            user_message_id=user_msg_id
+            user_message_id=user_msg_id,
+            guest_session_token=guest_session_token  # Return server-validated session token to client
         )
         
     except HTTPException as he:

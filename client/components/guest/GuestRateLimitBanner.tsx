@@ -22,7 +22,7 @@ export const GuestRateLimitBanner: React.FC<GuestRateLimitBannerProps> = ({
   showInChatbot = false 
 }) => {
   const router = useRouter();
-  const { promptsRemaining, hasReachedLimit, timeUntilReset } = useGuest();
+  const { promptsRemaining, hasReachedLimit } = useGuest();
 
   // Don't show if not in chatbot and has plenty of prompts
   if (!showInChatbot && promptsRemaining > 5) {
@@ -50,11 +50,7 @@ export const GuestRateLimitBanner: React.FC<GuestRateLimitBannerProps> = ({
               You've reached the free limit
             </Text>
             <Text style={styles.limitReachedSubtitle}>
-              {timeUntilReset ? (
-                <>Free prompts reset in <Text style={styles.timeHighlight}>{timeUntilReset}</Text></>
-              ) : (
-                'Your prompts will reset in 24 hours'
-              )}
+              Your free prompts will reset in 24 hours
             </Text>
             <View style={styles.actions}>
               <TouchableOpacity 

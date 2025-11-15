@@ -745,11 +745,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return hasRole('admin') || hasRole('superadmin');
   };
 
-  const continueAsGuest = () => {
-    console.log('👤 Continuing as guest');
-    setIsGuestMode(true);
-    setIsLoading(false);
-    router.replace('/chatbot');
+  const continueAsGuest = async () => {
+    try {
+      console.log('👤 Continuing as guest');
+      
+      // Generate and store guest session
+      const { generateGuestSessionId, GUEST_SESSION_EXPIRY_MS, GUEST_SESSION_STORAGE_KEY } = await import('../config/guestConfig');
+      const now = Date.now();
+      const guestSession = {
+        id: generateGuestSessionId(),
+        promptCount: 0,
+        createdAt: now,
+        expiresAt: now + GUEST_SESSION_EXPIRY_MS,
+      };
+      
+      // Store guest session
+      await AsyncStorage.setItem(GUEST_SESSION_STORAGE_KEY, JSON.stringify(guestSession));
+      console.log('✅ Guest session created:', guestSession.id);
+      
+      // Clear authenticated state
+      setAuthState({ session: null, user: null, supabaseUser: null });
+      setIsGuestMode(true);
+      setIsLoading(false);
+      
+      // Navigate to chatbot
+      router.replace('/chatbot');
+    } catch (error) {
+      console.error('❌ Error creating guest session:', error);
+      setIsLoading(false);
+    }
   };
 
   const value: AuthContextType = React.useMemo(() => ({

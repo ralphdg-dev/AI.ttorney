@@ -12,14 +12,11 @@ import {
   X,
   LogIn,
   UserPlus,
-  Book
 } from 'lucide-react-native';
 import { shouldUseNativeDriver } from '@/utils/animations';
-import { createShadowStyle } from '@/utils/shadowUtils';
 import { GlobalStyles } from '@/constants/GlobalStyles';
 import Colors from '@/constants/Colors';
 import { LAYOUT } from '@/constants/LayoutConstants';
-import { GuestDisclaimer } from './GuestDisclaimer';
 
 interface GuestSidebarProps {
   isOpen: boolean;
@@ -114,12 +111,6 @@ export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) =
 
   const menuItems: MenuItem[] = [
     {
-      id: 'legal-terms',
-      label: 'Legal Terms',
-      icon: Book,
-      onPress: () => handleNavigation('/glossary'),
-    },
-    {
       id: 'help',
       label: 'Help & Support',
       icon: HelpCircle,
@@ -195,20 +186,29 @@ export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) =
   };
 
   return (
-    <View style={styles.container}>
-      {/* Backdrop - Click to close */}
-      <TouchableOpacity
-        style={styles.backdrop}
-        activeOpacity={1}
-        onPress={onClose}
-      />
+    <View style={styles.container} pointerEvents={isOpen ? 'auto' : 'none'}>
+      {/* Backdrop - Click to close with fade animation */}
+      <Animated.View
+        style={[
+          styles.backdrop,
+          {
+            opacity: overlayAnim,
+          },
+        ]}
+        pointerEvents={isOpen ? 'auto' : 'none'}
+      >
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+      </Animated.View>
       {/* Sidebar */}
       <Animated.View
         style={[
           styles.sidebar,
           {
             transform: [{ translateX: slideAnim }],
-            opacity: overlayAnim,
           },
         ]}
         accessible={true}
@@ -234,11 +234,6 @@ export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) =
             >
               <X size={24} color={Colors.text.head} strokeWidth={1.5} />
             </TouchableOpacity>
-          </View>
-
-          {/* Guest Disclaimer */}
-          <View style={styles.disclaimerContainer}>
-            <GuestDisclaimer variant="inline" showCTA={false} />
           </View>
 
           {/* Auth Actions */}

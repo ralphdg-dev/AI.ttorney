@@ -101,8 +101,8 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [clearGuestSession]);
 
-  // Load guest session from storage on mount
-  // FAANG Best Practice: Load once on mount, no dependencies to avoid re-loads
+  // Load guest session from storage on mount and when app initializes
+  // Also reload if guest session changes in storage
   useEffect(() => {
     loadGuestSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps

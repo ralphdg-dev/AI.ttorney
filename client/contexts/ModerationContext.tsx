@@ -19,31 +19,38 @@ export const ModerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isLoading, setIsLoading] = useState(false);
   const isFetchingRef = useRef(false);
 
+  // Fetch moderation status (memoized to prevent unnecessary calls)
   const refreshStatus = useCallback(async () => {
-    if (!session?.access_token || !isAuthenticated || isFetchingRef.current) {
-      if (!session?.access_token || !isAuthenticated) setModerationStatus(null);
+    if (!session?.access_token || !isAuthenticated) {
+      setModerationStatus(null);
+      isFetchingRef.current = false;
       return;
     }
+
+    if (isFetchingRef.current) return;
 
     try {
       isFetchingRef.current = true;
       setIsLoading(true);
       const status = await getUserModerationStatus(session.access_token);
-      if (status) setModerationStatus(status);
+      setModerationStatus(status || null);
     } catch (error) {
       console.error('Failed to fetch moderation status:', error);
+      setModerationStatus(null);
     } finally {
       setIsLoading(false);
       isFetchingRef.current = false;
     }
   }, [session?.access_token, isAuthenticated]);
 
+  // Clear on logout, fetch on login
   useEffect(() => {
-    if (isAuthenticated && session?.access_token) {
-      refreshStatus();
-    } else {
+    if (!isAuthenticated || !session?.access_token) {
       setModerationStatus(null);
+      isFetchingRef.current = false;
+      return;
     }
+    refreshStatus();
   }, [isAuthenticated, session?.access_token, refreshStatus]);
 
   const isBlocked = moderationStatus?.account_status === 'suspended' || 
