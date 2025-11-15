@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TextInput, FlatList, ListRenderItem } from 'react-native';
-import { Send } from 'lucide-react-native';
+import { Send, User } from 'lucide-react-native';
 import Colors from '../../constants/Colors';
 import { useAuth } from '../../contexts/AuthContext';
 import Card from '../ui/Card';
@@ -8,8 +8,8 @@ import Button from '../ui/Button';
 import FadeInView from '../ui/FadeInView';
 import { SkeletonCard } from '../ui/SkeletonLoader';
 import { VerifiedLawyerBadge } from '../common/VerifiedLawyerBadge';
-import UserDisplay from '../common/UserDisplay';
 import { useOptimizedList } from '../../hooks/useOptimizedList';
+
 
 interface Comment {
   id: string;
@@ -25,6 +25,7 @@ interface Comment {
   is_anonymous?: boolean;
 }
 
+
 interface CommentsProps {
   postId: string;
   comments: Comment[];
@@ -32,6 +33,7 @@ interface CommentsProps {
   onAddComment?: (comment: string) => Promise<void>;
   onRefresh?: () => void;
 }
+
 
 const Comments: React.FC<CommentsProps> = React.memo(({
   postId,
@@ -44,12 +46,15 @@ const Comments: React.FC<CommentsProps> = React.memo(({
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+
   const isCommentDisabled = useMemo(() => {
     return newComment.trim().length === 0 || newComment.length > 500;
   }, [newComment]);
 
+
   const handleSubmitComment = useCallback(async () => {
     if (isCommentDisabled || !onAddComment) return;
+
 
     setIsSubmitting(true);
     try {
@@ -62,39 +67,57 @@ const Comments: React.FC<CommentsProps> = React.memo(({
     }
   }, [newComment, isCommentDisabled, onAddComment]);
 
-  const renderComment: ListRenderItem<Comment> = useCallback(({ item, index }) => (
-    <FadeInView delay={index * 30} key={item.id}>
-      <Card variant="default" padding="medium" style={styles.commentCard}>
-        <View style={styles.commentHeader}>
-          <UserDisplay
-            user={item.is_anonymous ? {
-              name: 'Anonymous',
-              username: 'anonymous',
-              avatar: '',
-              account_status: 'active'
-            } : item.user}
-            size="small"
-            showVerifiedBadge={true}
-          />
-          
-          <View style={styles.commentMeta}>
-            <Text style={styles.commentTimestamp}>
-              {new Date(item.created_at).toLocaleDateString()}
-            </Text>
+
+  const renderComment: ListRenderItem<Comment> = useCallback(({ item, index }) => {
+    // Determine if the user account is deactivated
+    const isDeactivated = item.user?.account_status === 'deactivated';
+    
+    return (
+      <FadeInView delay={index * 30} key={item.id}>
+        <Card variant="default" padding="medium" style={styles.commentCard}>
+          <View style={styles.commentHeader}>
+            <View style={styles.commentAvatar}>
+              <User size={16} color={Colors.text.secondary} />
+            </View>
+            <View style={styles.commentUserInfo}>
+              <View style={styles.commentUserNameRow}>
+                <Text style={styles.commentUserName}>
+                  {item.is_anonymous ? 'Anonymous' : (
+                    isDeactivated ? 'Deactivated Account' : (item.user?.name || 'Anonymous')
+                  )}
+                </Text>
+                {!item.is_anonymous && !isDeactivated && (
+                  <Text style={styles.commentUserHandle}>
+                    @{item.user?.username || 'user'}
+                  </Text>
+                )}
+              </View>
+              {!item.is_anonymous && !isDeactivated && item.user?.isLawyer && (
+                <View style={{ marginTop: 2, marginBottom: 2 }}>
+                  <VerifiedLawyerBadge size="sm" />
+                </View>
+              )}
+              <Text style={styles.commentTimestamp}>
+                {new Date(item.created_at).toLocaleDateString()}
+              </Text>
+            </View>
           </View>
-        </View>
-        <Text style={styles.commentContent}>{item.body}</Text>
-      </Card>
-    </FadeInView>
-  ), []);
+          <Text style={styles.commentContent}>{item.body}</Text>
+        </Card>
+      </FadeInView>
+    );
+  }, []);
+
 
   const keyExtractor = useCallback((item: Comment) => item.id, []);
+
 
   const optimizedListProps = useOptimizedList({
     data: comments,
     keyExtractor,
     renderItem: renderComment,
   });
+
 
   if (loading && comments.length === 0) {
     return (
@@ -107,9 +130,11 @@ const Comments: React.FC<CommentsProps> = React.memo(({
     );
   }
 
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Comments ({comments.length})</Text>
+
 
       {/* Comment Input */}
       {currentUser && (
@@ -147,6 +172,7 @@ const Comments: React.FC<CommentsProps> = React.memo(({
         </FadeInView>
       )}
 
+
       {/* Comments List */}
       {comments.length > 0 ? (
         <FlatList
@@ -172,13 +198,14 @@ const Comments: React.FC<CommentsProps> = React.memo(({
   );
 });
 
-const styles = StyleSheet.create({
+
+const styles = {
   container: {
-    marginTop: 16,
+    marginTop: 24,
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '600' as const,
     color: Colors.text.primary,
     marginBottom: 16,
   },
@@ -187,29 +214,45 @@ const styles = StyleSheet.create({
   },
   commentInput: {
     minHeight: 80,
-    fontSize: 16,
+    fontSize: 14,
     color: Colors.text.primary,
-    textAlignVertical: 'top',
+    textAlignVertical: 'top' as const,
     marginBottom: 12,
   },
   inputActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+  },
+  characterCount: {
+    fontSize: 12,
+    color: Colors.text.tertiary,
+  },
+  characterCountExceeded: {
+    color: Colors.status.error,
+  },
+  commentsList: {
+    flex: 1,
+  },
+  commentsListContent: {
+    paddingBottom: 16,
   },
   commentCard: {
     marginBottom: 12,
-    backgroundColor: Colors.background.secondary,
   },
   commentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     marginBottom: 8,
   },
-  commentMeta: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
+  commentAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.background.secondary,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginRight: 12,
   },
   commentUserInfo: {
     flex: 1,
@@ -253,8 +296,10 @@ const styles = StyleSheet.create({
     height: 80,
     marginBottom: 12,
   },
-});
+};
+
 
 Comments.displayName = 'Comments';
+
 
 export default Comments;

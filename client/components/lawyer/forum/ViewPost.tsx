@@ -41,6 +41,7 @@ interface PostData {
     avatar: string;
     isLawyer?: boolean;
     lawyerBadge?: string;
+    account_status?: string;
   };
   comments?: number;
   timestamp?: string;
@@ -65,6 +66,7 @@ interface Reply {
     avatar: string;
     isLawyer?: boolean;
     lawyerBadge?: string;
+    account_status?: string;
   };
   // Optimistic UI props
   isOptimistic?: boolean;
@@ -462,6 +464,7 @@ const ViewPost: React.FC = () => {
                   avatar: replyUserData?.photo_url || replyUserData?.profile_photo || undefined,
                   isLawyer: replyUserData?.role === 'verified_lawyer',
                   lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+                  account_status: replyUserData?.account_status,
                 }
               };
             });
@@ -585,6 +588,7 @@ const ViewPost: React.FC = () => {
             avatar: userData?.photo_url || userData?.profile_photo || undefined,
             isLawyer: userData?.role === 'verified_lawyer',
             lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+            account_status: userData?.account_status,
           },
           comments: 0,
         };
@@ -623,6 +627,7 @@ const ViewPost: React.FC = () => {
                     avatar: replyUserData?.photo_url || replyUserData?.profile_photo || undefined,
                     isLawyer: replyUserData?.role === 'verified_lawyer',
                     lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+                    account_status: replyUserData?.account_status,
                   }
                 };
               });
@@ -811,6 +816,7 @@ const ViewPost: React.FC = () => {
   // No separate loadReplies function needed
 
   const isAnonymous = post?.is_anonymous || false;
+  const isDeactivated = post?.user?.account_status === 'deactivated';
   const displayUser = isAnonymous 
     ? { name: 'Anonymous User', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png', isLawyer: false } // Detective icon for anonymous users
     : (post?.user || { name: 'User', avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', isLawyer: false }); // Gray default for regular users
@@ -1034,16 +1040,16 @@ const ViewPost: React.FC = () => {
                     {/* [Full Name] [lawyer badge] */}
                     <View style={{flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap'}}>
                       <Text style={tw`text-base font-semibold text-gray-900 mr-2`}>
-                        {displayUser.name}
+                        {isDeactivated ? 'Deactivated Account' : displayUser.name}
                       </Text>
-                      {displayUser.isLawyer && (
+                      {!isAnonymous && !isDeactivated && displayUser.isLawyer && (
                         <VerifiedLawyerBadge size="sm" />
                       )}
                     </View>
                     
                     {/* [username] [law category] - side by side */}
                     <View style={tw`flex-row items-center mt-1`}>
-                      {!isAnonymous && (
+                      {!isAnonymous && !isDeactivated && (
                         <Text style={tw`text-sm text-gray-500 mr-2`}>
                           @{displayUser.name?.toLowerCase().replace(/\s+/g, '')}
                         </Text>
@@ -1059,7 +1065,7 @@ const ViewPost: React.FC = () => {
                         ]}>
                           <Text style={[
                             tw`text-xs font-semibold`, 
-                            { color: categoryColors.text }
+                            { color: categoryColors.text, textTransform: 'uppercase' }
                           ]}>
                             {getCategoryDisplayText(post?.domain)}
                           </Text>
@@ -1124,6 +1130,7 @@ const ViewPost: React.FC = () => {
                   const allReplies = [...filteredReplies, ...optimisticReplies];
                   return allReplies.length > 0 ? allReplies.map((reply) => {
                   const isReplyAnonymous = reply.is_anonymous || false;
+                  const isReplyDeactivated = reply.user?.account_status === 'deactivated';
                   const replyUser = isReplyAnonymous 
                     ? { name: 'Anonymous User', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png', isLawyer: false }
                     : (reply.user || { name: 'User', avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png', isLawyer: false });
@@ -1132,7 +1139,7 @@ const ViewPost: React.FC = () => {
                   const replyComponent = (
                     <View key={reply.id} style={tw`mb-6 pl-4 bg-white`}>
                       <View style={tw`flex-row items-start mb-2`}>
-                        {isReplyAnonymous ? (
+                        {isReplyAnonymous || isReplyDeactivated ? (
                           <View style={tw`w-10 h-10 rounded-full bg-gray-100 border border-gray-200 items-center justify-center mr-3`}>
                             <User size={16} color="#6B7280" />
                           </View>
@@ -1154,9 +1161,9 @@ const ViewPost: React.FC = () => {
                             <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
                               <View style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
                                 <Text style={tw`text-base font-semibold text-gray-900 mr-2`}>
-                                  {replyUser.name}
+                                  {isReplyDeactivated ? 'Deactivated Account' : replyUser.name}
                                 </Text>
-                                {replyUser.isLawyer && (
+                                {!isReplyAnonymous && !isReplyDeactivated && replyUser.isLawyer && (
                                   <VerifiedLawyerBadge size="sm" />
                                 )}
                               </View>
@@ -1171,7 +1178,7 @@ const ViewPost: React.FC = () => {
                             </View>
                             
                             {/* [username] - law category not available in comments */}
-                            {!isReplyAnonymous && (
+                            {!isReplyAnonymous && !isReplyDeactivated && (
                               <Text style={tw`text-sm text-gray-500 mt-1`}>
                                 @{replyUser.name?.toLowerCase().replace(/\s+/g, '') || 'user'}
                               </Text>

@@ -23,6 +23,7 @@ interface PostData {
     avatar: string;
     isLawyer?: boolean;
     lawyerBadge?: string;
+    account_status?: string;
   };
   timestamp: string;
   category: string;
@@ -117,6 +118,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
           avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
           isLawyer: replyUserData?.role === 'verified_lawyer',
           lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+          account_status: replyUserData?.account_status,
         },
       };
     });
@@ -131,6 +133,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
             avatar: userData?.photo_url || userData?.profile_photo || undefined,
             isLawyer: userData?.role === 'verified_lawyer',
             lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+            account_status: userData?.account_status,
           },
       timestamp: created || '',
       category: row?.category || 'Others',
