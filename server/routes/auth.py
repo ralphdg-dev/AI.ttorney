@@ -394,7 +394,23 @@ async def reset_password_with_token(request: Dict[str, str] = Body(...)):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to find user"
             )
-        
+
+        # Prevent setting the same password as the current one by attempting a sign-in
+        # If sign-in with the provided new password succeeds, it matches the current password
+        try:
+            login_check = supabase.auth.sign_in_with_password({
+                "email": decoded["email"],
+                "password": new_password,
+            })
+            if getattr(login_check, "user", None):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="New password must be different from your current password"
+                )
+        except Exception:
+            # Invalid login indicates the new password is different from the current password
+            pass
+
         # Update user password using admin API
         try:
             result = supabase.auth.admin.update_user_by_id(

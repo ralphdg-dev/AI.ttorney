@@ -273,7 +273,23 @@ export default function ForgotPassword() {
       console.log("🔍 DEBUG: Reset password API response:", result);
       
       if (result.error) {
-        setError(result.error);
+        const errStr = typeof result.error === 'string' ? result.error.toLowerCase() : '';
+        const isSamePasswordError = errStr.includes('different from your current password');
+        const isGenericUpdateFail = errStr.includes('failed to update password');
+        if (isSamePasswordError || isGenericUpdateFail) {
+          toast.show({
+            placement: 'top',
+            duration: 3000,
+            render: ({ id }) => (
+              <Toast nativeID={id} action="error" variant="solid">
+                <ToastTitle>Password not changed</ToastTitle>
+                <ToastDescription>New password can't be the same as your current one.</ToastDescription>
+              </Toast>
+            ),
+          });
+        } else {
+          setError(result.error);
+        }
       } else {
         // Show success toast and redirect to login
         toast.show({
@@ -424,6 +440,9 @@ export default function ForgotPassword() {
         </Text>
         <Text className="text-sm text-center text-gray-500 mt-1">
           Password must be at least 8 characters with uppercase, lowercase, and a number.
+        </Text>
+        <Text className="text-sm text-center text-gray-500 mt-1">
+          New password must be different from your current password.
         </Text>
       </VStack>
 
