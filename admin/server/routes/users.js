@@ -69,7 +69,6 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
     const { data: users, error } = await query;
 
     if (error) {
-      console.error('Get legal seekers error:', error);
       return res.status(500).json({ 
         success: false, 
         error: 'Failed to fetch legal seekers' 
@@ -140,7 +139,6 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get legal seekers error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -187,7 +185,6 @@ router.get('/legal-seekers/stats/overview', authenticateAdmin, async (req, res) 
     });
 
   } catch (error) {
-    console.error('Get legal seekers stats error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -227,7 +224,6 @@ router.get('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get legal seeker details error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -273,7 +269,6 @@ router.patch('/legal-seekers/:id/status', authenticateAdmin, async (req, res) =>
     });
 
   } catch (error) {
-    console.error('Update legal seeker status error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -332,7 +327,6 @@ router.delete('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete legal seeker error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -376,20 +370,11 @@ router.get('/lawyers', authenticateAdmin, async (req, res) => {
     const { data: lawyers, error } = await query;
 
     if (error) {
-      console.error('Get lawyers error:', error);
       return res.status(500).json({ 
         success: false, 
         error: 'Failed to fetch lawyers: ' + error.message 
       });
     }
-
-    // Debug: Log the lawyer_info data to verify the foreign key relationship is working
-    console.log('Lawyers with lawyer_info:', lawyers?.map(l => ({
-      id: l.id,
-      name: l.full_name,
-      lawyer_info: l.lawyer_info
-    })));
-
 
     // Now try to get lawyer applications for these users
     let transformedLawyers = [];
@@ -406,7 +391,6 @@ router.get('/lawyers', authenticateAdmin, async (req, res) => {
         .order('version', { ascending: false }); // Get highest version first
 
       if (appError) {
-        console.error('Get applications error:', appError);
         // Continue without applications data
       }
 
@@ -464,7 +448,6 @@ router.get('/lawyers', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get lawyers error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error: ' + error.message 
@@ -497,7 +480,6 @@ router.get('/lawyers/:id', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get lawyer details error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -543,7 +525,6 @@ router.patch('/lawyers/:id/status', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update lawyer status error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -578,7 +559,6 @@ router.patch('/legal-seekers/:id/archive', authenticateAdmin, async (req, res) =
       .single();
 
     if (error) {
-      console.error('Archive user error:', error);
       return res.status(500).json({
         success: false,
         error: 'Failed to update archive status'
@@ -599,7 +579,6 @@ router.patch('/legal-seekers/:id/archive', authenticateAdmin, async (req, res) =
     });
 
   } catch (error) {
-    console.error('Archive user error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -888,11 +867,9 @@ router.patch('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
 
       if (auditError) {
         // Don't fail the request if audit logging fails
-        console.warn('Failed to create audit log:', auditError);
       }
     } catch (auditErr) {
       // Continue without failing the request
-      console.warn('Audit logging error:', auditErr);
     }
 
     res.json({
@@ -1014,7 +991,7 @@ router.patch('/legal-seekers/:id/strikes', authenticateAdmin, async (req, res) =
         }
       });
     } catch (auditError) {
-      console.warn('Failed to log strike action:', auditError.message);
+      // Failed to log strike action
     }
 
     res.json({
@@ -1027,7 +1004,6 @@ router.patch('/legal-seekers/:id/strikes', authenticateAdmin, async (req, res) =
     });
 
   } catch (error) {
-    console.error('Update user strikes error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -1128,7 +1104,7 @@ router.patch('/legal-seekers/:id/moderation', authenticateAdmin, async (req, res
         }
       });
     } catch (auditError) {
-      console.warn('Failed to log moderation action:', auditError.message);
+      // Failed to log moderation action
     }
 
     res.json({
@@ -1138,7 +1114,6 @@ router.patch('/legal-seekers/:id/moderation', authenticateAdmin, async (req, res
     });
 
   } catch (error) {
-    console.error('User moderation error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -1175,7 +1150,6 @@ router.get('/consultation-bans', authenticateAdmin, async (req, res) => {
     const { data: users, error: usersError } = await query;
 
     if (usersError) {
-      console.error('Error fetching users:', usersError);
       return res.status(500).json({
         success: false,
         error: 'Failed to fetch users'
@@ -1192,7 +1166,7 @@ router.get('/consultation-bans', authenticateAdmin, async (req, res) => {
       .gte('updated_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()); // Last 30 days
 
     if (cancellationsError) {
-      console.warn('Error fetching cancellations:', cancellationsError);
+      // Error fetching cancellations
     }
 
     // Count cancellations per user
@@ -1250,10 +1224,9 @@ router.get('/consultation-bans', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Consultation bans fetch error:', error);
     res.status(500).json({
       success: false,
-      error: 'Internal server error'
+      error: 'Failed to fetch consultation bans'
     });
   }
 });
@@ -1300,7 +1273,6 @@ router.post('/consultation-bans/:userId/lift', authenticateAdmin, async (req, re
       .eq('id', userId);
 
     if (updateError) {
-      console.error('Error lifting ban:', updateError);
       return res.status(500).json({
         success: false,
         error: 'Failed to lift consultation ban'
@@ -1321,7 +1293,7 @@ router.post('/consultation-bans/:userId/lift', authenticateAdmin, async (req, re
         }
       });
     } catch (auditError) {
-      console.warn('Failed to log ban lift action:', auditError.message);
+      // Failed to log ban lift action
     }
 
     res.json({
@@ -1336,7 +1308,6 @@ router.post('/consultation-bans/:userId/lift', authenticateAdmin, async (req, re
     });
 
   } catch (error) {
-    console.error('Lift consultation ban error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'

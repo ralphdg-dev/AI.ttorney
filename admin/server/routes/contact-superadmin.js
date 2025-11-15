@@ -208,7 +208,6 @@ router.post('/', contactLimiter, async (req, res) => {
 
     // Check SMTP configuration
     if (!process.env.SMTP_USERNAME || !process.env.SMTP_PASSWORD) {
-      console.error('SMTP credentials not configured');
       return res.status(500).json({
         success: false,
         error: 'Email service not configured'
@@ -221,9 +220,7 @@ router.post('/', contactLimiter, async (req, res) => {
     // Verify transporter connection
     try {
       await transporter.verify();
-      console.log('SMTP connection verified successfully');
     } catch (verifyError) {
-      console.error('SMTP connection failed:', verifyError);
       return res.status(500).json({
         success: false,
         error: 'Email service connection failed'
@@ -243,8 +240,7 @@ router.post('/', contactLimiter, async (req, res) => {
     // Send email to superadmin
     const info = await transporter.sendMail(mailOptions);
     
-    console.log(`Admin contact email sent successfully from ${email}:`, info.messageId);
-
+    
     // Send confirmation email to sender
     try {
       const confirmationHtml = getConfirmationEmailTemplate(name, subject);
@@ -256,9 +252,7 @@ router.post('/', contactLimiter, async (req, res) => {
       };
 
       const confirmationInfo = await transporter.sendMail(confirmationMailOptions);
-      console.log(`Confirmation email sent successfully to ${email}:`, confirmationInfo.messageId);
     } catch (confirmationError) {
-      console.error('Failed to send confirmation email:', confirmationError);
       // Don't fail the main request if confirmation fails
     }
 
@@ -269,11 +263,9 @@ router.post('/', contactLimiter, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error sending admin contact email:', error);
-    
     res.status(500).json({
       success: false,
-      error: 'Failed to send message. Please try again later.'
+      error: 'Failed to send message. Please try again.'
     });
   }
 });

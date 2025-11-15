@@ -83,7 +83,6 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
     res.status(500).json({ 
       error: 'Internal server error during login.' 
     });
@@ -124,7 +123,6 @@ router.put('/me', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, admin: adminResponse });
   } catch (error) {
-    console.error('Update profile error:', error);
     return res.status(500).json({ error: 'Internal server error.' });
   }
 });
@@ -157,7 +155,6 @@ router.post('/forgot-password', async (req, res) => {
 
     res.json({ success: true, message: 'Reset code sent to your email', expiresInMinutes: otpResult.expiresInMinutes || 2 });
   } catch (error) {
-    console.error('Forgot password error:', error);
     // Do not leak internals
     res.json({ success: true, message: 'If the email exists, a reset code has been sent.' });
   }
@@ -206,7 +203,6 @@ router.post('/verify-reset-otp', async (req, res) => {
 
     res.json({ success: true, message: 'OTP verified', passwordResetToken });
   } catch (error) {
-    console.error('Verify reset OTP error:', error);
     res.status(500).json({ error: 'Internal server error during OTP verification.' });
   }
 });
@@ -252,13 +248,11 @@ router.post('/reset-password', async (req, res) => {
     });
 
     if (updateError) {
-      console.error('Supabase update password error:', updateError);
       return res.status(500).json({ error: 'Failed to update password.' });
     }
 
     res.json({ success: true, message: 'Password has been reset successfully.' });
   } catch (error) {
-    console.error('Reset password error:', error);
     res.status(500).json({ error: 'Internal server error during password reset.' });
   }
 });
@@ -346,7 +340,6 @@ router.post('/verify-otp', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Verify OTP error:', error);
     res.status(500).json({
       error: 'Internal server error during OTP verification.'
     });
@@ -393,7 +386,6 @@ router.post('/resend-otp', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Resend OTP error:', error);
     res.status(500).json({
       error: 'Internal server error during OTP resend.'
     });
@@ -411,7 +403,6 @@ router.post('/logout', authenticateAdmin, async (req, res) => {
       message: 'Logout successful'
     });
   } catch (error) {
-    console.error('Logout error:', error);
     res.status(500).json({ 
       error: 'Internal server error during logout.' 
     });
@@ -446,7 +437,6 @@ router.get('/me', authenticateAdmin, async (req, res) => {
       admin: adminResponse
     });
   } catch (error) {
-    console.error('Get profile error:', error);
     res.status(500).json({ 
       error: 'Internal server error.' 
     });
@@ -513,7 +503,6 @@ router.get('/joined', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, created_at: userRow.created_at });
   } catch (error) {
-    console.error('Get joined date error:', error);
     return res.status(500).json({ error: 'Internal server error.' });
   }
 });
@@ -555,7 +544,6 @@ router.post('/refresh', authenticateAdmin, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Token refresh error:', error);
     res.status(500).json({ 
       error: 'Internal server error during token refresh.' 
     });
@@ -597,13 +585,11 @@ try {
   });
 
   if (updateError) {
-    console.error('Change password update error:', updateError);
     return res.status(500).json({ error: 'Failed to update password.' });
   }
 
   return res.json({ success: true, message: 'Password updated successfully.' });
 } catch (error) {
-  console.error('Change password error:', error);
   return res.status(500).json({ error: 'Internal server error.' });
 }
 });
@@ -699,7 +685,6 @@ router.put('/photo', authenticateAdmin, async (req, res) => {
 
     return res.json({ success: true, photo_url: updatedRow.photo_url, profile_photo: updatedRow.profile_photo });
   } catch (error) {
-    console.error('Update photo error:', error);
     return res.status(500).json({ error: 'Internal server error.' });
   }
 });

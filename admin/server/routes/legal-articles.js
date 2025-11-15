@@ -29,10 +29,10 @@ const logAuditEvent = async (
     });
 
     if (error) {
-      console.error("Audit log error:", error);
+      // Audit log error
     }
   } catch (error) {
-    console.error("Failed to log audit event:", error);
+    // Failed to log audit event
   }
 };
 
@@ -110,7 +110,6 @@ router.get("/", async (req, res) => {
 
     res.status(200).json({ success: true, data: formattedData });
   } catch (err) {
-    console.error("Error fetching legal articles:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -226,7 +225,6 @@ router.post(
 
       res.status(201).json({ success: true, data: formattedArticle });
     } catch (err) {
-      console.error(err);
       res
         .status(500)
         .json({ success: false, message: err.message || "Server error" });
@@ -321,7 +319,7 @@ router.put(
             );
           }
         } catch (parseError) {
-          console.error("Error parsing audit logs:", parseError);
+          // Error parsing audit logs
         }
       }
 
@@ -360,16 +358,12 @@ router.put(
           updatedArticle.title_en || "Article",
           updatedArticle.title_fil || "Artikulo"
         ).catch((err) => {
-          console.error(
-            "⚠️ Failed to send update notifications (non-blocking):",
-            err
-          );
+          // Failed to send update notifications (non-blocking)
         });
       }
 
       res.status(200).json({ success: true, data: formattedArticle });
     } catch (err) {
-      console.error(err);
       res
         .status(500)
         .json({ success: false, message: err.message || "Server error" });
@@ -467,16 +461,13 @@ router.patch("/:id/publish", authenticateAdmin, async (req, res) => {
         updatedArticle.title_en || "New Article",
         updatedArticle.title_fil || "Bagong Artikulo"
       ).catch((err) => {
-        console.error(
-          "⚠️ Failed to send publish notifications (non-blocking):",
-          err
-        );
+        // Failed to send publish notifications (non-blocking)
       });
     }
 
     res.status(200).json({ success: true, data: formattedArticle });
   } catch (err) {
-    console.error("Publish/Unpublish error:", err);
+    // Publish/Unpublish error
     res
       .status(500)
       .json({ success: false, message: err.message || "Server error" });
@@ -534,7 +525,7 @@ router.patch("/:id/archive", authenticateAdmin, async (req, res) => {
       data: updatedArticle,
     });
   } catch (err) {
-    console.error("Archive error:", err);
+    // Archive error
     res
       .status(500)
       .json({ success: false, message: err.message || "Server error" });
@@ -586,7 +577,7 @@ router.patch("/:id/restore", authenticateAdmin, async (req, res) => {
       data: restoredArticle,
     });
   } catch (err) {
-    console.error("Restore error:", err);
+    // Restore error
     res
       .status(500)
       .json({ success: false, message: err.message || "Server error" });
@@ -675,7 +666,7 @@ router.get("/:id/audit-logs", authenticateAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get article audit logs error:", error);
+    // Get article audit logs error
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -749,7 +740,7 @@ router.get("/:id/recent-activity", authenticateAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get article recent activity error:", error);
+    // Get article recent activity error
     res.status(500).json({
       success: false,
       error: "Internal server error",

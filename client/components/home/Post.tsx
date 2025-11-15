@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
-import { Bookmark, MoreHorizontal, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
+import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
 import { getCategoryColors, getCategoryDisplayText } from '@/utils/categoryUtils';
 import ReportModal from '../common/ReportModal';
 import { ReportService } from '../../services/reportService';
@@ -9,8 +9,9 @@ import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePostBookmarks } from '../../contexts/PostBookmarksContext';
 import FadeInView from '../ui/FadeInView';
-import UserDisplay from '../common/UserDisplay';
+ 
 import { VerifiedLawyerBadge } from '../common/VerifiedLawyerBadge';
+
 
 interface PostProps {
   id: string;
@@ -44,6 +45,7 @@ interface PostProps {
   searchTerm?: string;
 }
 
+
 const Post: React.FC<PostProps> = React.memo(({
   id,
   user,
@@ -70,6 +72,7 @@ const Post: React.FC<PostProps> = React.memo(({
   const { loadBookmarks: refreshBookmarkContext } = usePostBookmarks();
   const [isBookmarked, setIsBookmarked] = useState(propIsBookmarked || false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
   const [displayTime, setDisplayTime] = useState(() => {
     // Initialize with formatted time
     const dateToFormat = created_at || timestamp;
@@ -98,6 +101,7 @@ const Post: React.FC<PostProps> = React.memo(({
   });
   const [showAlreadyReported, setShowAlreadyReported] = useState(false);
 
+
   // Helper function to get initials from name
   const getInitials = (name: string) => {
     if (!name || typeof name !== 'string') {
@@ -114,6 +118,7 @@ const Post: React.FC<PostProps> = React.memo(({
     
     return initials || 'U'; // Fallback to 'U' if no initials
   };
+
 
 
   // Update display time periodically if we have raw timestamp
@@ -163,13 +168,16 @@ const Post: React.FC<PostProps> = React.memo(({
   const [isReportLoading, setIsReportLoading] = useState(false);
 
 
+
   // Remove individual bookmark status checks - now handled by parent Timeline component
+
 
   const handleBookmarkPress = useCallback(async () => {
     if (!currentUser?.id) {
       onBookmarkPress?.();
       return;
     }
+
 
     // Optimistic update - update UI immediately
     const previousBookmarkState = isBookmarked;
@@ -210,22 +218,27 @@ const Post: React.FC<PostProps> = React.memo(({
     }
   }, [currentUser?.id, id, onBookmarkPress, onBookmarkStatusChange, session, isBookmarked, refreshBookmarkContext]);
 
+
   const handleMorePress = useCallback(() => {
     onMenuToggle?.(id);
   }, [onMenuToggle, id]);
+
 
   const handlePostPress = useCallback(() => {
     onPostPress?.();
   }, [onPostPress]);
 
+
   const handleCommentPress = useCallback(() => {
     onCommentPress?.();
   }, [onCommentPress]);
+
 
   const handleReportPress = useCallback(() => {
     // Open the modal immediately for instant feedback
     setReportModalVisible(true);
     setShowAlreadyReported(false);
+
 
     // Run the check in the background and update state if needed
     (async () => {
@@ -247,8 +260,10 @@ const Post: React.FC<PostProps> = React.memo(({
     })();
   }, [currentUser?.id, id, session]);
 
+
   const handleReportSubmit = useCallback(async (reason: string, category: string, reasonContext?: string) => {
     if (!currentUser?.id) return;
+
 
     setIsReportLoading(true);
     try {
@@ -261,6 +276,7 @@ const Post: React.FC<PostProps> = React.memo(({
         reasonContext || category,
         session
       );
+
 
       if (result.success) {
         // Don't close modal immediately - let ReportModal handle success state and auto-close
@@ -275,15 +291,25 @@ const Post: React.FC<PostProps> = React.memo(({
     }
   }, [currentUser?.id, id, onReportPress, session]);
 
+
   // Clean category text by removing "Related Post" and simplifying names
   const cleanCategory = category?.trim() || '';
+
 
   // Get category colors and display text using shared utility
   const categoryColors = getCategoryColors(cleanCategory);
   const displayText = getCategoryDisplayText(cleanCategory);
 
+
   // Determine if the user is anonymous
   const isAnonymous = (user.username || '').toLowerCase() === 'anonymous' || (user.name || '').toLowerCase().includes('anonymous');
+  
+  // Debug: Log user object structure
+  console.log('Post user object:', user);
+  
+  // Determine if the user account is deactivated
+  const isDeactivated = user.account_status === 'deactivated';
+
 
   return (
     <FadeInView delay={index * 50} style={styles.fadeContainer}>
@@ -294,27 +320,59 @@ const Post: React.FC<PostProps> = React.memo(({
       >
         {/* User Info Row */}
         <View style={styles.userRow}>
-          <UserDisplay
-            user={{
-              name: user.name,
-              username: user.username,
-              avatar: user.avatar,
-              isLawyer: user.isLawyer,
-              account_status: user.account_status
-            }}
-            size="medium"
-            showVerifiedBadge={true}
-          />
+          {isAnonymous || isDeactivated ? (
+            <View style={[styles.avatar, styles.anonymousAvatar]}>
+              <User size={20} color="#6B7280" />
+            </View>
+          ) : user.avatar && !user.avatar.includes('flaticon') && !imageLoadError ? (
+            <Image 
+              source={{ uri: user.avatar }} 
+              style={styles.avatar}
+              onError={() => setImageLoadError(true)}
+            />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: Colors.primary.blue, justifyContent: 'center', alignItems: 'center' }]}>
+              <Text style={{ color: 'white', fontWeight: '600', fontSize: 14 }}>
+                {getInitials(user.name)}
+              </Text>
+            </View>
+          )}
           
           <View style={styles.userInfo}>
-            {/* Category Badge */}
-            <View style={[styles.categoryBadge, { 
-              backgroundColor: categoryColors.bg,
-              borderColor: categoryColors.border 
-            }]}>
-              <Text style={[styles.categoryText, { color: categoryColors.text }]}>
-                {displayText}
+            {/* User Name and Category Row */}
+            <View style={styles.userNameRow}>
+              <Text style={styles.userName}>
+                {isDeactivated ? 'Deactivated Account' : (user.name || 'User')}
               </Text>
+
+
+              {/* Verified Lawyer Badge (unified across app) */}
+              {!isAnonymous && !isDeactivated && user?.isLawyer && (
+                <View style={{ marginRight: 6 }}>
+                  <VerifiedLawyerBadge size="sm" />
+                </View>
+              )}
+              
+              {/* Category Badge */}
+              <View style={[styles.categoryBadge, { 
+                backgroundColor: categoryColors.bg,
+                borderColor: categoryColors.border 
+              }]}>
+                <Text style={[styles.categoryText, { color: categoryColors.text }]}>
+                  {displayText}
+                </Text>
+              </View>
+            </View>
+            
+            {/* User Handle and Timestamp Row */}
+            <View style={styles.userMetaRow}>
+              {!isAnonymous && !isDeactivated && (
+                <>
+                  <Text style={styles.userHandle}>@{user.username || 'user'}</Text>
+                  <Text style={styles.metaSeparator}> • </Text>
+                </>
+              )}
+              <Text style={styles.timestamp}>{displayTime}</Text>
             </View>
           </View>
           
@@ -326,6 +384,7 @@ const Post: React.FC<PostProps> = React.memo(({
           </TouchableOpacity>
         </View>
 
+
         {/* Post Content */}
         <View style={styles.contentContainer}>
           <Text style={styles.content}>{content}</Text>
@@ -336,6 +395,7 @@ const Post: React.FC<PostProps> = React.memo(({
             </View>
           )}
         </View>
+
 
         {/* More Menu */}
         {isMenuOpen && (
@@ -368,6 +428,7 @@ const Post: React.FC<PostProps> = React.memo(({
           </View>
         )}
 
+
         {/* Engagement Actions */}
         <View style={styles.actions}>
           <View style={styles.actionsLeft}>
@@ -380,6 +441,7 @@ const Post: React.FC<PostProps> = React.memo(({
             <ChevronRight size={18} color="#536471" />
           </TouchableOpacity>
         </View>
+
 
         {/* Report Modal */}
         <ReportModal
@@ -564,6 +626,8 @@ const styles = StyleSheet.create({
   },
 });
 
+
 Post.displayName = 'Post';
+
 
 export default Post;

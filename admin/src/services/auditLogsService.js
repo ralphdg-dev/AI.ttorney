@@ -45,7 +45,6 @@ class AuditLogsService {
 
       return data;
     } catch (error) {
-      console.error('Get audit logs error:', error);
       throw error;
     }
   }
@@ -75,7 +74,6 @@ class AuditLogsService {
 
       return data;
     } catch (error) {
-      console.error('Get target audit logs error:', error);
       throw error;
     }
   }
@@ -105,7 +103,6 @@ class AuditLogsService {
 
       return data;
     } catch (error) {
-      console.error('Get admin audit logs error:', error);
       throw error;
     }
   }
@@ -130,7 +127,6 @@ class AuditLogsService {
 
       return data;
     } catch (error) {
-      console.error('Create audit log error:', error);
       throw error;
     }
   }
@@ -190,7 +186,6 @@ class AuditLogsService {
 
       return { success: true, message: 'Export completed successfully' };
     } catch (error) {
-      console.error('Export audit logs error:', error);
       throw error;
     }
   }
@@ -226,7 +221,6 @@ class AuditLogsService {
 
       return data;
     } catch (error) {
-      console.error('Get audit log stats error:', error);
       throw error;
     }
   }
@@ -261,7 +255,6 @@ class AuditLogsService {
 
       return data;
     } catch (error) {
-      console.error('Cleanup audit logs error:', error);
       throw error;
     }
   }

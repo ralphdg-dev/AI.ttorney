@@ -769,7 +769,6 @@ router.patch('/:id', authenticateAdmin, requireSuperAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update admin status error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -877,7 +876,6 @@ router.get('/:id/recent-activity', authenticateAdmin, requireSuperAdmin, async (
     });
 
   } catch (error) {
-    console.error('Get admin recent activity error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'

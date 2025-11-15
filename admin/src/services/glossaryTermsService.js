@@ -25,7 +25,6 @@ const createAuditLog = async (termId, action, metadata = {}) => {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error("Error creating audit log:", error);
     throw error;
   }
 };
@@ -46,7 +45,6 @@ const logViewAction = async (termId) => {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error("Error logging view action:", error);
     throw error;
   }
 };
@@ -67,7 +65,6 @@ const getTermAuditLogs = async (termId, page = 1, limit = 50) => {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error("Error fetching term audit logs:", error);
     throw error;
   }
 };
@@ -88,7 +85,6 @@ const getTermRecentActivity = async (termId, page = 1, limit = 50) => {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error("Error fetching term recent activity:", error);
     throw error;
   }
 };
@@ -143,7 +139,6 @@ const glossaryTermsService = {
 
       return await response.json();
     } catch (error) {
-      console.error("Failed to fetch glossary terms:", error);
       throw error;
     }
   },
@@ -165,7 +160,6 @@ const glossaryTermsService = {
 
       return await response.json();
     } catch (error) {
-      console.error("Failed to fetch glossary term:", error);
       throw error;
     }
   },
@@ -188,7 +182,6 @@ const glossaryTermsService = {
 
       return await response.json();
     } catch (error) {
-      console.error("Failed to create glossary term:", error);
       throw error;
     }
   },
@@ -214,7 +207,6 @@ const glossaryTermsService = {
 
       return await response.json();
     } catch (error) {
-      console.error("Failed to bulk create glossary terms:", error);
       throw error;
     }
   },
@@ -237,7 +229,6 @@ const glossaryTermsService = {
 
       return await response.json();
     } catch (error) {
-      console.error("Failed to update glossary term:", error);
       throw error;
     }
   },
@@ -259,7 +250,6 @@ const glossaryTermsService = {
 
       return await response.json();
     } catch (error) {
-      console.error("Failed to delete glossary term:", error);
       throw error;
     }
   },
@@ -291,13 +281,11 @@ const glossaryTermsService = {
 
       if (!response.ok) {
         // Don't throw error for audit logging failures, just log them
-        console.warn("Failed to create audit log:", response.status);
         return null;
       }
 
       return await response.json();
     } catch (error) {
-      console.warn("Failed to create audit log:", error);
       return null;
     }
   },

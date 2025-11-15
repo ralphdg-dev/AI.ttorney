@@ -125,8 +125,7 @@ router.get('/', authenticateAdmin, async (req, res) => {
     ]);
 
     if (logsError) {
-      console.error('Error fetching audit logs:', logsError);
-      
+      // Error fetching audit logs
       // Check if table doesn't exist
       if (logsError.code === '42P01') {
         return res.status(404).json({ 
@@ -143,7 +142,6 @@ router.get('/', authenticateAdmin, async (req, res) => {
     }
 
     if (countError) {
-      console.error('Error getting audit logs count:', countError);
       return res.status(500).json({ 
         success: false, 
         error: 'Failed to get audit logs count: ' + countError.message 
@@ -164,7 +162,6 @@ router.get('/', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Audit logs fetch error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error: ' + error.message 
@@ -202,7 +199,6 @@ router.get('/:id', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Audit log fetch error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error: ' + error.message 
@@ -308,7 +304,6 @@ router.get('/export/csv', authenticateAdmin, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Audit logs export error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error: ' + error.message 
@@ -380,7 +375,6 @@ router.get('/stats/summary', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Audit logs stats error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error: ' + error.message 
@@ -432,7 +426,6 @@ INSERT INTO admin_audit_logs (action, target_table, target_id, actor_id, role, m
     }
 
   } catch (error) {
-    console.error('Setup check error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error: ' + error.message
