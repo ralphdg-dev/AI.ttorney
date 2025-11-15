@@ -7,8 +7,7 @@ const router = express.Router();
 // Test endpoint to check table structure
 router.get('/test', authenticateAdmin, async (req, res) => {
   try {
-    console.log('Testing lawyer_applications table...');
-    
+        
     // Try to get just one record to see the structure
     const { data: testData, error: testError } = await supabaseAdmin
       .from('lawyer_applications')
@@ -16,7 +15,6 @@ router.get('/test', authenticateAdmin, async (req, res) => {
       .limit(1);
     
     if (testError) {
-      console.error('Test query error:', testError);
       return res.json({ 
         success: false, 
         error: testError.message,
@@ -24,8 +22,7 @@ router.get('/test', authenticateAdmin, async (req, res) => {
       });
     }
     
-    console.log('Test data:', testData);
-    
+        
     // Also test users table
     const { data: userData, error: userError } = await supabaseAdmin
       .from('users')
@@ -33,7 +30,7 @@ router.get('/test', authenticateAdmin, async (req, res) => {
       .limit(1);
     
     if (userError) {
-      console.error('Users test error:', userError);
+      // Users test error
     }
     
     res.json({
@@ -44,7 +41,6 @@ router.get('/test', authenticateAdmin, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Test endpoint error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -58,8 +54,7 @@ router.get('/', authenticateAdmin, async (req, res) => {
     const { page = 1, limit = 10, search = '', status = 'all', archived = 'active' } = req.query;
     const offset = (page - 1) * limit;
 
-    console.log('Fetching lawyer applications with params:', { page, limit, search, status, archived });
-
+    
     // First, get the latest application ID for each user based on submitted_at
     const { data: latestApplications, error: latestError } = await supabaseAdmin
       .from('lawyer_applications')
@@ -67,10 +62,9 @@ router.get('/', authenticateAdmin, async (req, res) => {
       .order('submitted_at', { ascending: false });
 
     if (latestError) {
-      console.error('Error getting latest applications:', latestError);
       return res.status(500).json({ 
         success: false, 
-        error: 'Failed to fetch latest applications: ' + latestError.message 
+        error: latestError.message 
       });
     }
 
@@ -84,8 +78,7 @@ router.get('/', authenticateAdmin, async (req, res) => {
     });
 
     const latestApplicationIds = Array.from(userLatestMap.values());
-    console.log('Latest application IDs:', latestApplicationIds);
-
+    
     if (latestApplicationIds.length === 0) {
       return res.json({
         success: true,
@@ -118,7 +111,6 @@ router.get('/', authenticateAdmin, async (req, res) => {
         .in('id', latestApplicationIds);
 
       if (searchError) {
-        console.error('Search filter error:', searchError);
         return res.status(500).json({ 
           success: false, 
           error: 'Failed to apply search filter: ' + searchError.message 
@@ -173,17 +165,13 @@ router.get('/', authenticateAdmin, async (req, res) => {
     const { data: applications, error } = await query;
 
     if (error) {
-      console.error('Get lawyer applications error:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
       return res.status(500).json({ 
         success: false, 
         error: 'Failed to fetch lawyer applications: ' + error.message 
       });
     }
 
-    console.log('Found applications:', applications?.length || 0);
-    console.log('Sample application data:', applications?.[0]); // Debug: check if archived field is included
-
+    
     // Get application type for each application (check if user has previous applications)
     const applicationsWithType = [];
     
@@ -273,8 +261,7 @@ router.get('/', authenticateAdmin, async (req, res) => {
 
     const totalCount = totalFilteredIds.length;
 
-    console.log('Total applications count:', totalCount);
-
+    
     res.json({
       success: true,
       data: transformedApplications,
@@ -287,7 +274,6 @@ router.get('/', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get lawyer applications error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error: ' + error.message 
@@ -340,7 +326,6 @@ router.get('/:id', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get lawyer application details error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -382,7 +367,6 @@ router.get('/:id/history', authenticateAdmin, async (req, res) => {
       .order('submitted_at', { ascending: false });
 
     if (error) {
-      console.error('Get application history error:', error);
       return res.status(500).json({ 
         success: false, 
         error: 'Failed to fetch application history: ' + error.message 
@@ -438,7 +422,6 @@ router.get('/:id/history', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get application history error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -452,14 +435,11 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
 
-    console.log('Update application request:', { id, updateData });
-
+    
     // Helper function to create audit log
     const createAuditLog = async (action, targetId, reason = null, metadata = {}) => {
       try {
-        console.log('Creating audit log with admin ID:', req.admin.id);
-        console.log('Audit log metadata:', metadata);
-        
+                
         const auditData = {
           action,
           target_table: 'lawyer_applications',
@@ -470,21 +450,17 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
           created_at: new Date().toISOString()
         };
         
-        console.log('Full audit data being inserted:', auditData);
-        
+                
         const { data, error } = await supabaseAdmin
           .from('admin_audit_logs')
           .insert(auditData)
           .select();
           
         if (error) {
-          console.error('Audit log insert error:', error);
-        } else {
-          console.log('Audit log created successfully:', data);
+          // Audit log insert error
         }
       } catch (auditError) {
-        console.error('Failed to create audit log:', auditError);
-        console.error('Admin data:', req.admin);
+        // Failed to create audit log
       }
     };
 
@@ -502,15 +478,13 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
       .single();
 
     if (findError || !existingApp) {
-      console.log('Application not found:', { id, findError });
       return res.status(404).json({ 
         success: false, 
         error: 'Lawyer application not found' 
       });
     }
 
-    console.log('Found application:', existingApp);
-
+    
     // Prepare update data - only include fields that are allowed to be updated
     const allowedFields = [
       'roll_number', 
@@ -530,8 +504,7 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
     // Always update the updated_at timestamp
     filteredUpdateData.updated_at = new Date().toISOString();
 
-    console.log('Filtered update data:', filteredUpdateData);
-
+    
     // Update the application
     const { data: application, error } = await supabaseAdmin
       .from('lawyer_applications')
@@ -541,7 +514,6 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
       .single();
 
     if (error || !application) {
-      console.log('Update failed:', { error, application });
       return res.status(500).json({ 
         success: false, 
         error: 'Lawyer application update failed: ' + (error?.message || 'Unknown error')
@@ -563,7 +535,7 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
           .eq('id', application.user_id);
 
         if (userError) {
-          console.error('Failed to update user pending_lawyer flag:', userError);
+          // Failed to update user pending_lawyer flag
         }
       } else if (status === 'rejected') {
         // Get current user data to check rejection count
@@ -591,7 +563,7 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
             .eq('id', application.user_id);
 
           if (userError) {
-            console.error('Failed to update user rejection data:', userError);
+            // Failed to update user rejection data
           }
         }
       } else if (status === 'resubmission') {
@@ -604,7 +576,7 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
           .eq('id', application.user_id);
 
         if (userError) {
-          console.error('Failed to update user for resubmission:', userError);
+          // Failed to update user for resubmission
         }
       }
     }
@@ -685,7 +657,6 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update lawyer application error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error: ' + error.message 
@@ -699,15 +670,12 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
     const { id } = req.params;
     const { status, admin_feedback } = req.body;
 
-    console.log('Update status request:', { id, status, admin_feedback });
-
+    
     // Helper function to create audit log
     const createAuditLog = async (action, targetId, metadata = {}) => {
       try {
         // Ensure the admin ID exists in the admin table
-        console.log('Creating audit log with admin ID:', req.admin.id);
-        console.log('Audit log metadata:', metadata);
-        
+                
         const auditData = {
           action,
           target_table: 'lawyer_applications',
@@ -718,21 +686,17 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
           created_at: new Date().toISOString()
         };
         
-        console.log('Full audit data being inserted:', auditData);
-        
+                
         const { data, error } = await supabaseAdmin
           .from('admin_audit_logs')
           .insert(auditData)
           .select();
           
         if (error) {
-          console.error('Audit log insert error:', error);
-        } else {
-          console.log('Audit log created successfully:', data);
+          // Audit log insert error
         }
       } catch (auditError) {
-        console.error('Failed to create audit log:', auditError);
-        console.error('Admin data:', req.admin);
+        // Failed to create audit log
       }
     };
 
@@ -760,15 +724,13 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
       .single();
 
     if (findError || !existingApp) {
-      console.log('Application not found:', { id, findError });
       return res.status(404).json({ 
         success: false, 
         error: 'Lawyer application not found' 
       });
     }
 
-    console.log('Found application:', existingApp);
-
+    
     const updateData = {
       status,
       updated_at: new Date().toISOString(),
@@ -788,8 +750,7 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
       .single();
 
     if (error || !application) {
-      console.log('Update failed:', { error, application });
-      return res.status(404).json({ 
+            return res.status(404).json({ 
         success: false, 
         error: 'Lawyer application update failed: ' + (error?.message || 'Unknown error')
       });
@@ -807,8 +768,7 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
         .eq('id', application.user_id);
 
       if (userError) {
-        console.error('Failed to update user pending_lawyer flag:', userError);
-        // Don't fail the whole operation, just log the error
+                // Don't fail the whole operation, just log the error
       }
     } else if (status === 'rejected') {
       // Get current user data to check rejection count
@@ -819,7 +779,7 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
         .single();
 
       if (getUserError) {
-        console.error('Failed to get user data for rejection tracking:', getUserError);
+        // Failed to get user data for rejection tracking
       } else {
         const currentRejectCount = userData.reject_count || 0;
         const newRejectCount = currentRejectCount + 1;
@@ -838,9 +798,7 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
           .eq('id', application.user_id);
 
         if (userError) {
-          console.error('Failed to update user rejection data:', userError);
-        } else {
-          console.log(`User ${application.user_id} rejected. Count: ${newRejectCount}, Blocked: ${isBlocked}`);
+          // Failed to update user for resubmission
         }
       }
     } else if (status === 'resubmission') {
@@ -853,8 +811,7 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
         .eq('id', application.user_id);
 
       if (userError) {
-        console.error('Failed to update user for resubmission:', userError);
-      }
+              }
     }
 
     // Create audit log for the status change
@@ -886,7 +843,6 @@ router.patch('/:id/status', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update lawyer application status error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -940,7 +896,6 @@ router.get('/stats/overview', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get lawyer applications stats error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -953,8 +908,7 @@ router.post('/signed-url', authenticateAdmin, async (req, res) => {
   try {
     const { bucket, filePath } = req.body;
 
-    console.log('Signed URL request:', { bucket, filePath });
-
+    
     if (!bucket || !filePath) {
       return res.status(400).json({
         success: false,
@@ -979,7 +933,7 @@ router.post('/signed-url', authenticateAdmin, async (req, res) => {
       });
 
     if (fileError) {
-      console.error('Error checking file existence:', fileError);
+      // Error checking file existence
     }
 
     // Check if file exists in the bucket
@@ -988,7 +942,6 @@ router.post('/signed-url', authenticateAdmin, async (req, res) => {
     );
 
     if (!fileExists) {
-      console.log('File not found in storage:', { bucket, filePath, availableFiles: fileData?.map(f => f.name) });
       return res.status(404).json({
         success: false,
         error: 'File not found in storage',
@@ -1006,22 +959,19 @@ router.post('/signed-url', authenticateAdmin, async (req, res) => {
       .createSignedUrl(filePath, 3600); // 3600 seconds = 1 hour
 
     if (error) {
-      console.error('Error creating signed URL:', error);
       return res.status(500).json({
         success: false,
         error: 'Failed to create signed URL: ' + error.message
       });
     }
 
-    console.log('Signed URL created successfully for:', filePath);
-
+    
     res.json({
       success: true,
       signedUrl: data.signedUrl
     });
 
   } catch (error) {
-    console.error('Signed URL endpoint error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -1050,7 +1000,6 @@ router.get('/:id/audit-logs', authenticateAdmin, async (req, res) => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Get audit logs error:', error);
       return res.status(500).json({ 
         success: false, 
         error: 'Failed to fetch audit logs: ' + error.message 
@@ -1076,7 +1025,6 @@ router.get('/:id/audit-logs', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get audit logs error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
@@ -1092,13 +1040,13 @@ router.post('/:id/audit-logs', authenticateAdmin, async (req, res) => {
     const adminId = req.admin.id; // From authenticateAdmin middleware
 
     // Debug: Log what we're receiving
-    console.log('PDF Audit Log Debug - Received data:', {
+    const debugData = {
       applicationId: id,
       action,
       metadata,
       adminId,
       adminInfo: req.admin
-    });
+    };
 
     // Validate required fields
     if (!action) {
@@ -1133,8 +1081,7 @@ router.post('/:id/audit-logs', authenticateAdmin, async (req, res) => {
       created_at: new Date().toISOString()
     };
 
-    console.log('PDF Audit Log Debug - Inserting data:', auditLogData);
-
+    
     const { data: auditLog, error: auditError } = await supabaseAdmin
       .from('admin_audit_logs')
       .insert(auditLogData)
@@ -1149,15 +1096,13 @@ router.post('/:id/audit-logs', authenticateAdmin, async (req, res) => {
       .single();
 
     if (auditError) {
-      console.error('Create audit log error:', auditError);
       return res.status(500).json({
         success: false,
         error: 'Failed to create audit log: ' + auditError.message
       });
     }
 
-    console.log('PDF Audit Log Debug - Stored audit log:', auditLog);
-
+    
     // Transform response for frontend
     const transformedLog = {
       id: auditLog.id,
@@ -1171,10 +1116,8 @@ router.post('/:id/audit-logs', authenticateAdmin, async (req, res) => {
       created_at: auditLog.created_at
     };
 
-    console.log('PDF Audit Log Debug - Transformed response:', transformedLog);
-
-    console.log(`Audit log created: ${action} by ${auditLog.admin?.full_name} for application ${id}`);
-
+    
+    
     res.status(201).json({
       success: true,
       data: transformedLog,
@@ -1182,7 +1125,6 @@ router.post('/:id/audit-logs', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Create audit log error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -1230,7 +1172,6 @@ router.patch('/:id/archive', authenticateAdmin, async (req, res) => {
       .single();
 
     if (updateError) {
-      console.error('Archive update error:', updateError);
       return res.status(500).json({
         success: false,
         error: 'Failed to update archive status: ' + updateError.message
@@ -1262,14 +1203,13 @@ router.patch('/:id/archive', authenticateAdmin, async (req, res) => {
         .insert(auditData);
 
       if (auditError) {
-        console.error('Audit log error:', auditError);
+        // Audit log error
       }
     } catch (auditError) {
-      console.error('Failed to create audit log:', auditError);
-    }
+        // Failed to create audit log
+      }
 
-    console.log(`Application ${archived ? 'archived' : 'unarchived'}: ${id} by admin ${adminId}`);
-
+    
     res.json({
       success: true,
       data: updatedApp,
@@ -1277,7 +1217,6 @@ router.patch('/:id/archive', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Archive operation error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'

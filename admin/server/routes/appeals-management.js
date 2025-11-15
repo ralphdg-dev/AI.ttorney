@@ -24,10 +24,10 @@ const logAuditEvent = async (
     });
 
     if (error) {
-      console.error("Audit log error:", error);
+      // Audit log error
     }
   } catch (error) {
-    console.error("Failed to log audit event:", error);
+    // Failed to log audit event
   }
 };
 
@@ -66,7 +66,6 @@ router.get("/", async (req, res) => {
       .range(offset, offset + limit - 1);
 
     if (appealsError) {
-      console.error("Error fetching appeals:", appealsError);
       return res
         .status(500)
         .json({ success: false, error: appealsError.message });
@@ -77,7 +76,7 @@ router.get("/", async (req, res) => {
       .select("id", { count: "exact", head: true });
 
     if (countError) {
-      console.error("Error counting appeals:", countError);
+      // Error counting appeals
       return res
         .status(500)
         .json({ success: false, error: countError.message });
@@ -121,7 +120,6 @@ router.get("/", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error in get appeals route:", error);
     res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
@@ -159,7 +157,6 @@ router.get("/:id", async (req, res) => {
       .single();
 
     if (error) {
-      console.error("Error fetching appeal:", error);
       return res.status(500).json({ success: false, error: error.message });
     }
 
@@ -169,7 +166,6 @@ router.get("/:id", async (req, res) => {
 
     res.json({ success: true, data });
   } catch (error) {
-    console.error("Error in get appeal by id:", error);
     res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
@@ -312,10 +308,6 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
 
           if (notifyApproveError) throw notifyApproveError;
         } catch (liftErr) {
-          console.error(
-            "Error lifting suspension after appeal approval:",
-            liftErr
-          );
           return res.status(500).json({
             success: false,
             error: "Failed to lift suspension after approval",
@@ -363,10 +355,6 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
 
           if (notifyError) throw notifyError;
         } catch (notifyErr) {
-          console.error(
-            "Error notifying user about rejected appeal:",
-            notifyErr
-          );
           return res.status(500).json({
             success: false,
             error: "Failed to notify user about rejected appeal",
@@ -403,7 +391,6 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
       data: responseData,
     });
   } catch (error) {
-    console.error("Error in patch appeal:", error);
     res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
@@ -468,7 +455,6 @@ router.delete("/:id", authenticateAdmin, async (req, res) => {
 
     res.json({ success: true, message: "Appeal deleted successfully" });
   } catch (error) {
-    console.error("Error in delete appeal:", error);
     res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
@@ -544,7 +530,6 @@ router.get("/:id/audit-logs", authenticateAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get appeal audit logs error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -623,7 +608,6 @@ router.get("/:id/recent-activity", authenticateAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get appeal recent activity error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -670,7 +654,6 @@ router.post("/audit-log", authenticateAdmin, async (req, res) => {
       .single();
 
     if (error) {
-      console.error("Error creating audit log:", error);
       return res.status(500).json({
         success: false,
         error: "Failed to create audit log: " + error.message,
@@ -683,7 +666,6 @@ router.post("/audit-log", authenticateAdmin, async (req, res) => {
       data: auditLog,
     });
   } catch (error) {
-    console.error("Error in audit log route:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -744,7 +726,6 @@ router.post("/:id/view", authenticateAdmin, async (req, res) => {
       message: "View action logged successfully",
     });
   } catch (error) {
-    console.error("Error logging view action:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",

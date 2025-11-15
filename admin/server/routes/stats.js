@@ -42,7 +42,6 @@ router.get("/user-count", async (req, res) => {
       up,
     });
   } catch (error) {
-    console.error("Error fetching user count:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -76,7 +75,6 @@ router.get("/lawyer-count", async (req, res) => {
       up,
     });
   } catch (error) {
-    console.error("Error fetching lawyer count:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -118,7 +116,6 @@ router.get("/weekly-forum-posts", async (req, res) => {
       up,
     });
   } catch (error) {
-    console.error("Error fetching weekly forum posts:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -160,7 +157,6 @@ router.get("/consultations-count", async (req, res) => {
       up,
     });
   } catch (error) {
-    console.error("Error fetching consultations count:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -192,7 +188,6 @@ router.get("/lawyer-applications-monthly", async (req, res) => {
 
     res.json(chartData);
   } catch (error) {
-    console.error("Error fetching monthly lawyer applications:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -230,7 +225,6 @@ router.get("/lawyer-applications-status-monthly", async (req, res) => {
 
     res.json(chartData);
   } catch (error) {
-    console.error("Error fetching status-based lawyer applications:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -264,7 +258,6 @@ router.get("/forum-reports-last-30-days", async (req, res) => {
 
     res.json(chartData);
   } catch (error) {
-    console.error("Error fetching forum reports for last 30 days:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -304,7 +297,6 @@ router.get("/forum-posts-by-category", async (req, res) => {
 
     res.json(chartData);
   } catch (error) {
-    console.error("Error fetching forum posts by category:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -344,7 +336,6 @@ router.get("/terms-by-category", async (req, res) => {
 
     res.json(chartData);
   } catch (error) {
-    console.error("Error fetching terms by category:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -387,7 +378,6 @@ router.get("/articles-by-category", async (req, res) => {
 
     res.json(chartData);
   } catch (error) {
-    console.error("Error fetching articles by category:", error);
     res.status(500).json({ error: error.message });
   }
 });

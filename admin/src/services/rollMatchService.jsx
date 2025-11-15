@@ -19,7 +19,6 @@ class RollMatchService {
 
       return this.lawyersList;
     } catch (error) {
-      console.error("Error loading lawyers list:", error);
       this.lawyersList = [];
       this.initialized = true;
       return this.lawyersList;
@@ -60,7 +59,6 @@ class RollMatchService {
       const day = date.getDate().toString().padStart(2, "0");
       return `${year}-${month}-${day}`;
     } catch (error) {
-      console.error(`Error parsing date: ${dateString}`, error);
       return null;
     }
   }

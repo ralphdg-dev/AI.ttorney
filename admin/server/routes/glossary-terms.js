@@ -24,10 +24,10 @@ const logAuditEvent = async (
     });
 
     if (error) {
-      console.error("Audit log error:", error);
+      // Audit log error
     }
   } catch (error) {
-    console.error("Failed to log audit event:", error);
+    // Failed to log audit event
   }
 };
 
@@ -114,7 +114,6 @@ router.get("/", authenticateAdmin, async (req, res) => {
       await Promise.all([query.range(offset, offset + limit - 1), countQuery]);
 
     if (termsError) {
-      console.error("Error fetching glossary terms:", termsError);
       return res.status(500).json({
         success: false,
         error: "Failed to fetch glossary terms: " + termsError.message,
@@ -122,7 +121,6 @@ router.get("/", authenticateAdmin, async (req, res) => {
     }
 
     if (countError) {
-      console.error("Error counting glossary terms:", countError);
       return res.status(500).json({
         success: false,
         error: "Failed to count glossary terms: " + countError.message,
@@ -144,7 +142,6 @@ router.get("/", authenticateAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error in glossary terms route:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -171,8 +168,7 @@ router.get("/:id", authenticateAdmin, async (req, res) => {
         });
       }
 
-      console.error("Error fetching glossary term:", error);
-      return res.status(500).json({
+    return res.status(500).json({
         success: false,
         error: "Failed to fetch glossary term: " + error.message,
       });
@@ -183,7 +179,6 @@ router.get("/:id", authenticateAdmin, async (req, res) => {
       data: term,
     });
   } catch (error) {
-    console.error("Error in get glossary term route:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -253,7 +248,6 @@ router.post("/", authenticateAdmin, async (req, res) => {
       .single();
 
     if (error) {
-      console.error("Error creating glossary term:", error);
       return res.status(500).json({
         success: false,
         error: "Failed to create glossary term: " + error.message,
@@ -284,7 +278,6 @@ router.post("/", authenticateAdmin, async (req, res) => {
       data: newTerm,
     });
   } catch (error) {
-    console.error("Error in create glossary term route:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -436,7 +429,6 @@ router.post("/bulk", authenticateAdmin, async (req, res) => {
       errors: results.errors.length > 0 ? results.errors : undefined,
     });
   } catch (error) {
-    console.error("Error in bulk create glossary terms route:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error: " + error.message,
@@ -479,8 +471,7 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
         });
       }
 
-      console.error("Error fetching glossary term:", fetchError);
-      return res.status(500).json({
+    return res.status(500).json({
         success: false,
         error: "Failed to fetch glossary term: " + fetchError.message,
       });
@@ -533,7 +524,6 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
       .single();
 
     if (updateError) {
-      console.error("Error updating glossary term:", updateError);
       return res.status(500).json({
         success: false,
         error: "Failed to update glossary term: " + updateError.message,
@@ -552,8 +542,7 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
           });
         }
       } catch (parseError) {
-        console.error("Error parsing audit logs:", parseError);
-        // Fallback to individual field change detection
+        // Error parsing audit logs - fallback to individual field change detection
         await logIndividualFieldChanges(
           existingTerm,
           updatedTerm,
@@ -579,7 +568,6 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
       data: updatedTerm,
     });
   } catch (error) {
-    console.error("Error in update glossary term route:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -760,8 +748,7 @@ router.delete("/:id", authenticateAdmin, async (req, res) => {
         });
       }
 
-      console.error("Error fetching glossary term:", fetchError);
-      return res.status(500).json({
+    return res.status(500).json({
         success: false,
         error: "Failed to fetch glossary term: " + fetchError.message,
       });
@@ -773,7 +760,6 @@ router.delete("/:id", authenticateAdmin, async (req, res) => {
       .eq("id", id);
 
     if (deleteError) {
-      console.error("Error deleting glossary term:", deleteError);
       return res.status(500).json({
         success: false,
         error: "Failed to delete glossary term: " + deleteError.message,
@@ -801,7 +787,6 @@ router.delete("/:id", authenticateAdmin, async (req, res) => {
       message: "Glossary term archived successfully",
     });
   } catch (error) {
-    console.error("Error in delete glossary term route:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -831,8 +816,7 @@ router.patch("/:id/restore", authenticateAdmin, async (req, res) => {
         });
       }
 
-      console.error("Error fetching glossary term:", fetchError);
-      return res.status(500).json({
+    return res.status(500).json({
         success: false,
         error: "Failed to fetch glossary term: " + fetchError.message,
       });
@@ -851,7 +835,6 @@ router.patch("/:id/restore", authenticateAdmin, async (req, res) => {
       .single();
 
     if (restoreError) {
-      console.error("Error restoring glossary term:", restoreError);
       return res.status(500).json({
         success: false,
         error: "Failed to restore glossary term: " + restoreError.message,
@@ -879,7 +862,6 @@ router.patch("/:id/restore", authenticateAdmin, async (req, res) => {
       data: restoredTerm,
     });
   } catch (error) {
-    console.error("Error in restore glossary term route:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -927,7 +909,6 @@ router.post("/:id/view", authenticateAdmin, async (req, res) => {
       message: "View action logged successfully",
     });
   } catch (error) {
-    console.error("Error logging view action:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -1017,7 +998,6 @@ router.get("/:id/audit-logs", authenticateAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get term audit logs error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -1091,7 +1071,6 @@ router.get("/:id/recent-activity", authenticateAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get term recent activity error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -1133,7 +1112,6 @@ router.post("/audit-log", authenticateAdmin, async (req, res) => {
       .single();
 
     if (error) {
-      console.error("Error creating audit log:", error);
       return res.status(500).json({
         success: false,
         error: "Failed to create audit log: " + error.message,
@@ -1146,7 +1124,6 @@ router.post("/audit-log", authenticateAdmin, async (req, res) => {
       data: auditLog,
     });
   } catch (error) {
-    console.error("Error in audit log route:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",

@@ -18,7 +18,7 @@ router.get('/health', async (req, res) => {
       await supabaseAdmin.from('user_violations').select('id').limit(1);
       tableStatus.user_violations = true;
     } catch (error) {
-      console.log('user_violations table check:', error.message);
+      // Table check failed
     }
 
     // Check user_suspensions table
@@ -26,7 +26,7 @@ router.get('/health', async (req, res) => {
       await supabaseAdmin.from('user_suspensions').select('id').limit(1);
       tableStatus.user_suspensions = true;
     } catch (error) {
-      console.log('user_suspensions table check:', error.message);
+      // Table check failed
     }
 
     // Check users table
@@ -34,7 +34,7 @@ router.get('/health', async (req, res) => {
       await supabaseAdmin.from('users').select('id').limit(1);
       tableStatus.users = true;
     } catch (error) {
-      console.log('users table check:', error.message);
+      // Table check failed
     }
 
     res.json({
@@ -45,7 +45,6 @@ router.get('/health', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Health check error:', error);
     res.status(500).json({
       success: false,
       error: 'Health check failed'
@@ -67,13 +66,6 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
       duration 
     } = req.body;
     const adminId = req.admin?.id;
-
-    console.log('=== ADMIN MODERATION ACTION ===');
-    console.log('User ID:', user_id);
-    console.log('Action:', action);
-    console.log('Duration:', duration);
-    console.log('Admin ID:', adminId);
-    console.log('Reason:', admin_reason);
 
     // Helper function to calculate end date based on duration
     const calculateEndDate = (duration) => {
@@ -300,13 +292,11 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
     // Execute database operations in transaction
     let violationResult = null;
     
-    console.log('Attempting to insert violation data:', JSON.stringify(violationData, null, 2));
-    
     // Try to refresh schema cache by making a simple query first
     try {
       await supabaseAdmin.from('user_violations').select('id').limit(1);
     } catch (schemaError) {
-      console.log('Schema refresh attempt:', schemaError.message);
+      // Schema refresh failed
     }
     
     try {
@@ -317,18 +307,17 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
         .single();
 
       if (violationError) {
-        console.error('Error creating violation record:', violationError);
         
         // Check if it's a schema cache issue
         if (violationError.code === 'PGRST204' || violationError.message.includes('schema cache')) {
-          console.warn('Schema cache issue detected, using fallback violation record');
+          // Schema cache issue detected, using fallback violation record
           violationResult = {
             id: `fallback-violation-${Date.now()}`,
             ...violationData,
             created_at: new Date().toISOString()
           };
         } else if (violationError.code === '42P01' || violationError.message.includes('relation') || violationError.message.includes('does not exist')) {
-          console.warn('user_violations table does not exist, using fallback');
+          // user_violations table does not exist, using fallback
           violationResult = {
             id: `mock-violation-${Date.now()}`,
             ...violationData,
@@ -344,7 +333,6 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
         violationResult = data;
       }
     } catch (err) {
-      console.error('Error with user_violations table:', err);
       // Create mock violation record as fallback
       violationResult = {
         id: `mock-violation-${Date.now()}`,
@@ -360,7 +348,6 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
       .eq('id', user_id);
 
     if (userUpdateError) {
-      console.error('Error updating user:', userUpdateError);
       return res.status(500).json({
         success: false,
         error: `Failed to update user: ${userUpdateError.message}`
@@ -380,13 +367,13 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
         if (suspensionError) {
           // If table doesn't exist, just log and continue
           if (suspensionError.code === '42P01' || suspensionError.message.includes('relation') || suspensionError.message.includes('does not exist')) {
-            console.warn('user_suspensions table does not exist, skipping suspension record');
+            // user_suspensions table does not exist, skipping suspension record
           } else {
-            console.error('Error creating suspension record:', suspensionError);
+            // Error creating suspension record
           }
         }
       } catch (err) {
-        console.warn('Error with user_suspensions table:', err.message);
+        // Error with user_suspensions table
       }
     }
 
@@ -409,7 +396,6 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
         .eq('id', report_id);
 
       if (reportError) {
-        console.error('Error updating report:', reportError);
         // Don't fail the request, just log the error
       }
     }
@@ -431,7 +417,7 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
         }
       });
     } catch (auditError) {
-      console.warn('Failed to log admin action:', auditError.message);
+      // Failed to log admin action
     }
 
     res.json({
@@ -448,7 +434,6 @@ router.post('/apply-action/:user_id', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Admin moderation action error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -463,8 +448,7 @@ router.get('/violations/:user_id', authenticateAdmin, async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    console.log(`Fetching violations for user: ${user_id}, page: ${page}, limit: ${limit}`);
-
+    
     const { data: violations, error } = await supabaseAdmin
       .from('user_violations')
       .select(`
@@ -482,12 +466,7 @@ router.get('/violations/:user_id', authenticateAdmin, async (req, res) => {
       .range(offset, offset + limit - 1);
 
     if (error) {
-      console.error('Supabase violations query error:', {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      });
+      // Supabase violations query error
       
       // If table doesn't exist, return empty data
       if (error.code === '42P01' || error.message.includes('relation') || error.message.includes('does not exist')) {
@@ -516,10 +495,8 @@ router.get('/violations/:user_id', authenticateAdmin, async (req, res) => {
       .eq('user_id', user_id);
 
     if (countError) {
-      console.error('Count query error:', countError);
+      // Count query error
     }
-
-    console.log(`Found ${violations?.length || 0} violations, total count: ${count || 0}`);
 
     res.json({
       success: true,
@@ -533,7 +510,6 @@ router.get('/violations/:user_id', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get violations catch error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error: ' + error.message
@@ -546,8 +522,7 @@ router.get('/suspensions/:user_id', authenticateAdmin, async (req, res) => {
   try {
     const { user_id } = req.params;
 
-    console.log(`Fetching suspensions for user: ${user_id}`);
-
+    
     const { data: suspensions, error } = await supabaseAdmin
       .from('user_suspensions')
       .select(`
@@ -568,12 +543,7 @@ router.get('/suspensions/:user_id', authenticateAdmin, async (req, res) => {
       .order('started_at', { ascending: false });
 
     if (error) {
-      console.error('Supabase suspensions query error:', {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      });
+      // Supabase suspensions query error
       
       // If table doesn't exist, return empty data
       if (error.code === '42P01' || error.message.includes('relation') || error.message.includes('does not exist')) {
@@ -589,15 +559,13 @@ router.get('/suspensions/:user_id', authenticateAdmin, async (req, res) => {
       });
     }
 
-    console.log(`Found ${suspensions?.length || 0} suspensions`);
-
+    
     res.json({
       success: true,
       data: suspensions || []
     });
 
   } catch (error) {
-    console.error('Get suspensions catch error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error: ' + error.message
@@ -670,7 +638,6 @@ router.post('/lift-suspension/:user_id', authenticateAdmin, async (req, res) => 
       .eq('status', 'active');
 
     if (suspensionUpdateError) {
-      console.error('Error updating suspension record:', suspensionUpdateError);
       // Don't fail the request
     }
 
@@ -687,7 +654,7 @@ router.post('/lift-suspension/:user_id', authenticateAdmin, async (req, res) => 
         }
       });
     } catch (auditError) {
-      console.warn('Failed to log admin action:', auditError.message);
+      // Failed to log admin action
     }
 
     res.json({
@@ -696,7 +663,6 @@ router.post('/lift-suspension/:user_id', authenticateAdmin, async (req, res) => 
     });
 
   } catch (error) {
-    console.error('Lift suspension error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -772,7 +738,6 @@ router.post('/lift-ban/:user_id', authenticateAdmin, async (req, res) => {
       .eq('suspension_type', 'permanent');
 
     if (suspensionUpdateError) {
-      console.error('Error updating ban record:', suspensionUpdateError);
       // Don't fail the request
     }
 
@@ -791,7 +756,7 @@ router.post('/lift-ban/:user_id', authenticateAdmin, async (req, res) => {
         }
       });
     } catch (auditError) {
-      console.warn('Failed to log admin action:', auditError.message);
+      // Failed to log admin action
     }
 
     res.json({
@@ -800,7 +765,6 @@ router.post('/lift-ban/:user_id', authenticateAdmin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Lift ban error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -853,11 +817,7 @@ router.post('/acknowledge-lift/:user_id/:suspension_id', authenticateAdmin, asyn
       .eq('id', suspension_id);
 
     if (updateError) {
-      console.error('Error marking suspension as acknowledged:', updateError);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to mark suspension as acknowledged'
-      });
+      // Don't fail the request
     }
 
     // Log admin action
@@ -874,7 +834,7 @@ router.post('/acknowledge-lift/:user_id/:suspension_id', authenticateAdmin, asyn
         }
       });
     } catch (auditError) {
-      console.warn('Failed to log acknowledgment action:', auditError.message);
+      // Failed to log acknowledgment action
     }
 
     res.json({
@@ -883,7 +843,6 @@ router.post('/acknowledge-lift/:user_id/:suspension_id', authenticateAdmin, asyn
     });
 
   } catch (error) {
-    console.error('Acknowledge lift error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -913,7 +872,7 @@ router.get('/unacknowledged-lifts/:user_id', authenticateAdmin, async (req, res)
       .order('lifted_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching unacknowledged lifts:', error);
+      // Error fetching unacknowledged lifts
       
       // If table doesn't exist, return empty data
       if (error.code === '42P01' || error.message.includes('relation') || error.message.includes('does not exist')) {
@@ -935,7 +894,6 @@ router.get('/unacknowledged-lifts/:user_id', authenticateAdmin, async (req, res)
     });
 
   } catch (error) {
-    console.error('Get unacknowledged lifts error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error: ' + error.message
