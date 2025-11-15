@@ -15,6 +15,7 @@ export interface User {
   full_name: string;
   role: UserRole;
   is_verified: boolean;
+  profile_photo?: string;
   pending_lawyer?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -31,6 +32,7 @@ export interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isGuestMode: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   setUser: (user: User | null) => void;
@@ -476,6 +478,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     session: authState.session,
     isLoading,
     isAuthenticated: !!authState.session && !!authState.user,
+    isGuestMode: !authState.session || !authState.user,
     signIn,
     signOut,
     setUser: setUserData,

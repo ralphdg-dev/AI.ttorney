@@ -281,39 +281,64 @@ export default function TermsScreen() {
             ) : null}
           </VStack>
 
-          {/* Prohibited Conduct / Suspension */}
+          {/* Violation Criteria and Enforcement */}
           <VStack style={{ gap: 8 }}>
             <GSText size="lg" bold style={{ color: Colors.text.head }}>
-              7. {isVerifiedLawyer ? 'Account Suspension and Termination' : 'Prohibited Conduct'}
+              7. Violation Criteria and Enforcement
             </GSText>
-            {isVerifiedLawyer ? (
-              <>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  Ai.ttorney may suspend or terminate your access if you:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Violate these Terms or IBP ethical rules</BulletPoint>
-                  <BulletPoint>Misrepresent your credentials or identity</BulletPoint>
-                  <BulletPoint>Solicit, advertise, or request payment through the Platform</BulletPoint>
-                  <BulletPoint>Engage in unprofessional or unlawful behavior</BulletPoint>
-                </VStack>
-              </>
-            ) : isRegisteredUser ? (
-              <>
-                <GSText size="md" style={{ color: Colors.text.body }}>
-                  You agree not to:
-                </GSText>
-                <VStack style={{ paddingLeft: 12 }}>
-                  <BulletPoint>Post false, abusive, or defamatory content</BulletPoint>
-                  <BulletPoint>Attempt to bypass the booking process</BulletPoint>
-                  <BulletPoint>Misuse lawyer contact details for solicitation or harassment</BulletPoint>
-                  <BulletPoint>Share AI-generated or plagiarized content in the forum</BulletPoint>
-                </VStack>
-                <GSText size="md" style={{ color: Colors.text.body, marginTop: 4 }}>
-                  Violation may result in immediate account suspension or permanent banning.
-                </GSText>
-              </>
-            ) : null}
+            <GSText size="md" style={{ color: Colors.text.body }}>
+              Ai.ttorney maintains a three-strike system for violations. Users may be suspended or banned for the following conduct:
+            </GSText>
+            <VStack style={{ paddingLeft: 12 }}>
+              <BulletPoint>Posting false, abusive, defamatory, or harassing content</BulletPoint>
+              <BulletPoint>Attempting to bypass the booking process or payment restrictions</BulletPoint>
+              <BulletPoint>Misusing lawyer contact details for solicitation or harassment</BulletPoint>
+              <BulletPoint>Sharing AI-generated or plagiarized content without attribution</BulletPoint>
+              <BulletPoint>Violating IBP ethical standards (for lawyers)</BulletPoint>
+              <BulletPoint>Misrepresenting credentials or identity</BulletPoint>
+              <BulletPoint>Engaging in fraudulent or unlawful activities</BulletPoint>
+            </VStack>
+            
+            <GSText size="md" style={{ color: Colors.text.body, marginTop: 8 }}>
+              <GSText size="md" bold style={{ color: Colors.text.body }}>Suspension Duration:</GSText>
+            </GSText>
+            <VStack style={{ paddingLeft: 12 }}>
+              <BulletPoint>First offense: 7-day temporary suspension</BulletPoint>
+              <BulletPoint>Second offense: 30-day temporary suspension</BulletPoint>
+              <BulletPoint>Third offense: 90-day temporary suspension</BulletPoint>
+              <BulletPoint>Severe violations: Immediate permanent ban at discretion</BulletPoint>
+            </VStack>
+            
+            <GSText size="md" style={{ color: Colors.text.body, marginTop: 8 }}>
+              <GSText size="md" bold style={{ color: Colors.text.body }}>Permanent Ban Conditions:</GSText>
+            </GSText>
+            <VStack style={{ paddingLeft: 12 }}>
+              <BulletPoint>Accumulation of three (3) strikes within 12 months</BulletPoint>
+              <BulletPoint>Illegal activities or threats of violence</BulletPoint>
+              <BulletPoint>Repeated harassment or hate speech</BulletPoint>
+              <BulletPoint>Fraudulent behavior or identity misrepresentation</BulletPoint>
+              <BulletPoint>Systematic violation of platform terms</BulletPoint>
+            </VStack>
+            
+            <GSText size="md" style={{ color: Colors.text.body, marginTop: 8 }}>
+              <GSText size="md" bold style={{ color: Colors.text.body }}>Appeal Process:</GSText>
+            </GSText>
+            <VStack style={{ paddingLeft: 12 }}>
+              <BulletPoint>Suspended users may submit one appeal per suspension</BulletPoint>
+              <BulletPoint>Appeals must be submitted within 7 days of suspension</BulletPoint>
+              <BulletPoint>Include detailed explanation and any supporting evidence</BulletPoint>
+              <BulletPoint>Appeals are reviewed by admin within 3-5 business days</BulletPoint>
+              <BulletPoint>Approved appeals result in immediate suspension lift</BulletPoint>
+              <BulletPoint>Rejected appeals may be resubmitted with new evidence only</BulletPoint>
+            </VStack>
+            
+            <GSText size="md" style={{ color: Colors.text.body, marginTop: 8 }}>
+              <GSText size="md" bold style={{ color: Colors.text.body }}>Strike Reset:</GSText>
+            </GSText>
+            <VStack style={{ paddingLeft: 12 }}>
+              <BulletPoint>Strikes reset to zero after 12 months of good conduct</BulletPoint>
+              <BulletPoint>Successful appeals also reset strike count to zero</BulletPoint>
+            </VStack>
           </VStack>
 
           {/* Termination */}
@@ -339,7 +364,7 @@ export default function TermsScreen() {
           {/* Modifications */}
           <VStack style={{ gap: 8 }}>
             <GSText size="lg" bold style={{ color: Colors.text.head }}>
-              {isVerifiedLawyer ? '8. Modifications' : '9. Modifications'}
+              {isVerifiedLawyer ? '9. Modifications' : '10. Modifications'}
             </GSText>
             <GSText size="md" style={{ color: Colors.text.body }}>
               Ai.ttorney may update these Terms {isVerifiedLawyer ? 'at any time' : 'periodically'}. Continued use after {isVerifiedLawyer ? 'revisions' : 'updates'} {isVerifiedLawyer ? 'means you agree to' : 'constitutes acceptance of'} the {isVerifiedLawyer ? 'updated version' : 'new Terms'}.

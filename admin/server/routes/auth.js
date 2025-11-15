@@ -242,6 +242,29 @@ router.post('/reset-password', async (req, res) => {
       return res.status(404).json({ error: 'Admin not found.' });
     }
 
+    // Prevent password reuse - check if new password matches current password
+    try {
+      const { data: authCheck, error: authCheckError } = await supabase.auth.signInWithPassword({
+        email: admin.email,
+        password: newPassword
+      });
+      
+      // Sign out immediately if sign in was successful
+      if (authCheck?.session) {
+        await supabase.auth.signOut();
+      }
+      
+      // If sign in succeeded, the new password matches the current password
+      if (!authCheckError && authCheck?.user) {
+        return res.status(400).json({ 
+          error: 'New password cannot be the same as your current password. Please choose a different password.' 
+        });
+      }
+    } catch (error) {
+      // If there's an error checking the password, continue with the reset
+      console.log('Password reuse check failed, proceeding with reset:', error.message);
+    }
+
     // Update password in Supabase Auth
     const { data: updatedUser, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(decoded.adminId, {
       password: newPassword
