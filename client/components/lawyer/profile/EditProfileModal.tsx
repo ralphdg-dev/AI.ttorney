@@ -22,6 +22,7 @@ import {
 import tw from "tailwind-react-native-classnames";
 import Colors from "../../../constants/Colors";
 import { TimeSlot } from "../../../services/lawyerProfileServices";
+import { Avatar, AvatarImage, AvatarFallbackText } from "../../../components/ui/avatar";
 
 interface ProfileData {
   name: string;
@@ -600,10 +601,20 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         <ScrollView style={tw`flex-1 p-4`} showsVerticalScrollIndicator={false}>
           <View style={tw`bg-white rounded-lg p-4 mb-4 items-center`}>
             <View style={tw`relative mb-4`}>
-              <Image
-                source={{ uri: editFormData.avatar }}
-                style={tw`w-24 h-24 rounded-full`}
-              />
+              <Avatar 
+                size="xl" 
+                style={{ 
+                  backgroundColor: '#023D7B'
+                }}
+              >
+                <AvatarFallbackText style={{ color: '#FFFFFF' }}>
+                  {editFormData.name || "User"}
+                </AvatarFallbackText>
+                <AvatarImage 
+                  source={{ uri: editFormData.avatar }} 
+                  alt="Profile"
+                />
+              </Avatar>
               <TouchableOpacity
                 style={[
                   tw`absolute -bottom-2 -right-2 w-8 h-8 rounded-full border-2 border-white flex items-center justify-center`,

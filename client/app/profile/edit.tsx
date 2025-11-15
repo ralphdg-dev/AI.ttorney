@@ -105,7 +105,7 @@ const makeApiRequest = async ({ method, endpoint, body, timeout = DEFAULT_TIMEOU
 };
 
 export default function EditProfilePage() {
-  const { user, isAuthenticated, refreshProfile } = useAuth();
+  const { user, isAuthenticated, refreshUserData } = useAuth();
   const router = useRouter();
   const toast = useToast();
   
@@ -704,8 +704,8 @@ export default function EditProfilePage() {
       const responseData = await response.json();
 
       // Refresh the user profile to get updated data
-      if (refreshProfile) {
-        await refreshProfile();
+      if (refreshUserData) {
+        await refreshUserData();
       }
 
       toast.show({
@@ -725,7 +725,7 @@ export default function EditProfilePage() {
       setNewEmail("");
 
       // Refresh context in background
-      await refreshProfile();
+      await refreshUserData();
 
       setTimeout(() => {
         if (router.canGoBack()) {
@@ -823,10 +823,10 @@ export default function EditProfilePage() {
                   size="xl" 
                   style={[
                     tw`mb-3`,
-                    { backgroundColor: Colors.background.tertiary }
+                    { backgroundColor: '#023D7B' }
                   ]}
                 >
-                  <AvatarFallbackText style={{ color: Colors.text.primary }}>
+                  <AvatarFallbackText style={{ color: '#FFFFFF' }}>
                     {editFormData.full_name || profileData.full_name || "User"}
                   </AvatarFallbackText>
                 </Avatar>

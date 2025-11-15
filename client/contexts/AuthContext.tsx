@@ -118,9 +118,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [authState.session?.access_token]);
 
-  const handleAuthStateChange = React.useCallback(async (session: Session, shouldNavigate = false) => {
+  const handleAuthStateChange = React.useCallback(async (session: any, shouldNavigate: boolean = true) => {
     try {
-      // Fetch user profile from your custom users table
+      if (!session) {
+        setAuthState({ session: null, user: null, supabaseUser: null });
+        setIsLoading(false);
+        return;
+      }
+
+      // Get user profile from database
       const { data: profile, error } = await supabase
         .from('users')
         .select('*')
@@ -129,6 +135,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Error fetching user profile:', error);
+        setAuthState({
+          session,
+          user: null,
+          supabaseUser: session.user,
+        });
         setIsLoading(false);
         return;
       }
@@ -164,27 +175,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         let applicationStatus = null;
+        if (profile.role === 'lawyer' || profile.pending_lawyer) {
+          applicationStatus = await checkLawyerApplicationStatus();
+        }
         
-        // Check lawyer application status if user has pending_lawyer flag
         if (profile.pending_lawyer) {
-          setHasRedirectedToStatus(true);
-          
-          try {
-            const statusData = await checkLawyerApplicationStatus();
-            if (statusData && statusData.has_application && statusData.application) {
-              applicationStatus = statusData.application.status;
-            }
-          } catch (err) {
-            console.error('Error fetching lawyer application status:', err);
-            applicationStatus = 'pending';
-          }
-          
-          const redirectPath = getRoleBasedRedirect(
-            profile.role, 
-            profile.is_verified, 
-            profile.pending_lawyer, 
+          // Redirect pending lawyers to application status screen
+          const redirectPath = `/lawyer-status/${
             applicationStatus || 'pending'
-          );
+          }`;
           
           console.log('🔄 Redirecting pending lawyer to:', redirectPath);
           setIsLoading(false);
@@ -202,6 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error handling auth state change:', error);
+      setAuthState({ session: null, user: null, supabaseUser: null });
       setIsLoading(false);
     }
   }, [checkLawyerApplicationStatus, checkSuspensionStatus]);

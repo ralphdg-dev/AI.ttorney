@@ -1054,7 +1054,7 @@ const ViewPost: React.FC = () => {
                     <View style={tw`flex-row items-center mt-1`}>
                       {!isAnonymous && !isDeactivated && (
                         <Text style={tw`text-sm text-gray-500 mr-2`}>
-                          @{displayUser.name?.toLowerCase().replace(/\s+/g, '')}
+                          @{post.user?.username || 'user'}
                         </Text>
                       )}
                       

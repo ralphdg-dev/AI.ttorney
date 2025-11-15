@@ -30,7 +30,6 @@ const DeactivateAccountScreen: React.FC = () => {
   const executeDeactivation = async () => {
     try {
       setIsDeactivating(true);
-      const session = useAuth().session;
       if (!session?.access_token) throw new Error('No active session');
       const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(`${apiUrl}/auth/deactivate`, {
@@ -102,7 +101,6 @@ const DeactivateAccountScreen: React.FC = () => {
 
     try {
       setIsDeactivating(true);
-      const session = useAuth().session;
       if (!session?.access_token) throw new Error('No active session');
       const apiUrl = await NetworkConfig.getBestApiUrl();
       const controller = new AbortController();
