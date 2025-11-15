@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
-import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
+import { Bookmark, MoreHorizontal, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
 import { getCategoryColors, getCategoryDisplayText } from '@/utils/categoryUtils';
 import ReportModal from '../common/ReportModal';
 import { ReportService } from '../../services/reportService';
@@ -9,7 +9,7 @@ import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePostBookmarks } from '../../contexts/PostBookmarksContext';
 import FadeInView from '../ui/FadeInView';
- 
+import UserDisplay from '../common/UserDisplay';
 import { VerifiedLawyerBadge } from '../common/VerifiedLawyerBadge';
 
 interface PostProps {
@@ -19,6 +19,7 @@ interface PostProps {
     username: string;
     avatar: string;
     isLawyer?: boolean;
+    account_status?: string;
   };
   timestamp: string;
   created_at?: string; // Raw timestamp for dynamic formatting
@@ -293,55 +294,27 @@ const Post: React.FC<PostProps> = React.memo(({
       >
         {/* User Info Row */}
         <View style={styles.userRow}>
-          {isAnonymous ? (
-            <View style={[styles.avatar, styles.anonymousAvatar]}>
-              <User size={20} color="#6B7280" />
-            </View>
-          ) : user.avatar && !user.avatar.includes('flaticon') ? (
-            <Image 
-              source={{ uri: user.avatar }} 
-              style={styles.avatar}
-            />
-          ) : (
-            <View style={[styles.avatar, { backgroundColor: Colors.primary.blue, justifyContent: 'center', alignItems: 'center' }]}>
-              <Text style={{ color: 'white', fontWeight: '600', fontSize: 14 }}>
-                {getInitials(user.name)}
-              </Text>
-            </View>
-          )}
+          <UserDisplay
+            user={{
+              name: user.name,
+              username: user.username,
+              avatar: user.avatar,
+              isLawyer: user.isLawyer,
+              account_status: user.account_status
+            }}
+            size="medium"
+            showVerifiedBadge={true}
+          />
           
           <View style={styles.userInfo}>
-            {/* User Name and Category Row */}
-            <View style={styles.userNameRow}>
-              <Text style={styles.userName}>{user.name || 'User'}</Text>
-
-              {/* Verified Lawyer Badge (unified across app) */}
-              {!isAnonymous && user?.isLawyer && (
-                <View style={{ marginRight: 6 }}>
-                  <VerifiedLawyerBadge size="sm" />
-                </View>
-              )}
-              
-              {/* Category Badge */}
-              <View style={[styles.categoryBadge, { 
-                backgroundColor: categoryColors.bg,
-                borderColor: categoryColors.border 
-              }]}>
-                <Text style={[styles.categoryText, { color: categoryColors.text }]}>
-                  {displayText}
-                </Text>
-              </View>
-            </View>
-            
-            {/* User Handle and Timestamp Row */}
-            <View style={styles.userMetaRow}>
-              {!isAnonymous && (
-                <>
-                  <Text style={styles.userHandle}>@{user.username || 'user'}</Text>
-                  <Text style={styles.metaSeparator}> • </Text>
-                </>
-              )}
-              <Text style={styles.timestamp}>{displayTime}</Text>
+            {/* Category Badge */}
+            <View style={[styles.categoryBadge, { 
+              backgroundColor: categoryColors.bg,
+              borderColor: categoryColors.border 
+            }]}>
+              <Text style={[styles.categoryText, { color: categoryColors.text }]}>
+                {displayText}
+              </Text>
             </View>
           </View>
           

@@ -6,6 +6,8 @@ from middleware.auth import get_current_user
 from pydantic import BaseModel
 from typing import Dict, Any
 import logging
+from supabase import create_client
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -239,4 +241,62 @@ async def select_role(request: RoleSelectionRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update role"
+        )
+
+@router.patch("/reactivate", response_model=Dict[str, Any])
+async def reactivate_account(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Reactivate a deactivated account"""
+    try:
+        profile = current_user.get("profile")
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User profile not found"
+            )
+        
+        user_id = profile.get("id")
+        account_status = profile.get("account_status")
+        
+        if account_status != "deactivated":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Account is not deactivated and cannot be reactivated"
+            )
+        
+        # Initialize Supabase client
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        
+        if not supabase_url or not supabase_key:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database configuration missing"
+            )
+        
+        supabase = create_client(supabase_url, supabase_key)
+        
+        # Update account status to active
+        result = supabase.table("users").update({"account_status": "active"}).eq("id", user_id).execute()
+        
+        if result.data is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to reactivate account"
+            )
+        
+        logger.info(f"✅ Account reactivated successfully: {user_id[:8]}...")
+        
+        return {
+            "success": True,
+            "message": "Account reactivated successfully",
+            "account_status": "active"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Reactivate account error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reactivate account"
         )

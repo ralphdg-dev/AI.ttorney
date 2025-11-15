@@ -22,7 +22,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ModerationProvider } from "../contexts/ModerationContext";
 import { NotificationProvider } from "../contexts/NotificationContext";
 import { SidebarProvider } from "../components/AppSidebar";
-// import AuthGuard from "../components/auth/AuthGuard";
+import AuthGuard from "../components/auth/AuthGuard";
 import { SuspensionGuard } from "../components/SuspensionGuard";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 import NoInternetModal from "../components/common/NoInternetModal";
@@ -79,15 +79,16 @@ function AppContent() {
                     <ConsultationsProvider>
                       <ErrorBoundary fallbackRoute="/home">
                         <ForumCacheProvider>
-                          {/* Temporarily removed AuthGuard to fix crashing */}
-                          <SuspensionGuard>
-                            <RouteErrorBoundary>
-                              <SidebarProvider>
+                          <AuthGuard>
+                            <SuspensionGuard>
+                              <RouteErrorBoundary>
+                                <SidebarProvider>
                                   <Stack screenOptions={{ headerShown: false }}>
                                     <Stack.Screen name="index" options={{ headerShown: false }} />
                                     <Stack.Screen name="login" options={{ headerShown: false }} />
                                     <Stack.Screen name="role-selection" options={{ headerShown: false }} />
                                     <Stack.Screen name="banned" options={{ headerShown: false }} />
+                                    <Stack.Screen name="deactivated" options={{ headerShown: false }} />
                                     <Stack.Screen name="lawyer/index" options={{ headerShown: false }} />
                                     <Stack.Screen name="lawyer/forum" options={{ headerShown: false }} />
                                     <Stack.Screen name="lawyer/consult" options={{ headerShown: false }} />
@@ -103,9 +104,10 @@ function AppContent() {
                                     <Stack.Screen name="help" options={{ headerShown: false, title: "Help" }} />
                                     <Stack.Screen name="profile" options={{ headerShown: false }} />
                                   </Stack>
-                              </SidebarProvider>
-                            </RouteErrorBoundary>
-                          </SuspensionGuard>
+                                </SidebarProvider>
+                              </RouteErrorBoundary>
+                            </SuspensionGuard>
+                          </AuthGuard>
                         {/* </AuthGuard> */}
                         </ForumCacheProvider>
                       </ErrorBoundary>

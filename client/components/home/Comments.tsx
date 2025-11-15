@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TextInput, FlatList, ListRenderItem } from 'react-native';
-import { Send, User } from 'lucide-react-native';
+import { Send } from 'lucide-react-native';
 import Colors from '../../constants/Colors';
 import { useAuth } from '../../contexts/AuthContext';
 import Card from '../ui/Card';
@@ -8,6 +8,7 @@ import Button from '../ui/Button';
 import FadeInView from '../ui/FadeInView';
 import { SkeletonCard } from '../ui/SkeletonLoader';
 import { VerifiedLawyerBadge } from '../common/VerifiedLawyerBadge';
+import UserDisplay from '../common/UserDisplay';
 import { useOptimizedList } from '../../hooks/useOptimizedList';
 
 interface Comment {
@@ -19,6 +20,7 @@ interface Comment {
     username: string;
     avatar: string;
     isLawyer?: boolean;
+    account_status?: string;
   };
   is_anonymous?: boolean;
 }
@@ -64,25 +66,18 @@ const Comments: React.FC<CommentsProps> = React.memo(({
     <FadeInView delay={index * 30} key={item.id}>
       <Card variant="default" padding="medium" style={styles.commentCard}>
         <View style={styles.commentHeader}>
-          <View style={styles.commentAvatar}>
-            <User size={16} color={Colors.text.secondary} />
-          </View>
-          <View style={styles.commentUserInfo}>
-            <View style={styles.commentUserNameRow}>
-              <Text style={styles.commentUserName}>
-                {item.is_anonymous ? 'Anonymous' : (item.user?.name || 'Anonymous')}
-              </Text>
-              {!item.is_anonymous && (
-                <Text style={styles.commentUserHandle}>
-                  @{item.user?.username || 'user'}
-                </Text>
-              )}
-            </View>
-            {item.user?.isLawyer && (
-              <View style={{ marginTop: 2, marginBottom: 2 }}>
-                <VerifiedLawyerBadge size="sm" />
-              </View>
-            )}
+          <UserDisplay
+            user={item.is_anonymous ? {
+              name: 'Anonymous',
+              username: 'anonymous',
+              avatar: '',
+              account_status: 'active'
+            } : item.user}
+            size="small"
+            showVerifiedBadge={true}
+          />
+          
+          <View style={styles.commentMeta}>
             <Text style={styles.commentTimestamp}>
               {new Date(item.created_at).toLocaleDateString()}
             </Text>
@@ -177,13 +172,13 @@ const Comments: React.FC<CommentsProps> = React.memo(({
   );
 });
 
-const styles = {
+const styles = StyleSheet.create({
   container: {
-    marginTop: 24,
+    marginTop: 16,
   },
   title: {
     fontSize: 18,
-    fontWeight: '600' as const,
+    fontWeight: '600',
     color: Colors.text.primary,
     marginBottom: 16,
   },
@@ -192,45 +187,29 @@ const styles = {
   },
   commentInput: {
     minHeight: 80,
-    fontSize: 14,
+    fontSize: 16,
     color: Colors.text.primary,
-    textAlignVertical: 'top' as const,
+    textAlignVertical: 'top',
     marginBottom: 12,
   },
   inputActions: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'space-between' as const,
-  },
-  characterCount: {
-    fontSize: 12,
-    color: Colors.text.tertiary,
-  },
-  characterCountExceeded: {
-    color: Colors.status.error,
-  },
-  commentsList: {
-    flex: 1,
-  },
-  commentsListContent: {
-    paddingBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   commentCard: {
     marginBottom: 12,
+    backgroundColor: Colors.background.secondary,
   },
   commentHeader: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 8,
   },
-  commentAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.background.secondary,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    marginRight: 12,
+  commentMeta: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   commentUserInfo: {
     flex: 1,
@@ -274,7 +253,7 @@ const styles = {
     height: 80,
     marginBottom: 12,
   },
-};
+});
 
 Comments.displayName = 'Comments';
 
