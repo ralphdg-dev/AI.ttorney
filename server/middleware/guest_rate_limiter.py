@@ -92,7 +92,7 @@ class GuestRateLimiter:
     
     @staticmethod
     async def validate_guest_request(
-        request: Request,
+        request: Optional[Request] = None,
         session_id: Optional[str] = None,
         client_prompt_count: Optional[int] = None
     ) -> Dict:
@@ -106,17 +106,19 @@ class GuestRateLimiter:
         
         Returns: {"allowed": bool, "server_count": int, "remaining": int, ...}
         """
-        ip = request.client.host if request.client else "unknown"
+        ip = request.client.host if request and request.client else "unknown"
         
-        # STEP 1: IP Rate Limiting
-        ip_allowed, ip_reset_seconds = GuestRateLimiter.check_ip_rate_limit(ip)
-        if not ip_allowed:
-            return {
-                "allowed": False,
-                "reason": "ip_rate_limit",
-                "reset_seconds": ip_reset_seconds,
-                "message": GuestErrorMessages.ip_rate_limit(ip_reset_seconds // 60)
-            }
+        # STEP 1: IP rate limiting (skip if no Request object)
+        if request:
+            ip_allowed, ip_seconds_left = GuestRateLimiter.check_ip_rate_limit(ip)
+            if not ip_allowed:
+                return {
+                    "allowed": False,
+                    "reason": "ip_rate_limit",
+                    "message": GuestErrorMessages.IP_RATE_LIMIT,
+                    "seconds_left": ip_seconds_left,
+                    "remaining": 0
+                }
         
         # STEP 2: Session Validation
         if not session_id:
@@ -139,11 +141,23 @@ class GuestRateLimiter:
         # Get server-side session data
         session_data = GUEST_SESSIONS.get(session_id)
         if not session_data:
-            # Session not found - might be expired or tampered
+            # Session not found - server was likely restarted
+            # Create new session to provide seamless experience
+            print(f"🔄 Session {session_id} not found (server restart). Creating new session.")
+            new_session_id = GuestRateLimiter.generate_session_id()
+            GUEST_SESSIONS[new_session_id] = {
+                "count": 0,
+                "created_at": time.time(),
+                "ip": ip
+            }
+            
             return {
-                "allowed": False,
-                "reason": "session_not_found",
-                "message": GuestErrorMessages.session_not_found()
+                "allowed": True,
+                "session_id": new_session_id,
+                "server_count": 0,
+                "remaining": GUEST_PROMPT_LIMIT,
+                "reset_time": int(time.time() + SESSION_EXPIRY_HOURS * 3600),
+                "message": "Session refreshed due to server restart"
             }
         
         # STEP 3: Check session expiry

@@ -6,7 +6,6 @@ const testServerConnection = async () => {
   try {
     const response = await fetch("http://localhost:5001/health");
     const data = await response.json();
-    console.log("Server health check:", data);
     return true;
   } catch (error) {
     console.error("Server connection test failed:", error);
@@ -23,16 +22,7 @@ class ForumManagementService {
       localStorage.getItem("access_token") ||
       localStorage.getItem("authToken");
 
-    console.log("=== AUTH DEBUG ===");
-    console.log("Checking localStorage keys:");
-    console.log("- admin_token:", !!localStorage.getItem("admin_token"));
-    console.log("- token:", !!localStorage.getItem("token"));
-    console.log("- access_token:", !!localStorage.getItem("access_token"));
-    console.log("- authToken:", !!localStorage.getItem("authToken"));
-    console.log("Selected token found:", !!token);
     if (token) {
-      console.log("Token length:", token.length);
-      console.log("Token preview:", token.substring(0, 20) + "...");
     }
 
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -63,9 +53,6 @@ class ForumManagementService {
         sort_order,
       });
 
-      console.log("=== FETCHING FORUM POSTS ===");
-      console.log("Query params:", params);
-      console.log("URL:", `${API_BASE_URL}/forum/posts?${queryParams}`);
 
       const response = await fetch(
         `${API_BASE_URL}/forum/posts?${queryParams}`,
@@ -84,12 +71,7 @@ class ForumManagementService {
         throw new Error(data.error || "Failed to fetch forum posts");
       }
 
-      console.log("Forum posts response:", {
-        success: data.success,
-        count: data.data?.length || 0,
-        pagination: data.pagination,
-        sampleIds: data.data?.slice(0, 3).map(p => ({ id: p.id, content: p.content?.substring(0, 30) })) || []
-      });
+      return data;
 
       // Validate that all returned posts have valid IDs
       if (data.data) {
@@ -99,7 +81,6 @@ class ForumManagementService {
         }
         
         // Log all post IDs for debugging
-        console.log("All post IDs returned:", data.data.map(p => p.id));
       }
 
       return data;
@@ -136,16 +117,10 @@ class ForumManagementService {
   // Moderate a forum post (delete, flag, or restore)
   async moderatePost(id, action, reason = "") {
     try {
-      console.log("=== MODERATION ATTEMPT ===");
-      console.log("Post ID:", id);
-      console.log("Action:", action);
-      console.log("Reason:", reason);
 
       // Check if post exists first
-      console.log("=== CHECKING POST EXISTENCE ===");
       try {
         const existsCheck = await this.checkPostExists(id);
-        console.log("Post existence check result:", existsCheck);
         
         if (!existsCheck.exists) {
           throw new Error(`Post with ID ${id} does not exist in the database. It may have been deleted or the ID is incorrect.`);
@@ -162,14 +137,6 @@ class ForumManagementService {
       };
       const body = { action, reason };
 
-      console.log("=== MODERATION DEBUG ===");
-      console.log("URL:", url);
-      console.log("Method: PATCH");
-      console.log("Headers:", headers);
-      console.log("Body:", body);
-      console.log("Post ID:", id, "Type:", typeof id);
-      console.log("Action:", action);
-      console.log("API_BASE_URL:", API_BASE_URL);
 
       const response = await fetch(url, {
         method: "PATCH",
@@ -177,18 +144,13 @@ class ForumManagementService {
         body: JSON.stringify(body),
       });
 
-      console.log("Response status:", response.status);
-      console.log("Response ok:", response.ok);
-      console.log("Response headers:", Object.fromEntries(response.headers.entries()));
 
       let data;
       try {
         data = await response.json();
-        console.log("Response data:", data);
-      } catch (jsonError) {
+        } catch (jsonError) {
         console.error("Failed to parse JSON response:", jsonError);
         const textResponse = await response.text();
-        console.log("Raw response text:", textResponse);
         throw new Error(`Invalid JSON response: ${jsonError.message}`);
       }
 
@@ -198,7 +160,6 @@ class ForumManagementService {
         throw new Error(data.error || `Failed to ${action} post`);
       }
 
-      console.log("Moderation successful:", data);
       return data;
     } catch (error) {
       console.error(`Moderate post (${action}) error:`, error);
@@ -225,7 +186,6 @@ class ForumManagementService {
   async getReportedReplies(params = {}) {
     try {
       // First test server connectivity
-      console.log("Testing server connectivity...");
       const serverOnline = await testServerConnection();
       if (!serverOnline) {
         throw new Error(
@@ -257,17 +217,12 @@ class ForumManagementService {
         ...this.getAuthHeader(),
       };
 
-      console.log("API_BASE_URL:", API_BASE_URL);
-      console.log("Fetching reported replies from:", url);
-      console.log("Request headers:", headers);
-
       let response;
       try {
         response = await fetch(url, {
           method: "GET",
           headers,
         });
-        console.log("Fetch completed successfully");
       } catch (fetchError) {
         console.error("Fetch failed:", fetchError);
         throw new Error(
@@ -275,14 +230,11 @@ class ForumManagementService {
         );
       }
 
-      console.log("Response status:", response.status);
-      console.log("Response ok:", response.ok);
 
       let data;
       try {
         data = await response.json();
-        console.log("Response data:", data);
-      } catch (jsonError) {
+        } catch (jsonError) {
         console.error("JSON parse error:", jsonError);
         throw new Error(`Invalid JSON response: ${jsonError.message}`);
       }
@@ -305,7 +257,6 @@ class ForumManagementService {
   async getReportedPosts(params = {}) {
     try {
       // First test server connectivity
-      console.log("Testing server connectivity...");
       const serverOnline = await testServerConnection();
       if (!serverOnline) {
         throw new Error(
@@ -337,9 +288,6 @@ class ForumManagementService {
         ...this.getAuthHeader(),
       };
 
-      console.log("API_BASE_URL:", API_BASE_URL);
-      console.log("Fetching reported posts from:", url);
-      console.log("Request headers:", headers);
 
       let response;
       try {
@@ -347,7 +295,6 @@ class ForumManagementService {
           method: "GET",
           headers,
         });
-        console.log("Fetch completed successfully");
       } catch (fetchError) {
         console.error("Fetch failed:", fetchError);
         throw new Error(
@@ -355,14 +302,11 @@ class ForumManagementService {
         );
       }
 
-      console.log("Response status:", response.status);
-      console.log("Response ok:", response.ok);
 
       let data;
       try {
         data = await response.json();
-        console.log("Response data:", data);
-      } catch (jsonError) {
+        } catch (jsonError) {
         console.error("JSON parse error:", jsonError);
         throw new Error(`Invalid JSON response: ${jsonError.message}`);
       }

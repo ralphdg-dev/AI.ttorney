@@ -160,6 +160,33 @@ export const isPromptLimitReached = (promptCount: number): boolean => {
   return promptCount >= GUEST_PROMPT_LIMIT;
 };
 
+/**
+ * Calculate human-readable time until reset
+ * 
+ * @param expiresAt - Timestamp when session expires
+ * @returns Human-readable time string (e.g., "2h 15m", "45m", "30s")
+ */
+export const getTimeUntilReset = (expiresAt: number): string => {
+  const now = Date.now();
+  const msUntilReset = expiresAt - now;
+  
+  if (msUntilReset <= 0) {
+    return "Expired";
+  }
+  
+  const hours = Math.floor(msUntilReset / (1000 * 60 * 60));
+  const minutes = Math.floor((msUntilReset % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((msUntilReset % (1000 * 60)) / 1000);
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  } else {
+    return `${seconds}s`;
+  }
+};
+
 // ============================================================================
 // DISCLAIMER TEXT (Centralized)
 // ============================================================================

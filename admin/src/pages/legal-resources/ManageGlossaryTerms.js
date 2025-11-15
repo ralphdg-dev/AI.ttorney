@@ -510,7 +510,6 @@ const ManageGlossaryTerms = () => {
       setConfirmationModal((prev) => ({ ...prev, loading: true }));
 
       // TODO: Implement actual add API call
-      console.log("Creating new glossary term");
       alert("New glossary term has been created successfully!");
 
       setConfirmationModal({

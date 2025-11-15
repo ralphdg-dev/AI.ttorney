@@ -100,22 +100,9 @@ const ManageTopicsThreads = () => {
         sort_order: sortOrder,
       };
 
-      console.log("=== MANAGE TOPICS & THREADS - FETCHING POSTS ===");
-      console.log("Filter parameters:", params);
-
       const response = await forumManagementService.getForumPosts(params);
 
-      console.log("Response received:", {
-        success: response.success,
-        dataCount: response.data?.length || 0,
-        pagination: response.pagination,
-        firstPost: response.data?.[0] ? {
-          id: response.data[0].id,
-          content: response.data[0].content?.substring(0, 50) + "...",
-          category: response.data[0].category,
-          is_flagged: response.data[0].is_flagged
-        } : null
-      });
+      setPosts(response.data || []);
 
       setPosts(response.data);
       setPagination(response.pagination);
@@ -185,15 +172,6 @@ const ManageTopicsThreads = () => {
   };
 
   const openModerationModal = (post, action) => {
-    console.log("=== OPENING MODERATION MODAL ===");
-    console.log("Selected post:", {
-      id: post.id,
-      content: post.content?.substring(0, 50) + "...",
-      created_at: post.created_at,
-      user: post.user
-    });
-    console.log("Action:", action);
-    
     setSelectedPost(post);
     setModerationAction(action);
     setShowModerationModal(true);

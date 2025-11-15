@@ -229,15 +229,12 @@ const ManageLegalSeekers = () => {
       setLoadingDetails(true);
       setViewOpen(true);
       
-      console.log('handleView - Row user data:', user);
       
       // Fetch complete user details from the API
       const userDetails = await usersService.getLegalSeeker(user.id);
-      console.log('handleView - API response:', userDetails);
       setSelectedUser(userDetails);
     } catch (error) {
       console.error('Failed to fetch user details:', error);
-      console.log('handleView - Using fallback row data:', user);
       // Fallback to using row data if API call fails
       setSelectedUser(user);
     } finally {

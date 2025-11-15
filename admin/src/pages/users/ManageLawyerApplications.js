@@ -170,7 +170,6 @@ const ManageLawyerApplications = () => {
       const stats = rollMatchService.getMatchStatistics(
         applicationsWithRollCheck
       );
-      console.log("Roll Match Statistics:", stats);
     } catch (err) {
       setError(err.message);
       console.error("Failed to load lawyer applications:", err);
@@ -442,10 +441,6 @@ const ManageLawyerApplications = () => {
   };
 
   const handleResubmission = (applicationId, applicantName) => {
-    console.log("Handle resubmission called with:", {
-      applicationId,
-      applicantName,
-    });
     setConfirmationModal({
       open: true,
       type: "resubmission",
@@ -458,12 +453,6 @@ const ManageLawyerApplications = () => {
   const confirmResubmission = async (feedback) => {
     const { applicationId, applicantName } = confirmationModal;
 
-    console.log("Confirming resubmission:", {
-      applicationId,
-      applicantName,
-      feedback,
-    });
-
     try {
       setConfirmationModal((prev) => ({ ...prev, loading: true }));
       const result = await lawyerApplicationsService.updateApplicationStatus(
@@ -471,7 +460,6 @@ const ManageLawyerApplications = () => {
         "resubmission",
         feedback
       );
-      console.log("Resubmission result:", result);
       await loadData();
       setConfirmationModal({
         open: false,

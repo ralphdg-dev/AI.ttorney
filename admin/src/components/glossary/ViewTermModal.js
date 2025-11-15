@@ -216,7 +216,6 @@ const ViewTermModal = ({ open, onClose, term }) => {
         currentAdmin,
         term.id
       );
-      console.log("Term audit trail PDF exported and logged successfully");
 
       setTimeout(() => {
         loadAuditLogs();

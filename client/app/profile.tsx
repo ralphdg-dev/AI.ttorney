@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react-native";
 import Header from "../components/Header";
 import Navbar from "../components/Navbar";
+import ConfirmationModal from "../components/ui/ConfirmationModal";
 import Colors from "../constants/Colors";
 import { useAuth } from "../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
@@ -88,7 +89,29 @@ export default function UserProfilePage() {
     router.push('/profile/edit');
   };
 
-  if (!user) return null;
+  const [showSignoutModal, setShowSignoutModal] = useState(false);
+  
+  useEffect(() => {
+    if (!user) {
+      console.log("🔄 User not available, skipping profile refresh");
+      return;
+    }
+    
+    const timer = setTimeout(() => {
+      refreshProfile().catch(() => {});
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [user, refreshProfile]);
+  
+  const handleLogout = async () => {
+    setShowSignoutModal(true);
+  };
+
+  const confirmLogout = async () => {
+    await signOut();
+    setShowSignoutModal(false);
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
@@ -204,7 +227,7 @@ export default function UserProfilePage() {
 
               <TouchableOpacity 
                 style={tw`flex-row items-center py-4`}
-                onPress={signOut}
+                onPress={handleLogout}
               >
                 <LogOut size={20} color={Colors.status.error} />
                 <View style={tw`flex-1 ml-3`}>
@@ -216,7 +239,16 @@ export default function UserProfilePage() {
           </ProfileCard>
         </View>
       </ScrollView>
-
+      
+      <ConfirmationModal
+        isOpen={showSignoutModal}
+        onClose={() => setShowSignoutModal(false)}
+        onConfirm={confirmLogout}
+        title="Sign Out"
+        message="Are you sure you want to sign out? You will need to login again to access your account."
+        confirmText="Sign Out"
+        type="warning"
+      />
       <Navbar activeTab="profile" />
       <SidebarWrapper />
     </SafeAreaView>

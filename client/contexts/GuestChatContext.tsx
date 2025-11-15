@@ -14,6 +14,11 @@ export interface Message {
   fromUser: boolean;
   sources?: any[];
   language?: string;
+  confidence?: string;
+  legal_disclaimer?: string;
+  fallback_suggestions?: any;
+  normalized_query?: string;
+  is_complex_query?: boolean;
 }
 
 interface GuestSession {

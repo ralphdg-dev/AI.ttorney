@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-route
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import PublicRoute from './components/PublicRoute';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Login from './pages/auth/Login';
@@ -15,7 +16,6 @@ import ManageLegalSeekers from './pages/users/ManageLegalSeekers';
 import ManageLawyers from './pages/users/ManageLawyers';
 import ManageLawyerApplications from './pages/users/ManageLawyerApplications';
 import ManageAdminsPage from './pages/admin/ManageAdmins';
-import ManageAuditLogs from './pages/system/ManageAuditLogs';
 import ManageGlossaryTerms from './pages/legal-resources/ManageGlossaryTerms';
 import ManageAppeals from './pages/moderation/ManageAppeals';
 import ManageLegalArticles from './pages/legal-resources/ManageLegalArticles';
@@ -33,6 +33,7 @@ import Settings from "./pages/Settings";
 
 // Placeholder components for missing pages
 import Help from './pages/help/Help';
+import NotFound from './pages/NotFound';
 
 
 
@@ -93,9 +94,30 @@ const App = () => {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/verify-otp" element={<VerifyOTP />} />
+          <Route 
+            path="/login" 
+            element={
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            } 
+          />
+          <Route 
+            path="/forgot-password" 
+            element={
+              <PublicRoute>
+                <ForgotPassword />
+              </PublicRoute>
+            } 
+          />
+          <Route 
+            path="/verify-otp" 
+            element={
+              <PublicRoute>
+                <VerifyOTP />
+              </PublicRoute>
+            } 
+          />
           <Route
             path="/*"
             element={
@@ -121,7 +143,7 @@ const AdminDashboard = () => {
     if (pathname === "/users/lawyers") return "manage-lawyers";
     if (pathname === "/users/lawyer-applications") return "lawyer-applications";
     if (pathname === "/admin/manage-admins") return "manage-admins";
-    if (pathname === "/admin/audit-logs") return "audit-logs";
+    if (pathname === "/users/legal-seekers") return "manage-legal-seekers";
     if (pathname === "/legal-resources/glossary-terms")
       return "manage-glossary-terms";
     if (pathname === "/legal-resources/legal-articles")
@@ -147,11 +169,11 @@ const AdminDashboard = () => {
             <Routes>
               <Route
                 path="/"
-                element={hasRole('superadmin') ? <Dashboard /> : <Navigate to="/admin/audit-logs" replace />}
+                element={hasRole('superadmin') ? <Dashboard /> : <Navigate to="/users/legal-seekers" replace />}
               />
               <Route
                 path="/dashboard"
-                element={hasRole('superadmin') ? <Dashboard /> : <Navigate to="/admin/audit-logs" replace />}
+                element={hasRole('superadmin') ? <Dashboard /> : <Navigate to="/users/legal-seekers" replace />}
               />
 
               {/* Users Routes */}
@@ -168,9 +190,8 @@ const AdminDashboard = () => {
               {/* Admin Routes */}
               <Route
                 path="/admin/manage-admins"
-                element={hasRole('superadmin') ? <ManageAdminsPage /> : <Navigate to="/admin/audit-logs" replace />}
+                element={hasRole('superadmin') ? <ManageAdminsPage /> : <Navigate to="/users/legal-seekers" replace />}
               />
-              <Route path="/admin/audit-logs" element={<ManageAuditLogs />} />
 
               {/* Legal Resources Routes */}
               <Route path="/legal-resources/glossary-terms" element={<ManageGlossaryTerms />} />
@@ -204,6 +225,9 @@ const AdminDashboard = () => {
               {/* Other Routes */}
               <Route path="/settings" element={<Settings />} />
               <Route path="/help" element={<Help />} />
+              
+              {/* 404 Catch-all Route */}
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
         </div>

@@ -17,7 +17,6 @@ class RollMatchService {
       this.lawyersList = Array.isArray(LawyerList) ? LawyerList : [];
       this.initialized = true;
 
-      console.log(`Loaded ${this.lawyersList.length} lawyers from roll list`);
       return this.lawyersList;
     } catch (error) {
       console.error("Error loading lawyers list:", error);

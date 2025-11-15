@@ -148,7 +148,6 @@ class LawyerApplicationsService {
     try {
       // Return null immediately if filePath is empty or invalid
       if (!filePath || filePath.trim() === '' || filePath === 'null' || filePath === 'undefined') {
-        console.log('No file path provided, skipping signed URL request');
         return null;
       }
 
@@ -166,7 +165,6 @@ class LawyerApplicationsService {
       if (!response.ok) {
         // Handle file not found gracefully
         if (response.status === 404) {
-          console.log('File not found in storage:', { bucket, filePath });
           return null;
         }
         throw new Error(data.error || 'Failed to get signed URL');
@@ -177,7 +175,6 @@ class LawyerApplicationsService {
       console.error('Get signed URL error:', error);
       // Return null instead of throwing for missing files
       if (error.message.includes('Object not found') || error.message.includes('File not found')) {
-        console.log('File not found, returning null for signed URL');
         return null;
       }
       throw error;
@@ -235,7 +232,6 @@ class LawyerApplicationsService {
   // Create audit log entry
   async createAuditLog(auditData) {
     try {
-      console.log('Frontend Debug - Sending audit log data:', auditData);
       
       const response = await fetch(`${API_BASE_URL}/lawyer-applications/${auditData.application_id}/audit-logs`, {
         method: 'POST',
@@ -248,7 +244,6 @@ class LawyerApplicationsService {
 
       const data = await response.json();
       
-      console.log('Frontend Debug - Received response:', data);
       
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create audit log');

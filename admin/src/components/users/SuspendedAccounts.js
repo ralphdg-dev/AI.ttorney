@@ -72,9 +72,6 @@ const SuspendedAccounts = () => {
         );
       }
 
-      console.log("Suspended users API response:", response);
-      console.log("Total suspended users fetched:", filteredUsers.length);
-      console.log("Pagination info:", response.pagination);
 
       setUsers(filteredUsers);
       setPagination(response.pagination);
@@ -92,11 +89,6 @@ const SuspendedAccounts = () => {
 
     try {
       setProcessing(true);
-
-      console.log("Lifting suspension:", {
-        userId: selectedUser.id,
-        reason: liftReason,
-      });
 
       await usersService.moderateUser(
         selectedUser.id,

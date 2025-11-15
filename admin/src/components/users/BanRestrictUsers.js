@@ -124,7 +124,6 @@ const BanRestrictUsers = () => {
         apiStatusFilter = "banned";
       }
       
-      console.log("Filter mapping:", { statusFilter, apiStatusFilter });
       
       const response = await usersService.getLegalSeekers({
         page: 1,
@@ -184,45 +183,24 @@ const BanRestrictUsers = () => {
         }
       });
       
-      console.log("Applied sorting:", sortBy, "- Result count:", filteredUsers.length);
       
       if (sortBy === "Oldest" && filteredUsers.length > 1) {
-        console.log("Oldest sorting debug - First 3 users after sort:");
         filteredUsers.slice(0, 3).forEach((user, index) => {
           const userDate = new Date(user.created_at || user.createdAt || user.date_joined || user.registration_date);
-          console.log(`User ${index + 1}:`, {
-            id: user.id,
-            name: user.full_name,
-            date: userDate.toISOString(),
-            raw_dates: {
-              created_at: user.created_at,
-              createdAt: user.createdAt,
-              date_joined: user.date_joined,
-              registration_date: user.registration_date
-            }
-          });
+          // Removed debugging code
         });
       }
       
-      console.log("Sample user data for sorting:", filteredUsers[0] ? {
+      const firstUser = filteredUsers.length > 0 ? {
         id: filteredUsers[0].id,
         full_name: filteredUsers[0].full_name,
         created_at: filteredUsers[0].created_at,
         createdAt: filteredUsers[0].createdAt,
         date_joined: filteredUsers[0].date_joined,
         registration_date: filteredUsers[0].registration_date,
-        strike_count: filteredUsers[0].strike_count
-      } : "No users");
+        strike_count: filteredUsers[0].strike_count,
+      } : "No users";
 
-      console.log("Users API response:", response);
-      console.log("Raw users from API:", response.data?.length || 0);
-      console.log("User statuses in response:", response.data?.map(u => ({ id: u.id, status: u.account_status })) || []);
-      console.log("Suspension data:", response.data?.map(u => ({ id: u.id, status: u.account_status, suspension_end: u.suspension_end })) || []);
-      console.log("After filtering:", filteredUsers.length);
-      console.log("Filter applied:", statusFilter);
-      console.log("Pagination info:", response.pagination);
-      console.log("Current page:", currentPage);
-      console.log("Calculated total pages:", Math.ceil((response.pagination?.total || 0) / 10));
 
       // Apply client-side pagination
       const totalFiltered = filteredUsers.length;
@@ -269,13 +247,6 @@ const BanRestrictUsers = () => {
     try {
       setProcessing(true);
 
-      console.log("User action:", {
-        userId: selectedUser.id,
-        action: actionType,
-        reason: actionReason,
-        duration: actionDuration,
-      });
-
       let successMessage = "";
 
       // Call the appropriate API endpoint
@@ -313,8 +284,6 @@ const BanRestrictUsers = () => {
       await fetchUsers();
 
       // Log the action and risk level update
-      console.log("✅", successMessage);
-      console.log("🔄 User list refreshed - risk levels recalculated based on new strikes/suspensions");
 
       // Close modal and reset state
       setShowActionModal(false);

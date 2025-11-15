@@ -9,6 +9,7 @@ import {
   validateGuestSession,
   calculateRemainingPrompts,
   isPromptLimitReached,
+  getTimeUntilReset,
   type GuestSession,
 } from '../config/guestConfig';
 
@@ -18,7 +19,10 @@ export interface GuestContextType {
   promptCount: number;
   promptsRemaining: number;
   hasReachedLimit: boolean;
+  resetTime: number | null;
+  timeUntilReset: string | null;
   startGuestSession: () => Promise<void>;
+  updateGuestSessionId: (sessionId: string) => Promise<void>;
   incrementPromptCount: () => Promise<boolean>; // Returns false if limit reached
   clearGuestSession: () => Promise<void>;
   isLoading: boolean;
@@ -101,6 +105,25 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [clearGuestSession]);
 
+  // Update guest session with new ID from server (for session refresh)
+  const updateGuestSessionId = useCallback(async (sessionId: string) => {
+    if (!guestSession) {
+      console.warn('⚠️ No existing guest session to update');
+      await startGuestSession();
+      return;
+    }
+    
+    const updatedSession: GuestSession = {
+      ...guestSession,
+      id: sessionId,
+      // Keep existing prompt count and expiry
+    };
+    
+    setGuestSession(updatedSession);
+    await AsyncStorage.setItem('guestSession', JSON.stringify(updatedSession));
+    console.log('🔄 Guest session updated with new ID:', sessionId);
+  }, [guestSession, startGuestSession]);
+
   // Load guest session from storage on mount and when app initializes
   // Also reload if guest session changes in storage
   useEffect(() => {
@@ -164,11 +187,14 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     promptCount: guestSession?.promptCount || 0,
     promptsRemaining: calculateRemainingPrompts(guestSession?.promptCount || 0),
     hasReachedLimit: isPromptLimitReached(guestSession?.promptCount || 0),
+    resetTime: guestSession?.expiresAt || null,
+    timeUntilReset: guestSession ? getTimeUntilReset(guestSession.expiresAt) : null,
     startGuestSession,
+    updateGuestSessionId,
     incrementPromptCount,
     clearGuestSession,
     isLoading,
-  }), [guestSession, isLoading, startGuestSession, incrementPromptCount, clearGuestSession]);
+  }), [guestSession, isLoading, startGuestSession, updateGuestSessionId, incrementPromptCount, clearGuestSession]);
 
   return <GuestContext.Provider value={value}>{children}</GuestContext.Provider>;
 };

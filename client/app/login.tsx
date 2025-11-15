@@ -12,7 +12,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function Login() {
   const toast = useToast();
-  const { signIn, continueAsGuest, isLoading: authLoading, isAuthenticated } = useAuth();
+  const { signIn, continueAsGuest, isAuthenticated } = useAuth();
   const lastDeniedAtRef = useRef<number>(0);
   const deniedToastInProgressRef = useRef<boolean>(false);
   
