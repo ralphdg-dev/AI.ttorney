@@ -177,7 +177,7 @@ export default function SettingsScreen() {
             className="bg-white rounded-2xl mb-6 p-6" 
             style={cardShadowStyle}
           >
-            <HStack className="items-center" space="md">
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
               <Avatar 
                 size="lg"
                 style={{ backgroundColor: '#023D7B' }}
@@ -190,27 +190,25 @@ export default function SettingsScreen() {
                   alt="Profile"
                 />
               </Avatar>
-              <VStack className="flex-1" space="xs">
+              <View style={{ flex: 1, marginLeft: 12, marginRight: 8 }}>
                 <GSText size="lg" bold style={{ color: Colors.text.primary }}>
                   {user?.full_name || "User"}
                 </GSText>
                 <GSText 
                   size="sm" 
                   style={{ 
-                    color: Colors.text.secondary,
-                    flexShrink: 1,
-                    maxWidth: '100%'
+                    color: Colors.text.secondary
                   }}
                   numberOfLines={1}
                   ellipsizeMode="tail"
                 >
-                  {user?.email || "user@example.com"}
+                  @{user?.username || "username"}
                 </GSText>
-              </VStack>
-              <Box style={{ padding: 8 }}>
+              </View>
+              <View style={{ padding: 8 }}>
                 <ChevronRight size={20} color={Colors.text.secondary} />
-              </Box>
-            </HStack>
+              </View>
+            </View>
           </Box>
         </TouchableOpacity>
 
