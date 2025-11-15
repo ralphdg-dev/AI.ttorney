@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Alert, Platform, TextInput, TouchableOpacity } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useToast, Toast, ToastTitle, ToastDescription } from "../../components/ui/toast";
 import { router } from "expo-router";
 import { Box } from "../../components/ui/box";
@@ -539,13 +540,14 @@ export default function ForgotPassword() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-white"
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
-      
-      <Header 
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1 bg-white"
+      >
+        <StatusBar barStyle="dark-content" backgroundColor="white" />
+        
+        <Header 
         title="Forgot Password"
         showBackButton={true}
         onBackPress={() => {
@@ -571,5 +573,6 @@ export default function ForgotPassword() {
 
       {renderBottomSection()}
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

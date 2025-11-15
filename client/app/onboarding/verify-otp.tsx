@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Alert, Platform, TextInput, TouchableOpacity } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Box } from "../../components/ui/box";
@@ -11,6 +12,7 @@ import { ScrollView } from "../../components/ui/scroll-view";
 import { StatusBar } from "../../components/ui/status-bar";
 import { Image } from "../../components/ui/image";
 import PrimaryButton from "../../components/ui/PrimaryButton";
+import Header from "../../components/Header";
 import Colors from "../../constants/Colors";
 import { apiClient } from "../../lib/api-client";
 import { useAuth } from "../../contexts/AuthContext";
@@ -19,7 +21,7 @@ import otpsent from "../../assets/images/otpsent.png";
 export default function VerifyOTP() {
   const params = useLocalSearchParams();
   const email = typeof params.email === 'string' ? params.email : "user@example.com";
-  const { refreshUserData, signIn } = useAuth();
+  const { signIn } = useAuth();
 
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
@@ -266,14 +268,26 @@ export default function VerifyOTP() {
   };
 
 
+  const handleBack = () => {
+    router.back();
+  };
+
   const isOtpComplete = otp.every((digit) => digit !== "");
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-white"
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1 bg-white"
+      >
+        <StatusBar barStyle="dark-content" backgroundColor="white" />
+        
+        {/* Header - Use same Header component as login/sign-in */}
+        <Header 
+          showBackButton={true}
+          onBackPress={handleBack}
+          backgroundColor="white"
+        />
       
       <ScrollView
         className="flex-1"
@@ -281,7 +295,6 @@ export default function VerifyOTP() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header removed: Back navigation is disabled on Verify OTP page */}
 
         {/* Main Content */}
         <VStack className="flex-1 justify-center px-6 mx-auto w-full max-w-md">
@@ -396,5 +409,6 @@ export default function VerifyOTP() {
         </Box>
       </Box>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

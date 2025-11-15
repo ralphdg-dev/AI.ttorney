@@ -1,39 +1,40 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
-import { AppealService, AppealData } from '../services/appealService';
+import { appealService } from '../services/appealService';
 import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle, FileText } from 'lucide-react-native';
 
 export default function MyAppealsScreen() {
   const { session } = useAuth();
-  const [appeals, setAppeals] = useState<AppealData[]>([]);
+  const [appeals, setAppeals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAppeals();
-  }, []);
-
-  const loadAppeals = async () => {
+  const loadAppeals = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const result = await AppealService.getMyAppeals(session);
+      const result = await appealService.getMyAppeals(session?.access_token || '');
       
       if (result.success && result.data) {
         setAppeals(result.data);
       } else {
-        setError(result.error || 'Failed to load appeals');
+        console.error('Failed to load appeals');
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred while loading appeals');
     } finally {
       setLoading(false);
     }
-  };
+  }, [session]);
+
+  useEffect(() => {
+    loadAppeals();
+  }, [loadAppeals]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -114,17 +115,20 @@ export default function MyAppealsScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-gray-50 items-center justify-center">
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text className="mt-4 text-gray-600">Loading appeals...</Text>
-      </View>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+        <View className="flex-1 bg-gray-50 items-center justify-center">
+          <ActivityIndicator size="large" color="#3B82F6" />
+          <Text className="mt-4 text-gray-600">Loading appeals...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView 
-      className="flex-1 bg-gray-50"
-      refreshControl={
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+      <ScrollView 
+        className="flex-1 bg-gray-50"
+        refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
       }
     >
@@ -148,7 +152,7 @@ export default function MyAppealsScreen() {
             <FileText size={48} color="#9CA3AF" />
             <Text className="mt-4 text-lg font-semibold text-gray-900">No Appeals Yet</Text>
             <Text className="mt-2 text-center text-gray-600">
-              You haven't submitted any appeals. If you have an active suspension, you can appeal it from the suspended screen.
+              You haven&apos;t submitted any appeals. If you have an active suspension, you can appeal it from the suspended screen.
             </Text>
           </View>
         ) : (
@@ -249,10 +253,11 @@ export default function MyAppealsScreen() {
           <Text className="text-xs text-gray-500 text-center leading-5">
             Appeals are typically reviewed within 24-48 hours.
             {'\n'}
-            You will receive a notification when your appeal is reviewed.
+            You&apos;ll receive a notification when your appeal is reviewed.
           </Text>
         </View>
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
