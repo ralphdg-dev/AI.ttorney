@@ -28,6 +28,10 @@ export interface GuestContextType {
   clearGuestSession: () => Promise<void>;
   isLoading: boolean;
   isStartingSession: boolean; // Production: track session start progress
+  showTutorial: boolean;
+  setShowTutorial: (show: boolean) => void;
+  showOnboarding: boolean;
+  setShowOnboarding: (show: boolean) => void;
 }
 
 const GuestContext = createContext<GuestContextType | undefined>(undefined);
@@ -37,6 +41,8 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoading, setIsLoading] = useState(true);
   const [isStartingSession, setIsStartingSession] = useState(false); // Prevent race conditions
   const [, forceUpdate] = useState(0); // Force re-render trigger
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Define clearGuestSession first (no dependencies)
   const clearGuestSession = useCallback(async () => {
@@ -72,7 +78,7 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           } else {
             console.log('📋 Reusing existing valid guest session:', existingSession.id);
             setGuestSession(existingSession);
-            router.replace('/chatbot');
+            console.log('🧭 GuestContext: Guest session reused, letting index.tsx handle routing');
             return;
           }
         } catch (parseError) {
@@ -101,8 +107,8 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         action: 'session_created'
       });
       
-      // Navigate to chatbot after starting guest session
-      router.replace('/chatbot');
+      // Let index.tsx handle the routing to guest-onboarding
+      console.log('🧭 GuestContext: Guest session created, letting index.tsx handle routing');
     } catch (error) {
       console.error('❌ [PROD] Guest session start failed:', {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -211,7 +217,11 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     clearGuestSession,
     isLoading,
     isStartingSession, // Production: expose loading state to UI
-  }), [guestSession, startGuestSession, updateGuestSessionId, incrementPromptCount, clearGuestSession, isLoading, isStartingSession]);
+    showTutorial,
+    setShowTutorial,
+    showOnboarding,
+    setShowOnboarding,
+  }), [guestSession, startGuestSession, updateGuestSessionId, incrementPromptCount, clearGuestSession, isLoading, isStartingSession, showTutorial, setShowTutorial, showOnboarding, setShowOnboarding]);
 
   return <GuestContext.Provider value={value}>{children}</GuestContext.Provider>;
 };

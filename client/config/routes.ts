@@ -57,6 +57,13 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     isPublic: true,
     redirectTo: 'role-based'
   },
+  '/guest-onboarding': { 
+    path: '/guest-onboarding', 
+    isPublic: true,
+    requiresGuestSession: true,
+    redirectTo: 'role-based',
+    errorBoundary: true
+  },
 
   // Lawyer routes (all require verified_lawyer role)
   '/lawyer': { 

@@ -14,7 +14,22 @@ import { useGuest } from "../contexts/GuestContext";
 export default function Login() {
   const toast = useToast();
   const { signIn, isAuthenticated } = useAuth();
-  const { startGuestSession } = useGuest();
+  const { startGuestSession, isStartingSession, setShowTutorial } = useGuest();
+
+  // Debug wrapper for guest session start
+  const handleContinueAsGuest = async () => {
+    console.log('🔘 Continue as Guest button clicked');
+    try {
+      await startGuestSession();
+      console.log('✅ Guest session started successfully');
+      // Navigate to chatbot and start interactive tutorial
+      console.log('🧭 Login.tsx: Navigating to /chatbot and starting tutorial');
+      setShowTutorial(true);
+      router.push('/chatbot');
+    } catch (error) {
+      console.error('❌ Failed to start guest session:', error);
+    }
+  };
   const lastDeniedAtRef = useRef<number>(0);
   const deniedToastInProgressRef = useRef<boolean>(false);
   
@@ -335,12 +350,13 @@ export default function Login() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={startGuestSession}
+            onPress={handleContinueAsGuest}
             style={tw`mt-3`}
             activeOpacity={0.7}
+            disabled={isStartingSession}
           >
             <Text style={[tw`text-center`, { color: Colors.text.head }]}>
-              Continue as <Text style={{ color: Colors.primary.blue, fontWeight: '700' }}>Guest</Text>
+              {isStartingSession ? 'Starting...' : 'Continue as'} <Text style={{ color: Colors.primary.blue, fontWeight: '700' }}>Guest</Text>
             </Text>
           </TouchableOpacity>
         </View>

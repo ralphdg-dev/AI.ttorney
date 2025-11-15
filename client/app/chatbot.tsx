@@ -18,7 +18,7 @@ import {
   Image,
   Animated,
   StatusBar,
-} from "react-native";
+  } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
@@ -40,6 +40,7 @@ import { ModerationWarningBanner } from "../components/moderation/ModerationWarn
 import { NetworkConfig } from "../utils/networkConfig";
 import { LAYOUT, getTotalUIHeight } from "../constants/LayoutConstants";
 import { addGuestDataToRequest, logGuestRequest } from "../utils/guestRequestHelper";
+import GuestOnboardingTutorial from "../components/guest/GuestOnboardingTutorial";
 
 // ============================================================================
 // HELPER FUNCTIONS - DRY Principle
@@ -306,7 +307,7 @@ interface Message {
 
 export default function ChatbotScreen() {
   const { user, session, isLawyer } = useAuth();
-  const { isGuestMode, hasReachedLimit, incrementPromptCount, startGuestSession, updateGuestSessionId, guestSession, isLoading: isGuestLoading } = useGuest();
+  const { isGuestMode, hasReachedLimit, incrementPromptCount, startGuestSession, updateGuestSessionId, guestSession, isLoading: isGuestLoading, showTutorial, setShowTutorial } = useGuest();
   const guestChat = useGuestChat(); // Always call hooks unconditionally
   const { moderationStatus, refreshStatus } = useModerationStatus();
   const insets = useSafeAreaInsets();
@@ -316,6 +317,25 @@ export default function ChatbotScreen() {
   const isStreamingRef = useRef<boolean>(false); // Track if currently streaming
   const messages = localMessages; // Same state for everyone
   
+  // Refs for tutorial targets
+  const chatbotRef = useRef<View | null>(null);
+  const glossaryRef = useRef<View | null>(null);
+  const navbarRef = useRef<View | null>(null);
+  const menuRef = useRef<View | null>(null);
+  
+  const stepRefs: { [key: string]: React.RefObject<View | null> } = {
+    'chatbot-button': chatbotRef,
+    'glossary-button': glossaryRef,
+    'menu-button': menuRef,
+    'bottom-navbar': navbarRef,
+  };
+  
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    // Tutorial is complete, user stays on chatbot
+  };
+  
+    
   // Sync localMessages to GuestChatContext for guest persistence (optimized)
   useEffect(() => {
     if (isGuestMode && localMessages.length > 0) {
@@ -1476,6 +1496,7 @@ export default function ChatbotScreen() {
         showChatHistoryToggle={!isGuestMode}
         isChatHistoryOpen={sidebarRef.current?.isOpen?.() || false}
         onChatHistoryToggle={() => sidebarRef.current?.toggleSidebar?.()}
+        menuRef={menuRef}
       />
 
       {/* Guest Rate Limit Banner - Show for guest users */}
@@ -1754,6 +1775,7 @@ export default function ChatbotScreen() {
           <View style={tw`flex-row items-center`}>
             <View style={tw`flex-1 mr-3`}>
               <View
+                ref={chatbotRef}
                 style={[
                   tw`px-5 transition-all duration-200 rounded-full`,
                   {
@@ -1843,13 +1865,22 @@ export default function ChatbotScreen() {
       </KeyboardAvoidingView>
       {/* Conditionally render navbar based on user role and guest mode */}
       {isGuestMode ? (
-        <GuestNavbar activeTab="ask" />
+        <GuestNavbar activeTab="ask" glossaryRef={glossaryRef} navbarRef={navbarRef} />
       ) : user?.role === "verified_lawyer" ? (
         <LawyerNavbar activeTab="chatbot" />
       ) : (
         <Navbar activeTab="ask" />
       )}
       {!isGuestMode && <SidebarWrapper />}
+      
+      {/* Tutorial Overlay */}
+      {isGuestMode && (
+        <GuestOnboardingTutorial
+          visible={showTutorial}
+          onComplete={handleTutorialComplete}
+          stepRefs={stepRefs}
+        />
+      )}
     </SafeAreaView>
   );
 }

@@ -25,6 +25,7 @@ interface HeaderProps {
   rightComponent?: React.ReactNode;
   backgroundColor?: string; // Allow custom background color
   onLogoPress?: () => void;
+  menuRef?: React.RefObject<View | null>;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -45,6 +46,7 @@ const Header: React.FC<HeaderProps> = ({
   rightComponent,
   onLogoPress,
   showSearch = false,
+  menuRef,
 }) => {
   const { openSidebar } = useSidebar();
   const router = useRouter();
@@ -134,6 +136,7 @@ const Header: React.FC<HeaderProps> = ({
     if (showMenu) {
       return (
         <TouchableOpacity
+          ref={menuRef}
           style={styles.iconButton}
           onPress={handleMenuPress}
           activeOpacity={0.7}

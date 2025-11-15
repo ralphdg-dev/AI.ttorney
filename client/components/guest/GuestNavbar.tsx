@@ -11,9 +11,11 @@ import { LAYOUT } from '../../constants/LayoutConstants';
 
 interface GuestNavbarProps {
   activeTab?: 'learn' | 'ask';
+  glossaryRef?: React.RefObject<View | null>;
+  navbarRef?: React.RefObject<View | null>;
 }
 
-const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab }) => {
+const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab, glossaryRef, navbarRef }) => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
@@ -62,7 +64,7 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab }) => {
   ];
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+    <View ref={navbarRef} style={[styles.container, { paddingBottom: insets.bottom }]}>
       <View style={styles.navbar}>
         {tabs.map((tab) => {
           const IconComponent = tab.icon;
@@ -70,6 +72,7 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab }) => {
           return (
             <TouchableOpacity
               key={tab.id}
+              ref={tab.id === 'learn' ? glossaryRef : undefined}
               style={styles.tabItem}
               onPress={() => handleTabPress(tab.id)}
               activeOpacity={0.7}
