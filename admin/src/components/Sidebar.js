@@ -71,8 +71,6 @@ const Sidebar = ({ activeItem }) => {
         return "/users/suspended-accounts";
       case "manage-admins":
         return "/admin/manage-admins";
-      case "audit-logs":
-        return "/admin/audit-logs";
       case "manage-glossary-terms":
         return "/legal-resources/glossary-terms";
       case "manage-legal-articles":
@@ -278,16 +276,15 @@ const Sidebar = ({ activeItem }) => {
                 </div>
               ) : (
                 <div className={`mt-2 ${collapsed ? "space-y-3" : ""}`}>
-                  {section.groups.map((g) => (
-                    g.label === 'Admin'
-                      ? {
-                          ...g,
-                          items: g.items.filter((item) =>
-                            item.id === 'manage-admins' ? hasRole('superadmin') : true
-                          ),
-                        }
-                      : g
-                  )).map((g) => renderGroup(g))}
+                  {section.groups
+                    .filter((g) => {
+                      // Hide entire Admin section for non-superadmin users
+                      if (g.label === 'Admin') {
+                        return hasRole('superadmin');
+                      }
+                      return true;
+                    })
+                    .map((g) => renderGroup(g))}
                 </div>
               )}
               {/* Divider between MAIN and ACCOUNT */}
