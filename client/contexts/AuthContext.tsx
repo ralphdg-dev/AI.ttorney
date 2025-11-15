@@ -31,6 +31,7 @@ export interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isGuestMode: boolean;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   setUser: (user: User | null) => void;
@@ -476,6 +477,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     session: authState.session,
     isLoading,
     isAuthenticated: !!authState.session && !!authState.user,
+    isGuestMode: !authState.session || !authState.user,
     signIn,
     signOut,
     setUser: setUserData,
