@@ -20,7 +20,6 @@ export const sections = [
         label: "Admin",
         items: [
           { id: "manage-admins", label: "Manage Admins" },
-          { id: "audit-logs", label: "Audit Logs" },
         ],
       },
       {

@@ -36,53 +36,90 @@ const TermsByCategoryCard = () => {
   }, []);
 
   const COLORS = {
-    Civil: "#023D7B",
-    Consumer: "#0E5E9C",
-    Criminal: "#1D84B5",
-    Family: "#479FC8",
-    Labor: "#74B9D2", 
-    Others: "#A3BFD9",
+    Civil: { start: "#023D7B", end: "#0E5E9C" }, 
+    Consumer: { start: "#0E5E9C", end: "#1D84B5" }, 
+    Criminal: { start: "#1D84B5", end: "#479FC8" }, 
+    Family: { start: "#479FC8", end: "#74B9D2" },
+    Labor: { start: "#74B9D2", end: "#A3BFD9" },
+    Others: { start: "#A3BFD9", end: "#C5D4E3" }, 
+  };
+
+  // Custom tooltip with better styling
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload[0]) {
+      return (
+        <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
+          <p className="text-sm font-semibold text-gray-800">{label}</p>
+          <p className="text-lg font-bold text-blue-600">
+            {payload[0].value.toLocaleString()} terms
+          </p>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 flex flex-col">
-      <h4 className="text-[11px] text-gray-600 font-semibold mb-3">
-        Terms by Category
-      </h4>
+    <div className="group rounded-xl border border-blue-100 bg-white p-6 flex flex-col shadow-sm hover:shadow-xl transition-all duration-300">
+      <div className="flex items-center space-x-3 mb-4">
+        <div className="w-1 h-6 bg-gradient-to-b from-[#023D7B] to-[#0E5E9C] rounded-full" />
+        <h4 className="text-sm font-bold text-gray-800">
+          Terms by Category
+        </h4>
+      </div>
 
-      <div className="flex-1 min-h-[220px] sm:min-h-[260px] md:min-h-[300px]">
+      <div className="flex-1 min-h-[200px] sm:min-h-[250px] md:min-h-[300px]">
         {data.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              layout="vertical"
-              margin={{ top: 10, right: 20, left: 30, bottom: 10 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" tick={{ fontSize: 10 }} />
-              <YAxis
-                dataKey="category"
-                type="category"
-                tick={{ fontSize: 10 }}
-                width={70}
-              />
-              <Tooltip
-                formatter={(value) => [`${value} terms`, ""]}
-                labelFormatter={(label) => `${label}`}
-              />
-              <Bar dataKey="count" barSize={40} radius={[0, 4, 4, 0]}>
+            <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+              <defs>
                 {data.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[entry.category] || "#023D7B"}
+                  <linearGradient key={`terms-gradient-${index}`} id={`terms-gradient-${index}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={COLORS[entry.category]?.start || '#023D7B'} stopOpacity={1} />
+                    <stop offset="100%" stopColor={COLORS[entry.category]?.end || COLORS[entry.category]?.start || '#023D7B'} stopOpacity={1} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid 
+                strokeDasharray="3 3" 
+                stroke="#f0f0f0" 
+                vertical={false}
+              />
+              <XAxis 
+                dataKey="category" 
+                tick={{ fontSize: 10, fill: '#6b7280' }}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+                stroke="#e5e7eb"
+              />
+              <YAxis 
+                tick={{ fontSize: 10, fill: '#6b7280' }}
+                stroke="#e5e7eb"
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar 
+                dataKey="count" 
+                radius={[8, 8, 0, 0]}
+                animationDuration={1200}
+                animationEasing="ease-out"
+              >
+                {data.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={`url(#terms-gradient-${index})`}
                   />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div className="text-gray-400 text-sm text-center mt-10">
-            No terms found by category.
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-50 to-indigo-100 flex items-center justify-center mb-3">
+              <span className="text-2xl text-indigo-400">📖</span>
+            </div>
+            <p className="text-gray-400 text-sm font-medium">No terms found</p>
+            <p className="text-gray-300 text-xs mt-1">Add legal terms to the glossary</p>
           </div>
         )}
       </div>

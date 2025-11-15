@@ -26,10 +26,13 @@ const RecentLawyerApplicationsCard = () => {
   }, []);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 h-full flex flex-col">
-      <h4 className="text-[11px] text-gray-600 font-semibold mb-3">
-        Lawyer Applications (Last 30 Days)
-      </h4>
+    <div className="group rounded-xl border border-blue-100 bg-white p-6 h-full flex flex-col shadow-sm hover:shadow-xl transition-all duration-300">
+      <div className="flex items-center space-x-3 mb-4">
+        <div className="w-1 h-6 bg-gradient-to-b from-[#023D7B] to-[#0E5E9C] rounded-full" />
+        <h4 className="text-sm font-bold text-gray-800">
+          Lawyer Applications (Last 30 Days)
+        </h4>
+      </div>
 
       <div className="flex-1 min-h-[200px] sm:min-h-[250px] md:min-h-[300px]">
         {data.length > 0 ? (
@@ -75,8 +78,11 @@ const RecentLawyerApplicationsCard = () => {
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div className="text-gray-400 text-sm text-center mt-10">
-            No recent applications found.
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+              <span className="text-2xl text-gray-400">📄</span>
+            </div>
+            <p className="text-gray-400 text-sm font-medium">No recent applications</p>
           </div>
         )}
       </div>

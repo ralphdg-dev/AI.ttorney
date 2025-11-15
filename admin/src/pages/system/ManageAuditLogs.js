@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  History, 
-  Download, 
-  Search, 
-  Filter, 
+import {
+  History,
+  Download,
+  Search,
+  Filter,
   Calendar,
   Eye,
   FileText,
@@ -91,7 +91,7 @@ const TableTypeBadge = ({ table }) => {
 
 const ManageAuditLogs = () => {
   const { showSuccess, showError, ToastContainer } = useToast();
-  
+
   // State management
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -151,19 +151,19 @@ const ManageAuditLogs = () => {
               const adminRes = await adminManagementService.getAdmin(id);
               const name = adminRes?.data?.full_name || adminRes?.data?.email || null;
               if (name) return [id, name];
-            } catch {}
+            } catch { }
             // Try users legal seeker
             try {
               const userRes = await usersService.getLegalSeeker(id);
               const name = userRes?.data?.full_name || userRes?.data?.email || null;
               if (name) return [id, name];
-            } catch {}
+            } catch { }
             // Try users lawyer
             try {
               const lawyerRes = await usersService.getLawyer(id);
               const name = lawyerRes?.data?.full_name || lawyerRes?.data?.email || null;
               if (name) return [id, name];
-            } catch {}
+            } catch { }
             return [id, null];
           }));
           const resolved = results.reduce((acc, [id, name]) => { if (name) acc[id] = name; return acc; }, {});
@@ -171,7 +171,7 @@ const ManageAuditLogs = () => {
             setActorNameMap(prev => ({ ...prev, ...resolved }));
           }
         }
-      } catch {}
+      } catch { }
       setPagination(prev => ({
         ...prev,
         total: response.pagination?.total || 0,
@@ -180,14 +180,14 @@ const ManageAuditLogs = () => {
 
     } catch (err) {
       console.error('Failed to load audit logs:', err);
-      
+
       // Check if it's a setup issue
       if (err.message && err.message.includes('table not found')) {
         setError('Database setup required. Please set up the audit logs table.');
       } else {
         setError(err.message || 'Failed to load audit logs');
       }
-      
+
       showError('Failed to load audit logs: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
@@ -230,7 +230,7 @@ const ManageAuditLogs = () => {
   const handleExport = async () => {
     try {
       setExporting(true);
-      
+
       const params = {
         search: searchTerm,
         table: tableFilter === 'All Tables' ? '' : tableFilter.toLowerCase(),
@@ -241,7 +241,7 @@ const ManageAuditLogs = () => {
 
       await auditLogsService.exportAuditLogs(params);
       showSuccess('Audit logs exported successfully');
-      
+
     } catch (err) {
       console.error('Failed to export audit logs:', err);
       showError('Failed to export audit logs: ' + (err.message || 'Unknown error'));
@@ -328,19 +328,6 @@ const ManageAuditLogs = () => {
 
   return (
     <div>
-      {/* Header */}
-      <div className="mb-3">
-        <div className="flex items-stretch gap-2">
-          <div className="flex items-center justify-center px-2 rounded-md bg-[#023D7B]/10 text-[#023D7B] self-stretch">
-            <History size={14} />
-          </div>
-          <div className="flex flex-col justify-center">
-            <h2 className="text-[12px] font-semibold text-gray-900">Manage Audit Logs</h2>
-            <p className="text-[10px] text-gray-500 mt-0.5">Track all admin actions and system changes for accountability.</p>
-          </div>
-        </div>
-        <div className="mt-2 border-t border-gray-200" />
-      </div>
 
       {/* Toolbar */}
       <div className="w-full mb-3">
@@ -524,11 +511,10 @@ INSERT INTO admin_audit_logs (action, target_table, target_id, actor_id, role, m
                     <button
                       key={pageNum}
                       onClick={() => handlePageChange(pageNum)}
-                      className={`px-3 py-1.5 text-xs border rounded-md ${
-                        pagination.page === pageNum
+                      className={`px-3 py-1.5 text-xs border rounded-md ${pagination.page === pageNum
                           ? 'bg-[#023D7B] text-white border-[#023D7B]'
                           : 'border-gray-300 hover:bg-gray-50'
-                      }`}
+                        }`}
                     >
                       {pageNum}
                     </button>
@@ -554,7 +540,7 @@ INSERT INTO admin_audit_logs (action, target_table, target_id, actor_id, role, m
       {showDetailsModal && selectedLog && (
         <Modal
           open={showDetailsModal}
-          onClose={() => {}}
+          onClose={() => { }}
           title="Audit Log Details"
           width="max-w-3xl"
           showCloseButton={false}
