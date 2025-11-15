@@ -67,8 +67,7 @@ export const USER_FRIENDLY_MESSAGES = {
   
   // Generic errors
   'operation_failed': 'Operation failed. Please try again.',
-  'unexpected_error': 'An unexpected error occurred. Please try again or contact support.',
-  'maintenance_mode': 'The system is currently under maintenance. Please try again later.'
+  'unexpected_error': 'An unexpected error occurred. Please try again or contact support.'
 };
 
 /**
