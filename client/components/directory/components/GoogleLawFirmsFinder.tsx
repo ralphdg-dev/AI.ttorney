@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
-  TextInput, 
   Pressable, 
   Linking, 
   Alert, 
@@ -29,6 +28,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../../constants/Colors';
 import { NetworkConfig } from '../../../utils/networkConfig';
 import { shadowPresets, createShadowStyle } from '../../../utils/shadowUtils';
+import UnifiedSearchBar from '@/components/common/UnifiedSearchBar';
 
 interface LawFirm {
   id: string;
@@ -54,16 +54,29 @@ interface AutocompletePrediction {
 
 interface GoogleLawFirmsFinderProps {
   searchQuery?: string;
+  cache?: {
+    get: (location: string, radius: number) => any;
+    set: (location: string, radius: number, results: any) => void;
+    clear: () => void;
+    getStats: () => any;
+  };
 }
 
-export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFinderProps) {
+export default function GoogleLawFirmsFinder({ searchQuery, cache }: GoogleLawFirmsFinderProps) {
+  // DEBUG: Track cache prop and initial state
+  console.log('🗺️ GoogleLawFirmsFinder mounted');
+  console.log('🗺️ Cache prop received:', cache ? 'YES' : 'NO');
+  if (cache) {
+    const stats = cache.getStats();
+    console.log('🗺️ Initial cache stats:', stats);
+  }
+  
   const [lawFirms, setLawFirms] = useState<LawFirm[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [searchText, setSearchText] = useState('');
   const [, setCurrentLocationName] = useState('Manila, Philippines');
-  const [mapCenter, setMapCenter] = useState({ lat: 14.5995, lng: 120.9842 });
   const [WebView, setWebView] = useState<any>(null);
   const [webViewSupported, setWebViewSupported] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +103,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
+    
   // Client-side filtering with memoization (FAANG pattern - instant, no API calls)
   const filteredLawFirms = useMemo(() => {
     if (!searchCenter || allFetchedFirms.length === 0) {
@@ -238,30 +252,13 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     };
   }, []);
 
-  // Hide predictions when clicking outside (for better UX)
-  const handleSearchFocus = useCallback(() => {
-    if (predictions.length > 0 && searchText.length >= 2) {
-      setShowPredictions(true);
-    }
-  }, [predictions.length, searchText.length]);
+  
 
-  const handleSearchBlur = useCallback(() => {
-    // Delay hiding to allow for prediction selection
-    setTimeout(() => {
-      setShowPredictions(false);
-    }, 150);
-  }, []);
-
-
-  // Search by location name using the new endpoint with pagination support
-  const searchByLocationName = useCallback(async (locationName: string) => {
+  // Separate function for fresh data fetching (used for cache misses and background refresh)
+  const fetchFreshData = useCallback(async (locationName: string) => {
     try {
-      setLoading(true);
-      setError(null);
-      console.log(`Searching for law firms in: ${locationName}`);
-      
       const API_BASE_URL = await NetworkConfig.getBestApiUrl();
-      const response = await fetch(`${API_BASE_URL}/api/places/search`, {
+      const response = await fetch(`${API_BASE_URL}/api/places/search-by-location`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -294,28 +291,41 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
           distance_km: place.distance_km
         }));
 
+        // FAANG Cache: Store fresh data for future instant responses
+        if (cache) {
+          // Use the original search location name to prevent key mismatches
+          const originalSearchLocation = locationName;
+          console.log(`🗺️ Cache SET - Storing: "${originalSearchLocation}" (${selectedRadius}km) with ${firms.length} firms`);
+          console.log(`🗺️ Cache SET - API response location: "${data.location.formatted_address}"`);
+          cache.set(originalSearchLocation, selectedRadius, data.results);
+          console.log(`💾 Cache SET: ${firms.length} law firms for ${originalSearchLocation} (${selectedRadius}km)`);
+        }
+
         // Store all firms and search center for client-side filtering
         setAllFetchedFirms(firms);
         setLawFirms(firms); // CRITICAL: Set lawFirms so radius filter works
-        setSearchCenter({
+        const centerCoords = {
           lat: data.location.latitude,
           lng: data.location.longitude
-        });
+        };
+        setSearchCenter(centerCoords);
         setCurrentLocationName(data.location.formatted_address);
-        setMapCenter({
-          lat: data.location.latitude,
-          lng: data.location.longitude
-        });
         setRetryCount(0);
         
         // Log detailed search results
-        console.log(`✅ Search Results for ${data.location.formatted_address}:`);
+        console.log(`✅ Fresh Search Results for ${data.location.formatted_address}:`);
         console.log(`📊 Total fetched: ${firms.length} law firms (backend pagination enabled)`);
         console.log(`📍 Very close (≤2km): ${data.very_close_count || 0}`);
         console.log(`📍 Close (2-10km): ${data.close_count || 0}`);
         console.log(`📍 Nearby (>10km): ${data.nearby_count || 0}`);
         console.log(`🔍 Search radius used: ${data.search_radius_km}km`);
         console.log(`💬 ${data.message}`);
+        
+        // Log cache stats for debugging
+        if (cache) {
+          const stats = cache.getStats();
+          console.log(`📊 Cache Stats: ${stats.valid}/${stats.total} valid entries`);
+        }
       } else if (data.success && data.results.length === 0) {
         setAllFetchedFirms([]);
         setLawFirms([]);
@@ -336,7 +346,64 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cache, selectedRadius]);
+
+  // Search by location name using FAANG cache-first approach (Google/Netflix pattern)
+  const searchByLocationName = useCallback(async (locationName: string) => {
+    try {
+      // FAANG Cache-First Strategy: Check cache first for instant response
+      if (cache) {
+        console.log(`🗺️ Cache CHECK - Looking for: "${locationName}" (${selectedRadius}km)`);
+        const cachedResults = cache.get(locationName, selectedRadius);
+        console.log(`🗺️ Cache RESULT:`, cachedResults ? `HIT - ${cachedResults.length} firms` : 'MISS');
+        if (cachedResults) {
+          console.log(`⚡ Instant response from cache: ${cachedResults.length} law firms`);
+          const firms: LawFirm[] = cachedResults.map((place: any) => ({
+            id: place.place_id,
+            name: place.name,
+            address: place.vicinity || place.formatted_address || 'Address not available',
+            phone: place.formatted_phone_number,
+            rating: place.rating,
+            user_ratings_total: place.user_ratings_total,
+            types: place.types,
+            latitude: place.geometry?.location?.lat || 0,
+            longitude: place.geometry?.location?.lng || 0,
+            place_id: place.place_id,
+            distance_km: place.distance_km
+          }));
+
+          // Set cached data immediately (0ms load time)
+          setAllFetchedFirms(firms);
+          setLawFirms(firms);
+          setSearchCenter({
+            lat: cachedResults[0]?.geometry?.location?.lat || 14.5995,
+            lng: cachedResults[0]?.geometry?.location?.lng || 120.9842
+          });
+          setLoading(false);
+          
+          // Background refresh to ensure data is fresh (stale-while-revalidate)
+          console.log(`🔄 Background refresh for ${locationName}...`);
+          fetchFreshData(locationName);
+          return;
+        }
+      }
+
+      // No cache hit - fetch fresh data with loading state
+      setLoading(true);
+      setError(null);
+      console.log(`🔍 Cache miss - fetching fresh data for: ${locationName}`);
+      
+      await fetchFreshData(locationName);
+      
+    } catch (error) {
+      console.error('Error in searchByLocationName:', error);
+      setError('Failed to search for law firms. Please try again.');
+      setAllFetchedFirms([]);
+      setLawFirms([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [cache, selectedRadius, fetchFreshData]);
 
   // Optimized prediction selection with session token renewal
   const handlePredictionSelectUpdated = useCallback(async (prediction: AutocompletePrediction) => {
@@ -548,8 +615,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
   const handleShowOnMap = useCallback((firm: LawFirm) => {
     setSelectedFirmId(firm.id);
     setCurrentView('map');
-    // Update map center to focus on selected firm
-    setMapCenter({ lat: firm.latitude, lng: firm.longitude });
+    // Map centering is handled by the existing map system
   }, []);
 
 
@@ -756,7 +822,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
                 
                 map = new google.maps.Map(document.getElementById("map"), {
                     zoom: zoomLevel,
-                    center: { lat: ${mapCenter.lat}, lng: ${mapCenter.lng} },
+                    center: { lat: ${searchCenter?.lat || 14.5995}, lng: ${searchCenter?.lng || 120.9842} },
                     mapTypeControl: true,
                     streetViewControl: true,
                     fullscreenControl: true,
@@ -949,7 +1015,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     </body>
     </html>
     `;
-  }, [sortedLawFirms, mapCenter, userLocation, selectedFirmId]);
+  }, [sortedLawFirms, searchCenter, userLocation, selectedFirmId]);
 
   const renderLawFirmCard = useCallback((firm: LawFirm) => (
     <Box key={firm.id} className="mb-3 bg-white rounded-lg border border-gray-200">
@@ -1158,51 +1224,17 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
 
   // Search header with autocomplete dropdown - Unified with lawyer directory style
   const renderSearchHeader = () => (
-    <VStack space="md" className="px-5 py-4 bg-white" style={{ zIndex: 999 }}>
+    <VStack className="px-5 bg-white" style={{ zIndex: 999 }}>
       <Box className="relative" style={{ zIndex: 1000 }}>
-        {/* Unified search input matching lawyer directory */}
-        <Box className="bg-white rounded-lg border border-gray-300" style={{ minHeight: 48 }}>
-          <HStack className="items-center px-3">
-            <Ionicons name="search" size={18} color="#6B7280" />
-            <TextInput
-              className="flex-1 py-3 px-3 text-base"
-              placeholder="Search by street, barangay, or city"
-              placeholderTextColor="#9CA3AF"
-              value={searchText}
-              onChangeText={handleSearchTextChange}
-              onSubmitEditing={handleSearch}
-              onFocus={handleSearchFocus}
-              onBlur={handleSearchBlur}
-              returnKeyType="search"
-              editable={!searching}
-              style={{ 
-                color: Colors.text.head,
-                fontSize: 16,
-                minHeight: 42
-              }}
-              autoCorrect={false}
-              autoCapitalize="words"
-              blurOnSubmit={false}
-              maxLength={100}
-            />
-            {searchText.length > 0 && !searching && (
-              <Pressable 
-                onPress={() => {
-                  setSearchText('');
-                  searchTextRef.current = '';
-                  setShowPredictions(false);
-                  setPredictions([]);
-                }}
-                style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' }}
-              >
-                <Ionicons name="close" size={16} color="#6B7280" />
-              </Pressable>
-            )}
-            {searching && (
-              <Spinner size="small" color={Colors.primary.blue} />
-            )}
-          </HStack>
-        </Box>
+        {/* Unified search bar using the same component as lawyer directory */}
+        <UnifiedSearchBar
+          value={searchText}
+          onChangeText={handleSearchTextChange}
+          placeholder="Search by street, barangay, or city"
+          loading={searching}
+          editable={!searching}
+          containerClassName="pt-6 pb-4"
+        />
         
         {/* Autocomplete Dropdown */}
         {showPredictions && predictions.length > 0 && (
@@ -1383,8 +1415,8 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
       )}
 
       {allFetchedFirms.length > 0 && (
-        <Box className="px-1 pb-2">
-          <Text className="text-sm" style={{ color: Colors.text.sub }}>
+        <Box className="px-3 py-2">
+          <Text className="text-sm font-medium" style={{ color: '#374151' }}>
             Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredLawFirms.length)} of {filteredLawFirms.length} {filteredLawFirms.length === 1 ? 'law firm' : 'law firms'} within {selectedRadius}km
           </Text>
         </Box>
@@ -1613,7 +1645,7 @@ export default function GoogleLawFirmsFinder({ searchQuery }: GoogleLawFirmsFind
     </ScrollView>
   );
 
-  // Render Map View (Full Screen)
+  // Render Map View (Full Screen) - Uses same cached data as list view
   const renderMapView = () => (
     <Box className="relative flex-1">
       {/* Law Firm Counter - Top Right */}

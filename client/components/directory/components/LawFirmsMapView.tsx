@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Alert, Linking, Platform, ScrollView, TextInput, Keyboard, Dimensions } from 'react-native';
+import { View, Alert, Linking, Platform, ScrollView, Keyboard, Dimensions } from 'react-native';
 import * as Location from 'expo-location';
 import { NetworkConfig } from '../../../utils/networkConfig';
 import { VStack } from '@/components/ui/vstack';
@@ -9,6 +9,7 @@ import { Button, ButtonText } from '@/components/ui/button/';
 import { Box } from '@/components/ui/box';
 import { Pressable } from '@/components/ui/pressable';
 import { Spinner } from '@/components/ui/spinner';
+import UnifiedSearchBar from '@/components/common/UnifiedSearchBar';
 import { 
   Phone, 
   Navigation, 
@@ -18,9 +19,7 @@ import {
   Map,
   ArrowLeft,
   Smartphone,
-  Search,
-  Locate,
-  X
+  Locate
 } from 'lucide-react-native';
 import Colors from '../../../constants/Colors';
 import { shadowPresets, createShadowStyle } from '../../../utils/shadowUtils';
@@ -86,9 +85,15 @@ interface ScreenSize {
 
 interface LawFirmsMapViewProps {
   searchQuery?: string;
+  cache?: {
+    get: (location: string, radius: number) => any;
+    set: (location: string, radius: number, results: any) => void;
+    clear: () => void;
+    getStats: () => any;
+  };
 }
 
-export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
+export default function LawFirmsMapView({ searchQuery, cache }: LawFirmsMapViewProps) {
   const [lawFirms, setLawFirms] = useState<LawFirm[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
@@ -233,12 +238,9 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
     }
   }, [fetchAutocomplete]);
 
-  // Search functions
-  const searchByLocationName = useCallback(async (locationName: string) => {
+  // Separate function for fresh data fetching (used for cache misses and background refresh)
+  const fetchFreshMapData = useCallback(async (locationName: string) => {
     try {
-      setSearching(true);
-      console.log(`Searching for law firms in: ${locationName}`);
-
       const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(`${apiUrl}/api/places/search-by-location`, {
         method: 'POST',
@@ -271,6 +273,13 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
           place_id: place.place_id,
           distance_km: place.distance_km || 0
         }));
+
+        // FAANG Cache: Store fresh data for future instant responses
+        if (cache) {
+          const cacheLocationName = data.location_info?.name || locationName;
+          cache.set(cacheLocationName, selectedRadius, data.results);
+          console.log(`🗺️ Map Cache SET: ${firms.length} law firms for ${cacheLocationName} (${selectedRadius}km)`);
+        }
         
         setLawFirms(firms);
         setCurrentLocationName(data.location_info?.name || locationName);
@@ -282,6 +291,12 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
             lng: data.location_info.coordinates.lng
           });
         }
+
+        // Log cache stats for debugging
+        if (cache) {
+          const stats = cache.getStats();
+          console.log(`🗺️ Map Cache Stats: ${stats.valid}/${stats.total} valid entries`);
+        }
       } else {
         throw new Error(data.message || 'No results found');
       }
@@ -292,7 +307,58 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
     } finally {
       setSearching(false);
     }
-  }, [selectedRadius]);
+  }, [selectedRadius, cache]);
+
+  // Search functions with FAANG cache-first approach (Google/Netflix pattern)
+  const searchByLocationName = useCallback(async (locationName: string) => {
+    try {
+      // FAANG Cache-First Strategy: Check cache first for instant response
+      if (cache) {
+        const cachedResults = cache.get(locationName, selectedRadius);
+        if (cachedResults) {
+          console.log(`🗺️ Map Cache HIT: ${cachedResults.length} law firms for ${locationName} (${selectedRadius}km)`);
+          const firms: LawFirm[] = cachedResults.map((place: any) => ({
+            id: place.place_id,
+            name: place.name || 'Law Firm',
+            address: place.formatted_address || place.vicinity || 'Address not available',
+            phone: place.formatted_phone_number || place.international_phone_number,
+            rating: place.rating || 0,
+            user_ratings_total: place.user_ratings_total || 0,
+            types: place.types || [],
+            latitude: place.geometry?.location?.lat || CONSTANTS.DEFAULT_LOCATION.lat,
+            longitude: place.geometry?.location?.lng || CONSTANTS.DEFAULT_LOCATION.lng,
+            place_id: place.place_id,
+            distance_km: place.distance_km
+          }));
+
+          // Set cached data immediately (0ms load time)
+          setLawFirms(firms);
+          setMapCenter({
+            lat: cachedResults[0]?.geometry?.location?.lat || CONSTANTS.DEFAULT_LOCATION.lat,
+            lng: cachedResults[0]?.geometry?.location?.lng || CONSTANTS.DEFAULT_LOCATION.lng
+          });
+          setSearching(false);
+          
+          // Background refresh to ensure data is fresh (stale-while-revalidate)
+          console.log(`🔄 Map background refresh for ${locationName}...`);
+          fetchFreshMapData(locationName);
+          return;
+        }
+      }
+
+      // No cache hit - fetch fresh data with loading state
+      setSearching(true);
+      console.log(`🗺️ Map Cache MISS - fetching fresh data for: ${locationName}`);
+      
+      await fetchFreshMapData(locationName);
+      
+    } catch (error) {
+      console.error('Error in map searchByLocationName:', error);
+      setLawFirms([]);
+    } finally {
+      setSearching(false);
+    }
+  }, [cache, selectedRadius, fetchFreshMapData]);
 
   const handlePredictionSelect = useCallback((prediction: AutocompletePrediction) => {
     setSearchText(prediction.description);
@@ -391,20 +457,7 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
     }
   }, [locationPermission, selectedRadius]);
 
-  // Search focus/blur handlers
-  const handleSearchFocus = useCallback(() => {
-    if (predictions.length > 0 && searchText.length >= 2) {
-      setShowPredictions(true);
-    }
-  }, [predictions.length, searchText.length]);
-
-  const handleSearchBlur = useCallback(() => {
-    // Delay hiding to allow for prediction selection
-    setTimeout(() => {
-      setShowPredictions(false);
-    }, 150);
-  }, []);
-
+  
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -1094,7 +1147,6 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
 
   // Mobile Search Header Component - Industry-grade responsive design
   const renderMobileSearchHeader = () => {
-    const fontSize = screenSize.isSmall ? 14 : screenSize.isMedium ? 15 : 16;
     const placeholderText = screenSize.isSmall 
       ? "Search area (e.g., 'Makati')" 
       : "Search by street, barangay, or city (e.g., '62 Baco', 'Makati')";
@@ -1102,52 +1154,15 @@ export default function LawFirmsMapView({ searchQuery }: LawFirmsMapViewProps) {
     return (
       <VStack space="md" className="px-4 py-4 bg-white" style={{ zIndex: 1000 }}>
         <Box className="relative" style={{ zIndex: 1000 }}>
-          {/* Enhanced Search Input with 48px minimum touch target */}
-          <Box 
-            className="bg-white rounded-lg border border-gray-300 focus:border-blue-400" 
-            style={{ minHeight: 48 }}
-          >
-            <HStack className="items-center px-3">
-              <Search size={18} color="#6B7280" />
-              <TextInput
-                className="flex-1 py-3 px-3"
-                style={{ 
-                  fontSize,
-                  color: Colors.text.head,
-                  minHeight: 42 // Ensure touch target
-                }}
-                placeholder={placeholderText}
-                placeholderTextColor="#9CA3AF"
-                value={searchText}
-                onChangeText={handleSearchTextChangeWithAutocomplete}
-                onSubmitEditing={handleSearch}
-                onFocus={handleSearchFocus}
-                onBlur={handleSearchBlur}
-                returnKeyType="search"
-                editable={!searching}
-                autoCorrect={false}
-                autoCapitalize="words"
-                blurOnSubmit={false}
-                maxLength={100}
-              />
-              {searchText.length > 0 && !searching && (
-                <Pressable 
-                  onPress={() => {
-                    setSearchText('');
-                    searchTextRef.current = '';
-                    setShowPredictions(false);
-                    setPredictions([]);
-                  }} 
-                  style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' }}
-                >
-                  <X size={16} color="#6B7280" />
-                </Pressable>
-              )}
-              {searching && (
-                <Spinner size="small" color={Colors.primary.blue} />
-              )}
-            </HStack>
-          </Box>
+          {/* Unified search bar using the same component as lawyer directory */}
+          <UnifiedSearchBar
+            value={searchText}
+            onChangeText={handleSearchTextChangeWithAutocomplete}
+            placeholder={placeholderText}
+            loading={searching}
+            editable={!searching}
+            containerClassName="pt-0 pb-0"
+          />
           
           {/* Mobile Autocomplete Dropdown */}
           {showPredictions && predictions.length > 0 && (

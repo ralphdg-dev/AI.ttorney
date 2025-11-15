@@ -42,10 +42,88 @@ interface Lawyer {
   created_at: string;
 }
 
+// FAANG-style multi-layer caching system
 const frontendCache = {
   lawyers: null as any,
   timestamp: 0,
-  ttl: 5 * 60 * 1000,
+  ttl: 5 * 60 * 1000, // 5 minutes for lawyers
+};
+
+// Law firms cache with location+radius keys (Google/Netflix pattern)
+const lawFirmsCache = {
+  data: new Map<string, { results: any; timestamp: number; location: string; radius: number }>(),
+  ttl: 5 * 60 * 1000, // 5 minutes - Google Places data changes frequently
+  maxSize: 50, // Prevent memory bloat
+  
+  // Generate cache key: "{location}_{radius}"
+  getKey: (location: string, radius: number): string => `${location.toLowerCase()}_${radius}`,
+  
+  // Get cached results if valid
+  get: (location: string, radius: number) => {
+    const key = lawFirmsCache.getKey(location, radius);
+    const cached = lawFirmsCache.data.get(key);
+    
+    if (!cached) return null;
+    
+    // Check TTL
+    if (Date.now() - cached.timestamp > lawFirmsCache.ttl) {
+      lawFirmsCache.data.delete(key);
+      return null;
+    }
+    
+    console.log(`🎯 Cache HIT: ${cached.results.length} law firms for ${location} (${radius}km)`);
+    return cached.results;
+  },
+  
+  // Set cache with automatic cleanup
+  set: (location: string, radius: number, results: any) => {
+    const key = lawFirmsCache.getKey(location, radius);
+    
+    // Cleanup old entries if max size reached
+    if (lawFirmsCache.data.size >= lawFirmsCache.maxSize) {
+      const oldestKey = lawFirmsCache.data.keys().next().value;
+      if (oldestKey) {
+        lawFirmsCache.data.delete(oldestKey);
+      }
+    }
+    
+    lawFirmsCache.data.set(key, {
+      results,
+      timestamp: Date.now(),
+      location,
+      radius
+    });
+    
+    console.log(`💾 Cache SET: ${results.length} law firms for ${location} (${radius}km)`);
+  },
+  
+  // Clear all cache
+  clear: () => {
+    lawFirmsCache.data.clear();
+    console.log('🗑️ Law firms cache cleared');
+  },
+  
+  // Get cache stats for debugging
+  getStats: () => {
+    const now = Date.now();
+    let validEntries = 0;
+    let expiredEntries = 0;
+    
+    lawFirmsCache.data.forEach((cached) => {
+      if (now - cached.timestamp <= lawFirmsCache.ttl) {
+        validEntries++;
+      } else {
+        expiredEntries++;
+      }
+    });
+    
+    return {
+      total: lawFirmsCache.data.size,
+      valid: validEntries,
+      expired: expiredEntries,
+      maxSize: lawFirmsCache.maxSize
+    };
+  }
 };
 
 export default function DirectoryScreen() {
@@ -74,8 +152,6 @@ export default function DirectoryScreen() {
         setActiveTab(normalized);
       }
     }
-    // Only respond to changes in `tab`
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   useEffect(() => {
@@ -290,10 +366,15 @@ export default function DirectoryScreen() {
 
       {/* Conditionally render based on active tab */}
       {activeTab === "law-firms" ? (
-        // Law Firms Tab - Google Law Firms Finder
-        <GoogleLawFirmsFinder searchQuery={searchQuery} />
+        // Law Firms Tab - Google Law Firms Finder with consistent container
+        <View style={{ flex: 1 }}>
+          <GoogleLawFirmsFinder 
+            searchQuery={searchQuery} 
+            cache={lawFirmsCache} // Pass FAANG cache to component
+          />
+        </View>
       ) : (
-        // Lawyers Tab - Using UnifiedSearchBar component
+        // Lawyers Tab - Using UnifiedSearchBar component with same container structure
         <View style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 20 }}>
             <UnifiedSearchBar
