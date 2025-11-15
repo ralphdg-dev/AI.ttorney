@@ -17,12 +17,12 @@ import { SidebarWrapper, useSidebar } from "@/components/AppSidebar";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import { ArticleCardSkeletonList } from "@/components/guides/ArticleCardSkeleton";
 import { useLegalArticles } from "@/hooks/useLegalArticles";
-import { useAuth } from "@/contexts/AuthContext";
+import { useGuest } from "../contexts/GuestContext";
 import { useBookmarks } from "@/contexts/BookmarksContext";
 
 export default function GuidesScreen() {
   const router = useRouter();
-  const { isGuestMode } = useAuth();
+  const { isGuestMode } = useGuest();
   const { openSidebar } = useSidebar();
   const { articles: legalArticles, loading, error, refetch, getArticlesByCategory, searchArticles } = useLegalArticles();
   const { isBookmarked, toggleBookmark } = useBookmarks();
@@ -31,7 +31,6 @@ export default function GuidesScreen() {
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
-  const [isFiltering, setIsFiltering] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const { width } = useWindowDimensions();
   
@@ -69,8 +68,6 @@ export default function GuidesScreen() {
       if (previousSearchRef.current === searchKey) return;
       previousSearchRef.current = searchKey;
       
-      setIsFiltering(true);
-      
       if (trimmedQuery) {
         if (trimmedQuery.length >= 2) {
           try {
@@ -94,8 +91,6 @@ export default function GuidesScreen() {
           }
         }
       }
-      
-      setIsFiltering(false);
     }, 100);
 
     return () => clearTimeout(searchTimeout);

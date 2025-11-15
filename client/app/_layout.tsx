@@ -22,7 +22,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ModerationProvider } from "../contexts/ModerationContext";
 import { NotificationProvider } from "../contexts/NotificationContext";
 import { SidebarProvider } from "../components/AppSidebar";
-import AuthGuard from "../components/auth/AuthGuard";
+import { AuthGuard } from "../components/AuthGuard";
 import { SuspensionGuard } from "../components/SuspensionGuard";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 import NoInternetModal from "../components/common/NoInternetModal";
@@ -80,9 +80,9 @@ function AppContent() {
                       <ErrorBoundary fallbackRoute="/home">
                         <ForumCacheProvider>
                           <AuthGuard>
-                            <SuspensionGuard>
-                              <RouteErrorBoundary>
-                                <SidebarProvider>
+                          <SuspensionGuard>
+                            <RouteErrorBoundary>
+                              <SidebarProvider>
                                   <Stack screenOptions={{ headerShown: false }}>
                                     <Stack.Screen name="index" options={{ headerShown: false }} />
                                     <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -104,11 +104,10 @@ function AppContent() {
                                     <Stack.Screen name="help" options={{ headerShown: false, title: "Help" }} />
                                     <Stack.Screen name="profile" options={{ headerShown: false }} />
                                   </Stack>
-                                </SidebarProvider>
-                              </RouteErrorBoundary>
-                            </SuspensionGuard>
-                          </AuthGuard>
-                        {/* </AuthGuard> */}
+                              </SidebarProvider>
+                            </RouteErrorBoundary>
+                          </SuspensionGuard>
+                        </AuthGuard>
                         </ForumCacheProvider>
                       </ErrorBoundary>
                     </ConsultationsProvider>

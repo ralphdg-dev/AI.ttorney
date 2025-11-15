@@ -9,10 +9,12 @@ import { Ionicons } from "@expo/vector-icons";
 import logo from "../assets/images/logo.png";
 import { useToast, Toast, ToastTitle, ToastDescription } from "../components/ui/toast";
 import { useAuth } from "../contexts/AuthContext";
+import { useGuest } from "../contexts/GuestContext";
 
 export default function Login() {
   const toast = useToast();
-  const { signIn, continueAsGuest, isAuthenticated } = useAuth();
+  const { signIn, isAuthenticated } = useAuth();
+  const { startGuestSession } = useGuest();
   const lastDeniedAtRef = useRef<number>(0);
   const deniedToastInProgressRef = useRef<boolean>(false);
   
@@ -88,7 +90,7 @@ export default function Login() {
       setIsSubmitting(true);
       const result = await signIn(email.toLowerCase().trim(), password);
 
-      if (result.suppressToast) {
+      if (!result.success) {
         return;
       }
 
@@ -333,7 +335,7 @@ export default function Login() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={continueAsGuest}
+            onPress={startGuestSession}
             style={tw`mt-3`}
             activeOpacity={0.7}
           >
