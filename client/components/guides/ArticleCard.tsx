@@ -68,7 +68,9 @@ const CHEVRON_SIZE = 20;
 
 // Styles
 const cardStyles = {
-  container: tw`mb-4 flex-1`,
+  container: {
+    marginBottom: 16,
+  },
   card: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -77,6 +79,8 @@ const cardStyles = {
     overflow: "hidden" as const,
     position: "relative" as const,
     flexDirection: "column" as const,
+    minHeight: 320, // Ensure consistent height
+    elevation: 2,
   },
   imageContainer: { height: IMAGE_HEIGHT, width: "100%" as const },
   image: { width: "100%" as const, height: "100%" as const },
@@ -89,7 +93,12 @@ const cardStyles = {
     backgroundColor: "rgba(255,255,255,0.9)",
     zIndex: 10,
   },
-  content: { padding: 16, paddingBottom: 48 },
+  content: { 
+    padding: 16, 
+    paddingBottom: 48,
+    flex: 1, // Allow content to fill available space
+    justifyContent: "space-between" as const,
+  },
   header: { flexDirection: "row" as const, alignItems: "flex-start" as const, justifyContent: "space-between" as const, marginBottom: 12 },
   title: { fontWeight: "700" as const, fontSize: 16, flex: 1, marginRight: 8 },
   filipinoTitle: { fontSize: 14, marginBottom: 12, fontWeight: "500" as const },
@@ -288,7 +297,13 @@ export const ArticleList = ({
         keyExtractor={(item) => item.id}
         numColumns={numColumns}
         key={numColumns} // fixes refresh/remount bug
-        contentContainerStyle={tw`px-2 pb-20`}
+        contentContainerStyle={{
+          paddingHorizontal: 8,
+          paddingBottom: 20,
+        }}
+        columnWrapperStyle={numColumns > 1 ? {
+          justifyContent: 'space-between',
+        } : undefined}
       />
     </View>
   );

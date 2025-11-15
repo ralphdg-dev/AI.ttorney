@@ -33,7 +33,7 @@ import { useGuest } from "../contexts/GuestContext";
 import { useBookmarks } from "@/contexts/BookmarksContext";
 import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 8;
 
 export default function GlossaryScreen() {
   const router = useRouter();
@@ -573,37 +573,55 @@ export default function GlossaryScreen() {
     );
   }, [activeTab, termsLoading, articlesLoading, isSearchingArticles, termsError, articlesError, isOffline, currentData.length, searchQuery, currentPage, fetchLegalTerms, refetch]);
 
-  const renderItem = useCallback(({ item }: { item: any }) => {
-    const itemMarginBottom = isDesktop ? 16 : isTablet ? 14 : 12;
-    
-    if (activeTab === "terms") {
-      return (
-        <TermListItem
-          item={item}
-          onPress={handleItemPress}
-          showFavorite={!isGuestMode}
-          containerStyle={{
-            width: numColumns > 1 ? (screenWidth - horizontalPadding * 2 - 12) / numColumns : "100%",
-            marginBottom: itemMarginBottom,
-          }}
-        />
-      );
-    } else {
-      return (
-        <ArticleCard
-          item={item}
-          onPress={handleItemPress}
-          onToggleBookmark={handleToggleBookmark}
-          showBookmark={!isGuestMode}
-          containerStyle={{
-            width: numColumns > 1 ? (screenWidth - horizontalPadding * 2 - 12) / numColumns : "100%",
-            marginHorizontal: 0,
-            marginBottom: itemMarginBottom,
-          }}
-        />
-      );
-    }
-  }, [activeTab, handleItemPress, handleToggleBookmark, numColumns, screenWidth, horizontalPadding, isGuestMode, isDesktop, isTablet]);
+  const renderItem = useCallback(
+    ({ item, index }: { item: any; index: number }) => {
+      const itemMarginBottom = isDesktop ? 16 : isTablet ? 14 : 12;
+      const columnGap = isDesktop ? 16 : isTablet ? 14 : 12;
+      const isLastInRow = numColumns <= 1 ? true : (index + 1) % numColumns === 0;
+
+      const totalHorizontalGaps = numColumns > 1 ? columnGap * (numColumns - 1) : 0;
+      const cardWidth =
+        (screenWidth - horizontalPadding * 2 - totalHorizontalGaps) / numColumns;
+
+      const baseContainerStyle = {
+        width: cardWidth,
+        marginBottom: itemMarginBottom,
+        ...(numColumns > 1 && !isLastInRow ? { marginRight: columnGap } : {}),
+      } as const;
+
+      if (activeTab === "terms") {
+        return (
+          <TermListItem
+            item={item}
+            onPress={handleItemPress}
+            showFavorite={!isGuestMode}
+            containerStyle={baseContainerStyle}
+          />
+        );
+      } else {
+        return (
+          <ArticleCard
+            item={item}
+            onPress={handleItemPress}
+            onToggleBookmark={handleToggleBookmark}
+            showBookmark={!isGuestMode}
+            containerStyle={baseContainerStyle}
+          />
+        );
+      }
+    },
+    [
+      activeTab,
+      handleItemPress,
+      handleToggleBookmark,
+      numColumns,
+      screenWidth,
+      horizontalPadding,
+      isGuestMode,
+      isDesktop,
+      isTablet,
+    ]
+  );
 
 
   return (
@@ -654,7 +672,7 @@ export default function GlossaryScreen() {
           }}
           columnWrapperStyle={
             numColumns > 1
-              ? { justifyContent: "space-between", marginBottom: 0 }
+              ? { justifyContent: "flex-start" }
               : undefined
           }
           renderItem={renderItem}

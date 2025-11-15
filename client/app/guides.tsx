@@ -34,7 +34,7 @@ export default function GuidesScreen() {
   const flatListRef = useRef<FlatList>(null);
   const { width } = useWindowDimensions();
   
-  const ARTICLES_PER_PAGE = 12;
+  const ARTICLES_PER_PAGE = 8;
   const cardGap = LAYOUT.SPACING.md; // 16
   
   // FAANG approach: Always 1 column on mobile for better UX
@@ -328,7 +328,7 @@ const renderPagination = () => {
               ListHeaderComponent={renderListHeader}
               ListFooterComponent={renderPagination}
               contentContainerStyle={{
-                paddingHorizontal: 20,
+                paddingHorizontal: 12,
                 paddingBottom: 100,  
                 flexGrow: 1 
               }}
@@ -340,9 +340,7 @@ const renderPagination = () => {
                   onToggleBookmark={handleToggleBookmark}
                   showBookmark={!isGuestMode}
                   containerStyle={{
-                    width: numColumns > 1 ? (width - 32 - 12) / numColumns : "100%",
-                    marginHorizontal: 0,
-                    marginBottom: cardGap,
+                    width: numColumns > 1 ? (width - 24 - 16) / numColumns : "100%",
                   }}
                 />
               )}
