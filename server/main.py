@@ -63,7 +63,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
+# Request logging middleware (added before CORS to run after it)
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"🌐 {request.method} {request.url.path}")
+    logger.info(f"🔑 Headers: {dict(request.headers)}")
+    response = await call_next(request)
+    logger.info(f"📤 Response status: {response.status_code}")
+    return response
+
+# Configure CORS (added after logging to run before it)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -76,25 +85,15 @@ app.add_middleware(
         "http://192.168.68.102:8081",  # Old network Expo dev server
         "exp://192.168.68.102:8081",   # Old network Expo dev server
         "http://192.168.68.102:8000",  # Old API server access
-        "*",  # Allow all origins for Expo Go (development only)
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
 
 # Import routes after app creation to avoid circular imports
 from routes import auth
 from routes.forum import router as forum_router
-
-# Request logging middleware
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    logger.info(f"🌐 {request.method} {request.url.path}")
-    logger.info(f"🔑 Headers: {dict(request.headers)}")
-    response = await call_next(request)
-    logger.info(f"📤 Response status: {response.status_code}")
-    return response
 
 # Global exception handler
 @app.exception_handler(Exception)
