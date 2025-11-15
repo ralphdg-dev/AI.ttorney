@@ -7,9 +7,7 @@ const router = express.Router();
 // Get all forum posts with filtering and pagination
 router.get("/posts", authenticateAdmin, async (req, res) => {
   try {
-    console.log("=== FORUM POSTS ENDPOINT CALLED ===");
-    console.log("Query params:", req.query);
-
+    
     const {
       page = 1,
       limit = 50,
@@ -24,11 +22,7 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
     const offset = (page - 1) * limit;
 
     // Build the query with filters
-    console.log(
-      `Fetching forum posts: page ${page}, limit ${limit}, offset ${offset}`
-    );
-    console.log("Applied filters:", { search, category, status, reported });
-
+    
     let query = supabaseAdmin
       .from("forum_posts")
       .select(
@@ -96,34 +90,13 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
 
     const { data: testPosts, error: testError } = await query;
 
-    console.log("Basic query result:", {
-      count: testPosts?.length || 0,
-      error: testError,
-      sample: testPosts?.[0] || null,
-    });
-
+    
     // Debug: Check what fields are available in the first post
     if (testPosts && testPosts.length > 0) {
-      console.log(
-        "Available fields in forum_posts:",
-        Object.keys(testPosts[0])
-      );
-      console.log("Sample post data:", {
-        id: testPosts[0].id,
-        content: testPosts[0].body,
-        text: testPosts[0].text,
-        body: testPosts[0].body,
-        message: testPosts[0].message,
-        description: testPosts[0].description,
-        title: testPosts[0].title,
-        category: testPosts[0].category,
-        type: testPosts[0].type,
-        tag: testPosts[0].tag,
-      });
+      // Debug information removed
     }
 
     if (testError) {
-      console.error("forum_posts table error:", testError);
       return res.status(500).json({
         success: false,
         error: `Database error: ${testError.message}`,
@@ -132,7 +105,6 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
     }
 
     if (!testPosts || testPosts.length === 0) {
-      console.log("No posts found in forum_posts table");
       return res.json({
         success: true,
         data: [],
@@ -169,25 +141,14 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
         5: "Other",
       };
 
-      console.log(
-        `Mapping category: "${categoryId}" -> "${
-          categories[categoryId] || categoryId || "Uncategorized"
-        }"`
-      );
-      return categories[categoryId] || categoryId || "Uncategorized";
+            return categories[categoryId] || categoryId || "Uncategorized";
     };
 
     // Process posts with actual data
     const processedPosts = testPosts.map((post, index) => {
       // Debug category for first few posts
       if (index < 3) {
-        console.log(`Post ${post.id} category debug:`, {
-          category: post.category,
-          type: post.type,
-          tag: post.tag,
-          forum_category: post.forum_category,
-          law_category: post.law_category,
-        });
+        // Debug information removed
       }
 
       const categoryValue =
@@ -282,16 +243,13 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
     const { count, error: countError } = await countQuery;
 
     if (countError) {
-      console.error("Count query error:", countError);
+      // Count query error
     }
 
     const totalCount = count || testPosts.length;
     const totalPages = Math.ceil(totalCount / parseInt(limit));
 
-    console.log(
-      `Returning ${processedPosts.length} posts out of ${totalCount} total`
-    );
-
+    
     return res.json({
       success: true,
       data: processedPosts,
@@ -303,7 +261,6 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get forum posts error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -359,7 +316,6 @@ router.get("/posts/:id", authenticateAdmin, async (req, res) => {
       data: post,
     });
   } catch (error) {
-    console.error("Get forum post error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -374,10 +330,7 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
     const { action, reason } = req.body; // action: 'delete' | 'flag' | 'restore'
     const adminId = req.admin?.id; // Get admin ID from the authenticated admin object
 
-    console.log("=== MODERATION REQUEST ===");
-    console.log("Admin object:", req.admin);
-    console.log("Admin ID:", adminId);
-
+    
     if (!action || !["delete", "flag", "restore"].includes(action)) {
       return res.status(400).json({
         success: false,
@@ -418,12 +371,7 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
       }
 
       // Create entry in flagged_posts table
-      console.log("=== CREATING FLAG RECORD ===");
-      console.log("Post ID:", id);
-      console.log("Admin ID:", adminId);
-      console.log("Reason:", reason);
-      console.log("Action:", action);
-
+      
       const flagData = {
         forum_post_id: id,
         flagged_by_admin_id: adminId, // Use admin ID from admin table
@@ -435,21 +383,13 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
         status: "active",
       };
 
-      console.log("Flag data to insert:", flagData);
-
+      
       const { data: flagResult, error: flagError } = await supabaseAdmin
         .from("flagged_posts")
         .insert(flagData)
         .select();
 
       if (flagError) {
-        console.error("Error creating flag record:", flagError);
-        console.error("Flag error details:", {
-          message: flagError.message,
-          details: flagError.details,
-          hint: flagError.hint,
-          code: flagError.code,
-        });
         return res.status(500).json({
           success: false,
           error: `Failed to create flag record: ${flagError.message}`,
@@ -457,8 +397,7 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
         });
       }
 
-      console.log("Flag record created successfully:", flagResult);
-
+      
       // Update the post to mark it as flagged
       const { data: updatedPost, error: updateError } = await supabaseAdmin
         .from("forum_posts")
@@ -487,8 +426,7 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
           details: { reason, action_type: action },
         });
       } catch (auditError) {
-        console.warn("Failed to log audit trail:", auditError.message);
-        // Don't fail the main operation if audit logging fails
+        // Failed to log audit trail - don't fail main operation
       }
 
       res.json({
@@ -510,7 +448,7 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
         .eq("status", "active");
 
       if (resolveError) {
-        console.error("Error resolving flags:", resolveError);
+        // Error resolving flags
       }
 
       // Update the post to remove flag
@@ -541,8 +479,7 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
           details: { reason, action_type: action },
         });
       } catch (auditError) {
-        console.warn("Failed to log audit trail:", auditError.message);
-        // Don't fail the main operation if audit logging fails
+        // Failed to log audit trail - don't fail main operation
       }
 
       res.json({
@@ -552,7 +489,6 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Moderate forum post error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -563,30 +499,21 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
 // Debug endpoint to check reports in database
 router.get("/reported-posts/debug", authenticateAdmin, async (req, res) => {
   try {
-    console.log("=== DEBUG ENDPOINT CALLED ===");
-
+    
     // Get sample reports
     const { data: allReports, error: reportsError } = await supabaseAdmin
       .from("forum_reports")
       .select("*")
       .limit(10);
 
-    console.log("Reports query result:", {
-      count: allReports?.length,
-      error: reportsError,
-    });
-
+    
     // Get sample posts
     const { data: allPosts, error: postsError } = await supabaseAdmin
       .from("forum_posts")
       .select("id, content, created_at")
       .limit(10);
 
-    console.log("Posts query result:", {
-      count: allPosts?.length,
-      error: postsError,
-    });
-
+    
     if (reportsError || postsError) {
       return res.json({
         success: false,
@@ -666,7 +593,6 @@ router.get("/reported-posts/debug", authenticateAdmin, async (req, res) => {
       samplePosts: allPosts?.slice(0, 3),
     });
   } catch (error) {
-    console.error("Debug endpoint error:", error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -676,8 +602,7 @@ router.get("/reported-posts/debug", authenticateAdmin, async (req, res) => {
 
 router.get("/reported-posts", authenticateAdmin, async (req, res) => {
   try {
-    console.log("Reported posts endpoint called with query:", req.query);
-
+    
     const {
       page = 1,
       limit = 50,
@@ -728,7 +653,6 @@ router.get("/reported-posts", authenticateAdmin, async (req, res) => {
     const { data: reports, error } = await query;
 
     if (error) {
-      console.error("Get reports error:", error);
       return res.status(500).json({
         success: false,
         error: `Failed to fetch reports: ${error.message}`,
@@ -756,10 +680,6 @@ router.get("/reported-posts", authenticateAdmin, async (req, res) => {
           .maybeSingle();
 
         if (postError) {
-          console.error(
-            `Error fetching post for report ${report.id}:`,
-            postError
-          );
         }
 
         post = postData || null;
@@ -785,8 +705,7 @@ router.get("/reported-posts", authenticateAdmin, async (req, res) => {
 
     const { count, error: countError } = await countQuery;
 
-    if (countError) console.error("Count error:", countError);
-
+    
     res.json({
       success: true,
       data: reportsWithPosts,
@@ -798,7 +717,6 @@ router.get("/reported-posts", authenticateAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get reported posts error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -867,7 +785,7 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
               .eq("id", postRow.id);
 
             if (flagUpdateErr) {
-              console.warn("Failed to set is_flagged=true on forum_posts:", flagUpdateErr);
+              // Failed to set is_flagged=true on forum_posts
             }
 
             // Get current user strike/suspension counts and status
@@ -919,7 +837,7 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
                 .eq("id", postRow.user_id);
 
               if (userUpdateErr) {
-                console.warn("Failed to update user status/strikes:", userUpdateErr);
+                // Failed to update user status/strikes
               }
             }
 
@@ -943,10 +861,10 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
                 .insert(violationData);
 
               if (violationErr) {
-                console.warn("Failed to create user violation record:", violationErr);
+                // Failed to create user violation record
               }
             } catch (vioErr) {
-              console.warn("Exception creating violation record:", vioErr?.message || vioErr);
+              // Exception creating violation record
             }
 
             // Only send notifications and create suspensions when not already banned
@@ -956,7 +874,7 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
           }
         }
       } catch (strikeErr) {
-        console.warn("Sanction side-effect (add strike) failed:", strikeErr?.message || strikeErr);
+        // Sanction side-effect (add strike) failed
       }
     }
 
@@ -976,7 +894,6 @@ router.patch("/reports/:id/resolve", authenticateAdmin, async (req, res) => {
       data: data,
     });
   } catch (error) {
-    console.error("Resolve report error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -1007,7 +924,6 @@ router.get("/posts/:id/flags", authenticateAdmin, async (req, res) => {
       .order("flagged_at", { ascending: false });
 
     if (error) {
-      console.error("Error fetching flags:", error);
       return res.status(500).json({
         success: false,
         error: `Failed to fetch flags: ${error.message}`,
@@ -1020,7 +936,6 @@ router.get("/posts/:id/flags", authenticateAdmin, async (req, res) => {
       count: flags?.length || 0,
     });
   } catch (error) {
-    console.error("Get post flags error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -1033,8 +948,7 @@ router.get("/posts/:id/exists", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
-    console.log(`=== CHECKING POST EXISTENCE: ${id} ===`);
-
+    
     const { data: post, error } = await supabaseAdmin
       .from("forum_posts")
       .select(
@@ -1044,7 +958,6 @@ router.get("/posts/:id/exists", authenticateAdmin, async (req, res) => {
       .maybeSingle();
 
     if (error) {
-      console.error("Database error:", error);
       return res.status(500).json({
         success: false,
         error: `Database error: ${error.message}`,
@@ -1053,9 +966,9 @@ router.get("/posts/:id/exists", authenticateAdmin, async (req, res) => {
     }
 
     const exists = !!post;
-    console.log("Post exists:", exists);
     if (exists) {
-      console.log("Post data:", {
+      // Post data debugging removed
+      const postDebug = {
         id: post.id,
         content_preview: post.body?.substring(0, 50),
         created_at: post.created_at,
@@ -1063,7 +976,7 @@ router.get("/posts/:id/exists", authenticateAdmin, async (req, res) => {
         user_id: post.user_id,
         is_anonymous: post.is_anonymous,
         category: post.category,
-      });
+      };
     }
 
     res.json({
@@ -1073,7 +986,6 @@ router.get("/posts/:id/exists", authenticateAdmin, async (req, res) => {
       message: exists ? "Post found in database" : "Post not found in database",
     });
   } catch (error) {
-    console.error("Check post existence error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -1118,7 +1030,6 @@ router.get("/statistics", authenticateAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get forum statistics error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -1129,8 +1040,7 @@ router.get("/statistics", authenticateAdmin, async (req, res) => {
 // Get all reported replies with filtering and pagination
 router.get("/reported-replies", authenticateAdmin, async (req, res) => {
   try {
-    console.log("Reported replies endpoint called with query:", req.query);
-
+    
     const {
       page = 1,
       limit = 50,
@@ -1187,7 +1097,6 @@ router.get("/reported-replies", authenticateAdmin, async (req, res) => {
     const { data: reports, error } = await query;
 
     if (error) {
-      console.error("Get reported replies error:", error);
       return res.status(500).json({
         success: false,
         error: `Failed to fetch reported replies: ${error.message}`,
@@ -1209,8 +1118,7 @@ router.get("/reported-replies", authenticateAdmin, async (req, res) => {
 
     const { count, error: countError } = await countQuery;
 
-    if (countError) console.error("Count error:", countError);
-
+    
     res.json({
       success: true,
       data: reports || [],
@@ -1222,7 +1130,6 @@ router.get("/reported-replies", authenticateAdmin, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get reported replies error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -1237,11 +1144,7 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
     const { action } = req.body; // action: 'dismiss' | 'sanctioned'
     const adminId = req.admin?.id;
 
-    console.log("=== RESOLVE REPLY REPORT ===");
-    console.log("Report ID:", id);
-    console.log("Action:", action);
-    console.log("Admin ID:", adminId);
-
+    
     if (!action || !["dismiss", "sanctioned"].includes(action)) {
       return res.status(400).json({
         success: false,
@@ -1289,7 +1192,6 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
           .single();
 
         if (userError) {
-          console.error("Error fetching user:", userError);
           throw new Error("Failed to fetch user data");
         }
 
@@ -1342,12 +1244,10 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
           .single();
 
         if (violationError) {
-          console.error("Error creating violation:", violationError);
           throw new Error("Failed to create violation record");
         }
 
-        console.log("✅ Violation created:", violation.id);
-
+        
         // Update user status
         // Build user update
         const userUpdate = {
@@ -1371,12 +1271,10 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
           .eq("id", report.reply.user_id);
 
         if (updateError) {
-          console.error("Error updating user:", updateError);
           throw new Error("Failed to update user status");
         }
 
-        console.log(`✅ User updated: ${actionTaken}, strikes: ${userUpdate.strike_count}`);
-
+        
         // Hide the reply
         const { error: hideError } = await supabaseAdmin
           .from("forum_replies")
@@ -1384,9 +1282,9 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
           .eq("id", report.reply_id);
 
         if (hideError) {
-          console.error("Error hiding reply:", hideError);
+          // Error hiding reply
         } else {
-          console.log("✅ Reply hidden");
+          // Reply hidden successfully
         }
 
         // Send notification to violating user
@@ -1421,13 +1319,12 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
             .select();
 
           if (notifError) {
-            console.error("❌ Error sending notification:", notifError);
             throw notifError;
           }
           
-          console.log("✅ Notification sent to user:", notifData);
+          // Notification sent successfully
         } catch (notifError) {
-          console.error("❌ Failed to send notification:", notifError.message || notifError);
+          // Failed to send notification
         }
 
         // Create suspension record if needed
@@ -1448,13 +1345,12 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
             .insert(suspensionData);
 
           if (suspensionError) {
-            console.error("Error creating suspension:", suspensionError);
+            // Error creating suspension
           } else {
-            console.log("✅ Suspension record created");
+            // Suspension record created successfully
           }
         }
       } catch (violationErr) {
-        console.error("Error processing violation:", violationErr);
         return res.status(500).json({
           success: false,
           error: "Failed to process violation",
@@ -1498,7 +1394,7 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
         },
       });
     } catch (auditError) {
-      console.warn("Failed to log audit trail:", auditError.message);
+      // Audit log error
     }
 
     res.json({
@@ -1507,7 +1403,6 @@ router.patch("/reply-reports/:id/resolve", authenticateAdmin, async (req, res) =
       data: data,
     });
   } catch (error) {
-    console.error("Resolve reply report error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",

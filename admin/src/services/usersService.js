@@ -34,7 +34,6 @@ class UsersService {
 
       return data;
     } catch (error) {
-      console.error('Get legal seekers error:', error);
       throw error;
     }
   }
@@ -58,7 +57,6 @@ class UsersService {
 
       return data;
     } catch (error) {
-      console.error('Get legal seeker error:', error);
       throw error;
     }
   }
@@ -83,7 +81,6 @@ class UsersService {
 
       return data;
     } catch (error) {
-      console.error('Update legal seeker status error:', error);
       throw error;
     }
   }
@@ -107,7 +104,6 @@ class UsersService {
 
       return data;
     } catch (error) {
-      console.error('Delete legal seeker error:', error);
       throw error;
     }
   }
@@ -131,7 +127,6 @@ class UsersService {
 
       return data;
     } catch (error) {
-      console.error('Get legal seekers stats error:', error);
       throw error;
     }
   }
@@ -162,7 +157,6 @@ class UsersService {
 
       return data;
     } catch (error) {
-      console.error('Get lawyers error:', error);
       throw error;
     }
   }
@@ -186,7 +180,6 @@ class UsersService {
 
       return data;
     } catch (error) {
-      console.error('Get lawyer error:', error);
       throw error;
     }
   }
@@ -211,7 +204,6 @@ class UsersService {
 
       return data;
     } catch (error) {
-      console.error('Update lawyer status error:', error);
       throw error;
     }
   }
@@ -236,7 +228,6 @@ class UsersService {
 
       return data;
     } catch (error) {
-      console.error('Archive legal seeker error:', error);
       throw error;
     }
   }
@@ -275,7 +266,6 @@ class UsersService {
         return data;
       }
     } catch (error) {
-      console.error('Update user strikes error:', error);
       throw error;
     }
   }
@@ -324,7 +314,6 @@ class UsersService {
         throw new Error(`Unknown action: ${action}`);
       }
     } catch (error) {
-      console.error(`User ${action} error:`, error);
       throw error;
     }
   }

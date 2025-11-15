@@ -34,7 +34,6 @@ Always return ONLY the translation with no extra words, explanations, or comment
       translation: completion.choices[0].message.content.trim(),
     });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: "Translation failed" });
   }
 });
