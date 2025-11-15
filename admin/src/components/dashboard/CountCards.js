@@ -2,31 +2,37 @@ import React, { useEffect, useState } from "react";
 import { Users, UserCheck, MessageSquare, Calendar } from "lucide-react";
 
 const StatCard = ({ title, value, delta, up, Icon }) => (
-  <div
-    className="rounded-lg border p-4"
-    style={{ backgroundColor: "#023D7B0D", borderColor: "#023D7B26" }}
-  >
-    <div className="flex items-center justify-between">
-      <h4 className="text-[11px] text-gray-600 font-semibold">{title}</h4>
-      {Icon ? <Icon size={16} style={{ color: "#023D7B" }} /> : <span>▢</span>}
-    </div>
-    <div className="mt-2 flex items-end justify-between">
-      <p className="text-2xl font-semibold" style={{ color: "#023D7B" }}>
-        {value?.toLocaleString?.() || 0}
-      </p>
-      {delta != null && (
-        <div className="flex items-center space-x-1">
-          <span
-            className={`text-[10px] ${
-              up ? "text-emerald-600" : "text-red-600"
-            }`}
-          >
-            {up ? "+" : ""}
-            {delta}%
-          </span>
-          <span className="text-gray-400">{up ? "↗" : "↙"}</span>
+  <div className="group relative overflow-hidden rounded-xl border border-blue-100 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:border-blue-200">
+    {/* Gradient overlay on hover */}
+    <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+    
+    <div className="relative">
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{title}</h4>
+        <div className="p-2 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100/50 group-hover:from-blue-100 group-hover:to-blue-200/50 transition-all duration-300">
+          {Icon ? <Icon size={20} className="text-[#023D7B]" /> : <span>▢</span>}
         </div>
-      )}
+      </div>
+      
+      <div className="flex items-end justify-between">
+        <p className="text-3xl font-bold bg-gradient-to-br from-[#023D7B] to-[#0E5E9C] bg-clip-text text-transparent">
+          {value?.toLocaleString?.() || 0}
+        </p>
+        {delta != null && (
+          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-gray-50 to-gray-100">
+            <span className={`text-xs font-semibold ${
+              up ? "text-emerald-600" : "text-red-600"
+            }`}>
+              {up ? "+" : ""}{delta}%
+            </span>
+            <span className={`text-sm ${
+              up ? "text-emerald-500" : "text-red-500"
+            }`}>
+              {up ? "↗" : "↙"}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   </div>
 );

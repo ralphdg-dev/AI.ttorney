@@ -182,9 +182,6 @@ export default function Help() {
                     <Item title="Profile Management" query={query} keywords="first name last name email read only joined date change password policy">
                         Update your first and last name. Email is read-only. Joined Date is sourced from the users table. Change password with current-password verification and policy checks.
                     </Item>
-                    <Item title="Maintenance Mode" query={query} keywords="toggle configure maintenance message">
-                        Toggle and configure maintenance messaging if available in your build.
-                    </Item>
                 </Section>
 
                 <Section title="Tips & Troubleshooting" icon={ListChecks} query={query}>

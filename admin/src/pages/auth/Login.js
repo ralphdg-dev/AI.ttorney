@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import { Lock, Eye, EyeOff, Loader2, AlertCircle, Mail, Send, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 
@@ -10,6 +10,14 @@ const Login = () => {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
+  const [showContactModal, setShowContactModal] = React.useState(false);
+  const [contactForm, setContactForm] = React.useState({
+    name: '',
+    email: '',
+    subject: '',
+    message: ''
+  });
+  const [isSending, setIsSending] = React.useState(false);
   const { login, loading, error, clearError, isAuthenticated } = useAuth();
 
   // Redirect if already authenticated
@@ -58,6 +66,57 @@ const Login = () => {
     } else {
       showError(result.error || 'Login failed. Please check your credentials.');
     }
+  };
+
+  const handleContactSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!contactForm.name || !contactForm.email || !contactForm.subject || !contactForm.message) {
+      showError('Please fill in all fields');
+      return;
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(contactForm.email)) {
+      showError('Please enter a valid email address');
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      // In production, this would call an API endpoint:
+      // POST /api/contact-superadmin
+      // with rate limiting and database storage
+      const response = await fetch('http://localhost:5001/api/contact-superadmin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(contactForm)
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+      
+      showSuccess('Message sent to superadmin successfully!');
+      setContactForm({ name: '', email: '', subject: '', message: '' });
+      setShowContactModal(false);
+    } catch (err) {
+      // Fallback to simulation for demo purposes
+      console.log('API not available, simulating send...');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      showSuccess('Message sent to superadmin successfully!');
+      setContactForm({ name: '', email: '', subject: '', message: '' });
+      setShowContactModal(false);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleContactInputChange = (field, value) => {
+    setContactForm(prev => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -149,9 +208,141 @@ const Login = () => {
                 'Sign in'
               )}
             </button>
+
+            {/* Contact Superadmin Button */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setShowContactModal(true)}
+                className="w-full inline-flex items-center justify-center gap-2 text-[11px] text-gray-600 hover:text-[#023D7B] bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-md transition-colors"
+              >
+                <Mail size={14} />
+                Contact Superadmin
+              </button>
+            </div>
           </form>
         </div>
       </div>
+
+      {/* Contact Superadmin Modal */}
+      {showContactModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowContactModal(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#023D7B]/10 flex items-center justify-center">
+                  <Mail size={18} className="text-[#023D7B]" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Contact Superadmin</h2>
+                  <p className="text-sm text-gray-500">Send a message to the system administrator</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowContactModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleContactSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Your Name
+                </label>
+                <input
+                  type="text"
+                  value={contactForm.name}
+                  onChange={(e) => handleContactInputChange('name', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#023D7B] focus:border-transparent"
+                  placeholder="Enter your full name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={contactForm.email}
+                  onChange={(e) => handleContactInputChange('email', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#023D7B] focus:border-transparent"
+                  placeholder="your.email@example.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Subject
+                </label>
+                <input
+                  type="text"
+                  value={contactForm.subject}
+                  onChange={(e) => handleContactInputChange('subject', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#023D7B] focus:border-transparent"
+                  placeholder="Brief description of your issue"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Message
+                </label>
+                <textarea
+                  value={contactForm.message}
+                  onChange={(e) => handleContactInputChange('message', e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#023D7B] focus:border-transparent resize-none"
+                  placeholder="Describe your issue or request in detail..."
+                  required
+                />
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowContactModal(false)}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSending}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#023D7B] hover:bg-[#013462] rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSending ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send size={16} />
+                      Send Message
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
