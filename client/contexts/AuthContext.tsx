@@ -139,9 +139,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         supabaseUser: session.user,
       });
 
+      // ALWAYS check if user is deactivated - this takes priority over everything
+      if (profile && profile.account_status === 'deactivated') {
+        // Only redirect if not already on deactivated page to prevent infinite loops
+        const currentRoute = window.location.pathname || '';
+        if (!currentRoute.includes('/deactivated')) {
+          setIsLoading(false);
+          router.replace('/deactivated' as any);
+        } else {
+          setIsLoading(false);
+        }
+        return;
+      }
+
       // Only handle navigation on explicit login attempts
       if (shouldNavigate && profile) {
-        // FIRST: Check if user is suspended - this takes priority over everything
+        // Check if user is suspended - this takes priority over everything
         const suspensionStatus = await checkSuspensionStatus();
         if (suspensionStatus && suspensionStatus.isSuspended) {
           console.log('🚫 User is suspended, redirecting to suspended screen');
@@ -358,6 +371,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ...prev,
             user: profile,
           }));
+          
+          // Check if account became deactivated and redirect immediately
+          if (profile.account_status === 'deactivated') {
+            // Only redirect if not already on deactivated page to prevent infinite loops
+            const currentRoute = window.location.pathname || '';
+            if (!currentRoute.includes('/deactivated')) {
+              router.replace('/deactivated' as any);
+            }
+          }
         }
       }
     } catch (error) {

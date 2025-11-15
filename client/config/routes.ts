@@ -40,6 +40,12 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     serverValidation: true,
     errorBoundary: true
   },
+  '/deactivated': { 
+    path: '/deactivated', 
+    isPublic: true,
+    redirectTo: 'role-based',
+    errorBoundary: true
+  },
   '/onboarding/onboarding': { 
     path: '/onboarding/onboarding', 
     isPublic: true,

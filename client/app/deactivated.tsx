@@ -7,7 +7,7 @@ import { supabase } from '../config/supabase';
 import { useRouter } from 'expo-router';
 
 const DeactivatedPage: React.FC = () => {
-  const { signOut, refreshProfile, session } = useAuth();
+  const { signOut, refreshUserData, session } = useAuth();
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [isReactivating, setIsReactivating] = React.useState(false);
@@ -28,20 +28,13 @@ const DeactivatedPage: React.FC = () => {
       
       // Get the correct API URL using NetworkConfig
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      console.log('🔄 Reactivating account at:', apiUrl);
       
-      // Use AuthContext session data (industry-standard pattern)
-      console.log('🔍 Checking session from AuthContext...');
-      console.log('📋 Session available:', session ? 'YES' : 'NO');
-      console.log('🎫 Access token:', session?.access_token ? 'PRESENT' : 'MISSING');
-      
+      // Use AuthContext session data
       if (!session?.access_token) {
-        console.error('❌ No authentication token available');
         setIsReactivating(false);
         return;
       }
       
-      console.log('🚀 Making PATCH request with Authorization header...');
       const response = await fetch(`${apiUrl}/auth/reactivate`, {
         method: 'PATCH',
         headers: {
@@ -49,18 +42,15 @@ const DeactivatedPage: React.FC = () => {
           'Accept': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        credentials: 'include',
       });
-
+      
+      const data = await response.json();
+      
       if (response.ok) {
-        console.log('✅ Account reactivated successfully');
-        // Refresh profile to update account status
-        await refreshProfile();
-        console.log('🔄 Redirecting to home after successful reactivation...');
-        // Force redirect to home after successful reactivation
+        await refreshUserData();
         router.replace('/home');
       } else {
-        console.error('❌ Failed to reactivate account:', response.status, response.statusText);
+        setIsReactivating(false);
       }
     } catch (error) {
       console.error('Error during reactivation:', error);

@@ -23,7 +23,8 @@ import {
   Shield, 
   ChevronRight,
   Plus,
-  FileText
+  FileText,
+  UserX
 } from "lucide-react-native";
 
 type SettingItem = {
@@ -70,6 +71,15 @@ export default function SettingsScreen() {
       type: "toggle",
       value: pushNotifications,
       onToggle: setPushNotifications,
+    },
+    {
+      id: "deactivate-account",
+      title: "Deactivate account",
+      icon: <UserX size={20} color={Colors.text.body} />,
+      type: "navigation",
+      onPress: () => {
+        router.push("/settings/deactivate-account");
+      },
     },
   ];
 

@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from auth.models import UserSignUp, UserSignIn, OTPRequest, VerifyOTPRequest, OTPResponse, PasswordReset, SendOTPRequest
-from auth.service import AuthService
+from auth.service import AuthService, clear_auth_cache
 from services.otp_service import OTPService
 from middleware.auth import get_current_user
 from pydantic import BaseModel
@@ -241,6 +241,228 @@ async def select_role(request: RoleSelectionRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update role"
+        )
+
+@router.post("/validate-email", response_model=Dict[str, Any])
+async def validate_email(
+    request: dict = Body(...),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Validate user email without performing any action"""
+    try:
+        # Extract email from request body
+        email = request.get("email")
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email is required"
+            )
+        
+        logger.info(f"Email validation request received for user: {current_user.get('user', {}).get('email', 'unknown')}")
+        
+        # Get user's email from current_user
+        user_data = current_user.get("user", {})
+        user_email = user_data.get("email")
+        if not user_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User email not found"
+            )
+        
+        # Compare emails (case-insensitive)
+        if email.lower().strip() != user_email.lower().strip():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email does not match your account"
+            )
+        
+        logger.info(f"✅ Email validation successful for user: {user_email}")
+        
+        return {
+            "success": True,
+            "message": "Email is valid",
+            "valid": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Email validation error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to validate email"
+        )
+
+@router.post("/validate-password", response_model=Dict[str, Any])
+async def validate_password(
+    request: dict = Body(...),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Validate user password without performing any action"""
+    try:
+        # Extract password from request body
+        password = request.get("password")
+        if not password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password is required"
+            )
+        
+        logger.info(f"Password validation request received for user: {current_user.get('user', {}).get('email', 'unknown')}")
+        
+        # Verify password
+        user_data = current_user.get("user", {})
+        email = user_data.get("email")
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User email not found"
+            )
+        
+        # Initialize Supabase client for password verification
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        
+        if not supabase_url or not supabase_key:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database configuration missing"
+            )
+        
+        supabase_client = create_client(supabase_url, supabase_key)
+        
+        # Verify password
+        try:
+            auth_result = supabase_client.auth.sign_in_with_password({
+                "email": email,
+                "password": password
+            })
+            
+            if not auth_result.user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid password"
+                )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid password"
+            )
+        
+        logger.info(f"✅ Password validation successful for user: {current_user.get('user', {}).get('email', 'unknown')}")
+        
+        return {
+            "success": True,
+            "message": "Password is valid",
+            "valid": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Password validation error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to validate password"
+        )
+
+@router.patch("/deactivate", response_model=Dict[str, Any])
+async def deactivate_account(
+    request: dict = Body(...),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Deactivate a user account"""
+    try:
+        logger.info(f"🔍 Deactivation request body: {request}")
+        
+        # Extract email from request body
+        email = request.get("email")
+        if not email:
+            logger.error("❌ Email not found in request body")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email is required"
+            )
+        
+        logger.info(f"📧 Email extracted from request: {email}")
+        logger.info(f"Deactivation request received for user: {current_user.get('user', {}).get('email', 'unknown')}")
+        
+        # Get user's email from current_user
+        user_data = current_user.get("user", {})
+        user_email = user_data.get("email")
+        if not user_email:
+            logger.error("❌ User email not found in current_user")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User email not found"
+            )
+        
+        logger.info(f"📧 User email from session: {user_email}")
+        
+        # Verify email matches (case-insensitive)
+        if email.lower().strip() != user_email.lower().strip():
+            logger.error(f"❌ Email mismatch: request='{email}' vs user='{user_email}'")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email does not match your account"
+            )
+        
+        logger.info("✅ Email validation passed")
+        
+        profile = current_user.get("profile")
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User profile not found"
+            )
+        
+        user_id = profile.get("id")
+        account_status = profile.get("account_status")
+        
+        if account_status == "deactivated":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Your account is already deactivated. You can reactivate it anytime by logging in."
+            )
+        
+        # Deactivate account
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        
+        if not supabase_url or not supabase_key:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database configuration missing"
+            )
+        
+        supabase_client = create_client(supabase_url, supabase_key)
+        
+        result = supabase_client.table("users").update({"account_status": "deactivated"}).eq("id", user_id).execute()
+        
+        if result.data is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to deactivate account"
+            )
+        
+        logger.info(f"✅ Account deactivated successfully: {user_id[:8]}...")
+        
+        # Clear auth cache to force fresh data on next request
+        clear_auth_cache()
+        
+        return {
+            "success": True,
+            "message": "Account deactivated successfully",
+            "account_status": "deactivated"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Deactivate account error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to deactivate account"
         )
 
 @router.patch("/reactivate", response_model=Dict[str, Any])
