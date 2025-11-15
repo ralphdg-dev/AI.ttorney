@@ -33,6 +33,12 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     redirectTo: 'role-based',
     errorBoundary: true
   },
+  '/auth/forgot-password': {
+    path: '/auth/forgot-password',
+    isPublic: true,
+    redirectTo: 'role-based',
+    errorBoundary: true
+  },
   '/role-selection': { 
     path: '/role-selection', 
     allowedRoles: ['guest', 'registered_user'],

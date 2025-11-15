@@ -284,7 +284,7 @@ export default function Login() {
 
           {/* Forgot Password */}
           <View style={tw`flex-row items-center justify-end mb-6`}>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/auth/forgot-password')}>
               <Text style={[tw`text-sm`, { color: Colors.primary.blue }]}>
                 Forgot password?
               </Text>

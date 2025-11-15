@@ -8,6 +8,7 @@ interface ApiResponse<T = any> {
   locked_out?: boolean;
   retry_after?: number;
   attempts_remaining?: number;
+  passwordResetToken?: string;
   success?: boolean;
 }
 
@@ -47,7 +48,7 @@ class ApiClient {
       let text: string | null = null;
       try {
         data = await response.json();
-      } catch (_) {
+      } catch {
         try {
           text = await response.text();
         } catch {}
@@ -55,6 +56,11 @@ class ApiClient {
 
       if (!response.ok) {
         const errorMessage = (data && (data.detail || data.message)) || text || `Request failed (${response.status})`;
+        console.log('🔍 DEBUG: API Error Response');
+        console.log('🔍 DEBUG: Response status:', response.status);
+        console.log('🔍 DEBUG: Response data:', data);
+        console.log('🔍 DEBUG: Response text:', text);
+        console.log('🔍 DEBUG: Error message:', errorMessage);
         const errorResponse: ApiResponse = {
           success: false,
           error: errorMessage,
@@ -80,6 +86,9 @@ class ApiClient {
       if (data && typeof data === 'object' && typeof (data as any).message === 'string') {
         successResponse.message = (data as any).message;
       }
+      console.log('🔍 DEBUG: API Success Response');
+      console.log('🔍 DEBUG: Response data:', data);
+      console.log('🔍 DEBUG: Success response:', successResponse);
       return successResponse;
     } catch (error) {
       console.error('API request failed:', error);
@@ -127,6 +136,28 @@ class ApiClient {
     return this.request('/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  // Forgot Password endpoints
+  async sendPasswordResetOTP(email: string): Promise<ApiResponse> {
+    return this.request('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async verifyResetOTP(email: string, otpCode: string): Promise<ApiResponse> {
+    return this.request('/auth/verify-reset-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otpCode }),
+    });
+  }
+
+  async resetPasswordWithToken(token: string, newPassword: string): Promise<ApiResponse> {
+    return this.request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ passwordResetToken: token, newPassword }),
     });
   }
 
