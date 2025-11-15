@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import {
   Save,
   User,
@@ -57,6 +58,9 @@ const Settings = () => {
         if (profileData.newPassword !== profileData.confirmPassword) {
           throw new Error('New password and confirm password do not match.');
         }
+        if (profileData.newPassword === profileData.currentPassword) {
+          throw new Error('You cannot use your current password as your new password.');
+        }
         if (profileData.newPassword.length < 8 || !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(profileData.newPassword)) {
           throw new Error('Password must be at least 8 characters and include uppercase, lowercase, and a number.');
         }
@@ -109,6 +113,7 @@ const Settings = () => {
       setProfileData((prev) => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
     } catch (e) {
       showError(e.message || 'Failed to save settings.');
+      setConfirmOpen(false);
     } finally {
       setConfirmBusy(false);
       setLoading(false);
@@ -411,6 +416,14 @@ const Settings = () => {
     }
   };
 
+  // Portal wrapper for modal to ensure proper overlay coverage
+  const ModalPortal = ({ children }) => {
+    return ReactDOM.createPortal(
+      children,
+      document.body
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -469,32 +482,34 @@ const Settings = () => {
         <div className="p-6">{renderTabContent()}</div>
       </div>
 
-      <Modal
-        open={confirmOpen}
-        onClose={() => (confirmBusy ? null : setConfirmOpen(false))}
-        title="Confirm Save"
-        showCloseButton={!confirmBusy}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-700">Save the changes to your profile{(profileData.currentPassword || profileData.newPassword || profileData.confirmPassword) ? ' and update your password' : ''}?</p>
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={() => setConfirmOpen(false)}
-              disabled={confirmBusy}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={performSave}
-              disabled={confirmBusy}
-              className="px-3 py-2 text-sm bg-[#023D7B] text-white rounded-md hover:bg-[#013964] disabled:opacity-50"
-            >
-              {confirmBusy ? 'Saving...' : 'Save'}
-            </button>
+      <ModalPortal>
+        <Modal
+          open={confirmOpen}
+          onClose={() => (confirmBusy ? null : setConfirmOpen(false))}
+          title="Confirm Save"
+          showCloseButton={!confirmBusy}
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">Save the changes to your profile{(profileData.currentPassword || profileData.newPassword || profileData.confirmPassword) ? ' and update your password' : ''}?</p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setConfirmOpen(false)}
+                disabled={confirmBusy}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={performSave}
+                disabled={confirmBusy}
+                className="px-3 py-2 text-sm bg-[#023D7B] text-white rounded-md hover:bg-[#013964] disabled:opacity-50"
+              >
+                {confirmBusy ? 'Saving...' : 'Save'}
+              </button>
+            </div>
           </div>
-        </div>
-      </Modal>
+        </Modal>
+      </ModalPortal>
     </div>
   );
 };
