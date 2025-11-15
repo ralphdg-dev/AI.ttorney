@@ -363,13 +363,14 @@ const ReportedPosts = () => {
       </>
 
       {/* View Report Modal */}
-      {showResolutionModal && selectedReport && resolutionAction === 'view' && (
+      {showResolutionModal && selectedReport && resolutionAction === 'view' && ReactDOM.createPortal(
         <ViewReportedPostModal
           open={showResolutionModal}
           onClose={closeModal}
           report={selectedReport}
-          loading={false}
-        />
+          loading={loading}
+        />,
+        document.body
       )}
 
       {/* Resolution Modal */}
