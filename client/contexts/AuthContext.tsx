@@ -26,6 +26,7 @@ export interface User {
   photo_url?: string;
   created_at?: string;
   updated_at?: string;
+  account_status?: string;
 }
 
 export interface AuthState {
@@ -174,8 +175,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ⚡ FAANG OPTIMIZATION: Run ALL API calls in PARALLEL + Cache profile data
       // This reduces login time from ~3-5 seconds to ~1 second
       const [profileResult, suspensionResult, lawyerStatusResult] = await Promise.allSettled([
-        // 1. Fetch FULL user profile (including birthdate, profile_photo, photo_url)
-        supabase.from('users').select('id,email,username,full_name,role,is_verified,pending_lawyer,birthdate,profile_photo,photo_url,created_at,updated_at').eq('id', session.user.id).single(),
+        // 1. Fetch FULL user profile (including birthdate, profile_photo, photo_url, account_status)
+        supabase.from('users').select('id,email,username,full_name,role,is_verified,pending_lawyer,birthdate,profile_photo,photo_url,created_at,updated_at,account_status').eq('id', session.user.id).single(),
         // 2. Check suspension status (only if we have a token)
         session?.access_token ? checkSuspensionStatus() : Promise.resolve(null),
         // 3. Pre-fetch lawyer status (we'll use it if needed)
@@ -202,7 +203,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
 
-      console.log('✅ Profile loaded:', { username: profile.username, role: profile.role });
+      console.log('✅ Profile loaded:', { username: profile.username, role: profile.role, account_status: profile.account_status });
+
+      // IMMEDIATE BANNED CHECK - Must run before any other logic
+      console.log('🔍 Checking banned status:', { 
+        account_status: profile.account_status, 
+        status_type: typeof profile.account_status,
+        isBanned: profile.account_status === 'banned'
+      });
+      if (profile.account_status === 'banned') {
+        console.log('🚫 User is permanently banned, redirecting to banned screen');
+        setIsLoading(false);
+        
+        // Try multiple redirect approaches
+        try {
+          console.log('🔄 Attempting safeReplace redirect...');
+          safeReplace('/banned' as any);
+        } catch (error) {
+          console.error('❌ safeReplace failed:', error);
+          try {
+            console.log('🔄 Attempting direct router.replace...');
+            const { router } = await import('expo-router');
+            router.replace('/banned');
+          } catch (error2) {
+            console.error('❌ Direct router.replace failed:', error2);
+            // Last resort - force reload to banned page
+            console.log('🔄 Using window.location as last resort...');
+            if (typeof window !== 'undefined') {
+              window.location.href = '/banned';
+            }
+          }
+        }
+        return true;
+      }
 
       if (profile.role === 'admin' || profile.role === 'superadmin') {
         if (adminBlockInProgressRef.current) {
