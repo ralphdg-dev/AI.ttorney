@@ -200,7 +200,6 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
         currentAdmin,
         admin.id
       );
-      console.log('Admin audit trail PDF exported and logged successfully');
       
       // Refresh audit logs to show the new PDF generation entry
       setTimeout(() => {
@@ -230,7 +229,6 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
         currentAdmin,
         admin.id
       );
-      console.log('Admin activity PDF exported and logged successfully');
       
       // Refresh both audit logs and recent activity to show the new PDF generation entry
       setTimeout(() => {

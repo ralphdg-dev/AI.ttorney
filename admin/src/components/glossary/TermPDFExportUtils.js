@@ -44,9 +44,6 @@ const logPDFGeneration = async (
       },
     };
 
-    console.log(
-      `Logging PDF generation: ${presentableAction} for term ${termId}`
-    );
 
     const response = await fetch(
       "http://localhost:5001/api/glossary-terms/audit-log",
@@ -64,9 +61,7 @@ const logPDFGeneration = async (
       throw new Error(`Failed to log PDF generation: ${response.statusText}`);
     }
 
-    console.log(`Successfully logged PDF generation audit for term ${termId}`);
   } catch (error) {
-    console.error("Failed to log PDF generation audit:", error);
     // Still continue with PDF generation even if audit logging fails
   }
 };
@@ -131,7 +126,6 @@ const addPDFHeader = async (doc, title, reportNumber, generatedBy = null) => {
 
             doc.addImage(logoBase64, "PNG", 20, 20, 15, 15);
             logoLoaded = true;
-            console.log("Logo loaded successfully from fallback:", logoPath);
             break;
           }
         } catch (pathError) {
@@ -235,7 +229,6 @@ export const exportTermAuditTrailPDF = async (
   termId = null
 ) => {
   if (!auditLogs || auditLogs.length === 0) {
-    console.log("No audit logs data available");
     alert("No audit trail data available to export");
     return;
   }
@@ -353,7 +346,6 @@ export const exportTermAuditTrailPDF = async (
 
     // Log PDF generation in audit trail
     if (termId && adminInfo) {
-      console.log(`Term Audit Trail PDF generated: ${fileName}`);
       await logPDFGeneration(
         termId,
         "term_audit",
@@ -381,7 +373,6 @@ export const exportTermActivityPDF = async (
   termId = null
 ) => {
   if (!activityLogs || activityLogs.length === 0) {
-    console.log("No activity logs data available");
     alert("No activity data available to export");
     return;
   }
@@ -483,7 +474,6 @@ export const exportTermActivityPDF = async (
 
     // Log PDF generation in audit trail
     if (termId && adminInfo) {
-      console.log(`Term Activity Report PDF generated: ${fileName}`);
       await logPDFGeneration(
         termId,
         "term_activity",

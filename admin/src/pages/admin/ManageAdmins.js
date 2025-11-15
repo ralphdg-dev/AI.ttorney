@@ -192,7 +192,6 @@ const ManageAdmins = () => {
       };
       
       const role = mapRoleFilter(roleFilter);
-      console.log('Role filter:', roleFilter, '-> API role:', role);
 
       const params = {
         page: 1, // Always start from page 1 for search

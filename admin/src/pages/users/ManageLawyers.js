@@ -150,7 +150,6 @@ const ManageLawyers = () => {
   const handleEditSave = async (updatedLawyer, originalLawyer) => {
     try {
       // TODO: Replace with actual lawyersService.updateLawyer call
-      console.log('Updating lawyer:', updatedLawyer);
       
       // For now, simulate the update
       await new Promise(resolve => setTimeout(resolve, 1000));

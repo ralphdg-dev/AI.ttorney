@@ -183,9 +183,6 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
   // Debug logging
   React.useEffect(() => {
     if (userData) {
-      console.log('ViewLegalSeekerModal - Raw user data:', user);
-      console.log('ViewLegalSeekerModal - Processed userData:', userData);
-      console.log('ViewLegalSeekerModal - Available fields:', Object.keys(userData));
     }
   }, [user, userData]);
 
@@ -210,7 +207,6 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
   const handleExportAuditTrail = async () => {
     try {
       // TODO: Implement PDF export functionality
-      console.log('Exporting audit trail PDF for legal seeker:', userData.id);
       alert('PDF export functionality will be implemented soon');
     } catch (error) {
       console.error('Failed to export audit trail PDF:', error);
@@ -222,7 +218,6 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
   const handleExportActivity = async () => {
     try {
       // TODO: Implement PDF export functionality
-      console.log('Exporting activity PDF for legal seeker:', userData.id);
       alert('PDF export functionality will be implemented soon');
     } catch (error) {
       console.error('Failed to export activity PDF:', error);

@@ -225,7 +225,6 @@ const ViewArticleModal = ({ open, onClose, article }) => {
         currentAdmin,
         article.id
       );
-      console.log("Article audit trail PDF exported and logged successfully");
 
       setTimeout(() => {
         loadAuditLogs();

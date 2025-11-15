@@ -35,9 +35,7 @@ const logPDFGeneration = async (adminId, reportType, adminInfo, reportNumber = n
     };
     
     // Call the audit logging service
-    console.log(`Logging PDF generation: ${presentableAction} for admin ${adminId}`);
     await adminManagementService.createAdminAuditLog(adminId, auditData);
-    console.log(`Successfully logged PDF generation audit for admin ${adminId}`);
   } catch (error) {
     console.error('Failed to log PDF generation audit:', error);
     // Still continue with PDF generation even if audit logging fails
@@ -107,7 +105,6 @@ const addPDFHeader = async (doc, title, reportNumber, generatedBy = null) => {
             // Add logo to PDF
             doc.addImage(logoBase64, 'PNG', 20, 20, 15, 15);
             logoLoaded = true;
-            console.log('Logo loaded successfully from fallback:', logoPath);
             break;
           }
         } catch (pathError) {
@@ -207,7 +204,6 @@ const addPDFFooter = (doc) => {
 export const exportAdminAuditTrailPDF = async (auditLogs, adminFullName, adminEmail, adminInfo = null, adminId = null) => {
   
   if (!auditLogs || auditLogs.length === 0) {
-    console.log('No audit logs data available');
     alert('No audit trail data available to export');
     return;
   }
@@ -309,7 +305,6 @@ export const exportAdminAuditTrailPDF = async (auditLogs, adminFullName, adminEm
     
     // Log PDF generation in audit trail
     if (adminId) {
-      console.log(`Admin Audit Trail PDF generated: ${fileName}`);
       // Ensure we have admin info, even if it's minimal
       const auditAdminInfo = adminInfo || { 
         full_name: 'Unknown Admin', 
@@ -331,7 +326,6 @@ export const exportAdminAuditTrailPDF = async (auditLogs, adminFullName, adminEm
 export const exportAdminActivityPDF = async (activityLogs, adminFullName, adminEmail, adminInfo = null, adminId = null) => {
   
   if (!activityLogs || activityLogs.length === 0) {
-    console.log('No activity logs data available');
     alert('No activity data available to export');
     return;
   }
@@ -410,7 +404,6 @@ export const exportAdminActivityPDF = async (activityLogs, adminFullName, adminE
     
     // Log PDF generation in audit trail
     if (adminId) {
-      console.log(`Admin Activity Report PDF generated: ${fileName}`);
       // Ensure we have admin info, even if it's minimal
       const auditAdminInfo = adminInfo || { 
         full_name: 'Unknown Admin', 

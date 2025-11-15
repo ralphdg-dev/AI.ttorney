@@ -349,7 +349,6 @@ const ManageConsultationBans = () => {
                             color="info"
                             onClick={() => {
                               // Navigate to user details or show modal
-                              console.log('View user details:', user.id);
                             }}
                           >
                             <InfoIcon />

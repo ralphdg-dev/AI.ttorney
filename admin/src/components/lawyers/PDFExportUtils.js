@@ -71,34 +71,27 @@ const loadImageAsBase64 = async (imagePath, primaryBucket = null) => {
   
   for (const bucket of buckets) {
     try {
-      console.log(`Trying to load image from bucket: ${bucket}, path: ${imagePath}`);
       const signedUrl = await lawyerApplicationsService.getSignedUrl(bucket, imagePath);
       if (!signedUrl) {
-        console.log(`No signed URL for bucket: ${bucket}`);
         continue;
       }
       
-      console.log(`Got signed URL: ${signedUrl}`);
       const response = await fetch(signedUrl);
       if (!response.ok) {
-        console.log(`Fetch failed for bucket ${bucket}:`, response.status);
         continue;
       }
       
       const blob = await response.blob();
       if (blob.size === 0) {
-        console.log(`Empty blob for bucket: ${bucket}`);
         continue;
       }
       
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = () => {
-          console.log(`Successfully loaded image from bucket: ${bucket}`);
           resolve(reader.result);
         };
         reader.onerror = () => {
-          console.log(`FileReader error for bucket: ${bucket}`);
           resolve(null);
         };
         reader.readAsDataURL(blob);
@@ -150,7 +143,6 @@ const addPDFHeader = async (doc, title, reportNumber, generatedBy = null) => {
             // Add logo to PDF
             doc.addImage(logoBase64, 'PNG', 20, 20, 15, 15);
             logoLoaded = true;
-            console.log('Logo loaded successfully from fallback:', logoPath);
             break;
           }
         } catch (pathError) {
@@ -250,7 +242,6 @@ const addPDFFooter = (doc) => {
 export const exportApplicationHistoryPDF = async (history, fullName, email, application, adminInfo = null) => {
   
   if (!history || history.length === 0) {
-    console.log('No history data available');
     alert('No application history data available to export');
     return;
   }
@@ -558,7 +549,6 @@ export const exportApplicationHistoryPDF = async (history, fullName, email, appl
 export const exportAuditTrailPDF = async (auditLogs, fullName, email, adminInfo = null, applicationId = null) => {
   
   if (!auditLogs || auditLogs.length === 0) {
-    console.log('No audit logs data available');
     alert('No audit trail data available to export');
     return;
   }

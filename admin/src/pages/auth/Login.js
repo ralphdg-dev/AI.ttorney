@@ -105,7 +105,6 @@ const Login = () => {
       setShowContactModal(false);
     } catch (err) {
       // Fallback to simulation for demo purposes
-      console.log('API not available, simulating send...');
       await new Promise(resolve => setTimeout(resolve, 1500));
       showSuccess('Message sent to superadmin successfully!');
       setContactForm({ name: '', email: '', subject: '', message: '' });

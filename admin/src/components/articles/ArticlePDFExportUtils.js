@@ -47,9 +47,6 @@ const logPDFGeneration = async (
     };
 
     // Call the audit logging endpoint
-    console.log(
-      `Logging PDF generation: ${presentableAction} for article ${articleId}`
-    );
 
     const response = await fetch(
       "http://localhost:5001/api/legal-articles/audit-log",
@@ -67,9 +64,6 @@ const logPDFGeneration = async (
       throw new Error(`Failed to log PDF generation: ${response.statusText}`);
     }
 
-    console.log(
-      `Successfully logged PDF generation audit for article ${articleId}`
-    );
   } catch (error) {
     console.error("Failed to log PDF generation audit:", error);
     // Still continue with PDF generation even if audit logging fails
@@ -136,7 +130,6 @@ const addPDFHeader = async (doc, title, reportNumber, generatedBy = null) => {
 
             doc.addImage(logoBase64, "PNG", 20, 20, 15, 15);
             logoLoaded = true;
-            console.log("Logo loaded successfully from fallback:", logoPath);
             break;
           }
         } catch (pathError) {
@@ -246,7 +239,6 @@ export const exportArticleAuditTrailPDF = async (
   articleId = null
 ) => {
   if (!auditLogs || auditLogs.length === 0) {
-    console.log("No audit logs data available");
     alert("No audit trail data available to export");
     return;
   }
@@ -364,7 +356,6 @@ export const exportArticleAuditTrailPDF = async (
 
     // Log PDF generation in audit trail
     if (articleId && adminInfo) {
-      console.log(`Article Audit Trail PDF generated: ${fileName}`);
       await logPDFGeneration(
         articleId,
         "article_audit",
@@ -392,7 +383,6 @@ export const exportArticleActivityPDF = async (
   articleId = null
 ) => {
   if (!activityLogs || activityLogs.length === 0) {
-    console.log("No activity logs data available");
     alert("No activity data available to export");
     return;
   }
@@ -499,7 +489,6 @@ export const exportArticleActivityPDF = async (
 
     // Log PDF generation in audit trail
     if (articleId && adminInfo) {
-      console.log(`Article Activity Report PDF generated: ${fileName}`);
       await logPDFGeneration(
         articleId,
         "article_activity",
