@@ -1,13 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
-import { supabase, clearAuthStorage, resetSupabaseClient } from '../config/supabase';
-import { router } from 'expo-router';
+import { supabase, clearAuthStorage } from '../config/supabase';
+import { router, useSegments } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GUEST_SESSION_STORAGE_KEY, validateGuestSession, isSessionExpired } from '../config/guestConfig';
-import { useToast, Toast, ToastTitle, ToastDescription } from '../components/ui/toast';
-import { normalizePath } from '../utils/path';
-import NavigationHelper from '../utils/navigationHelper';
 
 // Role hierarchy based on backend schema
 export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
@@ -21,12 +16,8 @@ export interface User {
   role: UserRole;
   is_verified: boolean;
   pending_lawyer?: boolean;
-  birthdate?: string;
-  profile_photo?: string;
-  photo_url?: string;
   created_at?: string;
   updated_at?: string;
-  account_status?: string;
 }
 
 export interface AuthState {
@@ -40,19 +31,15 @@ export interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  isGuestMode: boolean;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string; suppressToast?: boolean }>;
-  signUp: (email: string, password: string, metadata: { username: string; first_name: string; last_name: string; birthdate: string }) => Promise<{ success: boolean; error?: string; user?: any }>;
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
-  continueAsGuest: () => void;
   setUser: (user: User | null) => void;
   refreshUserData: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
   hasRole: (role: UserRole) => boolean;
   isLawyer: () => boolean;
   isAdmin: () => boolean;
   checkLawyerApplicationStatus: () => Promise<any>;
-  checkSuspensionStatus: () => Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null; needsLiftedAcknowledgment: boolean } | null>;
+  checkSuspensionStatus: () => Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null } | null>;
   hasRedirectedToStatus: boolean;
   setHasRedirectedToStatus: (value: boolean) => void;
   initialAuthCheck: boolean;
@@ -63,6 +50,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const segments = useSegments();
   const [authState, setAuthState] = useState<AuthState>({
     session: null,
     user: null,
@@ -72,29 +60,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [initialAuthCheck, setInitialAuthCheck] = useState(false);
   const [hasRedirectedToStatus, setHasRedirectedToStatus] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isGuestMode, setIsGuestMode] = useState(false);
-  const toast = useToast();
-  const adminToastShownAtRef = React.useRef<number>(0);
-  const adminBlockInProgressRef = React.useRef<boolean>(false);
-  const lastRedirectRef = React.useRef<string | null>(null);
-
-  const safeReplace = React.useCallback((targetPath: string) => {
-    if (!targetPath) return;
-    const currentPathRaw = typeof window !== 'undefined' ? (window.location?.pathname || '') : '';
-    NavigationHelper.replaceIfDifferent(router, currentPathRaw, targetPath, lastRedirectRef);
-  }, []);
-
-  // Clear marker when current URL equals last redirect
-  React.useEffect(() => {
-    const pathRaw = typeof window !== 'undefined' ? (window.location?.pathname || '') : '';
-    const path = normalizePath(pathRaw);
-    if (lastRedirectRef.current === path) {
-      lastRedirectRef.current = null;
-    }
-  });
 
 
-  const checkSuspensionStatus = React.useCallback(async (): Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null; needsLiftedAcknowledgment: boolean } | null> => {
+  const checkSuspensionStatus = React.useCallback(async (): Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null } | null> => {
     try {
       if (!authState.session?.access_token) {
         return null;
@@ -111,22 +79,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.ok) {
         const data = await response.json();
-        
-        // Check if user needs to acknowledge suspension lifted
-        // This happens when:
-        // 1. Account status is NOT suspended (suspension has ended or been lifted)
-        // 2. There is a most recent suspension
-        // 3. lifted_acknowledged is false or null
-        const needsLiftedAcknowledgment = 
-          data.account_status !== 'suspended' && 
-          data.most_recent_suspension_id && 
-          (data.lifted_acknowledged === false || data.lifted_acknowledged === null);
-        
         return {
           isSuspended: data.account_status === 'suspended',
           suspensionCount: data.suspension_count || 0,
           suspensionEnd: data.suspension_end || null,
-          needsLiftedAcknowledgment,
         };
       }
       
@@ -162,114 +118,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [authState.session?.access_token]);
 
-  const handleAuthStateChange = React.useCallback(async (session: Session, shouldNavigate = false): Promise<boolean> => {
+  const handleAuthStateChange = React.useCallback(async (session: Session, shouldNavigate = false) => {
     try {
-      console.log('🔐 handleAuthStateChange called:', { shouldNavigate, userId: session.user.id, isSigningOut });
-      
-      // Skip processing if we're in the middle of signing out
-      if (isSigningOut) {
-        console.log('🚫 Skipping auth state change during sign out');
-        return false;
-      }
-      
-      // ⚡ FAANG OPTIMIZATION: Run ALL API calls in PARALLEL + Cache profile data
-      // This reduces login time from ~3-5 seconds to ~1 second
-      const [profileResult, suspensionResult, lawyerStatusResult] = await Promise.allSettled([
-        // 1. Fetch FULL user profile (including birthdate, profile_photo, photo_url, account_status)
-        supabase.from('users').select('id,email,username,full_name,role,is_verified,pending_lawyer,birthdate,profile_photo,photo_url,created_at,updated_at,account_status').eq('id', session.user.id).single(),
-        // 2. Check suspension status (only if we have a token)
-        session?.access_token ? checkSuspensionStatus() : Promise.resolve(null),
-        // 3. Pre-fetch lawyer status (we'll use it if needed)
-        session?.access_token ? checkLawyerApplicationStatus() : Promise.resolve(null)
-      ]);
+      // Fetch user profile from your custom users table
+      const { data: profile, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
 
-      // Handle profile fetch result with better error recovery
-      if (profileResult.status === 'rejected') {
-        console.error('❌ Profile fetch rejected:', profileResult.reason);
+      if (error) {
+        console.error('Error fetching user profile:', error);
         setIsLoading(false);
-        return false;
-      }
-      
-      if (profileResult.status === 'fulfilled' && profileResult.value.error) {
-        console.error('❌ Profile fetch error:', profileResult.value.error);
-        setIsLoading(false);
-        return false;
+        return;
       }
 
-      const profile = profileResult.value.data;
-      if (!profile) {
-        console.error('❌ No profile data returned');
-        setIsLoading(false);
-        return false;
-      }
-
-      console.log('✅ Profile loaded:', { username: profile.username, role: profile.role, account_status: profile.account_status });
-
-      // IMMEDIATE BANNED CHECK - Must run before any other logic
-      console.log('🔍 Checking banned status:', { 
-        account_status: profile.account_status, 
-        status_type: typeof profile.account_status,
-        isBanned: profile.account_status === 'banned'
-      });
-      if (profile.account_status === 'banned') {
-        console.log('🚫 User is permanently banned, redirecting to banned screen');
-        setIsLoading(false);
-        
-        // Try multiple redirect approaches
-        try {
-          console.log('🔄 Attempting safeReplace redirect...');
-          safeReplace('/banned' as any);
-        } catch (error) {
-          console.error('❌ safeReplace failed:', error);
-          try {
-            console.log('🔄 Attempting direct router.replace...');
-            const { router } = await import('expo-router');
-            router.replace('/banned');
-          } catch (error2) {
-            console.error('❌ Direct router.replace failed:', error2);
-            // Last resort - force reload to banned page
-            console.log('🔄 Using window.location as last resort...');
-            if (typeof window !== 'undefined') {
-              window.location.href = '/banned';
-            }
-          }
-        }
-        return true;
-      }
-
-      if (profile.role === 'admin' || profile.role === 'superadmin') {
-        if (adminBlockInProgressRef.current) {
-          // Already handled this attempt; avoid duplicate toasts/actions
-          setIsLoading(false);
-          return false;
-        }
-        adminBlockInProgressRef.current = true;
-        // Do not show toast here; caller (login screen) will display a single toast
-        try { await supabase.auth.signOut({ scope: 'global' }); } catch {}
-        try { await clearAuthStorage(); } catch {}
-        setAuthState({ session: null, user: null, supabaseUser: null });
-        setHasRedirectedToStatus(false);
-        setIsGuestMode(false);
-        setIsLoading(false);
-        // Reset guard after short delay to allow future attempts
-        setTimeout(() => { adminBlockInProgressRef.current = false; }, 2000);
-        return false;
-      }
-
-      // ⚡ FAANG OPTIMIZATION: Cache profile data in AsyncStorage for instant loads
-      try {
-        await AsyncStorage.setItem(
-          `profile_cache_${session.user.id}`,
-          JSON.stringify({
-            profile,
-            cachedAt: Date.now(),
-          })
-        );
-      } catch (error) {
-        console.warn('Failed to cache profile:', error);
-      }
-
-      // Update auth state immediately
       setAuthState({
         session,
         user: profile,
@@ -278,23 +141,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Only handle navigation on explicit login attempts
       if (shouldNavigate && profile) {
-        // Check suspension status (already fetched in parallel)
-        const suspensionStatus = suspensionResult.status === 'fulfilled' ? suspensionResult.value : null;
-        
-        // Check if user is currently suspended
+        // FIRST: Check if user is suspended - this takes priority over everything
+        const suspensionStatus = await checkSuspensionStatus();
         if (suspensionStatus && suspensionStatus.isSuspended) {
           console.log('🚫 User is suspended, redirecting to suspended screen');
           setIsLoading(false);
-          safeReplace('/suspended' as any);
-          return true;
-        }
-        
-        // Check if user needs to acknowledge suspension lifted
-        if (suspensionStatus && suspensionStatus.needsLiftedAcknowledgment) {
-          console.log('✅ User suspension lifted, redirecting to suspension-lifted screen');
-          setIsLoading(false);
-          safeReplace('/suspension-lifted' as any);
-          return true;
+          router.replace('/suspended' as any);
+          return;
         }
         
         let applicationStatus = null;
@@ -303,20 +156,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (profile.pending_lawyer) {
           setHasRedirectedToStatus(true);
           
-          // Use pre-fetched lawyer status data
-          const statusData = lawyerStatusResult.status === 'fulfilled' ? lawyerStatusResult.value : null;
-          if (statusData && statusData.has_application && statusData.application) {
-            applicationStatus = statusData.application.status;
-          } else {
+          try {
+            const statusData = await checkLawyerApplicationStatus();
+            if (statusData && statusData.has_application && statusData.application) {
+              applicationStatus = statusData.application.status;
+            }
+          } catch (err) {
+            console.error('Error fetching lawyer application status:', err);
             applicationStatus = 'pending';
-          }
-          
-          // Special handling for accepted status - show approval modal
-          if (applicationStatus === 'accepted') {
-            console.log('🎉 Application accepted! Redirecting to acceptance page');
-            setIsLoading(false);
-            safeReplace('/onboarding/lawyer/lawyer-status/accepted' as any);
-            return true;
           }
           
           const redirectPath = getRoleBasedRedirect(
@@ -328,75 +175,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           console.log('🔄 Redirecting pending lawyer to:', redirectPath);
           setIsLoading(false);
-          safeReplace(redirectPath as any);
-          return true;
+          router.replace(redirectPath as any);
         } else {
           // User doesn't have pending lawyer status, redirect normally
           const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
           console.log('🔄 Redirecting user to:', redirectPath);
           setIsLoading(false);
-          safeReplace(redirectPath as any);
-          return true;
+          router.replace(redirectPath as any);
         }
       } else {
         // Not navigating, just set loading to false
         setIsLoading(false);
-        return true;
       }
     } catch (error) {
-      console.error('❌ Error handling auth state change:', error);
+      console.error('Error handling auth state change:', error);
       setIsLoading(false);
-      return false;
     }
-  }, [checkLawyerApplicationStatus, checkSuspensionStatus, isSigningOut]);
+  }, [checkLawyerApplicationStatus, checkSuspensionStatus]);
 
   useEffect(() => {
     // Initialize auth state and listen for auth changes
     const initialize = async () => {
       try {
-        // Check for guest session first (before Supabase auth)
-        const guestSessionData = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
-        if (guestSessionData) {
-          const guestSession = JSON.parse(guestSessionData);
-          
-          // Validate session integrity (security check)
-          if (!validateGuestSession(guestSession)) {
-            console.warn('⚠️ Invalid guest session detected on app load, clearing...');
-            await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
-            setIsGuestMode(false);
-            setAuthState({ session: null, user: null, supabaseUser: null });
-            setIsLoading(false);
-            setInitialAuthCheck(true);
-            return;
-          }
-          
-          // Check if guest session is still valid
-          if (!isSessionExpired(guestSession.expiresAt)) {
-            console.log('👤 Valid guest session found on app load');
-            console.log('   Session ID:', guestSession.id);
-            console.log('   Prompts used:', guestSession.promptCount, '/ 15');
-            setIsGuestMode(true);
-            setAuthState({ session: null, user: null, supabaseUser: null });
-            setIsLoading(false);
-            setInitialAuthCheck(true);
-            return; // Skip Supabase auth check
-          } else {
-            console.log('⏰ Guest session expired, clearing and redirecting to login...');
-            await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
-            setIsGuestMode(false);
-            setAuthState({ session: null, user: null, supabaseUser: null });
-            setIsLoading(false);
-            setInitialAuthCheck(true);
-            // Redirect will happen in index.tsx since no auth and no guest mode
-            return;
-          }
-        }
-
-        // Check for existing session
+        // Get initial session
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('❌ Session error:', error.message);
+          console.error('Session error:', error.message);
+          // Clear session on error and redirect to login
           await clearAuthStorage();
           setAuthState({ session: null, user: null, supabaseUser: null });
           setIsLoading(false);
@@ -405,7 +211,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         if (initialSession) {
-          console.log('✅ Existing session found');
           await handleAuthStateChange(initialSession, false);
         } else {
           setAuthState({ session: null, user: null, supabaseUser: null });
@@ -414,36 +219,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         setInitialAuthCheck(true);
 
-        // Auth state listener
+        // Listen for auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event: string, session: any) => {
-            console.log('🔔 Auth event:', event, { hasSession: !!session, isSigningOut });
-            
-            // Ignore events during sign out (prevent race conditions)
-            if (isSigningOut) {
-              console.log('🚫 Ignoring auth event during sign out');
-              return;
-            }
-            
             if (event === 'SIGNED_IN' && session) {
-              console.log('✅ Processing SIGNED_IN event');
-              await handleAuthStateChange(session, false);
+              await handleAuthStateChange(session, true);
             } else if (event === 'TOKEN_REFRESHED' && session) {
-              console.log('🔄 Processing TOKEN_REFRESHED event');
               await handleAuthStateChange(session, false);
             } else if (event === 'SIGNED_OUT') {
-              console.log('🚪 Processing SIGNED_OUT event');
-              // Only update state if we're not already in the process of signing out
-              if (!isSigningOut) {
-                setAuthState({ session: null, user: null, supabaseUser: null });
-                setHasRedirectedToStatus(false);
-                setIsGuestMode(false);
-                setIsLoading(false);
-              }
+              // Clear auth state and redirect flag
+              setAuthState({ session: null, user: null, supabaseUser: null });
+              setHasRedirectedToStatus(false);
+              setIsLoading(false);
+              setIsSigningOut(false);
+              
+              // Navigation is already handled by signOut function
+              // This event handler just ensures state is cleared
             }
             
-            // Ensure loading is turned off for all events except SIGNED_OUT (unless we're signing out)
-            if (event !== 'SIGNED_OUT' || !isSigningOut) {
+            // Ensure loading is always set to false after auth state changes
+            if (event !== 'SIGNED_OUT') {
               setIsLoading(false);
             }
           }
@@ -453,11 +248,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Cleanup subscription on unmount
         return () => {
-          console.log('🧹 Cleaning up auth listener');
           subscription.unsubscribe();
         };
       } catch (error) {
-        console.error('❌ Auth initialization error:', error);
+        console.error('Auth initialization error:', error);
         setIsLoading(false);
       }
     };
@@ -469,246 +263,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('🔐 Signing in:', email);
       setIsLoading(true);
       setHasRedirectedToStatus(false);
-      setIsSigningOut(false); // Ensure we're not in signing out state
       
-      // Clear stale data before login
-      try {
-        await clearAuthStorage();
-        const guestSession = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
-        if (guestSession) {
-          await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
-          setIsGuestMode(false);
-        }
-        
-        // Clear any cached profile data from previous sessions
-        const allKeys = await AsyncStorage.getAllKeys();
-        const profileKeys = allKeys.filter(key => key.startsWith('profile_cache_'));
-        if (profileKeys.length > 0) await AsyncStorage.multiRemove(profileKeys);
-        
-      } catch (cleanupError) {
-        console.warn('⚠️ Pre-login cleanup error (non-critical):', cleanupError);
-      }
-      
-      // Reset auth state before login attempt
-      setAuthState({ session: null, user: null, supabaseUser: null });
-      
-      // Fresh login attempt
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.toLowerCase().trim(),
+        email,
         password,
       });
 
       if (error) {
-        console.error('❌ Login error:', error.message);
-        setIsLoading(false);
+        console.error('Sign in error:', error.message);
         
-        // Map errors to user-friendly messages
-        const errorMap: Record<string, string> = {
-          'Invalid login credentials': 'Invalid email or password',
-          'Email not confirmed': 'Please verify your email address',
-          'email_not_confirmed': 'Please verify your email address',
-          'network': 'Network error. Please check your connection',
-          'fetch': 'Network error. Please check your connection',
-          'rate_limit': 'Too many attempts. Please try again later',
-        };
+        // Map Supabase errors to user-friendly messages
+        let errorMessage = 'Invalid email or password';
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Invalid email or password';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Please verify your email address';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error. Please check your connection';
+        }
         
-        const errorMessage = Object.entries(errorMap).find(([key]) => 
-          error.message.includes(key)
-        )?.[1] || 'Invalid email or password';
-        
+        // Don't call handleAuthStateChange on error - let the listener handle it
         return { success: false, error: errorMessage };
       }
 
       if (data.session) {
-        console.log('✅ Login successful, processing auth state...');
-        const allowed = await handleAuthStateChange(data.session, true);
-        if (!allowed) {
-          return { success: false, error: 'Access denied', suppressToast: false };
-        }
+        // The onAuthStateChange listener will handle navigation
+        // We just need to wait for it to complete
+        await handleAuthStateChange(data.session, true);
         return { success: true };
       }
 
-      setIsLoading(false);
       return { success: false, error: 'Login failed. Please try again' };
     } catch (error: any) {
-      console.error('❌ signIn exception:', error);
-      setIsLoading(false);
+      console.error('Sign in catch:', error);
       return { success: false, error: 'Network error. Please check your connection' };
-    }
-  };
-
-  const signUp = async (
-    email: string, 
-    password: string, 
-    metadata: { username: string; first_name: string; last_name: string; birthdate: string }
-  ) => {
-    try {
-      console.log('📝 signUp called for:', email);
-      setIsLoading(true);
-      
-      // CRITICAL: Clear any existing guest session before signup
-      // This prevents guest mode from persisting after successful registration
-      const guestSessionData = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
-      if (guestSessionData) {
-        console.log('🗑️ Clearing guest session before signup');
-        await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
-        setIsGuestMode(false);
-      }
-      
-      // Create user account without Supabase's automatic email confirmation
-      // We handle email verification through our custom OTP system
-      const { data, error } = await supabase.auth.signUp({
-        email: email.toLowerCase().trim(),
-        password,
-        options: {
-          data: {
-            username: metadata.username,
-            first_name: metadata.first_name,
-            last_name: metadata.last_name,
-            full_name: `${metadata.first_name} ${metadata.last_name}`,
-            birthdate: metadata.birthdate,
-          },
-          // Completely disable Supabase's email confirmation system
-          emailRedirectTo: undefined,
-          captchaToken: undefined,
-        },
-      });
-
-      if (error) {
-        console.error('❌ Supabase signUp error:', error.message);
-        
-        // Map Supabase errors to user-friendly messages
-        let errorMessage = 'Registration failed. Please try again';
-        if (error.message.includes('already registered') || error.message.includes('already exists')) {
-          errorMessage = 'Email already registered. Please sign in instead';
-        } else if (error.message.includes('rate_limit')) {
-          errorMessage = 'Too many attempts. Please try again later';
-        } else if (error.message.includes('password')) {
-          errorMessage = 'Password does not meet requirements';
-        } else if (error.message.includes('network') || error.message.includes('fetch')) {
-          errorMessage = 'Network error. Please check your connection';
-        }
-        
-        setIsLoading(false);
-        return { success: false, error: errorMessage };
-      }
-
-      if (data.user) {
-        console.log('✅ User created:', data.user.id);
-        setIsLoading(false);
-        return { success: true, user: data.user };
-      }
-
-      console.error('❌ No user returned from Supabase');
+    } finally {
       setIsLoading(false);
-      return { success: false, error: 'Registration failed. Please try again' };
-    } catch (error: any) {
-      console.error('❌ signUp exception:', error);
-      setIsLoading(false);
-      return { success: false, error: 'Network error. Please check your connection' };
     }
   };
 
   const signOut = async () => {
     try {
-      console.log('🚪 Signing out...');
+      // Set signing out flag FIRST so guards know to skip checks
       setIsSigningOut(true);
-      setIsLoading(true); // Show loading during logout process
       
-      // Perform cleanup first (synchronously)
-      try {
-        // Clear all cached profile data
-        const allKeys = await AsyncStorage.getAllKeys();
-        const profileKeys = allKeys.filter(key => key.startsWith('profile_cache_'));
-        if (profileKeys.length > 0) await AsyncStorage.multiRemove(profileKeys);
-        
-        // Clear guest session if any
-        await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
-        
-        // Clear auth storage
-        await clearAuthStorage();
-        
-        // Sign out from Supabase
-        await supabase.auth.signOut({ scope: 'global' });
-        
-        console.log('✅ Cleanup complete');
-      } catch (cleanupError) {
-        console.warn('⚠️ Cleanup error (non-critical):', cleanupError);
-      }
-      
-      // Reset all auth state BEFORE navigation, but keep isSigningOut=true until nav settles
+      // Clear auth state IMMEDIATELY
       setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
-      setIsGuestMode(false);
-
-      // Force navigation to login with multiple attempts while isSigningOut is still true
-      console.log('🔄 Forcing navigation to login...');
-      try {
-        // Try immediate navigation
-        safeReplace('/login');
-        
-        // Backup navigation after short delay (WEB ONLY)
-        if (typeof window !== 'undefined') {
-          setTimeout(() => {
-            try {
-              const path = window.location?.pathname || '';
-              if (!path.startsWith('/login')) {
-                console.log('🔄 Backup navigation attempt...');
-                safeReplace('/login');
-              }
-            } catch {}
-          }, 100);
-        }
-        
-        // Nuclear option - reload page for web ONLY if navigation didn't take effect
-        if (typeof window !== 'undefined') {
-          setTimeout(() => {
-            try {
-              const path = window.location?.pathname || '';
-              if (!path.startsWith('/login')) {
-                console.log('🔄 Web reload fallback...');
-                window.location.replace('/login');
-              }
-            } catch {}
-          }, 800);
-        }
-      } catch (navError) {
-        console.error('❌ Navigation error:', navError);
-      }
-
-      // Turn off loading and release signingOut flag slightly after nav to avoid guard races
-      setTimeout(() => {
-        setIsLoading(false);
-        setIsSigningOut(false);
-        console.log('✅ Logout complete');
-      }, 200);
-      
-    } catch (error) {
-      console.error('❌ Logout error:', error);
-      
-      // Nuclear fallback - force reset everything
-      try {
-        await resetSupabaseClient();
-      } catch {}
-      
-      setAuthState({ session: null, user: null, supabaseUser: null });
-      setHasRedirectedToStatus(false);
-      setIsGuestMode(false);
       setIsLoading(false);
-      setIsSigningOut(false);
       
-      // Force navigation with fallbacks
-      try {
-        safeReplace('/login');
-        if (typeof window !== 'undefined') {
-          setTimeout(() => window.location.href = '/login', 200);
-        }
-      } catch (navError) {
-        console.error('❌ Fallback navigation error:', navError);
-      }
+      // Redirect to login IMMEDIATELY - don't wait for anything
+      router.replace('/login');
+      
+      // Clear signing out flag after a tiny delay to ensure navigation completes
+      setTimeout(() => setIsSigningOut(false), 100);
+      
+      // Clear storage and sign out in background (non-blocking)
+      clearAuthStorage().catch(() => {});
+      supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+    } catch (error) {
+      console.error('Sign out error:', error);
+      
+      // Force clear ALL states and redirect immediately
+      setIsSigningOut(true);
+      setAuthState({ session: null, user: null, supabaseUser: null });
+      setHasRedirectedToStatus(false);
+      setIsLoading(false);
+      router.replace('/login');
+      setTimeout(() => setIsSigningOut(false), 100);
     }
   };
 
@@ -741,31 +365,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // ⚡ FAANG OPTIMIZATION: Lightweight profile refresh for profile page
-  const refreshProfile = React.useCallback(async () => {
-    const userId = authState.session?.user?.id;
-    if (!userId) return;
-
-    try {
-      const { data: profile, error } = await supabase
-        .from('users')
-        .select('id,email,username,full_name,role,is_verified,pending_lawyer,birthdate,profile_photo,photo_url,created_at,updated_at')
-        .eq('id', userId)
-        .single();
-
-      if (!error && profile) {
-        await AsyncStorage.setItem(
-          `profile_cache_${userId}`,
-          JSON.stringify({ profile, cachedAt: Date.now() })
-        );
-
-        setAuthState(prev => ({ ...prev, user: profile }));
-      }
-    } catch (error) {
-      console.error('Error refreshing profile:', error);
-    }
-  }, [authState.session?.user?.id]);
-
   const hasRole = (role: UserRole): boolean => {
     return authState.user?.role === role;
   };
@@ -778,52 +377,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return hasRole('admin') || hasRole('superadmin');
   };
 
-  const continueAsGuest = async () => {
-    try {
-      console.log('👤 Continuing as guest');
-      
-      // Generate and store guest session
-      const { generateGuestSessionId, GUEST_SESSION_EXPIRY_MS, GUEST_SESSION_STORAGE_KEY } = await import('../config/guestConfig');
-      const now = Date.now();
-      const guestSession = {
-        id: generateGuestSessionId(),
-        promptCount: 0,
-        createdAt: now,
-        expiresAt: now + GUEST_SESSION_EXPIRY_MS,
-      };
-      
-      // Store guest session
-      await AsyncStorage.setItem(GUEST_SESSION_STORAGE_KEY, JSON.stringify(guestSession));
-      console.log('✅ Guest session created:', guestSession.id);
-      
-      // Clear authenticated state
-      setAuthState({ session: null, user: null, supabaseUser: null });
-      setIsGuestMode(true);
-      setIsLoading(false);
-      
-      // FAANG approach: Let routing logic handle navigation
-      // Guest users will be redirected by index.tsx based on onboarding status
-      // This ensures consistent entry point for all unauthenticated users
-      router.replace('/');
-    } catch (error) {
-      console.error('❌ Error creating guest session:', error);
-      setIsLoading(false);
-    }
-  };
+
 
   const value: AuthContextType = React.useMemo(() => ({
     user: authState.user,
     session: authState.session,
     isLoading,
     isAuthenticated: !!authState.session && !!authState.user,
-    isGuestMode,
     signIn,
-    signUp,
     signOut,
-    continueAsGuest,
     setUser: setUserData,
     refreshUserData,
-    refreshProfile,
     hasRole,
     isLawyer,
     isAdmin,
@@ -834,7 +398,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initialAuthCheck,
     isSigningOut,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [authState.user, authState.session, isLoading, isGuestMode, hasRedirectedToStatus, isSigningOut, checkLawyerApplicationStatus, checkSuspensionStatus]);
+  }), [authState.user, authState.session, isLoading, hasRedirectedToStatus, isSigningOut, checkLawyerApplicationStatus, checkSuspensionStatus]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

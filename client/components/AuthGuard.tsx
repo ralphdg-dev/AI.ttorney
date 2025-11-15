@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useRouter, useSegments } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
+import { useGuest } from '../contexts/GuestContext';
 import { 
   getRouteConfig, 
   hasRoutePermission,
@@ -16,7 +17,8 @@ interface AuthGuardProps {
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
-  const { user, session, isLoading, isAuthenticated, isGuestMode, isSigningOut, initialAuthCheck } = useAuth();
+  const { user, session, isLoading, isAuthenticated, isSigningOut, initialAuthCheck } = useAuth();
+  const { isGuestMode } = useGuest();
   const router = useRouter();
   const segments = useSegments();
   // Compute route info for render-time gating
@@ -81,12 +83,43 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     }
 
     // Wait for initial auth check to complete (prevents race condition on hard refresh)
+    console.log('🔍 AuthGuard: initialAuthCheck =', initialAuthCheck, 'isLoading =', isLoading);
     if (!initialAuthCheck) {
+      console.log('⏸️ AuthGuard: Blocking - initialAuthCheck not complete');
       return; // Block ALL routes until we know if user is guest/authenticated/unauthenticated
     }
 
     // ⚡ OPTIMIZATION: Don't block on loading for public routes (login, register)
-    if (!routeConfig) return;
+    if (!routeConfig) {
+      return;
+    }
+
+    // IMPORTANT: Check guest session requirements BEFORE early returns
+    // Some public routes require an active guest session
+    console.log('🔍 Route Check:', {
+      path: currentPath,
+      requiresGuestSession: routeConfig.requiresGuestSession,
+      isAuthenticated,
+      isGuestMode
+    });
+    
+    // For routes requiring guest session, ensure user is either authenticated OR has valid guest session
+    if (routeConfig.requiresGuestSession) {
+      if (!isAuthenticated) {
+        // Check if user is actually in guest mode with valid session
+        if (!isGuestMode) {
+          console.log('🚫 Blocking access - guest session required, not in guest mode');
+          const redirectPath = '/login';
+          logRouteAccess(currentPath, null, 'denied', 'Guest session required for this route');
+          redirectIfNeeded(redirectPath);
+          return;
+        } else {
+          console.log('✅ Allowing access - guest mode active');
+        }
+      } else {
+        console.log('✅ Allowing access - user authenticated');
+      }
+    }
 
     // Skip permission checks for lawyer status screens to prevent redirect loops
     // But still render the children (LawyerStatusGuard will handle access control)
@@ -165,7 +198,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
         return;
       }
 
-      // Log public access
+      // Log public access (guest session check already handled above)
       logRouteAccess(currentPath, null, 'granted', 'Public route');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

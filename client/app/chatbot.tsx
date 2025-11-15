@@ -305,8 +305,8 @@ interface Message {
 }
 
 export default function ChatbotScreen() {
-  const { user, session, isLawyer, isGuestMode } = useAuth();
-  const { hasReachedLimit, incrementPromptCount, startGuestSession, updateGuestSessionId, guestSession, isLoading: isGuestLoading } = useGuest();
+  const { user, session, isLawyer } = useAuth();
+  const { isGuestMode, hasReachedLimit, incrementPromptCount, startGuestSession, updateGuestSessionId, guestSession, isLoading: isGuestLoading } = useGuest();
   const guestChat = useGuestChat(); // Always call hooks unconditionally
   const { moderationStatus, refreshStatus } = useModerationStatus();
   const insets = useSafeAreaInsets();

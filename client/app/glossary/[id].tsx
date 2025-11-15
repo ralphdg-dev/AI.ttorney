@@ -20,7 +20,7 @@ import { GuestNavbar } from "@/components/guest";
 import Colors from "@/constants/Colors";
 import { Star, BookOpen, Globe } from "lucide-react-native";
 import { useFavorites } from "@/contexts/FavoritesContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useGuest } from "../../contexts/GuestContext";
 import { NetworkConfig } from "@/utils/networkConfig";
 
 interface GlossaryTerm {
@@ -38,7 +38,7 @@ interface GlossaryTerm {
 export default function TermDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { isGuestMode } = useAuth();
+  const { isGuestMode } = useGuest();
   const { isFavorite, toggleFavorite } = useFavorites();
   const [term, setTerm] = useState<GlossaryTerm | null>(null);
   const [loading, setLoading] = useState(true);

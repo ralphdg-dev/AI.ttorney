@@ -6,7 +6,8 @@ import Header from '@/components/Header';
 import { VStack } from "@/components/ui/vstack";
 import { Text as GSText } from '@/components/ui/text';
 import Colors from '@/constants/Colors';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from "../contexts/AuthContext";
+import { useGuest } from "../contexts/GuestContext";
 import { safeGoBack } from '@/utils/navigationHelper';
 import Navbar from "@/components/Navbar";
 import { GuestNavbar } from "@/components/guest";
@@ -32,7 +33,8 @@ const Section: React.FC<{ title: string; children: React.ReactNode; icon?: strin
 export default function AboutScreen() {
   const router = useRouter();
   const pathname = usePathname();
-  const { isGuestMode, isAuthenticated, user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const { isGuestMode } = useGuest();
 
   // Intelligent back navigation handler (FAANG best practice)
   const handleBackPress = useCallback(() => {
@@ -150,7 +152,7 @@ export default function AboutScreen() {
           {/* Legal Coverage */}
           <Section title="Legal Coverage">
             <GSText size="md" style={{ color: Colors.text.body }}>
-              Ai.ttorney's AI chatbot and resources initially cover five primary areas of Philippine law, selected for their relevance to everyday life and high public demand:
+              Ai.ttorney&apos;s AI chatbot and resources initially cover five primary areas of Philippine law, selected for their relevance to everyday life and high public demand:
             </GSText>
             <VStack style={{ gap: 8, marginTop: 4 }}>
               <GSText size="md" bold style={{ color: Colors.text.head }}>
@@ -210,7 +212,7 @@ export default function AboutScreen() {
           {/* Lawyer Oversight and Independence */}
           <Section title="Lawyer Oversight and Independence">
             <GSText size="md" style={{ color: Colors.text.body }}>
-              Ai.ttorney is developed and maintained under the supervision of licensed legal professionals to ensure the accuracy and reliability of its content. While some of the platform's development and validation are handled by lawyers and legal experts, the platform is entirely independent and does not serve the commercial interests of any law firm. Ai.ttorney exists solely to provide legal literacy, verified resources, and pro bono consultation access to the public.
+              Ai.ttorney is developed and maintained under the supervision of licensed legal professionals to ensure the accuracy and reliability of its content. While some of the platform&apos;s development and validation are handled by lawyers and legal experts, the platform is entirely independent and does not serve the commercial interests of any law firm. Ai.ttorney exists solely to provide legal literacy, verified resources, and pro bono consultation access to the public.
             </GSText>
           </Section>
 

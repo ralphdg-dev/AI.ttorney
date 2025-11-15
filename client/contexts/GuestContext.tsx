@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   GUEST_PROMPT_LIMIT,
@@ -26,6 +27,7 @@ export interface GuestContextType {
   incrementPromptCount: () => Promise<boolean>; // Returns false if limit reached
   clearGuestSession: () => Promise<void>;
   isLoading: boolean;
+  isStartingSession: boolean; // Production: track session start progress
 }
 
 const GuestContext = createContext<GuestContextType | undefined>(undefined);
@@ -33,6 +35,7 @@ const GuestContext = createContext<GuestContextType | undefined>(undefined);
 export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [guestSession, setGuestSession] = useState<GuestSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isStartingSession, setIsStartingSession] = useState(false); // Prevent race conditions
   const [, forceUpdate] = useState(0); // Force re-render trigger
 
   // Define clearGuestSession first (no dependencies)
@@ -48,7 +51,37 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Define startGuestSession (no dependencies)
   const startGuestSession = useCallback(async () => {
+    // Prevent race conditions - don't allow multiple simultaneous session starts
+    if (isStartingSession) {
+      console.log('⏸️ Session start already in progress, skipping');
+      return;
+    }
+
     try {
+      setIsStartingSession(true);
+      
+      // First check if we already have a valid session
+      const existingSessionData = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
+      if (existingSessionData) {
+        try {
+          const existingSession: GuestSession = JSON.parse(existingSessionData);
+          if (!validateGuestSession(existingSession)) {
+            console.warn('⚠️ Invalid existing session, creating new one');
+          } else if (isSessionExpired(existingSession.expiresAt)) {
+            console.log('⏰ Existing session expired, creating new one');
+          } else {
+            console.log('📋 Reusing existing valid guest session:', existingSession.id);
+            setGuestSession(existingSession);
+            router.replace('/chatbot');
+            return;
+          }
+        } catch (parseError) {
+          console.error('❌ Corrupted session data, clearing and creating new session:', parseError);
+          await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+        }
+      }
+      
+      // Create new session only if needed
       const now = Date.now();
       const newSession: GuestSession = {
         id: generateGuestSessionId(),
@@ -60,50 +93,28 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       await AsyncStorage.setItem(GUEST_SESSION_STORAGE_KEY, JSON.stringify(newSession));
       setGuestSession(newSession);
       
-      console.log('✅ Guest session started:', newSession.id);
-      console.log('   Expires:', new Date(newSession.expiresAt).toLocaleString());
+      console.log('✅ [PROD] Guest session lifecycle: started', {
+        sessionId: newSession.id,
+        expiresAt: new Date(newSession.expiresAt).toISOString(),
+        promptLimit: GUEST_PROMPT_LIMIT,
+        timestamp: new Date().toISOString(),
+        action: 'session_created'
+      });
+      
+      // Navigate to chatbot after starting guest session
+      router.replace('/chatbot');
     } catch (error) {
-      console.error('❌ Error starting guest session:', error);
-    }
-  }, []);
-
-  // Define loadGuestSession (depends on clearGuestSession)
-  const loadGuestSession = useCallback(async () => {
-    try {
-      const sessionData = await AsyncStorage.getItem(GUEST_SESSION_STORAGE_KEY);
-      if (sessionData) {
-        const session: GuestSession = JSON.parse(sessionData);
-        
-        // Validate session integrity (security check)
-        if (!validateGuestSession(session)) {
-          console.warn('⚠️ Invalid guest session detected, clearing...');
-          await clearGuestSession();
-          return;
-        }
-        
-        // Check if session is expired
-        if (!isSessionExpired(session.expiresAt)) {
-          setGuestSession(session);
-          console.log('📋 Guest session loaded:', {
-            id: session.id,
-            promptCount: session.promptCount,
-            remaining: calculateRemainingPrompts(session.promptCount),
-            expires: new Date(session.expiresAt).toLocaleString()
-          });
-        } else {
-          // Session expired, clear it
-          console.log('⏰ Guest session expired, clearing...');
-          await clearGuestSession();
-        }
-      }
-    } catch (error) {
-      console.error('❌ Error loading guest session:', error);
-      // Clear potentially corrupted session
-      await clearGuestSession();
+      console.error('❌ [PROD] Guest session start failed:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+        action: 'startGuestSession'
+      });
+      // In production, consider showing user-friendly error message
+      // For now, just log - user can try again
     } finally {
-      setIsLoading(false);
+      setIsStartingSession(false);
     }
-  }, [clearGuestSession]);
+  }, [isStartingSession]);
 
   // Update guest session with new ID from server (for session refresh)
   const updateGuestSessionId = useCallback(async (sessionId: string) => {
@@ -124,11 +135,9 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     console.log('🔄 Guest session updated with new ID:', sessionId);
   }, [guestSession, startGuestSession]);
 
-  // Load guest session from storage on mount and when app initializes
-  // Also reload if guest session changes in storage
+  // Initialize without auto-loading guest sessions
   useEffect(() => {
-    loadGuestSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setIsLoading(false);
   }, []);
 
   // Define incrementPromptCount (depends on guestSession and startGuestSession)
@@ -175,18 +184,25 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       return true;
     } catch (error) {
-      console.error('❌ Error incrementing prompt count:', error);
+      console.error('❌ [PROD] Failed to increment guest prompt count:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        sessionId: guestSession.id,
+        currentCount: guestSession.promptCount,
+        timestamp: new Date().toISOString(),
+        action: 'incrementPromptCount'
+      });
+      // Return false to indicate failure - conversation should handle this gracefully
       return false;
     }
   }, [guestSession, startGuestSession, clearGuestSession]);
 
   // FAANG Best Practice: Memoize context value to prevent unnecessary re-renders
   const value: GuestContextType = React.useMemo(() => ({
-    isGuestMode: !!guestSession && !isSessionExpired(guestSession?.expiresAt || 0),
+    isGuestMode: !!guestSession,
     guestSession,
     promptCount: guestSession?.promptCount || 0,
-    promptsRemaining: calculateRemainingPrompts(guestSession?.promptCount || 0),
-    hasReachedLimit: isPromptLimitReached(guestSession?.promptCount || 0),
+    promptsRemaining: guestSession ? calculateRemainingPrompts(guestSession.promptCount) : GUEST_PROMPT_LIMIT,
+    hasReachedLimit: guestSession ? isPromptLimitReached(guestSession.promptCount) : false,
     resetTime: guestSession?.expiresAt || null,
     timeUntilReset: guestSession ? getTimeUntilReset(guestSession.expiresAt) : null,
     startGuestSession,
@@ -194,7 +210,8 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     incrementPromptCount,
     clearGuestSession,
     isLoading,
-  }), [guestSession, isLoading, startGuestSession, updateGuestSessionId, incrementPromptCount, clearGuestSession]);
+    isStartingSession, // Production: expose loading state to UI
+  }), [guestSession, startGuestSession, updateGuestSessionId, incrementPromptCount, clearGuestSession, isLoading, isStartingSession]);
 
   return <GuestContext.Provider value={value}>{children}</GuestContext.Provider>;
 };

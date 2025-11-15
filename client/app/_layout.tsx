@@ -22,7 +22,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ModerationProvider } from "../contexts/ModerationContext";
 import { NotificationProvider } from "../contexts/NotificationContext";
 import { SidebarProvider } from "../components/AppSidebar";
-// import AuthGuard from "../components/auth/AuthGuard";
+import { AuthGuard } from "../components/AuthGuard";
 import { SuspensionGuard } from "../components/SuspensionGuard";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 import NoInternetModal from "../components/common/NoInternetModal";
@@ -79,7 +79,7 @@ function AppContent() {
                     <ConsultationsProvider>
                       <ErrorBoundary fallbackRoute="/home">
                         <ForumCacheProvider>
-                          {/* Temporarily removed AuthGuard to fix crashing */}
+                          <AuthGuard>
                           <SuspensionGuard>
                             <RouteErrorBoundary>
                               <SidebarProvider>
@@ -106,7 +106,7 @@ function AppContent() {
                               </SidebarProvider>
                             </RouteErrorBoundary>
                           </SuspensionGuard>
-                        {/* </AuthGuard> */}
+                        </AuthGuard>
                         </ForumCacheProvider>
                       </ErrorBoundary>
                     </ConsultationsProvider>

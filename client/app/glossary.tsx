@@ -29,7 +29,7 @@ import {
   generateGlossaryCacheKey,
 } from "@/services/cacheService";
 import { NetworkConfig } from "@/utils/networkConfig";
-import { useAuth } from "@/contexts/AuthContext";
+import { useGuest } from "../contexts/GuestContext";
 import { useBookmarks } from "@/contexts/BookmarksContext";
 import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 
@@ -37,7 +37,7 @@ const ITEMS_PER_PAGE = 10;
 
 export default function GlossaryScreen() {
   const router = useRouter();
-  const { isGuestMode } = useAuth();
+  const { isGuestMode } = useGuest();
   const { openSidebar } = useSidebar();
   const [activeTab, setActiveTab] = useState<string>("terms");
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -45,7 +45,6 @@ export default function GlossaryScreen() {
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
-  const [isFiltering, setIsFiltering] = useState(false);
 
   // Terms state
   const [terms, setTerms] = useState<TermItem[]>([]);
@@ -218,11 +217,8 @@ export default function GlossaryScreen() {
   // Search and category change
   useEffect(() => {
     if (activeTab === "terms") {
-      setIsFiltering(true);
       const timeoutId = setTimeout(() => {
-        fetchLegalTerms(1, activeCategory, debouncedSearch).finally(() => {
-          setIsFiltering(false);
-        });
+        fetchLegalTerms(1, activeCategory, debouncedSearch);
       }, 100);
       return () => clearTimeout(timeoutId);
     }
@@ -263,7 +259,7 @@ export default function GlossaryScreen() {
 
       return () => clearTimeout(searchTimeout);
     }
-  }, [searchQuery, activeCategory, activeTab, legalArticles, searchArticles, getArticlesByCategory]);
+  }, [searchQuery, activeCategory, activeTab, legalArticles, searchArticles, getArticlesByCategory, debouncedSearch]);
 
   // Handle data differently for terms (server-side pagination) vs articles (client-side pagination)
   const currentData = useMemo(() => {

@@ -7,6 +7,7 @@ export interface RouteConfig {
   allowedRoles?: UserRole[];
   redirectTo?: string;
   isPublic?: boolean;
+  requiresGuestSession?: boolean; // New: Requires active guest session
   serverValidation?: boolean; // New: Enable server-side validation
   fallbackRoute?: string; // New: Fallback route for errors
   errorBoundary?: boolean; // New: Enable error boundary
@@ -108,6 +109,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   '/guides': { 
     path: '/guides', 
     isPublic: true, // Allow guest access
+    requiresGuestSession: true, // Requires active guest session
     redirectTo: 'role-based',
     serverValidation: false,
     errorBoundary: true
@@ -115,6 +117,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   '/glossary': { 
     path: '/glossary', 
     isPublic: true, // Allow guest access to legal terms
+    requiresGuestSession: true, // Requires active guest session
     redirectTo: 'role-based',
     serverValidation: false,
     errorBoundary: true
@@ -122,6 +125,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   '/article': { 
     path: '/article', 
     isPublic: true, // Allow guest access to articles
+    requiresGuestSession: true, // Requires active guest session
     redirectTo: 'role-based',
     serverValidation: false,
     errorBoundary: true
@@ -129,6 +133,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   '/chatbot': { 
     path: '/chatbot', 
     isPublic: true, // Allow guest access with 15-prompt limit
+    requiresGuestSession: true, // Requires active guest session
     redirectTo: 'role-based',
     serverValidation: false,
     errorBoundary: true
@@ -210,6 +215,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   '/settings/privacy-policy': { 
     path: '/settings/privacy-policy', 
     isPublic: true, // Allow guest access from GuestSidebar
+    requiresGuestSession: true, // Requires active guest session
     redirectTo: 'role-based',
     serverValidation: false,
     errorBoundary: true
@@ -217,6 +223,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   '/settings/terms': { 
     path: '/settings/terms', 
     isPublic: true, // Allow guest access from GuestSidebar
+    requiresGuestSession: true, // Requires active guest session
     redirectTo: 'role-based',
     serverValidation: false,
     errorBoundary: true
@@ -224,6 +231,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   '/settings/about-us': { 
     path: '/settings/about-us', 
     isPublic: true, // Allow guest access from GuestSidebar
+    requiresGuestSession: true, // Requires active guest session
     redirectTo: 'role-based',
     serverValidation: false,
     errorBoundary: true
@@ -231,6 +239,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   '/help': { 
     path: '/help', 
     isPublic: true, // Allow guest access from GuestSidebar
+    requiresGuestSession: true, // Requires active guest session
     redirectTo: 'role-based',
     serverValidation: false,
     errorBoundary: true
@@ -238,6 +247,7 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
   '/about': { 
     path: '/about', 
     isPublic: true, // Allow guest access from GuestSidebar
+    requiresGuestSession: true, // Requires active guest session
     redirectTo: 'role-based',
     serverValidation: false,
     errorBoundary: true
