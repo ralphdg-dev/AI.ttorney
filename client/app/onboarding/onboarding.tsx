@@ -10,6 +10,7 @@ import ActionLink from '../../components/ui/ActionLink';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEffect } from 'react';
 import { getRoleBasedRedirect } from '../../config/routes';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Onboarding() {
   const { user, isAuthenticated } = useAuth();
@@ -33,21 +34,14 @@ export default function Onboarding() {
     onHandlerStateChange,
   } = useOnboardingAnimation(onboardingSlides.length);
 
-  const handleSkip = () => {
+  const proceedToRegistration = async () => {
+    await AsyncStorage.setItem("@onboarding_completed", "true").catch(() => {});
     router.push('/onboarding/registration');
   };
 
-  const handleNext = () => {
-    goToNextSlide(() => {
-      router.push('/onboarding/registration');
-    });
-  };
-
-  const handleGestureStateChange = (event: any) => {
-    onHandlerStateChange(event, () => {
-      router.push('/onboarding/registration');
-    });
-  };
+  const handleSkip = proceedToRegistration;
+  const handleNext = () => goToNextSlide(proceedToRegistration);
+  const handleGestureStateChange = (event: any) => onHandlerStateChange(event, proceedToRegistration);
 
   return (
     <GestureHandlerRootView style={tw`flex-1`}>

@@ -768,8 +768,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsGuestMode(true);
       setIsLoading(false);
       
-      // Navigate to chatbot
-      router.replace('/chatbot');
+      // FAANG approach: Let routing logic handle navigation
+      // Guest users will be redirected by index.tsx based on onboarding status
+      // This ensures consistent entry point for all unauthenticated users
+      router.replace('/');
     } catch (error) {
       console.error('❌ Error creating guest session:', error);
       setIsLoading(false);

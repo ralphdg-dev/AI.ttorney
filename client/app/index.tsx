@@ -1,22 +1,25 @@
 import { Redirect } from "expo-router";
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { getRoleBasedRedirect } from "../config/routes";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function SplashScreen() {
   const { user, isLoading, isAuthenticated, isGuestMode, initialAuthCheck } = useAuth();
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem("@onboarding_completed")
+      .then(seen => setHasSeenOnboarding(seen === "true"))
+      .catch(() => setHasSeenOnboarding(false));
+  }, []);
+
   const redirectPath = useMemo(() => {
-    if (!initialAuthCheck || isLoading) return null;
-    if (isGuestMode) return "/chatbot";
+    if (!initialAuthCheck || isLoading || hasSeenOnboarding === null) return null;
     if (isAuthenticated && user) return getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
-    return "/login";
-  }, [initialAuthCheck, isLoading, isGuestMode, isAuthenticated, user]);
+    if (!hasSeenOnboarding) return "/onboarding/onboarding";
+    return isGuestMode ? "/chatbot" : "/login";
+  }, [initialAuthCheck, isLoading, isAuthenticated, isGuestMode, user, hasSeenOnboarding]);
 
-  if (redirectPath) {
-    return <Redirect href={redirectPath as any} />;
-  }
-
-  // While waiting for initial auth check, AppContent keeps the splash screen up.
-  // Once ready, we immediately redirect without rendering an intermediate loader.
-  return null;
+  return redirectPath ? <Redirect href={redirectPath as any} /> : null;
 }
