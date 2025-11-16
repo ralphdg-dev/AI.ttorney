@@ -35,7 +35,7 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
     // Apply search filter
     if (search && search.trim()) {
       const searchTerm = search.trim();
-      query = query.or(`body.ilike.%${searchTerm}%,title.ilike.%${searchTerm}%`);
+      query = query.ilike("body", `%${searchTerm}%`);
     }
 
     // Apply category filter
@@ -199,7 +199,7 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
     // Apply the same filters to count query
     if (search && search.trim()) {
       const searchTerm = search.trim();
-      countQuery = countQuery.or(`body.ilike.%${searchTerm}%,title.ilike.%${searchTerm}%`);
+      countQuery = countQuery.ilike("body", `%${searchTerm}%`);
     }
 
     if (category && category !== "all") {
@@ -510,7 +510,7 @@ router.get("/reported-posts/debug", authenticateAdmin, async (req, res) => {
     // Get sample posts
     const { data: allPosts, error: postsError } = await supabaseAdmin
       .from("forum_posts")
-      .select("id, content, created_at")
+      .select("id, body, created_at")
       .limit(10);
 
     
