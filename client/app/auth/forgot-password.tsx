@@ -158,9 +158,9 @@ export default function ForgotPassword() {
       if (result.error) {
         setError(result.error);
         
-        if (result.locked_out) {
+        if (result.locked_out || result.lockedOut) {
           setIsLockedOut(true);
-          setLockoutTimer(result.retry_after || 900);
+          setLockoutTimer(result.retry_after || result.retryAfter || 900);
           setOtp(["", "", "", "", "", ""]);
         }
         
@@ -174,7 +174,9 @@ export default function ForgotPassword() {
           setOtp(["", "", "", "", "", ""]);
         }
         
-        if (result.attempts_remaining !== undefined) {
+        if (result.attemptsRemaining !== undefined) {
+          setAttemptsRemaining(result.attemptsRemaining);
+        } else if (result.attempts_remaining !== undefined) {
           setAttemptsRemaining(result.attempts_remaining);
         }
       } else {

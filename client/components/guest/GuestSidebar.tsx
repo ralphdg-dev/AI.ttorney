@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Dimensi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { 
-  LogOut,
   Shield,
   FileText,
   Info,
@@ -93,12 +92,7 @@ export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) =
     router.push(path as any);
   };
 
-  const handleExitGuestMode = () => {
-    onClose();
-    // Clear guest session and redirect to login
-    router.replace('/login');
-  };
-
+  
   const handleLogin = () => {
     onClose();
     router.push('/login');
@@ -141,20 +135,7 @@ export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) =
       icon: FileText,
       onPress: () => handleNavigation('/settings/terms'),
     },
-    {
-      id: 'divider2',
-      label: '',
-      icon: View,
-      onPress: () => {},
-      divider: true,
-    },
-    {
-      id: 'exit',
-      label: 'Exit Guest Mode',
-      icon: LogOut,
-      onPress: handleExitGuestMode,
-    },
-  ];
+      ];
 
   const renderMenuItem = (item: MenuItem) => {
     if (item.divider) {
