@@ -440,15 +440,6 @@ export default function DirectoryScreen() {
               ) : (
                 <>
                   {filteredLawyers
-                    .filter(
-                      (lawyer) =>
-                        lawyer.days &&
-                        lawyer.days.trim() !== "" &&
-                        lawyer.hours_available &&
-                        (typeof lawyer.hours_available === 'object' && !Array.isArray(lawyer.hours_available)
-                          ? Object.keys(lawyer.hours_available).length > 0
-                          : Array.isArray(lawyer.hours_available) && lawyer.hours_available.length > 0)
-                    )
                     .map((lawyer) => (
                       <LawyerCard
                         key={lawyer.id}
