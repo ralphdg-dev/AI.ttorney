@@ -304,9 +304,6 @@ const Post: React.FC<PostProps> = React.memo(({
   // Determine if the user is anonymous
   const isAnonymous = (user.username || '').toLowerCase() === 'anonymous' || (user.name || '').toLowerCase().includes('anonymous');
   
-  // Debug: Log user object structure
-  console.log('Post user object:', user);
-  
   // Determine if the user account is deactivated
   const isDeactivated = user.account_status === 'deactivated';
 

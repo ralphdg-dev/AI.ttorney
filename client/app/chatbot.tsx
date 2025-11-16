@@ -1777,7 +1777,7 @@ export default function ChatbotScreen() {
               <View
                 ref={chatbotRef}
                 style={[
-                  tw`px-5 transition-all duration-200 rounded-full`,
+                  tw`px-5 rounded-full`,
                   {
                     backgroundColor: isGenerating ? "#F3F4F6" : Colors.background.secondary,
                     borderWidth: 1,
@@ -1829,7 +1829,7 @@ export default function ChatbotScreen() {
               disabled={!input.trim() || isGenerating}
               activeOpacity={0.8}
               style={[
-                tw`items-center justify-center transition-all duration-200 rounded-full`,
+                tw`items-center justify-center rounded-full`,
                 {
                   width: 52,
                   height: 52,

@@ -83,7 +83,10 @@ function AppContent() {
                           <SuspensionGuard>
                             <RouteErrorBoundary>
                               <SidebarProvider>
-                                  <Stack screenOptions={{ headerShown: false }}>
+                                  <Stack screenOptions={{ 
+                                    headerShown: false,
+                                    animation: 'none' // Disable slide animations
+                                  }}>
                                     <Stack.Screen name="index" options={{ headerShown: false }} />
                                     <Stack.Screen name="login" options={{ headerShown: false }} />
                                     <Stack.Screen name="role-selection" options={{ headerShown: false }} />
