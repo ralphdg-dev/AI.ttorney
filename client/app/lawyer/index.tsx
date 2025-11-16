@@ -13,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLawyerDashboard } from '../../hooks/useLawyerDashboard';
 import { getClientName } from '../../utils/consultationStyles';
 import { QUICK_STATS_CONFIG, DASHBOARD_CONSTANTS } from '../../constants/dashboardConfig';
+import RegisteredOnboardingOverlay from '../../components/onboarding/RegisteredOnboardingOverlay';
 
 const LawyerDashboard: React.FC = () => {
   const router = useRouter();
@@ -181,6 +182,7 @@ const LawyerDashboard: React.FC = () => {
 
       <LawyerNavbar activeTab="home" />
       <SidebarWrapper />
+      <RegisteredOnboardingOverlay />
     </SafeAreaView>
   );
 };

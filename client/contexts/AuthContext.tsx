@@ -19,6 +19,7 @@ export interface User {
   pending_lawyer?: boolean;
   created_at?: string;
   updated_at?: string;
+  onboard?: boolean;
 }
 
 export interface AuthState {

@@ -1,11 +1,11 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import LawyerNavbar from '../lawyer/LawyerNavbar';
+import LawyerNavbar from '../lawyer/shared/LawyerNavbar';
 import Navbar from '../Navbar';
 
 interface RoleBasedNavigationProps {
   activeTab?: string;
-  lawyerActiveTab?: 'home' | 'cases' | 'consult' | 'clients' | 'profile';
+  lawyerActiveTab?: 'home' | 'forum' | 'consult' | 'chatbot' | 'profile';
   userActiveTab?: 'home' | 'directory' | 'guides' | 'glossary' | 'booklawyer';
 }
 
@@ -21,7 +21,7 @@ const RoleBasedNavigation: React.FC<RoleBasedNavigationProps> = ({
   }
 
   if (isLawyer()) {
-    const lawyerTab = (lawyerActiveTab || activeTab || 'home') as 'home' | 'cases' | 'consult' | 'clients' | 'profile';
+    const lawyerTab = (lawyerActiveTab || activeTab || 'home') as 'home' | 'forum' | 'consult' | 'chatbot' | 'profile';
     return <LawyerNavbar activeTab={lawyerTab} />;
   }
 
