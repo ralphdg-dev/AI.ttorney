@@ -12,7 +12,7 @@ class UserSignUp(BaseModel):
     first_name: str
     last_name: str
     birthdate: date
-    role: UserRole = "registered_user"
+    role: UserRole = "guest"
     
     @property
     def full_name(self) -> str:

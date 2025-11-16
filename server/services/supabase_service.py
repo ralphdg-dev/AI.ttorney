@@ -163,27 +163,38 @@ class SupabaseService:
                 # Create a copy of user_data without None values
                 clean_user_data = {k: v for k, v in user_data.items() if v is not None}
                 
+                logger.info(f"🔍 Attempting to insert user profile: {clean_user_data.get('email')}")
+                logger.debug(f"📊 Profile data: {clean_user_data}")
+                
                 response = await client.post(
                     f"{self.rest_url}/users",
                     json=clean_user_data,
                     headers=self._get_headers(use_service_key=True)
                 )
                 
+                logger.info(f"📡 Insert response status: {response.status_code}")
+                
                 if response.status_code in [200, 201]:
                     if response.content:
                         data = response.json()
+                        logger.info(f"✅ User profile created successfully")
                         return {"success": True, "data": data}
                     else:
                         # Success but no content (common with Supabase inserts)
+                        logger.info(f"✅ User profile created (no content returned)")
                         return {"success": True, "data": {"message": "User profile created successfully"}}
                 else:
                     error_data = response.json() if response.content else {}
-                    logger.error(f"Insert user profile failed: {response.status_code}, {error_data}")
-                    return {"success": False, "error": error_data}
+                    error_msg = error_data.get("message") or error_data.get("msg") or error_data.get("hint") or str(error_data)
+                    logger.error(f"❌ Insert user profile failed: {response.status_code}")
+                    logger.error(f"📋 Error details: {error_data}")
+                    return {"success": False, "error": f"Database error creating new user: {error_msg}"}
                     
         except Exception as e:
-            logger.error(f"Insert user profile error: {str(e)}")
-            return {"success": False, "error": str(e)}
+            logger.error(f"❌ Insert user profile exception: {str(e)}")
+            import traceback
+            logger.error(f"📋 Traceback: {traceback.format_exc()}")
+            return {"success": False, "error": f"Database error creating new user: {str(e)}"}
     
     async def get_user_profile(self, user_id: str) -> Dict[str, Any]:
         """Get user profile from users table"""
@@ -239,13 +250,19 @@ class SupabaseService:
                     query_params.append(f"{key}=eq.{value}")
                 query_string = "&".join(query_params)
                 
+                logger.info(f"🔄 Updating user profile with where: {where_clause}")
+                logger.debug(f"📊 Update data: {update_data}")
+                
                 response = await client.patch(
                     f"{self.rest_url}/users?{query_string}",
                     json=update_data,
                     headers=self._get_headers(use_service_key=True)
                 )
                 
+                logger.info(f"📡 Update response status: {response.status_code}")
+                
                 if response.status_code in [200, 204]:
+                    logger.info(f"✅ User profile updated successfully")
                     return {"success": True, "message": "User profile updated"}
                 else:
                     error_data = response.json() if response.content else {}

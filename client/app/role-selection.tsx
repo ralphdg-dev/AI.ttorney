@@ -102,7 +102,6 @@ export default function RoleSelection() {
       // Get user email from AuthContext instead of AsyncStorage
       const userEmail = user?.email;
       
-      
       if (!userEmail) {
         Alert.alert('Error', 'User email not found. Please try logging in again.');
         setIsLoading(false);
@@ -113,40 +112,45 @@ export default function RoleSelection() {
       const apiRoleSelection = "registered_user";
       
       // Call role selection API
-      
+      console.log('📤 Calling role selection API...');
       const response = await apiClient.selectRole({
         email: userEmail,
         selected_role: apiRoleSelection
       });
 
-
       if (response.success) {
-        // Refresh user data in AuthContext to update role
-        await refreshUserData();
+        console.log('✅ Role API call successful, refreshing user data...');
         
-        // Navigate based on selected role
-        console.log('✅ Role updated successfully, navigating...');
+        // Refresh user data and get the updated profile directly
+        const updatedProfile = await refreshUserData();
         
-        if (selectedRole === "seeker") {
-          // Legal seeker goes to home page - use replace to prevent back navigation
-          console.log('🏠 Navigating to home for legal seeker');
-          router.replace("/home");
-        } else if (selectedRole === "lawyer") {
-          // Lawyer goes to verification instructions - use replace to prevent back navigation
-          console.log('⚖️ Navigating to lawyer verification for lawyer');
-          router.replace("/onboarding/lawyer/verification-instructions");
+        if (updatedProfile) {
+          console.log('✅ Profile updated successfully:', { role: updatedProfile.role });
+          
+          // Navigate immediately - no race condition
+          if (selectedRole === "seeker") {
+            console.log('🏠 Navigating to home for legal seeker');
+            router.replace("/home");
+          } else if (selectedRole === "lawyer") {
+            console.log('⚖️ Navigating to lawyer verification for lawyer');
+            router.replace("/onboarding/lawyer/verification-instructions");
+          } else {
+            console.log('🔄 Fallback navigation to home');
+            router.replace("/home");
+          }
         } else {
-          // Fallback
-          console.log('🔄 Fallback navigation to home');
-          router.replace("/home");
+          console.error('❌ Failed to refresh user profile');
+          Alert.alert('Error', 'Failed to update user profile. Please try again.');
+          setIsLoading(false);
         }
       } else {
         console.error('❌ Role selection failed:', response.error);
         Alert.alert('Error', response.error || 'Failed to update role');
+        setIsLoading(false);
       }
-    } catch {
+    } catch (error) {
+      console.error('❌ Role selection error:', error);
       Alert.alert('Error', 'Failed to update role. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };

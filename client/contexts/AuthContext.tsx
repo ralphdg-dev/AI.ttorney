@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, clearAuthStorage } from '../config/supabase';
-import { router, useSegments } from 'expo-router';
+import { router } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
 
 // Role hierarchy based on backend schema
@@ -36,7 +36,7 @@ export interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   setUser: (user: User | null) => void;
-  refreshUserData: () => Promise<void>;
+  refreshUserData: () => Promise<User | null>;
   hasRole: (role: UserRole) => boolean;
   isLawyer: () => boolean;
   isAdmin: () => boolean;
@@ -52,7 +52,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const segments = useSegments();
   const [authState, setAuthState] = useState<AuthState>({
     session: null,
     user: null,
@@ -428,10 +427,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }));
   };
 
-  const refreshUserData = async () => {
+  const refreshUserData = async (): Promise<User | null> => {
     try {
+      console.log('🔄 refreshUserData called');
       if (authState.session?.user?.id) {
         // Fetch updated user profile from database
+        console.log('📡 Fetching user profile from database...');
         const { data: profile, error } = await supabase
           .from('users')
           .select('*')
@@ -439,6 +440,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .single();
 
         if (!error && profile) {
+          console.log('✅ Profile fetched successfully:', { role: profile.role, account_status: profile.account_status });
+          
+          // Update state immediately
           setAuthState(prev => ({
             ...prev,
             user: profile,
@@ -452,10 +456,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               router.replace('/deactivated' as any);
             }
           }
+          
+          // Return the profile for immediate use by caller
+          return profile;
+        } else {
+          console.error('❌ Error fetching profile:', error);
+          return null;
         }
+      } else {
+        console.warn('⚠️ No session user ID available for refresh');
+        return null;
       }
     } catch (error) {
-      console.error('Error refreshing user data:', error);
+      console.error('❌ Error refreshing user data:', error);
+      return null;
     }
   };
 

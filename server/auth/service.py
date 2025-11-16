@@ -72,26 +72,33 @@ class AuthService:
                 logger.error(f"No user ID in Supabase response: {response_data}")
                 return {"success": False, "error": "User creation failed - no user ID returned"}
             
-            # STEP 3: Check if profile already exists (may be created by database trigger)
+            # STEP 3: Wait for trigger to create profile, then update it
+            # The database trigger automatically creates a profile when auth user is created
+            # We need to wait a moment for the trigger to complete
+            import asyncio
+            await asyncio.sleep(0.5)  # Give trigger time to execute
+            
+            # Check if profile was created by trigger
             existing_profile = await self.supabase.get_user_profile(auth_user["id"])
             
             if existing_profile["success"] and existing_profile.get("data"):
-                # Profile already exists (created by trigger), just update it with our data
-                logger.info(f"Profile already exists for user {auth_user['id']}, updating instead of inserting")
+                # Profile exists (created by trigger), update it with complete data
+                logger.info(f"✅ Profile created by trigger for user {auth_user['id']}, updating with complete data")
                 profile_data = {
                     "username": user_data.username,
                     "full_name": user_data.full_name,
                     "birthdate": user_data.birthdate.isoformat(),
                     "role": "guest",  # Always start as guest until verified
-                    "is_verified": False
+                    "is_verified": False,
+                    "auth_provider": "email"
                 }
                 profile_response = await self.supabase.update_user_profile(
                     profile_data,
                     {"id": auth_user["id"]}
                 )
             else:
-                # Profile doesn't exist, create it
-                logger.info(f"Creating new profile for user {auth_user['id']}")
+                # Profile doesn't exist (trigger failed or disabled), create it manually
+                logger.warning(f"⚠️ Trigger did not create profile for user {auth_user['id']}, creating manually")
                 profile_data = {
                     "id": auth_user["id"],  # Use same UUID from auth.users
                     "email": user_data.email,
@@ -99,7 +106,8 @@ class AuthService:
                     "full_name": user_data.full_name,
                     "birthdate": user_data.birthdate.isoformat(),
                     "role": "guest",  # Always start as guest until verified
-                    "is_verified": False
+                    "is_verified": False,
+                    "auth_provider": "email"
                 }
                 profile_response = await self.supabase.insert_user_profile(profile_data)
             
