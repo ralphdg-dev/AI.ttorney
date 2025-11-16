@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { LoadingWithTrivia } from '../components/LoadingWithTrivia';
 
 export default function ApplyLawyer() {
+  const insets = useSafeAreaInsets();
   const { user, session, checkLawyerApplicationStatus } = useAuth();
 
   useEffect(() => {
@@ -67,13 +68,13 @@ export default function ApplyLawyer() {
 
   // Show loading immediately to prevent white page flash
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+    <View style={{ flex: 1, paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }}>
       <View style={{ flex: 1, backgroundColor: '#1F2937' }}>
         <LoadingWithTrivia 
           message="LOADING..."
           showTrivia={true}
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 }

@@ -48,7 +48,10 @@ const Header: React.FC<HeaderProps> = ({
   showSearch = false,
   menuRef,
 }) => {
-  const { openSidebar } = useSidebar();
+  const sidebarContext = useSidebar();
+  const openSidebar = sidebarContext?.openSidebar || (() => {
+    console.warn('Sidebar context not available, menu button disabled');
+  });
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { unreadCount } = useNotifications();

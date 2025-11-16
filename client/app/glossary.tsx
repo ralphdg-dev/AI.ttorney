@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
   StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
 import { HStack } from "@/components/ui/hstack";
@@ -36,6 +36,7 @@ import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 const ITEMS_PER_PAGE = 8;
 
 export default function GlossaryScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isGuestMode } = useGuest();
   const { openSidebar } = useSidebar();
@@ -328,9 +329,9 @@ export default function GlossaryScreen() {
 
   const handleItemPress = useCallback((item: TermItem | ArticleItem) => {
     if (activeTab === "terms") {
-      router.push(`/glossary/${item.id}` as any);
+      router.push(`/glossary/${item.id}`);
     } else {
-      router.push(`/article/${item.id}` as any);
+      router.push(`/article/${item.id}`);
     }
   }, [activeTab, router]);
 
@@ -351,7 +352,7 @@ export default function GlossaryScreen() {
 
   // Render functions
   const renderListHeader = useCallback(() => (
-    <View style={{ marginBottom: isDesktop ? 28 : isTablet ? 24 : 20 }}>
+    <View style={{ marginBottom: isDesktop ? 28 : isTablet ? 24 : 20, paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }}>
       <HStack className="items-center" style={{ marginBottom: isDesktop ? 16 : 12 }}>
         <Ionicons name="pricetags" size={16} color={Colors.text.sub} />
         <GSText size="sm" className="ml-2 font-semibold text-gray-600">
@@ -625,7 +626,7 @@ export default function GlossaryScreen() {
 
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#f9fafb" }} edges={["top"]}>
+    <View style={{ flex: 1, backgroundColor: "#f9fafb" }} edges={["top"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#f9fafb" />
       <Header 
         title="Legal Glossary" 
@@ -710,6 +711,6 @@ export default function GlossaryScreen() {
       ) : (
         <SidebarWrapper />
       )}
-    </SafeAreaView>
+    </View>
   );
 }

@@ -166,10 +166,6 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    // TODO: Implement Google login
-    console.log("Google login pressed");
-  };
 
   const handleBack = () => {
     // @ts-ignore: canGoBack may not exist on some expo-router versions
@@ -320,32 +316,6 @@ export default function Login() {
           >
             <Text style={tw`text-lg font-semibold text-white`}>
               {isSubmitting ? 'Signing In...' : 'Login'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* OR Separator */}
-          <View style={tw`flex-row items-center mb-4`}>
-            <View style={tw`flex-1 h-px bg-gray-300`} />
-            <Text style={[tw`mx-4 text-sm`, { color: Colors.text.sub }]}>
-              OR
-            </Text>
-            <View style={tw`flex-1 h-px bg-gray-300`} />
-          </View>
-
-          {/* Google Button */}
-          <TouchableOpacity
-            style={tw`flex-row items-center justify-center py-3 bg-white border border-gray-300 rounded-lg`}
-            onPress={handleGoogleLogin}
-          >
-            <Image
-              source={require("../assets/images/registration/google.png")}
-              style={[tw`mr-2`, { width: 22, height: 22 }]}
-              resizeMode="contain"
-            />
-            <Text
-              style={[tw`text-lg font-semibold`]}
-            >
-              Login with Google
             </Text>
           </TouchableOpacity>
 

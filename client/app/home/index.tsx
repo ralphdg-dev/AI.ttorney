@@ -7,7 +7,6 @@ import Timeline, { TimelineHandle } from '../../components/home/Timeline';
 import Header from '../../components/Header';
 import { SidebarWrapper } from '../../components/AppSidebar';
 import Colors from '../../constants/Colors';
-import RegisteredOnboardingOverlay from '../../components/onboarding/RegisteredOnboardingOverlay';
 
 const HomePage: React.FC = () => {
   const router = useRouter();
@@ -35,7 +34,6 @@ const HomePage: React.FC = () => {
         
         <Navbar activeTab="home" />
       <SidebarWrapper />
-      <RegisteredOnboardingOverlay />
     </SafeAreaView>
   );
 };

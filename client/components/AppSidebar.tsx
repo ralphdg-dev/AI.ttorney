@@ -92,10 +92,12 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
 };
 
 // Hook
-export const useSidebar = (): SidebarContextType => {
+export const useSidebar = (): SidebarContextType | null => {
   const context = useContext(SidebarContext);
   if (context === undefined) {
-    throw new Error("useSidebar must be used within a SidebarProvider");
+    // Return null instead of throwing to handle Android initialization timing
+    console.warn("useSidebar must be used within a SidebarProvider, returning null");
+    return null;
   }
   return context;
 };
@@ -458,7 +460,11 @@ export const SidebarWrapper: React.FC<{
     avatar?: string;
   };
 }> = ({ userInfo }) => {
-  const { isVisible, closeSidebar } = useSidebar();
+  const sidebarContext = useSidebar();
+  const isVisible = sidebarContext?.isVisible || false;
+  const closeSidebar = sidebarContext?.closeSidebar || (() => {
+    console.warn('Sidebar context not available, closeSidebar disabled');
+  });
   const router = useRouter();
   const { user } = useAuth();
 

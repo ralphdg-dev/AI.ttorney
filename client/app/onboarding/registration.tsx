@@ -724,34 +724,6 @@ export default function UserRegistration() {
           disabled={!isComplete || loading}
         />
 
-        {/* OR separator */}
-        <View className="flex-row items-center my-3">
-          <View className="flex-1 h-px bg-gray-300" />
-          <Text className="mx-3 text-gray-500">OR</Text>
-          <View className="flex-1 h-px bg-gray-300" />
-        </View>
-
-        {/* Google sign up */}
-        <TouchableOpacity
-          className="py-3 rounded-lg flex-row items-center justify-center mb-3 border border-gray-300 bg-white"
-          style={{
-            width: screenWidth - 64,
-            height: 56,
-            alignSelf: 'center',
-          }}
-          onPress={() => { /* TODO: google sign up */ }}
-          activeOpacity={0.8}
-        >
-          <Image
-            source={require('../../assets/images/registration/google.png')}
-            style={{ width: 20, height: 20, marginRight: 8 }}
-            resizeMode="contain"
-          />
-          <Text className="text-gray-900 font-semibold text-lg">
-            Sign Up with Google
-          </Text>
-        </TouchableOpacity>
-
         {/* Bottom link */}
         <View className="items-center mt-4">
           <Text className="text-gray-500">

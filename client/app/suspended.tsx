@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Image, TextInput, Alert, Modal } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { AlertTriangle, LogOut, Hourglass, Info, EyeOff, ShieldAlert, MessageSquare, CheckCircle, XCircle, Clock } from 'lucide-react-native';
@@ -14,6 +14,7 @@ interface SuspensionInfo {
 }
 
 export default function SuspendedScreen() {
+  const insets = useSafeAreaInsets();
   const { signOut, session, isLoading: authLoading } = useAuth();
   const [suspensionInfo, setSuspensionInfo] = useState<SuspensionInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -238,11 +239,11 @@ export default function SuspendedScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+      <View style={{ flex: 1 , paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }} >
         <View className="flex-1 bg-white justify-center items-center">
           <ActivityIndicator size="large" color="#3B82F6" />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -250,7 +251,7 @@ export default function SuspendedScreen() {
   const suspensionMessage = getSuspensionMessage(suspensionCount);
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+    <View style={{ flex: 1 }} >
       <View className="flex-1 bg-white">
       {/* Simple Header with Logo Only */}
       <View className="bg-white px-4 pt-6 pb-3 border-b border-gray-200 items-center">
@@ -476,6 +477,6 @@ export default function SuspendedScreen() {
       </View>
     </ScrollView>
     </View>
-    </SafeAreaView>
+    </View>
   );
 }

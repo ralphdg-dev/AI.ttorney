@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -81,11 +80,13 @@ interface ErrorFallbackProps {
   fallbackRoute?: string;
 }
 
-const ErrorFallback: React.FC<ErrorFallbackProps> = ({ error, onRetry, fallbackRoute }) => {
-  const router = useRouter();
-
+const ErrorFallback: React.FC<ErrorFallbackProps> = ({ error, onRetry }) => {
   const handleGoHome = () => {
-    router.push((fallbackRoute || '/home') as any);
+    // Don't use router in error boundary - just reload the app
+    // This ensures we don't cause another error if navigation context is broken
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   };
 
   return (
