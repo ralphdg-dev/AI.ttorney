@@ -188,6 +188,13 @@ const ManageTopicsThreads = () => {
   };
 
   const getStatusBadge = (post) => {
+    if (post.is_deleted) {
+      return (
+        <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+          Deleted
+        </span>
+      );
+    }
     if (post.is_flagged) {
       return (
         <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">

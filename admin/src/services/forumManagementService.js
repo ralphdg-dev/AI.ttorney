@@ -167,9 +167,9 @@ class ForumManagementService {
     }
   }
 
-  // Delete a forum post (actually flags it since there's no soft delete)
+  // Delete a forum post (soft delete via deleted_at)
   async deletePost(id, reason = "") {
-    return this.moderatePost(id, "flag", reason);
+    return this.moderatePost(id, "delete", reason);
   }
 
   // Flag a forum post

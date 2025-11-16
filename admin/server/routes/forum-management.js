@@ -43,13 +43,13 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
       query = query.eq("category", category.toLowerCase());
     }
 
-    // Apply status filter
-    if (status && status !== "all") {
-      if (status === "active") {
-        query = query.eq("is_flagged", false);
-      } else if (status === "deleted") {
-        query = query.eq("is_flagged", true);
-      }
+    // Apply status filter (default: hide deleted)
+    if (status === "deleted") {
+      // Show only soft-deleted posts
+      query = query.not("deleted_at", "is", null);
+    } else {
+      // Active or all -> only non-deleted posts
+      query = query.is("deleted_at", null);
     }
 
     // Apply reported filter
@@ -160,6 +160,8 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
 
       return {
         ...post,
+        // Derived flags for UI
+        is_deleted: !!post.deleted_at,
         // Try different possible content field names
         content:
           post.body ||
@@ -206,12 +208,10 @@ router.get("/posts", authenticateAdmin, async (req, res) => {
       countQuery = countQuery.eq("category", category.toLowerCase());
     }
 
-    if (status && status !== "all") {
-      if (status === "active") {
-        countQuery = countQuery.eq("is_flagged", false);
-      } else if (status === "deleted") {
-        countQuery = countQuery.eq("is_flagged", true);
-      }
+    if (status === "deleted") {
+      countQuery = countQuery.not("deleted_at", "is", null);
+    } else {
+      countQuery = countQuery.is("deleted_at", null);
     }
 
     if (reported && reported !== "all") {
@@ -352,7 +352,7 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
       });
     }
 
-    if (action === "flag" || action === "delete") {
+    if (action === "flag") {
       // Check if post is already flagged by this admin
       const { data: existingFlag } = await supabaseAdmin
         .from("flagged_posts")
@@ -370,20 +370,14 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
         });
       }
 
-      // Create entry in flagged_posts table
-      
+      // Create entry in flagged_posts table for flag action only
       const flagData = {
         forum_post_id: id,
-        flagged_by_admin_id: adminId, // Use admin ID from admin table
-        reason:
-          reason ||
-          (action === "delete"
-            ? "Marked for deletion by admin"
-            : "Flagged by admin"),
+        flagged_by_admin_id: adminId,
+        reason: reason || "Flagged by admin",
         status: "active",
       };
 
-      
       const { data: flagResult, error: flagError } = await supabaseAdmin
         .from("flagged_posts")
         .insert(flagData)
@@ -397,8 +391,7 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
         });
       }
 
-      
-      // Update the post to mark it as flagged
+      // Update the post to mark it as flagged (not deleted)
       const { data: updatedPost, error: updateError } = await supabaseAdmin
         .from("forum_posts")
         .update({
@@ -431,7 +424,45 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
 
       res.json({
         success: true,
-        message: `Post ${action}d successfully`,
+        message: `Post flagged successfully`,
+        data: updatedPost,
+      });
+    } else if (action === "delete") {
+      // Soft delete ONLY: do not create flagged_posts record
+      const { data: updatedPost, error: updateError } = await supabaseAdmin
+        .from("forum_posts")
+        .update({
+          is_flagged: true,
+          deleted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (updateError) {
+        return res.status(500).json({
+          success: false,
+          error: "Failed to soft delete post",
+        });
+      }
+
+      // Log the moderation action (if audit logs table exists)
+      try {
+        await supabaseAdmin.from("admin_audit_logs").insert({
+          admin_id: adminId,
+          action: `forum_post_delete`,
+          target_type: "forum_post",
+          target_id: id,
+          details: { reason, action_type: "delete" },
+        });
+      } catch (auditError) {
+        // Failed to log audit trail - don't fail main operation
+      }
+
+      res.json({
+        success: true,
+        message: `Post deleted successfully`,
         data: updatedPost,
       });
     } else if (action === "restore") {
@@ -451,10 +482,11 @@ router.patch("/posts/:id/moderate", authenticateAdmin, async (req, res) => {
         // Error resolving flags
       }
 
-      // Update the post to remove flag
+      // Restore the post from soft delete and remove any flag
       const { data: updatedPost, error: updateError } = await supabaseAdmin
         .from("forum_posts")
         .update({
+          deleted_at: null,
           is_flagged: false,
           updated_at: new Date().toISOString(),
         })
