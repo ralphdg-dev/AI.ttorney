@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter, useSegments } from 'expo-router';
 import Colors from '../../constants/Colors';
+import ProfileFetchError from './ProfileFetchError';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -27,7 +28,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
   allowedRoles,
   redirectTo = '/login'
 }) => {
-  const { user, isLoading, isAuthenticated, initialAuthCheck, isSigningOut } = useAuth();
+  const { user, isLoading, isAuthenticated, initialAuthCheck, isSigningOut, profileFetchError, retryProfileFetch, signOut } = useAuth();
   const router = useRouter();
   const segments = useSegments();
   const [isBanned, setIsBanned] = useState(false);
@@ -39,18 +40,17 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
       return;
     }
 
-    // Get current path from segments (expo-router way)
-    const currentPath = '/' + segments.join('/');
-    
     // Wait for initial auth check to complete
-    if (!initialAuthCheck || isLoading || !segments) {
+    if (!initialAuthCheck || isLoading) {
       return;
     }
+
+    // Get current path from segments (expo-router way)
+    const currentPath = segments && segments.length > 0 ? '/' + segments.join('/') : '/';
     
     console.log('🔍 AuthGuard: Checking redirect', { 
       account_status: user?.account_status, 
-      currentPath, 
-      segments,
+      currentPath,
       requireAuth,
       isAuthenticated,
       allowedRoles 
@@ -95,6 +95,16 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
     setIsDeactivated(false);
     console.log('✅ AuthGuard: All checks passed', { account_status: user?.account_status, currentPath });
   }, [user, isLoading, isAuthenticated, initialAuthCheck, requireAuth, allowedRoles, redirectTo, router, isSigningOut, segments])
+
+  // Show profile fetch error screen if profile fetch failed
+  if (profileFetchError && !isLoading) {
+    return (
+      <ProfileFetchError 
+        onRetry={retryProfileFetch}
+        onLogout={signOut}
+      />
+    );
+  }
 
   // Show loading state while checking auth
   if (!initialAuthCheck || isLoading) {

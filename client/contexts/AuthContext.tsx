@@ -49,6 +49,8 @@ export interface AuthContextType {
   setHasRedirectedToStatus: (value: boolean) => void;
   initialAuthCheck: boolean;
   isSigningOut: boolean;
+  profileFetchError: boolean;
+  retryProfileFetch: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -64,6 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [initialAuthCheck, setInitialAuthCheck] = useState(false);
   const [hasRedirectedToStatus, setHasRedirectedToStatus] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [profileFetchError, setProfileFetchError] = useState(false);
 
 
   const checkSuspensionStatus = React.useCallback(async (): Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null } | null> => {
@@ -143,6 +146,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [authState.session?.access_token]);
 
+  // Fetch user profile with retry logic
+  const fetchUserProfile = React.useCallback(async (userId: string, retryCount = 0): Promise<any> => {
+    const MAX_RETRIES = 2;
+    const TIMEOUT_MS = 5000; // Reduced from 10s to 5s
+    
+    try {
+      console.log(`🔐 Fetching user profile (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
+      
+      const profileResult: any = await Promise.race([
+        supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single(),
+        new Promise(resolve => 
+          setTimeout(() => resolve({ 
+            data: null, 
+            error: { message: `Profile fetch timeout after ${TIMEOUT_MS/1000}s`, code: 'TIMEOUT' } 
+          }), TIMEOUT_MS)
+        ),
+      ]);
+
+      const { data: profileData, error } = profileResult;
+
+      if (error) {
+        // If timeout or network error, retry
+        if ((error.code === 'TIMEOUT' || error.message?.includes('network')) && retryCount < MAX_RETRIES) {
+          console.warn(`⚠️ Profile fetch failed (${error.message}), retrying in ${(retryCount + 1) * 1000}ms...`);
+          await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 1000));
+          return fetchUserProfile(userId, retryCount + 1);
+        }
+        
+        console.error('❌ Profile fetch failed after retries:', error.message);
+        return { data: null, error };
+      }
+
+      console.log('✅ Profile fetched successfully');
+      return { data: profileData, error: null };
+    } catch (err) {
+      console.error('❌ Profile fetch exception:', err);
+      return { data: null, error: err };
+    }
+  }, []);
+
   const handleAuthStateChange = React.useCallback(async (session: any, shouldNavigate: boolean = true) => {
     console.log('🔐 handleAuthStateChange called:', { session: !!session, shouldNavigate });
     
@@ -150,7 +197,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const timeoutId = setTimeout(() => {
       console.warn('🚨 Auth state change timeout - forcing isLoading to false');
       setIsLoading(false);
-    }, 8000); // 8 second timeout
+    }, 15000); // 15 second total timeout (allows for retries)
     
     try {
       if (!session) {
@@ -161,76 +208,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // Get user profile from database
+      // Get user profile from database with retry logic
       console.log('🔐 Fetching user profile for ID:', session.user.id);
       
-      let profile = null;
-      
-      try {
-        // Add timeout to profile fetch so slow Supabase queries don't block login
-        console.log('⏱️ Starting profile fetch with 10s timeout...');
-        console.log('🔐 User ID:', session.user.id);
-        console.log('🔐 Session valid:', !!session.access_token);
+      const { data: profile, error } = await fetchUserProfile(session.user.id);
+
+      if (error) {
+        console.error('❌ Error fetching user profile:', error);
+        console.error('❌ This usually means:');
+        console.error('   1. Missing RLS policy: Run /server/database/migrations/010_fix_users_table_rls.sql');
+        console.error('   2. Supabase connection is slow or blocked');
+        console.error('   3. User row does not exist in database');
         
-        const profileResult: any = await Promise.race([
-          supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single(),
-          new Promise(resolve => setTimeout(() => resolve({ data: null, error: { message: 'Profile fetch timeout after 10 seconds' } }), 10000)),
-        ]);
-        console.log('✅ Profile fetch completed or timed out');
-
-        const { data: profileData, error } = profileResult;
-
-        console.log('🔐 Supabase query result:', { 
-          hasProfile: !!profileData, 
-          errorMessage: error?.message,
-          errorCode: error?.code,
-          errorDetails: error?.details 
-        });
-
-        if (error) {
-          console.error('❌ Error fetching user profile:', error);
-          console.error('❌ Full error object:', JSON.stringify(error, null, 2));
-          console.error('❌ This usually means:');
-          console.error('   1. Missing RLS policy: Run the SQL migration at /server/database/migrations/010_fix_users_table_rls.sql');
-          console.error('   2. Supabase connection is very slow (check network)');
-          console.error('   3. Network/firewall blocking Supabase');
-          console.error('   4. User row does not exist in database');
-          
-          // Try to provide more specific error message
-          if (error.message?.includes('timeout')) {
-            console.error('🚨 TIMEOUT: Query took longer than 10 seconds');
-            console.error('🚨 ACTION: Check Supabase dashboard for RLS policies on users table');
-          } else if (error.code === 'PGRST116') {
-            console.error('🚨 NO ROWS RETURNED: User profile does not exist in database');
-          } else if (error.message?.includes('permission')) {
-            console.error('🚨 PERMISSION DENIED: Missing RLS policy for SELECT on users table');
-          }
-          
-          // Clear state and stop - don't try to proceed with incomplete data
-          setAuthState({
-            session,
-            user: null,
-            supabaseUser: session.user,
-          });
-          setIsLoading(false);
-          clearTimeout(timeoutId);
-          return;
+        // For timeout errors, show a user-friendly error
+        if (error.code === 'TIMEOUT' || error.message?.includes('timeout')) {
+          console.error('🚨 TIMEOUT: Check Supabase RLS policies and network connection');
         }
-
-        profile = profileData;
-        console.log('🔐 User profile fetched:', { role: profile.role, account_status: profile.account_status });
-        setAuthState({
-          session,
-          user: profile,
-          supabaseUser: session.user,
-        });
-
-      } catch (dbError) {
-        console.error('Database query error:', dbError);
+        
+        // Set error state to show error screen
+        setProfileFetchError(true);
+        
+        // Clear state and stop - don't try to proceed with incomplete data
         setAuthState({
           session,
           user: null,
@@ -240,6 +238,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         clearTimeout(timeoutId);
         return;
       }
+
+      // Clear error state on successful fetch
+      setProfileFetchError(false);
+
+      if (!profile) {
+        console.error('❌ No profile data returned');
+        setAuthState({
+          session,
+          user: null,
+          supabaseUser: session.user,
+        });
+        setIsLoading(false);
+        clearTimeout(timeoutId);
+        return;
+      }
+
+      console.log('🔐 User profile fetched:', { role: profile.role, account_status: profile.account_status });
+      setAuthState({
+        session,
+        user: profile,
+        supabaseUser: session.user,
+      });
 
       console.log('🔐 Profile fetch completed, checking account status...');
 
@@ -329,7 +349,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
       clearTimeout(timeoutId);
     }
-  }, [checkLawyerApplicationStatus, checkSuspensionStatus]);
+  }, [fetchUserProfile, checkLawyerApplicationStatus, checkSuspensionStatus]);
 
   useEffect(() => {
     // Initialize auth state and listen for auth changes
@@ -455,6 +475,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
       setIsLoading(false);
+      setProfileFetchError(false);
       
       // Redirect to login IMMEDIATELY - don't wait for anything
       router.replace('/login');
@@ -473,8 +494,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAuthState({ session: null, user: null, supabaseUser: null });
       setHasRedirectedToStatus(false);
       setIsLoading(false);
+      setProfileFetchError(false);
       router.replace('/login');
       setTimeout(() => setIsSigningOut(false), 100);
+    }
+  };
+
+  const retryProfileFetch = async () => {
+    console.log('🔄 Retrying profile fetch...');
+    setIsLoading(true);
+    setProfileFetchError(false);
+    
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession) {
+        await handleAuthStateChange(currentSession, false);
+      } else {
+        console.error('❌ No session found for retry');
+        setIsLoading(false);
+        setProfileFetchError(true);
+      }
+    } catch (error) {
+      console.error('❌ Retry failed:', error);
+      setIsLoading(false);
+      setProfileFetchError(true);
     }
   };
 
@@ -564,8 +607,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setHasRedirectedToStatus,
     initialAuthCheck,
     isSigningOut,
+    profileFetchError,
+    retryProfileFetch,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [authState.user, authState.session, isLoading, hasRedirectedToStatus, isSigningOut, checkLawyerApplicationStatus, checkSuspensionStatus]);
+  }), [authState.user, authState.session, isLoading, hasRedirectedToStatus, isSigningOut, profileFetchError, checkLawyerApplicationStatus, checkSuspensionStatus]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
