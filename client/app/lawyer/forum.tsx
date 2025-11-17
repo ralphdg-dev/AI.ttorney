@@ -7,6 +7,7 @@ import { LawyerNavbar } from '../../components/lawyer/shared';
 import Header from '../../components/Header';
 import { SidebarWrapper } from '../../components/AppSidebar';
 import Colors from '../../constants/Colors';
+import AuthGuard from '../../components/auth/AuthGuard';
 
 const LawyerForum: React.FC = () => {
   const router = useRouter();
@@ -16,25 +17,27 @@ const LawyerForum: React.FC = () => {
   }, [router]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      <Header 
-          variant="home"
-          showMenu={true}
-          showSearch={true}
-          showNotifications={true}
-          onNotificationPress={handleNotificationPress}
-        />
-        
-      <View style={{ 
-        flex: 1, 
-        backgroundColor: Colors.background.secondary 
-      }}>
-        <Timeline context="lawyer" />
-      </View>
-      <LawyerNavbar activeTab="forum" />
-      <SidebarWrapper />
-    </SafeAreaView>
+    <AuthGuard requireAuth={true} allowedRoles={['verified_lawyer']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+        <Header 
+            variant="home"
+            showMenu={true}
+            showSearch={true}
+            showNotifications={true}
+            onNotificationPress={handleNotificationPress}
+          />
+          
+        <View style={{ 
+          flex: 1, 
+          backgroundColor: Colors.background.secondary 
+        }}>
+          <Timeline context="lawyer" />
+        </View>
+        <LawyerNavbar activeTab="forum" />
+        <SidebarWrapper />
+      </SafeAreaView>
+    </AuthGuard>
   );
 };
 
