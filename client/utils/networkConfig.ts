@@ -138,14 +138,14 @@ export class NetworkConfig {
 
     const primaryUrl = this.getApiUrl();
     
-    // Web: Skip health check, return immediately
-    if (Platform.OS === 'web') {
+    // Skip health check in development for faster, more reliable connections
+    if (__DEV__) {
       this.cachedApiUrl = primaryUrl;
       this.lastHealthCheck = now;
       return primaryUrl;
     }
     
-    // Mobile: Verify connectivity before returning
+    // Production: Verify connectivity before returning
     if (__DEV__) {
       console.log(`🔍 Verifying API connection: ${primaryUrl}`);
     }

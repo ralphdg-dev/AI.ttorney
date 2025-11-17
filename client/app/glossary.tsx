@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
   StatusBar,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
 import { HStack } from "@/components/ui/hstack";
@@ -40,6 +40,12 @@ export default function GlossaryScreen() {
   const router = useRouter();
   const { isGuestMode } = useGuest();
   const { openSidebar } = useSidebar();
+  
+  // Force status bar to white on mount
+  useEffect(() => {
+    StatusBar.setBarStyle('dark-content', true);
+    StatusBar.setBackgroundColor('#ffffff', true);
+  }, []);
   const [activeTab, setActiveTab] = useState<string>("terms");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -364,7 +370,7 @@ export default function GlossaryScreen() {
         onCategoryChange={handleCategoryChange}
       />
     </View>
-  ), [activeCategory, handleCategoryChange, isDesktop, isTablet]);
+  ), [activeCategory, handleCategoryChange, isDesktop, isTablet, insets.top, insets.left, insets.right]);
 
   const renderPaginationControls = useCallback(() => {
     // Show pagination if there are multiple pages
@@ -626,8 +632,7 @@ export default function GlossaryScreen() {
 
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#f9fafb" }} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f9fafb" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }} edges={["top"]}>
       <Header 
         title="Legal Glossary" 
         showBackButton={false}
@@ -711,6 +716,6 @@ export default function GlossaryScreen() {
       ) : (
         <SidebarWrapper />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
