@@ -282,5 +282,4 @@ class LawyerApplicationsService {
   }
 }
 
-const lawyerApplicationsService = new LawyerApplicationsService();
-export default lawyerApplicationsService;
+export default new LawyerApplicationsService();

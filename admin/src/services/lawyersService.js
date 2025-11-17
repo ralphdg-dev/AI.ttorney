@@ -454,5 +454,4 @@ class LawyersService {
   }
 }
 
-const lawyersService = new LawyersService();
-export default lawyersService;
+export default new LawyersService();

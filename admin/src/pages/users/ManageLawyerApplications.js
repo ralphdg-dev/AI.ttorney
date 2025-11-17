@@ -1,9 +1,14 @@
 import React from "react";
 import { MoreVertical } from "lucide-react";
 import {
+  FileText,
   Eye,
   Pencil,
   Archive,
+  ArchiveRestore,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
   ChevronUp,
   ChevronDown,
   ChevronLeft,
@@ -12,14 +17,16 @@ import {
   RotateCcw,
   X,
   RefreshCw,
-  XCircle,
+  Loader2,
   Users,
 } from "lucide-react";
+import Tooltip from "../../components/ui/Tooltip";
 import ListToolbar from "../../components/ui/ListToolbar";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
 import ViewLawyerApplicationModal from "../../components/lawyers/ViewLawyerApplicationModal";
-import DataTable from "../../components/ui/DataTable";
 import RollMatchBadge from "../../components/lawyers/RollMatchBadge";
+import Pagination from "../../components/ui/Pagination";
+import DataTable from "../../components/ui/DataTable";
 import { useToast } from "../../components/ui/Toast";
 import lawyerApplicationsService from "../../services/lawyerApplicationsService";
 import rollMatchService from "../../services/rollMatchService"; // Import the new service
@@ -60,10 +67,13 @@ const StatusBadge = ({ status, isArchived = false }) => {
 };
 
 const ManageLawyerApplications = () => {
-  const { ToastContainer } = useToast();
+  const { showSuccess, showError, showWarning, ToastContainer } = useToast();
   const [query, setQuery] = React.useState("");
+  const [debouncedQuery, setDebouncedQuery] = React.useState("");
+  const [status, setStatus] = React.useState("All");
   const [combinedFilter, setCombinedFilter] = React.useState("Active");
   const [sortBy, setSortBy] = React.useState("Newest");
+  const [data, setData] = React.useState([]);
   const [allData, setAllData] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
@@ -73,6 +83,7 @@ const ManageLawyerApplications = () => {
     total: 0,
     pages: 0,
   });
+  const [actionLoading, setActionLoading] = React.useState({});
   const [sortConfig, setSortConfig] = React.useState({
     key: null,
     direction: "asc",
@@ -96,6 +107,14 @@ const ManageLawyerApplications = () => {
   const [openMenuId, setOpenMenuId] = React.useState(null);
   const [openMenuPos, setOpenMenuPos] = React.useState({ right: 20, bottom: 20 });
 
+  // Debounce search query
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [query]);
 
   // Load data from API and check roll numbers
   const loadData = React.useCallback(async () => {
@@ -151,7 +170,6 @@ const ManageLawyerApplications = () => {
       const stats = rollMatchService.getMatchStatistics(
         applicationsWithRollCheck
       );
-      console.log('Roll match statistics:', stats);
     } catch (err) {
       setError(err.message);
       console.error("Failed to load lawyer applications:", err);
@@ -364,7 +382,7 @@ const ManageLawyerApplications = () => {
   };
 
   const confirmApprove = async () => {
-    const { applicationId } = confirmationModal;
+    const { applicationId, applicantName } = confirmationModal;
 
     try {
       setConfirmationModal((prev) => ({ ...prev, loading: true }));
@@ -398,7 +416,7 @@ const ManageLawyerApplications = () => {
   };
 
   const confirmReject = async (feedback) => {
-    const { applicationId } = confirmationModal;
+    const { applicationId, applicantName } = confirmationModal;
 
     try {
       setConfirmationModal((prev) => ({ ...prev, loading: true }));
@@ -433,11 +451,11 @@ const ManageLawyerApplications = () => {
   };
 
   const confirmResubmission = async (feedback) => {
-    const { applicationId } = confirmationModal;
+    const { applicationId, applicantName } = confirmationModal;
 
     try {
       setConfirmationModal((prev) => ({ ...prev, loading: true }));
-      await lawyerApplicationsService.updateApplicationStatus(
+      const result = await lawyerApplicationsService.updateApplicationStatus(
         applicationId,
         "resubmission",
         feedback
@@ -458,7 +476,7 @@ const ManageLawyerApplications = () => {
   };
 
   const confirmArchive = async () => {
-    const { applicationId, type } = confirmationModal;
+    const { applicationId, applicantName, type } = confirmationModal;
     const isArchiving = type === "archive";
 
     try {
@@ -491,7 +509,7 @@ const ManageLawyerApplications = () => {
   };
 
   const confirmEdit = async () => {
-    const { applicationId, changes } = confirmationModal;
+    const { applicationId, applicantName, changes } = confirmationModal;
 
     try {
       setConfirmationModal((prev) => ({ ...prev, loading: true }));

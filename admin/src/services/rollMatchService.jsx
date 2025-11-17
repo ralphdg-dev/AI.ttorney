@@ -227,5 +227,4 @@ class RollMatchService {
   }
 }
 
-const rollMatchService = new RollMatchService();
-export default rollMatchService;
+export default new RollMatchService();

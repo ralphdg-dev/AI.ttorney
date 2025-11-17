@@ -275,5 +275,4 @@ class AdminManagementService {
   */
 }
 
-const adminManagementService = new AdminManagementService();
-export default adminManagementService;
+export default new AdminManagementService();

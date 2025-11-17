@@ -260,5 +260,4 @@ class AuditLogsService {
   }
 }
 
-const auditLogsService = new AuditLogsService();
-export default auditLogsService;
+export default new AuditLogsService();

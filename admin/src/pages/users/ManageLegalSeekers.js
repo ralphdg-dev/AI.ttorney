@@ -1,11 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Users, Eye, Pencil, Archive, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, XCircle, RefreshCw, MoreVertical } from 'lucide-react';
+import { Users, Eye, Pencil, Archive, ArchiveRestore, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Loader2, XCircle, RefreshCw, MoreVertical } from 'lucide-react';
+import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import ViewLegalSeekerModal from '../../components/users/ViewLegalSeekerModal';
 import EditLegalSeekerModal from '../../components/users/EditLegalSeekerModal';
 import DataTable from '../../components/ui/DataTable';
+import Pagination from '../../components/ui/Pagination';
 import { useToast } from '../../components/ui/Toast';
 import usersService from '../../services/usersService';
 import legalSeekerService from '../../services/legalSeekerService';
@@ -54,11 +56,13 @@ const LawyerApplicationBadge = ({ hasApplication }) => {
 };
 
 const ManageLegalSeekers = () => {
-  const { ToastContainer } = useToast();
+  const { showSuccess, showError, showWarning, ToastContainer } = useToast();
   const [query, setQuery] = React.useState('');
   const [debouncedQuery, setDebouncedQuery] = React.useState('');
   const [combinedFilter, setCombinedFilter] = React.useState('Active');
+  const [status, setStatus] = React.useState('All');
   const [sortBy, setSortBy] = React.useState('Newest');
+  const [data, setData] = React.useState([]);
   const [allData, setAllData] = React.useState([]); // Store all data for client-side filtering
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
@@ -68,6 +72,7 @@ const ManageLegalSeekers = () => {
     total: 0,
     pages: 0
   });
+  const [actionLoading, setActionLoading] = React.useState({});
   const [sortConfig, setSortConfig] = React.useState({
     key: null,
     direction: 'asc'
@@ -196,21 +201,27 @@ const ManageLegalSeekers = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedQuery, combinedFilter]);
+  }, [pagination.page, pagination.limit, debouncedQuery, combinedFilter]);
 
   // Load data on component mount and when filters change
   React.useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Handle status toggle (unused but kept for potential future functionality)
-  // const handleStatusToggle = async (userId, currentStatus) => {
-  //   try {
-  //     // Implementation would go here
-  //   } catch (err) {
-  //     console.error('Failed to toggle status:', err);
-  //   }
-  // };
+  // Handle status toggle
+  const handleStatusToggle = async (userId, currentStatus) => {
+    try {
+      setActionLoading(prev => ({ ...prev, [userId]: true }));
+      const newStatus = currentStatus === 'Verified';
+      await usersService.updateLegalSeekerStatus(userId, !newStatus);
+      await loadData(); // Reload data
+    } catch (err) {
+      console.error('Failed to update status:', err);
+      alert('Failed to update user status: ' + err.message);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [userId]: false }));
+    }
+  };
 
   // Handle view user details
   const handleView = async (user) => {
@@ -321,7 +332,7 @@ const ManageLegalSeekers = () => {
 
   // Handle archive/unarchive user
   const confirmArchive = async () => {
-    const { userId, type } = confirmationModal;
+    const { userId, userName, type } = confirmationModal;
     const isArchiving = type === 'archive';
     
     try {
@@ -340,7 +351,7 @@ const ManageLegalSeekers = () => {
 
   // Handle edit confirmation
   const confirmEdit = async () => {
-    const { userId, changes } = confirmationModal;
+    const { userId, userName, changes } = confirmationModal;
     
     try {
       setConfirmationModal(prev => ({ ...prev, loading: true }));

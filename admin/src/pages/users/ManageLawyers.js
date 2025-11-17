@@ -1,11 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Users, Eye, Pencil, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Archive, MoreVertical, Loader2 } from 'lucide-react';
+import { Users, Eye, Pencil, UserX, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Archive, MoreVertical } from 'lucide-react';
+import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import ViewLawyerModal from '../../components/lawyers/ViewLawyerModal';
 import EditLawyerModal from '../../components/lawyers/EditLawyerModal';
 import DataTable from '../../components/ui/DataTable';
+import Pagination from '../../components/ui/Pagination';
 import { useToast } from '../../components/ui/Toast';
 import usersService from '../../services/usersService';
 
@@ -16,7 +18,7 @@ const StatusBadge = ({ status }) => (
 );
 
 const ManageLawyers = () => {
-  const { showSuccess, showError, ToastContainer } = useToast();
+  const { showSuccess, showError, showWarning, ToastContainer } = useToast();
   const [query, setQuery] = React.useState('');
   const [sortBy, setSortBy] = React.useState('Newest');
   const [data, setData] = React.useState([]);
@@ -126,7 +128,7 @@ const ManageLawyers = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, query, showError]);
+  }, [pagination.page, pagination.limit, query]);
 
   // Load data on component mount and when filters change
   React.useEffect(() => {
