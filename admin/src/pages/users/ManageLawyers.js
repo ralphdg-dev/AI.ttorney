@@ -1,11 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Users, Eye, Pencil, UserX, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Archive, MoreVertical } from 'lucide-react';
+import { Users, Eye, UserX, Loader2, XCircle, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Archive, MoreVertical } from 'lucide-react';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import ViewLawyerModal from '../../components/lawyers/ViewLawyerModal';
-import EditLawyerModal from '../../components/lawyers/EditLawyerModal';
 import DataTable from '../../components/ui/DataTable';
 import Pagination from '../../components/ui/Pagination';
 import { useToast } from '../../components/ui/Toast';
@@ -41,12 +40,9 @@ const ManageLawyers = () => {
     lawyerId: null,
     lawyerName: '',
     loading: false,
-    changes: null // For tracking edit changes
   });
   const [viewModalOpen, setViewModalOpen] = React.useState(false);
   const [selectedLawyer, setSelectedLawyer] = React.useState(null);
-  const [editModalOpen, setEditModalOpen] = React.useState(false);
-  const [editingLawyer, setEditingLawyer] = React.useState(null);
 
   // Kebab dropdown state (like ManageAdmins)
   const [openDropdown, setOpenDropdown] = React.useState(null);
@@ -141,31 +137,6 @@ const ManageLawyers = () => {
     setViewModalOpen(true);
   };
 
-  const handleEdit = (lawyer) => {
-    setEditingLawyer(lawyer);
-    setEditModalOpen(true);
-  };
-
-  // Handle edit save
-  const handleEditSave = async (updatedLawyer, originalLawyer) => {
-    try {
-      // TODO: Replace with actual lawyersService.updateLawyer call
-      
-      // For now, simulate the update
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      await loadData(); // Reload data to reflect changes
-      setEditModalOpen(false);
-      setEditingLawyer(null);
-      
-      showSuccess(`Lawyer "${updatedLawyer.full_name}" updated successfully!`);
-      
-    } catch (err) {
-      console.error('Failed to update lawyer:', err);
-      showError('Failed to update lawyer: ' + (err.message || 'Unknown error'));
-    }
-  };
-
   // Handle suspend lawyer
   const handleSuspend = (lawyerId, lawyerName) => {
     setConfirmationModal({
@@ -173,7 +144,7 @@ const ManageLawyers = () => {
       type: 'suspend',
       lawyerId,
       lawyerName,
-      loading: false
+      loading: false,
     });
   };
 
@@ -195,7 +166,7 @@ const ManageLawyers = () => {
   };
 
   const closeConfirmationModal = () => {
-    setConfirmationModal({ open: false, type: '', lawyerId: null, lawyerName: '', loading: false, changes: null });
+    setConfirmationModal({ open: false, type: '', lawyerId: null, lawyerName: '', loading: false });
   };
 
   // Handle suspend confirmation
@@ -208,7 +179,7 @@ const ManageLawyers = () => {
       
       await usersService.updateLawyerStatus(lawyerId, false); // false = suspended/unverified
       await loadData(); // Reload data
-      setConfirmationModal({ open: false, type: '', lawyerId: null, lawyerName: '', loading: false, changes: null });
+      setConfirmationModal({ open: false, type: '', lawyerId: null, lawyerName: '', loading: false });
       
       showSuccess(`Lawyer "${lawyerName}" suspended successfully!`);
       
@@ -502,15 +473,6 @@ const ManageLawyers = () => {
                         <span>View</span>
                       </div>
                     </button>
-                    <button
-                      onClick={() => { handleEdit(row); setOpenDropdown(null); setDropdownPosition({}); }}
-                      className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-center">
-                        <Pencil className="w-4 h-4 mr-3 text-gray-500" />
-                        <span>Edit</span>
-                      </div>
-                    </button>
                     <div className="border-t border-gray-200 my-1"></div>
                     <button
                       onClick={() => { handleSuspend(row.id, row.full_name); setOpenDropdown(null); setDropdownPosition({}); }}
@@ -668,14 +630,6 @@ const ManageLawyers = () => {
         open={viewModalOpen}
         onClose={() => setViewModalOpen(false)}
         lawyer={selectedLawyer}
-      />
-
-      {/* Edit Lawyer Modal */}
-      <EditLawyerModal
-        open={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
-        lawyer={editingLawyer}
-        onSave={handleEditSave}
       />
 
       {/* Confirmation Modal */}
