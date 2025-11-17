@@ -168,27 +168,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       try {
         // Add timeout to profile fetch so slow Supabase queries don't block login
-        console.log('⏱️ Starting profile fetch with 7s timeout...');
+        console.log('⏱️ Starting profile fetch with 10s timeout...');
+        console.log('🔐 User ID:', session.user.id);
+        console.log('🔐 Session valid:', !!session.access_token);
+        
         const profileResult: any = await Promise.race([
           supabase
             .from('users')
             .select('*')
             .eq('id', session.user.id)
             .single(),
-          new Promise(resolve => setTimeout(() => resolve({ data: null, error: { message: 'Profile fetch timeout' } }), 7000)),
+          new Promise(resolve => setTimeout(() => resolve({ data: null, error: { message: 'Profile fetch timeout after 10 seconds' } }), 10000)),
         ]);
         console.log('✅ Profile fetch completed or timed out');
 
         const { data: profileData, error } = profileResult;
 
-        console.log('🔐 Supabase query result:', { profile: !!profileData, error: error?.message });
+        console.log('🔐 Supabase query result:', { 
+          hasProfile: !!profileData, 
+          errorMessage: error?.message,
+          errorCode: error?.code,
+          errorDetails: error?.details 
+        });
 
         if (error) {
           console.error('❌ Error fetching user profile:', error);
+          console.error('❌ Full error object:', JSON.stringify(error, null, 2));
           console.error('❌ This usually means:');
-          console.error('   1. Supabase connection is very slow');
-          console.error('   2. Missing SELECT RLS policy on users table');
+          console.error('   1. Missing RLS policy: Run the SQL migration at /server/database/migrations/010_fix_users_table_rls.sql');
+          console.error('   2. Supabase connection is very slow (check network)');
           console.error('   3. Network/firewall blocking Supabase');
+          console.error('   4. User row does not exist in database');
+          
+          // Try to provide more specific error message
+          if (error.message?.includes('timeout')) {
+            console.error('🚨 TIMEOUT: Query took longer than 10 seconds');
+            console.error('🚨 ACTION: Check Supabase dashboard for RLS policies on users table');
+          } else if (error.code === 'PGRST116') {
+            console.error('🚨 NO ROWS RETURNED: User profile does not exist in database');
+          } else if (error.message?.includes('permission')) {
+            console.error('🚨 PERMISSION DENIED: Missing RLS policy for SELECT on users table');
+          }
           
           // Clear state and stop - don't try to proceed with incomplete data
           setAuthState({
