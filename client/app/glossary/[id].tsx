@@ -6,8 +6,9 @@ import {
   Animated,
   Pressable,
   ActivityIndicator,
-  SafeAreaView,
+  Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Text as GSText } from "@/components/ui/text";
 import { Button, ButtonText } from "@/components/ui/button/";
@@ -180,7 +181,7 @@ export default function TermDetailScreen() {
 
   // Main content
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white" edges={["top", "left", "right"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       {/* Header */}
       <View 
@@ -273,7 +274,7 @@ export default function TermDetailScreen() {
                 Definition
               </GSText>
             </View>
-            <GSText size="md" className="mb-4" style={{ color: '#374151', lineHeight: 24 }}>
+            <GSText size="md" className="mb-4" style={{ color: '#374151', ...(Platform.OS !== 'web' && { lineHeight: 24 }) }}>
               {term.definition_en}
             </GSText>
           </View>
@@ -287,7 +288,7 @@ export default function TermDetailScreen() {
                   Kahulugan sa Filipino
                 </GSText>
               </View>
-              <GSText size="md" style={{ color: '#374151', lineHeight: 24 }}>
+              <GSText size="md" style={{ color: '#374151', ...(Platform.OS !== 'web' && { lineHeight: 24 }) }}>
                 {term.definition_fil}
               </GSText>
             </View>
@@ -311,7 +312,7 @@ export default function TermDetailScreen() {
                     className="bg-blue-50 p-4 rounded-lg"
                     style={{ borderLeftWidth: 4, borderLeftColor: Colors.primary.blue }}
                   >
-                    <GSText size="md" style={{ color: '#374151', fontStyle: 'italic', lineHeight: 22 }}>
+                    <GSText size="md" style={{ color: '#374151', fontStyle: 'italic', ...(Platform.OS !== 'web' && { lineHeight: 22 }) }}>
                       &ldquo;{term.example_en}&rdquo;
                     </GSText>
                   </View>
@@ -326,7 +327,7 @@ export default function TermDetailScreen() {
                     className="bg-blue-50 p-4 rounded-lg"
                     style={{ borderLeftWidth: 4, borderLeftColor: Colors.primary.blue }}
                   >
-                    <GSText size="md" style={{ color: '#374151', fontStyle: 'italic', lineHeight: 22 }}>
+                    <GSText size="md" style={{ color: '#374151', fontStyle: 'italic', ...(Platform.OS !== 'web' && { lineHeight: 22 }) }}>
                       &ldquo;{term.example_fil}&rdquo;
                     </GSText>
                   </View>

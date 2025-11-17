@@ -633,7 +633,7 @@ export default function GlossaryScreen() {
 
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }} edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }} edges={["top", "left", "right"]}>
       <Header 
         title="Legal Glossary" 
         showBackButton={false}

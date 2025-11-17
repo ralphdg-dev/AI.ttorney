@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleProp, ViewStyle } from "react-native";
+import { View, Text, TouchableOpacity, StyleProp, ViewStyle, Platform } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import Colors from "@/constants/Colors";
 import { ChevronRight, Star } from "lucide-react-native";
@@ -77,7 +77,7 @@ export default function TermListItem({ item, onPress, containerStyle, showFavori
             <Text
               numberOfLines={1}
               ellipsizeMode="tail"
-              style={[tw`font-bold text-lg`, { color: Colors.text.head, flexShrink: 1, marginRight: 8 }]}
+              style={[tw`font-bold text-lg`, { color: Colors.text.head, flexShrink: 1, marginRight: 8, ...(Platform.OS !== 'web' && { lineHeight: 24 }) }]}
             >
               {item.title}
             </Text>
@@ -97,14 +97,14 @@ export default function TermListItem({ item, onPress, containerStyle, showFavori
             </View>
           </View>
           {item.filipinoTerm ? (
-            <Text style={[tw`text-sm mb-3 font-medium`, { color: Colors.primary.blue }]}>
+            <Text style={[tw`text-sm mb-3 font-medium`, { color: Colors.primary.blue, ...(Platform.OS !== 'web' && { lineHeight: 20 }) }]}>
               {item.filipinoTerm}
             </Text>
           ) : null}
           <Text 
             numberOfLines={2}
             ellipsizeMode="tail"
-            style={[tw`text-sm`, { color: Colors.text.sub }]}
+            style={[tw`text-sm`, { color: Colors.text.sub, ...(Platform.OS !== 'web' && { lineHeight: 20 }) }]}
           >
             {item.definition}
           </Text>
@@ -112,7 +112,7 @@ export default function TermListItem({ item, onPress, containerStyle, showFavori
             <Text 
               numberOfLines={2}
               ellipsizeMode="tail"
-              style={[tw`text-sm mt-1 italic`, { color: '#6B7280' }]}
+              style={[tw`text-sm mt-1 italic`, { color: '#6B7280', ...(Platform.OS !== 'web' && { lineHeight: 20 }) }]}
             >
               {item.filipinoDefinition}
             </Text>
