@@ -17,10 +17,13 @@ import ViewArticleModal from "../../components/articles/ViewArticleModal";
 import AddArticleModal from "../../components/articles/AddArticleModal";
 import EditArticleModal from "../../components/articles/EditArticleModal";
 import PublishModal from "./components/PublishModal";
+import { useToast } from "../../components/ui/Toast";
 
 const categories = ["All", "Family", "Criminal", "Civil", "Labor", "Consumer"];
 
 const ManageLegalArticles = () => {
+  const { showSuccess, showError, showWarning, ToastContainer } = useToast();
+
   // States
   const [query, setQuery] = React.useState("");
   const [category, setCategory] = React.useState("All");
@@ -143,7 +146,7 @@ const ManageLegalArticles = () => {
         `http://localhost:5001/api/legal-articles/${articleId}/archive`,
         {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
         }
       );
 
@@ -154,8 +157,11 @@ const ManageLegalArticles = () => {
 
       // Remove the archived article from the list
       setArticles((prev) => prev.filter((a) => a.id !== articleId));
+      const a = articles.find((x) => x.id === articleId);
+      showSuccess(`Archived "${a?.enTitle || "Article"}" successfully`);
     } catch (err) {
       console.error("Archive error:", err);
+      showError(err.message || "Failed to archive article");
     }
   };
 
@@ -166,7 +172,7 @@ const ManageLegalArticles = () => {
         `http://localhost:5001/api/legal-articles/${articleId}/restore`,
         {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
         }
       );
 
@@ -177,8 +183,11 @@ const ManageLegalArticles = () => {
 
       // Remove the restored article from the archives list
       setArticles((prev) => prev.filter((a) => a.id !== articleId));
+      const a = articles.find((x) => x.id === articleId);
+      showSuccess(`Restored "${a?.enTitle || "Article"}" successfully`);
     } catch (err) {
       console.error("Restore error:", err);
+      showError(err.message || "Failed to restore article");
     }
   };
 
@@ -536,6 +545,7 @@ const ManageLegalArticles = () => {
 
   return (
     <div>
+      <ToastContainer />
       {/* Header */}
       <div className="mb-3">
         <div className="flex items-stretch gap-2">
