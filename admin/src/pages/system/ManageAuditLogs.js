@@ -2,9 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   History,
   Download,
-  Search,
-  Filter,
-  Calendar,
   Eye,
   FileText,
   User,
@@ -192,7 +189,7 @@ const ManageAuditLogs = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, searchTerm, tableFilter, actionFilter, dateRange, sortBy]);
+  }, [pagination.page, pagination.limit, searchTerm, tableFilter, actionFilter, dateRange, sortBy, actorNameMap, showError]);
   // include actorNameMap in deps indirectly via load trigger from logs
 
   // Load data on component mount and when dependencies change
@@ -205,7 +202,7 @@ const ManageAuditLogs = () => {
     if (pagination.page !== 1) {
       setPagination(prev => ({ ...prev, page: 1 }));
     }
-  }, [searchTerm, tableFilter, actionFilter, dateRange, sortBy]);
+  }, [searchTerm, tableFilter, actionFilter, dateRange, sortBy, pagination.page]);
 
   // Format date for display
   const formatDate = (dateString) => {

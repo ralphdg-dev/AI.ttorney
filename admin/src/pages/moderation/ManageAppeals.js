@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { appealAdminService } from '../../services/appealAdminService';
 import { Clock, CheckCircle, XCircle, Eye, Loader2, AlertCircle, MessageSquare } from 'lucide-react';
 import ReviewAppealModal from '../../components/moderation/ReviewAppealModal';
@@ -11,12 +11,7 @@ export default function ManageAppeals() {
   const [selectedAppeal, setSelectedAppeal] = useState(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
 
-  useEffect(() => {
-    loadAppeals();
-    loadStats();
-  }, [statusFilter]);
-
-  const loadAppeals = async () => {
+  const loadAppeals = useCallback(async () => {
     setLoading(true);
     try {
       const response = await appealAdminService.getAppeals(statusFilter);
@@ -27,7 +22,12 @@ export default function ManageAppeals() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
+
+  useEffect(() => {
+    loadAppeals();
+    loadStats();
+  }, [loadAppeals]);
 
   const loadStats = async () => {
     try {

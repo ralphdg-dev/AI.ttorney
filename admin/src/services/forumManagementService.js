@@ -5,7 +5,7 @@ const API_BASE_URL =
 const testServerConnection = async () => {
   try {
     const response = await fetch("http://localhost:5001/health");
-    const data = await response.json();
+    await response.json();
     return true;
   } catch (error) {
     console.error("Server connection test failed:", error);
@@ -69,18 +69,6 @@ class ForumManagementService {
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to fetch forum posts");
-      }
-
-      return data;
-
-      // Validate that all returned posts have valid IDs
-      if (data.data) {
-        const invalidPosts = data.data.filter(post => !post.id);
-        if (invalidPosts.length > 0) {
-          console.warn("Found posts without IDs:", invalidPosts);
-        }
-        
-        // Log all post IDs for debugging
       }
 
       return data;
@@ -150,7 +138,7 @@ class ForumManagementService {
         data = await response.json();
         } catch (jsonError) {
         console.error("Failed to parse JSON response:", jsonError);
-        const textResponse = await response.text();
+        await response.text();
         throw new Error(`Invalid JSON response: ${jsonError.message}`);
       }
 
@@ -532,4 +520,5 @@ class ForumManagementService {
   }
 }
 
-export default new ForumManagementService();
+const forumManagementService = new ForumManagementService();
+export default forumManagementService;
