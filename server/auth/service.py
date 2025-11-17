@@ -90,7 +90,8 @@ class AuthService:
                     "birthdate": user_data.birthdate.isoformat(),
                     "role": "guest",  # Always start as guest until verified
                     "is_verified": False,
-                    "auth_provider": "email"
+                    "auth_provider": "email",
+                    "onboard": False,  # New users have not completed onboarding
                 }
                 profile_response = await self.supabase.update_user_profile(
                     profile_data,
@@ -107,7 +108,8 @@ class AuthService:
                     "birthdate": user_data.birthdate.isoformat(),
                     "role": "guest",  # Always start as guest until verified
                     "is_verified": False,
-                    "auth_provider": "email"
+                    "auth_provider": "email",
+                    "onboard": False,  # New users have not completed onboarding
                 }
                 profile_response = await self.supabase.insert_user_profile(profile_data)
             

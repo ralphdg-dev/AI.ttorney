@@ -121,9 +121,9 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       }
     }
 
-    // Skip permission checks for lawyer status screens to prevent redirect loops
-    // But still render the children (LawyerStatusGuard will handle access control)
-    if (currentPath.includes('/lawyer-status/')) {
+    // Skip permission checks for certain onboarding/status screens to prevent redirect loops
+    // LawyerStatusGuard and the individual screens handle their own access control
+    if (currentPath.includes('/lawyer-status/') || currentPath === '/onboarding/registered-tutorial') {
       return;
     }
 

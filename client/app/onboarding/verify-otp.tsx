@@ -128,29 +128,29 @@ export default function VerifyOTP() {
       if (result.error) {
         console.log('❌ Verification failed:', result.error);
         setError(result.error);
-        
+
         // Handle lockout scenario
         if (result.locked_out) {
           setIsLockedOut(true);
           setLockoutTimer(result.retry_after || 900); // 15 minutes default
           setOtp(["", "", "", "", "", ""]); // Clear OTP inputs
         }
-        
+
         // Handle OTP expiration - enable resend immediately (only for actual expiration, not incorrect codes)
-        const isExpiredOrNotFound = result.error.includes("expired") || 
+        const isExpiredOrNotFound = result.error.includes("expired") ||
                                    result.error.includes("OTP not found") ||
                                    result.error.includes("OTP has expired");
-        const isIncorrectCode = result.error.includes("incorrect") || 
-                               result.error.includes("invalid") || 
+        const isIncorrectCode = result.error.includes("incorrect") ||
+                               result.error.includes("invalid") ||
                                result.error.includes("wrong");
-        
+
         // Only enable immediate resend for expired/not found OTPs, not for incorrect codes
         if (isExpiredOrNotFound && !isIncorrectCode) {
           setCanResend(true);
           setResendTimer(0);
           setOtp(["", "", "", "", "", ""]); // Clear OTP inputs
         }
-        
+
         // Handle attempts remaining
         if (result.attempts_remaining !== undefined) {
           setAttemptsRemaining(result.attempts_remaining);
@@ -159,47 +159,29 @@ export default function VerifyOTP() {
         // Success case - OTP verified successfully
         console.log('✅ Email verified successfully!');
         console.log('🔍 Debug - Success result:', result);
-        
-        // Store verified email
+
+        // Store verified email so we can reference it later (e.g., role selection)
         await AsyncStorage.setItem('user_email', email);
         console.log('📱 Stored email in AsyncStorage');
-        
+
         // Clear form states
         setOtp(["", "", "", "", "", ""]);
         setError("");
         setAttemptsRemaining(null);
         setIsLockedOut(false);
         console.log('🧹 Cleared form states');
-        
-        // Get password from AsyncStorage (stored during registration)
-        const storedPassword = await AsyncStorage.getItem('temp_registration_password');
-        
-        if (storedPassword) {
-          console.log('🔐 Found stored password, signing in user...');
-          
-          // Sign in the user automatically after verification
-          const signInResult = await signIn(email, storedPassword);
-          
-          if (signInResult.success) {
-            console.log('✅ User signed in successfully after verification');
-            
-            // Clean up temporary password
-            await AsyncStorage.removeItem('temp_registration_password');
-            
-            // Navigate to role selection
-            setTimeout(() => {
-              console.log('🚀 Navigating to role selection...');
-              router.replace('/role-selection');
-            }, 500);
-          } else {
-            console.error('❌ Auto sign-in failed:', signInResult.error);
-            // Fallback: navigate to login
-            router.replace('/login');
-          }
-        } else {
-          console.log('⚠️ No stored password found, redirecting to login');
-          router.replace('/login');
+
+        // Best-effort cleanup of temporary registration password
+        try {
+          await AsyncStorage.removeItem('temp_registration_password');
+          console.log('🧹 Removed temp_registration_password from storage');
+        } catch (cleanupError) {
+          console.warn('⚠️ Failed to remove temp_registration_password:', cleanupError);
         }
+
+        // Redirect to login so the user can sign in with their now-verified account
+        console.log('🚀 OTP verified, redirecting to login for sign-in');
+        router.replace('/login');
       }
     } catch (error) {
       console.error('❌ Verification exception:', error);

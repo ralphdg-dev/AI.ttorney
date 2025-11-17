@@ -72,12 +72,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const { NetworkConfig } = await import('../utils/networkConfig');
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      const response = await fetch(`${apiUrl}/api/user/moderation-status`, {
-        headers: {
-          'Authorization': `Bearer ${authState.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+
+      // Add a soft timeout so this check can never block login/navigation forever
+      const response: any = await Promise.race([
+        fetch(`${apiUrl}/api/user/moderation-status`, {
+          headers: {
+            'Authorization': `Bearer ${authState.session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }),
+        new Promise(resolve => setTimeout(() => resolve('timeout'), 6000)),
+      ]);
+
+      if (response === 'timeout') {
+        console.warn('⚠️ Suspension status check timed out, proceeding without suspension data');
+        return null;
+      }
 
       if (response.ok) {
         const data = await response.json();
@@ -89,7 +99,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       return null;
-    } catch {
+    } catch (error) {
+      console.warn('⚠️ Suspension status check failed, proceeding without suspension data', error);
       return null;
     }
   }, [authState.session?.access_token]);
@@ -102,12 +113,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const { NetworkConfig } = await import('../utils/networkConfig');
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      const response = await fetch(`${apiUrl}/api/lawyer-applications/me`, {
-        headers: {
-          'Authorization': `Bearer ${authState.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+
+      const response: any = await Promise.race([
+        fetch(`${apiUrl}/api/lawyer-applications/me`, {
+          headers: {
+            'Authorization': `Bearer ${authState.session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }),
+        new Promise(resolve => setTimeout(() => resolve('timeout'), 7000)),
+      ]);
+
+      if (response === 'timeout') {
+        console.warn('⚠️ Lawyer application status check timed out, proceeding without application data');
+        return null;
+      }
 
       if (response.ok) {
         const data = await response.json();
@@ -115,7 +135,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       return null;
-    } catch {
+    } catch (error) {
+      console.warn('⚠️ Lawyer application status check failed, proceeding without application data', error);
       return null;
     }
   }, [authState.session?.access_token]);
@@ -127,7 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const timeoutId = setTimeout(() => {
       console.warn('🚨 Auth state change timeout - forcing isLoading to false');
       setIsLoading(false);
-    }, 10000); // 10 second timeout
+    }, 8000); // 8 second timeout
     
     try {
       if (!session) {
@@ -144,16 +165,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let profile = null;
       
       try {
-        const { data: profileData, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        // Add timeout to profile fetch so slow Supabase queries don't block login
+        console.log('⏱️ Starting profile fetch with 7s timeout...');
+        const profileResult: any = await Promise.race([
+          supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single(),
+          new Promise(resolve => setTimeout(() => resolve({ data: null, error: { message: 'Profile fetch timeout' } }), 7000)),
+        ]);
+        console.log('✅ Profile fetch completed or timed out');
+
+        const { data: profileData, error } = profileResult;
 
         console.log('🔐 Supabase query result:', { profile: !!profileData, error: error?.message });
 
         if (error) {
-          console.error('Error fetching user profile:', error);
+          console.error('❌ Error fetching user profile:', error);
+          
+          // If this is a timeout, try to proceed with minimal user data from session
+          if (error.message?.includes('timeout')) {
+            console.warn('⚠️ Profile fetch timed out - creating minimal user object from session');
+            const minimalUser: User = {
+              session,
+              id: session.user.id,
+              email: session.user.email || '',
+              username: session.user.email?.split('@')[0] || 'user',
+              full_name: session.user.user_metadata?.full_name || '',
+              role: 'registered_user' as UserRole,
+              is_verified: false,
+              onboard: true, // Assume onboarded to skip tutorial on timeout
+            };
+            setAuthState({
+              session,
+              user: minimalUser,
+              supabaseUser: session.user,
+            });
+            setIsLoading(false);
+            clearTimeout(timeoutId);
+            
+            // Still navigate on timeout
+            if (shouldNavigate) {
+              console.log('🔄 Navigating with minimal user data');
+              router.replace('/home' as any);
+            }
+            return;
+          }
+          
+          // For other errors, clear state
           setAuthState({
             session,
             user: null,
@@ -341,7 +401,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
   const signIn = async (email: string, password: string) => {
     console.log('🔑 signIn called:', { email });
     
@@ -367,26 +426,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           errorMessage = 'Network error. Please check your connection';
         }
         
-        setIsLoading(false); // Ensure loading is set to false on error
+        setIsLoading(false);
         return { success: false, error: errorMessage };
       }
 
       if (data.session) {
         console.log('🔑 Sign in successful, session created');
-        // The onAuthStateChange listener will handle navigation
-        // But we also call handleAuthStateChange directly for immediate response
-        await handleAuthStateChange(data.session, true);
+        // The onAuthStateChange listener + handleAuthStateChange will
+        // fetch the profile, run checks, and navigate. We do not await
+        // that work here so the login button can stop showing
+        // "Signing In..." as soon as Supabase auth succeeds.
         return { success: true };
       }
 
-      setIsLoading(false); // Ensure loading is set to false if no session
+      setIsLoading(false);
       return { success: false, error: 'Login failed. Please try again' };
     } catch (error: any) {
       console.error('Sign in catch:', error);
-      setIsLoading(false); // Ensure loading is set to false on catch
+      setIsLoading(false);
       return { success: false, error: 'Network error. Please check your connection' };
     }
-    // Note: Don't set isLoading(false) here since handleAuthStateChange manages it
+    // Note: on successful sign-in, handleAuthStateChange manages isLoading
   };
 
   const signOut = async () => {

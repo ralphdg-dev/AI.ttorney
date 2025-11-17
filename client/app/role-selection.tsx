@@ -125,10 +125,13 @@ export default function RoleSelection() {
         const updatedProfile = await refreshUserData();
         
         if (updatedProfile) {
-          console.log('✅ Profile updated successfully:', { role: updatedProfile.role });
+          console.log('✅ Profile updated successfully:', { role: updatedProfile.role, onboard: updatedProfile.onboard });
           
           // Navigate immediately - no race condition
-          if (selectedRole === "seeker") {
+          if (selectedRole === "seeker" && !updatedProfile.onboard) {
+            console.log('🎓 Navigating to registered onboarding tutorial for new seeker');
+            router.replace("/onboarding/registered-tutorial" as any);
+          } else if (selectedRole === "seeker") {
             console.log('🏠 Navigating to home for legal seeker');
             router.replace("/home");
           } else if (selectedRole === "lawyer") {
