@@ -83,12 +83,6 @@ export default function LawyerBookingView() {
     {}
   );
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
-  const [consultationBanStatus, setConsultationBanStatus] = useState<{
-    can_book: boolean;
-    ban_status: string;
-    ban_end: string | null;
-    message: string | null;
-  } | null>(null);
   const [isCheckingBanStatus, setIsCheckingBanStatus] = useState(false);
 
   const today = new Date();
@@ -281,13 +275,28 @@ export default function LawyerBookingView() {
       errors.timeSlot = "Please select a time slot";
     }
 
-    // Date validation (ensure not in the past)
+    // Date validation (ensure date is in the future, not today)
     const selectedDate = new Date(selectedYear, selectedMonth, selectedDay);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    if (selectedDate < today) {
-      errors.timeSlot = "Cannot book consultation for past dates";
+    // Check if date is in the past or today
+    if (selectedDate <= today) {
+      errors.timeSlot = "Consultation date must be in the future";
+      
+      // Show toast for same-day validation
+      toast.show({
+        placement: 'top',
+        duration: 4000,
+        render: ({ id }) => (
+          <Toast nativeID={id} action="warning" variant="solid">
+            <ToastTitle>Date Not Available</ToastTitle>
+            <ToastDescription>
+              Same-day consultations are not available. Please select a future date.
+            </ToastDescription>
+          </Toast>
+        ),
+      });
     }
 
     return errors;
@@ -366,7 +375,6 @@ export default function LawyerBookingView() {
         let payload: any = null;
         try { payload = await response.json(); } catch {}
         const msg = payload?.detail || payload?.message || "Your account is temporarily restricted from booking consultations.";
-        setConsultationBanStatus({ can_book: false, ban_status: "active", ban_end: null, message: msg });
         Alert.alert(
           "Booking Temporarily Restricted",
           msg,
@@ -383,8 +391,6 @@ export default function LawyerBookingView() {
 
       const banStatus = await response.json();
       console.log("📋 Consultation ban status:", banStatus);
-      
-      setConsultationBanStatus(banStatus);
       
       if (!banStatus.can_book) {
         // Show ban message to user
@@ -1391,12 +1397,6 @@ export default function LawyerBookingView() {
               </Text>
             </HStack>
           </TouchableOpacity>
-          <HStack className="items-center justify-center mt-3">
-            <CheckCircle2 size={14} color={Colors.text.sub} strokeWidth={2} />
-            <Text className="text-xs ml-1.5" style={{ color: Colors.text.sub }}>
-              You&apos;ll receive a confirmation email shortly
-            </Text>
-          </HStack>
         </Box>
       </ScrollView>
 

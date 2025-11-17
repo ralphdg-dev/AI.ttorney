@@ -28,12 +28,30 @@ export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ ch
     }
 
     try {
-      console.log("🔄 ConsultationsContext: Loading consultations for user:", user.id);
-      const { count, error } = await supabase
+      console.log("🔄 ConsultationsContext: Loading consultations for user:", user.id, "role:", user.role);
+      
+      let query = supabase
         .from("consultation_requests")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
         .is("deleted_at", null);
+
+      // For lawyers: count pending requests they need to respond to
+      if (user.role === 'verified_lawyer') {
+        query = query.eq("lawyer_id", user.id).eq("status", "pending");
+        console.log("📋 ConsultationsContext: Counting pending requests for lawyer");
+      } 
+      // For users: count upcoming/accepted consultations they need to attend
+      else {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayString = today.toISOString();
+        console.log("📅 ConsultationsContext: Today's date (ISO):", todayString);
+        query = query.eq("user_id", user.id).eq("status", "accepted").gte("consultation_date", todayString);
+        console.log("📋 ConsultationsContext: Counting upcoming consultations for user");
+      }
+
+      console.log("🔍 ConsultationsContext: Executing query...");
+      const { count, error } = await query;
 
       if (error) {
         console.error("❌ ConsultationsContext: Error fetching consultations count:", error);
@@ -41,11 +59,12 @@ export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ ch
       }
 
       console.log("✅ ConsultationsContext: Loaded count:", count);
+      console.log("📊 ConsultationsContext: Setting consultationsCount to:", count || 0);
       setConsultationsCount(count || 0);
     } catch (error) {
       console.error("❌ ConsultationsContext: Exception in loadConsultations:", error);
     }
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user?.id, user?.role]);
 
   // Optimistic updates (instant feedback)
   const incrementCount = useCallback(() => {

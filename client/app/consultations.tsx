@@ -36,7 +36,7 @@ export default function ConsultationsScreen() {
   const scaleAnim = useState(new Animated.Value(0.8))[0];
   const { user, session, isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  const getAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };
@@ -54,7 +54,7 @@ export default function ConsultationsScreen() {
     }
     
     return headers;
-  };
+  }, [session?.access_token]);
 
   const fetchConsultations = useCallback(async () => {
     if (!user?.id) {
@@ -299,7 +299,7 @@ export default function ConsultationsScreen() {
         ]
       );
     }
-  }, [consultations, user?.id, closeDetailsModal]);
+  }, [consultations, user?.id, closeDetailsModal, getAuthHeaders]);
 
   const openDetailsModal = (consultation: ConsultationWithLawyer) => {
     setSelectedConsultation(consultation);
@@ -321,7 +321,15 @@ export default function ConsultationsScreen() {
   const filteredConsultations = useMemo(() => {
     let filtered = consultations;
 
-    if (activeFilter !== "all") {
+    if (activeFilter === "upcoming") {
+      // Show accepted consultations with future dates (matching sidebar logic)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      filtered = filtered.filter((c) => {
+        const consultationDate = new Date(c.consultation_date);
+        return c.status === "accepted" && consultationDate >= today;
+      });
+    } else if (activeFilter !== "all") {
       filtered = filtered.filter((c) => c.status === activeFilter);
     }
 

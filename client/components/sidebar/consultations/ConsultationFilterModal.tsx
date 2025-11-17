@@ -19,6 +19,7 @@ interface ConsultationFilterModalProps {
 }
 
 const statusOptions = [
+  { id: "upcoming", label: "Upcoming" },
   { id: "all", label: "All" },
   { id: "pending", label: "Pending" },
   { id: "accepted", label: "Accepted" },

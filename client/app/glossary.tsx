@@ -38,8 +38,9 @@ const ITEMS_PER_PAGE = 8;
 export default function GlossaryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const sidebar = useSidebar();
   const { isGuestMode } = useGuest();
-  const { openSidebar } = useSidebar();
+  const { openSidebar: openSidebarFromSidebar } = sidebar || {};
   
   // Force status bar to white on mount
   useEffect(() => {
@@ -306,9 +307,9 @@ export default function GlossaryScreen() {
     if (isGuestMode) {
       setIsGuestSidebarOpen(true);
     } else {
-      openSidebar();
+      openSidebarFromSidebar?.();
     }
-  }, [isGuestMode, openSidebar]);
+  }, [isGuestMode, openSidebarFromSidebar]);
 
   const handleCategoryChange = useCallback((categoryId: string) => {
     setActiveCategory(categoryId);
