@@ -8,6 +8,7 @@ import Header from '../../components/Header';
 import { SidebarWrapper } from '../../components/AppSidebar';
 import Colors from '../../constants/Colors';
 import RegisteredOnboardingOverlay from '../../components/onboarding/RegisteredOnboardingOverlay';
+import AuthGuard from '../../components/auth/AuthGuard';
 
 const HomePage: React.FC = () => {
   const router = useRouter();
@@ -19,24 +20,26 @@ const HomePage: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      <Header 
-          variant="home"
-          showSearch={true}
-          showNotifications={true}
-          onNotificationPress={handleNotificationPress}
-          onLogoPress={() => timelineRef.current?.scrollToTop()}
-        />
-        
-        <View style={styles.content}>
-          <Timeline ref={timelineRef} />
-        </View>
-        
-        <Navbar activeTab="home" />
-      <SidebarWrapper />
-      <RegisteredOnboardingOverlay />
-    </SafeAreaView>
+    <AuthGuard requireAuth={true}>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+        <Header 
+            variant="home"
+            showSearch={true}
+            showNotifications={true}
+            onNotificationPress={handleNotificationPress}
+            onLogoPress={() => timelineRef.current?.scrollToTop()}
+          />
+          
+          <View style={styles.content}>
+            <Timeline ref={timelineRef} />
+          </View>
+          
+          <Navbar activeTab="home" />
+        <SidebarWrapper />
+        <RegisteredOnboardingOverlay />
+      </SafeAreaView>
+    </AuthGuard>
   );
 };
 
