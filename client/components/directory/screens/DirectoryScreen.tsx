@@ -285,10 +285,29 @@ export default function DirectoryScreen() {
     }
   }, [isAuthenticated, user]);
 
+  // Track if we've loaded data before
+  const hasLoadedRef = React.useRef(false);
+
   useEffect(() => {
     // Only fetch lawyers when lawyers tab is active
     if (activeTab === "lawyers") {
-      fetchLawyers();
+      // Check if we have valid cached data
+      const now = Date.now();
+      const hasCachedData = frontendCache.lawyers && 
+                           frontendCache.lawyers.length > 0 &&
+                           now - frontendCache.timestamp < frontendCache.ttl;
+      
+      // Only fetch if we don't have cached data OR it's the first load
+      if (!hasCachedData || !hasLoadedRef.current) {
+        fetchLawyers();
+        hasLoadedRef.current = true;
+      } else {
+        // Use cached data immediately
+        setLawyersData(frontendCache.lawyers);
+        setLoading(false);
+      }
+      
+      // Always check active request (it's fast)
       checkActiveRequest();
     }
   }, [activeTab, fetchLawyers, checkActiveRequest]);

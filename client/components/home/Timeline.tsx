@@ -342,10 +342,14 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     }
   }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, posts.length]);
 
+  // Track if we've loaded before to prevent unnecessary reloads
+  const hasInitialLoadRef = useRef(false);
+
   // Initial load with cache check
   useEffect(() => {
-    if (isComponentMounted.current) {
+    if (isComponentMounted.current && !hasInitialLoadRef.current) {
       loadPosts();
+      hasInitialLoadRef.current = true;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -362,14 +366,19 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         return;
       }
 
-      if (!isCacheValid()) {
+      // Check if we have valid cached data
+      if (isCacheValid()) {
+        if (__DEV__) console.log('📱 Timeline: Screen focused, cache valid - using cached data');
+        const cachedPosts = getCachedPosts();
+        if (cachedPosts && cachedPosts.length > 0) {
+          setPosts(cachedPosts);
+          setInitialLoading(false);
+        }
+      } else {
         if (__DEV__) console.log('📱 Timeline: Screen focused, cache invalid - refreshing');
         loadPosts(true); // Force refresh
-      } else {
-        if (__DEV__) console.log('📱 Timeline: Screen focused, cache valid - skipping refresh to preserve pagination');
-        // Don't reload from cache as it would overwrite paginated posts
       }
-    }, [loadPosts, isCacheValid])
+    }, [loadPosts, isCacheValid, getCachedPosts])
   );
 
   // Remove duplicate useFocusEffect - already handled above

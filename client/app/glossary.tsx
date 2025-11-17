@@ -211,10 +211,17 @@ export default function GlossaryScreen() {
     setTermsTotalPages(Math.ceil(filtered.length / ITEMS_PER_PAGE));
   }, [allTerms]);
 
+  // Track if we've loaded terms before
+  const hasLoadedTermsRef = useRef(false);
+
   // Initial load - fetch all terms once
   useEffect(() => {
-    if (activeTab === "terms" && allTerms.length === 0) {
-      fetchAllLegalTerms();
+    if (activeTab === "terms") {
+      // Only fetch if we haven't loaded before OR we have no data
+      if (!hasLoadedTermsRef.current && allTerms.length === 0) {
+        fetchAllLegalTerms();
+        hasLoadedTermsRef.current = true;
+      }
     }
   }, [activeTab, allTerms.length, fetchAllLegalTerms]);
 
