@@ -25,8 +25,8 @@ _posts_cache = {}
 # User-specific caches with shorter duration to prevent stale user data
 _bookmarks_cache = {}  # user_id -> {post_ids_hash: (bookmarks, timestamp)}
 _replies_cache = {}    # post_ids_hash -> (reply_counts, timestamp)
-CACHE_DURATION = 20  # 20 seconds
-USER_CACHE_DURATION = 15  # 15 seconds for user-specific data cache - balance between freshness and performance
+CACHE_DURATION = 10  # 10 seconds - reduced for fresher data
+USER_CACHE_DURATION = 8  # 8 seconds for user-specific data cache - balance between freshness and performance
 
 def clear_posts_cache():
     """Clear all cached posts when new content is added."""
@@ -493,10 +493,10 @@ async def list_recent_posts(
         # If no cached posts, fetch them WITH replies for instant ViewPost loading
         if base_posts is None:
             supabase = SupabaseService()
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                # Fetch all posts without limits (set very high limit to override Supabase defaults)
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                # Fetch recent posts with reasonable limit for better performance
                 posts_response = await client.get(
-                    f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&order=created_at.desc&is_flagged=eq.false&limit=10000",
+                    f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&order=created_at.desc&is_flagged=eq.false&limit=100",
                     headers=supabase._get_headers(use_service_key=True)
                 )
 
@@ -518,7 +518,7 @@ async def list_recent_posts(
                         
                         logger.info(f"🔍 Fetching replies with URL: {replies_url}")
                         
-                        async with httpx.AsyncClient(timeout=15.0) as client:
+                        async with httpx.AsyncClient(timeout=10.0) as client:
                             replies_response = await client.get(
                                 replies_url,
                                 headers=supabase._get_headers(use_service_key=True)
@@ -534,7 +534,7 @@ async def list_recent_posts(
                             fallback_url = f"{supabase.rest_url}/forum_replies?select=id,reply_body,created_at,user_id,is_anonymous,post_id&post_id=in.({ids_param})&hidden=eq.false&order=created_at.asc"
                             logger.info(f"🔍 Fallback URL: {fallback_url}")
                             
-                            async with httpx.AsyncClient(timeout=15.0) as client:
+                            async with httpx.AsyncClient(timeout=10.0) as client:
                                 fallback_response = await client.get(
                                     fallback_url,
                                     headers=supabase._get_headers(use_service_key=True)

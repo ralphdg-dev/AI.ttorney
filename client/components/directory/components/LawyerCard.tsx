@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Text } from "@/components/ui/text";
@@ -6,8 +6,6 @@ import { Pressable } from "@/components/ui/pressable";
 import { Box } from "@/components/ui/box";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../../../constants/Colors";
-import { useAuth } from "../../../contexts/AuthContext";
-import { hasActiveConsultationRequest } from "../../utils/consultationUtils";
 import { shadowPresets } from "../../../utils/shadowUtils";
 
 interface Lawyer {
@@ -23,16 +21,17 @@ interface Lawyer {
 interface LawyerCardProps {
   lawyer: Lawyer;
   onBookConsultation: (lawyer: Lawyer) => void;
+  hasActiveRequest?: boolean;
+  checkingRequest?: boolean;
 }
 
 export default function LawyerCard({
   lawyer,
   onBookConsultation,
+  hasActiveRequest = false,
+  checkingRequest = false,
 }: LawyerCardProps) {
   const [showAllSpecialization, setShowAllSpecialization] = useState(false);
-  const [hasActiveRequest, setHasActiveRequest] = useState(false);
-  const [checkingRequest, setCheckingRequest] = useState(false);
-  const { user, isAuthenticated } = useAuth();
 
   const primarySpecialization = lawyer.specialization[0];
   const additionalCount = lawyer.specialization.length - 1;
@@ -78,28 +77,6 @@ export default function LawyerCard({
 
   const todayTimes = getTodayAvailableTimes();
   const hasTimesToday = todayTimes.length > 0;
-
-  useEffect(() => {
-    const checkActiveRequests = async () => {
-      if (!isAuthenticated || !user) {
-        setHasActiveRequest(false);
-        return;
-      }
-
-      setCheckingRequest(true);
-      try {
-        const activeRequest = await hasActiveConsultationRequest(user.id);
-        setHasActiveRequest(activeRequest);
-      } catch (error) {
-        console.error("Error checking active requests:", error);
-        setHasActiveRequest(false);
-      } finally {
-        setCheckingRequest(false);
-      }
-    };
-
-    checkActiveRequests();
-  }, [user, isAuthenticated]);
 
   const handleSpecializationPress = () => {
     setShowAllSpecialization(!showAllSpecialization);

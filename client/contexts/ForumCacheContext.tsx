@@ -79,9 +79,9 @@ interface ForumCacheContextType {
 
 const ForumCacheContext = createContext<ForumCacheContextType | undefined>(undefined);
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache duration
-const POST_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes for individual posts
-const COMMENTS_CACHE_DURATION = 3 * 60 * 1000; // 3 minutes for comments
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache duration - reduced for fresher data
+const POST_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes for individual posts
+const COMMENTS_CACHE_DURATION = 2 * 60 * 1000; // 2 minutes for comments
 
 export const ForumCacheProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cacheData, setCacheData] = useState<CacheData | null>(null);

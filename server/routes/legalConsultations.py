@@ -13,8 +13,8 @@ import uuid
 router = APIRouter(prefix="/legal-consultations", tags=["legal-consultations"])
 logger = logging.getLogger(__name__)
 
-lawyers_cache = TTLCache(maxsize=100, ttl=300) 
-single_lawyer_cache = TTLCache(maxsize=500, ttl=300) 
+lawyers_cache = TTLCache(maxsize=100, ttl=60)  # 1 minute for fresher data
+single_lawyer_cache = TTLCache(maxsize=500, ttl=120)  # 2 minutes for individual lawyers
 
 pending_requests = {}
 request_lock = asyncio.Lock()
@@ -112,105 +112,95 @@ async def get_lawyers_with_cache(supabase_service, use_cache=True):
                     future.set_result(response_data.dict() if 'response_data' in locals() else error_response.dict())
 
 async def fetch_lawyers_from_db(supabase_service):
-    """Fetch lawyers from database with optimized query"""
+    """Fetch lawyers from database with optimized query - HTTP first for speed"""
     try:
-        response = supabase_service.supabase.table("lawyer_info").select("*").execute()
-        
-        if hasattr(response, 'data') and response.data:
-            lawyers_data = response.data
-            logger.info(f"Found {len(lawyers_data)} lawyers using Supabase client")
-
-            # ✅ OPTIONAL: sync 'available' column with 'accepting_consultations' for consistency
-            for lawyer_data in lawyers_data:
-                accepting = bool(lawyer_data.get("accepting_consultations", False))
-                if lawyer_data.get("available") != accepting:
-                    try:
-                        supabase_service.supabase.table("lawyer_info") \
-                            .update({"available": accepting}) \
-                            .eq("id", lawyer_data.get("id")) \
-                            .execute()
-                    except Exception as sync_error:
-                        logger.warning(f"Could not sync availability for lawyer {lawyer_data.get('id')}: {sync_error}")
-
-            lawyers = []
-            for lawyer_data in lawyers_data:
-                try:
-                    accepting = bool(lawyer_data.get("accepting_consultations", False))
-                    lawyer = Lawyer(
-                        id=lawyer_data.get("id"),
-                        lawyer_id=lawyer_data.get("lawyer_id"),
-                        name=lawyer_data.get("name", "Unknown Lawyer"),
-                        specialization=normalize_specialization(lawyer_data.get("specialization")),
-                        location=lawyer_data.get("location"),
-                        hours=lawyer_data.get("hours"),
-                        days=lawyer_data.get("days"),
-                        bio=lawyer_data.get("bio"),
-                        available=accepting,  # ✅ This is now controlled by accepting_consultations
-                        hours_available=lawyer_data.get("hours_available"),
-                        created_at=lawyer_data.get("created_at"),
-                    )
-                    lawyers.append(lawyer)
-                except Exception as e:
-                    logger.warning(f"Error parsing lawyer data: {e}, data: {lawyer_data}")
-                    continue
+        # Use HTTP API directly for better performance
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            url = f"{supabase_service.rest_url}/lawyer_info"
+            response = await client.get(
+                url,
+                params={"select": "*"},
+                headers=supabase_service._get_headers(use_service_key=True)
+            )
             
-            if not lawyers:
-                raise Exception("No valid lawyer data found")
-            
-            return lawyers
-        else:
-            raise Exception("No data returned from Supabase client")
-
-    except Exception as client_error:
-        logger.warning(f"Supabase client failed, falling back to HTTP: {str(client_error)}")
-        
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                url = f"{supabase_service.rest_url}/lawyer_info"
-                response = await client.get(
-                    url,
-                    params={"select": "*"},
-                    headers=supabase_service._get_headers(use_service_key=True)
-                )
+            if response.status_code == 200:
+                lawyers_data = response.json()
+                if not lawyers_data:
+                    raise Exception("No data returned from API")
                 
-                if response.status_code == 200:
-                    lawyers_data = response.json()
-                    if not lawyers_data:
-                        raise Exception("No data returned from HTTP API")
-                    
-                    logger.info(f"Found {len(lawyers_data)} lawyers using HTTP")
-                    
-                    lawyers = []
-                    for lawyer_data in lawyers_data:
-                        try:
-                            accepting = bool(lawyer_data.get("accepting_consultations", False))
-                            lawyer = Lawyer(
-                                id=lawyer_data.get("id"),
-                                lawyer_id=lawyer_data.get("lawyer_id"),
-                                name=lawyer_data.get("name", "Unknown Lawyer"),
-                                specialization=lawyer_data.get("specialization"),
-                                location=lawyer_data.get("location"),
-                                hours=lawyer_data.get("hours"),
-                                bio=lawyer_data.get("bio"),
-                                days=lawyer_data.get("days"),
-                                available=accepting,  # ✅ same logic here
-                                hours_available=lawyer_data.get("hours_available"),
-                                created_at=lawyer_data.get("created_at")
-                            )
-                            lawyers.append(lawyer)
-                        except Exception as e:
-                            logger.warning(f"Error parsing lawyer data from HTTP: {e}")
-                            continue
-                    
-                    if not lawyers:
-                        raise Exception("No valid lawyer data found from HTTP")
-                    
-                    return lawyers
-                else:
-                    raise Exception(f"HTTP request failed: {response.status_code} - {response.text}")
-        except Exception as http_error:
-            logger.error(f"HTTP fallback also failed: {http_error}")
-            raise client_error from http_error
+                logger.info(f"Found {len(lawyers_data)} lawyers using HTTP API")
+                
+                lawyers = []
+                for lawyer_data in lawyers_data:
+                    try:
+                        accepting = bool(lawyer_data.get("accepting_consultations", False))
+                        lawyer = Lawyer(
+                            id=lawyer_data.get("id"),
+                            lawyer_id=lawyer_data.get("lawyer_id"),
+                            name=lawyer_data.get("name", "Unknown Lawyer"),
+                            specialization=normalize_specialization(lawyer_data.get("specialization")),
+                            location=lawyer_data.get("location"),
+                            hours=lawyer_data.get("hours"),
+                            days=lawyer_data.get("days"),
+                            bio=lawyer_data.get("bio"),
+                            available=accepting,
+                            hours_available=lawyer_data.get("hours_available"),
+                            created_at=lawyer_data.get("created_at"),
+                        )
+                        lawyers.append(lawyer)
+                    except Exception as e:
+                        logger.warning(f"Error parsing lawyer data: {e}")
+                        continue
+                
+                if not lawyers:
+                    raise Exception("No valid lawyer data found")
+                
+                return lawyers
+            else:
+                raise Exception(f"HTTP request failed: {response.status_code}")
+
+    except Exception as http_error:
+        logger.warning(f"HTTP API failed, falling back to Supabase client: {str(http_error)}")
+        
+        # Fallback to Supabase client
+        try:
+            response = supabase_service.supabase.table("lawyer_info").select("*").execute()
+            
+            if hasattr(response, 'data') and response.data:
+                lawyers_data = response.data
+                logger.info(f"Found {len(lawyers_data)} lawyers using Supabase client fallback")
+                
+                lawyers = []
+                for lawyer_data in lawyers_data:
+                    try:
+                        accepting = bool(lawyer_data.get("accepting_consultations", False))
+                        lawyer = Lawyer(
+                            id=lawyer_data.get("id"),
+                            lawyer_id=lawyer_data.get("lawyer_id"),
+                            name=lawyer_data.get("name", "Unknown Lawyer"),
+                            specialization=normalize_specialization(lawyer_data.get("specialization")),
+                            location=lawyer_data.get("location"),
+                            hours=lawyer_data.get("hours"),
+                            days=lawyer_data.get("days"),
+                            bio=lawyer_data.get("bio"),
+                            available=accepting,
+                            hours_available=lawyer_data.get("hours_available"),
+                            created_at=lawyer_data.get("created_at"),
+                        )
+                        lawyers.append(lawyer)
+                    except Exception as e:
+                        logger.warning(f"Error parsing lawyer data: {e}")
+                        continue
+                
+                if not lawyers:
+                    raise Exception("No valid lawyer data found")
+                
+                return lawyers
+            else:
+                raise Exception("No data returned from Supabase client")
+        except Exception as client_error:
+            logger.error(f"Supabase client fallback also failed: {client_error}")
+            raise http_error from client_error
 
 
 @router.get("/lawyers", response_model=LawyerResponse)

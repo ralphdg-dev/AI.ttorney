@@ -46,7 +46,7 @@ interface Lawyer {
 const frontendCache = {
   lawyers: null as any,
   timestamp: 0,
-  ttl: 5 * 60 * 1000, // 5 minutes for lawyers
+  ttl: 60 * 1000, // 1 minute for fresher data - aligned with backend
 };
 
 // Law firms cache with location+radius keys (Google/Netflix pattern)
@@ -138,6 +138,8 @@ export default function DirectoryScreen() {
   const [selectedSpecialization, setSelectedSpecialization] =
     useState<string>("All");
   const { user, isAuthenticated } = useAuth();
+  const [hasActiveRequest, setHasActiveRequest] = useState<boolean>(false);
+  const [checkingActiveRequest, setCheckingActiveRequest] = useState<boolean>(false);
 
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(300));
@@ -190,9 +192,15 @@ export default function DirectoryScreen() {
 
   const fetchLawyers = useCallback(async (forceRefresh: boolean = false) => {
     try {
-      setLoading(true);
-
+      // Don't show loading spinner if we have cached data
       const now = Date.now();
+      const hasCachedData = frontendCache.lawyers && frontendCache.lawyers.length > 0;
+      
+      if (!hasCachedData) {
+        setLoading(true);
+      }
+
+      // Check cache first
       if (
         !forceRefresh &&
         frontendCache.lawyers &&
@@ -200,6 +208,7 @@ export default function DirectoryScreen() {
       ) {
         setLawyersData(frontendCache.lawyers);
         setLoading(false);
+        setRefreshing(false);
         return;
       }
 
@@ -209,33 +218,80 @@ export default function DirectoryScreen() {
         ? `${apiUrl}/legal-consultations/lawyers?refresh=true`
         : `${apiUrl}/legal-consultations/lawyers`;
 
-      const response = await fetch(url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      
       const result = await response.json();
 
       if (result.success) {
         const lawyers = result.data || [];
         setLawyersData(lawyers);
 
+        // Update cache
         frontendCache.lawyers = lawyers;
         frontendCache.timestamp = now;
       } else {
-        Alert.alert("Error", "Failed to fetch lawyers: " + result.error);
+        // Only show alert if we don't have cached data
+        if (!hasCachedData) {
+          Alert.alert("Error", "Failed to fetch lawyers: " + result.error);
+        }
       }
-    } catch (error) {
-      Alert.alert("Error", "Failed to connect to server");
-      console.error("Error fetching lawyers:", error);
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.warn('Lawyer fetch timeout');
+      } else {
+        console.error("Error fetching lawyers:", error);
+      }
+      // Only show alert if we don't have cached data
+      if (!frontendCache.lawyers || frontendCache.lawyers.length === 0) {
+        Alert.alert("Error", "Failed to connect to server");
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
+  // Check for active consultation request once
+  const checkActiveRequest = useCallback(async () => {
+    if (!isAuthenticated || !user) {
+      setHasActiveRequest(false);
+      return;
+    }
+
+    setCheckingActiveRequest(true);
+    try {
+      const { NetworkConfig } = await import('@/utils/networkConfig');
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(
+        `${apiUrl}/legal-consultations/user/${user.id}/active-requests`,
+        { signal: AbortSignal.timeout(5000) } // 5s timeout
+      );
+      
+      if (response.ok) {
+        const result = await response.json();
+        setHasActiveRequest(result.has_active_requests || false);
+      } else {
+        setHasActiveRequest(false);
+      }
+    } catch (error) {
+      console.warn('Error checking active requests:', error);
+      setHasActiveRequest(false);
+    } finally {
+      setCheckingActiveRequest(false);
+    }
+  }, [isAuthenticated, user]);
+
   useEffect(() => {
     // Only fetch lawyers when lawyers tab is active
     if (activeTab === "lawyers") {
       fetchLawyers();
+      checkActiveRequest();
     }
-  }, [activeTab, fetchLawyers]);
+  }, [activeTab, fetchLawyers, checkActiveRequest]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -261,7 +317,10 @@ export default function DirectoryScreen() {
       .join("");
   }, []);
 
+  // Memoize lawyer processing for better performance
   const lawyers = useMemo(() => {
+    if (!lawyersData || lawyersData.length === 0) return [];
+    
     return lawyersData.map((lawyer) => ({
       ...lawyer,
       displayDays: getDayAbbreviations(lawyer.days),
@@ -281,19 +340,26 @@ export default function DirectoryScreen() {
     }));
   }, [lawyersData, getDayAbbreviations]);
 
+  // Optimized filtering with early returns
   const filteredLawyers = useMemo(() => {
+    if (!lawyers || lawyers.length === 0) return [];
+    
     let filtered = lawyers;
 
-    // Filter out unavailable lawyers
+    // Filter out unavailable lawyers first (most restrictive)
     filtered = filtered.filter((lawyer) => lawyer.available);
+    if (filtered.length === 0) return [];
 
+    // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter((lawyer) =>
         lawyer.name.toLowerCase().includes(query)
       );
+      if (filtered.length === 0) return [];
     }
 
+    // Apply day filter
     if (selectedDays.length > 0) {
       filtered = filtered.filter((lawyer) => {
         if (!lawyer.days) return false;
@@ -304,18 +370,21 @@ export default function DirectoryScreen() {
           availableDays.includes(day.toLowerCase())
         );
       });
+      if (filtered.length === 0) return [];
     }
 
+    // Apply specialization filter
     if (selectedSpecialization !== "All") {
+      const validSpecs = [
+        "family law",
+        "labor law",
+        "civil law",
+        "criminal law",
+        "consumer law",
+      ];
+      
       filtered = filtered.filter((lawyer) => {
         const specs = lawyer.specialization.map((s: string) => s.toLowerCase());
-        const validSpecs = [
-          "family law",
-          "labor law",
-          "civil law",
-          "criminal law",
-          "consumer law",
-        ];
 
         if (selectedSpecialization === "Others Law") {
           return specs.some((s: string) => !validSpecs.includes(s));
@@ -450,6 +519,8 @@ export default function DirectoryScreen() {
                         onBookConsultation={() =>
                           handleBookConsultation(lawyer)
                         }
+                        hasActiveRequest={hasActiveRequest}
+                        checkingRequest={checkingActiveRequest}
                       />
                     ))}
                 </>

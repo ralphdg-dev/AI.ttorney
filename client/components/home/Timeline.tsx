@@ -198,8 +198,10 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     }
   }, [session?.access_token]);
 
-  // Optimized loadPosts - now fetches all posts at once
-  const loadPosts = useCallback(async (force = false) => {
+  // Optimized loadPosts with retry logic and better error handling
+  const loadPosts = useCallback(async (force = false, retryCount = 0) => {
+    const MAX_RETRIES = 2;
+    
     // Check cache first (only for initial load)
     if (!force && isCacheValid()) {
       const cachedPosts = getCachedPosts();
@@ -207,13 +209,13 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         if (__DEV__) console.log('Timeline: Using cached posts, skipping fetch');
         setPosts(cachedPosts);
         setInitialLoading(false);
+        setError(null);
         return;
       }
     }
 
     // Close any open dropdown menus when refreshing
     setOpenMenuPostId(null);
-    setError(null);
 
     if (!isAuthenticated) {
       if (__DEV__) console.warn('Timeline: User not authenticated, clearing posts');
@@ -221,14 +223,17 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       setRefreshing(false);
       setInitialLoading(false);
       setLoadingMore(false);
+      setError(null);
       return;
     }
 
     // Set loading state before making request
-    setRefreshing(true);
-    refreshingRef.current = true;
+    if (retryCount === 0) {
+      setRefreshing(true);
+      refreshingRef.current = true;
+    }
     setCurrentPage(0);
-    setHasMore(false); // No more posts to load since we fetch all at once
+    setHasMore(false);
     hasMoreRef.current = false;
 
     const now = Date.now();
@@ -239,10 +244,10 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       const API_BASE_URL = await NetworkConfig.getBestApiUrl();
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
 
       if (__DEV__) {
-        console.log('Timeline: Fetching all posts from database');
+        console.log(`Timeline: Fetching posts (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
       }
 
       const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`, {
@@ -256,9 +261,8 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       if (!response.ok) {
         const errorText = await response.text();
         if (response.status === 403) {
-          if (__DEV__) console.error('Timeline: Authentication failed - 403 Forbidden. Check if user is properly authenticated.');
-          // Clear posts and show authentication error
-          setPosts([]);
+          if (__DEV__) console.error('Timeline: Authentication failed - 403 Forbidden');
+          // Don't clear posts on auth error, just show error message
           setError('Authentication required. Please log in again.');
           return;
         }
@@ -271,10 +275,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       if (__DEV__) {
         console.log('Timeline: Raw API response:', {
           success: data?.success,
-          dataType: Array.isArray(data?.data) ? 'array' : typeof data?.data,
           dataLength: Array.isArray(data?.data) ? data.data.length : 'not array',
-          directArray: Array.isArray(data),
-          directLength: Array.isArray(data) ? data.length : 'not array'
         });
       }
 
@@ -282,43 +283,53 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         mapped = data.data.map(mapApiToPost);
       } else if (Array.isArray(data)) {
         mapped = data.map(mapApiToPost);
+      } else {
+        if (__DEV__) console.warn('Timeline: Unexpected response format', data);
       }
 
       if (__DEV__) {
-        console.log(`Timeline: Mapped ${mapped.length} posts from API response - all posts loaded`);
+        console.log(`Timeline: Successfully mapped ${mapped.length} posts`);
       }
-
-      // Since we're fetching all posts, there are no more to load
-      const hasMorePosts = false;
 
       // Only update if component is still mounted
       if (isComponentMounted.current) {
-        // Always replace posts since we fetch all posts at once
         setPosts(mapped);
-        setCachedPosts(mapped); // Cache the posts
+        setCachedPosts(mapped);
         setCurrentPage(0);
-        setHasMore(hasMorePosts);
-        hasMoreRef.current = hasMorePosts;
-
-        if (__DEV__ && mapped.length === 0) {
-          console.log('Timeline: No posts found after mapping');
-        }
-
-        // Clear any error state on successful load
+        setHasMore(false);
+        hasMoreRef.current = false;
         setError(null);
+
+        if (mapped.length === 0 && __DEV__) {
+          console.log('Timeline: No posts available');
+        }
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        // Silent abort - don't log as it's expected behavior
-        return;
+        if (__DEV__) console.warn('Timeline: Request timeout');
+        // Retry on timeout
+        if (retryCount < MAX_RETRIES && isComponentMounted.current) {
+          if (__DEV__) console.log(`Timeline: Retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+          setTimeout(() => loadPosts(force, retryCount + 1), 1000 * (retryCount + 1));
+          return;
+        }
       }
 
       const errorMessage = error.message || 'Failed to load posts';
       if (__DEV__) console.error('Timeline load error:', errorMessage);
 
       if (isComponentMounted.current) {
-        setError(errorMessage);
-        // Don't clear posts on error to maintain user experience
+        // Only show error if we have no posts to display
+        if (posts.length === 0) {
+          setError(errorMessage);
+        }
+        
+        // Retry on network errors
+        if (retryCount < MAX_RETRIES && posts.length === 0) {
+          if (__DEV__) console.log(`Timeline: Retrying after error... (${retryCount + 1}/${MAX_RETRIES})`);
+          setTimeout(() => loadPosts(force, retryCount + 1), 2000 * (retryCount + 1));
+          return;
+        }
       }
     } finally {
       if (isComponentMounted.current) {
@@ -329,7 +340,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         loadingMoreRef.current = false;
       }
     }
-  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime]);
+  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, posts.length]);
 
   // Initial load with cache check
   useEffect(() => {
