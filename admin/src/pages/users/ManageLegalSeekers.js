@@ -212,8 +212,8 @@ const ManageLegalSeekers = () => {
   const handleStatusToggle = async (userId, currentStatus) => {
     try {
       setActionLoading(prev => ({ ...prev, [userId]: true }));
-      const newStatus = currentStatus === 'Verified';
-      await usersService.updateLegalSeekerStatus(userId, !newStatus);
+      const newStatus = !currentStatus;
+      await usersService.updateLegalSeekerStatus(userId, newStatus);
       await loadData(); // Reload data
     } catch (err) {
       console.error('Failed to update status:', err);
