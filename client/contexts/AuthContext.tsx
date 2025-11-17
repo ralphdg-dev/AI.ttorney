@@ -146,43 +146,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [authState.session?.access_token]);
 
-  // Fetch user profile with retry logic
-  const fetchUserProfile = React.useCallback(async (userId: string, retryCount = 0): Promise<any> => {
-    const MAX_RETRIES = 2;
-    const TIMEOUT_MS = 5000; // Reduced from 10s to 5s
-    
+  // Fetch user profile - simplified since Supabase is healthy
+  const fetchUserProfile = React.useCallback(async (userId: string): Promise<any> => {
     try {
-      console.log(`🔐 Fetching user profile (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
+      console.log(`🔐 Fetching user profile for: ${userId}`);
       
-      const profileResult: any = await Promise.race([
-        supabase
-          .from('users')
-          .select('*')
-          .eq('id', userId)
-          .single(),
-        new Promise(resolve => 
-          setTimeout(() => resolve({ 
-            data: null, 
-            error: { message: `Profile fetch timeout after ${TIMEOUT_MS/1000}s`, code: 'TIMEOUT' } 
-          }), TIMEOUT_MS)
-        ),
-      ]);
-
-      const { data: profileData, error } = profileResult;
+      const { data: profileData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
       if (error) {
-        // If timeout or network error, retry
-        if ((error.code === 'TIMEOUT' || error.message?.includes('network')) && retryCount < MAX_RETRIES) {
-          console.warn(`⚠️ Profile fetch failed (${error.message}), retrying in ${(retryCount + 1) * 1000}ms...`);
-          await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 1000));
-          return fetchUserProfile(userId, retryCount + 1);
-        }
-        
-        console.error('❌ Profile fetch failed after retries:', error.message);
+        console.error('❌ Profile fetch error:', error);
         return { data: null, error };
       }
 
-      console.log('✅ Profile fetched successfully');
+      if (!profileData) {
+        console.error('❌ No profile data returned');
+        return { data: null, error: { message: 'No profile found', code: 'NO_DATA' } };
+      }
+
+      console.log('✅ Profile fetched successfully:', profileData.email);
       return { data: profileData, error: null };
     } catch (err) {
       console.error('❌ Profile fetch exception:', err);
@@ -197,7 +182,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const timeoutId = setTimeout(() => {
       console.warn('🚨 Auth state change timeout - forcing isLoading to false');
       setIsLoading(false);
-    }, 15000); // 15 second total timeout (allows for retries)
+      setProfileFetchError(true);
+    }, 10000); // 10 second total timeout
     
     try {
       if (!session) {

@@ -69,9 +69,18 @@ WITH CHECK (auth.uid() = id);
 -- Verify RLS is enabled
 -- ============================================
 DO $$
+DECLARE
+  rls_enabled BOOLEAN;
 BEGIN
-  IF NOT (SELECT relrowsecurity FROM pg_class WHERE relname = 'users') THEN
-    RAISE EXCEPTION 'RLS is not enabled on users table!';
+  -- Check if RLS is enabled on public.users table specifically
+  SELECT relrowsecurity INTO rls_enabled
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE c.relname = 'users' 
+  AND n.nspname = 'public';
+  
+  IF NOT rls_enabled THEN
+    RAISE EXCEPTION 'RLS is not enabled on public.users table!';
   END IF;
   
   RAISE NOTICE 'RLS policies successfully configured for users table';
