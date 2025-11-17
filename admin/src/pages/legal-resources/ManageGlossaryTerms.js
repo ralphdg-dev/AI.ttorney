@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom";
-import { Book, Eye, Pencil, Archive, Upload, History, MoreVertical } from "lucide-react";
+import { Book, Eye, Pencil, Archive, ArchiveRestore, Upload, History, MoreVertical } from "lucide-react";
 import Tooltip from "../../components/ui/Tooltip";
 import ListToolbar from "../../components/ui/ListToolbar";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
@@ -12,7 +12,7 @@ import Pagination from "../../components/ui/Pagination";
 import { useToast } from "../../components/ui/Toast";
 import glossaryTermsService from "../../services/glossaryTermsService";
 
-const categories = ["All", "Family", "Criminal", "Civil", "Labor", "Consumer"];
+const categories = ["All", "Family", "Criminal", "Civil", "Labor", "Consumer", "Archived"];
 
 const ManageGlossaryTerms = () => {
   const { showSuccess, showError, showWarning, ToastContainer } = useToast();
@@ -50,6 +50,32 @@ const ManageGlossaryTerms = () => {
       return JSON.parse(localStorage.getItem("admin_user") || "{}");
     } catch {
       return { full_name: "Admin", role: "admin" };
+    }
+  };
+
+  // Handle restore confirmation
+  const confirmRestore = async () => {
+    const { termId, termName } = confirmationModal;
+    try {
+      setConfirmationModal((prev) => ({ ...prev, loading: true }));
+      await glossaryTermsService.restoreGlossaryTerm(termId);
+      await loadData();
+
+      setConfirmationModal({
+        open: false,
+        type: "",
+        termId: null,
+        termName: "",
+        loading: false,
+        changes: null,
+        updatedData: null,
+      });
+
+      showSuccess(`Glossary term "${termName}" restored successfully!`);
+    } catch (err) {
+      console.error("Failed to restore term:", err);
+      showError("Failed to restore term: " + err.message);
+      setConfirmationModal((prev) => ({ ...prev, loading: false }));
     }
   };
 
@@ -92,15 +118,27 @@ const ManageGlossaryTerms = () => {
         >
           <Pencil size={12} className="mr-2 text-gray-500" /> Edit
         </button>
-        <button
-          className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-red-50"
-          onClick={() => {
-            handleArchive(row);
-            setOpenMenuId(null);
-          }}
-        >
-          <Archive size={12} className="mr-2 text-red-500" /> Archive
-        </button>
+        {row.deleted_at ? (
+          <button
+            className="flex items-center w-full px-3 py-1.5 text-green-700 hover:bg-green-50"
+            onClick={() => {
+              handleRestore(row);
+              setOpenMenuId(null);
+            }}
+          >
+            <ArchiveRestore size={12} className="mr-2 text-green-600" /> Restore
+          </button>
+        ) : (
+          <button
+            className="flex items-center w-full px-3 py-1.5 text-red-600 hover:bg-red-50"
+            onClick={() => {
+              handleArchive(row);
+              setOpenMenuId(null);
+            }}
+          >
+            <Archive size={12} className="mr-2 text-red-500" /> Archive
+          </button>
+        )}
       </div>,
       document.body
     );
@@ -131,11 +169,16 @@ const ManageGlossaryTerms = () => {
       // Map frontend category to backend format
       const categoryParam = category === "All" ? "all" : category.toLowerCase();
 
+      // Frontend-only filtering: do not pass search to backend to avoid 500s.
+      // If searching OR using a non-All category, pull more rows at once to filter client-side.
+      const isSearching = query.trim().length > 0;
+      const isCategoryFiltered = category !== "All";
+      const useClientFilter = isSearching || isCategoryFiltered;
       const params = {
-        page: pagination.page,
-        limit: pagination.limit,
-        search: query.trim(),
-        category: categoryParam,
+        page: useClientFilter ? 1 : pagination.page,
+        limit: useClientFilter ? 1000 : pagination.limit,
+        search: "", // disable backend search; we will filter on the client
+        category: useClientFilter ? "all" : categoryParam,
         status: "all", // Show all verification statuses
       };
 
@@ -364,6 +407,17 @@ const ManageGlossaryTerms = () => {
     });
   };
 
+  // Handle restore term
+  const handleRestore = (term) => {
+    setConfirmationModal({
+      open: true,
+      type: "restore",
+      termId: term.id,
+      termName: term.term_en,
+      loading: false,
+    });
+  };
+
   // Helper function to get modal content
   const getModalContent = () => {
     const { type, termName, changes } = confirmationModal;
@@ -375,6 +429,13 @@ const ManageGlossaryTerms = () => {
           message: `Are you sure you want to archive "${termName}"? This term will be hidden from the main list but can be accessed through the "Archived" filter.`,
           confirmText: "Archive Term",
           onConfirm: confirmArchive,
+        };
+      case "restore":
+        return {
+          title: "Restore Glossary Term",
+          message: `Are you sure you want to restore "${termName}"? This will move the term back to the active list.`,
+          confirmText: "Restore Term",
+          onConfirm: confirmRestore,
         };
       case "edit":
         const changesList = changes
@@ -650,9 +711,45 @@ const ManageGlossaryTerms = () => {
     },
   ];
 
+  // Client-side filtering (frontend-only search)
+  const filteredTerms = React.useMemo(() => {
+    const q = (query || "").trim().toLowerCase();
+    const catFilter = (category || "All").toLowerCase();
+    return (terms || []).filter((t) => {
+      const termCat = (t.category || "").toLowerCase();
+      const isArchived = !!t.deleted_at;
+
+      // Archived view
+      if (catFilter === "archived") {
+        if (!isArchived) return false;
+      } else {
+        // Active views: exclude archived items
+        if (isArchived) return false;
+        // Category filter (if not All)
+        if (catFilter !== "all" && termCat !== catFilter) return false;
+      }
+
+      // Text search across fields (if any query)
+      if (!q) return true;
+      const termEn = (t.term_en || "").toLowerCase();
+      const termFil = (t.term_fil || "").toLowerCase();
+      const defEn = (t.definition_en || "").toLowerCase();
+      const defFil = (t.definition_fil || "").toLowerCase();
+      const verifiedBy = (t.verified_by || "").toLowerCase();
+      return (
+        termEn.includes(q) ||
+        termFil.includes(q) ||
+        defEn.includes(q) ||
+        defFil.includes(q) ||
+        termCat.includes(q) ||
+        verifiedBy.includes(q)
+      );
+    });
+  }, [terms, query, category]);
+
   // All terms with client-side sorting
   const sortedTerms = React.useMemo(() => {
-    let rows = [...terms];
+    let rows = [...filteredTerms];
 
     // Client-side sorting (since API returns data sorted by created_at desc by default)
     const byDate = (a, b) => new Date(b.created_at) - new Date(a.created_at);
@@ -685,7 +782,7 @@ const ManageGlossaryTerms = () => {
         break;
     }
     return rows;
-  }, [terms, sortBy]);
+  }, [filteredTerms, sortBy]);
 
   // Paginated data for display
   const paginatedData = React.useMemo(() => {

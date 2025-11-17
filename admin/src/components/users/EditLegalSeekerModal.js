@@ -51,7 +51,20 @@ const EditLegalSeekerModal = ({ open, onClose, user, onSave, loading = false }) 
   // Initialize status when modal opens or user changes
   useEffect(() => {
     if (userData && open) {
-      setIsVerified(userData.is_verified || false);
+      // Debug logging to understand data structure
+      console.log('EditLegalSeekerModal - user data:', user);
+      console.log('EditLegalSeekerModal - userData:', userData);
+      console.log('EditLegalSeekerModal - is_verified value:', userData.is_verified);
+      console.log('EditLegalSeekerModal - is_verified type:', typeof userData.is_verified);
+      
+      // Handle different data types and ensure proper boolean conversion
+      let isVerifiedValue = false;
+      if (userData.is_verified === true || userData.is_verified === 'true' || userData.is_verified === 1) {
+        isVerifiedValue = true;
+      }
+      
+      console.log('EditLegalSeekerModal - setting isVerified to:', isVerifiedValue);
+      setIsVerified(isVerifiedValue);
       setError('');
     }
   }, [userData, open]);

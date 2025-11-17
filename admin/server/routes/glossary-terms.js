@@ -86,25 +86,25 @@ router.get("/", authenticateAdmin, async (req, res) => {
     // Apply same filters to count query
     if (search && search.trim()) {
       const searchTerm = search.trim();
-      countQuery.or(
+      countQuery = countQuery.or(
         `term_en.ilike.%${searchTerm}%,term_fil.ilike.%${searchTerm}%,definition_en.ilike.%${searchTerm}%,definition_fil.ilike.%${searchTerm}%,category.ilike.%${searchTerm}%,verified_by.ilike.%${searchTerm}%`
       );
     }
 
     if (category && category !== "all") {
-      countQuery.eq("category", category.toLowerCase());
+      countQuery = countQuery.eq("category", category.toLowerCase());
     }
 
     if (status && status !== "all") {
       switch (status) {
         case "verified":
-          countQuery.eq("is_verified", true);
+          countQuery = countQuery.eq("is_verified", true);
           break;
         case "unverified":
-          countQuery.eq("is_verified", false);
+          countQuery = countQuery.eq("is_verified", false);
           break;
         case "pending":
-          countQuery.is("is_verified", null);
+          countQuery = countQuery.is("is_verified", null);
           break;
       }
     }
@@ -754,15 +754,17 @@ router.delete("/:id", authenticateAdmin, async (req, res) => {
       });
     }
 
-    const { error: deleteError } = await supabaseAdmin
+    const { data: archivedTerm, error: deleteError } = await supabaseAdmin
       .from("glossary_terms")
-      .delete()
-      .eq("id", id);
+      .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
 
     if (deleteError) {
       return res.status(500).json({
         success: false,
-        error: "Failed to delete glossary term: " + deleteError.message,
+        error: "Failed to archive glossary term: " + deleteError.message,
       });
     }
 
@@ -785,6 +787,7 @@ router.delete("/:id", authenticateAdmin, async (req, res) => {
     res.json({
       success: true,
       message: "Glossary term archived successfully",
+      data: archivedTerm,
     });
   } catch (error) {
     res.status(500).json({

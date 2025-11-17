@@ -41,7 +41,8 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
 
     // Add search filter if provided
     if (search) {
-      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+      const trimmedSearch = search.trim();
+      query = query.or(`full_name.ilike.%${trimmedSearch}%,email.ilike.%${trimmedSearch}%,username.ilike.%${trimmedSearch}%`);
     }
 
     // Add status filter
@@ -52,12 +53,32 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
         query = query.eq('is_verified', false);
       } else if (status === 'pending_lawyer') {
         query = query.eq('pending_lawyer', true);
+      } else if (status === 'no status') {
+        query = query
+          .eq('is_verified', false)
+          .eq('pending_lawyer', false)
+          .eq('account_status', 'active')
+          .is('banned_at', null)
+          .is('role', 'neq', 'guest') // Exclude deactivated/guest users
+          .or('suspension_end.is.null,suspension_end.lt.now()');
       }
     }
 
     // Add archived filter (handle null values - null means active/not archived)
     if (archived === 'active') {
-      query = query.or('archived.is.null,archived.eq.false');
+      // For pending lawyer filter, don't restrict account_status since they might have different statuses
+      if (status === 'pending_lawyer') {
+        query = query
+          .or('archived.is.null,archived.eq.false')
+          .is('banned_at', null)
+          .neq('role', 'guest');
+      } else {
+        query = query
+          .or('archived.is.null,archived.eq.false')
+          .is('banned_at', null)
+          .neq('role', 'guest')
+          .eq('account_status', 'active');
+      }
     } else if (archived === 'archived') {
       query = query.eq('archived', true);
     }
@@ -87,6 +108,7 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
       has_lawyer_application: user.pending_lawyer ? 'Yes' : 'No',
       role: user.role,
       archived: user.archived === true || user.archived === 'true',
+      is_verified: user.is_verified, // Include raw boolean for frontend logic
       // Include moderation fields
       strike_count: user.strike_count || 0,
       reject_count: user.reject_count || 0,
@@ -106,7 +128,7 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
 
     // Apply same filters as main query
     if (search) {
-      countQuery = countQuery.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+      countQuery = countQuery.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,username.ilike.%${search}%`);
     }
 
     if (status !== 'all') {
@@ -116,11 +138,31 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
         countQuery = countQuery.eq('is_verified', false);
       } else if (status === 'pending_lawyer') {
         countQuery = countQuery.eq('pending_lawyer', true);
+      } else if (status === 'no status') {
+        countQuery = countQuery
+          .eq('is_verified', false)
+          .eq('pending_lawyer', false)
+          .eq('account_status', 'active')
+          .is('banned_at', null)
+          .is('role', 'neq', 'guest') // Exclude deactivated/guest users
+          .or('suspension_end.is.null,suspension_end.lt.now()');
       }
     }
 
     if (archived === 'active') {
-      countQuery = countQuery.or('archived.is.null,archived.eq.false');
+      // For pending lawyer filter, don't restrict account_status since they might have different statuses
+      if (status === 'pending_lawyer') {
+        countQuery = countQuery
+          .or('archived.is.null,archived.eq.false')
+          .is('banned_at', null)
+          .neq('role', 'guest');
+      } else {
+        countQuery = countQuery
+          .or('archived.is.null,archived.eq.false')
+          .is('banned_at', null)
+          .neq('role', 'guest')
+          .eq('account_status', 'active');
+      }
     } else if (archived === 'archived') {
       countQuery = countQuery.eq('archived', true);
     }
@@ -361,7 +403,8 @@ router.get('/lawyers', authenticateAdmin, async (req, res) => {
 
     // Add search filter if provided
     if (search) {
-      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,username.ilike.%${search}%`);
+      const trimmedSearch = search.trim();
+      query = query.or(`full_name.ilike.%${trimmedSearch}%,email.ilike.%${trimmedSearch}%,username.ilike.%${trimmedSearch}%`);
     }
 
     // Add pagination

@@ -14,6 +14,28 @@ const createAuditLog = async (termId, action, metadata = {}) => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+
+  // Restore archived glossary term
+  async restoreGlossaryTerm(id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/glossary-terms/${id}/restore`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...glossaryTermsService.getAuthHeader(),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw error;
+    }
+  },
         body: JSON.stringify({
           action,
           target_id: termId,

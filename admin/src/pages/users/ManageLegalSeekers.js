@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Users, Eye, Pencil, Archive, ArchiveRestore, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Loader2, XCircle, RefreshCw, MoreVertical } from 'lucide-react';
+import { Users, Eye, Pencil, Archive, ArchiveRestore, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Loader2, XCircle, RefreshCw, MoreVertical, CheckCircle, XCircle as XCircleIcon } from 'lucide-react';
 import Tooltip from '../../components/ui/Tooltip';
 import ListToolbar from '../../components/ui/ListToolbar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
@@ -176,11 +176,11 @@ const ManageLegalSeekers = () => {
         archived = 'all';
       } else if (combinedFilter.includes('Active -')) {
         // Handle "Active - Verified", "Active - Unverified", etc.
-        status = combinedFilter.replace('Active - ', '').toLowerCase();
+        status = combinedFilter.replace('Active - ', '').toLowerCase().replace(' ', '_');
         archived = 'active';
       } else if (combinedFilter.includes('Archived -')) {
         // Handle "Archived - Verified", "Archived - Unverified", etc.
-        status = combinedFilter.replace('Archived - ', '').toLowerCase();
+        status = combinedFilter.replace('Archived - ', '').toLowerCase().replace(' ', '_');
         archived = 'archived';
       }
 
@@ -718,13 +718,25 @@ const ManageLegalSeekers = () => {
                         </div>
                       </button>
                       <button
-                        onClick={() => { handleEdit(row); setOpenDropdown(null); setDropdownPosition({}); }}
-                        className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        onClick={() => { handleStatusToggle(row.id, row.is_verified); setOpenDropdown(null); setDropdownPosition({}); }}
+                        className={`flex items-center justify-between w-full px-3 py-2 text-sm transition-colors ${
+                          row.is_verified 
+                            ? 'text-red-600 hover:bg-red-50' 
+                            : 'text-green-600 hover:bg-green-50'
+                        }`}
+                        disabled={actionLoading[row.id]}
                       >
                         <div className="flex items-center">
-                          <Pencil className="w-4 h-4 mr-3 text-gray-500" />
-                          <span>Edit</span>
+                          {row.is_verified ? (
+                            <XCircleIcon className="w-4 h-4 mr-3 text-red-500" />
+                          ) : (
+                            <CheckCircle className="w-4 h-4 mr-3 text-green-500" />
+                          )}
+                          <span>{row.is_verified ? 'Unverify' : 'Verify'}</span>
                         </div>
+                        {actionLoading[row.id] && (
+                          <Loader2 size={14} className="animate-spin text-gray-400" />
+                        )}
                       </button>
                       <div className="border-t border-gray-200 my-1"></div>
                       {!isArchived ? (
@@ -811,6 +823,7 @@ const ManageLegalSeekers = () => {
               'Active',
               'Archived', 
               'All',
+              'Active - No Status',
               'Active - Verified',
               'Active - Unverified',
               'Active - Pending Lawyer',
