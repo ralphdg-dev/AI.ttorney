@@ -7,35 +7,13 @@ const createAuditLog = async (termId, action, metadata = {}) => {
   try {
     const token = localStorage.getItem("admin_token");
     const response = await fetch(
-      "http://localhost:5001/api/glossary-terms/audit-log",
+      `${API_BASE_URL}/glossary-terms/audit-log`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-
-  // Restore archived glossary term
-  async restoreGlossaryTerm(id) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/glossary-terms/${id}/restore`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...glossaryTermsService.getAuthHeader(),
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      throw error;
-    }
-  },
         body: JSON.stringify({
           action,
           target_id: termId,
@@ -268,6 +246,65 @@ const glossaryTermsService = {
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Archive glossary term (soft delete)
+  async archiveGlossaryTerm(id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/glossary-terms/${id}/archive`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...glossaryTermsService.getAuthHeader(),
+        },
+      });
+
+      if (!response.ok) {
+        // If archive route is not available, fallback to DELETE
+        if (response.status === 404 || response.status === 405) {
+          const delResp = await fetch(`${API_BASE_URL}/glossary-terms/${id}`, {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+              ...glossaryTermsService.getAuthHeader(),
+            },
+          });
+          if (!delResp.ok) {
+            const delErr = await delResp.json().catch(() => ({}));
+            throw new Error(delErr.error || `HTTP error! status: ${delResp.status}`);
+          }
+          return await delResp.json();
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Restore archived glossary term
+  async restoreGlossaryTerm(id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/glossary-terms/${id}/restore`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...glossaryTermsService.getAuthHeader(),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       return await response.json();

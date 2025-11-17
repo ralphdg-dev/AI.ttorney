@@ -484,8 +484,13 @@ const ManageGlossaryTerms = () => {
     try {
       setConfirmationModal((prev) => ({ ...prev, loading: true }));
 
-      // Delete the term (since we don't have archive functionality, we'll delete)
-      await glossaryTermsService.deleteGlossaryTerm(termId);
+      // Archive the term via API (soft delete)
+      if (typeof glossaryTermsService.archiveGlossaryTerm === "function") {
+        await glossaryTermsService.archiveGlossaryTerm(termId);
+      } else {
+        // Fallback to DELETE if archive endpoint is not available
+        await glossaryTermsService.deleteGlossaryTerm(termId);
+      }
 
       // Log archive action
       await createAuditLog("ARCHIVED_TERM", termId, {
