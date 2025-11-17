@@ -14,7 +14,8 @@ import Navbar from "@/components/Navbar";
 import { SidebarWrapper } from "@/components/AppSidebar";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import { useBookmarks } from "@/contexts/BookmarksContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext";
+import { AuthGuard } from "../components/guards/AuthGuard";
 import { NetworkConfig } from '@/utils/networkConfig';
 import Button from "@/components/ui/Button";
 import { ArticleCardSkeletonList } from "@/components/guides/ArticleCardSkeleton";
@@ -162,9 +163,10 @@ export default function BookmarkedGuidesScreen() {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      <Header title="Bookmarked Guides" showMenu={true} />
+    <AuthGuard requireAuth={true}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+        <Header title="Bookmarked Guides" showMenu={true} />
 
       <View style={{ paddingHorizontal: 20 }}>
         <UnifiedSearchBar
@@ -221,8 +223,9 @@ export default function BookmarkedGuidesScreen() {
         />
       )}
 
-      <Navbar />
-      <SidebarWrapper />
-    </SafeAreaView>
+        <Navbar />
+        <SidebarWrapper />
+      </SafeAreaView>
+    </AuthGuard>
   );
 }

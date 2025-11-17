@@ -17,6 +17,7 @@ import { LawyerNavbar } from "@/components/lawyer/shared";
 import { SidebarWrapper } from "@/components/AppSidebar";
 import Colors from "@/constants/Colors";
 import { createShadowStyle } from '@/utils/shadowUtils';
+import { AuthGuard } from '@/components/guards/AuthGuard';
 import { 
   Lock, 
   Bell, 
@@ -156,8 +157,9 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+    <AuthGuard requireAuth={true}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
       {/* Header with menu button */}
       <Header 
@@ -266,8 +268,9 @@ export default function SettingsScreen() {
 
       </ScrollView>
 
-      {isLawyer ? <LawyerNavbar /> : <Navbar />}
-      <SidebarWrapper />
-    </SafeAreaView>
+        {isLawyer ? <LawyerNavbar /> : <Navbar />}
+        <SidebarWrapper />
+      </SafeAreaView>
+    </AuthGuard>
   );
 }

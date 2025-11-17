@@ -180,12 +180,6 @@ export default function Login() {
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
-      <Header 
-        showBackButton={true}
-        onBackPress={handleBack}
-        backgroundColor={Colors.background.primary}
-      />
-      
       <View style={tw`flex-1 bg-white`}>
         <KeyboardAvoidingView
           style={tw`flex-1`}

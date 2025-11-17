@@ -16,6 +16,7 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { LawyerNavbar } from "@/components/lawyer/shared";
 import { useRouter } from "expo-router";
+import { AuthGuard } from "@/components/guards/AuthGuard";
 
 export default function NotificationsScreen() {
   const { user } = useAuth();
@@ -180,24 +181,25 @@ export default function NotificationsScreen() {
   );
 
   return (
-    <SafeAreaView style={[{ flex: 1, backgroundColor: Colors.background.primary, position: "relative" }]} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      <Header title="Notifications" showMenu={true} />
+    <AuthGuard requireAuth={true}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+        <Header title="Notifications" showMenu={true} />
 
-      {/* Inbox filter row */}
-      <Box className="px-5 pt-6 pb-4" style={{ zIndex: menuOpen ? 100 : 1, position: "relative", elevation: menuOpen ? 12 : 0, overflow: 'visible' }}>
-        <HStack className="items-center justify-between">
-          <View style={{ position: "relative", flex: 1, zIndex: menuOpen ? 200 : 1 }}>
-            <Pressable onPress={() => setMenuOpen(v => !v)} style={({ pressed }) => [tw`flex-row items-center`, { opacity: pressed ? 0.6 : 1 }]}>
-              <GSText size="sm" bold style={{ color: Colors.text.head }}>
-                {`INBOX (${inboxFilter.toUpperCase()})`}
-              </GSText>
-              <View style={tw`ml-1`}>
-                <ChevronDown size={16} color={Colors.text.head} />
-              </View>
-            </Pressable>
+        {/* Inbox filter row */}
+        <Box className="px-5 pt-6 pb-4" style={{ zIndex: menuOpen ? 100 : 1, position: "relative", elevation: menuOpen ? 12 : 0, overflow: 'visible' }}>
+          <HStack className="items-center justify-between">
+            <View style={{ position: "relative", flex: 1, zIndex: menuOpen ? 200 : 1 }}>
+              <Pressable onPress={() => setMenuOpen(v => !v)} style={({ pressed }) => [tw`flex-row items-center`, { opacity: pressed ? 0.6 : 1 }]}>
+                <GSText size="sm" bold style={{ color: Colors.text.head }}>
+                  {`INBOX (${inboxFilter.toUpperCase()})`}
+                </GSText>
+                <View style={tw`ml-1`}>
+                  <ChevronDown size={16} color={Colors.text.head} />
+                </View>
+              </Pressable>
 
-            <DropdownMenu
+              <DropdownMenu
               open={menuOpen}
               position={{ top: 28, left: 0 }}
               minWidth={220}
@@ -329,5 +331,6 @@ export default function NotificationsScreen() {
         </Pressable>
       )}
     </SafeAreaView>
+  </AuthGuard>
   );
 }
