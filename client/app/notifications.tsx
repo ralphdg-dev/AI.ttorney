@@ -16,7 +16,7 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { LawyerNavbar } from "@/components/lawyer/shared";
 import { useRouter } from "expo-router";
-import { AuthGuard } from "@/components/guards/AuthGuard";
+import AuthGuard from "@/components/auth/AuthGuard";
 
 export default function NotificationsScreen() {
   const { user } = useAuth();

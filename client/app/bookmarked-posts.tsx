@@ -10,7 +10,7 @@ import Header from '../components/Header';
 import Navbar from '../components/Navbar';
 import { SidebarWrapper } from '../components/AppSidebar';
 import { useAuth } from '../contexts/AuthContext';
-import { AuthGuard } from '../components/guards/AuthGuard';
+import AuthGuard from "../components/auth/AuthGuard";
 import { usePostBookmarks } from '../contexts/PostBookmarksContext';
 import { BookmarkService } from '../services/bookmarkService';
 import Colors from '../constants/Colors';

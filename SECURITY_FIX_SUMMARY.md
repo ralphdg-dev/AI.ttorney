@@ -6,18 +6,22 @@ Users could access protected routes (profile, settings, consultations, etc.) wit
 
 ## Solution Implemented
 
-### 1. Created AuthGuard Component
+### 1. Enhanced Existing AuthGuard Component
 
-**File:** `/client/components/guards/AuthGuard.tsx`
+**File:** `/client/components/auth/AuthGuard.tsx`
 
 **Features:**
 
-- Checks authentication status before rendering protected content
-- Supports role-based access control (e.g., `verified_lawyer` only)
-- Shows loading state during auth check
-- Automatically redirects unauthenticated users to `/login`
-- Redirects unauthorized users (wrong role) to `/unauthorized`
-- Respects sign-out process (skips checks during sign-out)
+- ✅ Checks authentication status before rendering protected content
+- ✅ Supports role-based access control (e.g., `verified_lawyer` only)
+- ✅ Shows loading state during auth check with ActivityIndicator
+- ✅ Automatically redirects unauthenticated users to `/login`
+- ✅ Redirects unauthorized users (wrong role) to `/unauthorized`
+- ✅ Respects sign-out process (skips checks during sign-out)
+- ✅ Handles banned users (shows ban screen, blocks all access)
+- ✅ Handles deactivated users (redirects to deactivation screen)
+- ✅ Uses expo-router segments for path detection
+- ✅ Comprehensive logging for debugging
 
 **Usage:**
 
@@ -38,11 +42,6 @@ Users could access protected routes (profile, settings, consultations, etc.) wit
 5. **`/bookmarked-guides`** - Bookmarked guides (requires authentication)
 6. **`/favorite-terms`** - Favorite terms (requires authentication)
 7. **`/lawyer/profile`** - Lawyer profile (requires `verified_lawyer` role)
-
-#### ⚠️ Needs Syntax Fix:
-
-1. **`/notifications`** - Has duplicate JSX elements causing syntax errors
-2. **`/profile/edit`** - Has malformed return statement causing syntax errors
 
 ### 3. How AuthGuard Works
 

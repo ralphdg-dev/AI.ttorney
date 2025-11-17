@@ -12,7 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import Navbar from "../../components/Navbar";
 import Colors from "../../constants/Colors";
 import { useAuth } from "../../contexts/AuthContext";
-import { AuthGuard } from "../../components/guards/AuthGuard";
+import AuthGuard from "../../components/auth/AuthGuard";
 import tw from "tailwind-react-native-classnames";
 import { supabase } from "../../config/supabase";
 import { useRouter } from "expo-router";

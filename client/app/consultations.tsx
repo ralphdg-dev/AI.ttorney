@@ -11,7 +11,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../config/supabase";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { shouldUseNativeDriver } from "@/utils/animations";
-import { AuthGuard } from "@/components/guards/AuthGuard";
+import AuthGuard from "@/components/auth/AuthGuard";
 
 // Import consultation types and utilities
 import { ConsultationWithLawyer, ConsultationStatus, canCancelConsultation } from "@/types/consultation.types";

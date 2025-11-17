@@ -15,8 +15,10 @@ export interface User {
   full_name: string;
   role: UserRole;
   is_verified: boolean;
+  account_status?: 'active' | 'suspended' | 'banned' | 'deactivated';
   profile_photo?: string;
   pending_lawyer?: boolean;
+  birthdate?: string;
   created_at?: string;
   updated_at?: string;
   onboard?: boolean;

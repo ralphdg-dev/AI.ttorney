@@ -27,7 +27,7 @@ import { EditProfileModal } from "../../components/lawyer/profile";
 import { SidebarWrapper } from "../../components/AppSidebar";
 import Colors from "../../constants/Colors";
 import { useAuth } from "../../contexts/AuthContext";
-import { AuthGuard } from "../../components/guards/AuthGuard";
+import AuthGuard from "../../components/auth/AuthGuard";
 import tw from "tailwind-react-native-classnames";
 import { useLawyerProfile, TimeSlot } from "../../services/lawyerProfileServices";
 import { supabase } from "../../config/supabase";

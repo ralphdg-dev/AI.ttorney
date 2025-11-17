@@ -15,7 +15,7 @@ import { SidebarWrapper } from "@/components/AppSidebar";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import { useBookmarks } from "@/contexts/BookmarksContext";
 import { useAuth } from "../contexts/AuthContext";
-import { AuthGuard } from "../components/guards/AuthGuard";
+import AuthGuard from "../components/auth/AuthGuard";
 import { NetworkConfig } from '@/utils/networkConfig';
 import Button from "@/components/ui/Button";
 import { ArticleCardSkeletonList } from "@/components/guides/ArticleCardSkeleton";

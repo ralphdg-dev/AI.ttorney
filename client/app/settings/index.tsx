@@ -17,7 +17,7 @@ import { LawyerNavbar } from "@/components/lawyer/shared";
 import { SidebarWrapper } from "@/components/AppSidebar";
 import Colors from "@/constants/Colors";
 import { createShadowStyle } from '@/utils/shadowUtils';
-import { AuthGuard } from '@/components/guards/AuthGuard';
+import AuthGuard from "../../components/auth/AuthGuard";
 import { 
   Lock, 
   Bell, 

@@ -1,52 +1,124 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter, useSegments } from 'expo-router';
-// Temporarily comment out BannedScreen to debug import issues
-// import BannedScreen from '../banned/BannedScreen';
+import Colors from '../../constants/Colors';
 
 interface AuthGuardProps {
   children: React.ReactNode;
+  requireAuth?: boolean;
+  allowedRoles?: string[];
+  redirectTo?: string;
 }
 
-const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
-  const { user, isLoading } = useAuth();
+/**
+ * Authentication Guard Component
+ * 
+ * Protects routes by checking authentication status, user roles, and account status.
+ * Handles banned/deactivated users and redirects unauthenticated users to login.
+ * 
+ * @param requireAuth - If true, user must be authenticated (default: true)
+ * @param allowedRoles - Array of allowed user roles (optional)
+ * @param redirectTo - Custom redirect path for unauthenticated users (default: '/login')
+ */
+const AuthGuard: React.FC<AuthGuardProps> = ({ 
+  children, 
+  requireAuth = true,
+  allowedRoles,
+  redirectTo = '/login'
+}) => {
+  const { user, isLoading, isAuthenticated, initialAuthCheck, isSigningOut } = useAuth();
   const router = useRouter();
   const segments = useSegments();
   const [isBanned, setIsBanned] = useState(false);
   const [isDeactivated, setIsDeactivated] = useState(false);
 
   useEffect(() => {
+    // Skip checks during sign out process
+    if (isSigningOut) {
+      return;
+    }
+
     // Get current path from segments (expo-router way)
     const currentPath = '/' + segments.join('/');
     
-    // Only redirect if auth check is complete and user is not already on the correct page
-    if (isLoading || !segments) return;
+    // Wait for initial auth check to complete
+    if (!initialAuthCheck || isLoading || !segments) {
+      return;
+    }
     
-    console.log('🔍 AuthGuard: Checking redirect', { account_status: user?.account_status, currentPath, segments });
+    console.log('🔍 AuthGuard: Checking redirect', { 
+      account_status: user?.account_status, 
+      currentPath, 
+      segments,
+      requireAuth,
+      isAuthenticated,
+      allowedRoles 
+    });
     
+    // Check banned status first (highest priority)
     if (user?.account_status === 'banned' && currentPath !== '/banned') {
       setIsBanned(true);
       setIsDeactivated(false);
       console.log('🚫 AuthGuard: Banned user detected, redirecting to banned screen');
       router.replace('/banned');
-    } else if (user?.account_status === 'deactivated' && currentPath !== '/deactivated') {
+      return;
+    }
+    
+    // Check deactivated status
+    if (user?.account_status === 'deactivated' && currentPath !== '/deactivated') {
       setIsDeactivated(true);
       setIsBanned(false);
       console.log('⏸️ AuthGuard: Deactivated user detected, redirecting to deactivated screen');
       router.replace('/deactivated');
-    } else {
-      setIsBanned(false);
-      setIsDeactivated(false);
-      console.log('✅ AuthGuard: No redirect needed', { account_status: user?.account_status, currentPath });
+      return;
     }
-  }, [user, isLoading, segments]); // Use segments in dependency array
+    
+    // Check authentication requirement
+    if (requireAuth && !isAuthenticated) {
+      console.log('🚫 AuthGuard: User not authenticated, redirecting to', redirectTo);
+      router.replace(redirectTo as any);
+      return;
+    }
 
-  // Show loading screen while checking auth
-  if (isLoading) {
+    // Check role requirements
+    if (allowedRoles && allowedRoles.length > 0 && user) {
+      if (!allowedRoles.includes(user.role)) {
+        console.log('🚫 AuthGuard: User role not allowed:', user.role, 'Required:', allowedRoles);
+        router.replace('/unauthorized' as any);
+        return;
+      }
+    }
+    
+    // All checks passed
+    setIsBanned(false);
+    setIsDeactivated(false);
+    console.log('✅ AuthGuard: All checks passed', { account_status: user?.account_status, currentPath });
+  }, [user, isLoading, isAuthenticated, initialAuthCheck, requireAuth, allowedRoles, redirectTo, router, isSigningOut, segments])
+
+  // Show loading state while checking auth
+  if (!initialAuthCheck || isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: Colors.background.primary }]}>
+        <ActivityIndicator size="large" color={Colors.primary.blue} />
+      </View>
+    );
+  }
+
+  // Don't render protected content if not authenticated (when auth is required)
+  if (requireAuth && !isAuthenticated) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: Colors.background.primary }]}>
+        <ActivityIndicator size="large" color={Colors.primary.blue} />
+      </View>
+    );
+  }
+
+  // Don't render if role check fails
+  if (allowedRoles && allowedRoles.length > 0 && user && !allowedRoles.includes(user.role)) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: Colors.background.primary }]}>
+        <ActivityIndicator size="large" color={Colors.primary.blue} />
       </View>
     );
   }
@@ -54,7 +126,6 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   // If user is banned, show banned screen instead of app content
   // This ensures COMPLETE blocking of all app functionality
   if (isBanned || user?.account_status === 'banned') {
-    // Temporary fallback to prevent crashing
     return (
       <View style={styles.bannedContainer}>
         <Text style={styles.bannedTitle}>Account Permanently Banned</Text>
@@ -69,7 +140,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   // The routing system will handle showing the appropriate deactivated.tsx screen
   // No need for AuthGuard fallback since deactivated users can access their screen
 
-  // Otherwise, show the normal app content
+  // Render protected content
   return <>{children}</>;
 };
 

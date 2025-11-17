@@ -19,7 +19,7 @@ import CategoryScroller from "@/components/glossary/CategoryScroller";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { NetworkConfig } from '@/utils/networkConfig';
 import { useAuth } from "../contexts/AuthContext";
-import { AuthGuard } from "../components/guards/AuthGuard";
+import AuthGuard from "../components/auth/AuthGuard";
 
 const API_BASE_URL = NetworkConfig.getApiUrl();
 

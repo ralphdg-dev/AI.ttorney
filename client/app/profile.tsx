@@ -23,7 +23,7 @@ import { useRouter } from "expo-router";
 import { Avatar, AvatarImage, AvatarFallbackText } from "../components/ui/avatar";
 import { SidebarWrapper } from "../components/AppSidebar";
 import { createShadowStyle } from "../utils/shadowUtils";
-import { AuthGuard } from "../components/guards/AuthGuard";
+import AuthGuard from "../components/auth/AuthGuard";
 
 // Common styling utilities
 const cardStyle = createShadowStyle({
