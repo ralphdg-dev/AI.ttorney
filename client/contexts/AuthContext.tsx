@@ -145,9 +145,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleAuthStateChange = React.useCallback(async (session: any, shouldNavigate: boolean = true) => {
     const timeoutId = setTimeout(() => {
-      console.warn('Auth timeout - forcing loading to false');
+      console.warn('Auth timeout');
       setIsLoading(false);
-    }, 8000);
+    }, 5000);
     
     try {
       if (!session) {
@@ -162,27 +162,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       try {
         
-        const profileResult: any = await Promise.race([
-          supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single(),
-          new Promise(resolve => setTimeout(() => resolve({ data: null, error: { message: 'Profile fetch timeout after 10 seconds' } }), 10000)),
-        ]);
-
-        const { data: profileData, error } = profileResult;
+        const { data: profileData, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
 
         if (error) {
-          console.error('Profile fetch error:', error.message || error);
-          
-          setAuthState({
-            session,
-            user: null,
-            supabaseUser: session.user,
-          });
+          console.error('Profile fetch failed:', error);
+          await supabase.auth.signOut();
+          setAuthState({ session: null, user: null, supabaseUser: null });
           setIsLoading(false);
           clearTimeout(timeoutId);
+          router.replace('/login');
           return;
         }
 
