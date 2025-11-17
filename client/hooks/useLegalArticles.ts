@@ -250,90 +250,33 @@ export const useLegalArticles = () => {
     }
   };
 
-  const getArticlesByCategory = async (category: string): Promise<ArticleItem[]> => {
-    try {
-      let data: LegalArticle[] = [];
-      
-      // Use server API (send category; server supports it)
-      const dbCategory = category === 'work' ? 'labor' : category;
-      const apiUrl = await NetworkConfig.getBestApiUrl();
-      const response = await fetch(`${apiUrl}/api/legal/articles?category=${encodeURIComponent(dbCategory)}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        return [];
-      }
-      
-      data = result.data || [];
-
-      return data.map((article: LegalArticle) => {
-        const rawCategory = (article as any).category;
-        const normalized = normalizeCategory(rawCategory || undefined);
-        return ({
-          id: article.id, // Already a string (UUID)
-          title: article.title_en,
-          filipinoTitle: article.title_fil || undefined,
-          summary: article.description_en || 
-            (article.content_en
-              ? (article.content_en.length > 150 
-                  ? article.content_en.substring(0, 150) + "..."
-                  : article.content_en)
-              : ""),
-          filipinoSummary: article.description_fil || 
-            (article.content_fil
-              ? (article.content_fil.length > 150 
-                  ? article.content_fil.substring(0, 150) + "..."
-                  : article.content_fil)
-              : undefined),
-          category: normalized,
-          imageUrl: getStorageUrl(article.image_article || null),
-        });
-      });
-    } catch (err) {
-      console.error('Error fetching articles by category:', err);
-      return [];
-    }
+  // Client-side category filtering
+  const getArticlesByCategory = (category: string): ArticleItem[] => {
+    if (category === 'all') return articles;
+    return articles.filter(article => article.category === category);
   };
 
-  const searchArticles = async (query: string, category?: string): Promise<ArticleItem[]> => {
-    try {
-      let data: LegalArticle[] = [];
-      
-      // Use server API search endpoint
-      data = await searchArticlesFromServer(query, category);
+  // Client-side search filtering
+  const searchArticles = (query: string, category?: string): ArticleItem[] => {
+    const searchLower = query.toLowerCase().trim();
+    let filtered = articles;
 
-      return data.map((article: LegalArticle) => {
-        const rawCategory = (article as any).category;
-        const normalized = normalizeCategory(rawCategory || undefined);
-        return ({
-          id: article.id, // Already a string (UUID)
-          title: article.title_en,
-          filipinoTitle: article.title_fil || undefined,
-          summary: article.description_en || 
-            (article.content_en
-              ? (article.content_en.length > 150 
-                  ? article.content_en.substring(0, 150) + "..."
-                  : article.content_en)
-              : ""),
-          filipinoSummary: article.description_fil || 
-            (article.content_fil
-              ? (article.content_fil.length > 150 
-                  ? article.content_fil.substring(0, 150) + "..."
-                  : article.content_fil)
-              : undefined),
-          category: normalized,
-          imageUrl: getStorageUrl(article.image_article || null),
-        });
-      });
-    } catch (err) {
-      console.error('Error searching articles:', err);
-      return [];
+    // Apply category filter first if provided
+    if (category && category !== 'all') {
+      filtered = filtered.filter(article => article.category === category);
     }
+
+    // Apply search filter
+    if (searchLower) {
+      filtered = filtered.filter(article => 
+        article.title.toLowerCase().includes(searchLower) ||
+        (article.filipinoTitle && article.filipinoTitle.toLowerCase().includes(searchLower)) ||
+        article.summary.toLowerCase().includes(searchLower) ||
+        (article.filipinoSummary && article.filipinoSummary.toLowerCase().includes(searchLower))
+      );
+    }
+
+    return filtered;
   };
 
   return {

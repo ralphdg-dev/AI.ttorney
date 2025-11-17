@@ -55,7 +55,8 @@ export default function GlossaryScreen() {
   const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
 
   // Terms state
-  const [terms, setTerms] = useState<TermItem[]>([]);
+  const [allTerms, setAllTerms] = useState<TermItem[]>([]); // Store all terms
+  const [terms, setTerms] = useState<TermItem[]>([]); // Filtered terms
   const [termsLoading, setTermsLoading] = useState<boolean>(true);
   const [termsError, setTermsError] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState<boolean>(false);
@@ -127,17 +128,13 @@ export default function GlossaryScreen() {
     }));
   }, []);
 
-  // Fetch legal terms
-  const fetchLegalTerms = useCallback(async (
-    page = 1,
-    category = activeCategory,
-    search = searchQuery
-  ) => {
+  // Fetch all legal terms once
+  const fetchAllLegalTerms = useCallback(async () => {
     try {
       setTermsLoading(true);
       setTermsError(null);
 
-      const cacheKey = generateGlossaryCacheKey(page, category, search);
+      const cacheKey = 'glossary_all_terms';
       const isConnected = await CacheService.isConnected();
       setIsOffline(!isConnected);
 
@@ -145,11 +142,9 @@ export default function GlossaryScreen() {
 
       if (cachedData) {
         const formattedTerms = formatTerms(
-          cachedData.terms || cachedData.data?.terms || []
+          cachedData.terms || []
         );
-        setTerms(formattedTerms);
-        setTermsTotalPages(cachedData.pagination?.pages || 1);
-        setTermsTotalCount(cachedData.pagination?.total || formattedTerms.length);
+        setAllTerms(formattedTerms);
         if (!isConnected) {
           setTermsLoading(false);
           return;
@@ -160,21 +155,8 @@ export default function GlossaryScreen() {
         throw new Error("No internet connection and no cached data available");
       }
 
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: ITEMS_PER_PAGE.toString(),
-      });
-
-      if (category && category !== "all") {
-        params.append("category", category);
-      }
-
-      if (search && search.trim()) {
-        params.append("search", search.trim());
-      }
-
       const apiUrl = await NetworkConfig.getBestApiUrl();
-      const response = await fetch(`${apiUrl}/glossary/terms?${params}`);
+      const response = await fetch(`${apiUrl}/glossary/terms/all`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -182,20 +164,17 @@ export default function GlossaryScreen() {
 
       const data = await response.json();
       const formattedTerms = formatTerms(data.terms);
-      setTerms(formattedTerms);
-      setTermsTotalPages(data.pagination?.pages || 1);
-      setTermsTotalCount(data.pagination?.total || formattedTerms.length);
+      setAllTerms(formattedTerms);
 
       await CacheService.set(cacheKey, {
         terms: data.terms,
-        pagination: data.pagination,
       });
     } catch (err) {
       console.error("Error fetching legal terms:", err);
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
       setTermsError(errorMessage);
 
-      if (!isOffline && !terms.length) {
+      if (!isOffline && !allTerms.length) {
         Alert.alert(
           "Connection Error",
           `Could not fetch terms from server. Error: ${errorMessage}`,
@@ -205,14 +184,46 @@ export default function GlossaryScreen() {
     } finally {
       setTermsLoading(false);
     }
-  }, [activeCategory, searchQuery, formatTerms, isOffline, terms.length]);
+  }, [formatTerms, isOffline, allTerms.length]);
 
-  // Initial load
-  useEffect(() => {
-    if (activeTab === "terms") {
-      fetchLegalTerms(1);
+  // Filter terms client-side
+  const filterTerms = useCallback((category: string, search: string) => {
+    let filtered = [...allTerms];
+
+    // Apply category filter
+    if (category && category !== "all") {
+      filtered = filtered.filter(term => term.category === category);
     }
-  }, [activeTab, fetchLegalTerms]);
+
+    // Apply search filter
+    if (search && search.trim()) {
+      const searchLower = search.trim().toLowerCase();
+      filtered = filtered.filter(term => 
+        term.title.toLowerCase().includes(searchLower) ||
+        (term.filipinoTerm && term.filipinoTerm.toLowerCase().includes(searchLower)) ||
+        term.definition.toLowerCase().includes(searchLower) ||
+        (term.filipinoDefinition && term.filipinoDefinition.toLowerCase().includes(searchLower))
+      );
+    }
+
+    setTerms(filtered);
+    setTermsTotalCount(filtered.length);
+    setTermsTotalPages(Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  }, [allTerms]);
+
+  // Initial load - fetch all terms once
+  useEffect(() => {
+    if (activeTab === "terms" && allTerms.length === 0) {
+      fetchAllLegalTerms();
+    }
+  }, [activeTab, allTerms.length, fetchAllLegalTerms]);
+
+  // Filter terms when allTerms, category, or search changes
+  useEffect(() => {
+    if (activeTab === "terms" && allTerms.length > 0) {
+      filterTerms(activeCategory, debouncedSearch);
+    }
+  }, [activeTab, allTerms, activeCategory, debouncedSearch, filterTerms]);
 
   // Debounce search input
   useEffect(() => {
@@ -222,54 +233,29 @@ export default function GlossaryScreen() {
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
-  // Search and category change
-  useEffect(() => {
-    if (activeTab === "terms") {
-      const timeoutId = setTimeout(() => {
-        fetchLegalTerms(1, activeCategory, debouncedSearch);
-      }, 100);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [activeCategory, debouncedSearch, activeTab, fetchLegalTerms]);
 
-  // Articles search with optimized debounce
+  // Articles filter with client-side filtering
   useEffect(() => {
     if (activeTab === "guides") {
-      const searchTimeout = setTimeout(async () => {
-        const trimmedQuery = debouncedSearch.trim();
-        
-        if (trimmedQuery && trimmedQuery.length >= 2) {
-          setIsSearchingArticles(true);
-          try {
-            const searchResults = await searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
-            setDisplayArticles(searchResults);
-          } catch (err) {
-            console.error("Search error:", err);
-            setDisplayArticles([]);
-          } finally {
-            setIsSearchingArticles(false);
-          }
+      const trimmedQuery = debouncedSearch.trim();
+      
+      if (trimmedQuery && trimmedQuery.length >= 2) {
+        // Client-side search
+        const searchResults = searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
+        setDisplayArticles(searchResults);
+      } else {
+        // Client-side category filter
+        if (activeCategory === "all") {
+          setDisplayArticles(legalArticles);
         } else {
-          setIsSearchingArticles(false);
-          if (activeCategory === "all") {
-            setDisplayArticles(legalArticles);
-          } else {
-            try {
-              const byCat = await getArticlesByCategory(activeCategory);
-              setDisplayArticles(byCat);
-            } catch (err) {
-              console.error("Category fetch error:", err);
-              setDisplayArticles(legalArticles);
-            }
-          }
+          const byCat = getArticlesByCategory(activeCategory);
+          setDisplayArticles(byCat);
         }
-      }, 100);
-
-      return () => clearTimeout(searchTimeout);
+      }
     }
-  }, [searchQuery, activeCategory, activeTab, legalArticles, searchArticles, getArticlesByCategory, debouncedSearch]);
+  }, [debouncedSearch, activeCategory, activeTab, legalArticles, searchArticles, getArticlesByCategory]);
 
-  // Handle data differently for terms (server-side pagination) vs articles (client-side pagination)
+  // Handle data differently for terms vs articles (both now use client-side pagination)
   const currentData = useMemo(() => {
     if (activeTab === "terms") {
       return terms;
@@ -284,15 +270,10 @@ export default function GlossaryScreen() {
   const totalCount = activeTab === "terms" ? termsTotalCount : currentData.length;
   
   const paginatedData = useMemo(() => {
-    if (activeTab === "terms") {
-      // For terms, return all data since server already paginated
-      return currentData;
-    } else {
-      // For articles, apply client-side pagination
-      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-      return currentData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-    }
-  }, [activeTab, currentData, currentPage]);
+    // Both terms and articles now use client-side pagination
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return currentData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [currentData, currentPage]);
 
   // Handlers
   const handleTabChange = (tabId: string) => {
@@ -315,24 +296,10 @@ export default function GlossaryScreen() {
     setActiveCategory(categoryId);
     setCurrentPage(1);
     
-    if (activeTab === "guides" && categoryId !== "all") {
-      (async () => {
-        try {
-          const byCat = await getArticlesByCategory(categoryId);
-          setDisplayArticles(byCat);
-        } catch (err) {
-          console.error("Category fetch error:", err);
-          setDisplayArticles(legalArticles);
-        }
-      })();
-    } else if (activeTab === "guides") {
-      setDisplayArticles(legalArticles);
-    }
-    
     setTimeout(() => {
       flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
     }, 50);
-  }, [activeTab, getArticlesByCategory, legalArticles]);
+  }, []);
 
   const handleItemPress = useCallback((item: TermItem | ArticleItem) => {
     if (activeTab === "terms") {
@@ -348,14 +315,8 @@ export default function GlossaryScreen() {
 
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
-    
-    // For terms, fetch new data from server
-    if (activeTab === "terms") {
-      fetchLegalTerms(page, activeCategory, searchQuery);
-    }
-    
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-  }, [activeTab, activeCategory, searchQuery, fetchLegalTerms]);
+  }, []);
 
   // Render functions
   const renderListHeader = useCallback(() => (
@@ -540,7 +501,7 @@ export default function GlossaryScreen() {
           </GSText>
           {!isOffline && (
             <TouchableOpacity
-              onPress={() => activeTab === "terms" ? fetchLegalTerms(currentPage) : refetch()}
+              onPress={() => activeTab === "terms" ? fetchAllLegalTerms() : refetch()}
               className="px-6 py-3 mt-4 bg-blue-500 rounded-lg"
             >
               <GSText className="font-semibold text-white">Retry</GSText>
@@ -579,7 +540,7 @@ export default function GlossaryScreen() {
         </GSText>
       </View>
     );
-  }, [activeTab, termsLoading, articlesLoading, isSearchingArticles, termsError, articlesError, isOffline, currentData.length, searchQuery, currentPage, fetchLegalTerms, refetch]);
+  }, [activeTab, termsLoading, articlesLoading, isSearchingArticles, termsError, articlesError, isOffline, currentData.length, searchQuery, fetchAllLegalTerms, refetch]);
 
   const renderItem = useCallback(
     ({ item, index }: { item: any; index: number }) => {
@@ -689,7 +650,7 @@ export default function GlossaryScreen() {
           initialNumToRender={8}
           windowSize={10}
           refreshing={termsLoading || articlesLoading}
-          onRefresh={() => activeTab === "terms" ? fetchLegalTerms(currentPage) : refetch()}
+          onRefresh={() => activeTab === "terms" ? fetchAllLegalTerms() : refetch()}
         />
       </Animated.View>
 

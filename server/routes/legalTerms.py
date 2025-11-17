@@ -85,6 +85,40 @@ async def get_glossary_terms(
         logger.error(f"Error fetching glossary terms: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@router.get("/terms/all")
+async def get_all_glossary_terms():
+    """Get all glossary terms without pagination for client-side filtering"""
+    try:
+        supabase_service = SupabaseService()
+        
+        # Fetch all terms at once
+        base_url = f"{supabase_service.rest_url}/glossary_terms"
+        params = {
+            "select": "id,term_en,term_fil,definition_en,definition_fil,example_en,example_fil,category,created_at",
+            "order": "term_en.asc",
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                base_url,
+                params=params,
+                headers=supabase_service._get_headers()
+            )
+            
+            if response.status_code == 200:
+                terms = response.json()
+                return {
+                    "terms": terms,
+                    "total": len(terms)
+                }
+            else:
+                logger.error(f"Supabase query failed: {response.text}")
+                raise HTTPException(status_code=500, detail="Failed to fetch glossary terms")
+                
+    except Exception as e:
+        logger.error(f"Error fetching all glossary terms: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 @router.get("/terms/{term_id}")
 async def get_glossary_term(term_id: str):
     """Get a specific glossary term by ID"""

@@ -59,41 +59,23 @@ export default function GuidesScreen() {
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
-  // Search and filter
+  // Search and filter with client-side filtering
   useEffect(() => {
-    const searchTimeout = setTimeout(async () => {
-      const trimmedQuery = debouncedSearch.trim();
-      const searchKey = `${trimmedQuery}-${activeCategory}`;
-      
-      if (previousSearchRef.current === searchKey) return;
-      previousSearchRef.current = searchKey;
-      
-      if (trimmedQuery) {
-        if (trimmedQuery.length >= 2) {
-          try {
-            const searchResults = await searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
-            setDisplayArticles(searchResults);
-          } catch (err) {
-            console.error("Search error:", err);
-            setDisplayArticles([]);
-          }
-        }
+    const trimmedQuery = debouncedSearch.trim();
+    
+    if (trimmedQuery && trimmedQuery.length >= 2) {
+      // Client-side search
+      const searchResults = searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
+      setDisplayArticles(searchResults);
+    } else {
+      // Client-side category filter
+      if (activeCategory === "all") {
+        setDisplayArticles(legalArticles);
       } else {
-        if (activeCategory === "all") {
-          setDisplayArticles(legalArticles);
-        } else {
-          try {
-            const byCat = await getArticlesByCategory(activeCategory);
-            setDisplayArticles(byCat);
-          } catch (err) {
-            console.error("Category fetch error:", err);
-            setDisplayArticles(legalArticles);
-          }
-        }
+        const byCat = getArticlesByCategory(activeCategory);
+        setDisplayArticles(byCat);
       }
-    }, 100);
-
-    return () => clearTimeout(searchTimeout);
+    }
   }, [debouncedSearch, activeCategory, legalArticles, searchArticles, getArticlesByCategory]);
 
   const articlesToRender: ArticleItem[] = useMemo(() => {
@@ -113,14 +95,6 @@ export default function GuidesScreen() {
 
   const handleCategoryChange = (categoryId: string): void => {
     setActiveCategory(categoryId);
-    if (categoryId && categoryId !== "all") {
-      (async () => {
-        const byCat = await getArticlesByCategory(categoryId);
-        setDisplayArticles(byCat);
-      })();
-    } else {
-      setDisplayArticles(legalArticles);
-    }
     setTimeout(() => {
       flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
     }, 50);
