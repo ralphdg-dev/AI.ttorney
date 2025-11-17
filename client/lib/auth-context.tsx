@@ -21,7 +21,7 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ data: any; error: any }>;
-  signUp: (email: string, password: string, username: string, full_name?: string) => Promise<{ data: any; error: any }>;
+  signUp: (email: string, password: string, username: string, first_name: string, last_name: string, birthdate: string) => Promise<{ data: any; error: any }>;
   signOut: () => Promise<{ error: any }>;
   resetPassword: (email: string) => Promise<{ data: any; error: any }>;
 }
@@ -110,14 +110,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { data: null, error: { message: 'Sign in failed' } };
       }
     },
-    signUp: async (email: string, password: string, username: string, full_name?: string) => {
+    signUp: async (email: string, password: string, username: string, first_name: string, last_name: string, birthdate: string) => {
       try {
         // Use server API for sign up
         const response = await apiClient.signUp({
           email,
           password,
           username,
-          full_name,
+          first_name,
+          last_name,
+          birthdate,
           role: 'registered_user'
         });
         
@@ -130,7 +132,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           email, 
           password,
           options: {
-            data: { username, full_name }
+            data: { username, first_name, last_name }
           }
         });
         return { data, error };
@@ -157,7 +159,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     },
     resetPassword: async (email: string) => {
       try {
-        const response = await apiClient.resetPassword(email);
+        const response = await apiClient.resetPassword({ email });
         if (response.error) {
           return { data: null, error: { message: response.error } };
         }

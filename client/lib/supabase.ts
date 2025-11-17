@@ -113,6 +113,8 @@ export const db = {
       get: (id: number) =>
         supabase.from("chatbot_logs").select("*").eq("id", id).single(),
       getAll: () => supabase.from("chatbot_logs").select("*"),
+      getAllFlagged: () => 
+        supabase.from("chatbot_logs").select("*").eq("flagged", true),
       getByUser: (userId: string) =>
         supabase.from("chatbot_logs").select("*").eq("user_id", userId),
       create: (log: Database["public"]["Tables"]["chatbot_logs"]["Insert"]) =>
@@ -127,14 +129,20 @@ export const db = {
           .eq("id", id)
           .select()
           .single(),
-    },
-    flagged: {
-      get: (id: number) =>
-        supabase.from("chatbot_flagged").select("*").eq("id", id).single(),
-      getAll: () => supabase.from("chatbot_flagged").select("*"),
-      create: (
-        flagged: Database["public"]["Tables"]["chatbot_flagged"]["Insert"]
-      ) => supabase.from("chatbot_flagged").insert(flagged).select().single(),
+      flag: (id: number) =>
+        supabase
+          .from("chatbot_logs")
+          .update({ flagged: true })
+          .eq("id", id)
+          .select()
+          .single(),
+      unflag: (id: number) =>
+        supabase
+          .from("chatbot_logs")
+          .update({ flagged: false })
+          .eq("id", id)
+          .select()
+          .single(),
     },
   },
 
@@ -190,7 +198,7 @@ export const db = {
   // Legal
   legal: {
     articles: {
-      get: (id: number) =>
+      get: (id: string) =>
         supabase.from("legal_articles").select("*").eq("id", id).single(),
       getAll: () => supabase.from("legal_articles").select("*"),
       getByDomain: (domain: string) =>
@@ -199,7 +207,7 @@ export const db = {
         article: Database["public"]["Tables"]["legal_articles"]["Insert"]
       ) => supabase.from("legal_articles").insert(article).select().single(),
       update: (
-        id: number,
+        id: string,
         updates: Database["public"]["Tables"]["legal_articles"]["Update"]
       ) =>
         supabase
@@ -210,7 +218,7 @@ export const db = {
           .single(),
     },
     glossary: {
-      get: (id: number) =>
+      get: (id: string) =>
         supabase.from("glossary_terms").select("*").eq("id", id).single(),
       getAll: () => supabase.from("glossary_terms").select("*"),
       getByDomain: (domain: string) =>
