@@ -27,6 +27,7 @@ import { EditProfileModal } from "../../components/lawyer/profile";
 import { SidebarWrapper } from "../../components/AppSidebar";
 import Colors from "../../constants/Colors";
 import { useAuth } from "../../contexts/AuthContext";
+import { AuthGuard } from "../../components/guards/AuthGuard";
 import tw from "tailwind-react-native-classnames";
 import { useLawyerProfile, TimeSlot } from "../../services/lawyerProfileServices";
 import { supabase } from "../../config/supabase";
@@ -646,9 +647,10 @@ const LawyerProfilePage: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      <Header title="Profile" showMenu={true} />
+    <AuthGuard requireAuth={true} allowedRoles={['verified_lawyer']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+        <Header title="Profile" showMenu={true} />
       <ScrollView
         style={tw`flex-1`}
         showsVerticalScrollIndicator={false}
@@ -1000,9 +1002,10 @@ const LawyerProfilePage: React.FC = () => {
         confirmText="Sign Out"
         type="warning"
       />
-      <LawyerNavbar activeTab="profile" />
-      <SidebarWrapper />
-    </SafeAreaView>
+        <LawyerNavbar activeTab="profile" />
+        <SidebarWrapper />
+      </SafeAreaView>
+    </AuthGuard>
   );
 };
 

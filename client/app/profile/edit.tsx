@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import Navbar from "../../components/Navbar";
 import Colors from "../../constants/Colors";
 import { useAuth } from "../../contexts/AuthContext";
+import { AuthGuard } from "../../components/guards/AuthGuard";
 import tw from "tailwind-react-native-classnames";
 import { supabase } from "../../config/supabase";
 import { useRouter } from "expo-router";
@@ -755,7 +756,8 @@ export default function EditProfilePage() {
   }
 
   return (
-    <SafeAreaView style={[tw`flex-1`, { backgroundColor: Colors.background.primary }]}>
+  <AuthGuard requireAuth={true}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       {/* Back Button Header */}
       <View style={[tw`bg-white p-4 flex-row items-center justify-between`, { borderBottomColor: Colors.border.light, borderBottomWidth: 1 }]}>
@@ -1183,5 +1185,6 @@ export default function EditProfilePage() {
 
       <Navbar activeTab="profile" />
     </SafeAreaView>
+  </AuthGuard>
   );
 }

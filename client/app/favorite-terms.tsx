@@ -18,7 +18,8 @@ import TermListItem, { TermItem } from "@/components/glossary/TermListItem";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { NetworkConfig } from '@/utils/networkConfig';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from "../contexts/AuthContext";
+import { AuthGuard } from "../components/guards/AuthGuard";
 
 const API_BASE_URL = NetworkConfig.getApiUrl();
 
@@ -115,9 +116,10 @@ export default function FavoritesScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      <Header title="Favorite Terms" showMenu={true} />
+    <AuthGuard requireAuth={true}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+        <Header title="Favorite Terms" showMenu={true} />
 
       <View style={{ paddingHorizontal: 20 }}>
         <UnifiedSearchBar
@@ -241,8 +243,9 @@ export default function FavoritesScreen() {
       )}
       
       {/* Bottom Navigation */}
-      <Navbar />
-      <SidebarWrapper />
-    </SafeAreaView>
+        <Navbar />
+        <SidebarWrapper />
+      </SafeAreaView>
+    </AuthGuard>
   );
 }

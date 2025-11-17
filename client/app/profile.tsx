@@ -23,6 +23,7 @@ import { useRouter } from "expo-router";
 import { Avatar, AvatarImage, AvatarFallbackText } from "../components/ui/avatar";
 import { SidebarWrapper } from "../components/AppSidebar";
 import { createShadowStyle } from "../utils/shadowUtils";
+import { AuthGuard } from "../components/guards/AuthGuard";
 
 // Common styling utilities
 const cardStyle = createShadowStyle({
@@ -114,9 +115,10 @@ export default function UserProfilePage() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      <Header title="Profile" showMenu={true} />
+    <AuthGuard requireAuth={true}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+        <Header title="Profile" showMenu={true} />
       
       <ScrollView 
         style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]} 
@@ -249,8 +251,9 @@ export default function UserProfilePage() {
         confirmText="Sign Out"
         type="warning"
       />
-      <Navbar activeTab="profile" />
-      <SidebarWrapper />
-    </SafeAreaView>
+        <Navbar activeTab="profile" />
+        <SidebarWrapper />
+      </SafeAreaView>
+    </AuthGuard>
   );
 }

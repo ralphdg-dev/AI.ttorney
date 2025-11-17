@@ -11,6 +11,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../config/supabase";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { shouldUseNativeDriver } from "@/utils/animations";
+import { AuthGuard } from "@/components/guards/AuthGuard";
 
 // Import consultation types and utilities
 import { ConsultationWithLawyer, ConsultationStatus, canCancelConsultation } from "@/types/consultation.types";
@@ -345,8 +346,9 @@ export default function ConsultationsScreen() {
     return filtered;
   }, [activeFilter, searchQuery, consultations]);
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+    <AuthGuard requireAuth={true}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header title="My Consultations" showMenu={true} />
       
       <View style={{ flex: 1 }}>
@@ -415,8 +417,9 @@ export default function ConsultationsScreen() {
         />
       </View>
 
-      <Navbar />
-      <SidebarWrapper />
-    </SafeAreaView>
+        <Navbar />
+        <SidebarWrapper />
+      </SafeAreaView>
+    </AuthGuard>
   );
 }
