@@ -17,37 +17,22 @@ export default function SplashScreen() {
   }, []);
 
   const redirectPath = useMemo(() => {
-    console.log('🔍 Index.tsx: Calculating redirect path', { 
-      initialAuthCheck, 
-      isLoading, 
-      hasSeenOnboarding, 
-      isAuthenticated, 
-      isGuestMode,
-      user 
-    });
-    
     if (!initialAuthCheck || isLoading || hasSeenOnboarding === null) {
-      console.log('⏳ Index.tsx: Waiting for auth check or loading');
       return null;
     }
     
     if (isAuthenticated && user) {
-      console.log('👤 Index.tsx: Authenticated user redirect');
       return getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
     }
 
-    // Guests should go directly to chatbot to see the tutorial
     if (isGuestMode) {
-      console.log('🧭 Index.tsx: Redirecting guest to /chatbot');
       return "/chatbot";
     }
 
-    // For non-guest unauthenticated users, show onboarding if they haven't seen it yet
     if (!hasSeenOnboarding) {
       return "/onboarding/onboarding";
     }
 
-    // Default unauthenticated entry point
     return "/login";
   }, [initialAuthCheck, isLoading, isAuthenticated, isGuestMode, user, hasSeenOnboarding]);
 

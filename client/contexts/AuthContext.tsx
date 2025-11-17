@@ -144,17 +144,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [authState.session?.access_token]);
 
   const handleAuthStateChange = React.useCallback(async (session: any, shouldNavigate: boolean = true) => {
-    console.log('🔐 handleAuthStateChange called:', { session: !!session, shouldNavigate });
-    
-    // Add timeout protection to prevent infinite loading
     const timeoutId = setTimeout(() => {
-      console.warn('🚨 Auth state change timeout - forcing isLoading to false');
+      console.warn('Auth timeout - forcing loading to false');
       setIsLoading(false);
-    }, 8000); // 8 second timeout
+    }, 8000);
     
     try {
       if (!session) {
-        console.log('🔐 No session, clearing auth state');
         setAuthState({ session: null, user: null, supabaseUser: null });
         setIsLoading(false);
         clearTimeout(timeoutId);
@@ -162,15 +158,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Get user profile from database
-      console.log('🔐 Fetching user profile for ID:', session.user.id);
-      
       let profile = null;
       
       try {
-        // Add timeout to profile fetch so slow Supabase queries don't block login
-        console.log('⏱️ Starting profile fetch with 10s timeout...');
-        console.log('🔐 User ID:', session.user.id);
-        console.log('🔐 Session valid:', !!session.access_token);
         
         const profileResult: any = await Promise.race([
           supabase
@@ -180,37 +170,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .single(),
           new Promise(resolve => setTimeout(() => resolve({ data: null, error: { message: 'Profile fetch timeout after 10 seconds' } }), 10000)),
         ]);
-        console.log('✅ Profile fetch completed or timed out');
 
         const { data: profileData, error } = profileResult;
 
-        console.log('🔐 Supabase query result:', { 
-          hasProfile: !!profileData, 
-          errorMessage: error?.message,
-          errorCode: error?.code,
-          errorDetails: error?.details 
-        });
-
         if (error) {
-          console.error('❌ Error fetching user profile:', error);
-          console.error('❌ Full error object:', JSON.stringify(error, null, 2));
-          console.error('❌ This usually means:');
-          console.error('   1. Missing RLS policy: Run the SQL migration at /server/database/migrations/010_fix_users_table_rls.sql');
-          console.error('   2. Supabase connection is very slow (check network)');
-          console.error('   3. Network/firewall blocking Supabase');
-          console.error('   4. User row does not exist in database');
+          console.error('Profile fetch error:', error.message || error);
           
-          // Try to provide more specific error message
-          if (error.message?.includes('timeout')) {
-            console.error('🚨 TIMEOUT: Query took longer than 10 seconds');
-            console.error('🚨 ACTION: Check Supabase dashboard for RLS policies on users table');
-          } else if (error.code === 'PGRST116') {
-            console.error('🚨 NO ROWS RETURNED: User profile does not exist in database');
-          } else if (error.message?.includes('permission')) {
-            console.error('🚨 PERMISSION DENIED: Missing RLS policy for SELECT on users table');
-          }
-          
-          // Clear state and stop - don't try to proceed with incomplete data
           setAuthState({
             session,
             user: null,
@@ -222,7 +187,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         profile = profileData;
-        console.log('🔐 User profile fetched:', { role: profile.role, account_status: profile.account_status });
         setAuthState({
           session,
           user: profile,
@@ -230,7 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
 
       } catch (dbError) {
-        console.error('Database query error:', dbError);
+        console.error('Profile fetch failed:', dbError);
         setAuthState({
           session,
           user: null,
@@ -241,7 +205,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      console.log('🔐 Profile fetch completed, checking account status...');
 
       // ALWAYS check if user is deactivated - this takes priority over everything
       if (profile && profile.account_status === 'deactivated') {
@@ -262,31 +225,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Check if user is banned FIRST - this takes priority over everything
-      if (profile.account_status === 'banned') {
-        console.log('🚫 User is banned, checking current route');
-        // Only redirect if not already on banned page to prevent infinite loops
+      if (profile?.account_status === 'banned') {
         const currentRoute = window.location.pathname || '';
         if (!currentRoute.includes('/banned')) {
-          console.log('🚫 Redirecting to banned screen');
           setIsLoading(false);
           clearTimeout(timeoutId);
           router.replace('/banned' as any);
         } else {
-          console.log('🚫 Already on banned page, not redirecting');
           setIsLoading(false);
           clearTimeout(timeoutId);
         }
         return;
       }
 
-      // Only handle navigation on explicit login attempts
       if (shouldNavigate && profile) {
-        console.log('🔐 Handling navigation for login');
-        
-        // Check if user is suspended - this takes priority over everything
         const suspensionStatus = await checkSuspensionStatus();
         if (suspensionStatus && suspensionStatus.isSuspended) {
-          console.log('🚫 User is suspended, redirecting to suspended screen');
           setIsLoading(false);
           clearTimeout(timeoutId);
           router.replace('/suspended' as any);
@@ -295,31 +249,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         let applicationStatus = null;
         if (profile.role === 'lawyer' || profile.pending_lawyer) {
-          console.log('🔐 Checking lawyer application status');
           applicationStatus = await checkLawyerApplicationStatus();
         }
         
         if (profile.pending_lawyer) {
-          // Redirect pending lawyers to application status screen
-          const redirectPath = `/lawyer-status/${
-            applicationStatus || 'pending'
-          }`;
-          
-          console.log('🔄 Redirecting pending lawyer to:', redirectPath);
+          const redirectPath = `/lawyer-status/${applicationStatus || 'pending'}`;
           setIsLoading(false);
           clearTimeout(timeoutId);
           router.replace(redirectPath as any);
         } else {
-          // User doesn't have pending lawyer status, redirect normally
           const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
-          console.log('🔄 Redirecting normal user to:', redirectPath);
           setIsLoading(false);
           clearTimeout(timeoutId);
           router.replace(redirectPath as any);
         }
       } else {
-        // Not navigating, just set loading to false
-        console.log('🔐 Not navigating, setting loading to false. shouldNavigate:', shouldNavigate, 'profile exists:', !!profile);
         setIsLoading(false);
         clearTimeout(timeoutId);
       }
@@ -399,8 +343,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    console.log('🔑 signIn called:', { email });
-    
     try {
       setIsLoading(true);
       setHasRedirectedToStatus(false);
@@ -411,9 +353,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
-        console.error('Sign in error:', error.message);
-        
-        // Map Supabase errors to user-friendly messages
         let errorMessage = 'Invalid email or password';
         if (error.message.includes('Invalid login credentials')) {
           errorMessage = 'Invalid email or password';
@@ -428,22 +367,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.session) {
-        console.log('🔑 Sign in successful, session created');
-        // The onAuthStateChange listener + handleAuthStateChange will
-        // fetch the profile, run checks, and navigate. We do not await
-        // that work here so the login button can stop showing
-        // "Signing In..." as soon as Supabase auth succeeds.
         return { success: true };
       }
 
       setIsLoading(false);
       return { success: false, error: 'Login failed. Please try again' };
     } catch (error: any) {
-      console.error('Sign in catch:', error);
+      console.error('Sign in error:', error);
       setIsLoading(false);
       return { success: false, error: 'Network error. Please check your connection' };
     }
-    // Note: on successful sign-in, handleAuthStateChange manages isLoading
   };
 
   const signOut = async () => {
@@ -487,10 +420,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUserData = async (): Promise<User | null> => {
     try {
-      console.log('🔄 refreshUserData called');
       if (authState.session?.user?.id) {
-        // Fetch updated user profile from database
-        console.log('📡 Fetching user profile from database...');
         const { data: profile, error } = await supabase
           .from('users')
           .select('*')
@@ -498,35 +428,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .single();
 
         if (!error && profile) {
-          console.log('✅ Profile fetched successfully:', { role: profile.role, account_status: profile.account_status });
-          
-          // Update state immediately
           setAuthState(prev => ({
             ...prev,
             user: profile,
           }));
           
-          // Check if account became deactivated and redirect immediately
           if (profile.account_status === 'deactivated') {
-            // Only redirect if not already on deactivated page to prevent infinite loops
             const currentRoute = window.location.pathname || '';
             if (!currentRoute.includes('/deactivated')) {
               router.replace('/deactivated' as any);
             }
           }
           
-          // Return the profile for immediate use by caller
           return profile;
         } else {
-          console.error('❌ Error fetching profile:', error);
+          console.error('Profile refresh error:', error);
           return null;
         }
-      } else {
-        console.warn('⚠️ No session user ID available for refresh');
-        return null;
       }
+      return null;
     } catch (error) {
-      console.error('❌ Error refreshing user data:', error);
+      console.error('Profile refresh failed:', error);
       return null;
     }
   };

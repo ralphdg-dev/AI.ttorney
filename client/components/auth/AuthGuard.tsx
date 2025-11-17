@@ -24,6 +24,10 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
 
     const currentPath = pathname || '/' + segments.join('/');
     const routeConfig = getRouteConfig(currentPath);
+
+    if (currentPath === '/login' && isAuthenticated) {
+      return;
+    }
     
     if (['/banned', '/deactivated', '/suspended', '/unauthorized', '/login', '/'].includes(currentPath)) {
       return;
@@ -49,7 +53,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       return;
     }
 
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !isLoading) {
       router.replace('/login');
       return;
     }

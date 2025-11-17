@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../constants/Colors";
-import Header from "../components/Header";
 import { Ionicons } from "@expo/vector-icons";
 import logo from "../assets/images/logo.png";
 import { useToast, Toast, ToastTitle, ToastDescription } from "../components/ui/toast";
@@ -18,16 +17,12 @@ export default function Login() {
 
   // Debug wrapper for guest session start
   const handleContinueAsGuest = async () => {
-    console.log('🔘 Continue as Guest button clicked');
     try {
       await startGuestSession();
-      console.log('✅ Guest session started successfully');
-      // Navigate to chatbot and start interactive tutorial
-      console.log('🧭 Login.tsx: Navigating to /chatbot and starting tutorial');
       setShowTutorial(true);
       router.push('/chatbot');
     } catch (error) {
-      console.error('❌ Failed to start guest session:', error);
+      console.error('Failed to start guest session:', error);
     }
   };
   const lastDeniedAtRef = useRef<number>(0);
@@ -45,13 +40,14 @@ export default function Login() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   
-  // Clear form on mount and when auth state changes; let AuthGuard handle redirects
   useEffect(() => {
-    setEmail("");
-    setPassword("");
-    setEmailError("");
-    setPasswordError("");
-    setShowPassword(false);
+    if (isAuthenticated) {
+      setEmail("");
+      setPassword("");
+      setEmailError("");
+      setPasswordError("");
+      setShowPassword(false);
+    }
   }, [isAuthenticated]);
 
 
@@ -163,16 +159,6 @@ export default function Login() {
       });
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-
-  const handleBack = () => {
-    // @ts-ignore: canGoBack may not exist on some expo-router versions
-    if (typeof (router as any).canGoBack === 'function' && (router as any).canGoBack()) {
-      router.back();
-    } else {
-      router.push('/role-selection');
     }
   };
 
