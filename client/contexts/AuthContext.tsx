@@ -183,37 +183,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
           console.error('❌ Error fetching user profile:', error);
+          console.error('❌ This usually means:');
+          console.error('   1. Supabase connection is very slow');
+          console.error('   2. Missing SELECT RLS policy on users table');
+          console.error('   3. Network/firewall blocking Supabase');
           
-          // If this is a timeout, try to proceed with minimal user data from session
-          if (error.message?.includes('timeout')) {
-            console.warn('⚠️ Profile fetch timed out - creating minimal user object from session');
-            const minimalUser: User = {
-              session,
-              id: session.user.id,
-              email: session.user.email || '',
-              username: session.user.email?.split('@')[0] || 'user',
-              full_name: session.user.user_metadata?.full_name || '',
-              role: 'registered_user' as UserRole,
-              is_verified: false,
-              onboard: true, // Assume onboarded to skip tutorial on timeout
-            };
-            setAuthState({
-              session,
-              user: minimalUser,
-              supabaseUser: session.user,
-            });
-            setIsLoading(false);
-            clearTimeout(timeoutId);
-            
-            // Still navigate on timeout
-            if (shouldNavigate) {
-              console.log('🔄 Navigating with minimal user data');
-              router.replace('/home' as any);
-            }
-            return;
-          }
-          
-          // For other errors, clear state
+          // Clear state and stop - don't try to proceed with incomplete data
           setAuthState({
             session,
             user: null,

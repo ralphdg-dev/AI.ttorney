@@ -71,9 +71,9 @@ const RegisteredOnboardingOverlay: React.FC = () => {
         {
           id: 'engage',
           position: 'top',
-          title: 'Engage with clients',
+          title: 'Access key features',
           description:
-            'Answer questions in the forum and respond to consultation requests to build trust and grow your practice.',
+            'Tap the menu icon to open the sidebar, tap the AI.ttorney logo to scroll to the top, and tap the bell to check your notifications.',
         },
       ];
     }
@@ -175,11 +175,16 @@ const RegisteredOnboardingOverlay: React.FC = () => {
         break;
       case 'middle':
       default:
+        // Position spotlight to cover stats cards + consultation calendar
+        const headerHeight = 64 + insets.top; // Header + status bar
+        const welcomeSectionHeight = 120; // Welcome text section
+        const startY = headerHeight + welcomeSectionHeight;
+        
         spotlight = {
           x: 16,
-          y: screenHeight * 0.35,
+          y: startY * 1.6,
           width: screenWidth - 32,
-          height: 140,
+          height: 300, // Tall enough to cover stats cards + calendar
         };
         break;
     }
@@ -188,21 +193,32 @@ const RegisteredOnboardingOverlay: React.FC = () => {
   }, [visible, currentStep, steps, insets]);
 
   const handleComplete = async () => {
+    console.log('🎯 Get Started button clicked');
+    console.log('📋 User ID:', session?.user?.id);
+    console.log('📋 Current onboard status:', user?.onboard);
+    
     if (!user || !session?.user?.id) {
+      console.error('❌ Missing user or session');
       setVisible(false);
       return;
     }
 
     try {
       setIsUpdating(true);
-      const { error } = await supabase
+      console.log('⏳ Updating onboard flag to true...');
+      
+      const { data, error } = await supabase
         .from('users')
         .update({ onboard: true })
-        .eq('id', session.user.id);
+        .eq('id', session.user.id)
+        .select();
 
       if (error) {
         console.error('❌ Failed to update onboarding flag:', error.message);
+        console.error('❌ Error details:', error);
       } else {
+        console.log('✅ Successfully updated onboard flag');
+        console.log('✅ Updated data:', data);
         setUser({ ...user, onboard: true });
       }
     } catch (err) {
