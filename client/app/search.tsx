@@ -211,18 +211,32 @@ const SearchScreen: React.FC = () => {
               data={searchResults}
               keyExtractor={(item) => String(item.id)}
               renderItem={({ item, index }: { item: any; index: number }) => {
+                const isAnon = !!item?.is_anonymous;
+                const userData = item?.users || {};
+                
                 const postData = {
                   id: item.id,
-                  user: {
-                    name: item.users?.full_name || 'User',
-                    username: item.users?.username || 'user',
-                    avatar: item.users?.avatar_url || '',
-                  },
+                  user: isAnon
+                    ? { 
+                        name: 'Anonymous User', 
+                        username: 'anonymous', 
+                        avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png' // Detective icon for anonymous
+                      }
+                    : {
+                        name: userData?.full_name || userData?.username || 'User',
+                        username: userData?.username || 'user',
+                        avatar: userData?.photo_url || userData?.profile_photo || undefined,
+                        isLawyer: userData?.role === 'verified_lawyer',
+                        lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+                        account_status: userData?.account_status,
+                      },
                   timestamp: item.created_at,
                   created_at: item.created_at,
                   category: item.category || 'General',
                   content: item.content || item.body || '',
                   comments: 0,
+                  is_anonymous: isAnon,
+                  is_flagged: !!item?.is_flagged,
                 };
 
                 return (
