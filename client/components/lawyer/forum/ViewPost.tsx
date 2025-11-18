@@ -917,7 +917,9 @@ const ViewPost: React.FC = () => {
           if (from === 'search' && query) {
             router.push(`/search?query=${encodeURIComponent(query)}` as any);
           } else {
-            router.push('/lawyer/forum' as any);
+            // Role-based redirect: lawyers to /lawyer/forum, users to /home
+            const redirectPath = currentUser?.role === 'verified_lawyer' ? '/lawyer/forum' : '/home';
+            router.push(redirectPath as any);
           }
         }}
         rightComponent={
