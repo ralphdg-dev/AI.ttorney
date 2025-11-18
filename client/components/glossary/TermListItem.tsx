@@ -27,8 +27,9 @@ interface TermListItemProps {
 }
 
 export default function TermListItem({ item, onPress, containerStyle, showFavorite = true }: TermListItemProps) {
-  const { isFavorite, toggleFavorite } = useFavorites();
-  const isTermFavorite = isFavorite(item.id);
+  const { isFavorite, toggleFavorite, favoriteTermIds } = useFavorites();
+  // Subscribe to favoriteTermIds to ensure re-render when it changes
+  const isTermFavorite = favoriteTermIds.has(item.id);
 
   const handleFavoritePress = async (e: any) => {
     e.stopPropagation(); // Prevent triggering the main onPress

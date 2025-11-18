@@ -5,7 +5,7 @@ import { useToast, Toast, ToastTitle } from '@/components/ui/toast';
 
 const API_BASE_URL = NetworkConfig.getApiUrl();
 
-interface FavoritesContextType {
+export interface FavoritesContextType {
   favoriteTermIds: Set<string>;
   toggleFavorite: (termId: string, termTitle?: string) => Promise<void>;
   isFavorite: (termId: string) => boolean;
