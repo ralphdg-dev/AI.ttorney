@@ -32,7 +32,6 @@ import tw from "tailwind-react-native-classnames";
 import { useLawyerProfile, TimeSlot } from "../../services/lawyerProfileServices";
 import { supabase } from "../../config/supabase";
 import { useRouter } from "expo-router";
-import { useLawyerProfileContext } from "../../contexts/LawyerProfileContext";
 
 interface ProfileData {
   name: string;
@@ -331,44 +330,91 @@ const LawyerProfilePage: React.FC = () => {
     }
   };
 
-  // Use cached profile data from context
-  const { profileData: cachedProfile, fetchProfileData } = useLawyerProfileContext();
-
   const fetchLawyerContactInfo = useCallback(async () => {
     if (!user?.id) return;
 
-    // Use cached data if available
-    if (cachedProfile.contactInfo) {
-      console.log('Using cached lawyer contact info');
-      setIsAcceptingConsultations(cachedProfile.contactInfo.accepting_consultations);
-      setLawyerContactInfo(cachedProfile.contactInfo);
-      setIsLoading(false);
-      return;
-    }
-
-    // Otherwise fetch from context (which will fetch from DB if needed)
     try {
       setIsLoading(true);
-      await fetchProfileData();
+      const { data, error } = await supabase
+        .from("lawyer_info")
+        .select(
+          "phone_number, location, bio, specialization, days, hours_available, accepting_consultations"
+        )
+        .eq("lawyer_id", user.id)
+        .single();
+
+      if (error) {
+        if (error.code === "PGRST116") {
+          console.log("No lawyer info found for user:", user.id);
+          setLawyerContactInfo({
+            phone_number: "",
+            location: "",
+            bio: "",
+            specializations: "",
+            days: "",
+            hours_available: "",
+          });
+        } else {
+          console.error("Error fetching lawyer contact info:", error);
+        }
+      } else if (data) {
+        setIsAcceptingConsultations(!!data.accepting_consultations);
+        setLawyerContactInfo({
+          phone_number: data.phone_number || "",
+          location: data.location || "",
+          bio: data.bio || "",
+          specializations: data.specialization || "",
+          days: data.days || "",
+          hours_available: data.hours_available || "",
+        });
+      }
     } catch (error) {
       console.error("Error in fetchLawyerContactInfo:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id, cachedProfile.contactInfo, fetchProfileData]);
+  }, [user?.id]);
 
   const fetchProfessionalInfo = useCallback(async () => {
-    if (!user?.id) return;
-
-    // Use cached data if available
-    if (cachedProfile.professionalInfo) {
-      console.log('Using cached professional info');
-      setProfessionalInfo(cachedProfile.professionalInfo);
+    if (!user?.id) {
+      console.log("fetchProfessionalInfo: No user ID");
       return;
     }
 
-    // Otherwise it will be fetched by fetchProfileData
-  }, [user?.id, cachedProfile.professionalInfo]);
+    try {
+      console.log("Fetching professional info for user:", user.id);
+      const { data, error } = await supabase
+        .from("lawyer_applications")
+        .select("roll_number, roll_signing_date")
+        .eq("user_id", user.id)
+        .single();
+
+      console.log("Professional info fetch result:", { data, error });
+
+      if (error) {
+        if (error.code === "PGRST116") {
+          console.log("No professional info found for user:", user.id);
+          setProfessionalInfo({
+            rollNumber: "",
+            rollSigningDate: "",
+          });
+        } else {
+          console.error("Error fetching professional info:", error);
+        }
+      } else if (data) {
+        console.log("Setting professional info:", {
+          rollNumber: data.roll_number,
+          rollSigningDate: data.roll_signing_date,
+        });
+        setProfessionalInfo({
+          rollNumber: data.roll_number || "",
+          rollSigningDate: data.roll_signing_date || "",
+        });
+      }
+    } catch (error) {
+      console.error("Error in fetchProfessionalInfo:", error);
+    }
+  }, [user?.id]);
 
   const saveProfessionalInfo = async (
     rollNumber: string,
@@ -377,6 +423,8 @@ const LawyerProfilePage: React.FC = () => {
     if (!user?.id) return { success: false, error: "User not found" };
 
     try {
+      console.log("Saving professional info:", { rollNumber, rollSigningDate, userId: user.id });
+
       const { data: existingRecord } = await supabase
         .from("lawyer_applications")
         .select("id")
@@ -386,21 +434,25 @@ const LawyerProfilePage: React.FC = () => {
       let result;
 
       if (existingRecord) {
+        console.log("Updating existing record:", existingRecord.id);
         result = await supabase
           .from("lawyer_applications")
           .update({
-            roll_number: rollNumber,
-            roll_signing_date: rollSigningDate,
+            roll_number: rollNumber || null,
+            roll_signing_date: rollSigningDate || null,
             updated_at: new Date().toISOString(),
           })
-          .eq("user_id", user.id);
+          .eq("user_id", user.id)
+          .select();
       } else {
+        console.log("Creating new record");
         result = await supabase.from("lawyer_applications").insert({
           user_id: user.id,
-          roll_number: rollNumber,
-          roll_signing_date: rollSigningDate,
+          roll_number: rollNumber || null,
+          roll_signing_date: rollSigningDate || null,
           status: "approved",
-        });
+        })
+        .select();
       }
 
       if (result.error) {
@@ -408,6 +460,7 @@ const LawyerProfilePage: React.FC = () => {
         return { success: false, error: result.error.message };
       }
 
+      console.log("Professional info saved successfully:", result.data);
       return { success: true };
     } catch (error) {
       console.error("Error in saveProfessionalInfo:", error);
@@ -418,6 +471,7 @@ const LawyerProfilePage: React.FC = () => {
     }
   };
 
+  // Initialize profile data immediately when user is available
   useEffect(() => {
     const initializeProfileData = async () => {
       if (user) {
@@ -436,6 +490,7 @@ const LawyerProfilePage: React.FC = () => {
 
         setProfileData(userProfileData);
 
+        // Fetch data immediately in parallel
         await Promise.all([fetchLawyerContactInfo(), fetchProfessionalInfo()]);
 
         setIsInitialLoad(false);
@@ -462,26 +517,73 @@ const LawyerProfilePage: React.FC = () => {
     }
   }, [user, fetchLawyerContactInfo, fetchProfessionalInfo, refreshUserData]);
 
-  // Sync cached data with local state instantly
+  // Set up real-time subscription for instant updates
   useEffect(() => {
-    if (cachedProfile.contactInfo) {
-      setLawyerContactInfo(cachedProfile.contactInfo);
-      setIsAcceptingConsultations(cachedProfile.contactInfo.accepting_consultations);
-    }
-    if (cachedProfile.professionalInfo) {
-      setProfessionalInfo(cachedProfile.professionalInfo);
-    }
-  }, [cachedProfile.contactInfo, cachedProfile.professionalInfo]);
+    if (!user?.id) return;
 
-  useEffect(() => {
-    if (user && isInitialLoad) {
-      const timer = setTimeout(() => {
-        refreshProfileData();
-      }, 100);
+    // Subscribe to lawyer_info changes for real-time updates
+    const lawyerInfoSubscription = supabase
+      .channel(`lawyer_info:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lawyer_info',
+          filter: `lawyer_id=eq.${user.id}`,
+        },
+        (payload: any) => {
+          console.log('Real-time update received:', payload);
+          if (payload.new) {
+            const data = payload.new as any;
+            setIsAcceptingConsultations(!!data.accepting_consultations);
+            setLawyerContactInfo({
+              phone_number: data.phone_number || "",
+              location: data.location || "",
+              bio: data.bio || "",
+              specializations: data.specialization || "",
+              days: data.days || "",
+              hours_available: data.hours_available || "",
+            });
+          }
+        }
+      )
+      .subscribe();
 
-      return () => clearTimeout(timer);
-    }
-  }, [user, isInitialLoad, refreshProfileData]);
+    // Subscribe to lawyer_applications changes
+    const applicationsSubscription = supabase
+      .channel(`lawyer_applications:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lawyer_applications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload: any) => {
+          console.log('Professional info update received:', payload);
+          if (payload.new) {
+            const data = payload.new as any;
+            console.log('Updating professional info from subscription:', {
+              rollNumber: data.roll_number,
+              rollSigningDate: data.roll_signing_date,
+            });
+            setProfessionalInfo({
+              rollNumber: data.roll_number || "",
+              rollSigningDate: data.roll_signing_date || "",
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      supabase.removeChannel(lawyerInfoSubscription);
+      supabase.removeChannel(applicationsSubscription);
+    };
+  }, [user?.id]);
 
   const saveLawyerProfileToBackend = async (
     profileData: any,
@@ -489,42 +591,105 @@ const LawyerProfilePage: React.FC = () => {
     contactInfo: LawyerContactInfo,
     professionalInfo: ProfessionalInfo
   ) => {
+    if (!user?.id) {
+      return { success: false, error: "User not authenticated" };
+    }
+
     try {
-      const combinedData = {
-        name: profileData.name,
-        email: profileData.email,
-        avatar: profileData.avatar || '',
-        phone: contactInfo.phone_number,
-        location: contactInfo.location,
-        bio: contactInfo.bio,
-        specialization: Array.isArray(contactInfo.specializations) 
-          ? contactInfo.specializations 
-          : [contactInfo.specializations],
-        days: profileData.days,
-        hours_available: profileData.hours_available,
-      };
+      console.log("Saving profile data with availability:", profileData);
 
-      console.log("Saving profile data with availability:", combinedData);
+      // Prepare specialization string
+      const specializationString = Array.isArray(contactInfo.specializations)
+        ? contactInfo.specializations.join(", ")
+        : contactInfo.specializations;
 
-      const [profileResult, professionalResult] = await Promise.all([
-        saveProfile(combinedData, availabilitySlots),
-        saveProfessionalInfo(
-          professionalInfo.rollNumber,
-          professionalInfo.rollSigningDate
-        ),
-      ]);
+      // Update users table for name and email first
+      const { error: userError } = await supabase
+        .from("users")
+        .update({
+          full_name: profileData.name,
+          email: profileData.email,
+        })
+        .eq("id", user.id);
 
-      return {
-        success: profileResult.success && professionalResult.success,
-        error: !profileResult.success
-          ? profileResult.error
-          : !professionalResult.success
-          ? professionalResult.error
-          : undefined,
-      };
-    } catch (error) {
+      if (userError) {
+        console.error("Error updating user info:", userError);
+        return { success: false, error: userError.message };
+      }
+
+      // Check if lawyer_info record exists
+      const { data: existingLawyerInfo } = await supabase
+        .from("lawyer_info")
+        .select("id, name")
+        .eq("lawyer_id", user.id)
+        .single();
+
+      // Update lawyer_info table - only update if record exists
+      let lawyerInfoError;
+      let lawyerInfoData;
+
+      if (existingLawyerInfo) {
+        // Record exists - update it (preserve existing name field)
+        const updateData: any = {
+          phone_number: contactInfo.phone_number,
+          location: contactInfo.location,
+          bio: contactInfo.bio,
+          specialization: specializationString,
+          days: profileData.days || "",
+          hours_available: profileData.hours_available || {},
+          updated_at: new Date().toISOString(),
+        };
+
+        const result = await supabase
+          .from("lawyer_info")
+          .update(updateData)
+          .eq("lawyer_id", user.id)
+          .select()
+          .single();
+
+        lawyerInfoError = result.error;
+        lawyerInfoData = result.data;
+      } else {
+        // Record doesn't exist - create it with name from users table
+        const result = await supabase
+          .from("lawyer_info")
+          .insert({
+            lawyer_id: user.id,
+            name: profileData.name, // Use name from profile data for new records
+            phone_number: contactInfo.phone_number,
+            location: contactInfo.location,
+            bio: contactInfo.bio,
+            specialization: specializationString,
+            days: profileData.days || "",
+            hours_available: profileData.hours_available || {},
+          })
+          .select()
+          .single();
+
+        lawyerInfoError = result.error;
+        lawyerInfoData = result.data;
+      }
+
+      if (lawyerInfoError) {
+        console.error("Error updating lawyer_info:", lawyerInfoError);
+        return { success: false, error: lawyerInfoError.message };
+      }
+
+      // Update professional info
+      const professionalResult = await saveProfessionalInfo(
+        professionalInfo.rollNumber,
+        professionalInfo.rollSigningDate
+      );
+
+      if (!professionalResult.success) {
+        return professionalResult;
+      }
+
+      console.log("Profile saved successfully:", lawyerInfoData);
+      return { success: true };
+    } catch (error: any) {
       console.error("Error saving lawyer profile:", error);
-      throw error;
+      return { success: false, error: error.message || "Failed to save profile" };
     }
   };
 
@@ -581,6 +746,12 @@ const LawyerProfilePage: React.FC = () => {
       );
 
       if (result.success) {
+        // Update professional info state immediately
+        setProfessionalInfo({
+          rollNumber: editFormData.rollNumber || "",
+          rollSigningDate: editFormData.rollSigningDate || "",
+        });
+
         Alert.alert("Success", "Profile updated successfully!");
         setIsEditingProfile(false);
 

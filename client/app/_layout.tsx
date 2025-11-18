@@ -12,7 +12,6 @@ import { BookmarksProvider } from "../contexts/BookmarksContext";
 import { PostBookmarksProvider } from "../contexts/PostBookmarksContext";
 import { ConsultationsProvider } from "../contexts/ConsultationsContext";
 import { ForumCacheProvider } from "../contexts/ForumCacheContext";
-import { LawyerProfileProvider } from "../contexts/LawyerProfileContext";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ModerationProvider } from "../contexts/ModerationContext";
 import { NotificationProvider } from "../contexts/NotificationContext";
@@ -59,17 +58,16 @@ function AppContent() {
       />
       <GuestProvider>
         <GuestChatProvider>
-          <LawyerProfileProvider>
-            <ModerationProvider>
-              <NotificationProvider>
-                <FavoritesProvider>
-                  <BookmarksProvider>
-                    <PostBookmarksProvider>
-                      <ConsultationsProvider>
-                        <ErrorBoundary fallbackRoute="/home">
-                          <ForumCacheProvider>
-                            <SidebarProvider>
-                              <AuthGuard>
+          <ModerationProvider>
+            <NotificationProvider>
+              <FavoritesProvider>
+                <BookmarksProvider>
+                  <PostBookmarksProvider>
+                    <ConsultationsProvider>
+                      <ErrorBoundary fallbackRoute="/home">
+                        <ForumCacheProvider>
+                          <SidebarProvider>
+                            <AuthGuard>
                               <Stack screenOptions={{ 
                                 headerShown: false,
                                 animation: 'none'
@@ -105,7 +103,6 @@ function AppContent() {
               </FavoritesProvider>
             </NotificationProvider>
           </ModerationProvider>
-          </LawyerProfileProvider>
         </GuestChatProvider>
       </GuestProvider>
     </>
