@@ -917,7 +917,7 @@ const ViewPost: React.FC = () => {
           if (from === 'search' && query) {
             router.push(`/search?query=${encodeURIComponent(query)}` as any);
           } else {
-            router.push('/home' as any);
+            router.push('/lawyer/forum' as any);
           }
         }}
         rightComponent={
