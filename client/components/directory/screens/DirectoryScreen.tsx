@@ -36,7 +36,7 @@ interface Lawyer {
   location: string;
   hours: string;
   bio: string;
-  days: string;
+  days: string | string[]; // Can be JSON array ["Monday", "Tuesday"] or string
   available: boolean;
   hours_available: string | string[] | Record<string, string[]>; // JSONB or legacy formats
   created_at: string;
@@ -317,10 +317,9 @@ export default function DirectoryScreen() {
     fetchLawyers(true);
   }, [fetchLawyers]);
 
-  const getDayAbbreviations = useCallback((days: string): string => {
+  const getDayAbbreviations = useCallback((days: string | string[]): string => {
     if (!days) return "";
 
-    const dayArray = days.split(",");
     const abbreviationMap: { [key: string]: string } = {
       Monday: "Mon",
       Tuesday: "Tue",
@@ -331,9 +330,27 @@ export default function DirectoryScreen() {
       Sunday: "Sun",
     };
 
+    let dayArray: string[];
+    
+    if (Array.isArray(days)) {
+      // Already an array: ["Monday", "Tuesday"]
+      dayArray = days;
+    } else if (typeof days === 'string') {
+      // Try parsing as JSON array string
+      try {
+        const parsed = JSON.parse(days);
+        dayArray = Array.isArray(parsed) ? parsed : days.split(",");
+      } catch {
+        // Fallback to comma-separated string
+        dayArray = days.split(",");
+      }
+    } else {
+      return "";
+    }
+
     return dayArray
       .map((day) => abbreviationMap[day.trim()] || day.trim())
-      .join("");
+      .join(" ");
   }, []);
 
   // Memoize lawyer processing for better performance
@@ -378,21 +395,49 @@ export default function DirectoryScreen() {
       if (filtered.length === 0) return [];
     }
 
-    // Apply day filter
+    // Apply day filter (instant frontend filtering - no API calls needed)
     if (selectedDays.length > 0) {
       filtered = filtered.filter((lawyer) => {
         if (!lawyer.days) return false;
-        const availableDays = lawyer.days
-          .split(",")
-          .map((d: string) => d.trim().toLowerCase());
-        return selectedDays.some((day) =>
-          availableDays.includes(day.toLowerCase())
-        );
+        
+        // Parse lawyer's available days - handle JSON array, comma-separated, or space-separated
+        let availableDays: string[];
+        
+        if (Array.isArray(lawyer.days)) {
+          // Already an array: ["Monday", "Tuesday", "Wednesday"]
+          availableDays = lawyer.days.map((d: string) => d.trim().toLowerCase());
+        } else if (typeof lawyer.days === 'string') {
+          // Try parsing as JSON array string
+          try {
+            const parsed = JSON.parse(lawyer.days);
+            if (Array.isArray(parsed)) {
+              availableDays = parsed.map((d: string) => d.trim().toLowerCase());
+            } else {
+              throw new Error('Not an array');
+            }
+          } catch {
+            // Fallback to comma or space-separated string
+            if (lawyer.days.includes(',')) {
+              availableDays = lawyer.days.split(",").map((d: string) => d.trim().toLowerCase());
+            } else {
+              availableDays = lawyer.days.split(/\s+/).map((d: string) => d.trim().toLowerCase()).filter((d: string) => d.length > 0);
+            }
+          }
+        } else {
+          return false;
+        }
+        
+        // Check if any selected day matches any available day
+        return selectedDays.some((selectedDay) => {
+          const normalizedSelectedDay = selectedDay.trim().toLowerCase();
+          return availableDays.includes(normalizedSelectedDay);
+        });
       });
+      
       if (filtered.length === 0) return [];
     }
 
-    // Apply specialization filter
+    // Apply specialization filter (instant frontend filtering)
     if (selectedSpecialization !== "All") {
       const validSpecs = [
         "family law",
