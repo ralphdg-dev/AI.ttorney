@@ -1,13 +1,7 @@
 import { Stack } from "expo-router";
 import "@/global.css";
 import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
-import {
-  useFonts,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from "@expo-google-fonts/inter";
+import { useRobustFonts } from "@/utils/fontLoader";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
@@ -116,14 +110,10 @@ function AppContent() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-  });
+  const { isReady } = useRobustFonts();
 
-  if (!fontsLoaded) {
+  // Wait for fonts to load or timeout before rendering
+  if (!isReady) {
     return null;
   }
 
