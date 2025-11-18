@@ -146,6 +146,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [authState.session?.access_token]);
 
   const handleAuthStateChange = React.useCallback(async (session: any, shouldNavigate: boolean = true) => {
+    console.log(`🔄 handleAuthStateChange called - shouldNavigate: ${shouldNavigate}, current path: ${window.location.pathname}`);
+    
     const timeoutId = setTimeout(() => {
       console.warn('Auth timeout');
       toast.show({
@@ -172,21 +174,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // Get user profile from database with timeout protection
+      // Get user profile - use server API to bypass RLS issues
       let profile = null;
       const startTime = Date.now();
       
       try {
         console.log('🔍 Fetching profile for user:', session.user.id);
         
-        const profileFetchPromise = supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        // Fetch profile through server API (bypasses RLS, faster for lawyers)
+        const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+        const profileFetchPromise = fetch(`${API_URL}/auth/me`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }).then(async (response) => {
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Profile fetch HTTP error:', response.status, errorText);
+            throw new Error(`Profile fetch failed: ${response.status}`);
+          }
+          const data = await response.json();
+          console.log('Profile data received:', data);
+          // The endpoint returns {success: true, user: {user: {...}, profile: {...}}}
+          // We want the profile data
+          const profileData = data.user?.profile || data.user;
+          return { data: profileData, error: null };
+        }).catch((error) => {
+          console.error('Profile fetch network error:', error);
+          throw error;
+        });
         
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Profile fetch timeout')), 30000) // 30 second timeout
+          setTimeout(() => reject(new Error('Profile fetch timeout')), 10000) // 10 second timeout
         );
         
         const { data: profileData, error } = await Promise.race([
@@ -234,38 +255,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
 
-      // ALWAYS check if user is deactivated - this takes priority over everything
-      if (profile && profile.account_status === 'deactivated') {
-        console.log('🔐 User is deactivated, checking current route');
-        // Only redirect if not already on deactivated page to prevent infinite loops
-        const currentRoute = window.location.pathname || '';
-        if (!currentRoute.includes('/deactivated')) {
-          console.log('🔐 Redirecting to deactivated page');
-          setIsLoading(false);
-          clearTimeout(timeoutId);
-          router.replace('/deactivated' as any);
-        } else {
-          console.log('🔐 Already on deactivated page, not redirecting');
-          setIsLoading(false);
-          clearTimeout(timeoutId);
+      // Check account status (banned/deactivated) - only redirect on initial sign-in
+      if (profile && shouldNavigate) {
+        // ALWAYS check if user is deactivated - this takes priority over everything
+        if (profile.account_status === 'deactivated') {
+          console.log('🔐 User is deactivated, checking current route');
+          // Only redirect if not already on deactivated page to prevent infinite loops
+          const currentRoute = window.location.pathname || '';
+          if (!currentRoute.includes('/deactivated')) {
+            console.log('🔐 Redirecting to deactivated page');
+            setIsLoading(false);
+            clearTimeout(timeoutId);
+            router.replace('/deactivated' as any);
+          } else {
+            console.log('🔐 Already on deactivated page, not redirecting');
+            setIsLoading(false);
+            clearTimeout(timeoutId);
+          }
+          return;
         }
-        return;
+
+        // Check if user is banned FIRST - this takes priority over everything
+        if (profile.account_status === 'banned') {
+          const currentRoute = window.location.pathname || '';
+          if (!currentRoute.includes('/banned')) {
+            setIsLoading(false);
+            clearTimeout(timeoutId);
+            router.replace('/banned' as any);
+          } else {
+            setIsLoading(false);
+            clearTimeout(timeoutId);
+          }
+          return;
+        }
       }
 
-      // Check if user is banned FIRST - this takes priority over everything
-      if (profile?.account_status === 'banned') {
-        const currentRoute = window.location.pathname || '';
-        if (!currentRoute.includes('/banned')) {
-          setIsLoading(false);
-          clearTimeout(timeoutId);
-          router.replace('/banned' as any);
-        } else {
-          setIsLoading(false);
-          clearTimeout(timeoutId);
-        }
-        return;
-      }
-
+      // Only navigate on initial sign-in, not on token refresh
       if (shouldNavigate && profile) {
         const suspensionStatus = await checkSuspensionStatus();
         if (suspensionStatus && suspensionStatus.isSuspended) {
@@ -282,16 +307,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (profile.pending_lawyer) {
           const redirectPath = `/lawyer-status/${applicationStatus || 'pending'}`;
+          console.log(`🚀 Navigating to: ${redirectPath} (pending lawyer)`);
           setIsLoading(false);
           clearTimeout(timeoutId);
           router.replace(redirectPath as any);
         } else {
           const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
+          console.log(`🚀 Navigating to: ${redirectPath} (role: ${profile.role})`);
           setIsLoading(false);
           clearTimeout(timeoutId);
           router.replace(redirectPath as any);
         }
       } else {
+        // Token refresh - just update state, don't navigate
+        console.log('🔄 Token refreshed, keeping user on current page');
         setIsLoading(false);
         clearTimeout(timeoutId);
       }
@@ -332,21 +361,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Listen for auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event: string, session: any) => {
+            const currentPath = window.location.pathname || '';
+            console.log(`🎯 Auth event: ${event}, current path: ${currentPath}`);
+
             if (event === 'SIGNED_IN' && session) {
-              await handleAuthStateChange(session, true);
+              // Only auto-navigate after sign-in when user is on the login/root page
+              const isOnLoginPage = currentPath === '/login' || currentPath === '/';
+              const shouldNavigate = isOnLoginPage;
+              console.log(`📍 SIGNED_IN event - shouldNavigate: ${shouldNavigate}`);
+              await handleAuthStateChange(session, shouldNavigate);
             } else if (event === 'TOKEN_REFRESHED' && session) {
+              console.log('📍 TOKEN_REFRESHED event - will NOT navigate');
               await handleAuthStateChange(session, false);
             } else if (event === 'SIGNED_OUT') {
+              console.log('📍 SIGNED_OUT event');
               // Clear auth state and redirect flag
               setAuthState({ session: null, user: null, supabaseUser: null });
               setHasRedirectedToStatus(false);
               setIsLoading(false);
               setIsSigningOut(false);
-              
+
               // Navigation is already handled by signOut function
               // This event handler just ensures state is cleared
             }
-            
+
             // Ensure loading is always set to false after auth state changes
             if (event !== 'SIGNED_OUT') {
               setIsLoading(false);

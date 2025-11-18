@@ -14,6 +14,16 @@ const createSupabaseClient = () => {
     return supabaseInstance;
   }
 
+  // Validate that we have the required credentials
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('❌ Missing Supabase credentials!');
+    console.error('URL:', supabaseUrl);
+    console.error('Key:', supabaseAnonKey ? 'Present' : 'Missing');
+    throw new Error('Supabase credentials not configured');
+  }
+
+  console.log('🔧 Creating Supabase client with URL:', supabaseUrl);
+
   supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       autoRefreshToken: true,
@@ -28,6 +38,8 @@ const createSupabaseClient = () => {
     global: {
       headers: {
         'X-Client-Info': 'ai-ttorney-app',
+        'apikey': supabaseAnonKey, // Explicitly set apikey header
+        'Authorization': `Bearer ${supabaseAnonKey}`, // Explicitly set Authorization header
       },
     },
     db: {
@@ -39,6 +51,8 @@ const createSupabaseClient = () => {
       },
     },
   });
+
+  console.log('✅ Supabase client created successfully');
 
   return supabaseInstance;
 };

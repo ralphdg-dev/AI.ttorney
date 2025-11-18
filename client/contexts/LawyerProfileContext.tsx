@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import { supabase } from '../config/supabase';
+import { NetworkConfig } from '../utils/networkConfig';
 import { useAuth } from './AuthContext';
 
 interface LawyerContactInfo {
@@ -37,7 +37,7 @@ const LawyerProfileContext = createContext<LawyerProfileContextType | undefined>
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export const LawyerProfileProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   
   const [profileData, setProfileData] = useState<LawyerProfileData>({
     contactInfo: null,
@@ -47,7 +47,7 @@ export const LawyerProfileProvider: React.FC<{ children: ReactNode }> = ({ child
   });
 
   const fetchProfileData = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id || !session?.access_token) return;
 
     // Check if cache is still valid
     const now = Date.now();
@@ -59,28 +59,38 @@ export const LawyerProfileProvider: React.FC<{ children: ReactNode }> = ({ child
     setProfileData(prev => ({ ...prev, isLoading: true }));
 
     try {
-      // Fetch both contact info and professional info in parallel
-      const [contactResult, professionalResult] = await Promise.all([
-        supabase
-          .from('lawyer_info')
-          .select('phone_number, location, bio, specialization, days, hours_available, accepting_consultations')
-          .eq('lawyer_id', user.id)
-          .single(),
-        supabase
-          .from('lawyer_applications')
-          .select('roll_number, roll_signing_date')
-          .eq('user_id', user.id)
-          .single(),
-      ]);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      console.log('🔍 Fetching lawyer profile from backend:', apiUrl);
 
-      const contactInfo: LawyerContactInfo = contactResult.data ? {
-        phone_number: contactResult.data.phone_number || '',
-        location: contactResult.data.location || '',
-        bio: contactResult.data.bio || '',
-        specializations: contactResult.data.specialization || '',
-        days: contactResult.data.days || '',
-        hours_available: contactResult.data.hours_available || '',
-        accepting_consultations: !!contactResult.data.accepting_consultations,
+      const response = await fetch(`${apiUrl}/api/lawyer/profile`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Backend lawyer profile error:', response.status, errorText);
+        throw new Error(`Failed to fetch lawyer profile: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Backend lawyer profile received:', result);
+
+      const data = result.data || {};
+      const lawyerInfo = data.lawyer_info || null;
+      const professionalRow = data.professional_info || null;
+
+      const contactInfo: LawyerContactInfo = lawyerInfo ? {
+        phone_number: lawyerInfo.phone_number || '',
+        location: lawyerInfo.location || '',
+        bio: lawyerInfo.bio || '',
+        specializations: lawyerInfo.specialization || '',
+        days: lawyerInfo.days || '',
+        hours_available: lawyerInfo.hours_available || '',
+        accepting_consultations: !!lawyerInfo.accepting_consultations,
       } : {
         phone_number: '',
         location: '',
@@ -91,9 +101,9 @@ export const LawyerProfileProvider: React.FC<{ children: ReactNode }> = ({ child
         accepting_consultations: false,
       };
 
-      const professionalInfo: ProfessionalInfo = professionalResult.data ? {
-        rollNumber: professionalResult.data.roll_number || '',
-        rollSigningDate: professionalResult.data.roll_signing_date || '',
+      const professionalInfo: ProfessionalInfo = professionalRow ? {
+        rollNumber: professionalRow.roll_number || '',
+        rollSigningDate: professionalRow.roll_signing_date || '',
       } : {
         rollNumber: '',
         rollSigningDate: '',
@@ -106,12 +116,12 @@ export const LawyerProfileProvider: React.FC<{ children: ReactNode }> = ({ child
         lastFetched: Date.now(),
       });
 
-      console.log('Lawyer profile data fetched and cached');
+      console.log('Lawyer profile data fetched from backend and cached');
     } catch (error) {
-      console.error('Error fetching lawyer profile data:', error);
+      console.error('Error fetching lawyer profile data via backend:', error);
       setProfileData(prev => ({ ...prev, isLoading: false }));
     }
-  }, [user?.id, profileData.lastFetched]);
+  }, [user?.id, session?.access_token, profileData.lastFetched]);
 
   const updateContactInfo = useCallback((info: Partial<LawyerContactInfo>) => {
     setProfileData(prev => ({
