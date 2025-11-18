@@ -1307,22 +1307,46 @@ export default function ChatbotScreen() {
             />
 
             {/* Show sources with URLs */}
-            {!isUser && item.sources && item.sources.length > 0 && (
-              <View
-                style={[
-                  tw`pt-2 mt-3 border-t`,
-                  { borderTopColor: Colors.border.light },
-                ]}
-              >
-                <Text
+            {!isUser && item.sources && item.sources.length > 0 && (() => {
+              // Filter sources to only show authoritative Philippine legal sources
+              const authoritativeDomains = [
+                'officialgazette.gov.ph',
+                'lawphil.net',
+                'sc.judiciary.gov.ph',
+                'elibrary.judiciary.gov.ph'
+              ];
+              
+              const filteredSources = item.sources.filter((source) => {
+                // Check if source_url contains any of the authoritative domains
+                if (source.source_url) {
+                  return authoritativeDomains.some(domain => 
+                    source.source_url!.toLowerCase().includes(domain)
+                  );
+                }
+                // Also check the 'law' field for these sources
+                const lawLower = source.law.toLowerCase();
+                return authoritativeDomains.some(domain => lawLower.includes(domain));
+              });
+              
+              // Only render if we have filtered sources
+              if (filteredSources.length === 0) return null;
+              
+              return (
+                <View
                   style={[
-                    tw`mb-2 text-sm font-bold`,
-                    { color: Colors.text.primary },
+                    tw`pt-2 mt-3 border-t`,
+                    { borderTopColor: Colors.border.light },
                   ]}
                 >
-                  Legal Sources
-                </Text>
-                {item.sources.map((source, idx) => (
+                  <Text
+                    style={[
+                      tw`mb-2 text-sm font-bold`,
+                      { color: Colors.text.primary },
+                    ]}
+                  >
+                    Legal Sources
+                  </Text>
+                  {filteredSources.map((source, idx) => (
                   <View
                     key={idx}
                     style={[
@@ -1393,8 +1417,9 @@ export default function ChatbotScreen() {
                     </View>
                   </View>
                 ))}
-              </View>
-            )}
+                </View>
+              );
+            })()}
 
             {/* Legal disclaimer */}
             {!isUser && item.legal_disclaimer && (

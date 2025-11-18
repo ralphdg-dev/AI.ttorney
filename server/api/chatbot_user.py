@@ -72,6 +72,9 @@ from services.violation_tracking_service import get_violation_tracking_service
 from services.prompt_injection_detector import get_prompt_injection_detector
 from models.violation_types import ViolationType
 
+# Import RAG utilities with web search
+from utils.rag_utils import retrieve_relevant_context_with_web_search
+
 # Import guest rate limiting (OpenAI/Anthropic security pattern)
 from middleware.guest_rate_limiter import GuestRateLimiter
 
@@ -3371,12 +3374,26 @@ async def ask_legal_question(
         
         # Vector search
         search_start = time.time()
-        print(f"\n🔍 [STEP 7] Qdrant vector search...")
+        print(f"\n🔍 [STEP 7] Enhanced RAG with web search...")
         print(f"   📡 Connecting to Qdrant Cloud...")
-        context, sources = retrieve_relevant_context(search_query, TOP_K_RESULTS)
+        context, sources, rag_metadata = retrieve_relevant_context_with_web_search(
+            question=search_query,
+            qdrant_client=qdrant_client,
+            openai_client=openai_client,
+            collection_name=COLLECTION_NAME,
+            embedding_model=EMBEDDING_MODEL,
+            top_k=TOP_K_RESULTS,
+            min_confidence_score=MIN_CONFIDENCE_SCORE,
+            enable_web_search=True  # Enable web search augmentation
+        )
         search_time = time.time() - search_start
-        print(f"⏱️  Qdrant search took: {search_time:.2f}s")
+        print(f"⏱️  Search took: {search_time:.2f}s")
         print(f"   Found {len(sources)} relevant sources")
+        
+        # Log RAG metadata
+        if rag_metadata.get("web_search_triggered"):
+            print(f"   🌐 Web search triggered: {rag_metadata['search_strategy']}")
+            print(f"   📊 Qdrant: {rag_metadata['qdrant_results']}, Web: {rag_metadata['web_results']}")
         
         # Check if we have sufficient context
         if not sources or len(sources) == 0:

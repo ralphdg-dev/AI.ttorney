@@ -56,7 +56,6 @@ from api.chatbot_lawyer import (
     is_complex_query,
     
     # Utility functions
-    retrieve_relevant_context,
     generate_ai_response,
     save_chat_interaction,
     # New roleplay detection & referral
@@ -72,6 +71,9 @@ from services.content_moderation_service import get_moderation_service
 from services.violation_tracking_service import get_violation_tracking_service
 from services.prompt_injection_detector import get_prompt_injection_detector
 from models.violation_types import ViolationType
+
+# Import RAG utilities with web search
+from utils.rag_utils import retrieve_relevant_context_with_web_search
 
 # Create router
 router = APIRouter(prefix="/api/chatbot/lawyer", tags=["Legal Practice & Research API - Streaming"])
@@ -514,8 +516,26 @@ async def ask_legal_question(
                         logger.error(f"Failed to save casual history: {e}")
                 return
             
-            # ===== VECTOR SEARCH =====
-            context, sources = retrieve_relevant_context(request.question, TOP_K_RESULTS)
+            # ===== ENHANCED RAG WITH WEB SEARCH =====
+            from api.chatbot_lawyer import (
+                qdrant_client, openai_client, COLLECTION_NAME, 
+                EMBEDDING_MODEL, MIN_CONFIDENCE_SCORE
+            )
+            
+            context, sources, rag_metadata = retrieve_relevant_context_with_web_search(
+                question=request.question,
+                qdrant_client=qdrant_client,
+                openai_client=openai_client,
+                collection_name=COLLECTION_NAME,
+                embedding_model=EMBEDDING_MODEL,
+                top_k=TOP_K_RESULTS,
+                min_confidence_score=MIN_CONFIDENCE_SCORE,
+                enable_web_search=True
+            )
+            
+            # Log RAG metadata
+            if rag_metadata.get("web_search_triggered"):
+                logger.info(f"🌐 Web search triggered (streaming): {rag_metadata['search_strategy']}")
             
             # Check if we have sufficient context
             if not sources or len(sources) == 0:

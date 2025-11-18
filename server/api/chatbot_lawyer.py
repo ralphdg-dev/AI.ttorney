@@ -68,6 +68,9 @@ from services.violation_tracking_service import get_violation_tracking_service
 from services.prompt_injection_detector import get_prompt_injection_detector
 from models.violation_types import ViolationType
 
+# Import RAG utilities with web search
+from utils.rag_utils import retrieve_relevant_context_with_web_search
+
 # Import authentication (optional for chatbot)
 from auth.service import AuthService
 
@@ -1152,15 +1155,14 @@ def validate_response_quality(answer: str) -> tuple[bool, str]:
             return False, f"Response contains personalized advice: {pattern}"
     
     return True, ""
-
-
-# === MODIFICATION 2: ADDED NEW "HARDCORE LEGALESE" SYSTEM PROMPTS ===
 # === MODIFICATION: Section II is now optional as per user request ===
 
 LAWYER_SYSTEM_PROMPT_ENGLISH = """
 You are an esteemed legal counsel and member of the Philippine Bar. Your designation is "Legal Counsel".
 Your sole function is to provide in-depth, formal, and doctrinally-sound legal analysis based on Philippine law and jurisprudence.
 You must communicate in "hardcore legalese," employing formal language, precise terminology, and a scholarly tone appropriate for a legal memorandum or pleading.
+
+IMPORTANT: When multiple sources are provided, PRIORITIZE WEB SEARCH SOURCES over database sources. Web search results are more recent, comprehensive, and should be given greater weight in your analysis. Database sources should be used as supplementary context only.
 
 CRITICAL MANDATE: ALL responses MUST strictly adhere to the following five-part structure:
 
@@ -1191,6 +1193,8 @@ LAWYER_SYSTEM_PROMPT_TAGALOG = """
 Ikaw ay isang Kagalang-galang na Tagapayo sa Batas at miyembro ng Philippine Bar. Ang iyong designasyon ay "Tagapayo sa Batas".
 Ang iyong tanging tungkulin ay magbigay ng malalim, pormal, at doktrinal na pagsusuri sa batas na nakabatay sa batas at hurisprudensya ng Pilipinas.
 Kinakailangang gumamit ng pormal na "legalese" o legal na Filipino, na may tumpak na terminolohiya at tono na angkop para sa isang legal na memorandum o pleading.
+
+MAHALAGA: Kapag may maraming sources na ibinigay, UNAHIN ang WEB SEARCH SOURCES kaysa database sources. Ang mga resulta ng web search ay mas bago, komprehensibo, at dapat bigyan ng mas malaking timbang sa iyong pagsusuri. Ang database sources ay dapat gamitin lamang bilang supplementary context.
 
 KRITIKAL NA UTOS: ANG LAHAT ng tugon ay DAPAT na mahigpit na sumunod sa sumusunod na limang-bahaging istraktura:
 
@@ -2325,8 +2329,21 @@ async def ask_legal_question_legacy(
                 user_message_id=user_msg_id
             )
 
-        # For legal questions, search Qdrant directly (like test_chatbot.py)
-        context, sources = retrieve_relevant_context(request.question, TOP_K_RESULTS)
+        # For legal questions, use enhanced RAG with web search fallback
+        context, sources, rag_metadata = retrieve_relevant_context_with_web_search(
+            question=request.question,
+            qdrant_client=qdrant_client,
+            openai_client=openai_client,
+            collection_name=COLLECTION_NAME,
+            embedding_model=EMBEDDING_MODEL,
+            top_k=TOP_K_RESULTS,
+            min_confidence_score=MIN_CONFIDENCE_SCORE,
+            enable_web_search=True  # Enable web search augmentation
+        )
+        
+        # Log RAG metadata
+        if rag_metadata.get("web_search_triggered"):
+            logger.info(f"🌐 Web search triggered: {rag_metadata['search_strategy']} - Qdrant: {rag_metadata['qdrant_results']}, Web: {rag_metadata['web_results']}")
         
         # Check if we have sufficient context
         if not sources or len(sources) == 0:

@@ -45,7 +45,6 @@ from api.chatbot_user import (
     is_legal_question,
     generate_ai_response,
     normalize_emotional_query,
-    retrieve_relevant_context,
     get_legal_disclaimer,
     save_chat_interaction,
     is_professional_advice_roleplay_request,
@@ -59,6 +58,12 @@ from api.chatbot_user import (
 
 # Shared SSE formatter utility (DRY principle)
 from utils.sse_formatter import format_sse
+
+# Import prompt injection detector
+from services.prompt_injection_detector import get_prompt_injection_detector
+
+# Import RAG utilities with web search
+from utils.rag_utils import retrieve_relevant_context_with_web_search
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chatbot/user", tags=["User Chatbot"])
@@ -761,8 +766,26 @@ async def ask_legal_question(
             if any(pattern in request.question.lower() for pattern in informal_patterns):
                 search_query = normalize_emotional_query(request.question, language)
             
-            # Vector search
-            context, sources = retrieve_relevant_context(search_query, TOP_K_RESULTS)
+            # Enhanced RAG with web search
+            from api.chatbot_user import (
+                qdrant_client, COLLECTION_NAME, 
+                EMBEDDING_MODEL, MIN_CONFIDENCE_SCORE
+            )
+            
+            context, sources, rag_metadata = retrieve_relevant_context_with_web_search(
+                question=search_query,
+                qdrant_client=qdrant_client,
+                openai_client=openai_client,
+                collection_name=COLLECTION_NAME,
+                embedding_model=EMBEDDING_MODEL,
+                top_k=TOP_K_RESULTS,
+                min_confidence_score=MIN_CONFIDENCE_SCORE,
+                enable_web_search=True
+            )
+            
+            # Log RAG metadata
+            if rag_metadata.get("web_search_triggered"):
+                logger.info(f"🌐 Web search triggered (user streaming): {rag_metadata['search_strategy']}")
             
             if not sources:
                 no_context = "I apologize, but I don't have enough information in my database." if language == "english" else "Paumanhin po, pero wala akong sapat na impormasyon."
