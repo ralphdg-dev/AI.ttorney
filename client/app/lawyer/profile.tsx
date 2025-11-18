@@ -32,6 +32,7 @@ import tw from "tailwind-react-native-classnames";
 import { useLawyerProfile, TimeSlot } from "../../services/lawyerProfileServices";
 import { supabase } from "../../config/supabase";
 import { useRouter } from "expo-router";
+import { useLawyerProfileContext } from "../../contexts/LawyerProfileContext";
 
 interface ProfileData {
   name: string;
@@ -330,81 +331,44 @@ const LawyerProfilePage: React.FC = () => {
     }
   };
 
+  // Use cached profile data from context
+  const { profileData: cachedProfile, fetchProfileData } = useLawyerProfileContext();
+
   const fetchLawyerContactInfo = useCallback(async () => {
     if (!user?.id) return;
 
+    // Use cached data if available
+    if (cachedProfile.contactInfo) {
+      console.log('Using cached lawyer contact info');
+      setIsAcceptingConsultations(cachedProfile.contactInfo.accepting_consultations);
+      setLawyerContactInfo(cachedProfile.contactInfo);
+      setIsLoading(false);
+      return;
+    }
+
+    // Otherwise fetch from context (which will fetch from DB if needed)
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from("lawyer_info")
-        .select(
-          "phone_number, location, bio, specialization, days, hours_available, accepting_consultations"
-        )
-        .eq("lawyer_id", user.id)
-        .single();
-
-      if (error) {
-        if (error.code === "PGRST116") {
-          console.log("No lawyer info found for user:", user.id);
-          setLawyerContactInfo({
-            phone_number: "",
-            location: "",
-            bio: "",
-            specializations: "",
-            days: "",
-            hours_available: "",
-          });
-        } else {
-          console.error("Error fetching lawyer contact info:", error);
-        }
-      } else if (data) {
-        setIsAcceptingConsultations(!!data.accepting_consultations);
-        setLawyerContactInfo({
-          phone_number: data.phone_number || "",
-          location: data.location || "",
-          bio: data.bio || "",
-          specializations: data.specialization || "",
-          days: data.days || "",
-          hours_available: data.hours_available || "",
-        });
-      }
+      await fetchProfileData();
     } catch (error) {
       console.error("Error in fetchLawyerContactInfo:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, cachedProfile.contactInfo, fetchProfileData]);
 
   const fetchProfessionalInfo = useCallback(async () => {
     if (!user?.id) return;
 
-    try {
-      const { data, error } = await supabase
-        .from("lawyer_applications")
-        .select("roll_number, roll_signing_date")
-        .eq("user_id", user.id)
-        .single();
-
-      if (error) {
-        if (error.code === "PGRST116") {
-          console.log("No professional info found for user:", user.id);
-          setProfessionalInfo({
-            rollNumber: "",
-            rollSigningDate: "",
-          });
-        } else {
-          console.error("Error fetching professional info:", error);
-        }
-      } else if (data) {
-        setProfessionalInfo({
-          rollNumber: data.roll_number || "",
-          rollSigningDate: data.roll_signing_date || "",
-        });
-      }
-    } catch (error) {
-      console.error("Error in fetchProfessionalInfo:", error);
+    // Use cached data if available
+    if (cachedProfile.professionalInfo) {
+      console.log('Using cached professional info');
+      setProfessionalInfo(cachedProfile.professionalInfo);
+      return;
     }
-  }, [user?.id]);
+
+    // Otherwise it will be fetched by fetchProfileData
+  }, [user?.id, cachedProfile.professionalInfo]);
 
   const saveProfessionalInfo = async (
     rollNumber: string,
@@ -497,6 +461,17 @@ const LawyerProfilePage: React.FC = () => {
       setIsLoading(false);
     }
   }, [user, fetchLawyerContactInfo, fetchProfessionalInfo, refreshUserData]);
+
+  // Sync cached data with local state instantly
+  useEffect(() => {
+    if (cachedProfile.contactInfo) {
+      setLawyerContactInfo(cachedProfile.contactInfo);
+      setIsAcceptingConsultations(cachedProfile.contactInfo.accepting_consultations);
+    }
+    if (cachedProfile.professionalInfo) {
+      setProfessionalInfo(cachedProfile.professionalInfo);
+    }
+  }, [cachedProfile.contactInfo, cachedProfile.professionalInfo]);
 
   useEffect(() => {
     if (user && isInitialLoad) {
