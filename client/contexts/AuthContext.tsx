@@ -3,6 +3,7 @@ import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, clearAuthStorage } from '../config/supabase';
 import { router } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
+import { useToast, Toast, ToastTitle, ToastDescription } from '../components/ui/toast';
 
 // Role hierarchy based on backend schema
 export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
@@ -64,6 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [initialAuthCheck, setInitialAuthCheck] = useState(false);
   const [hasRedirectedToStatus, setHasRedirectedToStatus] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const toast = useToast();
 
 
   const checkSuspensionStatus = React.useCallback(async (): Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null } | null> => {
@@ -146,8 +148,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleAuthStateChange = React.useCallback(async (session: any, shouldNavigate: boolean = true) => {
     const timeoutId = setTimeout(() => {
       console.warn('Auth timeout');
+      toast.show({
+        placement: 'top',
+        render: ({ id }) => {
+          return (
+            <Toast nativeID={id} action="warning" variant="solid">
+              <ToastTitle>Authentication Timeout</ToastTitle>
+              <ToastDescription>
+                Sign in is taking longer than expected. Please check your connection and try again.
+              </ToastDescription>
+            </Toast>
+          );
+        },
+      });
       setIsLoading(false);
-    }, 5000);
+    }, 15000);
     
     try {
       if (!session) {
