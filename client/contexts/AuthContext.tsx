@@ -172,20 +172,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // Get user profile from database
+      // Get user profile from database with timeout protection
       let profile = null;
+      const startTime = Date.now();
       
       try {
+        console.log('🔍 Fetching profile for user:', session.user.id);
         
-        const { data: profileData, error } = await supabase
+        const profileFetchPromise = supabase
           .from('users')
           .select('*')
           .eq('id', session.user.id)
           .single();
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Profile fetch timeout')), 30000) // 30 second timeout
+        );
+        
+        const { data: profileData, error } = await Promise.race([
+          profileFetchPromise,
+          timeoutPromise
+        ]) as any;
+        
+        const fetchTime = Date.now() - startTime;
+        console.log(`✅ Profile fetch completed in ${fetchTime}ms`);
 
         if (error) {
-          console.error('Profile fetch failed:', error);
-          await supabase.auth.signOut();
+          console.error('❌ Profile fetch failed:', error);
+          console.error('Error details:', JSON.stringify(error, null, 2));
+          
+          // Force complete sign out with storage clearing
+          await clearAuthStorage();
+          await supabase.auth.signOut({ scope: 'local' });
           setAuthState({ session: null, user: null, supabaseUser: null });
           setIsLoading(false);
           clearTimeout(timeoutId);
@@ -200,15 +218,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           supabaseUser: session.user,
         });
 
-      } catch (dbError) {
-        console.error('Profile fetch failed:', dbError);
-        setAuthState({
-          session,
-          user: null,
-          supabaseUser: session.user,
-        });
+      } catch (dbError: any) {
+        const fetchTime = Date.now() - startTime;
+        console.error('❌ Profile fetch exception after', fetchTime, 'ms:', dbError);
+        console.error('Exception details:', JSON.stringify(dbError, null, 2));
+        
+        // Force complete sign out on timeout
+        await clearAuthStorage();
+        await supabase.auth.signOut({ scope: 'local' });
+        setAuthState({ session: null, user: null, supabaseUser: null });
         setIsLoading(false);
         clearTimeout(timeoutId);
+        router.replace('/login');
         return;
       }
 

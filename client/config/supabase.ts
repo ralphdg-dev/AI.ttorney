@@ -25,6 +25,19 @@ const createSupabaseClient = () => {
       // Disable automatic email confirmation - we use custom OTP system
       flowType: 'pkce',
     },
+    global: {
+      headers: {
+        'X-Client-Info': 'ai-ttorney-app',
+      },
+    },
+    db: {
+      schema: 'public',
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
+      },
+    },
   });
 
   return supabaseInstance;
