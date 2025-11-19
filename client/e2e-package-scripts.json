@@ -1,0 +1,25 @@
+{
+  "scripts": {
+    "e2e:setup": "detox build --configuration android.emu.debug",
+    "e2e:test": "./e2e/run-tests.sh",
+    "e2e:test:login": "TEST_SUITE=login ./e2e/run-tests.sh",
+    "e2e:test:registration": "TEST_SUITE=registration ./e2e/run-tests.sh",
+    "e2e:test:device": "ANDROID_DEVICE=attached ./e2e/run-tests.sh",
+    "e2e:build:android": "detox build --configuration android.emu.debug",
+    "e2e:test:android": "detox test --configuration android.emu.debug",
+    "e2e:test:android:device": "detox test --configuration android.att.debug",
+    "e2e:clean": "detox clean-framework-cache && detox build --configuration android.emu.debug",
+    "e2e:report": "open ./e2e/test-reports/all-features-test-report.html",
+    "e2e:report:login": "open ./e2e/test-reports/login-test-report.html",
+    "e2e:report:registration": "open ./e2e/test-reports/registration-test-report.html",
+    "e2e:report:all": "open ./e2e/test-reports/login-test-report.html && open ./e2e/test-reports/registration-test-report.html"
+  },
+  "devDependencies": {
+    "detox": "^20.13.0",
+    "@types/detox": "^18.1.0",
+    "jest": "^29.7.0",
+    "jest-html-reporters": "^3.1.5",
+    "jest-junit": "^16.0.0",
+    "jest-sonar-reporter": "^2.0.0"
+  }
+}

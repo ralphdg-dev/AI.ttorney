@@ -1,5 +1,12 @@
 {
   "dependencies": {
     "react-native-svg": "^15.15.0"
+  },
+  "devDependencies": {
+    "@types/detox": "^17.14.3",
+    "detox": "^20.46.0",
+    "jest": "^30.2.0",
+    "jest-html-reporters": "^3.1.7",
+    "jest-junit": "^16.0.0"
   }
 }
