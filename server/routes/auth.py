@@ -122,6 +122,44 @@ async def check_username_exists(request: ValidationRequest):
         raise HTTPException(status_code=500, detail=result["error"])
     return {"exists": result["exists"]}
 
+@router.post("/check-email-exists")
+async def check_email_exists(request: Dict[str, str] = Body(...)):
+    """Check if email exists in database for password reset validation"""
+    try:
+        email = request.get("email")
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email is required"
+            )
+        
+        # Check if user exists in database
+        supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+        user_check = supabase.table('users').select('id').eq('email', email).execute()
+        logger.info(f"🔍 Email existence check for: {email}")
+        logger.info(f"🔍 User check result: {user_check.data}")
+        
+        if not user_check.data or len(user_check.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No account found with this email address. Please check your email or sign up for a new account."
+            )
+        
+        return {
+            "success": True,
+            "message": "Email found in database",
+            "exists": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Check email exists error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to verify email"
+        )
+
 @router.post("/forgot-password")
 async def forgot_password(request: Dict[str, str] = Body(...)):
     """Send OTP for password reset - only to registered users"""
@@ -204,7 +242,23 @@ async def send_otp(request: SendOTPRequest):
         if request.otp_type == "email_verification":
             result = await otp_service.send_verification_otp(request.email, request.user_name)
         elif request.otp_type == "password_reset":
-            result = await otp_service.send_password_reset_otp(request.email, request.user_name)
+            # Check if user exists in database before sending password reset OTP
+            supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+            user_check = supabase.table('users').select('id, full_name').eq('email', request.email).execute()
+            logger.info(f"🔍 Password reset OTP request for email: {request.email}")
+            logger.info(f"🔍 User check result: {user_check.data}")
+            
+            if not user_check.data or len(user_check.data) == 0:
+                # Return success message but don't send OTP (prevents enumeration)
+                return OTPResponse(
+                    success=True,
+                    message="If the email exists, a reset code has been sent.",
+                    expires_in_minutes=10
+                )
+            
+            # User exists, send OTP
+            user_name = user_check.data[0].get('full_name', request.user_name or 'User')
+            result = await otp_service.send_password_reset_otp(request.email, user_name)
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -250,6 +304,19 @@ async def verify_reset_otp(request: Dict[str, str] = Body(...)):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email and OTP code are required"
+            )
+        
+        # Check if user exists in database before verifying OTP
+        supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+        user_check = supabase.table('users').select('id').eq('email', email).execute()
+        logger.info(f"🔍 DEBUG: User existence check for email: {email}")
+        logger.info(f"🔍 DEBUG: User check result: {user_check.data}")
+        
+        if not user_check.data or len(user_check.data) == 0:
+            logger.warning(f"🔍 DEBUG: OTP verification attempted for non-existent user: {email}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid email or OTP code"
             )
         
         # Verify OTP for password reset
@@ -453,6 +520,20 @@ async def reset_password_with_token(request: Dict[str, str] = Body(...)):
 async def verify_otp(request: VerifyOTPRequest):
     """Verify OTP code"""
     try:
+        # For password reset OTPs, check if user exists in database
+        if request.otp_type == "password_reset":
+            supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+            user_check = supabase.table('users').select('id').eq('email', request.email).execute()
+            logger.info(f"🔍 DEBUG: User existence check for password reset OTP - email: {request.email}")
+            logger.info(f"🔍 DEBUG: User check result: {user_check.data}")
+            
+            if not user_check.data or len(user_check.data) == 0:
+                logger.warning(f"🔍 DEBUG: Password reset OTP verification attempted for non-existent user: {request.email}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid email or OTP code"
+                )
+        
         result = await otp_service.verify_otp(
             request.email,
             request.otp_code,

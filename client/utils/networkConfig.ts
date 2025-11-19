@@ -117,9 +117,19 @@ export class NetworkConfig {
    * This is needed when CLAT46 addresses are detected
    */
   private static getLocalNetworkIP(): string {
-    // Based on server logs, we know the server is accessible at 172.20.10.2
-    // This is the IP that the server is receiving requests from
-    return '172.20.10.2';
+    // Try multiple common network IPs for Android emulator/device access
+    // These are ordered by likelihood of success
+    const fallbackIPs = [
+      '172.20.10.2',  // Common WiFi network IP
+      '192.168.1.100', // Common home network IP
+      '10.0.2.2',     // Android emulator host IP
+      '192.168.0.100', // Alternative home network IP
+      'localhost'     // Final fallback
+    ];
+    
+    // For now, return the first one, but this could be enhanced
+    // to test connectivity to each IP and return the working one
+    return fallbackIPs[0];
   }
 
   /**

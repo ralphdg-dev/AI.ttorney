@@ -91,11 +91,42 @@ export default function ForgotPassword() {
     setError('');
 
     try {
+      // First, check if the email exists in the database
+      const emailCheckResult = await apiClient.checkEmailExistsForPasswordReset(email);
+      
+      if (emailCheckResult.error) {
+        // Email doesn't exist - show error toast
+        toast.show({
+          placement: 'top',
+          duration: 4000,
+          render: ({ id }) => (
+            <Toast nativeID={id} action="error" variant="solid">
+              <ToastTitle>Email Not Found</ToastTitle>
+              <ToastDescription>No account found with this email address. Please check your email or sign up for a new account.</ToastDescription>
+            </Toast>
+          ),
+        });
+        setError('No account found with this email address. Please check your email or sign up for a new account.');
+        return;
+      }
+
+      // Email exists, proceed to send OTP
       const result = await apiClient.sendPasswordResetOTP(email);
       
       if (result.error) {
         setError(result.error);
       } else {
+        // Show success toast
+        toast.show({
+          placement: 'top',
+          duration: 3000,
+          render: ({ id }) => (
+            <Toast nativeID={id} action="success" variant="solid">
+              <ToastTitle>Reset Code Sent</ToastTitle>
+              <ToastDescription>A password reset code has been sent to your email address.</ToastDescription>
+            </Toast>
+          ),
+        });
         setCurrentStep('otp');
         setResendTimer(120);
         setCanResend(false);
@@ -207,6 +238,24 @@ export default function ForgotPassword() {
     setCanResend(false);
     
     try {
+      // Check if email still exists before resending
+      const emailCheckResult = await apiClient.checkEmailExistsForPasswordReset(email);
+      
+      if (emailCheckResult.error) {
+        toast.show({
+          placement: 'top',
+          duration: 4000,
+          render: ({ id }) => (
+            <Toast nativeID={id} action="error" variant="solid">
+              <ToastTitle>Email Not Found</ToastTitle>
+              <ToastDescription>No account found with this email address. Please check your email or sign up for a new account.</ToastDescription>
+            </Toast>
+          ),
+        });
+        setCanResend(true);
+        return;
+      }
+
       const requestPromise = apiClient.sendPasswordResetOTP(email);
       resendRequestRef.current = requestPromise;
       const result = await requestPromise;
@@ -224,7 +273,16 @@ export default function ForgotPassword() {
       setIsLockedOut(false);
       setLockoutTimer(0);
 
-      Alert.alert("Code Sent", "A new verification code has been sent to your email.");
+      toast.show({
+        placement: 'top',
+        duration: 3000,
+        render: ({ id }) => (
+          <Toast nativeID={id} action="success" variant="solid">
+            <ToastTitle>Code Resent</ToastTitle>
+            <ToastDescription>A new verification code has been sent to your email.</ToastDescription>
+          </Toast>
+        ),
+      });
       
       setTimeout(() => {
         inputRefs.current[0]?.focus();

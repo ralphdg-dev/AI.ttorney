@@ -13,6 +13,10 @@ interface ApiResponse<T = any> {
 }
 
 class ApiClient {
+  private retryCount = 0;
+  private readonly maxRetries = 3;
+  private readonly retryDelay = 1000; // 1 second
+
   private async getBaseUrl(): Promise<string> {
     // Use unified network configuration for both dev and prod
     // NetworkConfig will choose the correct URL based on environment
@@ -30,19 +34,25 @@ class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retryAttempt: number = 0
   ): Promise<ApiResponse<T>> {
     try {
       const baseUrl = await this.getBaseUrl();
       const headers = await this.getAuthHeaders();
       const fullUrl = `${baseUrl}${endpoint}`;
       
-      console.log(`🌐 API Request: ${options.method || 'GET'} ${fullUrl}`);
-      console.log(`🔗 Base URL: ${baseUrl}`);
+      if (retryAttempt === 0) {
+        console.log(`🌐 API Request: ${options.method || 'GET'} ${fullUrl}`);
+        console.log(`🔗 Base URL: ${baseUrl}`);
+      } else {
+        console.log(`🔄 Retry attempt ${retryAttempt}/${this.maxRetries}: ${options.method || 'GET'} ${fullUrl}`);
+      }
       
-      // Create a timeout promise
+      // Create a timeout promise with longer timeout for retries
+      const timeoutDuration = retryAttempt > 0 ? 15000 : 10000; // 15s for retries, 10s for first attempt
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout after 10 seconds')), 10000);
+        setTimeout(() => reject(new Error(`Request timeout after ${timeoutDuration / 1000} seconds`)), timeoutDuration);
       });
       
       const fetchPromise = fetch(fullUrl, {
@@ -102,22 +112,52 @@ class ApiClient {
       console.log('🔍 DEBUG: Success response:', successResponse);
       return successResponse;
     } catch (error) {
+      const isNetworkError = error instanceof Error && (
+        error.message.includes('Network request failed') ||
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('timeout') ||
+        error.name === 'TypeError'
+      );
+
+      // Retry logic for network errors
+      if (isNetworkError && retryAttempt < this.maxRetries) {
+        console.warn(`⚠️ Network error on attempt ${retryAttempt + 1}, retrying in ${this.retryDelay}ms...`);
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, this.retryDelay * (retryAttempt + 1)));
+        
+        // Clear network cache and try again
+        NetworkConfig.clearCache();
+        return this.request<T>(endpoint, options, retryAttempt + 1);
+      }
+
       console.error('🚨 API request failed:', error);
       console.error('🚨 Error details:', {
         name: error instanceof Error ? error.name : 'Unknown',
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
+        retryAttempt,
+        endpoint,
       });
       
       let errorMessage = 'Network request failed';
       if (error instanceof Error) {
         if (error.message.includes('timeout')) {
-          errorMessage = 'Request timed out. Please check your internet connection.';
-        } else if (error.message.includes('Network request failed')) {
-          errorMessage = 'Cannot connect to server. Please check if the server is running and your network connection.';
+          errorMessage = retryAttempt > 0 
+            ? `Request timed out after ${retryAttempt + 1} attempts. Please check your internet connection.`
+            : 'Request timed out. Please check your internet connection.';
+        } else if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+          errorMessage = retryAttempt > 0
+            ? `Cannot connect to server after ${retryAttempt + 1} attempts. Please check if the server is running and your network connection.`
+            : 'Cannot connect to server. Please check if the server is running and your network connection.';
         } else {
           errorMessage = error.message;
         }
+      }
+      
+      // Add network diagnostics for debugging
+      if (__DEV__ && isNetworkError) {
+        console.log('🔍 Network Diagnostics:', NetworkConfig.getNetworkInfo());
       }
       
       return { error: errorMessage, success: false };
@@ -193,6 +233,13 @@ class ApiClient {
     return this.request('/auth/check-email', {
       method: 'POST',
       body: JSON.stringify({ value: email }),
+    });
+  }
+
+  async checkEmailExistsForPasswordReset(email: string): Promise<ApiResponse> {
+    return this.request('/auth/check-email-exists', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
     });
   }
 
@@ -293,6 +340,42 @@ class ApiClient {
   // Health check
   async healthCheck(): Promise<ApiResponse> {
     return this.request('/health');
+  }
+
+  // Network diagnostics and testing
+  async testNetworkConnection(): Promise<ApiResponse> {
+    try {
+      console.log('🔍 Starting network diagnostics...');
+      const networkTest = await NetworkConfig.testConnection();
+      
+      if (networkTest.success) {
+        console.log('✅ Network test passed');
+        return {
+          success: true,
+          message: 'Network connection is working',
+          data: networkTest
+        };
+      } else {
+        console.log('❌ Network test failed:', networkTest.error);
+        return {
+          success: false,
+          error: `Network test failed: ${networkTest.error}`,
+          data: networkTest
+        };
+      }
+    } catch (error) {
+      console.error('🚨 Network diagnostics failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Network diagnostics failed'
+      };
+    }
+  }
+
+  // Force refresh network connection
+  async refreshNetworkConnection(): Promise<string> {
+    console.log('🔄 Refreshing network connection...');
+    return await NetworkConfig.refreshConnection();
   }
 
   // Forum endpoints
