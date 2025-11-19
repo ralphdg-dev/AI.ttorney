@@ -714,7 +714,7 @@ export default function UserRegistration() {
         <View className="items-center mt-4">
           <Text className="text-gray-500">
             Already have an account?{' '}
-            <Text style={[tw`font-bold`, { color: Colors.primary.blue }]} onPress={() => router.push('/login')}>Sign In</Text>
+            <Text style={[{ fontWeight: 'bold' }, { color: Colors.primary.blue }]} onPress={() => router.push('/login')}>Sign In</Text>
           </Text>
         </View>
         </View>

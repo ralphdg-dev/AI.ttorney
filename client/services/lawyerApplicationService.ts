@@ -445,8 +445,8 @@ class LawyerApplicationService {
       const token = await this.getAuthToken();
       console.log('🔧 Auth token obtained:', token ? 'YES' : 'NO');
       
-      // Use simple direct fetch with localhost for web
-      const apiUrl = 'http://localhost:8000';
+      // Use NetworkConfig for proper API URL
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const url = `${apiUrl}/api/lawyer-applications/me`;
       console.log('🔧 Making direct fetch to:', url);
       
@@ -719,8 +719,8 @@ class LawyerApplicationService {
       const token = await this.getAuthToken();
       console.log('🔧 Auth token obtained:', token ? 'YES' : 'NO');
       
-      // Use simple direct fetch with localhost for web
-      const apiUrl = 'http://localhost:8000';
+      // Use NetworkConfig for proper API URL
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const url = `${apiUrl}/api/lawyer-applications/acknowledge-rejection`;
       console.log('🔧 Making direct fetch to:', url);
       

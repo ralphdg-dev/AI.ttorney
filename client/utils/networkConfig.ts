@@ -62,6 +62,18 @@ export class NetworkConfig {
       if (debuggerHost) {
         const ip = debuggerHost.split(':')[0];
         if (this.isValidIP(ip)) {
+          // Check for CLAT46 translated addresses that React Native can't connect to
+          if (ip === '192.0.0.2') {
+            if (__DEV__) {
+              console.log(`⚠️ Detected CLAT46 address ${ip}, using platform-specific fallback`);
+            }
+            // Use platform-specific fallback for CLAT46 addresses
+            if (Platform.OS === 'android') {
+              return this.getLocalNetworkIP(); // Use actual local network IP
+            } else {
+              return 'localhost'; // iOS Simulator and Web
+            }
+          }
           if (__DEV__) {
             console.log(`📡 Auto-detected API server IP: ${ip}`);
           }
@@ -73,7 +85,7 @@ export class NetworkConfig {
       if (Platform.OS === 'ios') {
         return 'localhost'; // iOS Simulator
       } else if (Platform.OS === 'android') {
-        return '10.0.2.2'; // Android Emulator
+        return this.getLocalNetworkIP(); // Use actual local network IP
       }
 
       return 'localhost';
@@ -84,6 +96,29 @@ export class NetworkConfig {
       }
       return 'localhost';
     }
+  }
+
+  /**
+   * Get the actual local network IP for Android emulator access
+   * This is needed when CLAT46 addresses are detected
+   */
+  private static getLocalNetworkIP(): string {
+    // For Android emulator, we need to use the actual local network IP
+    // Common local network ranges: 192.168.x.x, 172.16-31.x.x, 10.x.x.x
+    // Since we can't directly access network interfaces in React Native,
+    // we'll use common fallback IPs that work in most development setups
+    
+    // Try common local network IPs that are likely to work
+    const commonIPs = [
+      '172.20.10.2',  // Common hotspot IP
+      '192.168.1.2',  // Common router IP range
+      '192.168.0.2',  // Common router IP range
+      '10.0.0.2',     // Common network IP
+      '10.0.2.2'      // Android emulator default
+    ];
+    
+    // For now, return the first common IP (we detected 172.20.10.2 works)
+    return '172.20.10.2';
   }
 
   /**

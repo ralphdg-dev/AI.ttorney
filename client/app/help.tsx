@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import axios from "axios";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { NetworkConfig } from "../utils/networkConfig";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../constants/Colors";
 import Header from "@/components/Header";
@@ -277,8 +278,9 @@ export default function HelpAndSupport() {
 
     try {
       // Send email in the background
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await axios.post(
-        "http://localhost:8000/api/support/email",
+        `${apiUrl}/api/support/email`,
         {
           name: emailName,
           email: emailAddress,

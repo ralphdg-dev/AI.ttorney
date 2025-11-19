@@ -4,6 +4,7 @@ import { supabase, clearAuthStorage } from '../config/supabase';
 import { router } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
 import { useToast, Toast, ToastTitle, ToastDescription } from '../components/ui/toast';
+import { NetworkConfig } from '../utils/networkConfig';
 
 // Role hierarchy based on backend schema
 export type UserRole = 'guest' | 'registered_user' | 'verified_lawyer' | 'admin' | 'superadmin';
@@ -182,7 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('🔍 Fetching profile for user:', session.user.id);
         
         // Fetch profile through server API (bypasses RLS, faster for lawyers)
-        const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+        const API_URL = await NetworkConfig.getBestApiUrl();
         const profileFetchPromise = fetch(`${API_URL}/auth/me`, {
           method: 'GET',
           headers: {
