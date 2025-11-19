@@ -31,7 +31,22 @@ class SafetyFilter:
     - Veiled threats
     - Sexual harassment (regardless of polite tone)
     - Abuse of any kind
+    
+    IMPORTANT: Legal context awareness to prevent false positives on legitimate
+    legal questions about criminal cases, VAWC, relationships, etc.
     """
+    
+    # Legal context indicators (legitimate legal questions)
+    LEGAL_CONTEXT_INDICATORS = [
+        "criminal complaint", "filed a case", "violation of", "republic act",
+        "anti-vawc", "vawc", "criminal liability", "criminally liable",
+        "legal question", "law", "article", "code", "statute",
+        "trial", "court", "judge", "lawyer", "attorney",
+        "plaintiff", "defendant", "accused", "complainant",
+        "evidence", "testimony", "witness", "case", "lawsuit",
+        "legal advice", "legal rights", "legal remedies",
+        "demanda", "kaso", "batas", "korte", "abogado"
+    ]
     
     # CHILD SAFETY - ZERO TOLERANCE
     CHILD_KEYWORDS = [
@@ -101,13 +116,31 @@ class SafetyFilter:
         self.compiled_threats = [re.compile(p, re.IGNORECASE) for p in self.THREAT_PATTERNS]
         logger.info("✅ Safety filter initialized (ZERO TOLERANCE mode)")
     
+    def _is_legal_context(self, text: str) -> bool:
+        """
+        Check if text appears to be a legitimate legal question.
+        Returns True if legal context indicators are present.
+        """
+        text_lower = text.lower()
+        return any(
+            indicator in text_lower
+            for indicator in self.LEGAL_CONTEXT_INDICATORS
+        )
+    
     def check_child_safety(self, text: str) -> Tuple[bool, List[str]]:
         """
         Check for ANY combination of child + sexual context.
         ZERO TOLERANCE - even subtle implications are flagged.
+        
+        EXCEPTION: Legitimate legal questions about child abuse cases are allowed.
         """
         text_lower = text.lower()
         violations = []
+        
+        # Check if this is a legitimate legal question
+        if self._is_legal_context(text):
+            # Allow legal questions about child-related cases
+            return False, []
         
         # Check if text mentions children
         has_child_mention = any(
@@ -144,8 +177,17 @@ class SafetyFilter:
         return False, []
     
     def check_harassment(self, text: str) -> Tuple[bool, List[str]]:
-        """Check for sexual harassment (regardless of polite tone)."""
+        """
+        Check for sexual harassment (regardless of polite tone).
+        
+        EXCEPTION: Legitimate legal questions about harassment cases are allowed.
+        """
         violations = []
+        
+        # Check if this is a legitimate legal question
+        if self._is_legal_context(text):
+            # Allow legal questions about harassment cases
+            return False, []
         
         for pattern in self.compiled_harassment:
             if pattern.search(text):
@@ -168,9 +210,18 @@ class SafetyFilter:
         return False, []
     
     def check_abuse(self, text: str) -> Tuple[bool, List[str]]:
-        """Check for abuse indicators."""
+        """
+        Check for abuse indicators.
+        
+        EXCEPTION: Legitimate legal questions about abuse cases are allowed.
+        """
         text_lower = text.lower()
         violations = []
+        
+        # Check if this is a legitimate legal question
+        if self._is_legal_context(text):
+            # Allow legal questions about abuse cases
+            return False, []
         
         abuse_count = sum(
             1 for keyword in self.ABUSE_KEYWORDS

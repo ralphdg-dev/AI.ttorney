@@ -1409,11 +1409,6 @@ export default function ChatbotScreen() {
                           </Text>
                         </TouchableOpacity>
                       )}
-                      <Text
-                        style={[tw`text-xs`, { color: Colors.text.tertiary }]}
-                      >
-                        Relevance: {(source.relevance_score * 100).toFixed(0)}%
-                      </Text>
                     </View>
                   </View>
                 ))}
