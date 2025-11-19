@@ -1,0 +1,168 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - complementary [ref=e5]:
+    - button "Collapse sidebar" [ref=e6] [cursor=pointer]:
+      - img [ref=e7]
+    - generic [ref=e10]:
+      - img "avatar" [ref=e11]
+      - generic [ref=e12]:
+        - paragraph [ref=e13]: superadmin
+        - paragraph [ref=e14]: Ryo Bigol
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - paragraph [ref=e18]: MAIN
+        - button "Dashboard" [ref=e20] [cursor=pointer]:
+          - img [ref=e21]
+          - generic [ref=e24]: Dashboard
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - button "Users" [ref=e27] [cursor=pointer]:
+              - generic [ref=e28]:
+                - img [ref=e29]
+                - generic [ref=e34]: Users
+              - img [ref=e36]
+            - generic [ref=e38]:
+              - button "Manage Legal Seekers" [ref=e39] [cursor=pointer]
+              - button "Manage Lawyers" [ref=e40] [cursor=pointer]
+              - button "Lawyer Applications" [active] [ref=e41] [cursor=pointer]
+              - button "Suspended Accounts" [ref=e42] [cursor=pointer]
+          - button "Admin" [ref=e44] [cursor=pointer]:
+            - generic [ref=e45]:
+              - img [ref=e46]
+              - generic [ref=e48]: Admin
+            - img [ref=e50]
+          - button "Legal Resources" [ref=e53] [cursor=pointer]:
+            - generic [ref=e54]:
+              - img [ref=e55]
+              - generic [ref=e58]: Legal Resources
+            - img [ref=e60]
+          - button "Forum" [ref=e63] [cursor=pointer]:
+            - generic [ref=e64]:
+              - img [ref=e65]
+              - generic [ref=e67]: Forum
+            - img [ref=e69]
+          - button "Report Tickets" [ref=e72] [cursor=pointer]:
+            - generic [ref=e73]:
+              - img [ref=e74]
+              - generic [ref=e79]: Report Tickets
+            - img [ref=e81]
+          - button "Analytics" [ref=e84] [cursor=pointer]:
+            - generic [ref=e85]:
+              - img [ref=e86]
+              - generic [ref=e91]: Analytics
+            - img [ref=e93]
+      - generic [ref=e96]:
+        - paragraph
+        - button "Settings" [ref=e98] [cursor=pointer]:
+          - img [ref=e99]
+          - generic [ref=e102]: Settings
+    - generic [ref=e103]:
+      - button "Help" [ref=e104] [cursor=pointer]:
+        - img [ref=e105]
+        - generic [ref=e109]: Help
+      - button "Logout" [ref=e110] [cursor=pointer]:
+        - img [ref=e111]
+        - generic [ref=e115]: Logout
+  - generic [ref=e116]:
+    - banner [ref=e117]:
+      - navigation "Breadcrumb" [ref=e118]:
+        - img [ref=e119]
+        - list [ref=e124]:
+          - listitem [ref=e125]:
+            - generic [ref=e126]: Users
+            - generic [ref=e127]: /
+          - listitem [ref=e128]:
+            - generic [ref=e129]: Lawyer Applications
+    - main [ref=e134]:
+      - generic [ref=e135]:
+        - generic [ref=e137]:
+          - img [ref=e139]
+          - generic [ref=e144]:
+            - heading "Manage Lawyer Applications" [level=2] [ref=e145]
+            - paragraph [ref=e146]: Review and approve or reject lawyer applications.
+        - generic [ref=e150]:
+          - generic [ref=e152]:
+            - img [ref=e153]
+            - textbox "Search..." [ref=e156]
+          - generic [ref=e157]:
+            - button "Filter applications" [ref=e159] [cursor=pointer]:
+              - img [ref=e161]
+              - generic [ref=e163]: Active
+              - img [ref=e164]
+            - button "Sort by" [ref=e167] [cursor=pointer]:
+              - img [ref=e169]
+              - generic [ref=e174]: Newest
+              - img [ref=e175]
+        - table [ref=e179]:
+          - rowgroup [ref=e180]:
+            - row "Full Name Email Username Roll Number Roll Sign Date Application Prior Status Current Status Approval Actions" [ref=e181]:
+              - cell "Full Name" [ref=e182]:
+                - button "Full Name" [ref=e183] [cursor=pointer]:
+                  - generic [ref=e184]: Full Name
+              - cell "Email" [ref=e186]:
+                - button "Email" [ref=e187] [cursor=pointer]:
+                  - generic [ref=e188]: Email
+              - cell "Username" [ref=e190]:
+                - button "Username" [ref=e191] [cursor=pointer]:
+                  - generic [ref=e192]: Username
+              - cell "Roll Number" [ref=e194]:
+                - button "Roll Number" [ref=e195] [cursor=pointer]:
+                  - generic [ref=e196]: Roll Number
+              - cell "Roll Sign Date" [ref=e198]:
+                - button "Roll Sign Date" [ref=e199] [cursor=pointer]:
+                  - generic [ref=e200]: Roll Sign Date
+              - cell "Application" [ref=e202]
+              - cell "Prior Status" [ref=e203]
+              - cell "Current Status" [ref=e204]:
+                - button "Current Status" [ref=e205] [cursor=pointer]:
+                  - generic [ref=e206]: Current Status
+              - cell "Approval" [ref=e208]
+              - cell "Actions" [ref=e209]
+          - rowgroup [ref=e210]:
+            - row "Joaquin Angeles joaquinmiguel17.ja@gmail.com j24angele 2312000 Not Found Dec 31, 2025 2nd Attempt Accepted Pending Approve Request Resubmission Reject View Edit Archive" [ref=e211]:
+              - cell "Joaquin Angeles" [ref=e212]
+              - cell "joaquinmiguel17.ja@gmail.com" [ref=e213]
+              - cell "j24angele" [ref=e214]
+              - cell "2312000 Not Found" [ref=e215]:
+                - generic [ref=e216]:
+                  - generic [ref=e217]: "2312000"
+                  - generic "Roll number not found in PRA records" [ref=e218]:
+                    - generic [ref=e219]:
+                      - img [ref=e220]
+                      - generic [ref=e224]: Not Found
+              - cell "Dec 31, 2025" [ref=e225]
+              - cell "2nd Attempt" [ref=e226]:
+                - generic [ref=e227]: 2nd Attempt
+              - cell "Accepted" [ref=e228]:
+                - generic [ref=e229]: Accepted
+              - cell "Pending" [ref=e230]:
+                - generic [ref=e231]: Pending
+              - cell "Approve Request Resubmission Reject" [ref=e232]:
+                - generic [ref=e233]:
+                  - button "Approve" [ref=e235] [cursor=pointer]:
+                    - img [ref=e236]
+                  - button "Request Resubmission" [ref=e239] [cursor=pointer]:
+                    - img [ref=e240]
+                  - button "Reject" [ref=e244] [cursor=pointer]:
+                    - img [ref=e245]
+              - cell "View Edit Archive" [ref=e248]:
+                - generic [ref=e249]:
+                  - button "View" [ref=e251] [cursor=pointer]:
+                    - img [ref=e252]
+                  - button "Edit" [ref=e256] [cursor=pointer]:
+                    - img [ref=e257]
+                  - button "Archive" [ref=e261] [cursor=pointer]:
+                    - img [ref=e262]
+        - generic [ref=e266]:
+          - generic [ref=e267]: Showing 1 to 1 of 1 applications
+          - generic [ref=e268]:
+            - button "Previous" [disabled] [ref=e269]:
+              - img [ref=e270]
+              - text: Previous
+            - button "1" [ref=e273] [cursor=pointer]
+            - button "Next" [disabled] [ref=e274]:
+              - text: Next
+              - img [ref=e275]
+```

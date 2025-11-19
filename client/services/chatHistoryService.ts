@@ -1,0 +1,448 @@
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NetworkConfig } from '../utils/networkConfig';
+
+export interface ChatMessage {
+  id: string;
+  text: string;
+  fromUser: boolean;
+  timestamp: string;
+  sources?: any[];
+  confidence?: string;
+  language?: string;
+  legal_disclaimer?: string;
+  fallback_suggestions?: any[];
+  normalized_query?: string;
+  is_complex_query?: boolean;
+  role?: string;
+  content?: string;
+  metadata?: Record<string, any>;
+  tokens_used?: number;
+  response_time_ms?: number;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  last_message_at: string;
+  message_count: number;
+  preview?: string;
+  is_archived?: boolean;
+  language?: string;
+}
+
+const CURRENT_CONVERSATION_KEY = '@current_conversation_id';
+const ACTIVE_CONVERSATIONS_KEY = '@active_conversations';
+const CONVERSATIONS_CACHE_KEY = '@conversations_cache';
+const CACHE_DURATION = 30000; // 30 seconds cache
+
+/**
+ * Chat History Service
+ * Manages conversation persistence using session-based backend API
+ * Includes caching for optimized performance
+ */
+export class ChatHistoryService {
+  private static conversationsCache: { data: Conversation[]; timestamp: number } | null = null;
+  
+  private static async getHeaders(token?: string): Promise<Record<string, string>> {
+    // Try provided token first
+    if (token) {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+    }
+    
+    // Fallback to AsyncStorage token
+    try {
+      const storedToken = await AsyncStorage.getItem('access_token');
+      if (storedToken) {
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${storedToken}`
+        };
+      }
+    } catch (error) {
+      console.warn('Failed to get token from AsyncStorage:', error);
+    }
+    
+    return {
+      'Content-Type': 'application/json'
+    };
+  }
+  
+  static async getCurrentConversationId(userId?: string): Promise<string | null> {
+    try {
+      const key = userId ? `${CURRENT_CONVERSATION_KEY}_${userId}` : CURRENT_CONVERSATION_KEY;
+      const conversationId = await AsyncStorage.getItem(key);
+      
+      // Return null if no current conversation - let the UI create a new one
+      return conversationId;
+    } catch (error) {
+      console.error('Error getting conversation ID:', error);
+      return null;
+    }
+  }
+  
+  static async setCurrentConversationId(conversationId: string, userId?: string): Promise<void> {
+    try {
+      const key = userId ? `${CURRENT_CONVERSATION_KEY}_${userId}` : CURRENT_CONVERSATION_KEY;
+      await AsyncStorage.setItem(key, conversationId);
+      console.log('💾 Stored current conversation ID:', conversationId);
+    } catch (error) {
+      console.error('Error setting conversation ID:', error);
+    }
+  }
+
+  static async startNewConversation(userId?: string, title: string = 'New Conversation', token?: string): Promise<string> {
+    try {
+      console.log('✨ Creating new conversation for user:', userId);
+      const startTime = Date.now();
+      
+      // Create a new session via the backend API
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const headers = await this.getHeaders(token);
+      const response = await axios.post(
+        `${apiUrl}/api/chat-history/sessions`,
+        { title, language: 'en' },
+        { headers, timeout: 3000 } // 3 second timeout
+      );
+
+      const sessionId = response.data.id;
+      const createTime = Date.now() - startTime;
+      console.log(`✅ New session created in ${createTime}ms:`, sessionId);
+      
+      // Invalidate cache to force refresh
+      this.conversationsCache = null;
+      
+      // Store the new session ID as current
+      const key = userId ? `${CURRENT_CONVERSATION_KEY}_${userId}` : CURRENT_CONVERSATION_KEY;
+      await AsyncStorage.setItem(key, sessionId);
+      console.log('💾 Stored session ID in local storage');
+      
+      return sessionId;
+    } catch (error: any) {
+      console.error('❌ Error starting new conversation:', error.message);
+      if (error.code === 'ECONNABORTED') {
+        console.error('   Request timed out after 3 seconds');
+      }
+      if (error.response) {
+        console.error('   Status:', error.response.status);
+        console.error('   Data:', error.response.data);
+      }
+      throw error;
+    }
+  }
+
+  static async saveMessage(
+    message: ChatMessage,
+    conversationId: string,
+    userId?: string,
+    token?: string
+  ): Promise<boolean> {
+    try {
+      // Messages are now saved automatically by the backend
+      // This method is kept for backward compatibility
+      await this.updateConversationMetadata(conversationId, message, userId, token);
+      return true;
+    } catch (error) {
+      console.error('Error saving message:', error);
+      return false;
+    }
+  }
+
+  static async loadConversation(
+    conversationId: string,
+    userId?: string,
+    token?: string
+  ): Promise<ChatMessage[]> {
+    try {
+      console.log('📡 ChatHistoryService.loadConversation called');
+      console.log('   Conversation ID:', conversationId);
+      const startTime = Date.now();
+      
+      // Validate that conversationId is a UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(conversationId)) {
+        console.warn('❌ Invalid conversation ID format (not a UUID):', conversationId);
+        // Clear the invalid ID from storage
+        const key = userId ? `${CURRENT_CONVERSATION_KEY}_${userId}` : CURRENT_CONVERSATION_KEY;
+        await AsyncStorage.removeItem(key);
+        return [];
+      }
+
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const headers = await this.getHeaders(token);
+      const url = `${apiUrl}/api/chat-history/sessions/${conversationId}`;
+      
+      const response = await axios.get(url, { 
+        headers,
+        timeout: 15000 // 15 second timeout - conversations can have many messages
+      });
+      
+      const loadTime = Date.now() - startTime;
+      console.log(`⚡ Conversation loaded in ${loadTime}ms`);
+
+      if (response.data && response.data.messages) {
+        const messages = response.data.messages.map((msg: any) => ({
+          id: msg.id,
+          text: msg.content,
+          fromUser: msg.role === 'user',
+          timestamp: msg.created_at,
+          sources: msg.metadata?.sources,
+          confidence: msg.metadata?.confidence,
+          language: msg.metadata?.language,
+          role: msg.role,
+          content: msg.content,
+          metadata: msg.metadata,
+          tokens_used: msg.tokens_used,
+          response_time_ms: msg.response_time_ms
+        }));
+        
+        console.log('✅ Transformed', messages.length, 'messages');
+        return messages;
+      }
+
+      console.warn('⚠️  No messages in response');
+      return [];
+    } catch (error: any) {
+      console.error('❌ Error loading conversation:', error.message);
+      if (error.code === 'ECONNABORTED') {
+        console.error('   Request timed out after 3 seconds');
+      }
+      if (error.response) {
+        console.error('   Status:', error.response.status);
+      }
+      // Clear invalid conversation ID
+      const key = userId ? `${CURRENT_CONVERSATION_KEY}_${userId}` : CURRENT_CONVERSATION_KEY;
+      await AsyncStorage.removeItem(key);
+      return [];
+    }
+  }
+
+  static async getConversationsList(userId?: string, includeArchived: boolean = false, token?: string, forceRefresh: boolean = false): Promise<Conversation[]> {
+    try {
+      // Check cache first (only for non-archived requests)
+      if (!includeArchived && !forceRefresh && this.conversationsCache) {
+        const cacheAge = Date.now() - this.conversationsCache.timestamp;
+        if (cacheAge < CACHE_DURATION) {
+          console.log('⚡ Using cached conversations (age:', Math.round(cacheAge / 1000), 'seconds)');
+          return this.conversationsCache.data;
+        }
+      }
+
+      console.log('📜 Fetching conversations list for user:', userId);
+      const startTime = Date.now();
+      const headers = await this.getHeaders(token);
+      
+      // Optimized request with reasonable timeout and page size
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await axios.get(
+        `${apiUrl}/api/chat-history/sessions`,
+        { 
+          headers,
+          params: { 
+            include_archived: includeArchived, 
+            page: 1, 
+            page_size: 50, // Reduced for faster response
+            sort: 'updated_at', // Ensure most recent first
+            order: 'desc'
+          },
+          timeout: 10000 // 10 second timeout - reasonable for fetching list
+        }
+      );
+
+      const loadTime = Date.now() - startTime;
+      console.log(`⚡ API response time: ${loadTime}ms`);
+
+      if (response.data && response.data.sessions) {
+        const conversations = response.data.sessions;
+        console.log('✅ Loaded', conversations.length, 'conversations in', loadTime, 'ms');
+        
+        // Cache the result (only for non-archived requests)
+        if (!includeArchived) {
+          this.conversationsCache = {
+            data: conversations,
+            timestamp: Date.now()
+          };
+        }
+        
+        return conversations;
+      }
+      
+      console.warn('⚠️  No sessions in response');
+      return [];
+    } catch (error: any) {
+      const loadTime = Date.now() - (error.config?.metadata?.startTime || Date.now());
+      console.error(`❌ Error getting conversations list (${loadTime}ms):`, error.message);
+      
+      if (error.code === 'ECONNABORTED') {
+        console.error('   Request timed out after 3 seconds');
+      }
+      
+      if (error.response) {
+        console.error('   Status:', error.response.status);
+        console.error('   Data:', error.response.data);
+      }
+      
+      // Return cached data if available, even if stale
+      if (this.conversationsCache && !includeArchived) {
+        console.log('⚠️  Returning stale cache due to error');
+        return this.conversationsCache.data;
+      }
+      
+      // Return empty array on error - let UI handle gracefully
+      return [];
+    }
+  }
+
+  static async deleteConversation(conversationId: string, userId?: string, token?: string): Promise<boolean> {
+    try {
+      console.log('🗑️ Deleting conversation:', conversationId);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const headers = await this.getHeaders(token);
+      
+      const response = await axios.delete(
+        `${apiUrl}/api/chat-history/sessions/${conversationId}`,
+        { headers }
+      );
+      
+      console.log('✅ Delete response:', response.data);
+      
+      // Invalidate cache
+      this.conversationsCache = null;
+      
+      // Clear from local storage if it's the current conversation
+      const key = userId ? `${CURRENT_CONVERSATION_KEY}_${userId}` : CURRENT_CONVERSATION_KEY;
+      const currentId = await AsyncStorage.getItem(key);
+      if (currentId === conversationId) {
+        await AsyncStorage.removeItem(key);
+        console.log('🧹 Cleared current conversation from storage');
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error('❌ Error deleting conversation:', error);
+      if (error.response) {
+        console.error('   Status:', error.response.status);
+        console.error('   Data:', error.response.data);
+      }
+      return false;
+    }
+  }
+  
+  static async archiveConversation(conversationId: string, token?: string): Promise<boolean> {
+    try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const headers = await this.getHeaders(token);
+      await axios.post(
+        `${apiUrl}/api/chat-history/sessions/${conversationId}/archive`,
+        {},
+        { headers }
+      );
+      
+      // Invalidate cache
+      this.conversationsCache = null;
+      
+      return true;
+    } catch (error) {
+      console.error('Error archiving conversation:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Manually clear the conversations cache
+   * Useful for force refresh scenarios
+   */
+  static clearCache(): void {
+    console.log('🧹 Clearing conversations cache');
+    this.conversationsCache = null;
+  }
+  
+  static async updateConversationTitle(conversationId: string, title: string, token?: string): Promise<boolean> {
+    try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const headers = await this.getHeaders(token);
+      await axios.patch(
+        `${apiUrl}/api/chat-history/sessions/${conversationId}`,
+        { title },
+        { headers, timeout: 5000 }
+      );
+      
+      // Invalidate cache to force refresh
+      this.conversationsCache = null;
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating conversation title:', error);
+      return false;
+    }
+  }
+
+  private static generateConversationId(): string {
+    return `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private static async updateActiveConversationsList(
+    conversationId: string,
+    userId?: string,
+    token?: string
+  ): Promise<void> {
+    try {
+      const conversations = await this.getConversationsList(userId, false, token);
+      
+      const exists = conversations.find(c => c.id === conversationId);
+      if (exists) return;
+
+      const newConversation: Conversation = {
+        id: conversationId,
+        title: 'New Chat',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        last_message_at: new Date().toISOString(),
+        message_count: 0,
+        preview: '',
+      };
+
+      conversations.unshift(newConversation);
+      
+      const key = userId ? `${ACTIVE_CONVERSATIONS_KEY}_${userId}` : ACTIVE_CONVERSATIONS_KEY;
+      await AsyncStorage.setItem(key, JSON.stringify(conversations.slice(0, 50)));
+    } catch (error) {
+      console.error('Error updating conversations list:', error);
+    }
+  }
+
+  private static async updateConversationMetadata(
+    conversationId: string,
+    message: ChatMessage,
+    userId?: string,
+    token?: string
+  ): Promise<void> {
+    try {
+      const conversations = await this.getConversationsList(userId, false, token);
+      const index = conversations.findIndex(c => c.id === conversationId);
+
+      if (index !== -1) {
+        conversations[index].updated_at = new Date().toISOString();
+        conversations[index].message_count += 1;
+        
+        if (message.fromUser && conversations[index].title === 'New Chat') {
+          conversations[index].title = message.text.substring(0, 50);
+        }
+        
+        if (!message.fromUser) {
+          conversations[index].preview = message.text.substring(0, 100);
+        }
+
+        const key = userId ? `${ACTIVE_CONVERSATIONS_KEY}_${userId}` : ACTIVE_CONVERSATIONS_KEY;
+        await AsyncStorage.setItem(key, JSON.stringify(conversations));
+      }
+    } catch (error) {
+      console.error('Error updating conversation metadata:', error);
+    }
+  }
+}

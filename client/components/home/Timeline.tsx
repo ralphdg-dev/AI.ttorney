@@ -1,0 +1,875 @@
+import React, { useState, useEffect, useCallback, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
+
+import { View, FlatList, RefreshControl, TouchableOpacity, Animated, StyleSheet, ListRenderItem } from 'react-native';
+import { NetworkConfig } from '../../utils/networkConfig';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { Plus } from 'lucide-react-native';
+import Post from './Post';
+import { useAuth } from '../../contexts/AuthContext';
+import { useForumCache } from '../../contexts/ForumCacheContext';
+import Colors from '../../constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
+import { useList } from '@/hooks/useOptimizedList';
+import { SkeletonList } from '@/components/ui/SkeletonLoader';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { Text } from '@/components/ui/text';
+
+interface PostData {
+  id: string;
+  user: {
+    name: string;
+    username: string;
+    avatar: string;
+    isLawyer?: boolean;
+    lawyerBadge?: string;
+    account_status?: string;
+  };
+  timestamp: string;
+  category: string;
+  content: string;
+  comments: number;
+  // For optimistic posts
+  isOptimistic?: boolean;
+  animatedOpacity?: Animated.Value;
+  isLoading?: boolean;
+  isBookmarked?: boolean;
+  // Additional data for ViewPost caching
+  body?: string;
+  domain?: string;
+  created_at?: string;
+  user_id?: string;
+  is_anonymous?: boolean;
+  is_flagged?: boolean;
+  users?: any;
+  // For pagination animation
+  isNewlyLoaded?: boolean;
+  loadedIndex?: number;
+}
+
+interface TimelineProps {
+  context?: 'user' | 'lawyer';
+}
+
+export interface TimelineHandle {
+  scrollToTop: () => void;
+}
+
+const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }, ref) => {
+
+  const router = useRouter();
+  const { session, isAuthenticated, user: currentUser } = useAuth();
+  const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
+  const [posts, setPosts] = useState<PostData[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [optimisticPosts, setOptimisticPosts] = useState<PostData[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Refs for optimization
+  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isComponentMounted = useRef(true);
+  const loadingMoreRef = useRef(false);
+  const refreshingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const listRef = useRef<FlatList>(null);
+
+  useImperativeHandle(ref, () => ({
+    scrollToTop: () => {
+      try {
+        listRef.current?.scrollToOffset?.({ offset: 0, animated: true });
+      } catch {}
+    },
+  }), []);
+
+  // Force cache refresh to fix any lingering references
+  React.useEffect(() => {
+    // This ensures any old references are cleared
+  }, []);
+
+
+  const mapApiToPost = useCallback((row: any): PostData => {
+    const isAnon = !!row?.is_anonymous;
+    const created = row?.created_at || '';
+    const userData = row?.users || {};
+
+    // Map replies data if available
+    const replies = row?.replies || row?.forum_replies || [];
+    const mappedReplies = replies.map((reply: any) => {
+      const isReplyAnon = !!reply?.is_anonymous;
+      const replyUserData = reply?.users || {};
+
+      return {
+        id: String(reply?.id || ''),
+        body: reply?.reply_body || reply?.body || '',
+        created_at: reply?.created_at || null,
+        user_id: reply?.user_id || null,
+        is_anonymous: isReplyAnon,
+        is_flagged: !!reply?.is_flagged,
+        user: isReplyAnon ? undefined : {
+          name: replyUserData?.full_name || replyUserData?.username || 'User',
+          username: replyUserData?.username || 'user',
+          avatar: 'https://cdn-icons-png.flaticon.com/512/847/847969.png',
+          isLawyer: replyUserData?.role === 'verified_lawyer',
+          lawyerBadge: replyUserData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+          account_status: replyUserData?.account_status,
+        },
+      };
+    });
+
+    const postData: PostData = {
+      id: String(row?.id ?? ''),
+      user: isAnon
+        ? { name: 'Anonymous User', username: 'anonymous', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png' } // Detective icon for anonymous users
+        : { 
+            name: userData?.full_name || userData?.username || 'User', 
+            username: userData?.username || 'user', 
+            avatar: userData?.photo_url || userData?.profile_photo || undefined,
+            isLawyer: userData?.role === 'verified_lawyer',
+            lawyerBadge: userData?.role === 'verified_lawyer' ? 'Verified' : undefined,
+            account_status: userData?.account_status,
+          },
+      timestamp: created || '',
+      category: row?.category || 'Others',
+      content: row?.body || '',
+      comments: mappedReplies.length,
+      isBookmarked: !!row?.is_bookmarked,
+      // Additional data for ViewPost caching
+      body: row?.body || '',
+      domain: row?.category || 'others',
+      created_at: row?.created_at || null,
+      user_id: row?.user_id || null,
+      is_anonymous: isAnon,
+      is_flagged: !!row?.is_flagged,
+      users: userData,
+    };
+
+    // Cache the complete post (with or without comments) for instant ViewPost loading
+    const postWithComments = {
+      ...postData,
+      replies: mappedReplies,
+      commentsLoaded: true,
+      commentsTimestamp: Date.now()
+    };
+
+    // Use setCachedPost to cache the complete post
+    setCachedPost(postData.id, postWithComments as any);
+
+    if (__DEV__) {
+      console.log(`Cached post ${postData.id} with ${mappedReplies.length} comments from Timeline`);
+    }
+
+    return postData;
+  }, [setCachedPost]);
+
+  // Remove complex batching - bookmark status now comes from API
+
+  // Optimized auth headers helper with minimal logging
+  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
+    try {
+      // First try to get token from AuthContext session
+      if (session?.access_token) {
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        };
+      }
+
+      // Fallback to AsyncStorage
+      const token = await AsyncStorage.getItem('access_token');
+      if (token) {
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        };
+      }
+
+      if (__DEV__) console.warn('Timeline: No authentication token available');
+      return { 'Content-Type': 'application/json' };
+    } catch (error) {
+      if (__DEV__) console.error('Timeline auth error:', error);
+      return { 'Content-Type': 'application/json' };
+    }
+  }, [session?.access_token]);
+
+  // Optimized loadPosts with retry logic and better error handling
+  const loadPosts = useCallback(async (force = false, retryCount = 0) => {
+    const MAX_RETRIES = 2;
+    
+    // Check cache first (only for initial load)
+    if (!force && isCacheValid()) {
+      const cachedPosts = getCachedPosts();
+      if (cachedPosts && cachedPosts.length > 0) {
+        if (__DEV__) console.log('Timeline: Using cached posts, skipping fetch');
+        setPosts(cachedPosts);
+        setInitialLoading(false);
+        setError(null);
+        return;
+      }
+    }
+
+    // Close any open dropdown menus when refreshing
+    setOpenMenuPostId(null);
+
+    if (!isAuthenticated) {
+      if (__DEV__) console.warn('Timeline: User not authenticated, clearing posts');
+      setPosts([]);
+      setRefreshing(false);
+      setInitialLoading(false);
+      setLoadingMore(false);
+      setError(null);
+      return;
+    }
+
+    // Set loading state before making request
+    if (retryCount === 0) {
+      setRefreshing(true);
+      refreshingRef.current = true;
+    }
+    setCurrentPage(0);
+    setHasMore(false);
+    hasMoreRef.current = false;
+
+    const now = Date.now();
+    setLastFetchTime(now);
+
+    try {
+      const headers = await getAuthHeaders();
+      const API_BASE_URL = await NetworkConfig.getBestApiUrl();
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+
+      if (__DEV__) {
+        console.log(`Timeline: Fetching posts (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (response.status === 403) {
+          if (__DEV__) console.error('Timeline: Authentication failed - 403 Forbidden');
+          // Don't clear posts on auth error, just show error message
+          setError('Authentication required. Please log in again.');
+          return;
+        }
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      let mapped: PostData[] = [];
+
+      if (__DEV__) {
+        console.log('Timeline: Raw API response:', {
+          success: data?.success,
+          dataLength: Array.isArray(data?.data) ? data.data.length : 'not array',
+        });
+      }
+
+      if (Array.isArray(data?.data)) {
+        mapped = data.data.map(mapApiToPost);
+      } else if (Array.isArray(data)) {
+        mapped = data.map(mapApiToPost);
+      } else {
+        if (__DEV__) console.warn('Timeline: Unexpected response format', data);
+      }
+
+      if (__DEV__) {
+        console.log(`Timeline: Successfully mapped ${mapped.length} posts`);
+      }
+
+      // Only update if component is still mounted
+      if (isComponentMounted.current) {
+        setPosts(mapped);
+        setCachedPosts(mapped);
+        setCurrentPage(0);
+        setHasMore(false);
+        hasMoreRef.current = false;
+        setError(null);
+
+        if (mapped.length === 0 && __DEV__) {
+          console.log('Timeline: No posts available');
+        }
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        if (__DEV__) console.warn('Timeline: Request timeout');
+        // Retry on timeout
+        if (retryCount < MAX_RETRIES && isComponentMounted.current) {
+          if (__DEV__) console.log(`Timeline: Retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+          setTimeout(() => loadPosts(force, retryCount + 1), 1000 * (retryCount + 1));
+          return;
+        }
+      }
+
+      const errorMessage = error.message || 'Failed to load posts';
+      if (__DEV__) console.error('Timeline load error:', errorMessage);
+
+      if (isComponentMounted.current) {
+        // Only show error if we have no posts to display
+        if (posts.length === 0) {
+          setError(errorMessage);
+        }
+        
+        // Retry on network errors
+        if (retryCount < MAX_RETRIES && posts.length === 0) {
+          if (__DEV__) console.log(`Timeline: Retrying after error... (${retryCount + 1}/${MAX_RETRIES})`);
+          setTimeout(() => loadPosts(force, retryCount + 1), 2000 * (retryCount + 1));
+          return;
+        }
+      }
+    } finally {
+      if (isComponentMounted.current) {
+        setRefreshing(false);
+        refreshingRef.current = false;
+        setInitialLoading(false);
+        setLoadingMore(false);
+        loadingMoreRef.current = false;
+      }
+    }
+  }, [isAuthenticated, getAuthHeaders, mapApiToPost, isCacheValid, getCachedPosts, setCachedPosts, setLastFetchTime, posts.length]);
+
+  // Track if we've loaded before to prevent unnecessary reloads
+  const hasInitialLoadRef = useRef(false);
+
+  // Initial load with cache check
+  useEffect(() => {
+    if (isComponentMounted.current && !hasInitialLoadRef.current) {
+      loadPosts();
+      hasInitialLoadRef.current = true;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Refresh posts when screen comes into focus (e.g., returning from CreatePost)
+  const hasFocusedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      // Only refresh on focus if cache is invalid AND we've already loaded once
+      // This prevents overwriting paginated posts with cached first page
+      if (!hasFocusedOnce.current) {
+        hasFocusedOnce.current = true;
+        if (__DEV__) console.log('📱 Timeline: First focus, skipping refresh');
+        return;
+      }
+
+      // Check if we have valid cached data
+      if (isCacheValid()) {
+        if (__DEV__) console.log('📱 Timeline: Screen focused, cache valid - using cached data');
+        const cachedPosts = getCachedPosts();
+        if (cachedPosts && cachedPosts.length > 0) {
+          setPosts(cachedPosts);
+          setInitialLoading(false);
+        }
+      } else {
+        if (__DEV__) console.log('📱 Timeline: Screen focused, cache invalid - refreshing');
+        loadPosts(true); // Force refresh
+      }
+    }, [loadPosts, isCacheValid, getCachedPosts])
+  );
+
+  // Remove duplicate useFocusEffect - already handled above
+
+  // Optimized polling with smart intervals (only when component is active)
+  useEffect(() => {
+    // Clear any existing timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    const scheduleNextFetch = () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+
+      fetchTimeoutRef.current = setTimeout(() => {
+        if (isComponentMounted.current && isAuthenticated) {
+          // Only poll if the component is still mounted and user is on the page
+          loadPosts();
+          scheduleNextFetch(); // Schedule next fetch
+        }
+      }, 120000); // 2 minutes - much less aggressive
+    };
+
+    if (isAuthenticated) {
+      scheduleNextFetch();
+    }
+
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
+      }
+    };
+  }, [isAuthenticated, loadPosts]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isComponentMounted.current = false;
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      if (loadMoreTimeoutRef.current) {
+        clearTimeout(loadMoreTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Optimized event handlers with minimal logging
+  const handleCommentPress = useCallback((postId: string) => {
+    const route = context === 'lawyer' ? `/lawyer/ViewPost?postId=${postId}` : `/home/ViewPost?postId=${postId}`;
+    router.push(route as any);
+  }, [context, router]);
+
+  const handleBookmarkPress = useCallback((postId: string) => {
+    // The Post component handles the actual bookmark logic
+    if (__DEV__) console.log('Bookmark toggled:', postId);
+  }, []);
+
+  const handleBookmarkStatusChange = useCallback((postId: string, isBookmarked: boolean) => {
+    // Update the post in the posts array directly
+    setPosts(prev => prev.map(post => 
+      post.id === postId ? { ...post, isBookmarked } : post
+    ));
+    // Also update the cache
+    updatePostBookmark(postId, isBookmarked);
+  }, [updatePostBookmark]);
+
+  const handleReportPress = useCallback((postId: string) => {
+    // The Post component handles the actual report logic
+    if (__DEV__) console.log('Report submitted:', postId);
+  }, []);
+
+  const handleMenuToggle = useCallback((postId: string) => {
+    setOpenMenuPostId(prev => prev === postId ? null : postId);
+  }, []);
+
+  const handlePostPress = useCallback((postId: string) => {
+    // Prefetch the post before navigation for instant loading
+    prefetchPost(postId);
+
+    const route = context === 'lawyer' ? `/lawyer/ViewPost?postId=${postId}` : `/home/ViewPost?postId=${postId}`;
+    router.push(route as any);
+  }, [context, router, prefetchPost]);
+
+  // Manual refresh handler
+  const handleRefresh = useCallback(() => {
+    if (__DEV__) console.log('Timeline: Manual refresh triggered');
+    loadPosts(true); // Force refresh
+  }, [loadPosts]);
+
+  // Load more handler for infinite scrolling with debouncing
+  const loadMoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleLoadMore = useCallback(() => {
+    // Clear any pending load more calls
+    if (loadMoreTimeoutRef.current) {
+      clearTimeout(loadMoreTimeoutRef.current);
+    }
+
+    // Debounce the load more call to prevent rapid firing
+    loadMoreTimeoutRef.current = setTimeout(() => {
+      // Use refs to check current state and prevent stale closures
+      if (loadingMoreRef.current) {
+        if (__DEV__) console.log('Timeline: Already loading more, skipping');
+        return;
+      }
+
+      if (refreshingRef.current) {
+        if (__DEV__) console.log('Timeline: Currently refreshing, skipping load more');
+        return;
+      }
+
+      if (!hasMoreRef.current) {
+        if (__DEV__) console.log('Timeline: No more posts to load');
+        return;
+      }
+
+
+      if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage, hasMore: hasMoreRef.current });
+      loadPosts(false); // Don't force refresh
+    }, 300); // 300ms debounce
+  }, [loadPosts, currentPage]);
+
+  const handleCreatePost = useCallback(() => {
+    const route = context === 'lawyer' ? '/lawyer/CreatePost' : '/home/CreatePost';
+    router.push(route as any);
+  }, [context, router]);
+
+  // Function to add optimistic post
+  const addOptimisticPost = useCallback((postData: { body: string; category?: string; is_anonymous?: boolean }) => {
+    const animatedOpacity = new Animated.Value(0); // Start completely transparent
+
+    // Get current user info for optimistic post
+    const userName = currentUser?.full_name || currentUser?.username || currentUser?.email || 'You';
+    const userUsername = currentUser?.username || currentUser?.email?.split('@')[0] || 'you';
+    const isLawyer = currentUser?.role === 'verified_lawyer';
+
+    const optimisticPost: PostData = {
+      id: `optimistic-${Date.now()}`,
+      user: postData.is_anonymous 
+        ? { name: 'Anonymous User', username: 'anonymous', avatar: 'https://cdn-icons-png.flaticon.com/512/1077/1077114.png' } // Detective icon for anonymous posts
+        : { 
+            name: userName,
+            username: userUsername,
+            avatar: (currentUser as any)?.photo_url || (currentUser as any)?.profile_photo || undefined,
+            isLawyer: isLawyer,
+            lawyerBadge: isLawyer ? 'Verified' : undefined
+          },
+      timestamp: 'now',
+      created_at: new Date().toISOString(),
+      category: postData.category || 'Others',
+      content: postData.body,
+      comments: 0,
+      isOptimistic: true,
+      isLoading: true, // Add loading state for Facebook-style indicator
+      animatedOpacity,
+    };
+
+    setOptimisticPosts(prev => [optimisticPost, ...prev]);
+
+    // Smooth fade in animation
+    Animated.timing(animatedOpacity, {
+      toValue: 0.7, // Semi-transparent while posting
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
+    return optimisticPost.id;
+  }, [currentUser]);
+
+  // Function to confirm optimistic post (make it fully opaque and keep it seamless)
+  const confirmOptimisticPost = useCallback(
+    (optimisticId: string, realPost?: Partial<PostData> & { id: string }) => {
+      setOptimisticPosts(prev => {
+        const opt = prev.find(p => p.id === optimisticId);
+        if (!opt) return prev;
+
+        // If server returned a real ID, promote optimistic post to a real one immediately
+        if (realPost?.id) {
+          const promoted: PostData = {
+            ...opt,
+            id: realPost.id,
+            isOptimistic: false,
+            isLoading: false, // Remove loading state when confirmed
+            animatedOpacity: undefined,
+            created_at: realPost.created_at || opt.created_at || new Date().toISOString(),
+          } as PostData;
+
+          // Insert promoted post at the top of the real posts list and remove optimistic
+          setPosts(current => [promoted, ...current.filter(p => p.id !== realPost.id)]);
+          // Remove from optimistic list
+          return prev.filter(p => p.id !== optimisticId);
+        }
+
+        // Fallback: remove loading state and animate in, then remove after delay
+        const updatedOpt = { ...opt, isLoading: false };
+        if (opt.animatedOpacity) {
+          Animated.timing(opt.animatedOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+
+          setTimeout(() => {
+            setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+          }, 1000);
+        }
+        return prev.map(p => p.id === optimisticId ? updatedOpt : p);
+      });
+    },
+    []
+  );
+
+  // Function to remove failed optimistic post
+  const removeOptimisticPost = useCallback((optimisticId: string) => {
+    setOptimisticPosts(prev => {
+      const post = prev.find(p => p.id === optimisticId);
+      if (post?.animatedOpacity) {
+        // Animate out smoothly
+        Animated.timing(post.animatedOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => {
+          setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+        });
+      } else {
+        // Immediate removal if no animation
+        return prev.filter(p => p.id !== optimisticId);
+      }
+      return prev;
+    });
+  }, []);
+
+  // Expose functions globally for CreatePost to use (only once)
+  React.useEffect(() => {
+    if (context === 'user') {
+      (global as any).userForumActions = {
+        addOptimisticPost,
+        confirmOptimisticPost,
+        removeOptimisticPost,
+      };
+    }
+  }, [addOptimisticPost, confirmOptimisticPost, removeOptimisticPost, context]);
+
+  // Memoized key extractor
+  const keyExtractor = useCallback((item: PostData) => item.id, []);
+
+  // Memoized render item
+  const renderItem: ListRenderItem<PostData> = useCallback(({ item, index }: { item: PostData; index: number }) => {
+    // Use loadedIndex for newly loaded posts to create staggered animation
+    const animationIndex = item.isNewlyLoaded && item.loadedIndex !== undefined ? item.loadedIndex : 0;
+
+    const postComponent = (
+      <Post
+        key={item.id}
+        id={item.id}
+        user={item.user}
+        timestamp={item.timestamp}
+        created_at={item.created_at}
+        category={item.category}
+        content={item.content}
+        comments={item.comments}
+        onCommentPress={() => handleCommentPress(item.id)}
+        onReportPress={() => handleReportPress(item.id)}
+        onBookmarkPress={() => handleBookmarkPress(item.id)}
+        onPostPress={() => handlePostPress(item.id)}
+        index={animationIndex}
+        isLoading={item.isLoading}
+        isOptimistic={item.isOptimistic}
+        isMenuOpen={openMenuPostId === item.id}
+        onMenuToggle={handleMenuToggle}
+        isBookmarked={item.isBookmarked}
+        onBookmarkStatusChange={handleBookmarkStatusChange}
+      />
+    );
+
+    // Wrap optimistic posts with animated opacity
+    if (item.isOptimistic && item.animatedOpacity) {
+      return (
+        <Animated.View style={{ opacity: item.animatedOpacity }}>
+          {postComponent}
+        </Animated.View>
+      );
+    }
+
+    return postComponent;
+  }, [
+    handleCommentPress,
+    handleReportPress,
+    handleBookmarkPress,
+    handlePostPress,
+    openMenuPostId,
+    handleMenuToggle,
+    handleBookmarkStatusChange,
+  ]);
+
+  // Combined posts data with duplicate detection for seamless transition
+  const allPosts = useMemo(() => {
+    // Filter out real posts that match optimistic posts to prevent duplicates
+    const filteredRealPosts = posts.filter(realPost => {
+      // Check if there's an optimistic post with similar content and timestamp
+      const hasOptimisticMatch = optimisticPosts.some(optPost => {
+        // Match by content and approximate created_at timestamp (within 30 seconds)
+        const contentMatch = (optPost.content || '').trim() === (realPost.content || '').trim();
+        const t1 = optPost.created_at ? Date.parse(optPost.created_at) : NaN;
+        const t2 = realPost.created_at ? Date.parse(realPost.created_at) : NaN;
+        const timeMatch = Number.isFinite(t1) && Number.isFinite(t2) && Math.abs(t1 - t2) < 30000;
+        return contentMatch && timeMatch;
+      });
+
+      return !hasOptimisticMatch;
+    });
+
+    return [...optimisticPosts, ...filteredRealPosts];
+  }, [optimisticPosts, posts]);
+
+  // Use optimized list hook
+  const listProps = useList({
+    data: allPosts,
+    keyExtractor,
+    renderItem,
+  });
+
+  // Refresh control
+  const refreshControl = (
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+      colors={[Colors.primary.blue]}
+      tintColor={Colors.primary.blue}
+    />
+  );
+
+  // Expose functions globally for CreatePost to use
+  React.useEffect(() => {
+    if (context === 'user') {
+      (global as any).userForumActions = {
+        addOptimisticPost,
+        confirmOptimisticPost,
+        removeOptimisticPost,
+      };
+    }
+  }, [addOptimisticPost, confirmOptimisticPost, removeOptimisticPost, context]);
+
+  // Render footer component
+  const renderFooter = useCallback(() => {
+    if (loadingMore) {
+      return (
+        <View style={styles.loadingContainer}>
+          <LoadingSpinner size="small" />
+        </View>
+      );
+    }
+
+    if (!hasMore && allPosts.length > 0 && !loadingMore) {
+      return (
+        <View style={styles.endOfPostsContainer}>
+          <Text style={styles.endOfPostsText}>You&apos;ve reached the end</Text>
+        </View>
+      );
+    }
+
+    if (allPosts.length > 0) {
+      return <View style={styles.bottomSpacer} />;
+    }
+
+    return null;
+  }, [loadingMore, allPosts.length, hasMore]);
+
+  return (
+    <View style={styles.container}>
+      {/* Forum Loading Animation */}
+      <ForumLoadingAnimation visible={initialLoading} />
+
+      {/* Show skeleton loading for initial load */}
+      {initialLoading && allPosts.length === 0 ? (
+        <View style={styles.skeletonContainer}>
+          <SkeletonList itemCount={8} itemHeight={200} spacing={12} />
+        </View>
+      ) : (
+        <FlatList
+          ref={listRef}
+          {...listProps}
+          style={styles.timeline}
+          contentContainerStyle={allPosts.length === 0 ? styles.emptyContent : styles.timelineContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
+          ListHeaderComponent={null}
+          ListFooterComponent={renderFooter}
+          onScroll={() => setOpenMenuPostId(null)}
+          scrollEventThrottle={400}
+          onEndReached={allPosts.length > 0 ? handleLoadMore : undefined}
+          onEndReachedThreshold={0.3}
+          scrollEnabled={allPosts.length > 0 || initialLoading}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          windowSize={10}
+          initialNumToRender={10}
+        />
+      )}
+
+      {/* Floating Create Post Button */}
+      <TouchableOpacity 
+        style={styles.createPostButton} 
+        onPress={handleCreatePost} 
+        activeOpacity={0.7}
+        accessible={true}
+        accessibilityLabel="Create new post"
+        accessibilityRole="button"
+        accessibilityHint="Tap to create a new forum post"
+        testID="create-post-button"
+      >
+        <Plus size={26} color="#FFFFFF" strokeWidth={2.5} />
+      </TouchableOpacity>
+    </View>
+  );
+});
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  timeline: {
+    flex: 1,
+    backgroundColor: Colors.background.primary,
+  },
+  timelineContent: {
+    paddingTop: 10,
+    paddingBottom: 100, // Account for bottom navigation
+  },
+  emptyContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 10,
+  },
+  skeletonContainer: {
+    flex: 1,
+    backgroundColor: Colors.background.primary,
+    paddingHorizontal: 16,
+  },
+  bottomSpacer: {
+    height: 80, // Add a spacer at the bottom to prevent content from being hidden
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  endOfPostsContainer: {
+    paddingVertical: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  endOfPostsText: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    fontWeight: '500',
+  },
+  createPostButton: {
+    position: 'absolute',
+    bottom: 90, // Positioned above bottom navigation
+    right: 20,
+    width: 60, // Slightly larger for better touch target
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.primary.blue,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 12, // Higher elevation for better visibility
+    shadowColor: Colors.primary.blue,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    zIndex: 1000, // Explicit z-index for iOS
+    // Add subtle border for definition
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  loadingContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+
+Timeline.displayName = 'Timeline';
+
+export default Timeline;

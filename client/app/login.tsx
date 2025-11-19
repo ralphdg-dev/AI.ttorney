@@ -1,173 +1,332 @@
-import { View, Text, TextInput, TouchableOpacity, Image, Animated } from 'react-native';
-import { Link, router } from 'expo-router';
-import tw from 'tailwind-react-native-classnames';
-import { useState, useRef } from 'react';
-import Colors from '../constants/Colors';
-import { Ionicons } from '@expo/vector-icons';
-import logo from '../assets/images/logo.png';
+import React, { useState, useRef, useEffect } from "react";
+import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, KeyboardAvoidingView, Platform, StatusBar } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from "expo-router";
+import tw from "tailwind-react-native-classnames";
+import Colors from "../constants/Colors";
+import { Ionicons } from "@expo/vector-icons";
+import logo from "../assets/images/logo.png";
+import { useToast, Toast, ToastTitle, ToastDescription } from "../components/ui/toast";
+import { useAuth } from "../contexts/AuthContext";
+import { useGuest } from "../contexts/GuestContext";
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const toast = useToast();
+  const { signIn, isAuthenticated } = useAuth();
+  const { startGuestSession, isStartingSession, setShowTutorial } = useGuest();
 
-  const handleLogin = () => {
-    // TODO: Implement login logic
-    console.log('Login pressed');
+  // Debug wrapper for guest session start
+  const handleContinueAsGuest = async () => {
+    try {
+      await startGuestSession();
+      setShowTutorial(true);
+      router.push('/chatbot');
+    } catch (error) {
+      console.error('Failed to start guest session:', error);
+    }
   };
+  const lastDeniedAtRef = useRef<number>(0);
+  const deniedToastInProgressRef = useRef<boolean>(false);
+  
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Refs for input fields
+  const passwordInputRef = useRef<TextInput>(null);
+  
+  // Validation states
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  
+  useEffect(() => {
+    if (isAuthenticated) {
+      setEmail("");
+      setPassword("");
+      setEmailError("");
+      setPasswordError("");
+      setShowPassword(false);
+    }
+  }, [isAuthenticated]);
 
-  const handleGoogleLogin = () => {
-    // TODO: Implement Google login
-    console.log('Google login pressed');
+
+  // Validation functions
+  const validateEmail = (emailValue: string, showError: boolean = true) => {
+    if (!emailValue) {
+      if (showError) setEmailError("Email is required");
+      return false;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailValue)) {
+      if (showError) setEmailError("Invalid email format");
+      return false;
+    }
+    
+    setEmailError("");
+    return true;
+  };
+  
+  const validatePassword = (passwordValue: string, showError: boolean = true) => {
+    if (!passwordValue) {
+      if (showError) setPasswordError("Password is required");
+      return false;
+    }
+    
+    if (passwordValue.length < 6) {
+      if (showError) setPasswordError("Must be at least 6 characters");
+      return false;
+    }
+    
+    setPasswordError("");
+    return true;
+  };
+  
+  const handleLogin = async () => {
+    // Validate inputs
+    const isEmailValid = validateEmail(email, true);
+    const isPasswordValid = validatePassword(password, true);
+    
+    if (!isEmailValid || !isPasswordValid) {
+      return;
+    }
+
+    // Prevent double submission
+    if (isSubmitting) {
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      const result = await signIn(email.toLowerCase().trim(), password);
+
+      if (!result.success) {
+        return;
+      }
+
+      if (result.success) {
+        toast.show({
+          placement: "top",
+          render: ({ id }) => (
+            <Toast nativeID={id} action="success" variant="solid" className="mt-12">
+              <ToastTitle size="md">Welcome back!</ToastTitle>
+              <ToastDescription size="sm">Redirecting...</ToastDescription>
+            </Toast>
+          ),
+        });
+      } else {
+        // Show error toast (debounced for Access denied)
+        const now = Date.now();
+        const isAccessDenied = (result.error || "").toLowerCase().includes("access denied");
+        const recentlyShown = now - lastDeniedAtRef.current < 2000;
+        if (isAccessDenied) {
+          if (deniedToastInProgressRef.current) return;
+          if (recentlyShown) return;
+          deniedToastInProgressRef.current = true;
+          lastDeniedAtRef.current = now;
+          toast.show({
+            placement: "top",
+            render: ({ id }) => (
+              <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+                <ToastTitle size="md">Access denied</ToastTitle>
+              </Toast>
+            ),
+          });
+          setTimeout(() => { deniedToastInProgressRef.current = false; }, 2000);
+        } else {
+          toast.show({
+            placement: "top",
+            render: ({ id }) => (
+              <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+                <ToastTitle size="md">Login Failed</ToastTitle>
+                <ToastDescription size="sm">{result.error || "Invalid email or password"}</ToastDescription>
+              </Toast>
+            ),
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.show({
+        placement: "top",
+        render: ({ id }) => (
+          <Toast nativeID={id} action="error" variant="solid" className="mt-12">
+            <ToastTitle size="md">Connection Error</ToastTitle>
+            <ToastDescription size="sm">Please check your internet connection</ToastDescription>
+          </Toast>
+        ),
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <View style={tw`flex-1 bg-white`}>
-      {/* Top Navigation */}
-      <View style={tw`flex-row items-center px-6 pt-12 pb-4`}>
-        <TouchableOpacity 
-          onPress={() => router.back()}
-          style={tw`p-2`}
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      
+      <View style={tw`flex-1 bg-white`}>
+        <KeyboardAvoidingView
+          style={tw`flex-1`}
+          behavior={Platform.select({ ios: 'padding', android: undefined })}
         >
-          <Ionicons name="arrow-back" size={24} color="#A0A0A0" />
-        </TouchableOpacity>
-      </View>
+          <ScrollView
+            style={tw`flex-1`}
+            contentContainerStyle={tw`flex-grow`}
+            keyboardShouldPersistTaps="handled"
+          >
 
-             {/* Main Content */}
-       <View style={tw`flex-1 justify-center items-center px-6`}>
-         {/* Logo Image */}
-         <View style={tw`mb-0 -mt-16 items-center`}>
-           <Image
-             source={logo}
-             style={tw`w-32 h-32 mb-1`}
-             resizeMode="contain"
-           />
-        
-         </View>
+          {/* Main Content */}
+          <View style={tw`items-center justify-center flex-1 px-6`}>
+            {/* Logo Image */}
+            <View style={tw`items-center mb-0 -mt-16`}>
+              <Image
+                source={logo}
+                style={tw`w-32 h-32 mb-1`}
+                resizeMode="contain"
+              />
+            </View>
 
-        {/* Login Form */}
-        <View style={tw`w-full max-w-sm`}>
+            {/* Login Form */}
+            <View style={tw`w-full max-w-sm`}>
           {/* Email Input */}
           <View style={tw`mb-4`}>
-            <Text style={[tw`font-bold mb-2`, { color: Colors.text.head }]}>
+            <Text style={[tw`mb-2 font-bold`, { color: Colors.text.head }]}>
               Email
             </Text>
             <TextInput
               style={[
-                tw`border border-gray-300 rounded-lg px-4 py-3 bg-white`,
-                { color: Colors.text.head }
+                tw`px-4 py-3 bg-white border rounded-lg`,
+                {
+                  color: Colors.text.head,
+                  borderColor: emailError ? '#ef4444' : '#d1d5db',
+                  borderWidth: emailError ? 2 : 1,
+                },
               ]}
-              placeholder="Your email"
+              placeholder="your.email@example.com"
               placeholderTextColor="#9CA3AF"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (emailError) setEmailError("");
+              }}
+              onBlur={() => email && validateEmail(email, true)}
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+              returnKeyType="next"
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
             />
+            {emailError ? (
+              <Text style={[tw`mt-1 text-sm`, { color: '#ef4444' }]}>
+                {emailError}
+              </Text>
+            ) : null}
           </View>
 
           {/* Password Input */}
           <View style={tw`mb-4`}>
-            <Text style={[tw`font-bold mb-2`, { color: Colors.text.head }]}>
+            <Text style={[tw`mb-2 font-bold`, { color: Colors.text.head }]}>
               Password
             </Text>
             <View style={tw`relative`}>
               <TextInput
+                ref={passwordInputRef}
                 style={[
-                  tw`border border-gray-300 rounded-lg px-4 py-3 bg-white pr-12`,
-                  { color: Colors.text.head }
+                  tw`px-4 py-3 pr-12 bg-white border rounded-lg`,
+                  {
+                    color: Colors.text.head,
+                    borderColor: passwordError ? '#ef4444' : '#d1d5db',
+                    borderWidth: passwordError ? 2 : 1,
+                  },
                 ]}
-                placeholder="Your password"
+                placeholder="Enter your password"
                 placeholderTextColor="#9CA3AF"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (passwordError) setPasswordError("");
+                }}
+                onBlur={() => password && validatePassword(password, true)}
+                onSubmitEditing={handleLogin}
+                returnKeyType="go"
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
+                autoCorrect={false}
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={tw`absolute right-3 top-3`}
               >
-                <Ionicons 
-                  name={showPassword ? "eye" : "eye-off"} 
-                  size={20} 
-                  color="#9CA3AF" 
+                <Ionicons
+                  name={showPassword ? "eye" : "eye-off"}
+                  size={20}
+                  color="#9CA3AF"
                 />
               </TouchableOpacity>
             </View>
+            {passwordError ? (
+              <Text style={[tw`mt-1 text-sm`, { color: '#ef4444' }]}>
+                {passwordError}
+              </Text>
+            ) : null}
           </View>
 
-          {/* Remember Me & Forgot Password */}
-          <View style={tw`flex-row justify-between items-center mb-6`}>
-            <TouchableOpacity 
-              onPress={() => setRememberMe(!rememberMe)}
-              style={tw`flex-row items-center`}
-            >
-              <View style={[
-                tw`w-4 h-4 border rounded mr-2 items-center justify-center`,
-                { 
-                  borderColor: rememberMe ? Colors.primary.blue : '#D1D5DB',
-                  backgroundColor: rememberMe ? Colors.primary.blue : 'transparent'
-                }
-              ]}>
-                {rememberMe && (
-                  <Ionicons name="checkmark" size={12} color="white" />
-                )}
-              </View>
-              <Text style={[tw`text-sm`, { color: Colors.text.head }]}>
-                Remember me
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity>
+          {/* Forgot Password */}
+          <View style={tw`flex-row items-center justify-end mb-6`}>
+            <TouchableOpacity onPress={() => router.push('/auth/forgot-password')}>
               <Text style={[tw`text-sm`, { color: Colors.primary.blue }]}>
                 Forgot password?
               </Text>
             </TouchableOpacity>
           </View>
 
-                                {/* Login Button */}
-           <TouchableOpacity
-             style={[
-               tw`py-3 rounded-lg items-center justify-center mb-3`,
-               { backgroundColor: Colors.primary.blue }
-             ]}
-             onPress={handleLogin}
-           >
-             <Text style={tw`text-white font-semibold text-lg`}>
-               Login
-             </Text>
-           </TouchableOpacity>
+          {/* Login Button */}
+          <TouchableOpacity
+            style={[
+              tw`items-center justify-center py-3 mb-3 rounded-lg`,
+              { 
+                backgroundColor: isSubmitting ? '#9CA3AF' : Colors.primary.blue,
+                opacity: isSubmitting ? 0.7 : 1
+              },
+            ]}
+            onPress={handleLogin}
+            disabled={isSubmitting}
+          >
+            <Text style={tw`text-lg font-semibold text-white`}>
+              {isSubmitting ? 'Signing In...' : 'Login'}
+            </Text>
+          </TouchableOpacity>
 
-           {/* OR Separator */}
-           <View style={tw`flex-row items-center mb-4`}>
-             <View style={tw`flex-1 h-px bg-gray-300`} />
-             <Text style={[tw`mx-4 text-sm`, { color: Colors.text.sub }]}>
-               OR
-             </Text>
-             <View style={tw`flex-1 h-px bg-gray-300`} />
-           </View>
-
-           {/* Google Button */}
-           <TouchableOpacity
-             style={tw`py-3 rounded-lg items-center justify-center border border-gray-300 bg-white flex-row`}
-             onPress={handleGoogleLogin}
-           >
-             <Text style={[tw`font-semibold text-lg`, { color: Colors.text.head }]}>
-               Login with Google
-             </Text>
-           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleContinueAsGuest}
+            style={tw`mt-3`}
+            activeOpacity={0.7}
+            disabled={isStartingSession}
+          >
+            <Text style={[tw`text-center`, { color: Colors.text.head }]}>
+              {isStartingSession ? 'Starting...' : 'Continue as'} <Text style={{ color: Colors.primary.blue, fontWeight: '700' }}>Guest</Text>
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
       {/* Bottom Section */}
-      <View style={tw`px-6 pb-8 items-center`}>
+      <View style={tw`items-center px-6 pb-8`}>
         <Text style={[tw`text-center`, { color: Colors.text.sub }]}>
-          Don't have an account?{' '}
-          <Text style={[tw`font-bold`, { color: Colors.primary.blue }]}>Sign Up</Text>
+          Don&apos;t have an account?{" "}
+          <Text
+            style={[tw`font-bold`, { color: Colors.primary.blue }]}
+            onPress={() => router.push('/onboarding/registration')}
+          >
+            Sign Up
+          </Text>
         </Text>
       </View>
-    </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    </SafeAreaView>
   );
-} 
+}

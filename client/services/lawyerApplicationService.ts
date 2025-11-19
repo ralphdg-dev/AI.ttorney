@@ -1,0 +1,761 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NetworkConfig } from '../utils/networkConfig';
+
+interface FileUploadResponse {
+  success: boolean;
+  file_path?: string;
+  message: string;
+  error?: string;
+}
+
+interface LawyerApplicationStatus {
+  has_application: boolean;
+  application?: {
+    id: string;
+    user_id: string;
+    full_name?: string;
+    roll_signing_date?: string;
+    ibp_id?: string;
+    roll_number?: string;
+    selfie?: string;
+    status: 'pending' | 'accepted' | 'rejected' | 'resubmission';
+    reviewed_by?: string;
+    reviewed_at?: string;
+    admin_notes?: string;
+    matched_roll_id?: number;
+    matched_at?: string;
+    submitted_at: string;
+    updated_at: string;
+    // New versioning fields
+    version?: number;
+    parent_application_id?: string;
+    is_latest?: boolean;
+    // Acknowledgment field
+    acknowledged?: boolean;
+  };
+  can_apply: boolean;
+  reject_count: number;
+  is_blocked: boolean;
+  last_rejected_at?: string;
+}
+
+interface LawyerApplicationHistory {
+  applications: {
+    id: string;
+    user_id: string;
+    full_name?: string;
+    roll_signing_date?: string;
+    ibp_id?: string;
+    roll_number?: string;
+    selfie?: string;
+    status: 'pending' | 'accepted' | 'rejected' | 'resubmission';
+    reviewed_by?: string;
+    reviewed_at?: string;
+    admin_notes?: string;
+    matched_roll_id?: number;
+    matched_at?: string;
+    submitted_at: string;
+    updated_at: string;
+    version?: number;
+    parent_application_id?: string;
+    is_latest?: boolean;
+  }[];
+  total_applications: number;
+}
+
+interface SubmitApplicationResponse {
+  success: boolean;
+  message: string;
+  application_id?: string;
+  version?: number;
+  data?: {
+    redirect_path: string;
+  };
+}
+
+class LawyerApplicationService {
+  private cachedApplicationStatus: LawyerApplicationStatus | null = null;
+  private cacheTimestamp: number | null = null;
+  private readonly CACHE_DURATION = 10000; // 10 seconds
+  private readonly REQUEST_TIMEOUT = 10000; // 10 seconds
+  private readonly POLLING_INTERVAL = 30000; // 30 seconds
+  private pendingRequests = new Map<string, Promise<any>>();
+  private pollingInterval: any = null;
+  private statusChangeCallbacks = new Set<(status: LawyerApplicationStatus | null) => void>();
+  private statusCache: { data: LawyerApplicationStatus | null; timestamp: number } | null = null;
+
+
+  private async getAuthToken(): Promise<string | null> {
+    try {
+      // Try to get token from Supabase session first
+      const { supabase } = await import('../config/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.access_token) {
+        return session.access_token;
+      }
+      
+      // Fallback to AsyncStorage for backward compatibility
+      const token = await AsyncStorage.getItem('access_token');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    console.log('🔧 makeRequest: Getting auth token...');
+    const token = await this.getAuthToken();
+    console.log('🔧 makeRequest: Auth token obtained:', token ? 'YES' : 'NO');
+    
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT);
+    
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    try {
+      console.log('🔧 makeRequest: Getting API URL...');
+      
+      // Add timeout to getBestApiUrl to prevent hanging
+      const apiUrlPromise = NetworkConfig.getBestApiUrl();
+      const apiUrlTimeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('API URL timeout')), 3000); // 3 second timeout
+      });
+      
+      const apiUrl = await Promise.race([apiUrlPromise, apiUrlTimeout]);
+      console.log('🔧 makeRequest: API URL obtained:', apiUrl);
+      console.log('🔧 makeRequest: Making fetch request to:', `${apiUrl}${endpoint}`);
+      
+      const response = await fetch(`${apiUrl}${endpoint}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+      
+      console.log('🔧 makeRequest: Fetch completed, response status:', response.status);
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      console.log('🔧 makeRequest: Fetch failed with error:', error);
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timed out. Please check your connection and try again.');
+      }
+      throw error;
+    }
+  }
+
+  async uploadIbpIdCard(file: { uri: string; name: string; type?: string } | File): Promise<FileUploadResponse> {
+    try {
+      // Validate file type - no GIFs allowed
+      const fileType = file instanceof File ? file.type : file.type;
+      const fileName = file instanceof File ? file.name : file.name;
+      
+      if (fileType === 'image/gif' || fileName?.toLowerCase().endsWith('.gif')) {
+        return {
+          success: false,
+          message: 'Upload failed',
+          error: 'GIF files are not allowed. Please upload a JPEG or PNG image.',
+        };
+      }
+      
+      // Only allow JPEG and PNG
+      if (fileType && !['image/jpeg', 'image/jpg', 'image/png'].includes(fileType)) {
+        return {
+          success: false,
+          message: 'Upload failed',
+          error: 'Only JPEG and PNG images are allowed.',
+        };
+      }
+      
+      const formData = new FormData();
+      
+      // Handle File object directly (web platform)
+      if (file instanceof File) {
+        formData.append('file', file);
+      } else {
+        // Handle URI-based file (native platforms)
+        formData.append('file', {
+          uri: file.uri,
+          name: file.name,
+          type: file.type || 'image/jpeg',
+        } as any);
+      }
+
+      let response;
+      let data;
+      
+      try {
+        response = await this.makeRequest('/api/lawyer-applications/upload/ibp-id', {
+          method: 'POST',
+          body: formData,
+        });
+      } catch (requestError) {
+        throw new Error(`Network request failed: ${requestError instanceof Error ? requestError.message : 'Unknown network error'}`);
+      }
+      
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(`Invalid response format: ${response.status} ${response.statusText}`);
+      }
+      
+      if (!response.ok) {
+        let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+        
+        if (data?.detail) {
+          if (Array.isArray(data.detail)) {
+            // Handle FastAPI validation errors (array of error objects)
+            errorMsg = data.detail.map((err: any) => err.msg || err.message || JSON.stringify(err)).join(', ');
+          } else {
+            errorMsg = data.detail;
+          }
+        } else if (data?.message) {
+          errorMsg = data.message;
+        }
+        
+        throw new Error(errorMsg);
+      }
+
+      return data;
+    } catch (error) {
+      
+      let errorMessage = 'Unknown error';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else {
+        errorMessage = `Unexpected error: ${JSON.stringify(error)}`;
+      }
+      
+      return {
+        success: false,
+        message: 'Upload failed',
+        error: errorMessage,
+      };
+    }
+  }
+
+  async uploadSelfie(file: { uri: string; name: string; type?: string } | File): Promise<FileUploadResponse> {
+    try {
+      // Validate file type - no GIFs allowed
+      const fileType = file instanceof File ? file.type : file.type;
+      const fileName = file instanceof File ? file.name : file.name;
+      
+      if (fileType === 'image/gif' || fileName?.toLowerCase().endsWith('.gif')) {
+        return {
+          success: false,
+          message: 'Upload failed',
+          error: 'GIF files are not allowed. Please upload a JPEG or PNG image.',
+        };
+      }
+      
+      // Only allow JPEG and PNG
+      if (fileType && !['image/jpeg', 'image/jpg', 'image/png'].includes(fileType)) {
+        return {
+          success: false,
+          message: 'Upload failed',
+          error: 'Only JPEG and PNG images are allowed.',
+        };
+      }
+      
+      const formData = new FormData();
+      
+      // Handle File object directly (web platform)
+      if (file instanceof File) {
+        formData.append('file', file);
+      } else {
+        // Handle URI-based file (native platforms)
+        formData.append('file', {
+          uri: file.uri,
+          name: file.name,
+          type: file.type || 'image/jpeg',
+        } as any);
+      }
+
+      let response;
+      let data;
+      
+      try {
+        response = await this.makeRequest('/api/lawyer-applications/upload/selfie', {
+          method: 'POST',
+          body: formData,
+        });
+      } catch (requestError) {
+        throw new Error(`Network request failed: ${requestError instanceof Error ? requestError.message : 'Unknown network error'}`);
+      }
+      
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(`Invalid response format: ${response.status} ${response.statusText}`);
+      }
+      
+      if (!response.ok) {
+        let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+        
+        if (data?.detail) {
+          if (Array.isArray(data.detail)) {
+            // Handle FastAPI validation errors (array of error objects)
+            errorMsg = data.detail.map((err: any) => err.msg || err.message || JSON.stringify(err)).join(', ');
+          } else {
+            errorMsg = data.detail;
+          }
+        } else if (data?.message) {
+          errorMsg = data.message;
+        }
+        
+        throw new Error(errorMsg);
+      }
+
+      return data;
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Upload failed',
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      };
+    }
+  }
+
+  async submitApplication(applicationData: {
+    full_name: string;
+    roll_signing_date: string;
+    ibp_id: string;
+    roll_number: string;
+    selfie: string;
+  }): Promise<SubmitApplicationResponse> {
+    try {
+      // Convert date string to YYYY-MM-DD format for backend
+      const dateObj = new Date(applicationData.roll_signing_date);
+      const formattedDate = dateObj.toISOString().split('T')[0];
+      
+      const formData = new FormData();
+      formData.append('full_name', applicationData.full_name);
+      formData.append('roll_signing_date', formattedDate);
+      formData.append('ibp_id', applicationData.ibp_id || '');
+      formData.append('roll_number', applicationData.roll_number);
+      formData.append('selfie', applicationData.selfie || '');
+
+      const response = await this.makeRequest('/api/lawyer-applications/submit', {
+        method: 'POST',
+        body: formData,
+      });
+
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(`Server error ${response.status}: ${response.statusText}`);
+      }
+      
+      if (!response.ok) {
+        let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+      
+        if (data?.detail) {
+          if (Array.isArray(data.detail)) {
+            // Handle FastAPI validation errors (array of error objects)
+            errorMsg = data.detail.map((err: any) => err.msg || err.message || JSON.stringify(err)).join(', ');
+          } else {
+            errorMsg = data.detail;
+          }
+        } else if (data?.message) {
+          errorMsg = data.message;
+        }
+      
+        throw new Error(errorMsg);
+      }
+
+      return data;
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Submission failed',
+      };
+    }
+  }
+
+  async getApplicationStatus(): Promise<LawyerApplicationStatus | null> {
+    const cacheKey = 'lawyer-application-status';
+    
+    // Check memory cache first
+    if (this.statusCache && (Date.now() - this.statusCache.timestamp) < this.CACHE_DURATION) {
+      return this.statusCache.data;
+    }
+
+    // Check persistent cache
+    try {
+      const cachedData = await AsyncStorage.getItem(cacheKey);
+      if (cachedData) {
+        const parsed = JSON.parse(cachedData);
+        if ((Date.now() - parsed.timestamp) < this.CACHE_DURATION) {
+          this.statusCache = parsed;
+          return parsed.data;
+        }
+      }
+    } catch (error) {
+      console.error('Cache read error:', error);
+    }
+
+    // Deduplicate requests
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    const requestPromise = this.fetchApplicationStatus();
+    this.pendingRequests.set(cacheKey, requestPromise);
+
+    try {
+      const data = await requestPromise;
+      
+      // Cache in memory and storage
+      const cacheData = { data, timestamp: Date.now() };
+      this.statusCache = cacheData;
+      
+      try {
+        await AsyncStorage.setItem(cacheKey, JSON.stringify(cacheData));
+      } catch (error) {
+        console.error('Cache write error:', error);
+      }
+
+      return data;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  private async fetchApplicationStatus(): Promise<LawyerApplicationStatus | null> {
+    try {
+      console.log('🔄 Starting direct API request to /api/lawyer-applications/me');
+      
+      // Get auth token directly
+      const token = await this.getAuthToken();
+      console.log('🔧 Auth token obtained:', token ? 'YES' : 'NO');
+      
+      // Use NetworkConfig for proper API URL
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const url = `${apiUrl}/api/lawyer-applications/me`;
+      console.log('🔧 Making direct fetch to:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+        // Add a shorter timeout
+        signal: AbortSignal.timeout(8000), // 8 second timeout
+      });
+      
+      console.log('✅ Direct API response received, status:', response.status);
+      
+      if (!response.ok) {
+        console.log('❌ API response not ok, parsing error...');
+        const errorText = await response.text();
+        console.log('Error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      console.log('📄 Parsing successful response...');
+      const data = await response.json();
+      console.log('🔍 Full API response data:', JSON.stringify(data, null, 2));
+      
+      if (data && data.application) {
+        console.log('🔍 Application object:', JSON.stringify(data.application, null, 2));
+        console.log('🔍 reviewed_at field:', data.application.reviewed_at);
+      } else {
+        console.log('🔍 No application data found in response');
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Direct API request failed:', error);
+      return null;
+    }
+  }
+
+  // Clear cache when status might change (after submission, etc.)
+  clearStatusCache(): void {
+    this.statusCache = null;
+    AsyncStorage.removeItem('lawyer-application-status').catch(console.error);
+  }
+
+  /**
+   * Public method to clear all cache
+   */
+  clearCache(): void {
+    this.clearStatusCache();
+  }
+
+  // Prefetch status in background
+  async prefetchApplicationStatus(): Promise<void> {
+    try {
+      await this.getApplicationStatus();
+    } catch {
+      // Silent fail for background prefetch
+    }
+  }
+
+  // Clear pending_lawyer flag when user completes accepted flow
+  async clearPendingLawyerStatus(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.makeRequest('/api/lawyer-applications/clear-pending', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to clear pending lawyer status');
+      }
+
+      const data = await response.json();
+      
+      // Clear cache since user status has changed
+      this.clearStatusCache();
+      
+      return {
+        success: true,
+        message: data.message || 'Pending lawyer status cleared successfully'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to clear pending lawyer status'
+      };
+    }
+  }
+
+  // Activate verified lawyer role after user accepts application approval
+  async activateVerifiedLawyer(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.makeRequest('/api/lawyer-applications/activate-lawyer', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to activate verified lawyer role');
+      }
+
+      const data = await response.json();
+      
+      // Clear cache since user status has changed
+      this.clearStatusCache();
+      
+      return {
+        success: true,
+        message: data.message || 'Verified lawyer role activated successfully'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to activate verified lawyer role'
+      };
+    }
+  }
+
+  // Resubmit application (creates new version)
+  async resubmitApplication(applicationData: {
+    full_name: string;
+    roll_signing_date: string;
+    ibp_id: string;
+    roll_number: string;
+    selfie: string;
+  }): Promise<SubmitApplicationResponse> {
+    try {
+      // Convert date string to YYYY-MM-DD format for backend
+      const dateObj = new Date(applicationData.roll_signing_date);
+      const formattedDate = dateObj.toISOString().split('T')[0];
+      
+      const formData = new FormData();
+      formData.append('full_name', applicationData.full_name);
+      formData.append('roll_signing_date', formattedDate);
+      formData.append('ibp_id', applicationData.ibp_id || '');
+      formData.append('roll_number', applicationData.roll_number);
+      formData.append('selfie', applicationData.selfie || '');
+
+      const response = await this.makeRequest('/api/lawyer-applications/resubmit', {
+        method: 'POST',
+        body: formData,
+      });
+
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(`Server error ${response.status}: ${response.statusText}`);
+      }
+      
+      if (!response.ok) {
+        let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+      
+        if (data?.detail) {
+          if (Array.isArray(data.detail)) {
+            // Handle FastAPI validation errors (array of error objects)
+            errorMsg = data.detail.map((err: any) => err.msg || err.message || JSON.stringify(err)).join(', ');
+          } else {
+            errorMsg = data.detail;
+          }
+        } else if (data?.message) {
+          errorMsg = data.message;
+        }
+      
+        throw new Error(errorMsg);
+      }
+
+      // Clear cache since application status has changed
+      this.clearStatusCache();
+
+      return data;
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Resubmission failed',
+      };
+    }
+  }
+
+  // Get application history
+  async getApplicationHistory(): Promise<LawyerApplicationHistory | null> {
+    try {
+      const response = await this.makeRequest('/api/lawyer-applications/history');
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to get application history');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Get application history failed:', error);
+      return null;
+    }
+  }
+
+
+  // Real-time status monitoring
+  startStatusPolling(): void {
+    if (this.pollingInterval) {
+      return; // Already polling
+    }
+
+    this.pollingInterval = setInterval(async () => {
+      try {
+        const currentStatus = await this.fetchApplicationStatus();
+        const cachedStatus = this.statusCache?.data;
+        
+        // Check if status has changed
+        if (this.hasStatusChanged(cachedStatus || null, currentStatus)) {
+          // Update cache
+          this.statusCache = { data: currentStatus, timestamp: Date.now() };
+          
+          // Notify all callbacks
+          this.statusChangeCallbacks.forEach(callback => {
+            try {
+              callback(currentStatus);
+            } catch (error) {
+              console.error('Error in status change callback:', error);
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error during status polling:', error);
+      }
+    }, this.POLLING_INTERVAL);
+  }
+
+  stopStatusPolling(): void {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
+  }
+
+  onStatusChange(callback: (status: LawyerApplicationStatus | null) => void): () => void {
+    this.statusChangeCallbacks.add(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      this.statusChangeCallbacks.delete(callback);
+    };
+  }
+
+  private hasStatusChanged(oldStatus: LawyerApplicationStatus | null, newStatus: LawyerApplicationStatus | null): boolean {
+    if (!oldStatus && !newStatus) return false;
+    if (!oldStatus || !newStatus) return true;
+    
+    const oldApp = oldStatus.application;
+    const newApp = newStatus.application;
+    
+    if (!oldApp && !newApp) return false;
+    if (!oldApp || !newApp) return true;
+    
+    return (
+      oldApp.status !== newApp.status ||
+      oldApp.version !== newApp.version ||
+      oldApp.updated_at !== newApp.updated_at
+    );
+  }
+
+  // Acknowledge rejection - sets acknowledged flag to true
+  async acknowledgeRejection(): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('🔄 Starting acknowledge rejection request');
+      
+      // Get auth token directly
+      const token = await this.getAuthToken();
+      console.log('🔧 Auth token obtained:', token ? 'YES' : 'NO');
+      
+      // Use NetworkConfig for proper API URL
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const url = `${apiUrl}/api/lawyer-applications/acknowledge-rejection`;
+      console.log('🔧 Making direct fetch to:', url);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+      });
+
+      console.log('🔧 Response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('🔧 Error response:', errorData);
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('🔧 Success response:', data);
+      
+      // Clear cache after successful acknowledgment
+      this.clearCache();
+      
+      return data;
+    } catch (error) {
+      console.error('🔧 Acknowledge rejection error:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to acknowledge rejection',
+      };
+    }
+  }
+}
+
+export const lawyerApplicationService = new LawyerApplicationService();
+export type { FileUploadResponse, LawyerApplicationStatus, LawyerApplicationHistory, SubmitApplicationResponse };
