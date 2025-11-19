@@ -101,10 +101,6 @@ export default function Login() {
       setIsSubmitting(true);
       const result = await signIn(email.toLowerCase().trim(), password);
 
-      if (!result.success) {
-        return;
-      }
-
       if (result.success) {
         toast.show({
           placement: "top",

@@ -1,17 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Alert, Platform, TextInput, TouchableOpacity } from "react-native";
+import { Alert, Platform, TextInput, TouchableOpacity, View, Text, ScrollView, KeyboardAvoidingView, StatusBar, Image } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useToast, Toast, ToastTitle, ToastDescription } from "../../components/ui/toast";
 import { router } from "expo-router";
-import { Box } from "../../components/ui/box";
-import { VStack } from "../../components/ui/vstack";
-import { HStack } from "../../components/ui/hstack";
-import { Text } from "../../components/ui/text";
-import { KeyboardAvoidingView } from "../../components/ui/keyboard-avoiding-view";
-import { ScrollView } from "../../components/ui/scroll-view";
-import { StatusBar } from "../../components/ui/status-bar";
-import { Image } from "../../components/ui/image";
-import { Input, InputField } from "../../components/ui/input";
+import tw from "tailwind-react-native-classnames";
+import { Ionicons } from "@expo/vector-icons";
 import PrimaryButton from "../../components/ui/PrimaryButton";
 import Header from "../../components/Header";
 import Colors from "../../constants/Colors";
@@ -325,82 +318,89 @@ export default function ForgotPassword() {
   const isOtpComplete = otp.every((digit) => digit !== "");
 
   const renderEmailStep = () => (
-    <VStack className="flex-1 justify-center px-6 mx-auto w-full max-w-md">
-      <VStack className="items-center mb-8">
+    <View style={tw`flex-1 justify-center px-6 mx-auto w-full max-w-sm`}>
+      <View style={tw`items-center mb-8`}>
         <Image
           source={otpsent}
-          className="mb-4 w-36 h-36"
+          style={tw`mb-4 w-36 h-36`}
           resizeMode="contain"
-          alt="Forgot Password"
         />
-        <Text className="mb-4 text-2xl font-bold text-center text-gray-900">
+        <Text style={[tw`mb-4 text-2xl font-bold text-center`, { color: Colors.text.head }]}>
           Forgot Password?
         </Text>
-        <Text className="text-base text-center text-gray-600">
+        <Text style={[tw`text-base text-center`, { color: Colors.text.sub }]}>
           Enter your email address and we&apos;ll send you a code to reset your password.
         </Text>
-      </VStack>
+      </View>
 
-      <VStack className="space-y-4 mb-6">
-        <Input className="border-gray-300">
-          <InputField
-            placeholder="Email address"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-          />
-        </Input>
-
+      <View style={tw`mb-6`}>
+        <Text style={[tw`mb-2 font-bold`, { color: Colors.text.head }]}>
+          Email
+        </Text>
+        <TextInput
+          style={[
+            tw`px-4 py-3 bg-white border rounded-lg`,
+            {
+              color: Colors.text.head,
+              borderColor: error ? '#ef4444' : '#d1d5db',
+              borderWidth: error ? 2 : 1,
+            },
+          ]}
+          placeholder="your.email@example.com"
+          placeholderTextColor="#9CA3AF"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
         {error && (
-          <Text className="text-sm text-red-500">
+          <Text style={[tw`mt-1 text-sm`, { color: '#ef4444' }]}>
             {error}
           </Text>
         )}
-      </VStack>
-    </VStack>
+      </View>
+    </View>
   );
 
   const renderOtpStep = () => (
-    <VStack className="flex-1 justify-center px-6 mx-auto w-full max-w-md">
-      <VStack className="items-center mb-8">
+    <View style={tw`flex-1 justify-center px-6 mx-auto w-full max-w-sm`}>
+      <View style={tw`items-center mb-8`}>
         <Image
           source={otpsent}
-          className="mb-4 w-36 h-36"
+          style={tw`mb-4 w-36 h-36`}
           resizeMode="contain"
-          alt="OTP Sent"
         />
-        <Text className="mb-4 text-2xl font-bold text-center text-gray-900">
+        <Text style={[tw`mb-4 text-2xl font-bold text-center`, { color: Colors.text.head }]}>
           Verify Your Email
         </Text>
-        <VStack className="items-center space-y-1">
-          <Text className="text-base text-center text-gray-600">
+        <View style={tw`items-center`}>
+          <Text style={[tw`text-base text-center`, { color: Colors.text.sub }]}>
             We&apos;ve sent a code to
           </Text>
-          <Text className="text-base font-semibold text-gray-900">
+          <Text style={[tw`text-base font-semibold`, { color: Colors.text.head }]}>
             {email}
           </Text>
-          <Text className="text-base text-center text-gray-600">
+          <Text style={[tw`text-base text-center`, { color: Colors.text.sub }]}>
             Enter it below to continue.
           </Text>
-        </VStack>
-      </VStack>
+        </View>
+      </View>
 
-      <VStack className="items-center mb-8">
-        <HStack className="justify-center items-center mb-4 space-x-2">
+      <View style={tw`items-center mb-8`}>
+        <View style={tw`flex-row justify-center items-center mb-4`}>
           {otp.map((digit, index) => (
             <TextInput
               key={index}
               ref={(ref) => { inputRefs.current[index] = ref; }}
-              className={`w-12 h-14 border-2 rounded-xl text-center font-bold text-xl ${
-                error
-                  ? "border-red-500"
-                  : digit
-                  ? "bg-blue-50 border-blue-500"
-                  : "bg-white border-gray-300"
-              }`}
-              style={{ color: Colors.text.head }}
+              style={[
+                tw`w-12 h-14 border-2 rounded-xl text-center font-bold text-xl mx-1`,
+                {
+                  color: Colors.text.head,
+                  backgroundColor: error ? '#fff' : digit ? '#eff6ff' : '#fff',
+                  borderColor: error ? '#ef4444' : digit ? '#3b82f6' : '#d1d5db',
+                }
+              ]}
               value={digit}
               onChangeText={(value) => handleOtpChange(index, value)}
               onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
@@ -410,92 +410,125 @@ export default function ForgotPassword() {
               accessibilityLabel={`Digit ${index + 1}`}
             />
           ))}
-        </HStack>
+        </View>
 
         {error && (
-          <Text className="px-4 text-sm text-center text-red-500">
+          <Text style={[tw`px-4 text-sm text-center`, { color: '#ef4444' }]}>
             {error}
           </Text>
         )}
 
         {attemptsRemaining !== null && attemptsRemaining > 0 && !isLockedOut && (
-          <Text className="px-4 mt-2 text-sm text-center text-orange-500">
+          <Text style={[tw`px-4 mt-2 text-sm text-center`, { color: '#f59e0b' }]}>
             {attemptsRemaining} attempt(s) remaining
           </Text>
         )}
 
         {isLockedOut && lockoutTimer > 0 && (
-          <Text className="px-4 mt-2 text-sm font-semibold text-center text-red-600">
+          <Text style={[tw`px-4 mt-2 text-sm font-semibold text-center`, { color: '#dc2626' }]}>
             Account temporarily locked. Try again in {Math.floor(lockoutTimer / 60)}:{(lockoutTimer % 60).toString().padStart(2, '0')}
           </Text>
         )}
-      </VStack>
-    </VStack>
+      </View>
+    </View>
   );
 
   const renderResetStep = () => (
-    <VStack className="flex-1 justify-center px-6 mx-auto w-full max-w-md">
-      <VStack className="items-center mb-8">
-        <Box className="mb-4 w-24 h-24 bg-blue-100 rounded-full items-center justify-center">
-          <Text className="text-4xl">🔐</Text>
-        </Box>
-        <Text className="mb-2 text-2xl font-bold text-center text-gray-900">
+    <View style={tw`flex-1 justify-center px-6 mx-auto w-full max-w-sm`}>
+      <View style={tw`items-center mb-8`}>
+        <View style={[tw`mb-4 w-24 h-24 rounded-full items-center justify-center`, { backgroundColor: '#dbeafe' }]}>
+          <Text style={tw`text-4xl`}>🔐</Text>
+        </View>
+        <Text style={[tw`mb-2 text-2xl font-bold text-center`, { color: Colors.text.head }]}>
           Reset Password
         </Text>
-        <Text className="text-base text-center text-gray-600">
+        <Text style={[tw`text-base text-center`, { color: Colors.text.sub }]}>
           Enter your new password below.
         </Text>
-        <Text className="text-sm text-center text-gray-500 mt-1">
+        <Text style={[tw`text-sm text-center mt-1`, { color: Colors.text.sub }]}>
           Password must be at least 8 characters with uppercase, lowercase, and a number.
         </Text>
-        <Text className="text-sm text-center text-gray-500 mt-1">
+        <Text style={[tw`text-sm text-center mt-1`, { color: Colors.text.sub }]}>
           New password must be different from your current password.
         </Text>
-      </VStack>
+      </View>
 
-      <VStack className="space-y-4 mb-6">
-        <VStack className="space-y-2">
-          <Text className="text-sm font-medium text-gray-700">New Password</Text>
-          <Input className="border-gray-300">
-            <InputField
+      <View style={tw`mb-6`}>
+        <View style={tw`mb-4`}>
+          <Text style={[tw`mb-2 font-bold`, { color: Colors.text.head }]}>
+            New Password
+          </Text>
+          <View style={tw`relative`}>
+            <TextInput
+              style={[
+                tw`px-4 py-3 pr-12 bg-white border rounded-lg`,
+                {
+                  color: Colors.text.head,
+                  borderColor: error ? '#ef4444' : '#d1d5db',
+                  borderWidth: error ? 2 : 1,
+                },
+              ]}
               placeholder="Enter new password"
+              placeholderTextColor="#9CA3AF"
               value={newPassword}
               onChangeText={setNewPassword}
               secureTextEntry={!showPassword}
             />
-          </Input>
-        </VStack>
+            <TouchableOpacity
+              style={tw`absolute right-3 top-3`}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons
+                name={showPassword ? "eye-off" : "eye"}
+                size={20}
+                color="#6B7280"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        <VStack className="space-y-2">
-          <Text className="text-sm font-medium text-gray-700">Confirm New Password</Text>
-          <Input className="border-gray-300">
-            <InputField
+        <View style={tw`mb-4`}>
+          <Text style={[tw`mb-2 font-bold`, { color: Colors.text.head }]}>
+            Confirm New Password
+          </Text>
+          <View style={tw`relative`}>
+            <TextInput
+              style={[
+                tw`px-4 py-3 pr-12 bg-white border rounded-lg`,
+                {
+                  color: Colors.text.head,
+                  borderColor: (confirmPassword && newPassword !== confirmPassword) ? '#ef4444' : '#d1d5db',
+                  borderWidth: (confirmPassword && newPassword !== confirmPassword) ? 2 : 1,
+                },
+              ]}
               placeholder="Confirm new password"
+              placeholderTextColor="#9CA3AF"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry={!showPassword}
             />
-          </Input>
-        </VStack>
-
-        <TouchableOpacity
-          onPress={() => setShowPassword(!showPassword)}
-          className="self-start mt-2"
-        >
-          <Text className="text-sm text-blue-500 font-medium">
-            {showPassword ? 'Hide' : 'Show'} password
-          </Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={tw`absolute right-3 top-3`}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons
+                name={showPassword ? "eye-off" : "eye"}
+                size={20}
+                color="#6B7280"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {error && (
-          <Box className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <Text className="text-sm text-red-600">
+          <View style={[tw`border rounded-lg p-3`, { backgroundColor: '#fef2f2', borderColor: '#fecaca' }]}>
+            <Text style={[tw`text-sm`, { color: '#dc2626' }]}>
               {error}
             </Text>
-          </Box>
+          </View>
         )}
-      </VStack>
-    </VStack>
+      </View>
+    </View>
   );
 
   const renderBottomSection = () => {
@@ -525,7 +558,7 @@ export default function ForgotPassword() {
     const buttonProps = getButtonProps();
 
     return (
-      <Box className="relative px-6 pb-12 mt-8">
+      <View style={tw`relative px-6 pb-12 mt-8`}>
         <PrimaryButton
           title={buttonProps.title}
           onPress={buttonProps.onPress}
@@ -534,20 +567,22 @@ export default function ForgotPassword() {
         />
 
         {currentStep === 'otp' && (
-          <Box className="items-center px-4 sm:px-6 md:px-8 mt-4">
-            <Text className="text-sm text-center sm:text-base" style={{ color: Colors.text.sub }}>
+          <View style={tw`items-center px-4 mt-4`}>
+            <Text style={[tw`text-sm text-center`, { color: Colors.text.sub }]}>
               Didn&apos;t receive code?
             </Text>
             <TouchableOpacity
               onPress={!isLockedOut && canResend && !isResending ? handleResendOTP : undefined}
               disabled={isLockedOut || !canResend || isResending}
-              className="mt-2"
+              style={tw`mt-2`}
             >
               <Text
-                className="text-sm font-bold sm:text-base text-center"
-                style={{
-                  color: (canResend && !isLockedOut && !isResending) ? Colors.primary.blue : '#9ca3af'
-                }}
+                style={[
+                  tw`text-sm font-bold text-center`,
+                  {
+                    color: (canResend && !isLockedOut && !isResending) ? Colors.primary.blue : '#9ca3af'
+                  }
+                ]}
               >
                 {isLockedOut 
                   ? "Resend unavailable (locked out)" 
@@ -559,46 +594,48 @@ export default function ForgotPassword() {
                 }
               </Text>
             </TouchableOpacity>
-          </Box>
+          </View>
         )}
-      </Box>
+      </View>
     );
   };
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1 bg-white"
-      >
-        <StatusBar barStyle="dark-content" backgroundColor="white" />
-        
-        <Header 
-        title="Forgot Password"
-        showBackButton={true}
-        onBackPress={() => {
-          // Try to go back, but if no history exists, navigate to login
-          if (router.canGoBack()) {
-            router.back();
-          } else {
-            router.replace('/login');
-          }
-        }}
-      />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ flexGrow: 1 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {currentStep === 'email' && renderEmailStep()}
-        {currentStep === 'otp' && renderOtpStep()}
-        {currentStep === 'reset' && renderResetStep()}
-      </ScrollView>
+      <View style={tw`flex-1 bg-white`}>
+        <KeyboardAvoidingView
+          style={tw`flex-1`}
+          behavior={Platform.select({ ios: 'padding', android: undefined })}
+        >
+          <Header 
+            title="Forgot Password"
+            showBackButton={true}
+            onBackPress={() => {
+              // Try to go back, but if no history exists, navigate to login
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/login');
+              }
+            }}
+          />
+          
+          <ScrollView
+            style={tw`flex-1`}
+            contentContainerStyle={tw`flex-grow`}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {currentStep === 'email' && renderEmailStep()}
+            {currentStep === 'otp' && renderOtpStep()}
+            {currentStep === 'reset' && renderResetStep()}
+          </ScrollView>
 
-      {renderBottomSection()}
-    </KeyboardAvoidingView>
+          {renderBottomSection()}
+        </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
