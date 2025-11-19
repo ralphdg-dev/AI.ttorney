@@ -15,7 +15,7 @@ const LineChartCard = () => {
     const fetchStatusData = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5001/api/stats/lawyer-applications-status-monthly"
+          `${process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api'}/stats/lawyer-applications-status-monthly`
         );
         const result = await response.json();
 

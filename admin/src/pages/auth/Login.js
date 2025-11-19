@@ -88,7 +88,7 @@ const Login = () => {
       // In production, this would call an API endpoint:
       // POST /api/contact-superadmin
       // with rate limiting and database storage
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api';
       const response = await fetch(`${API_BASE_URL}/contact-superadmin`, {
         method: 'POST',
         headers: {

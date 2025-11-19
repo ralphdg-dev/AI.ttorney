@@ -21,7 +21,7 @@ import ActionAppealModal from "../../components/appeals/ActionAppealModal";
 import SuccessModal from "../../components/appeals/SuccessModal";
 import { format } from "date-fns";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api';
 
 const ManageAppeals = () => {
   const [appeals, setAppeals] = React.useState([]);

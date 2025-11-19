@@ -1,10 +1,10 @@
 const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:5001/api";
+  process.env.REACT_APP_API_URL || "https://ai-ttorney-admin-server.onrender.com/api";
 
 // Test server connectivity
 const testServerConnection = async () => {
   try {
-    const healthUrl = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '/health') : 'http://localhost:5001/health';
+    const healthUrl = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '/health') : 'https://ai-ttorney-admin-server.onrender.com/health';
     const response = await fetch(healthUrl);
     const data = await response.json();
     return true;

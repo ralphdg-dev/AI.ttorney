@@ -17,7 +17,7 @@ const ForumPostsByCategoryCard = () => {
     const fetchForumPosts = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5001/api/stats/forum-posts-by-category"
+          `${process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api'}/stats/forum-posts-by-category`
         );
         const result = await response.json();
 

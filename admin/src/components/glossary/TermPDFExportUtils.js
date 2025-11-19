@@ -46,7 +46,7 @@ const logPDFGeneration = async (
 
 
     const response = await fetch(
-      "http://localhost:5001/api/glossary-terms/audit-log",
+      `${process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api'}/glossary-terms/audit-log`,
       {
         method: "POST",
         headers: {

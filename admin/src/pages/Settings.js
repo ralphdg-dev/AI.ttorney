@@ -69,7 +69,7 @@ const Settings = () => {
       const updates = [];
       if (firstName || lastName) {
         updates.push(
-          fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/auth/me`, {
+          fetch(`${process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api'}/auth/me`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
             body: JSON.stringify({ firstName, lastName }),
@@ -78,7 +78,7 @@ const Settings = () => {
       }
       if (wantPasswordChange) {
         updates.push(
-          fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/auth/change-password`, {
+          fetch(`${process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api'}/auth/change-password`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
             body: JSON.stringify({ currentPassword: profileData.currentPassword, newPassword: profileData.newPassword }),
@@ -89,7 +89,7 @@ const Settings = () => {
       // Upload profile picture if a new image was selected (data URL)
       if (profilePicture && typeof profilePicture === 'string' && profilePicture.startsWith('data:')) {
         updates.push(
-          fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/auth/photo`, {
+          fetch(`${process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api'}/auth/photo`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
             body: JSON.stringify({ image: profilePicture })
@@ -140,7 +140,7 @@ const Settings = () => {
     }
     (async () => {
       try {
-        const resp = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/auth/joined`, {
+        const resp = await fetch(`${process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api'}/auth/joined`, {
           headers: { 'Content-Type': 'application/json', ...getAuthHeader() }
         });
         const data = await resp.json();

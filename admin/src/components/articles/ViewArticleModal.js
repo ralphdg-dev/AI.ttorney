@@ -160,7 +160,7 @@ const ViewArticleModal = ({ open, onClose, article }) => {
       setAuditError(null);
 
       const response = await fetch(
-        `http://localhost:5001/api/legal-articles/${article.id}/audit-logs`,
+        `${process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api'}/legal-articles/${article.id}/audit-logs`,
         {
           headers: getAuthHeaders(),
         }

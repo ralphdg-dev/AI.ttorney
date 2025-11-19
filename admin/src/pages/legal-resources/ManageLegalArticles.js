@@ -20,7 +20,7 @@ import PublishModal from "./components/PublishModal";
 import { useToast } from "../../components/ui/Toast";
 
 const categories = ["All", "Family", "Criminal", "Civil", "Labor", "Consumer"];
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api';
 
 const ManageLegalArticles = () => {
   const { showSuccess, showError, showWarning, ToastContainer } = useToast();
