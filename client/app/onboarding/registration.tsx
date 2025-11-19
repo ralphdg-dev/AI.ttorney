@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Image, KeyboardAvoidingView, Platform, ActivityIndicator, Dimensions, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Header from '../../components/Header';
+import tw from 'tailwind-react-native-classnames';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../lib/api-client';
@@ -303,24 +303,10 @@ export default function UserRegistration() {
     });
   }
 
-  const handleBack = () => {
-    // @ts-ignore: canGoBack may not exist on some expo-router versions
-    if (typeof (router as any).canGoBack === 'function' && (router as any).canGoBack()) {
-      router.back();
-    } else {
-      router.push('/role-selection');
-    }
-  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      
-      <Header 
-        showBackButton={true}
-        onBackPress={handleBack}
-        backgroundColor={Colors.background.primary}
-      />
       
       <KeyboardAvoidingView
         className="flex-1"
@@ -340,7 +326,7 @@ export default function UserRegistration() {
         >
         <View className={`w-full ${isDesktop ? 'max-w-lg' : isTablet ? 'max-w-md' : 'max-w-full'}`}>
         {/* Logo */}
-        <View className="items-center mt-2 mb-3">
+        <View className="items-center mt-8 mb-3">
           <Image
             source={require('../../assets/images/logo.png')}
             style={{ width: logoSize, height: logoSize }}
@@ -728,7 +714,7 @@ export default function UserRegistration() {
         <View className="items-center mt-4">
           <Text className="text-gray-500">
             Already have an account?{' '}
-            <Text className="font-bold text-blue-600" onPress={() => router.push('/login')}>Sign In</Text>
+            <Text style={[tw`font-bold`, { color: Colors.primary.blue }]} onPress={() => router.push('/login')}>Sign In</Text>
           </Text>
         </View>
         </View>
