@@ -170,8 +170,9 @@ process.on('SIGINT', () => {
 
 // Start server
 app.listen(PORT, () => {
+  const host = process.env.HOST || 'localhost';
   console.log(`🚀 Admin API Server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔐 Auth endpoint: http://localhost:${PORT}/api/auth`);
+  console.log(`📊 Health check: http://${host}:${PORT}/health`);
+  console.log(`🔐 Auth endpoint: http://${host}:${PORT}/api/auth`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });

@@ -33,7 +33,7 @@ const logViewAction = async (termId) => {
   try {
     const token = localStorage.getItem("admin_token");
     const response = await fetch(
-      `http://localhost:5001/api/glossary-terms/${termId}/view`,
+      `${API_BASE_URL}/glossary-terms/${termId}/view`,
       {
         method: "POST",
         headers: {
@@ -53,7 +53,7 @@ const getTermAuditLogs = async (termId, page = 1, limit = 50) => {
   try {
     const token = localStorage.getItem("admin_token");
     const response = await fetch(
-      `http://localhost:5001/api/glossary-terms/${termId}/audit-logs?page=${page}&limit=${limit}`,
+      `${API_BASE_URL}/glossary-terms/${termId}/audit-logs?page=${page}&limit=${limit}`,
       {
         method: "GET",
         headers: {
@@ -73,7 +73,7 @@ const getTermRecentActivity = async (termId, page = 1, limit = 50) => {
   try {
     const token = localStorage.getItem("admin_token");
     const response = await fetch(
-      `http://localhost:5001/api/glossary-terms/${termId}/recent-activity?page=${page}&limit=${limit}`,
+      `${API_BASE_URL}/glossary-terms/${termId}/recent-activity?page=${page}&limit=${limit}`,
       {
         method: "GET",
         headers: {

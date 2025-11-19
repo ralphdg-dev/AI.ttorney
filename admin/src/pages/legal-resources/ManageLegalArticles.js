@@ -20,6 +20,7 @@ import PublishModal from "./components/PublishModal";
 import { useToast } from "../../components/ui/Toast";
 
 const categories = ["All", "Family", "Criminal", "Civil", "Labor", "Consumer"];
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 const ManageLegalArticles = () => {
   const { showSuccess, showError, showWarning, ToastContainer } = useToast();
@@ -72,9 +73,7 @@ const ManageLegalArticles = () => {
   const fetchArticles = async (archives = false) => {
     setLoading(true);
     try {
-      const res = await fetch(
-        `http://localhost:5001/api/legal-articles?archived=${archives}`
-      );
+      const res = await fetch(`${API_BASE_URL}/legal-articles?archived=${archives}`);
       const json = await res.json();
       if (json.success) {
         setArticles(json.data);
@@ -120,7 +119,7 @@ const ManageLegalArticles = () => {
       data.append("category", formData.category.toLowerCase());
       if (formData.image) data.append("image", formData.image);
 
-      const res = await fetch("http://localhost:5001/api/legal-articles", {
+      const res = await fetch(`${API_BASE_URL}/legal-articles`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -142,13 +141,10 @@ const ManageLegalArticles = () => {
   // Handle archive
   const handleArchive = async (articleId) => {
     try {
-      const res = await fetch(
-        `http://localhost:5001/api/legal-articles/${articleId}/archive`,
-        {
-          method: "PATCH",
-          headers: getAuthHeaders(),
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/legal-articles/${articleId}/archive`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+      });
 
       const json = await res.json();
       if (!json.success) {
@@ -168,13 +164,10 @@ const ManageLegalArticles = () => {
   // Handle restore
   const handleRestore = async (articleId) => {
     try {
-      const res = await fetch(
-        `http://localhost:5001/api/legal-articles/${articleId}/restore`,
-        {
-          method: "PATCH",
-          headers: getAuthHeaders(),
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/legal-articles/${articleId}/restore`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+      });
 
       const json = await res.json();
       if (!json.success) {
@@ -194,14 +187,11 @@ const ManageLegalArticles = () => {
   // Handle publish/unpublish
   const handlePublish = async (articleId, publish) => {
     try {
-      const res = await fetch(
-        `http://localhost:5001/api/legal-articles/${articleId}/publish`,
-        {
-          method: "PATCH",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ publish }),
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/legal-articles/${articleId}/publish`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ publish }),
+      });
 
       const json = await res.json();
       if (!json.success) {

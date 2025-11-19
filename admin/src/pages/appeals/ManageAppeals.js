@@ -21,6 +21,8 @@ import ActionAppealModal from "../../components/appeals/ActionAppealModal";
 import SuccessModal from "../../components/appeals/SuccessModal";
 import { format } from "date-fns";
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+
 const ManageAppeals = () => {
   const [appeals, setAppeals] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -58,7 +60,7 @@ const ManageAppeals = () => {
     try {
       const currentAdmin = getCurrentAdmin();
       const response = await fetch(
-        "http://localhost:5001/api/appeals-management/audit-log",
+        `${API_BASE_URL}/appeals-management/audit-log`,
         {
           method: "POST",
           headers: {
@@ -93,7 +95,7 @@ const ManageAppeals = () => {
       setAuditError(null);
 
       const response = await fetch(
-        `http://localhost:5001/api/appeals-management/${appealId}/audit-logs`,
+        `${API_BASE_URL}/appeals-management/${appealId}/audit-logs`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
@@ -127,7 +129,7 @@ const ManageAppeals = () => {
       setActivityError(null);
 
       const response = await fetch(
-        `http://localhost:5001/api/appeals-management/${appealId}/recent-activity`,
+        `${API_BASE_URL}/appeals-management/${appealId}/recent-activity`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
@@ -158,7 +160,7 @@ const ManageAppeals = () => {
   React.useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch("http://localhost:5001/api/appeals-management");
+        const res = await fetch(`${API_BASE_URL}/appeals-management`);
         const json = await res.json();
         if (json.success) {
           setAppeals(json.data || []);
@@ -209,7 +211,7 @@ const ManageAppeals = () => {
       setActionLoading(true);
 
       const res = await fetch(
-        `http://localhost:5001/api/appeals-management/${id}`,
+        `${API_BASE_URL}/appeals-management/${id}`,
         {
           method: "PATCH",
           headers: {

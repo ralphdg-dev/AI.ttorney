@@ -4,7 +4,8 @@ const API_BASE_URL =
 // Test server connectivity
 const testServerConnection = async () => {
   try {
-    const response = await fetch("http://localhost:5001/health");
+    const healthUrl = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace('/api', '/health') : 'http://localhost:5001/health';
+    const response = await fetch(healthUrl);
     const data = await response.json();
     return true;
   } catch (error) {
@@ -189,7 +190,7 @@ class ForumManagementService {
       const serverOnline = await testServerConnection();
       if (!serverOnline) {
         throw new Error(
-          "Server is not running or not accessible at http://localhost:5001"
+          `Server is not running or not accessible at ${API_BASE_URL.replace('/api', '')}`
         );
       }
 
@@ -260,7 +261,7 @@ class ForumManagementService {
       const serverOnline = await testServerConnection();
       if (!serverOnline) {
         throw new Error(
-          "Server is not running or not accessible at http://localhost:5001"
+          `Server is not running or not accessible at ${API_BASE_URL.replace('/api', '')}`
         );
       }
 
