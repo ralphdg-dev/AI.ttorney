@@ -171,16 +171,47 @@ export default function VerifyOTP() {
         setIsLockedOut(false);
         console.log('🧹 Cleared form states');
 
-        // Best-effort cleanup of temporary registration password
+        // Attempt to automatically sign in the user with stored password
+        try {
+          const storedPassword = await AsyncStorage.getItem('temp_registration_password');
+          console.log('🔍 Retrieved stored password for auto sign-in');
+          
+          if (storedPassword) {
+            // Small delay to ensure email verification status is updated in Supabase
+            console.log('⏳ Waiting briefly for email verification to propagate...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            console.log('🚀 Attempting automatic sign-in after OTP verification');
+            const signInResult = await signIn(email, storedPassword);
+            
+            if (signInResult.success) {
+              console.log('✅ Automatic sign-in successful after OTP verification');
+              // Clean up the temporary password
+              await AsyncStorage.removeItem('temp_registration_password');
+              console.log('🧹 Removed temp_registration_password from storage');
+              // User is now automatically logged in, AuthContext will handle navigation
+              return;
+            } else {
+              console.warn('⚠️ Automatic sign-in failed:', signInResult.error);
+              // Fall back to manual login
+            }
+          } else {
+            console.warn('⚠️ No stored password found for automatic sign-in');
+          }
+        } catch (autoSignInError) {
+          console.error('❌ Auto sign-in error:', autoSignInError);
+        }
+
+        // Fallback: Clean up password if auto sign-in failed
         try {
           await AsyncStorage.removeItem('temp_registration_password');
-          console.log('🧹 Removed temp_registration_password from storage');
+          console.log('🧹 Removed temp_registration_password from storage (fallback)');
         } catch (cleanupError) {
           console.warn('⚠️ Failed to remove temp_registration_password:', cleanupError);
         }
 
-        // Redirect to login so the user can sign in with their now-verified account
-        console.log('🚀 OTP verified, redirecting to login for sign-in');
+        // If auto sign-in failed, redirect to login as fallback
+        console.log('🚀 OTP verified but auto sign-in failed, redirecting to login for manual sign-in');
         router.replace('/login');
       }
     } catch (error) {

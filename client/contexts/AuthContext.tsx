@@ -366,10 +366,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log(`🎯 Auth event: ${event}, current path: ${currentPath}`);
 
             if (event === 'SIGNED_IN' && session) {
-              // Only auto-navigate after sign-in when user is on the login/root page
+              // Auto-navigate after sign-in when user is on login, root, or OTP verification pages
               const isOnLoginPage = currentPath === '/login' || currentPath === '/';
-              const shouldNavigate = isOnLoginPage;
-              console.log(`📍 SIGNED_IN event - shouldNavigate: ${shouldNavigate}`);
+              const isOnOTPPage = currentPath.includes('/onboarding/verify-otp') || currentPath.includes('/onboarding/otp-success');
+              const shouldNavigate = isOnLoginPage || isOnOTPPage;
+              console.log(`📍 SIGNED_IN event - shouldNavigate: ${shouldNavigate} (login: ${isOnLoginPage}, otp: ${isOnOTPPage})`);
               await handleAuthStateChange(session, shouldNavigate);
             } else if (event === 'TOKEN_REFRESHED' && session) {
               console.log('📍 TOKEN_REFRESHED event - will NOT navigate');
