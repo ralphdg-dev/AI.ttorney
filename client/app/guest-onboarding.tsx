@@ -61,7 +61,7 @@ export default function GuestOnboardingScreen() {
       // Show tutorial after navigation to chatbot using global state
       setTimeout(() => setShowTutorial(true), 500);
     } catch (error) {
-      console.error('Failed to start guest session:', error);
+      console.warn('Failed to start guest session:', error);
     }
   };
 

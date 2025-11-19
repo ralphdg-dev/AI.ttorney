@@ -154,7 +154,7 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
     try {
       await AsyncStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
     } catch (error) {
-      console.error('Failed to save tutorial completion:', error);
+      console.warn('Failed to save tutorial completion:', error);
     }
     onComplete();
   };

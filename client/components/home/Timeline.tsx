@@ -193,7 +193,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       if (__DEV__) console.warn('Timeline: No authentication token available');
       return { 'Content-Type': 'application/json' };
     } catch (error) {
-      if (__DEV__) console.error('Timeline auth error:', error);
+      if (__DEV__) console.warn('Timeline auth error:', error);
       return { 'Content-Type': 'application/json' };
     }
   }, [session?.access_token]);
@@ -261,7 +261,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       if (!response.ok) {
         const errorText = await response.text();
         if (response.status === 403) {
-          if (__DEV__) console.error('Timeline: Authentication failed - 403 Forbidden');
+          if (__DEV__) console.warn('Timeline: Authentication failed - 403 Forbidden');
           // Don't clear posts on auth error, just show error message
           setError('Authentication required. Please log in again.');
           return;
@@ -305,18 +305,18 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         }
       }
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        if (__DEV__) console.warn('Timeline: Request timeout');
+      if (error?.name === 'AbortError') {
+        if (__DEV__) console.warn('Timeline: Request aborted or timed out');
         // Retry on timeout
         if (retryCount < MAX_RETRIES && isComponentMounted.current) {
           if (__DEV__) console.log(`Timeline: Retrying... (${retryCount + 1}/${MAX_RETRIES})`);
           setTimeout(() => loadPosts(force, retryCount + 1), 1000 * (retryCount + 1));
-          return;
         }
+        return;
       }
 
-      const errorMessage = error.message || 'Failed to load posts';
-      if (__DEV__) console.error('Timeline load error:', errorMessage);
+      const errorMessage = (error && error.message) ? error.message : 'Failed to load posts';
+      if (__DEV__) console.warn('Timeline load error:', errorMessage);
 
       if (isComponentMounted.current) {
         // Only show error if we have no posts to display
