@@ -88,7 +88,8 @@ const Login = () => {
       // In production, this would call an API endpoint:
       // POST /api/contact-superadmin
       // with rate limiting and database storage
-      const response = await fetch('http://localhost:5001/api/contact-superadmin', {
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+      const response = await fetch(`${API_BASE_URL}/contact-superadmin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
