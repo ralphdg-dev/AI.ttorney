@@ -134,6 +134,11 @@ export default function ForgotPassword() {
   };
 
   const handleVerifyOTP = async () => {
+    if (canResend) {
+      setError("This code has expired. Please request a new reset code.");
+      return;
+    }
+
     const otpString = otp.join("");
 
     console.log("🔍 DEBUG: Frontend OTP verification");
@@ -506,7 +511,7 @@ export default function ForgotPassword() {
           return {
             title: isLoading ? "Verifying..." : "Verify",
             onPress: handleVerifyOTP,
-            disabled: isLoading || !isOtpComplete || isLockedOut
+            disabled: isLoading || !isOtpComplete || isLockedOut || canResend
           };
         case 'reset':
           return {
