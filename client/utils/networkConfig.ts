@@ -39,7 +39,12 @@ export class NetworkConfig {
       return `http://localhost:8000`;
     }
     
-    return `http://${detectedIP}:${this.DEFAULT_PORT}`;
+    const apiUrl = `http://${detectedIP}:${this.DEFAULT_PORT}`;
+    if (__DEV__) {
+      console.log(`🔗 Using API URL: ${apiUrl} (Platform: ${Platform.OS})`);
+    }
+    
+    return apiUrl;
   }
 
   /**
@@ -59,41 +64,50 @@ export class NetworkConfig {
                           (Constants.manifest as any)?.debuggerHost ||
                           Constants.manifest2?.extra?.expoClient?.hostUri;
       
+      console.log('🔍 DEBUG: Expo manifest data:', {
+        hostUri: Constants.expoConfig?.hostUri,
+        debuggerHost: (Constants.manifest as any)?.debuggerHost,
+        manifest2: Constants.manifest2?.extra?.expoClient?.hostUri,
+        platform: Platform.OS
+      });
+      
       if (debuggerHost) {
         const ip = debuggerHost.split(':')[0];
+        console.log(`🔍 DEBUG: Extracted IP from debuggerHost: ${ip}`);
+        
         if (this.isValidIP(ip)) {
           // Check for CLAT46 translated addresses that React Native can't connect to
           if (ip === '192.0.0.2') {
-            if (__DEV__) {
-              console.log(`⚠️ Detected CLAT46 address ${ip}, using platform-specific fallback`);
-            }
+            console.log(`⚠️ Detected CLAT46 address ${ip}, using platform-specific fallback`);
             // Use platform-specific fallback for CLAT46 addresses
             if (Platform.OS === 'android') {
-              return this.getLocalNetworkIP(); // Use actual local network IP
+              const fallbackIP = this.getLocalNetworkIP();
+              console.log(`🔄 Using fallback IP: ${fallbackIP}`);
+              return fallbackIP;
             } else {
               return 'localhost'; // iOS Simulator and Web
             }
           }
-          if (__DEV__) {
-            console.log(`📡 Auto-detected API server IP: ${ip}`);
-          }
+          console.log(`📡 Using detected API server IP: ${ip}`);
           return ip;
         }
       }
 
       // Fallback for emulators/simulators
       if (Platform.OS === 'ios') {
+        console.log('📱 iOS detected, using localhost');
         return 'localhost'; // iOS Simulator
       } else if (Platform.OS === 'android') {
-        return this.getLocalNetworkIP(); // Use actual local network IP
+        const fallbackIP = this.getLocalNetworkIP();
+        console.log(`🤖 Android detected, using fallback IP: ${fallbackIP}`);
+        return fallbackIP;
       }
 
+      console.log('🔄 Using default localhost');
       return 'localhost';
 
     } catch (error) {
-      if (__DEV__) {
-        console.warn('⚠️ IP detection failed, using fallback:', error);
-      }
+      console.warn('⚠️ IP detection failed, using fallback:', error);
       return 'localhost';
     }
   }
@@ -103,21 +117,8 @@ export class NetworkConfig {
    * This is needed when CLAT46 addresses are detected
    */
   private static getLocalNetworkIP(): string {
-    // For Android emulator, we need to use the actual local network IP
-    // Common local network ranges: 192.168.x.x, 172.16-31.x.x, 10.x.x.x
-    // Since we can't directly access network interfaces in React Native,
-    // we'll use common fallback IPs that work in most development setups
-    
-    // Try common local network IPs that are likely to work
-    const commonIPs = [
-      '172.20.10.2',  // Common hotspot IP
-      '192.168.1.2',  // Common router IP range
-      '192.168.0.2',  // Common router IP range
-      '10.0.0.2',     // Common network IP
-      '10.0.2.2'      // Android emulator default
-    ];
-    
-    // For now, return the first common IP (we detected 172.20.10.2 works)
+    // Based on server logs, we know the server is accessible at 172.20.10.2
+    // This is the IP that the server is receiving requests from
     return '172.20.10.2';
   }
 
@@ -242,5 +243,58 @@ export class NetworkConfig {
   static async refreshConnection(): Promise<string> {
     this.clearCache();
     return await this.getBestApiUrl();
+  }
+
+  /**
+   * Test network connectivity to help debug issues
+   */
+  static async testConnection(): Promise<{
+    success: boolean;
+    url: string;
+    error?: string;
+    diagnostics: object;
+  }> {
+    const url = this.getApiUrl();
+    const diagnostics = this.getNetworkInfo();
+    
+    console.log('🔍 Network Diagnostics:', diagnostics);
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(`${url}/health`, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        console.log('✅ Network test successful');
+        return { success: true, url, diagnostics };
+      } else {
+        console.log(`❌ Network test failed: ${response.status}`);
+        return { 
+          success: false, 
+          url, 
+          error: `Server responded with status ${response.status}`,
+          diagnostics 
+        };
+      }
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.log(`❌ Network test failed: ${errorMessage}`);
+      return { 
+        success: false, 
+        url, 
+        error: errorMessage,
+        diagnostics 
+      };
+    }
   }
 }

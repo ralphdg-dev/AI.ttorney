@@ -1,16 +1,13 @@
-import React, { useRef, useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  SafeAreaView,
   ScrollView,
+  StyleSheet,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useGuest } from '../contexts/GuestContext';
 import { 
   MessageSquarePlus, 
   Scale, 
@@ -18,17 +15,15 @@ import {
   ArrowRight,
   User
 } from 'lucide-react-native';
-import tw from 'tailwind-react-native-classnames';
+import { useGuest } from '../contexts/GuestContext';
 
-const { width: screenWidth } = Dimensions.get('window');
 
 export default function GuestOnboardingScreen() {
+  console.log('🏠 Guest onboarding page loaded - checking for auto-redirect triggers');
+  
   const { startGuestSession, setShowTutorial } = useGuest();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  
-  console.log('🏠 Guest onboarding page loaded - checking for auto-redirect triggers');
-  
   
   const features = [
     {
@@ -99,7 +94,7 @@ export default function GuestOnboardingScreen() {
 
         {/* Features */}
         <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>What's Available</Text>
+          <Text style={styles.sectionTitle}>What&apos;s Available</Text>
           {features.map((feature, index) => {
             const IconComponent = feature.icon;
             return (
@@ -150,8 +145,7 @@ export default function GuestOnboardingScreen() {
         {/* Bottom spacing */}
         <View style={{ height: 40 }} />
       </ScrollView>
-
-          </SafeAreaView>
+    </SafeAreaView>
   );
 };
 
@@ -317,4 +311,3 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
-

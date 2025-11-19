@@ -35,14 +35,25 @@ class ApiClient {
     try {
       const baseUrl = await this.getBaseUrl();
       const headers = await this.getAuthHeaders();
+      const fullUrl = `${baseUrl}${endpoint}`;
       
-      const response = await fetch(`${baseUrl}${endpoint}`, {
+      console.log(`🌐 API Request: ${options.method || 'GET'} ${fullUrl}`);
+      console.log(`🔗 Base URL: ${baseUrl}`);
+      
+      // Create a timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout after 10 seconds')), 10000);
+      });
+      
+      const fetchPromise = fetch(fullUrl, {
         ...options,
         headers: {
           ...headers,
           ...options.headers,
         },
       });
+      
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
 
       let data: any = null;
       let text: string | null = null;
@@ -91,8 +102,25 @@ class ApiClient {
       console.log('🔍 DEBUG: Success response:', successResponse);
       return successResponse;
     } catch (error) {
-      console.error('API request failed:', error);
-      return { error: error instanceof Error ? error.message : 'Unknown error', success: false };
+      console.error('🚨 API request failed:', error);
+      console.error('🚨 Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      
+      let errorMessage = 'Network request failed';
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Request timed out. Please check your internet connection.';
+        } else if (error.message.includes('Network request failed')) {
+          errorMessage = 'Cannot connect to server. Please check if the server is running and your network connection.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      return { error: errorMessage, success: false };
     }
   }
 
