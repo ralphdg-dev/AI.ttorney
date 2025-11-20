@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
-import { View, ScrollView } from 'react-native';
+import { View, ScrollView, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import tw from 'tailwind-react-native-classnames';
 import { useRouter, usePathname } from 'expo-router';
 import Header from '@/components/Header';
@@ -47,8 +48,10 @@ export default function AboutScreen() {
   }, [router, isGuestMode, isAuthenticated, user?.role, pathname]);
 
   return (
-    <View style={tw`flex-1 bg-white`}>
-      <Header showBackButton={true} showMenu={false} onBackPress={handleBackPress} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={["top", "left", "right"]}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      <View style={tw`flex-1 bg-white`}>
+        <Header showBackButton={true} showMenu={false} onBackPress={handleBackPress} />
 
       <ScrollView
         style={tw`flex-1`}
@@ -266,7 +269,8 @@ export default function AboutScreen() {
       ) : (
         <Navbar activeTab="profile" />
       )}
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
