@@ -546,7 +546,7 @@ export default function DirectoryScreen() {
               {loading && !refreshing ? (
                 <LawyerListSkeleton count={3} />
               ) : filteredLawyers.length === 0 ? (
-                <VStack className="items-center justify-center py-12 px-6">
+                <VStack className="items-center justify-center px-6 py-12">
                   <Ionicons
                     name="search-outline"
                     size={48}
@@ -554,13 +554,13 @@ export default function DirectoryScreen() {
                     style={{ marginBottom: 12 }}
                   />
                   <UIText
-                    className="text-center text-base font-semibold mb-2"
+                    className="mb-2 text-base font-semibold text-center"
                     style={{ color: Colors.text.head }}
                   >
                     No lawyers found
                   </UIText>
                   <UIText
-                    className="text-center text-sm"
+                    className="text-sm text-center"
                     style={{ color: Colors.text.sub }}
                   >
                     {searchQuery

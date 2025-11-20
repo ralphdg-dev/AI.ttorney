@@ -29,6 +29,7 @@ import Colors from '../../../constants/Colors';
 import { NetworkConfig } from '../../../utils/networkConfig';
 import { shadowPresets, createShadowStyle } from '../../../utils/shadowUtils';
 import UnifiedSearchBar from '@/components/common/UnifiedSearchBar';
+import { LAYOUT } from '../../../constants/LayoutConstants';
 
 interface LawFirm {
   id: string;
@@ -1315,8 +1316,8 @@ export default function GoogleLawFirmsFinder({ searchQuery, cache }: GoogleLawFi
 
   // Search header with autocomplete dropdown - Unified with lawyer directory style
   const renderSearchHeader = () => (
-    <VStack className="px-5 bg-white" style={{ zIndex: 999 }}>
-      <Box className="relative" style={{ zIndex: 1000 }}>
+    <VStack className="px-5 bg-white" style={{ zIndex: LAYOUT.Z_INDEX.base }}>
+      <Box className="relative" style={{ zIndex: LAYOUT.Z_INDEX.dropdown }}>
         {/* Unified search bar using the same component as lawyer directory */}
         <UnifiedSearchBar
           value={searchText}
@@ -1340,7 +1341,7 @@ export default function GoogleLawFirmsFinder({ searchQuery, cache }: GoogleLawFi
               borderWidth: 1,
               borderColor: '#E5E7EB',
               ...shadowPresets.medium,
-              zIndex: 9999,
+              zIndex: LAYOUT.Z_INDEX.dropdown,
               maxHeight: 250,
               overflow: 'hidden',
             }}
@@ -1455,7 +1456,7 @@ export default function GoogleLawFirmsFinder({ searchQuery, cache }: GoogleLawFi
               shadowRadius: 8,
               elevation: 10,
             }),
-            zIndex: 9999,
+            zIndex: LAYOUT.Z_INDEX.dropdown,
             minWidth: 120,
           }}
         >
@@ -1741,7 +1742,7 @@ export default function GoogleLawFirmsFinder({ searchQuery, cache }: GoogleLawFi
     <Box className="relative flex-1">
       {/* Law Firm Counter - Top Right */}
       {filteredLawFirms.length > 0 && (
-        <Box className="absolute top-3 right-3" style={{ zIndex: 1000 }}>
+        <Box className="absolute top-3 right-3" style={{ zIndex: LAYOUT.Z_INDEX.sticky }}>
           <Box style={{
             backgroundColor: 'rgba(255, 255, 255, 0.95)',
             paddingHorizontal: 10,
@@ -1797,7 +1798,7 @@ export default function GoogleLawFirmsFinder({ searchQuery, cache }: GoogleLawFi
     <Box className="flex-1 bg-gray-50">
       <VStack className="flex-1">
         {/* Fixed Search Header */}
-        <Box className="bg-white border-b border-gray-200" style={{ zIndex: 100 }}>
+        <Box className="bg-white border-b border-gray-200" style={{ zIndex: LAYOUT.Z_INDEX.sticky }}>
           {renderSearchHeader()}
         </Box>
         

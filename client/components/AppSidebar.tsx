@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Dimensions } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Dimensions, Platform, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useBookmarks } from "../contexts/BookmarksContext";
@@ -25,9 +25,7 @@ import {
 import Colors from "../constants/Colors";
 import { GlobalStyles } from "../constants/GlobalStyles";
 import { useAuth } from "../contexts/AuthContext";
-import { createShadowStyle } from "../utils/shadowUtils";
 import { LAYOUT } from "../constants/LayoutConstants";
-import { Image } from "react-native";
 
 const { width: screenWidth } = Dimensions.get("window");
 const SIDEBAR_WIDTH = Math.min(screenWidth * 0.75, 320);
@@ -556,6 +554,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: SIDEBAR_WIDTH,
     backgroundColor: "#FFFFFF",
+    zIndex: LAYOUT.Z_INDEX.drawer,
+    elevation: Platform.OS === 'android' ? 8 : undefined,
   },
   header: {
     flexDirection: "row",
