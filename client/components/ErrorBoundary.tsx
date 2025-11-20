@@ -1,5 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { router } from 'expo-router';
+import { NetworkConfig } from '../utils/networkConfig';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -40,21 +42,26 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     }
   }
 
-  private logErrorToService = (error: Error, errorInfo: React.ErrorInfo) => {
-    const errorData = {
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
-      timestamp: new Date().toISOString(),
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
-      url: typeof window !== 'undefined' ? window.location.href : 'unknown'
-    };
+  private logErrorToService = async (error: Error, errorInfo: React.ErrorInfo) => {
+    try {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const errorData = {
+        message: error.message,
+        stack: error.stack,
+        componentStack: errorInfo.componentStack,
+        timestamp: new Date().toISOString(),
+        platform: Platform.OS,
+        userAgent: Platform.OS === 'web' && typeof navigator !== 'undefined' ? navigator.userAgent : `${Platform.OS}/${Platform.Version}`,
+      };
 
-    fetch('/api/errors', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(errorData)
-    }).catch(logError => console.error('Failed to log error:', logError));
+      await fetch(`${apiUrl}/api/errors`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(errorData)
+      });
+    } catch (logError) {
+      console.error('Failed to log error:', logError);
+    }
   };
 
   private handleRetry = () => {
@@ -80,12 +87,17 @@ interface ErrorFallbackProps {
   fallbackRoute?: string;
 }
 
-const ErrorFallback: React.FC<ErrorFallbackProps> = ({ error, onRetry }) => {
+const ErrorFallback: React.FC<ErrorFallbackProps> = ({ error, onRetry, fallbackRoute }) => {
   const handleGoHome = () => {
-    // Don't use router in error boundary - just reload the app
-    // This ensures we don't cause another error if navigation context is broken
-    if (typeof window !== 'undefined') {
-      window.location.href = '/';
+    onRetry();
+    try {
+      router.replace((fallbackRoute || '/') as any);
+    } catch (navError) {
+      console.error('Navigation error:', navError);
+      // Fallback for web only
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.location.href = fallbackRoute || '/';
+      }
     }
   };
 

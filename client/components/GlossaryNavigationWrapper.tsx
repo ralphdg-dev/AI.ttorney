@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { router } from 'expo-router';
 
 interface GlossaryNavigationWrapperProps {
   children: React.ReactNode;
@@ -34,9 +35,14 @@ export class GlossaryNavigationWrapper extends React.Component<
   }
 
   handleReload = () => {
-    // Try to reload the app
-    if (typeof window !== 'undefined') {
-      window.location.reload();
+    try {
+      router.replace('/glossary' as any);
+    } catch (navError) {
+      console.error('Navigation error:', navError);
+      // Fallback for web only
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.location.reload();
+      }
     }
   };
 

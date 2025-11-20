@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, clearAuthStorage } from '../config/supabase';
-import { router } from 'expo-router';
+import { router, useSegments } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
 import { useToast, Toast, ToastTitle, ToastDescription } from '../components/ui/toast';
 import { NetworkConfig } from '../utils/networkConfig';
@@ -67,6 +67,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [hasRedirectedToStatus, setHasRedirectedToStatus] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const toast = useToast();
+  const segments = useSegments();
+
+  // React Native compatible route detection
+  const getCurrentRoute = React.useCallback(() => {
+    return '/' + segments.join('/');
+  }, [segments]);
 
 
   const checkSuspensionStatus = React.useCallback(async (): Promise<{ isSuspended: boolean; suspensionCount: number; suspensionEnd: string | null } | null> => {
@@ -147,7 +153,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [authState.session?.access_token]);
 
   const handleAuthStateChange = React.useCallback(async (session: any, shouldNavigate: boolean = true) => {
-    console.log(`🔄 handleAuthStateChange called - shouldNavigate: ${shouldNavigate}, current path: ${window.location.pathname}`);
+    const currentPath = getCurrentRoute();
+    console.log(`🔄 handleAuthStateChange called - shouldNavigate: ${shouldNavigate}, current path: ${currentPath}`);
     
     const timeoutId = setTimeout(() => {
       console.warn('Auth timeout');
@@ -262,7 +269,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (profile.account_status === 'deactivated') {
           console.log('🔐 User is deactivated, checking current route');
           // Only redirect if not already on deactivated page to prevent infinite loops
-          const currentRoute = window.location.pathname || '';
+          const currentRoute = getCurrentRoute();
           if (!currentRoute.includes('/deactivated')) {
             console.log('🔐 Redirecting to deactivated page');
             setIsLoading(false);
@@ -278,7 +285,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Check if user is banned FIRST - this takes priority over everything
         if (profile.account_status === 'banned') {
-          const currentRoute = window.location.pathname || '';
+          const currentRoute = getCurrentRoute();
           if (!currentRoute.includes('/banned')) {
             setIsLoading(false);
             clearTimeout(timeoutId);
@@ -333,7 +340,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
       clearTimeout(timeoutId);
     }
-  }, [checkLawyerApplicationStatus, checkSuspensionStatus]);
+  }, [checkLawyerApplicationStatus, checkSuspensionStatus, getCurrentRoute]);
 
   useEffect(() => {
     // Initialize auth state and listen for auth changes
@@ -364,7 +371,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Listen for auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event: string, session: any) => {
-            const currentPath = window.location.pathname || '';
+            const currentPath = getCurrentRoute();
             console.log(`🎯 Auth event: ${event}, current path: ${currentPath}`);
 
             if (event === 'SIGNED_IN' && session) {
@@ -504,7 +511,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }));
           
           if (profile.account_status === 'deactivated') {
-            const currentRoute = window.location.pathname || '';
+            const currentRoute = getCurrentRoute();
             if (!currentRoute.includes('/deactivated')) {
               router.replace('/deactivated' as any);
             }

@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   Alert,
-  Animated,
-  Easing,
   StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -27,7 +25,6 @@ import { SidebarWrapper } from "../../components/AppSidebar";
 import { useAuth } from "../../contexts/AuthContext";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../../constants/Colors";
-import { shouldUseNativeDriver } from "../../utils/animations";
 import { NetworkConfig } from "../../utils/networkConfig";
 import { formatConsultationTime } from "../../utils/consultationUtils";
 import { useToast, Toast, ToastTitle, ToastDescription } from "../../components/ui/toast";
@@ -59,9 +56,7 @@ const LawyerConsultPage: React.FC = () => {
   const [filter, setFilter] = useState<
     "all" | "pending" | "accepted" | "completed"
   >("all");
-  const [consultationRequests, setConsultationRequests] = useState<
-    ConsultationRequest[]
-  >([]);
+  const [allConsultations, setAllConsultations] = useState<ConsultationRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     total_requests: 0,
@@ -71,51 +66,6 @@ const LawyerConsultPage: React.FC = () => {
     rejected_requests: 0,
     today_sessions: 0,
   });
-
-  const SkeletonBox = ({ width, height, style }: any) => {
-    const animatedValue = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(animatedValue, {
-            toValue: 1,
-            duration: 1000,
-            easing: Easing.ease,
-            useNativeDriver: shouldUseNativeDriver('opacity'),
-          }),
-          Animated.timing(animatedValue, {
-            toValue: 0,
-            duration: 1000,
-            easing: Easing.ease,
-            useNativeDriver: shouldUseNativeDriver('opacity'),
-          }),
-        ])
-      ).start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    const opacity = animatedValue.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.3, 0.7],
-    });
-
-    return (
-      <Animated.View
-        style={[
-          {
-            width,
-            height,
-            backgroundColor: "#E5E7EB",
-            borderRadius: 6,
-            opacity,
-          },
-          style,
-        ]}
-      />
-    );
-  };
-
   const [currentTime, setCurrentTime] = useState(new Date());
   const [confirmationModal, setConfirmationModal] = useState<{
     isOpen: boolean;
@@ -158,18 +108,15 @@ const LawyerConsultPage: React.FC = () => {
     };
   };
 
-  // Fetch consultation requests
+  // Single API call - fetch all consultations once, filter client-side
   const fetchConsultationRequests = async () => {
     if (!user?.id) return;
 
     try {
       setLoading(true);
-
       const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(
-        `${apiUrl}/api/consult-actions/my-consultations${
-          filter !== "all" ? `?status_filter=${filter}` : ""
-        }`,
+        `${apiUrl}/api/consult-actions/my-consultations`,
         {
           headers: {
             Authorization: `Bearer ${session?.access_token}`,
@@ -180,68 +127,32 @@ const LawyerConsultPage: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setConsultationRequests(data);
-
-        // Calculate accurate stats from the fetched data
-        const calculatedStats = calculateStats(data);
-        setStats(calculatedStats);
+        setAllConsultations(data);
+        setStats(calculateStats(data));
       } else {
-        console.error("Failed to fetch consultation requests");
         Alert.alert("Error", "Failed to load consultation requests");
       }
-    } catch (error) {
-      if (__DEV__) {
-        console.error("Error fetching consultation requests:", error);
-      }
+    } catch {
       Alert.alert("Error", "Failed to load consultations. Please check your connection.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch statistics (fallback to API if needed)
-  const fetchStats = async () => {
-    if (!user?.id) return;
-
-    try {
-      const apiUrl = await NetworkConfig.getBestApiUrl();
-      const response = await fetch(
-        `${apiUrl}/api/consult-actions/stats`,
-        {
-          headers: {
-            Authorization: `Bearer ${session?.access_token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setStats((prevStats) => ({
-          ...prevStats,
-          ...data, // Merge API stats with calculated ones
-        }));
-      }
-    } catch (error) {
-      if (__DEV__) {
-        console.error("Error fetching stats:", error);
-      }
-      // If API fails, we'll rely on the calculated stats
-    }
-  };
-
   useEffect(() => {
     if (user?.id && session?.access_token) {
-      // Wrap in async IIFE to handle promises properly
-      (async () => {
-        await fetchConsultationRequests();
-        await fetchStats();
-      })();
+      fetchConsultationRequests();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, session?.access_token, filter]);
+  }, [user?.id, session?.access_token]);
 
-  const getModeIcon = (mode: string | null) => {
+  // Client-side filtering (instant, no API calls)
+  const consultationRequests = useMemo(() => {
+    if (filter === "all") return allConsultations;
+    return allConsultations.filter(req => req.status === filter);
+  }, [allConsultations, filter]);
+
+  const getModeIcon = useCallback((mode: string | null) => {
     switch (mode) {
       case "online":
         return Video;
@@ -250,9 +161,9 @@ const LawyerConsultPage: React.FC = () => {
       default:
         return MessageCircle;
     }
-  };
+  }, []);
 
-  const getModeColor = (mode: string | null) => {
+  const getModeColor = useCallback((mode: string | null) => {
     switch (mode) {
       case "online":
         return { bg: "#E8F4FD", border: "#C1E4F7", text: Colors.primary.blue };
@@ -261,9 +172,9 @@ const LawyerConsultPage: React.FC = () => {
       default:
         return { bg: "#F3F4F6", border: "#D1D5DB", text: "#374151" };
     }
-  };
+  }, []);
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = useCallback((status: string) => {
     switch (status) {
       case "pending":
         return { bg: "#FEF3C7", text: "#92400E" };
@@ -276,7 +187,7 @@ const LawyerConsultPage: React.FC = () => {
       default:
         return { bg: "#F3F4F6", text: "#374151" };
     }
-  };
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -333,58 +244,24 @@ const LawyerConsultPage: React.FC = () => {
     });
   };
 
-  const handleRequestPress = (requestId: string) => {
-    console.log(`Consultation request ${requestId} pressed`);
+  const handleRequestPress = useCallback((requestId: string) => {
     router.push(`/lawyer/consultation/${requestId}`);
-  };
+  }, [router]);
 
-  const handleAcceptRequest = (
-    requestId: string,
-    clientName: string,
-    event?: any
-  ) => {
-    if (event) {
-      event.stopPropagation();
-    }
-    setConfirmationModal({
-      isOpen: true,
-      actionType: "accept",
-      requestId,
-      clientName,
-    });
-  };
+  const handleAcceptRequest = useCallback((requestId: string, clientName: string, event?: any) => {
+    event?.stopPropagation();
+    setConfirmationModal({ isOpen: true, actionType: "accept", requestId, clientName });
+  }, []);
 
-  const handleCompleteRequest = (
-    requestId: string,
-    clientName: string,
-    event?: any
-  ) => {
-    if (event) {
-      event.stopPropagation();
-    }
-    setConfirmationModal({
-      isOpen: true,
-      actionType: "complete",
-      requestId,
-      clientName,
-    });
-  };
+  const handleCompleteRequest = useCallback((requestId: string, clientName: string, event?: any) => {
+    event?.stopPropagation();
+    setConfirmationModal({ isOpen: true, actionType: "complete", requestId, clientName });
+  }, []);
 
-  const handleRejectRequest = (
-    requestId: string,
-    clientName: string,
-    event?: any
-  ) => {
-    if (event) {
-      event.stopPropagation();
-    }
-    setConfirmationModal({
-      isOpen: true,
-      actionType: "reject",
-      requestId,
-      clientName,
-    });
-  };
+  const handleRejectRequest = useCallback((requestId: string, clientName: string, event?: any) => {
+    event?.stopPropagation();
+    setConfirmationModal({ isOpen: true, actionType: "reject", requestId, clientName });
+  }, []);
 
   const handleConfirmAction = async () => {
     if (!confirmationModal.requestId || !confirmationModal.actionType) return;
@@ -418,7 +295,6 @@ const LawyerConsultPage: React.FC = () => {
       if (response.ok) {
         // Refresh the data
         await fetchConsultationRequests();
-        await fetchStats();
         
         // Show success toast
         toast.show({
@@ -490,56 +366,9 @@ const LawyerConsultPage: React.FC = () => {
         <Header
           title="Consultations"
         />
-        <ScrollView
-          style={tw`flex-1`}
-          contentContainerStyle={tw`pb-24`}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Stats Grid Skeleton */}
-          <View style={tw`px-4 pt-6 pb-2`}>
-            <SkeletonBox width="30%" height={24} style={{ marginBottom: 16 }} />
-            <View style={tw`flex-row flex-wrap -mr-3`}>
-              {[1, 2, 3, 4].map((i) => (
-                <View
-                  key={i}
-                  style={[
-                    tw`bg-white rounded-xl p-4 flex-1 border border-gray-100 mr-3 mb-3`,
-                    { minWidth: 144 },
-                  ]}
-                >
-                  <View style={tw`flex-row items-center justify-between mb-2`}>
-                    <SkeletonBox
-                      width={40}
-                      height={40}
-                      style={{ borderRadius: 8 }}
-                    />
-                    <SkeletonBox width={40} height={32} />
-                  </View>
-                  <SkeletonBox width="80%" height={14} />
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Filter tabs skeleton */}
-          <View style={tw`px-4 py-4`}>
-            <View style={tw`flex-row -mr-3`}>
-              {[1, 2, 3, 4].map((i) => (
-                <SkeletonBox
-                  key={i}
-                  width={100}
-                  height={40}
-                  style={{ borderRadius: 20, marginRight: 12 }}
-                />
-              ))}
-            </View>
-          </View>
-
-          {/* Consultation cards skeleton */}
-          <View style={tw`px-5`}>
-            <ConsultationListSkeleton count={3} />
-          </View>
-        </ScrollView>
+        <View style={tw`flex-1 px-5 pt-6`}>
+          <ConsultationListSkeleton count={5} />
+        </View>
       </SafeAreaView>
     );
   }
