@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Alert, Platform, TextInput, TouchableOpacity, View, Text, ScrollView, KeyboardAvoidingView, StatusBar, Image } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useToast, Toast, ToastTitle, ToastDescription } from "../../components/ui/toast";
-import { router } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
 import PrimaryButton from "../../components/ui/PrimaryButton";
@@ -10,10 +10,13 @@ import Header from "../../components/Header";
 import Colors from "../../constants/Colors";
 import { apiClient } from "../../lib/api-client";
 import otpsent from "../../assets/images/otpsent.png";
+import { safeGoBack } from "../../utils/navigationHelper";
 
 type Step = 'email' | 'otp' | 'reset';
 
 export default function ForgotPassword() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [currentStep, setCurrentStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
@@ -187,9 +190,9 @@ export default function ForgotPassword() {
       if (result.error) {
         setError(result.error);
         
-        if (result.locked_out || result.lockedOut) {
+        if (result.locked_out) {
           setIsLockedOut(true);
-          setLockoutTimer(result.retry_after || result.retryAfter || 900);
+          setLockoutTimer(result.retry_after || 900);
           setOtp(["", "", "", "", "", ""]);
         }
         
@@ -199,13 +202,9 @@ export default function ForgotPassword() {
         
         if (isExpiredOrNotFound) {
           setCanResend(true);
-          setResendTimer(0);
-          setOtp(["", "", "", "", "", ""]);
         }
         
-        if (result.attemptsRemaining !== undefined) {
-          setAttemptsRemaining(result.attemptsRemaining);
-        } else if (result.attempts_remaining !== undefined) {
+        if (result.attempts_remaining) {
           setAttemptsRemaining(result.attempts_remaining);
         }
       } else {
@@ -670,14 +669,12 @@ export default function ForgotPassword() {
           <Header 
             title="Forgot Password"
             showBackButton={true}
-            onBackPress={() => {
-              // Try to go back, but if no history exists, navigate to login
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/login');
-              }
-            }}
+            onBackPress={() => safeGoBack(router, {
+              isGuestMode: true, // Forgot password is accessible to guests
+              isAuthenticated: false,
+              userRole: undefined,
+              currentPath: pathname,
+            })}
           />
           
           <ScrollView

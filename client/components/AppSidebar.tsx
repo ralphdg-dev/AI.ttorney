@@ -499,7 +499,8 @@ export const SidebarWrapper: React.FC<{
         router.push("/about");
         break;
       case "apply-lawyer":
-        router.push("/apply-lawyer");
+        // Navigate directly to verification instructions to avoid redirect loop
+        router.push("/onboarding/lawyer/verification-instructions");
         break;
       case "profile":
         console.log("Profile page not implemented yet");

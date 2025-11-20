@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { appealService } from '../services/appealService';
 import { ArrowLeft, FileText } from 'lucide-react-native';
+import { safeGoBack } from '../utils/navigationHelper';
 
 const APPEAL_REASONS = [
   { value: 'Content was misclassified', label: 'Content was misclassified by AI' },
@@ -14,8 +15,9 @@ const APPEAL_REASONS = [
 ];
 
 export default function AppealSubmissionScreen() {
-  const { suspensionId } = useLocalSearchParams<{ suspensionId: string }>();
-  const { session } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { session, user, isAuthenticated } = useAuth();
   
   const [selectedReason, setSelectedReason] = useState('');
   const [customReason, setCustomReason] = useState('');
@@ -28,10 +30,7 @@ export default function AppealSubmissionScreen() {
     const finalReason = selectedReason === 'Other' ? customReason : selectedReason;
     
     if (!finalReason || finalReason.trim().length < 10) {
-      newErrors.reason = 'Reason must be at least 10 characters';
-    }
-    if (finalReason.trim().length > 200) {
-      newErrors.reason = 'Reason must not exceed 200 characters';
+      newErrors.reason = 'Please provide at least 10 characters for your reason';
     }
 
     setErrors(newErrors);
@@ -77,7 +76,7 @@ export default function AppealSubmissionScreen() {
               } else {
                 Alert.alert('Submission Failed', 'Failed to submit appeal');
               }
-            } catch (error) {
+            } catch {
               Alert.alert('Error', 'An unexpected error occurred');
             } finally {
               setSubmitting(false);
@@ -89,14 +88,18 @@ export default function AppealSubmissionScreen() {
   };
 
   const reasonLength = (selectedReason === 'Other' ? customReason : selectedReason).length;
-  const messageLength = 0;
 
   return (
     <ScrollView className="flex-1 bg-gray-50">
       <View className="p-6">
         {/* Header */}
         <View className="flex-row items-center mb-6">
-          <TouchableOpacity onPress={() => router.back()} className="mr-3">
+          <TouchableOpacity onPress={() => safeGoBack(router, {
+            isGuestMode: false,
+            isAuthenticated,
+            userRole: user?.role,
+            currentPath: pathname,
+          })} className="mr-3">
             <ArrowLeft size={24} color="#1F2937" />
           </TouchableOpacity>
           <Text className="text-2xl font-bold text-gray-900">Submit Appeal</Text>
@@ -190,7 +193,12 @@ export default function AppealSubmissionScreen() {
 
         {/* Cancel Button */}
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => safeGoBack(router, {
+            isGuestMode: false,
+            isAuthenticated,
+            userRole: user?.role,
+            currentPath: pathname,
+          })}
           className="mt-3 py-3 rounded-lg border border-gray-300"
         >
           <Text className="text-gray-700 font-semibold text-center">Cancel</Text>

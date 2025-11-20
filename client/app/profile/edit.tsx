@@ -15,12 +15,13 @@ import { useAuth } from "../../contexts/AuthContext";
 import AuthGuard from "../../components/AuthGuard";
 import tw from "tailwind-react-native-classnames";
 import { supabase } from "../../config/supabase";
-import { useRouter } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 import { useToast, Toast, ToastTitle, ToastDescription } from "../../components/ui/toast";
 import { Avatar, AvatarImage, AvatarFallbackText } from "../../components/ui/avatar";
 import { VStack } from "../../components/ui/vstack";
 import { createShadowStyle } from "../../utils/shadowUtils";
 import { NetworkConfig } from "../../utils/networkConfig";
+import { safeGoBack } from '../../utils/navigationHelper';
 
 interface UserProfileData {
   full_name: string;
@@ -108,6 +109,7 @@ const makeApiRequest = async ({ method, endpoint, body, timeout = DEFAULT_TIMEOU
 export default function EditProfilePage() {
   const { user, isAuthenticated, refreshUserData } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const toast = useToast();
   
   const [profileData, setProfileData] = useState<UserProfileData>({
@@ -729,11 +731,12 @@ export default function EditProfilePage() {
       await refreshUserData();
 
       setTimeout(() => {
-        if (router.canGoBack()) {
-          router.back();
-        } else {
-          router.push('/profile');
-        }
+        safeGoBack(router, {
+          isGuestMode: false,
+          isAuthenticated,
+          userRole: user?.role,
+          currentPath: pathname,
+        });
       }, 1500);
 
     } catch (error: any) {

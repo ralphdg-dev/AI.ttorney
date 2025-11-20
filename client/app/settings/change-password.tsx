@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, TouchableOpacity, Alert, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import tw from "tailwind-react-native-classnames";
-import { useRouter } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
@@ -16,10 +16,12 @@ import Colors from "@/constants/Colors";
 import { supabase } from "@/config/supabase";
 import { createShadowStyle } from "@/utils/shadowUtils";
 import { NetworkConfig } from "@/utils/networkConfig";
+import { safeGoBack } from "@/utils/navigationHelper";
 
 export default function ChangePasswordScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const pathname = usePathname();
+  const { user, isAuthenticated } = useAuth();
   const toast = useToast();
   
   const [oldPassword, setOldPassword] = useState("");
@@ -117,7 +119,12 @@ export default function ChangePasswordScreen() {
       
       // Navigate back after a short delay
       setTimeout(() => {
-        router.back();
+        safeGoBack(router, {
+          isGuestMode: false,
+          isAuthenticated,
+          userRole: user?.role,
+          currentPath: pathname,
+        });
       }, 1500);
 
     } catch (error: any) {
@@ -144,7 +151,12 @@ export default function ChangePasswordScreen() {
   };
 
   const handleCancel = () => {
-    router.back();
+    safeGoBack(router, {
+      isGuestMode: false,
+      isAuthenticated,
+      userRole: user?.role,
+      currentPath: pathname,
+    });
   };
 
   return (
@@ -156,7 +168,12 @@ export default function ChangePasswordScreen() {
         title="Change Password" 
         showBackButton={true}
         showMenu={false}
-        onBackPress={() => router.back()}
+        onBackPress={() => safeGoBack(router, {
+          isGuestMode: false,
+          isAuthenticated,
+          userRole: user?.role,
+          currentPath: pathname,
+        })}
       />
 
       <ScrollView

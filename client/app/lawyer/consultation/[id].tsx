@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, View, Text, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { Mail, Phone, Calendar, Clock, MessageSquare, Settings, AlertTriangle } from 'lucide-react-native';
 import { Button, ButtonText } from '../../../components/ui/button/';
 import { HStack } from '../../../components/ui/hstack';
@@ -13,6 +13,7 @@ import { NetworkConfig } from '../../../utils/networkConfig';
 import Header from '../../../components/Header';
 import { LawyerNavbar } from '../../../components/lawyer/shared';
 import { ConfirmationModal } from '../../../components/lawyer/consultation';
+import { safeGoBack } from '../../../utils/navigationHelper';
 
 interface ConsultationRequest {
   id: string;
@@ -37,7 +38,8 @@ interface ConsultationRequest {
 const ConsultationDetailPage: React.FC = () => {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { session } = useAuth();
+  const pathname = usePathname();
+  const { session, user, isAuthenticated } = useAuth();
   const [consultation, setConsultation] = useState<ConsultationRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -65,16 +67,26 @@ const ConsultationDetailPage: React.FC = () => {
         setConsultation(data);
       } else {
         Alert.alert('Error', 'Failed to load consultation details');
-        router.back();
+        safeGoBack(router, {
+          isGuestMode: false,
+          isAuthenticated,
+          userRole: user?.role,
+          currentPath: pathname,
+        });
       }
     } catch (error) {
       console.error('Error fetching consultation details:', error);
       Alert.alert('Error', 'Failed to load consultation details');
-      router.back();
+      safeGoBack(router, {
+        isGuestMode: false,
+        isAuthenticated,
+        userRole: user?.role,
+        currentPath: pathname,
+      });
     } finally {
       setLoading(false);
     }
-  }, [id, session?.access_token, router]);
+  }, [id, session?.access_token, router, pathname, isAuthenticated, user?.role]);
 
   useEffect(() => {
     if (id && session?.access_token) {
@@ -153,7 +165,12 @@ const ConsultationDetailPage: React.FC = () => {
         <Header 
           title="Loading..."
           showBackButton={true}
-          onBackPress={() => router.back()}
+          onBackPress={() => safeGoBack(router, {
+            isGuestMode: false,
+            isAuthenticated,
+            userRole: user?.role,
+            currentPath: pathname,
+          })}
         />
         <View style={tw`flex-1 justify-center items-center`}>
           <Text>Loading consultation details...</Text>
@@ -167,7 +184,12 @@ const ConsultationDetailPage: React.FC = () => {
       <Header 
         title={`Request #${consultation.status.toUpperCase()}-${consultation.id.slice(-4)}`}
         showBackButton={true}
-        onBackPress={() => router.back()}
+        onBackPress={() => safeGoBack(router, {
+          isGuestMode: false,
+          isAuthenticated,
+          userRole: user?.role,
+          currentPath: pathname,
+        })}
       />
 
       <ScrollView style={tw`flex-1`} showsVerticalScrollIndicator={false}>

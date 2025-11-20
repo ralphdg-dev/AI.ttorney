@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import Colors from '@/constants/Colors';
-import { Badge, BadgeText } from '@/components/ui/badge';
+import { Ionicons } from "@expo/vector-icons";
+import Colors from "../../constants/Colors";
+import { Badge, BadgeText } from "../../components/ui/badge";
+import Header from "../../components/Header";
 import { articleCache } from '@/services/articleCache';
 import { NetworkConfig } from '@/utils/networkConfig';
 import { useAuth } from '../../contexts/AuthContext';
@@ -183,7 +184,13 @@ export default function ArticleViewScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+        <Header 
+          title="Loading..."
+          showBackButton={true}
+          onBackPress={handleBack}
+        />
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading article...</Text>
         </View>
@@ -193,7 +200,13 @@ export default function ArticleViewScreen() {
 
   if (error || !article) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+        <Header 
+          title="Article Not Found"
+          showBackButton={true}
+          onBackPress={handleBack}
+        />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error || 'Article not found'}</Text>
           <View style={styles.buttonContainer}>
@@ -210,19 +223,20 @@ export default function ArticleViewScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={Colors.primary.blue} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Article</Text>
-        <TouchableOpacity onPress={toggleLanguage} style={styles.languageBtn}>
-          <Text style={styles.languageBtnText}>
-            {showFilipino ? 'EN' : 'FIL'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <Header 
+        title="Article"
+        showBackButton={true}
+        onBackPress={handleBack}
+        rightComponent={
+          <TouchableOpacity onPress={toggleLanguage} style={styles.languageBtn}>
+            <Text style={styles.languageBtnText}>
+              {showFilipino ? 'EN' : 'FIL'}
+            </Text>
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Article Image */}

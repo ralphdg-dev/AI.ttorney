@@ -8,24 +8,23 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserX, AlertTriangle, ArrowLeft } from 'lucide-react-native';
 import { Toast, ToastTitle, ToastDescription, useToast } from '../../components/ui/toast';
 import { NetworkConfig } from '../../utils/networkConfig';
 import Colors from '../../constants/Colors';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
+import { safeGoBack } from '../../utils/navigationHelper';
 
 const DeactivateAccountScreen: React.FC = () => {
   const router = useRouter();
-  const { session, refreshUserData } = useAuth();
+  const pathname = usePathname();
+  const { session, refreshUserData, user, isAuthenticated } = useAuth();
   const toast = useToast();
   const [email, setEmail] = useState('');
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [showModal, setShowModal] = useState(false);
-
-  // Get user data from session
-  const user = session?.user?.user_metadata;
 
   const executeDeactivation = async () => {
     try {
@@ -174,7 +173,12 @@ const DeactivateAccountScreen: React.FC = () => {
         borderBottomWidth: 1,
         borderBottomColor: Colors.border.light,
       }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
+        <TouchableOpacity onPress={() => safeGoBack(router, {
+          isGuestMode: false,
+          isAuthenticated,
+          userRole: user?.role,
+          currentPath: pathname,
+        })} style={{ padding: 4 }}>
           <ArrowLeft size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={{

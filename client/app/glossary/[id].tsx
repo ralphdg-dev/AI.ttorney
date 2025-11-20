@@ -4,24 +4,26 @@ import {
   Alert,
   StatusBar,
   Animated,
-  Pressable,
+  TouchableOpacity,
   ActivityIndicator,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, usePathname } from "expo-router";
 import { Text as GSText } from "@/components/ui/text";
 import { Button, ButtonText } from "@/components/ui/button/";
 import { Badge, BadgeText } from "@/components/ui/badge";
 import { shouldUseNativeDriver } from '@/utils/animations';
-import BackButton from "@/components/ui/BackButton";
+import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import { GuestNavbar } from "@/components/guest";
 import Colors from "@/constants/Colors";
 import { Star, BookOpen, Globe } from "lucide-react-native";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useGuest } from "../../contexts/GuestContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { NetworkConfig } from "@/utils/networkConfig";
+import { safeGoBack } from "@/utils/navigationHelper";
 
 interface GlossaryTerm {
   id: number;
@@ -38,7 +40,9 @@ interface GlossaryTerm {
 export default function TermDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const pathname = usePathname();
   const { isGuestMode } = useGuest();
+  const { user, isAuthenticated } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const [term, setTerm] = useState<GlossaryTerm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,7 +99,12 @@ export default function TermDetailScreen() {
         setTerm(data);
       } else {
         Alert.alert("Error", "Term not found");
-        router.back();
+        safeGoBack(router, {
+          isGuestMode,
+          isAuthenticated,
+          userRole: user?.role,
+          currentPath: pathname,
+        });
       }
     } catch (error) {
       console.error("Error loading term:", error);
@@ -107,13 +116,18 @@ export default function TermDetailScreen() {
         `Could not fetch term from server. Error: ${errorMessage}`,
         [
           { text: "Retry", onPress: loadTerm },
-          { text: "Go Back", onPress: () => router.back() },
+          { text: "Go Back", onPress: () => safeGoBack(router, {
+            isGuestMode,
+            isAuthenticated,
+            userRole: user?.role,
+            currentPath: pathname,
+          }) },
         ]
       );
     } finally {
       setLoading(false);
     }
-  }, [id, router]);
+  }, [id, router, pathname, isGuestMode, isAuthenticated, user?.role]);
 
   useEffect(() => {
     loadTerm();
@@ -132,41 +146,33 @@ export default function TermDetailScreen() {
   // Loading state
   if (loading) {
     return (
-      <View className="flex-1 bg-gray-50">
-        <View 
-          className="flex-row items-center justify-between px-4 md:px-6 lg:px-8 bg-white"
-          style={{ paddingTop: 50, paddingBottom: 16 }}
-        >
-          <BackButton onPress={handleBack} color={Colors.primary.blue} />
-          <GSText size="lg" bold style={{ color: Colors.primary.blue }}>
-            Loading...
-          </GSText>
-          <View style={{ width: 38 }} />
-        </View>
+      <SafeAreaView className="flex-1 bg-white" edges={["top", "left", "right"]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+        <Header 
+          title="Loading..."
+          showBackButton={true}
+          onBackPress={handleBack}
+        />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={Colors.primary.blue} />
           <GSText className="mt-4 text-gray-600">
             Loading term details...
           </GSText>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   // Error state
   if (!term) {
     return (
-      <View className="flex-1 bg-gray-50">
-        <View
-          className="flex-row items-center justify-between px-4 md:px-6 lg:px-8 bg-white"
-          style={{ paddingTop: 50, paddingBottom: 16 }}
-        >
-          <BackButton onPress={handleBack} color={Colors.primary.blue} />
-          <GSText size="lg" bold style={{ color: Colors.primary.blue }}>
-            Term Not Found
-          </GSText>
-          <View style={{ width: 38 }} />
-        </View>
+      <SafeAreaView className="flex-1 bg-white" edges={["top", "left", "right"]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+        <Header 
+          title="Term Not Found"
+          showBackButton={true}
+          onBackPress={handleBack}
+        />
         <View className="flex-1 items-center justify-center px-6">
           <GSText className="text-center mb-4 text-gray-600">
             The requested term could not be found.
@@ -175,40 +181,32 @@ export default function TermDetailScreen() {
             <ButtonText>Go Back to Glossary</ButtonText>
           </Button>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   // Main content
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top", "left", "right"]}>
+    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      {/* Header */}
-      <View 
-        className="flex-row items-center justify-between px-4 bg-white border-b border-gray-200"
-        style={{ paddingBottom: 16 }}
-      >
-        <BackButton onPress={handleBack} color={Colors.primary.blue} />
-        <GSText
-          size="xl"
-          bold
-          className="flex-1 text-center mx-2"
-          style={{ color: Colors.primary.blue, fontSize: 20 }}
-        >
-          {term?.term_en || "Legal Term"}
-        </GSText>
-        {!isGuestMode && (
-          <Pressable onPress={handleToggleFavorite} className="p-2">
+      <Header 
+        title={term.term_en}
+        showBackButton={true}
+        onBackPress={handleBack}
+        rightComponent={
+          <TouchableOpacity
+            onPress={handleToggleFavorite}
+            className="p-2"
+            disabled={isGuestMode}
+          >
             <Star
-              size={24}
-              color={isTermFavorite ? "#F59E0B" : "#D1D5DB"}
-              fill={isTermFavorite ? "#F59E0B" : "none"}
+              size={20}
+              color={isTermFavorite ? Colors.status.warning : Colors.text.sub}
+              fill={isTermFavorite ? Colors.status.warning : "none"}
             />
-          </Pressable>
-        )}
-        {isGuestMode && <View style={{ width: 38 }} />}
-      </View>
-
+          </TouchableOpacity>
+        }
+      />
       {/* Content */}
       <Animated.ScrollView
         className="flex-1 bg-gray-50"

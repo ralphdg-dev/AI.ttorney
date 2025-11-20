@@ -1,17 +1,24 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { Shield, ArrowLeft } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import Colors from '../constants/Colors';
+import { safeGoBack } from '../utils/navigationHelper';
 
 const UnauthorizedPage: React.FC = () => {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const pathname = usePathname();
+  const { user, signOut, isAuthenticated } = useAuth();
 
   const handleGoBack = () => {
-    router.back();
+    safeGoBack(router, {
+      isGuestMode: false,
+      isAuthenticated,
+      userRole: user?.role,
+      currentPath: pathname,
+    });
   };
 
   const handleGoHome = () => {

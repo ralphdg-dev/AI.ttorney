@@ -1,13 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { appealService } from '../services/appealService';
 import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle, FileText } from 'lucide-react-native';
+import { safeGoBack } from '../utils/navigationHelper';
 
 export default function MyAppealsScreen() {
-  const { session } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { session, user, isAuthenticated } = useAuth();
   const [appeals, setAppeals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -135,7 +138,12 @@ export default function MyAppealsScreen() {
       <View className="p-6">
         {/* Header */}
         <View className="flex-row items-center mb-6">
-          <TouchableOpacity onPress={() => router.back()} className="mr-3">
+          <TouchableOpacity onPress={() => safeGoBack(router, {
+            isGuestMode: false,
+            isAuthenticated,
+            userRole: user?.role,
+            currentPath: pathname,
+          })} className="mr-3">
             <ArrowLeft size={24} color="#1F2937" />
           </TouchableOpacity>
           <Text className="text-2xl font-bold text-gray-900">My Appeals</Text>

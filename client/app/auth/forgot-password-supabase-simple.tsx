@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { router } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 import { Box } from "../../components/ui/box";
 import { VStack } from "../../components/ui/vstack";
 import { Text } from "../../components/ui/text";
@@ -13,8 +13,11 @@ import Header from "../../components/Header";
 import Colors from "../../constants/Colors";
 import { supabase } from "../../config/supabase";
 import otpsent from "../../assets/images/otpsent.png";
+import { safeGoBack } from "../../utils/navigationHelper";
 
 export default function ForgotPassword() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -150,7 +153,12 @@ export default function ForgotPassword() {
             <Text 
               className="font-bold" 
               style={{ color: Colors.primary.blue }}
-              onPress={() => router.back()}
+              onPress={() => safeGoBack(router, {
+                isGuestMode: true, // Forgot password is accessible to guests
+                isAuthenticated: false,
+                userRole: undefined,
+                currentPath: pathname,
+              })}
             >
               Sign In
             </Text>
@@ -170,7 +178,12 @@ export default function ForgotPassword() {
       <Header 
         title="Forgot Password"
         showBackButton={true}
-        onBackPress={() => router.back()}
+        onBackPress={() => safeGoBack(router, {
+          isGuestMode: true, // Forgot password is accessible to guests
+          isAuthenticated: false,
+          userRole: undefined,
+          currentPath: pathname,
+        })}
       />
       
       <ScrollView
