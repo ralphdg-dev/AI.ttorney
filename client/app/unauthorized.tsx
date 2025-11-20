@@ -48,7 +48,7 @@ const UnauthorizedPage: React.FC = () => {
         {user && (
           <View style={styles.userInfo}>
             <Text style={styles.userText}>Signed in as: {user.full_name}</Text>
-            <Text style={styles.roleText}>Role: {user.role.replace('_', ' ').toUpperCase()}</Text>
+            <Text style={styles.roleText}>Role: {user.role?.replace('_', ' ').toUpperCase() || 'Unknown'}</Text>
           </View>
         )}
         

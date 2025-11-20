@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Image, TextInput, Alert, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -26,23 +26,7 @@ export default function SuspendedScreen() {
   const [showAppealModal, setShowAppealModal] = useState(false);
   const [showAppealForm, setShowAppealForm] = useState(false);
 
-  useEffect(() => {
-    // Wait for auth context to finish loading
-    if (authLoading) {
-      return;
-    }
-
-    // Wait for session to be available before fetching
-    if (session?.access_token) {
-      fetchSuspensionInfo();
-      checkExistingAppeal();
-    } else {
-      // Session is null after auth loading complete, redirect to login
-      router.replace('/login');
-    }
-  }, [session, authLoading]);
-
-  const fetchSuspensionInfo = async () => {
+  const fetchSuspensionInfo = useCallback(async () => {
     try {
       if (!session?.access_token) {
         router.replace('/login');
@@ -84,9 +68,9 @@ export default function SuspendedScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [session?.access_token]);
 
-  const checkExistingAppeal = async () => {
+  const checkExistingAppeal = useCallback(async () => {
     try {
       if (!session?.access_token) return;
       
@@ -97,7 +81,23 @@ export default function SuspendedScreen() {
     } finally {
       setLoadingAppeal(false);
     }
-  };
+  }, [session?.access_token]);
+
+  useEffect(() => {
+    // Wait for auth context to finish loading
+    if (authLoading) {
+      return;
+    }
+
+    // Wait for session to be available before fetching
+    if (session?.access_token) {
+      fetchSuspensionInfo();
+      checkExistingAppeal();
+    } else {
+      // Session is null after auth loading complete, redirect to login
+      router.replace('/login');
+    }
+  }, [session?.access_token, authLoading, fetchSuspensionInfo, checkExistingAppeal]);
 
   const handleSubmitAppeal = async () => {
     console.log('handleSubmitAppeal called', { appealReasonLength: appealReason.length });
@@ -272,9 +272,11 @@ export default function SuspendedScreen() {
                 Suspension ends {formatSuspensionEnd(suspensionInfo.suspension_end)}
               </Text>
             )}
-            <Text className="text-sm text-gray-600 leading-5">
-              This is your {suspensionMessage.title.toLowerCase()}. {suspensionMessage.message}
-            </Text>
+            {suspensionMessage?.title && suspensionMessage?.message && (
+              <Text className="text-sm text-gray-600 leading-5">
+                This is your {suspensionMessage.title.toLowerCase()}. {suspensionMessage.message}
+              </Text>
+            )}
           </View>
 
           {/* Warning Badge */}

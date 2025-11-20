@@ -37,6 +37,8 @@ export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ ch
 
       // For lawyers: count pending requests they need to respond to
       if (user.role === 'verified_lawyer') {
+        // RLS Note: Lawyers can only see consultations where lawyer_id matches their lawyer_info.id
+        // The RLS policy handles the mapping: auth.uid() → lawyer_info.lawyer_id → lawyer_info.id
         query = query.eq("lawyer_id", user.id).eq("status", "pending");
         console.log("📋 ConsultationsContext: Counting pending requests for lawyer");
       } 
@@ -55,6 +57,21 @@ export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ ch
 
       if (error) {
         console.error("❌ ConsultationsContext: Error fetching consultations count:", error);
+        console.error("❌ Error details:", {
+          message: error.message,
+          code: error.code,
+          hint: error.hint,
+          details: error.details
+        });
+        
+        // RLS errors typically have code "42501" (insufficient privilege)
+        if (error.code === '42501') {
+          console.error("🔒 RLS Policy Error: User may not have permission to view consultations");
+          console.error("🔍 Check: 1) RLS policies are correct, 2) User role is set properly");
+        }
+        
+        // Set to 0 on error (fail gracefully)
+        setConsultationsCount(0);
         return;
       }
 
@@ -63,6 +80,8 @@ export const ConsultationsProvider: React.FC<ConsultationsProviderProps> = ({ ch
       setConsultationsCount(count || 0);
     } catch (error) {
       console.error("❌ ConsultationsContext: Exception in loadConsultations:", error);
+      // Fail gracefully
+      setConsultationsCount(0);
     }
   }, [isAuthenticated, user?.id, user?.role]);
 
