@@ -317,9 +317,9 @@ export default function EditProfilePage() {
     }
   };
 
-  // Load profile data on mount
+  // Load profile data on mount - only run once when user is first loaded
   useEffect(() => {
-    if (user) {
+    if (user && isLoading) {
       const fallbackProfile = {
         full_name: user.full_name || "",
         email: user.email || "",
@@ -350,7 +350,7 @@ export default function EditProfilePage() {
       
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, isLoading]);
 
   // Cleanup timeouts on unmount
   useEffect(() => {
