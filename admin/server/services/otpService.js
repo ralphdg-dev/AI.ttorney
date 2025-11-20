@@ -1,5 +1,5 @@
-const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+const crypto = require("crypto");
+const fetch = require("node-fetch");
 
 // In-memory OTP storage (consider Redis for production)
 const otpStore = new Map();
@@ -20,19 +20,10 @@ setInterval(() => {
 
 class OTPService {
   constructor() {
-    // SMTP Configuration
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_SERVER || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT) || 587,
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: process.env.SMTP_USERNAME,
-        pass: process.env.SMTP_PASSWORD
-      }
-    });
-
-    this.fromEmail = process.env.FROM_EMAIL || 'noreply@ai.ttorney.com';
-    this.fromName = process.env.FROM_NAME || 'AI.ttorney Admin';
+    // Email configuration (Resend API)
+    this.resendApiKey = process.env.RESEND_API_KEY || "";
+    this.fromEmail = process.env.FROM_EMAIL || "noreply@ai.ttorney.com";
+    this.fromName = process.env.FROM_NAME || "AI.ttorney Admin";
     this.OTP_TTL_SECONDS = 120; // 2 minutes
     this.MAX_ATTEMPTS = 5;
     this.LOCKOUT_DURATION = 900; // 15 minutes in seconds
@@ -49,81 +40,145 @@ class OTPService {
    * Hash OTP code using SHA-256
    */
   hashOTP(otpCode) {
-    return crypto.createHash('sha256').update(otpCode).digest('hex');
+    return crypto.createHash("sha256").update(otpCode).digest("hex");
   }
 
   /**
    * Get OTP storage key
    */
-  getOTPKey(email, otpType = 'admin_login') {
+  getOTPKey(email, otpType = "admin_login") {
     return `otp:${otpType}:${email.toLowerCase().trim()}`;
   }
 
   /**
    * Send OTP via email
    */
-  async sendOTPEmail(email, otpCode, adminName = 'Admin') {
+  async sendOTPEmail(email, otpCode, adminName = "Admin") {
     try {
-      // Check if SMTP credentials are configured
-      if (!this.transporter.options.auth || !this.transporter.options.auth.user || !this.transporter.options.auth.pass) {
-        console.error('❌ SMTP credentials not configured. Please set SMTP_USERNAME and SMTP_PASSWORD in .env file');
-        console.log('\n📧 For testing, the OTP code is:', otpCode);
-        console.log('⚠️  Configure SMTP to send real emails\n');
-        return { success: false, error: 'SMTP not configured. Check server logs for OTP code.' };
+      if (!this.resendApiKey) {
+        console.error("❌ RESEND_API_KEY not configured in environment");
+        console.log("\n📧 For testing, the OTP code is:", otpCode);
+        console.log("⚠️  Configure RESEND_API_KEY to send real emails\n");
+        return {
+          success: false,
+          error:
+            "Email service not configured. Check server logs for OTP code.",
+        };
       }
 
-      const mailOptions = {
-        from: `"${this.fromName}" <${this.fromEmail}>`,
-        to: email,
-        subject: 'Admin Login Verification Code',
-        html: this.getEmailTemplate(otpCode, adminName)
-      };
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.resendApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: `"${this.fromName}" <${this.fromEmail}>`,
+          to: [email],
+          subject: "Admin Login Verification Code",
+          html: this.getEmailTemplate(otpCode, adminName),
+        }),
+      });
 
-      await this.transporter.sendMail(mailOptions);
-      console.log(`✅ OTP email sent successfully to ${email}`);
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        console.error("❌ Resend OTP email failed:", response.status, text);
+        console.log("\n📧 For testing, the OTP code is:", otpCode);
+        return {
+          success: false,
+          error:
+            "Failed to send OTP email via Resend. Check server logs for OTP code.",
+        };
+      }
+
+      console.log(`✅ OTP email sent successfully via Resend to ${email}`);
       return { success: true };
     } catch (error) {
-      console.error('❌ Send OTP email error:', error.message);
-      console.log('\n📧 For testing, the OTP code is:', otpCode);
-      console.log('⚠️  Configure SMTP credentials in .env file to send real emails\n');
-      return { success: false, error: 'Failed to send email. Check server logs for OTP code.' };
+      console.error("❌ Send OTP email error (Resend):", error.message);
+      console.log("\n📧 For testing, the OTP code is:", otpCode);
+      console.log("⚠️  Configure RESEND_API_KEY to send real emails\n");
+      return {
+        success: false,
+        error:
+          "Failed to send email via Resend. Check server logs for OTP code.",
+      };
     }
   }
 
   /**
    * Send OTP for password reset via email
    */
-  async sendPasswordResetEmail(email, otpCode, adminName = 'Admin') {
+  async sendPasswordResetEmail(email, otpCode, adminName = "Admin") {
     try {
-      if (!this.transporter.options.auth || !this.transporter.options.auth.user || !this.transporter.options.auth.pass) {
-        console.error('❌ SMTP credentials not configured. Please set SMTP_USERNAME and SMTP_PASSWORD in .env file');
-        console.log('\n📧 For testing, the password reset OTP code is:', otpCode);
-        console.log('⚠️  Configure SMTP to send real emails\n');
-        return { success: false, error: 'SMTP not configured. Check server logs for OTP code.' };
+      if (!this.resendApiKey) {
+        console.error("❌ RESEND_API_KEY not configured in environment");
+        console.log(
+          "\n📧 For testing, the password reset OTP code is:",
+          otpCode
+        );
+        console.log("⚠️  Configure RESEND_API_KEY to send real emails\n");
+        return {
+          success: false,
+          error:
+            "Email service not configured. Check server logs for OTP code.",
+        };
       }
 
-      const mailOptions = {
-        from: `"${this.fromName}" <${this.fromEmail}>`,
-        to: email,
-        subject: 'Admin Password Reset Code',
-        html: this.getPasswordResetEmailTemplate(otpCode, adminName)
-      };
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.resendApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: `"${this.fromName}" <${this.fromEmail}>`,
+          to: [email],
+          subject: "Admin Password Reset Code",
+          html: this.getPasswordResetEmailTemplate(otpCode, adminName),
+        }),
+      });
 
-      await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Password reset OTP email sent successfully to ${email}`);
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        console.error(
+          "❌ Resend Password Reset email failed:",
+          response.status,
+          text
+        );
+        console.log(
+          "\n📧 For testing, the password reset OTP code is:",
+          otpCode
+        );
+        return {
+          success: false,
+          error:
+            "Failed to send password reset email via Resend. Check server logs for OTP code.",
+        };
+      }
+
+      console.log(
+        `✅ Password reset OTP email sent successfully via Resend to ${email}`
+      );
       return { success: true };
     } catch (error) {
-      console.error('❌ Send Password Reset email error:', error.message);
-      console.log('\n📧 For testing, the password reset OTP code is:', otpCode);
-      console.log('⚠️  Configure SMTP credentials in .env file to send real emails\n');
-      return { success: false, error: 'Failed to send email. Check server logs for OTP code.' };
+      console.error(
+        "❌ Send Password Reset email error (Resend):",
+        error.message
+      );
+      console.log("\n📧 For testing, the password reset OTP code is:", otpCode);
+      console.log("⚠️  Configure RESEND_API_KEY to send real emails\n");
+      return {
+        success: false,
+        error:
+          "Failed to send password reset email via Resend. Check server logs for OTP code.",
+      };
     }
   }
 
   /**
    * Generate and send OTP for admin login
    */
-  async sendLoginOTP(email, adminName = 'Admin') {
+  async sendLoginOTP(email, adminName = "Admin") {
     try {
       const otpCode = this.generateOTP();
       const otpHash = this.hashOTP(otpCode);
@@ -133,12 +188,14 @@ class OTPService {
       otpStore.set(otpKey, {
         hash: otpHash,
         email: email,
-        expiresAt: Date.now() + (this.OTP_TTL_SECONDS * 1000),
+        expiresAt: Date.now() + this.OTP_TTL_SECONDS * 1000,
         attempts: 0,
-        lockedUntil: null
+        lockedUntil: null,
       });
 
-      console.log(`Admin login OTP stored for: ${email}, expires in: ${this.OTP_TTL_SECONDS}s`);
+      console.log(
+        `Admin login OTP stored for: ${email}, expires in: ${this.OTP_TTL_SECONDS}s`
+      );
 
       // Send email
       const emailResult = await this.sendOTPEmail(email, otpCode, adminName);
@@ -146,20 +203,20 @@ class OTPService {
       if (emailResult.success) {
         return {
           success: true,
-          message: 'OTP sent successfully to your email',
-          expiresInMinutes: 2
+          message: "OTP sent successfully to your email",
+          expiresInMinutes: 2,
         };
       } else {
         return {
           success: false,
-          error: 'Failed to send OTP email'
+          error: "Failed to send OTP email",
         };
       }
     } catch (error) {
-      console.error('Send login OTP error:', error);
+      console.error("Send login OTP error:", error);
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -167,31 +224,41 @@ class OTPService {
   /**
    * Generate and send OTP for password reset
    */
-  async sendPasswordResetOTP(email, adminName = 'Admin') {
+  async sendPasswordResetOTP(email, adminName = "Admin") {
     try {
       const otpCode = this.generateOTP();
       const otpHash = this.hashOTP(otpCode);
-      const otpKey = this.getOTPKey(email, 'password_reset');
+      const otpKey = this.getOTPKey(email, "password_reset");
 
       otpStore.set(otpKey, {
         hash: otpHash,
         email: email,
-        expiresAt: Date.now() + (this.OTP_TTL_SECONDS * 1000),
+        expiresAt: Date.now() + this.OTP_TTL_SECONDS * 1000,
         attempts: 0,
-        lockedUntil: null
+        lockedUntil: null,
       });
 
-      console.log(`Password reset OTP stored for: ${email}, expires in: ${this.OTP_TTL_SECONDS}s`);
+      console.log(
+        `Password reset OTP stored for: ${email}, expires in: ${this.OTP_TTL_SECONDS}s`
+      );
 
-      const emailResult = await this.sendPasswordResetEmail(email, otpCode, adminName);
+      const emailResult = await this.sendPasswordResetEmail(
+        email,
+        otpCode,
+        adminName
+      );
 
       if (emailResult.success) {
-        return { success: true, message: 'Password reset code sent successfully to your email', expiresInMinutes: 2 };
+        return {
+          success: true,
+          message: "Password reset code sent successfully to your email",
+          expiresInMinutes: 2,
+        };
       } else {
-        return { success: false, error: 'Failed to send OTP email' };
+        return { success: false, error: "Failed to send OTP email" };
       }
     } catch (error) {
-      console.error('Send password reset OTP error:', error);
+      console.error("Send password reset OTP error:", error);
       return { success: false, error: error.message };
     }
   }
@@ -208,7 +275,7 @@ class OTPService {
       if (!otpData) {
         return {
           success: false,
-          error: 'OTP not found or expired'
+          error: "OTP not found or expired",
         };
       }
 
@@ -217,20 +284,22 @@ class OTPService {
         otpStore.delete(otpKey);
         return {
           success: false,
-          error: 'OTP has expired'
+          error: "OTP has expired",
         };
       }
 
       // Check if locked out
       if (otpData.lockedUntil && Date.now() < otpData.lockedUntil) {
-        const remainingSeconds = Math.ceil((otpData.lockedUntil - Date.now()) / 1000);
+        const remainingSeconds = Math.ceil(
+          (otpData.lockedUntil - Date.now()) / 1000
+        );
         const minutes = Math.floor(remainingSeconds / 60);
         const seconds = remainingSeconds % 60;
         return {
           success: false,
           error: `Too many failed attempts. Please try again in ${minutes} minutes and ${seconds} seconds.`,
           lockedOut: true,
-          retryAfter: remainingSeconds
+          retryAfter: remainingSeconds,
         };
       }
 
@@ -243,14 +312,17 @@ class OTPService {
 
         // Check if max attempts reached
         if (otpData.attempts >= this.MAX_ATTEMPTS) {
-          otpData.lockedUntil = Date.now() + (this.LOCKOUT_DURATION * 1000);
-          console.warn(`Admin ${email} locked out after ${otpData.attempts} failed OTP attempts`);
+          otpData.lockedUntil = Date.now() + this.LOCKOUT_DURATION * 1000;
+          console.warn(
+            `Admin ${email} locked out after ${otpData.attempts} failed OTP attempts`
+          );
 
           return {
             success: false,
-            error: 'Too many failed attempts. Your account has been temporarily locked for 15 minutes.',
+            error:
+              "Too many failed attempts. Your account has been temporarily locked for 15 minutes.",
             lockedOut: true,
-            retryAfter: this.LOCKOUT_DURATION
+            retryAfter: this.LOCKOUT_DURATION,
           };
         }
 
@@ -258,7 +330,7 @@ class OTPService {
         return {
           success: false,
           error: `Invalid OTP code. ${remainingAttempts} attempt(s) remaining.`,
-          attemptsRemaining: remainingAttempts
+          attemptsRemaining: remainingAttempts,
         };
       }
 
@@ -268,13 +340,13 @@ class OTPService {
 
       return {
         success: true,
-        message: 'OTP verified successfully'
+        message: "OTP verified successfully",
       };
     } catch (error) {
-      console.error('Verify OTP error:', error);
+      console.error("Verify OTP error:", error);
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -282,27 +354,31 @@ class OTPService {
   /**
    * Verify OTP code for a specific flow (e.g., 'password_reset')
    */
-  async verifyOTPFor(email, otpCode, otpType = 'admin_login') {
+  async verifyOTPFor(email, otpCode, otpType = "admin_login") {
     try {
       const otpKey = this.getOTPKey(email, otpType);
       const otpData = otpStore.get(otpKey);
 
       if (!otpData) {
-        return { success: false, error: 'OTP not found or expired' };
+        return { success: false, error: "OTP not found or expired" };
       }
 
       if (Date.now() > otpData.expiresAt) {
         otpStore.delete(otpKey);
-        return { success: false, error: 'OTP has expired' };
+        return { success: false, error: "OTP has expired" };
       }
 
       if (otpData.lockedUntil && Date.now() < otpData.lockedUntil) {
-        const remainingSeconds = Math.ceil((otpData.lockedUntil - Date.now()) / 1000);
+        const remainingSeconds = Math.ceil(
+          (otpData.lockedUntil - Date.now()) / 1000
+        );
         return {
           success: false,
-          error: `Too many failed attempts. Please try again in ${Math.floor(remainingSeconds / 60)} minutes and ${remainingSeconds % 60} seconds.`,
+          error: `Too many failed attempts. Please try again in ${Math.floor(
+            remainingSeconds / 60
+          )} minutes and ${remainingSeconds % 60} seconds.`,
           lockedOut: true,
-          retryAfter: remainingSeconds
+          retryAfter: remainingSeconds,
         };
       }
 
@@ -310,23 +386,28 @@ class OTPService {
       if (otpData.hash !== providedHash) {
         otpData.attempts += 1;
         if (otpData.attempts >= this.MAX_ATTEMPTS) {
-          otpData.lockedUntil = Date.now() + (this.LOCKOUT_DURATION * 1000);
+          otpData.lockedUntil = Date.now() + this.LOCKOUT_DURATION * 1000;
           return {
             success: false,
-            error: 'Too many failed attempts. Your account has been temporarily locked for 15 minutes.',
+            error:
+              "Too many failed attempts. Your account has been temporarily locked for 15 minutes.",
             lockedOut: true,
-            retryAfter: this.LOCKOUT_DURATION
+            retryAfter: this.LOCKOUT_DURATION,
           };
         }
         const remainingAttempts = this.MAX_ATTEMPTS - otpData.attempts;
-        return { success: false, error: `Invalid OTP code. ${remainingAttempts} attempt(s) remaining.`, attemptsRemaining: remainingAttempts };
+        return {
+          success: false,
+          error: `Invalid OTP code. ${remainingAttempts} attempt(s) remaining.`,
+          attemptsRemaining: remainingAttempts,
+        };
       }
 
       otpStore.delete(otpKey);
       console.log(`OTP (${otpType}) verified successfully for: ${email}`);
-      return { success: true, message: 'OTP verified successfully' };
+      return { success: true, message: "OTP verified successfully" };
     } catch (error) {
-      console.error('Verify OTP error:', error);
+      console.error("Verify OTP error:", error);
       return { success: false, error: error.message };
     }
   }
