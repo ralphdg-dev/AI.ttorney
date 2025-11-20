@@ -22,7 +22,7 @@ class RouteValidationResponse(BaseModel):
     redirectTo: Optional[str] = None
     error: Optional[str] = None
 
-# Route configurations that require server-side validation
+                                                          
 SENSITIVE_ROUTES = {
     '/admin': {'required_role': 'admin', 'fallback': '/role-selection'},
     '/lawyer': {'required_role': 'verified_lawyer', 'fallback': '/role-selection'},
@@ -50,19 +50,19 @@ def get_role_hierarchy_level(role: str) -> int:
 def validate_user_access(user_role: str, required_role: str, path: str) -> bool:
     """Validate if user has access to the route based on role requirements"""
     
-    # Special handling for lawyer vs user separation
+                                                    
     if required_role == 'verified_lawyer' and user_role != 'verified_lawyer':
-        # Only verified lawyers can access lawyer routes
+                                                        
         return False
     
     if required_role == 'registered_user':
-        # User-specific routes should not be accessible to lawyers
+                                                                  
         user_specific_paths = ['/home', '/directory', '/glossary', '/guides', '/chatbot', '/booklawyer']
         if any(path.startswith(user_path) for user_path in user_specific_paths):
             if user_role == 'verified_lawyer':
                 return False
     
-    # Check minimum role requirement
+                                    
     user_level = get_role_hierarchy_level(user_role)
     required_level = get_role_hierarchy_level(required_role)
     
@@ -77,10 +77,10 @@ async def validate_route_access(
     Validate if the current user has access to the specified route
     """
     try:
-        # Extract and verify JWT token
+                                      
         token = credentials.credentials
         
-        # Get user from token
+                             
         try:
             auth_service = AuthService()
             user_data = await auth_service.get_user(token)
@@ -105,13 +105,13 @@ async def validate_route_access(
                 redirectTo="/login"
             )
         
-        # Check if route requires server-side validation
+                                                        
         route_config = SENSITIVE_ROUTES.get(request.path)
         if not route_config:
-            # Route doesn't require server validation, allow access
+                                                                   
             return RouteValidationResponse(valid=True)
         
-        # Validate user access
+                              
         user_role = user.get('role', 'guest')
         required_role = route_config['required_role']
         
@@ -122,7 +122,7 @@ async def validate_route_access(
                 redirectTo=route_config['fallback']
             )
         
-        # Additional checks for lawyer verification status
+                                                          
         if required_role == 'verified_lawyer':
             is_verified = user.get('is_verified', False)
             if not is_verified:
@@ -132,7 +132,7 @@ async def validate_route_access(
                     redirectTo="/onboarding/lawyer/verification-instructions"
                 )
         
-        # Log successful validation
+                                   
         print(f"[ROUTE_VALIDATION] SUCCESS: {user.get('email')} -> {request.path}")
         
         return RouteValidationResponse(valid=True)
@@ -163,7 +163,7 @@ async def log_route_access(request: dict):
     Log route access attempts for audit purposes
     """
     try:
-        # Store audit log in database
+                                     
         audit_data = {
             'timestamp': request.get('timestamp'),
             'path': request.get('path'),
@@ -175,7 +175,7 @@ async def log_route_access(request: dict):
             'user_agent': request.get('userAgent')
         }
         
-        # Insert into audit_logs table (create if doesn't exist)
+                                                                
         supabase_service = SupabaseService()
         result = supabase_service.supabase.table('audit_logs').insert(audit_data).execute()
         
@@ -204,7 +204,7 @@ async def log_route_error(request: dict):
             'route_config': request.get('routeConfig')
         }
         
-        # Insert into error_logs table
+                                      
         supabase_service = SupabaseService()
         result = supabase_service.supabase.table('error_logs').insert(error_data).execute()
         

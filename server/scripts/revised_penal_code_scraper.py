@@ -1,14 +1,3 @@
-"""
-AIRTIGHT LEGAL SCRAPER — REVISED PENAL CODE (Criminal Law Focus)
-Source: Supreme Court E-Library
-Target URL: https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/28/20426
-
-Goal:
-Scrape and structure all articles relevant to the Revised Penal Code (Book II — Crimes Against Property),
-focusing on Articles 293–312 (Robbery & Theft), Article 315 (Estafa), and Article 11 (Self-Defense).
-Ensure text integrity and dataset compatibility for AI chatbot training or retrieval.
-"""
-
 import requests
 from bs4 import BeautifulSoup
 import json
@@ -33,10 +22,10 @@ class RevisedPenalCodeScraper:
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
         
-        # Scrape ALL articles (no filter)
-        self.target_articles = None  # None means scrape all articles
+                                         
+        self.target_articles = None                                  
         
-        # Comprehensive penalty patterns
+                                        
         self.penalty_patterns = [
             r'reclusion\s+perpetua',
             r'reclusion\s+temporal',
@@ -67,24 +56,24 @@ class RevisedPenalCodeScraper:
         """
         for attempt in range(retries):
             try:
-                print(f"🔄 Fetching content (attempt {attempt + 1})...")
+                print(f" Fetching content (attempt {attempt + 1})...")
                 response = self.session.get(url, timeout=30)
                 response.raise_for_status()
                 
-                # Check if content is valid
+                                           
                 if len(response.text) < 1000:
-                    print(f"⚠️  Warning: Short content ({len(response.text)} chars)")
+                    print(f"  Warning: Short content ({len(response.text)} chars)")
                 
                 soup = BeautifulSoup(response.text, 'html.parser')
-                print(f"✅ Successfully fetched content ({len(response.text)} chars)")
+                print(f" Successfully fetched content ({len(response.text)} chars)")
                 return soup
                 
             except requests.exceptions.RequestException as e:
-                print(f"❌ Request failed (attempt {attempt + 1}): {e}")
+                print(f" Request failed (attempt {attempt + 1}): {e}")
                 if attempt < retries - 1:
-                    time.sleep(2 ** attempt)  # Exponential backoff
+                    time.sleep(2 ** attempt)                       
                     
-        print(f"❌ Failed to fetch content after {retries} attempts")
+        print(f" Failed to fetch content after {retries} attempts")
         return None
     
     def extract_articles(self, soup: BeautifulSoup) -> List[Dict]:
@@ -98,16 +87,16 @@ class RevisedPenalCodeScraper:
             List of dictionaries containing article data
         """
         if not soup:
-            print("❌ No soup object provided")
+            print(" No soup object provided")
             return []
         
-        # Get all text content
+                              
         text_content = " ".join(soup.stripped_strings)
         text_content = re.sub(r'\s+', ' ', text_content)
         
         print(f"📄 Processing text content ({len(text_content)} characters)")
         
-        # Split by articles using multiple patterns
+                                                   
         article_patterns = [
             r'(ART\.\s+\d+\.)',
             r'(Art\.\s+\d+\.)',
@@ -121,16 +110,16 @@ class RevisedPenalCodeScraper:
             splits = re.split(pattern, text_content, flags=re.IGNORECASE)
             if len(splits) > 1:
                 articles_found = splits
-                print(f"✅ Found articles using pattern: {pattern}")
+                print(f" Found articles using pattern: {pattern}")
                 break
         
         if not articles_found:
-            print("❌ No articles found with any pattern")
+            print(" No articles found with any pattern")
             return []
         
         extracted_articles = []
         
-        # Process article pairs (header + content)
+                                                  
         for i in range(1, len(articles_found), 2):
             if i + 1 >= len(articles_found):
                 break
@@ -138,33 +127,33 @@ class RevisedPenalCodeScraper:
             article_header = articles_found[i].strip()
             article_content = articles_found[i + 1].strip()
             
-            # Extract article number from header
+                                                
             article_num_match = re.search(r'(\d+)', article_header)
             if not article_num_match:
                 continue
                 
             article_num = int(article_num_match.group(1))
             
-            # Combine header and content to get the complete article text
-            # This ensures we capture the exact structure from the source
+                                                                         
+                                                                         
             full_article_text = f"{article_header} {article_content}".strip()
             
-            # Clean and structure the content - preserve original text accuracy
+                                                                               
             cleaned_content = self._clean_article_content(full_article_text)
             
-            # Ensure we have substantial content
+                                                
             if not cleaned_content or len(cleaned_content) < 30:
-                print(f"⚠️  Article {article_num} has insufficient content")
+                print(f"  Article {article_num} has insufficient content")
                 continue
             
-            # Extract penalties from the cleaned content
+                                                        
             penalties = self._extract_penalties(cleaned_content)
             
-            # Extract title from the complete article text (including header)
+                                                                             
             title = self._extract_article_title_from_full_text(cleaned_content, article_num)
             
-            # Remove the article number and "ART." prefix from the main content
-            # Keep only the actual article content without the header
+                                                                               
+                                                                     
             content_without_header = self._remove_article_header(cleaned_content, article_num)
             
             article_data = {
@@ -182,24 +171,24 @@ class RevisedPenalCodeScraper:
             extracted_articles.append(article_data)
             print(f"📄 Extracted Article {article_num}: {title[:50]}...")
         
-        print(f"✅ Successfully extracted {len(extracted_articles)} articles")
+        print(f" Successfully extracted {len(extracted_articles)} articles")
         return extracted_articles
     
     def _clean_article_content(self, content: str) -> str:
         """Clean and normalize article content while preserving accuracy."""
-        # Remove excessive whitespace but preserve paragraph structure
+                                                                      
         content = re.sub(r'\s+', ' ', content)
         
-        # Remove common artifacts at start/end
+                                              
         content = re.sub(r'^\s*[-–—]\s*', '', content)
         content = re.sub(r'\s*[-–—]\s*$', '', content)
         
-        # Fix common encoding issues and remove problematic characters
+                                                                      
         content = content.replace(''', "'").replace(''', "'")
         content = content.replace('"', '"').replace('"', '"')
         content = content.replace('–', '-').replace('—', '-')
         
-        # Remove specific problematic characters from the source
+                                                                
         content = content.replace('â', '')
         content = content.replace('Â', '')
         content = content.replace('Ã', '')
@@ -207,16 +196,16 @@ class RevisedPenalCodeScraper:
         content = content.replace('€', '')
         content = content.replace('Â€', '')
         
-        # Remove any remaining non-ASCII characters that might cause issues
+                                                                           
         content = re.sub(r'[^\x00-\x7F]+', '', content)
         
-        # Clean up any double spaces created by character removal
+                                                                 
         content = re.sub(r'\s+', ' ', content)
         
-        # Ensure proper sentence spacing
+                                        
         content = re.sub(r'\.([A-Z])', r'. \1', content)
         
-        # Remove any trailing periods that might have been duplicated
+                                                                     
         content = re.sub(r'\.+$', '.', content)
         
         return content.strip()
@@ -229,7 +218,7 @@ class RevisedPenalCodeScraper:
             matches = re.findall(pattern, content, re.IGNORECASE)
             penalties_found.extend(matches)
         
-        # Remove duplicates while preserving order
+                                                  
         unique_penalties = []
         for penalty in penalties_found:
             if penalty.lower() not in [p.lower() for p in unique_penalties]:
@@ -239,10 +228,10 @@ class RevisedPenalCodeScraper:
     
     def _extract_article_title_from_full_text(self, content: str, article_num: int) -> str:
         """Extract proper article title from the complete article text including header."""
-        # Look for the pattern: ART. [number]. [Title] circumstances. — [rest]
-        # This matches the exact structure shown in the website
+                                                                              
+                                                               
         
-        # Pattern 1: ART. [num]. [Title] [description]. — [content]
+                                                                   
         pattern1 = rf'ART\.\s*{article_num}\.\s*([^.—]+(?:\s+[^.—]+)*)\s*[.—]'
         match1 = re.search(pattern1, content, re.IGNORECASE)
         if match1:
@@ -250,17 +239,17 @@ class RevisedPenalCodeScraper:
             if len(title) >= 5 and len(title) <= 100:
                 return title
         
-        # Pattern 2: Look for title after article number but before em dash
+                                                                           
         pattern2 = rf'ART\.\s*{article_num}\.\s*([^—]+)—'
         match2 = re.search(pattern2, content, re.IGNORECASE)
         if match2:
             title = match2.group(1).strip()
-            # Clean up the title
+                                
             title = re.sub(r'\s+', ' ', title)
             if len(title) >= 5 and len(title) <= 100:
                 return title
         
-        # Pattern 3: First meaningful phrase after article number
+                                                                 
         pattern3 = rf'ART\.\s*{article_num}\.\s*([^.]+\.)'
         match3 = re.search(pattern3, content, re.IGNORECASE)
         if match3:
@@ -268,9 +257,9 @@ class RevisedPenalCodeScraper:
             if 5 <= len(title) <= 150:
                 return title
         
-        # Fallback: extract from the beginning of content
+                                                         
         words = content.split()
-        # Skip "ART." and number, get the meaningful title part
+                                                               
         title_start = 0
         for i, word in enumerate(words):
             if word.upper() == 'ART.' or word.isdigit():
@@ -295,27 +284,27 @@ class RevisedPenalCodeScraper:
     
     def _remove_article_header(self, content: str, article_num: int) -> str:
         """Remove the ART. [number] and title from content, keeping only the article body."""
-        # Remove patterns like "ART. 11." and the title from the beginning
+                                                                          
         patterns_to_remove = [
-            rf'^ART\.\s*{article_num}\.\s*[^.—]*[.—]\s*',  # ART. [num]. [title]. — or ART. [num]. [title] —
-            rf'^Art\.\s*{article_num}\.\s*[^.—]*[.—]\s*',   # Art. [num]. [title]. — or Art. [num]. [title] —
-            rf'^ARTICLE\s*{article_num}\.\s*[^.—]*[.—]\s*'  # ARTICLE [num]. [title]. — or ARTICLE [num]. [title] —
+            rf'^ART\.\s*{article_num}\.\s*[^.—]*[.—]\s*',                                                   
+            rf'^Art\.\s*{article_num}\.\s*[^.—]*[.—]\s*',                                                    
+            rf'^ARTICLE\s*{article_num}\.\s*[^.—]*[.—]\s*'                                                         
         ]
         
         for pattern in patterns_to_remove:
             content = re.sub(pattern, '', content, flags=re.IGNORECASE)
         
-        # Also remove just the title if it appears at the beginning (fallback)
-        # Look for the title pattern and remove it
+                                                                              
+                                                  
         title_patterns = [
-            r'^[A-Z][^.]*\.\s*',  # Capitalized sentence ending with period
-            r'^[^.]{5,100}\.\s*'  # Any reasonable title ending with period
+            r'^[A-Z][^.]*\.\s*',                                           
+            r'^[^.]{5,100}\.\s*'                                           
         ]
         
         for pattern in title_patterns:
-            # Only remove if it looks like a title (not the main content)
+                                                                         
             match = re.match(pattern, content)
-            if match and len(match.group(0).strip()) < 150:  # Reasonable title length
+            if match and len(match.group(0).strip()) < 150:                           
                 content = re.sub(pattern, '', content, count=1)
                 break
         
@@ -339,40 +328,40 @@ class RevisedPenalCodeScraper:
         validated_articles = []
         
         for article in articles:
-            # Check required fields
+                                   
             if not all(key in article for key in ['article_number', 'article_text']):
-                print(f"⚠️  Article missing required fields: {article.get('article_number', 'Unknown')}")
+                print(f"  Article missing required fields: {article.get('article_number', 'Unknown')}")
                 continue
             
-            # Check content quality
+                                   
             if len(article['article_text']) < 50:
-                print(f"⚠️  Article {article['article_number']} has insufficient content")
+                print(f"  Article {article['article_number']} has insufficient content")
                 continue
             
-            # All articles are valid (no filtering)
+                                                   
             validated_articles.append(article)
         
-        print(f"✅ Validated {len(validated_articles)} out of {len(articles)} articles")
+        print(f" Validated {len(validated_articles)} out of {len(articles)} articles")
         return validated_articles
     
     def export_data(self, articles: List[Dict], base_filename: str = "revised_penal_code"):
         """Export data as JSON and MD."""
         if not articles:
-            print("❌ No articles to export")
+            print(" No articles to export")
             return
         
-        # Ensure data/raw directory exists
+                                          
         output_dir = Path(__file__).parent.parent / "data" / "raw"
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Export to JSON
+                        
         json_filename = f"{base_filename}.json"
         json_path = output_dir / json_filename
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(articles, f, indent=2, ensure_ascii=False)
-        print(f"✅ Exported JSON: {json_path}")
+        print(f" Exported JSON: {json_path}")
         
-        # Export to Markdown
+                            
         md_filename = f"{base_filename}.md"
         md_path = output_dir / md_filename
         with open(md_path, 'w', encoding='utf-8') as f:
@@ -380,7 +369,7 @@ class RevisedPenalCodeScraper:
             f.write("**Source:** Supreme Court E-Library\n\n")
             f.write("---\n\n")
             
-            # Group by category
+                               
             by_category = {}
             for article in articles:
                 category = article.get('category', 'General')
@@ -388,7 +377,7 @@ class RevisedPenalCodeScraper:
                     by_category[category] = []
                 by_category[category].append(article)
             
-            # Write articles by category
+                                        
             for category, cat_articles in sorted(by_category.items()):
                 f.write(f"## {category}\n\n")
                 
@@ -408,34 +397,34 @@ class RevisedPenalCodeScraper:
             
             f.write(f"\n**Scraped:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         
-        print(f"✅ Exported MD: {md_path}")
+        print(f" Exported MD: {md_path}")
         
         return str(json_path), str(md_path)
     
     
     def scrape(self) -> List[Dict]:
         """Main scraping method that orchestrates the entire process."""
-        print("🚀 Starting Revised Penal Code scraping process")
+        print(" Starting Revised Penal Code scraping process")
         
-        # Fetch content
+                       
         soup = self.fetch_content(self.base_url)
         if not soup:
-            print("❌ Failed to fetch content")
+            print(" Failed to fetch content")
             return []
         
-        # Extract articles
+                          
         articles = self.extract_articles(soup)
         if not articles:
-            print("❌ No articles extracted")
+            print(" No articles extracted")
             return []
         
-        # Validate data
+                       
         validated_articles = self.validate_data(articles)
         
-        # Store for later use
+                             
         self.scraped_data = validated_articles
         
-        print(f"✅ Scraping completed successfully. {len(validated_articles)} articles extracted.")
+        print(f" Scraping completed successfully. {len(validated_articles)} articles extracted.")
         return validated_articles
 
 
@@ -447,14 +436,14 @@ def main():
     print("Source: Supreme Court E-Library")
     print()
     
-    # Initialize scraper
+                        
     scraper = RevisedPenalCodeScraper()
     
-    # Perform scraping
+                      
     articles = scraper.scrape()
     
     if articles:
-        # Export data
+                     
         json_file = scraper.export_data(articles)
         
         print("\nSCRAPING COMPLETED SUCCESSFULLY")
@@ -462,7 +451,7 @@ def main():
         print(f"JSON file: {json_file}")
         print()
         
-        # Display summary
+                         
         categories = {}
         for article in articles:
             cat = article['category']

@@ -1,26 +1,3 @@
-"""
-Violation Tracking Service
-
-Industry-grade violation tracking and automatic suspension system.
-Integrates with OpenAI content moderation to enforce community guidelines.
-
-Features:
-- Automatic strike counting (3 strikes = suspension)
-- Escalating suspensions (3 suspensions = permanent ban)
-- Comprehensive audit trail
-- Automatic strike reset after suspension
-- Admin review and appeal system
-
-Compliance:
-- GDPR Article 17 (Right to erasure)
-- Philippine RA 10173 (Data Privacy Act)
-- COPPA (Children's Online Privacy Protection Act)
-- Industry standards: Discord, Reddit, Slack moderation
-
-Author: AI.ttorney Team
-Date: 2025-10-22
-"""
-
 import logging
 from typing import Dict, Any, Optional, List, Union
 from datetime import datetime, timedelta
@@ -44,7 +21,7 @@ class ViolationTrackingService:
     This follows industry best practices from Discord, Reddit, and Slack.
     """
     
-    # Constants
+               
     STRIKES_FOR_SUSPENSION = 3
     SUSPENSIONS_FOR_BAN = 3
     SUSPENSION_DURATION_DAYS = 7
@@ -52,7 +29,7 @@ class ViolationTrackingService:
     def __init__(self):
         """Initialize the violation tracking service."""
         self.supabase = SupabaseService()
-        logger.info("✅ Violation tracking service initialized")
+        logger.info(" Violation tracking service initialized")
     
     async def record_violation(
         self,
@@ -85,57 +62,57 @@ class ViolationTrackingService:
             Exception: If database operations fail
         """
         try:
-            # Convert enum to string if needed
+                                              
             violation_type_str = violation_type.value if isinstance(violation_type, ViolationType) else violation_type
             
-            # Validate violation type
+                                     
             if not ViolationType.is_valid(violation_type_str):
                 raise ValueError(f"Invalid violation_type: {violation_type_str}. Must be one of: {ViolationType.values()}")
             
             logger.info(f"🚨 Recording violation for user {user_id[:8]}... (type: {violation_type_str})")
             
-            # Step 1: Get current user status
+                                             
             user_data = await self._get_user_status(user_id)
             if not user_data:
                 raise Exception(f"User {user_id} not found")
             
-            # Handle None values explicitly (database may return None instead of 0)
+                                                                                   
             current_strikes = user_data.get("strike_count") or 0
             current_suspensions = user_data.get("suspension_count") or 0
             
-            # Ensure they are integers
+                                      
             current_strikes = int(current_strikes) if current_strikes is not None else 0
             current_suspensions = int(current_suspensions) if current_suspensions is not None else 0
             
-            # Step 2: Increment strike count
+                                            
             new_strike_count = current_strikes + 1
-            logger.info(f"📊 Strike count: {current_strikes} → {new_strike_count}")
+            logger.info(f" Strike count: {current_strikes} → {new_strike_count}")
             
-            # Step 3: Determine action based on strikes and suspension history
+                                                                              
             action_taken = "strike_added"
             new_suspension_count = current_suspensions
             suspension_end = None
             account_status = AccountStatus.ACTIVE
             
             if new_strike_count >= self.STRIKES_FOR_SUSPENSION:
-                # User has reached strike threshold
+                                                   
                 if current_suspensions >= self.SUSPENSIONS_FOR_BAN:
-                    # This is the 3rd suspension (or more) → Permanent Ban
+                                                                          
                     action_taken = "banned"
                     account_status = AccountStatus.BANNED
                     new_suspension_count = current_suspensions + 1
-                    new_strike_count = 0  # Reset strikes (doesn't matter for banned users)
+                    new_strike_count = 0                                                   
                     logger.warning(f"🔨 PERMANENT BAN for user {user_id[:8]}... (suspension #{new_suspension_count})")
                 else:
-                    # Temporary suspension (7 days)
+                                                   
                     action_taken = "suspended"
                     account_status = AccountStatus.SUSPENDED
                     suspension_end = datetime.utcnow() + timedelta(days=self.SUSPENSION_DURATION_DAYS)
                     new_suspension_count = current_suspensions + 1
-                    new_strike_count = 0  # Reset strikes after suspension
-                    logger.warning(f"⏸️  SUSPENDED for user {user_id[:8]}... for {self.SUSPENSION_DURATION_DAYS} days (suspension #{new_suspension_count})")
+                    new_strike_count = 0                                  
+                    logger.warning(f"⏸  SUSPENDED for user {user_id[:8]}... for {self.SUSPENSION_DURATION_DAYS} days (suspension #{new_suspension_count})")
             
-            # Step 4: Update user status
+                                        
             await self._update_user_status(
                 user_id=user_id,
                 strike_count=new_strike_count,
@@ -144,7 +121,7 @@ class ViolationTrackingService:
                 suspension_end=suspension_end
             )
             
-            # Step 5: Record violation in database
+                                                  
             violation_id = await self._insert_violation_record(
                 user_id=user_id,
                 violation_type=violation_type_str,
@@ -156,7 +133,7 @@ class ViolationTrackingService:
                 suspension_count_after=new_suspension_count
             )
             
-            # Step 6: Create suspension record if suspended or banned
+                                                                     
             if action_taken in ["suspended", "banned"]:
                 await self._create_suspension_record(
                     user_id=user_id,
@@ -167,7 +144,7 @@ class ViolationTrackingService:
                     ends_at=suspension_end
                 )
             
-            # Step 7: Generate user-friendly message
+                                                    
             message = self._generate_user_message(
                 action_taken=action_taken,
                 strike_count=new_strike_count,
@@ -175,7 +152,7 @@ class ViolationTrackingService:
                 suspension_end=suspension_end
             )
             
-            logger.info(f"✅ Violation recorded: {action_taken} (violation_id: {violation_id})")
+            logger.info(f" Violation recorded: {action_taken} (violation_id: {violation_id})")
             
             return {
                 "action_taken": action_taken,
@@ -187,7 +164,7 @@ class ViolationTrackingService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Failed to record violation: {str(e)}")
+            logger.error(f" Failed to record violation: {str(e)}")
             raise Exception(f"Violation tracking error: {str(e)}")
     
     async def check_user_status(self, user_id: str) -> Dict[str, Any]:
@@ -205,7 +182,7 @@ class ViolationTrackingService:
                 - suspension_end: When suspension ends (if suspended)
         """
         try:
-            # Check for expired suspensions first
+                                                 
             await self._check_expired_suspensions(user_id)
             
             user_data = await self._get_user_status(user_id)
@@ -245,8 +222,8 @@ class ViolationTrackingService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Failed to check user status: {str(e)}")
-            # Fail-open: allow user to post if check fails
+            logger.error(f" Failed to check user status: {str(e)}")
+                                                          
             return {
                 "is_allowed": True,
                 "account_status": "active",
@@ -290,10 +267,10 @@ class ViolationTrackingService:
                     logger.error(f"Failed to get violations: {response.status_code}")
                     return []
         except Exception as e:
-            logger.error(f"❌ Failed to get user violations: {str(e)}")
+            logger.error(f" Failed to get user violations: {str(e)}")
             return []
     
-    # Private helper methods
+                            
     
     async def _get_user_status(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user's current moderation status."""
@@ -313,7 +290,7 @@ class ViolationTrackingService:
                     return data[0] if data else None
                 return None
         except Exception as e:
-            logger.error(f"❌ Failed to get user status: {str(e)}")
+            logger.error(f" Failed to get user status: {str(e)}")
             return None
     
     async def _update_user_status(
@@ -326,10 +303,10 @@ class ViolationTrackingService:
     ) -> bool:
         """Update user's moderation status."""
         try:
-            # Convert enum to string if needed
+                                              
             account_status_str = account_status.value if isinstance(account_status, AccountStatus) else account_status
             
-            # Validate account status
+                                     
             if not AccountStatus.is_valid(account_status_str):
                 raise ValueError(f"Invalid account_status: {account_status_str}. Must be one of: {AccountStatus.values()}")
             
@@ -354,7 +331,7 @@ class ViolationTrackingService:
                 
                 return response.status_code in [200, 204]
         except Exception as e:
-            logger.error(f"❌ Failed to update user status: {str(e)}")
+            logger.error(f" Failed to update user status: {str(e)}")
             return False
     
     async def _insert_violation_record(
@@ -374,14 +351,14 @@ class ViolationTrackingService:
                 "user_id": user_id,
                 "violation_type": violation_type,
                 "content_id": content_id,
-                "content_text": content_text[:1000],  # Limit to 1000 chars
+                "content_text": content_text[:1000],                       
                 "flagged_categories": moderation_result.get("categories", {}),
                 "category_scores": moderation_result.get("category_scores", {}),
                 "violation_summary": moderation_result.get("violation_summary", ""),
                 "action_taken": action_taken,
                 "strike_count_after": strike_count_after,
                 "suspension_count_after": suspension_count_after
-                # Note: ip_address and user_agent are logged above but not stored in DB
+                                                                                       
             }
             
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -401,7 +378,7 @@ class ViolationTrackingService:
                     logger.error(f"Failed to insert violation: {response.status_code}")
                     return None
         except Exception as e:
-            logger.error(f"❌ Failed to insert violation record: {str(e)}")
+            logger.error(f" Failed to insert violation record: {str(e)}")
             return None
     
     async def _create_suspension_record(
@@ -415,10 +392,10 @@ class ViolationTrackingService:
     ) -> bool:
         """Create suspension record in database."""
         try:
-            # Convert enum to string if needed
+                                              
             suspension_type_str = suspension_type.value if isinstance(suspension_type, SuspensionType) else suspension_type
             
-            # Validate suspension type
+                                      
             if not SuspensionType.is_valid(suspension_type_str):
                 raise ValueError(f"Invalid suspension_type: {suspension_type_str}. Must be one of: {SuspensionType.values()}")
             
@@ -442,7 +419,7 @@ class ViolationTrackingService:
                 
                 return response.status_code in [200, 201]
         except Exception as e:
-            logger.error(f"❌ Failed to create suspension record: {str(e)}")
+            logger.error(f" Failed to create suspension record: {str(e)}")
             return False
     
     async def _check_expired_suspensions(self, user_id: str) -> bool:
@@ -457,8 +434,8 @@ class ViolationTrackingService:
                 if suspension_end:
                     suspension_end_dt = datetime.fromisoformat(suspension_end.replace('Z', '+00:00'))
                     if suspension_end_dt <= datetime.utcnow():
-                        # Suspension has expired, reset user
-                        logger.info(f"⏰ Resetting expired suspension for user {user_id[:8]}...")
+                                                            
+                        logger.info(f" Resetting expired suspension for user {user_id[:8]}...")
                         await self._update_user_status(
                             user_id=user_id,
                             strike_count=0,
@@ -469,7 +446,7 @@ class ViolationTrackingService:
                         return True
             return False
         except Exception as e:
-            logger.error(f"❌ Failed to check expired suspensions: {str(e)}")
+            logger.error(f" Failed to check expired suspensions: {str(e)}")
             return False
     
     def _generate_user_message(
@@ -496,7 +473,7 @@ class ViolationTrackingService:
             remaining_strikes = self.STRIKES_FOR_SUSPENSION - strike_count
             strike_word = "strike" if strike_count == 1 else "strikes"
             
-            # Convert numbers to words for better readability
+                                                             
             remaining_text = {1: "One", 2: "Two", 3: "Three"}.get(remaining_strikes, str(remaining_strikes))
             
             return (
@@ -505,7 +482,7 @@ class ViolationTrackingService:
             )
 
 
-# Singleton instance
+                    
 _violation_tracking_service_instance: Optional[ViolationTrackingService] = None
 
 def get_violation_tracking_service() -> ViolationTrackingService:

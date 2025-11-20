@@ -1,7 +1,3 @@
-"""
-Pydantic models for consultation request validation
-Ensures data integrity and provides clear error messages
-"""
 from pydantic import BaseModel, EmailStr, validator, Field
 from typing import Optional
 from datetime import date
@@ -29,10 +25,10 @@ class ConsultationRequestCreate(BaseModel):
     @validator('mobile_number')
     def validate_mobile_number(cls, v):
         """Validate mobile number format"""
-        # Remove spaces, dashes, parentheses
+                                            
         cleaned = re.sub(r'[\s\-\(\)]', '', v)
         
-        # Check if it's a valid format (10-15 digits, optional + prefix)
+                                                                        
         if not re.match(r'^\+?[\d]{10,15}$', cleaned):
             raise ValueError('Invalid mobile number format. Must be 10-15 digits.')
         
@@ -41,10 +37,10 @@ class ConsultationRequestCreate(BaseModel):
     @validator('consultation_mode')
     def validate_mode(cls, v):
         """Validate and normalize consultation mode to match database enum"""
-        # Normalize to lowercase first
+                                      
         v_lower = v.lower() if isinstance(v, str) else v
         
-        # Map frontend values to database enum values
+                                                     
         mode_mapping = {
             'online': 'online',
             'in-person': 'onsite',
@@ -55,7 +51,7 @@ class ConsultationRequestCreate(BaseModel):
         if v_lower not in mode_mapping:
             raise ValueError(f'Consultation mode must be one of: online, onsite, phone (got: {v})')
         
-        return mode_mapping[v_lower]  # Return lowercase database value
+        return mode_mapping[v_lower]                                   
     
     @validator('message')
     def sanitize_message(cls, v):
@@ -83,8 +79,8 @@ class LawyerProfileUpdate(BaseModel):
     location: str = Field(..., min_length=2, max_length=200)
     phone_number: Optional[str] = Field(None, min_length=10, max_length=20)
     bio: str = Field(..., min_length=10, max_length=2000)
-    days: Optional[str] = None  # Deprecated, kept for backward compatibility
-    hours_available: Optional[dict] = None  # JSONB format: {"Monday": ["09:00", "11:00"]}
+    days: Optional[str] = None                                               
+    hours_available: Optional[dict] = None                                                
     
     @validator('phone_number')
     def validate_phone(cls, v):
@@ -120,7 +116,7 @@ class LawyerProfileUpdate(BaseModel):
                 if not isinstance(time_str, str):
                     raise ValueError(f'Time must be a string: {time_str}')
                 
-                # Validate HH:MM format
+                                       
                 if not re.match(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$', time_str):
                     raise ValueError(f'Invalid time format: {time_str}. Use HH:MM (24-hour format)')
         

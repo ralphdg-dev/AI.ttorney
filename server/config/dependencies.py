@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
 
-# Supabase client setup
+                       
 def get_supabase():
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_key = os.getenv("SUPABASE_ANON_KEY")
@@ -19,13 +19,13 @@ def get_supabase():
     
     return create_client(supabase_url, supabase_key)
 
-# Simple user extraction from token (you can enhance this later)
+                                                                
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     supabase = Depends(get_supabase)
 ):
     try:
-        # Verify the token with Supabase
+                                        
         user_data = supabase.auth.get_user(credentials.credentials)
         
         if user_data is None or user_data.user is None:

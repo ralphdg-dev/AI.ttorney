@@ -23,7 +23,7 @@ class ConsultationRequestService:
         
         self.rest_url = f"{self.url}/rest/v1"
         
-        # Create Supabase client for direct database operations
+                                                               
         self.supabase: Client = create_client(self.url, self.anon_key)
     
     def _get_headers(self, use_service_key: bool = False) -> Dict[str, str]:
@@ -39,7 +39,7 @@ class ConsultationRequestService:
     async def create_consultation_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new consultation request"""
         try:
-            # Validate required fields
+                                      
             required_fields = [
                 'user_id', 'lawyer_id', 'message', 'email', 
                 'mobile_number', 'consultation_date', 'consultation_time', 
@@ -50,10 +50,10 @@ class ConsultationRequestService:
                 if field not in request_data or not request_data[field]:
                     return {"success": False, "error": f"Missing required field: {field}"}
             
-            # Prepare consultation request data
+                                               
             consultation_request = {
                 "user_id": request_data["user_id"],
-                "lawyer_id": request_data["lawyer_id"],  # Now references lawyer_info.lawyer_id
+                "lawyer_id": request_data["lawyer_id"],                                        
                 "message": request_data["message"],
                 "email": request_data["email"],
                 "mobile_number": request_data["mobile_number"],
@@ -89,7 +89,7 @@ class ConsultationRequestService:
         """Get all consultation requests for a specific user"""
         try:
             async with httpx.AsyncClient() as client:
-                # Updated join to reference lawyer_info.lawyer_id instead of lawyer_info.id
+                                                                                           
                 response = await client.get(
                     f"{self.rest_url}/consultation_requests?user_id=eq.{user_id}&select=*,lawyer_info:lawyer_id(name,specializations)&order=requested_at.desc",
                     headers=self._get_headers()
@@ -110,7 +110,7 @@ class ConsultationRequestService:
         """Get all consultation requests for a specific lawyer"""
         try:
             async with httpx.AsyncClient() as client:
-                # Updated to filter by lawyer_id which now references lawyer_info.lawyer_id
+                                                                                           
                 response = await client.get(
                     f"{self.rest_url}/consultation_requests?lawyer_id=eq.{lawyer_id}&select=*,users(first_name,last_name,email)&order=requested_at.desc",
                     headers=self._get_headers()
@@ -159,7 +159,7 @@ class ConsultationRequestService:
         """Get a specific consultation request by ID"""
         try:
             async with httpx.AsyncClient() as client:
-                # Updated join to reference lawyer_info.lawyer_id
+                                                                 
                 response = await client.get(
                     f"{self.rest_url}/consultation_requests?id=eq.{request_id}&select=*,lawyer_info:lawyer_id(name,specializations),users(first_name,last_name,email)",
                     headers=self._get_headers()
@@ -203,12 +203,12 @@ class ConsultationRequestService:
         try:
             filter_clause = ""
             if lawyer_id:
-                filter_clause = f"lawyer_id=eq.{lawyer_id}"  # Now references lawyer_info.lawyer_id
+                filter_clause = f"lawyer_id=eq.{lawyer_id}"                                        
             elif user_id:
                 filter_clause = f"user_id=eq.{user_id}"
             
             async with httpx.AsyncClient() as client:
-                # Get counts for each status
+                                            
                 stats = {}
                 statuses = ["pending", "accepted", "rejected"]
                 
@@ -227,7 +227,7 @@ class ConsultationRequestService:
                     else:
                         stats[status] = 0
                 
-                # Get total count
+                                 
                 total_filter = filter_clause if filter_clause else ""
                 response = await client.get(
                     f"{self.rest_url}/consultation_requests?select=id&{total_filter}",

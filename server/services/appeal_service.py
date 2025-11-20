@@ -1,8 +1,3 @@
-"""
-Appeal Service for AI.ttorney
-Business logic for suspension appeal system
-"""
-
 from services.supabase_service import SupabaseService
 from typing import Optional, Dict, Any, List
 from datetime import datetime
@@ -26,7 +21,7 @@ class AppealService:
     ) -> Dict[str, Any]:
         """Create a new suspension appeal"""
         try:
-            # 1. Verify user is suspended
+                                         
             user_response = await self.supabase.client.table("users")\
                 .select("id, account_status, suspension_end")\
                 .eq("id", user_id)\
@@ -40,7 +35,7 @@ class AppealService:
             if user.get("account_status") != "suspended":
                 return {"success": False, "error": "You are not currently suspended"}
             
-            # 2. Verify suspension exists and belongs to user
+                                                             
             suspension_response = await self.supabase.client.table("user_suspensions")\
                 .select("*")\
                 .eq("id", suspension_id)\
@@ -54,7 +49,7 @@ class AppealService:
             
             suspension = suspension_response.data
             
-            # 3. Check if appeal already exists for this suspension
+                                                                   
             existing_appeal = await self.supabase.client.table("user_suspension_appeals")\
                 .select("id, status")\
                 .eq("suspension_id", suspension_id)\
@@ -64,7 +59,7 @@ class AppealService:
             if existing_appeal.data:
                 return {"success": False, "error": "An appeal is already pending for this suspension"}
             
-            # 4. Create appeal record
+                                     
             appeal_data = {
                 "user_id": user_id,
                 "suspension_id": suspension_id,
@@ -84,7 +79,7 @@ class AppealService:
             
             appeal = appeal_response.data[0]
             
-            # 5. Update suspension to mark it has an appeal
+                                                           
             await self.supabase.client.table("user_suspensions")\
                 .update({
                     "has_appeal": True,
@@ -139,10 +134,10 @@ class AppealService:
             
             suspension = response.data[0]
             
-            # Check if user can appeal (no pending appeal exists)
+                                                                 
             can_appeal = not suspension.get("has_appeal", False)
             
-            # Cannot appeal permanent bans (3rd suspension)
+                                                           
             if suspension.get("suspension_type") == "permanent":
                 can_appeal = False
             
@@ -166,7 +161,7 @@ class AppealService:
         try:
             offset = (page - 1) * limit
             
-            # Get appeals with user and suspension details
+                                                          
             response = await self.supabase.client.table("user_suspension_appeals")\
                 .select("""
                     *,
@@ -181,7 +176,7 @@ class AppealService:
                 .range(offset, offset + limit - 1)\
                 .execute()
             
-            # Get total count
+                             
             count_response = await self.supabase.client.table("user_suspension_appeals")\
                 .select("id", count="exact")\
                 .eq("status", status)\
@@ -213,7 +208,7 @@ class AppealService:
     ) -> Dict[str, Any]:
         """Review and decide on an appeal"""
         try:
-            # 1. Get appeal details
+                                   
             appeal_response = await self.supabase.client.table("user_suspension_appeals")\
                 .select("*, user_suspensions(*)")\
                 .eq("id", appeal_id)\
@@ -235,21 +230,21 @@ class AppealService:
             user_id = appeal["user_id"]
             suspension_id = appeal["suspension_id"]
             
-            # 2. Process decision
+                                 
             decision_status = "approved" if decision in ["lift_suspension", "reduce_duration"] else "rejected"
             
             if decision == "lift_suspension":
-                # Lift the suspension completely
+                                                
                 await self._lift_suspension(suspension_id, user_id, admin_id, admin_response)
                 
             elif decision == "reduce_duration":
-                # Reduce suspension duration
+                                            
                 if not new_end_date:
                     return {"success": False, "error": "new_end_date required for reduce_duration"}
                 
                 await self._reduce_suspension(suspension_id, user_id, new_end_date)
             
-            # 3. Update appeal record
+                                     
             update_data = {
                 "status": decision_status,
                 "decision": decision,
@@ -268,7 +263,7 @@ class AppealService:
                 .eq("id", appeal_id)\
                 .execute()
             
-            # 4. Notify user of decision
+                                        
             await self.supabase.client.table("users")\
                 .update({"has_pending_appeal_response": True})\
                 .eq("id", user_id)\
@@ -295,7 +290,7 @@ class AppealService:
     ):
         """Lift a suspension completely"""
         try:
-            # Update suspension status
+                                      
             await self.supabase.client.table("user_suspensions")\
                 .update({
                     "status": "lifted",
@@ -307,7 +302,7 @@ class AppealService:
                 .eq("id", suspension_id)\
                 .execute()
             
-            # Update user status back to active
+                                               
             await self.supabase.client.table("users")\
                 .update({
                     "account_status": "active",
@@ -330,7 +325,7 @@ class AppealService:
     ):
         """Reduce suspension duration"""
         try:
-            # Update suspension end date
+                                        
             await self.supabase.client.table("user_suspensions")\
                 .update({
                     "ends_at": new_end_date.isoformat(),
@@ -339,7 +334,7 @@ class AppealService:
                 .eq("id", suspension_id)\
                 .execute()
             
-            # Update user suspension_end
+                                        
             await self.supabase.client.table("users")\
                 .update({"suspension_end": new_end_date.isoformat()})\
                 .eq("id", user_id)\
@@ -354,7 +349,7 @@ class AppealService:
     async def get_appeal_stats(self) -> Dict[str, Any]:
         """Get appeal statistics for admin dashboard"""
         try:
-            # Get counts by status
+                                  
             stats = {
                 "pending": 0,
                 "under_review": 0,
@@ -373,7 +368,7 @@ class AppealService:
             
             stats["total"] = sum(stats.values())
             
-            # Calculate average review time for approved/rejected appeals
+                                                                         
             reviewed_response = await self.supabase.client.table("user_suspension_appeals")\
                 .select("created_at, reviewed_at")\
                 .in_("status", ["approved", "rejected"])\

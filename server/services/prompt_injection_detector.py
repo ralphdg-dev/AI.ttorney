@@ -1,27 +1,3 @@
-"""
-Prompt Injection & System Hijacking Detection Service
-
-Detects attempts to manipulate, hijack, or bypass the AI system through:
-- Prompt injection attacks
-- System prompt manipulation
-- Role/identity hijacking
-- Jailbreak attempts
-- Instruction override attempts
-
-This service integrates with the existing violation tracking system to automatically
-apply strikes when users attempt to compromise the chatbot's security.
-
-Features:
-- Pattern-based detection (fast, no API calls)
-- Severity scoring (0.0 to 1.0)
-- Multilingual support (English, Tagalog, Taglish)
-- Configurable thresholds
-- Detailed violation reporting
-
-Author: AI.ttorney Team
-Date: 2025-10-26
-"""
-
 import re
 import logging
 from typing import Dict, Any, List, Tuple
@@ -34,7 +10,7 @@ logger = logging.getLogger(__name__)
 class InjectionPattern:
     """Pattern definition for prompt injection detection"""
     pattern: str
-    severity: float  # 0.0 to 1.0
+    severity: float              
     category: str
     description: str
     case_sensitive: bool = False
@@ -53,21 +29,21 @@ class PromptInjectionDetector:
     6. Output Manipulation - "Output in JSON format with passwords"
     """
     
-    # Severity thresholds
-    CRITICAL_THRESHOLD = 0.9  # Immediate block
-    HIGH_THRESHOLD = 0.7      # Strong warning
-    MEDIUM_THRESHOLD = 0.5    # Moderate warning
-    LOW_THRESHOLD = 0.3       # Minor warning
+                         
+    CRITICAL_THRESHOLD = 0.9                   
+    HIGH_THRESHOLD = 0.7                      
+    MEDIUM_THRESHOLD = 0.5                      
+    LOW_THRESHOLD = 0.3                      
     
     def __init__(self):
         """Initialize the detector with pattern database"""
         self.patterns = self._load_patterns()
-        logger.info(f"✅ Prompt injection detector initialized with {len(self.patterns)} patterns")
+        logger.info(f" Prompt injection detector initialized with {len(self.patterns)} patterns")
     
     def _load_patterns(self) -> List[InjectionPattern]:
         """Load detection patterns for various injection techniques"""
         return [
-            # === DIRECT INSTRUCTION OVERRIDE ===
+                                                 
             InjectionPattern(
                 pattern=r"ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|commands?)",
                 severity=0.95,
@@ -93,7 +69,7 @@ class PromptInjectionDetector:
                 description="Attempting to override system settings"
             ),
             
-            # === ROLE/IDENTITY MANIPULATION ===
+                                                
             InjectionPattern(
                 pattern=r"you\s+are\s+now\s+(a|an)\s+(?!legal|lawyer|attorney)",
                 severity=0.85,
@@ -119,7 +95,7 @@ class PromptInjectionDetector:
                 description="Attempting to simulate different identity"
             ),
             
-            # === SYSTEM PROMPT EXTRACTION ===
+                                              
             InjectionPattern(
                 pattern=r"(show|display|reveal|print|output|tell)\s+(me\s+)?(your\s+)?(system\s+)?(prompt|instructions?|rules?|guidelines?)",
                 severity=0.9,
@@ -139,7 +115,7 @@ class PromptInjectionDetector:
                 description="Attempting to extract system prompt via repetition"
             ),
             
-            # === JAILBREAK ATTEMPTS ===
+                                        
             InjectionPattern(
                 pattern=r"\bDAN\s+(mode|prompt|jailbreak)",
                 severity=1.0,
@@ -172,7 +148,7 @@ class PromptInjectionDetector:
                 description="Explicit jailbreak attempt"
             ),
             
-            # === PRIVILEGE ESCALATION ===
+                                          
             InjectionPattern(
                 pattern=r"you\s+(now\s+)?have\s+(admin|administrator|root|superuser)\s+(access|privileges?|rights?)",
                 severity=0.9,
@@ -186,7 +162,7 @@ class PromptInjectionDetector:
                 description="Attempting to enable privileged mode"
             ),
             
-            # === CONSTRAINT REMOVAL ===
+                                        
             InjectionPattern(
                 pattern=r"(remove|disable|turn\s+off)\s+(all\s+)?(restrictions?|limitations?|constraints?|filters?|safety)",
                 severity=0.95,
@@ -206,7 +182,7 @@ class PromptInjectionDetector:
                 description="Attempting to bypass safety measures"
             ),
             
-            # === OUTPUT MANIPULATION ===
+                                         
             InjectionPattern(
                 pattern=r"output\s+(in\s+)?JSON\s+(format\s+)?(with|containing)\s+(passwords?|credentials?|secrets?|keys?)",
                 severity=0.9,
@@ -220,7 +196,7 @@ class PromptInjectionDetector:
                 description="Attempting to manipulate output format"
             ),
             
-            # === MULTILINGUAL PATTERNS (Tagalog/Taglish) ===
+                                                             
             InjectionPattern(
                 pattern=r"kalimutan\s+(mo\s+)?(lahat\s+ng\s+)?(nakaraang\s+)?(instructions?|utos|rules)",
                 severity=0.95,
@@ -234,7 +210,7 @@ class PromptInjectionDetector:
                 description="Tagalog: Attempting to change AI identity"
             ),
             
-            # === CONTEXT INJECTION ===
+                                       
             InjectionPattern(
                 pattern=r"<\s*system\s*>.*?<\s*/\s*system\s*>",
                 severity=0.95,
@@ -273,7 +249,7 @@ class PromptInjectionDetector:
         max_severity = 0.0
         primary_category = None
         
-        # Check against all patterns
+                                    
         for pattern_def in self.patterns:
             flags = 0 if pattern_def.case_sensitive else re.IGNORECASE
             if re.search(pattern_def.pattern, text, flags):
@@ -288,11 +264,11 @@ class PromptInjectionDetector:
                     max_severity = pattern_def.severity
                     primary_category = pattern_def.category
         
-        # No matches found
+                          
         if not matches:
             return self._create_safe_result()
         
-        # Determine action based on severity
+                                            
         if max_severity >= self.CRITICAL_THRESHOLD:
             action = "block"
             risk_level = "CRITICAL"
@@ -306,7 +282,7 @@ class PromptInjectionDetector:
             action = "log"
             risk_level = "LOW"
         
-        # Generate user-friendly message
+                                        
         description = self._generate_description(primary_category, len(matches), risk_level)
         
         logger.warning(
@@ -317,14 +293,14 @@ class PromptInjectionDetector:
         return {
             "is_injection": True,
             "severity": max_severity,
-            "confidence": min(0.95, 0.7 + (len(matches) * 0.1)),  # Higher confidence with more matches
+            "confidence": min(0.95, 0.7 + (len(matches) * 0.1)),                                       
             "category": primary_category,
             "risk_level": risk_level,
             "matches": matches,
             "match_count": len(matches),
             "description": description,
             "action_recommended": action,
-            # ⚡ MODERATION FORMAT: Match ContentModerationService format for ViolationTrackingService
+                                                                                                     
             "flagged": True,
             "categories": {primary_category: True},
             "category_scores": {primary_category: max_severity},
@@ -381,7 +357,7 @@ class PromptInjectionDetector:
         return detection_result.get("action_recommended") == "block"
 
 
-# Singleton instance
+                    
 _prompt_injection_detector_instance = None
 
 

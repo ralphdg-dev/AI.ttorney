@@ -1,31 +1,25 @@
-"""
-Guest Configuration - Backend
-Single source of truth for guest rate limiting configuration
-Mirrors frontend config for consistency (DRY principle)
-"""
-
 import os
 from typing import Final
 
-# ============================================================================
-# GUEST SESSION CONSTANTS (Single Source of Truth)
-# ============================================================================
+                                                                              
+                                                  
+                                                                              
 
-# Maximum number of prompts a guest user can send
-# Must match frontend: client/config/guestConfig.ts
+                                                 
+                                                   
 GUEST_PROMPT_LIMIT: Final[int] = int(os.getenv("GUEST_PROMPT_LIMIT", "15"))
 
-# Guest session expiration time in hours
-# Must match frontend: 24 hours
+                                        
+                               
 SESSION_EXPIRY_HOURS: Final[int] = int(os.getenv("GUEST_SESSION_HOURS", "24"))
 
-# IP-based rate limiting (backup layer)
-# Prevents abuse even if session tokens are compromised
+                                       
+                                                       
 IP_RATE_LIMIT_PER_HOUR: Final[int] = int(os.getenv("GUEST_IP_LIMIT_HOUR", "30"))
 
-# ============================================================================
-# VALIDATION RULES
-# ============================================================================
+                                                                              
+                  
+                                                                              
 
 class GuestSessionValidation:
     """
@@ -33,21 +27,21 @@ class GuestSessionValidation:
     Mirrors frontend validation for consistency
     """
     
-    # Minimum session ID length (prevents guessing attacks)
+                                                           
     MIN_SESSION_ID_LENGTH: Final[int] = 20
     
-    # Session ID must start with this prefix
+                                            
     SESSION_ID_PREFIX: Final[str] = "guest_"
     
-    # Maximum session age in seconds (24 hours + buffer)
+                                                        
     MAX_SESSION_AGE_SECONDS: Final[int] = (SESSION_EXPIRY_HOURS + 1) * 3600
     
-    # Expiry buffer for clock skew (5 minutes)
+                                              
     EXPIRY_BUFFER_SECONDS: Final[int] = 5 * 60
 
-# ============================================================================
-# ERROR MESSAGES (Centralized)
-# ============================================================================
+                                                                              
+                              
+                                                                              
 
 class GuestErrorMessages:
     """
@@ -75,9 +69,9 @@ class GuestErrorMessages:
         """Generate IP rate limit message"""
         return f"Too many requests from your IP. Try again in {minutes_left} minutes."
 
-# ============================================================================
-# HELPER FUNCTIONS (DRY Principle)
-# ============================================================================
+                                                                              
+                                  
+                                                                              
 
 def calculate_remaining_prompts(prompt_count: int) -> int:
     """
@@ -136,9 +130,9 @@ def calculate_reset_time(created_at: float) -> int:
     """
     return int(created_at + SESSION_EXPIRY_HOURS * 3600)
 
-# ============================================================================
-# EXPORT ALL
-# ============================================================================
+                                                                              
+            
+                                                                              
 
 __all__ = [
     'GUEST_PROMPT_LIMIT',

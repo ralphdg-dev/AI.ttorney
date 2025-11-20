@@ -9,14 +9,14 @@ import httpx
 router = APIRouter(prefix="/api/user/favorites", tags=["user_favorites"])
 logger = logging.getLogger(__name__)
 
-# Pydantic models
+                 
 class FavoriteTermRequest(BaseModel):
-    glossary_id: str  # UUID
+    glossary_id: str        
 
 class FavoriteTermResponse(BaseModel):
     id: str
     user_id: str
-    glossary_id: str  # UUID
+    glossary_id: str        
     favorited_at: str
 
 class BookmarkGuideRequest(BaseModel):
@@ -28,7 +28,7 @@ class BookmarkGuideResponse(BaseModel):
     article_id: str
     bookmarked_at: str
 
-# ============= GLOSSARY FAVORITES ENDPOINTS =============
+                                                          
 
 @router.get("/terms")
 async def get_favorite_terms(current_user: dict = Depends(get_current_user)):
@@ -41,7 +41,7 @@ async def get_favorite_terms(current_user: dict = Depends(get_current_user)):
         supabase_service = SupabaseService()
         
         async with httpx.AsyncClient() as client:
-            # Single query with embedded resource (PostgREST feature)
+                                                                     
             response = await client.get(
                 f"{supabase_service.rest_url}/user_glossary_favorites",
                 params={
@@ -58,7 +58,7 @@ async def get_favorite_terms(current_user: dict = Depends(get_current_user)):
             
             favorites = response.json()
             
-            # Transform to expected format
+                                          
             result = [
                 {
                     "id": fav["id"],
@@ -70,7 +70,7 @@ async def get_favorite_terms(current_user: dict = Depends(get_current_user)):
                 if fav.get("glossary_terms")
             ]
             
-            logger.info(f"✅ Retrieved {len(result)} favorite terms for user {user_id}")
+            logger.info(f" Retrieved {len(result)} favorite terms for user {user_id}")
             return result
                 
     except HTTPException:
@@ -93,7 +93,7 @@ async def add_favorite_term(
         
         supabase_service = SupabaseService()
         
-        # Check if already favorited
+                                    
         async with httpx.AsyncClient() as client:
             check_response = await client.get(
                 f"{supabase_service.rest_url}/user_glossary_favorites",
@@ -111,7 +111,7 @@ async def add_favorite_term(
                     logger.info(f"Term {request.glossary_id} already favorited by user {user_id}")
                     raise HTTPException(status_code=409, detail="Term already in favorites")
             
-            # Insert new favorite
+                                 
             insert_response = await client.post(
                 f"{supabase_service.rest_url}/user_glossary_favorites",
                 json={
@@ -123,7 +123,7 @@ async def add_favorite_term(
             
             if insert_response.status_code == 201:
                 favorite = insert_response.json()[0]
-                logger.info(f"✅ Added term {request.glossary_id} to favorites for user {user_id}")
+                logger.info(f" Added term {request.glossary_id} to favorites for user {user_id}")
                 return favorite
             else:
                 logger.error(f"Failed to add favorite: {insert_response.text}")
@@ -156,7 +156,7 @@ async def remove_favorite_term(term_id: str, current_user: dict = Depends(get_cu
             )
             
             if response.status_code == 204:
-                logger.info(f"✅ Removed term {term_id} from favorites for user {user_id}")
+                logger.info(f" Removed term {term_id} from favorites for user {user_id}")
                 return {"success": True, "message": "Favorite removed successfully"}
             else:
                 logger.error(f"Failed to remove favorite: {response.text}")
@@ -206,7 +206,7 @@ async def check_favorite_term(
         logger.error(f"Error checking favorite term: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-# ============= GUIDE BOOKMARKS ENDPOINTS =============
+                                                       
 
 @router.get("/guides", response_model=List[BookmarkGuideResponse])
 async def get_bookmarked_guides(current_user: dict = Depends(get_current_user)):
@@ -231,7 +231,7 @@ async def get_bookmarked_guides(current_user: dict = Depends(get_current_user)):
             
             if response.status_code == 200:
                 bookmarks = response.json()
-                logger.info(f"✅ Retrieved {len(bookmarks)} bookmarked guides for user {user_id}")
+                logger.info(f" Retrieved {len(bookmarks)} bookmarked guides for user {user_id}")
                 return bookmarks
             else:
                 logger.error(f"Failed to fetch bookmarks: {response.text}")
@@ -256,7 +256,7 @@ async def add_bookmarked_guide(
         
         supabase_service = SupabaseService()
         
-        # Check if already bookmarked
+                                     
         async with httpx.AsyncClient() as client:
             check_response = await client.get(
                 f"{supabase_service.rest_url}/user_guide_bookmarks",
@@ -274,7 +274,7 @@ async def add_bookmarked_guide(
                     logger.info(f"Guide {request.article_id} already bookmarked by user {user_id}")
                     raise HTTPException(status_code=409, detail="Guide already in bookmarks")
             
-            # Insert new bookmark
+                                 
             insert_response = await client.post(
                 f"{supabase_service.rest_url}/user_guide_bookmarks",
                 json={
@@ -286,7 +286,7 @@ async def add_bookmarked_guide(
             
             if insert_response.status_code == 201:
                 bookmark = insert_response.json()[0]
-                logger.info(f"✅ Added guide {request.article_id} to bookmarks for user {user_id}")
+                logger.info(f" Added guide {request.article_id} to bookmarks for user {user_id}")
                 return bookmark
             else:
                 logger.error(f"Failed to add bookmark: {insert_response.text}")
@@ -322,7 +322,7 @@ async def remove_bookmarked_guide(
             )
             
             if response.status_code == 204:
-                logger.info(f"✅ Removed guide {article_id} from bookmarks for user {user_id}")
+                logger.info(f" Removed guide {article_id} from bookmarks for user {user_id}")
                 return {"success": True, "message": "Bookmark removed successfully"}
             else:
                 logger.error(f"Failed to remove bookmark: {response.text}")

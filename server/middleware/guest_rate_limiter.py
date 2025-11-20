@@ -1,22 +1,3 @@
-"""
-Enterprise-Grade Guest Rate Limiting Middleware
-Following OpenAI/Anthropic security patterns
-
-SECURITY LAYERS:
-1. Server-side validation (never trust client)
-2. IP-based rate limiting (backup layer)
-3. Cryptographic session tokens (prevent spoofing)
-4. Request fingerprinting (detect abuse patterns)
-5. Redis-based distributed tracking (scalable)
-
-ANTI-BYPASS MEASURES:
-- Client data is NEVER trusted
-- Multiple independent validation layers
-- IP + User-Agent + Session fingerprinting
-- Exponential backoff on violations
-- Automatic session invalidation on tampering
-"""
-
 import time
 import uuid
 import os
@@ -26,10 +7,10 @@ from datetime import datetime
 from fastapi import Request
 from collections import defaultdict
 
-# Add parent directory to path for config imports
+                                                 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# DRY: Import centralized configuration
+                                       
 from config.guest_config import (
     GUEST_PROMPT_LIMIT,
     SESSION_EXPIRY_HOURS,
@@ -42,9 +23,9 @@ from config.guest_config import (
     calculate_reset_time,
 )
 
-# In-memory store (sufficient for <5000 users)
-# For >5000 users or multiple servers, use Redis
-GUEST_SESSIONS = {}  # {session_id: {count, created_at, ip}}
+                                              
+                                                
+GUEST_SESSIONS = {}                                         
 IP_RATE_LIMITS = defaultdict(lambda: {"count": 0, "reset_time": 0})
 
 
@@ -78,12 +59,12 @@ class GuestRateLimiter:
         now = time.time()
         ip_data = IP_RATE_LIMITS[ip]
         
-        # Reset if hour has passed
+                                  
         if now >= ip_data["reset_time"]:
             ip_data["count"] = 0
-            ip_data["reset_time"] = now + 3600  # 1 hour
+            ip_data["reset_time"] = now + 3600          
         
-        # Check limit
+                     
         if ip_data["count"] >= IP_RATE_LIMIT_PER_HOUR:
             seconds_left = int(ip_data["reset_time"] - now)
             return False, seconds_left
@@ -108,7 +89,7 @@ class GuestRateLimiter:
         """
         ip = request.client.host if request and request.client else "unknown"
         
-        # STEP 1: IP rate limiting (skip if no Request object)
+                                                              
         if request:
             ip_allowed, ip_seconds_left = GuestRateLimiter.check_ip_rate_limit(ip)
             if not ip_allowed:
@@ -120,9 +101,9 @@ class GuestRateLimiter:
                     "remaining": 0
                 }
         
-        # STEP 2: Session Validation
+                                    
         if not session_id:
-            # New guest - create simple session
+                                               
             session_id = GuestRateLimiter.generate_session_id()
             GUEST_SESSIONS[session_id] = {
                 "count": 0,
@@ -138,12 +119,12 @@ class GuestRateLimiter:
                 "reset_time": int(time.time() + SESSION_EXPIRY_HOURS * 3600)
             }
         
-        # Get server-side session data
+                                      
         session_data = GUEST_SESSIONS.get(session_id)
         if not session_data:
-            # Session not found - server was likely restarted
-            # Create new session to provide seamless experience
-            print(f"🔄 Session {session_id} not found (server restart). Creating new session.")
+                                                             
+                                                               
+            print(f" Session {session_id} not found (server restart). Creating new session.")
             new_session_id = GuestRateLimiter.generate_session_id()
             GUEST_SESSIONS[new_session_id] = {
                 "count": 0,
@@ -160,7 +141,7 @@ class GuestRateLimiter:
                 "message": "Session refreshed due to server restart"
             }
         
-        # STEP 3: Check session expiry
+                                      
         session_age = time.time() - session_data["created_at"]
         if session_age > SESSION_EXPIRY_HOURS * 3600:
             del GUEST_SESSIONS[session_id]
@@ -170,10 +151,10 @@ class GuestRateLimiter:
                 "message": GuestErrorMessages.session_expired()
             }
         
-        # STEP 4: Server-side count validation (NEVER trust client)
+                                                                   
         server_count = session_data["count"]
         
-        # DRY: Use helper to check limit
+                                        
         if is_prompt_limit_reached(server_count):
             reset_time = calculate_reset_time(session_data["created_at"])
             seconds_left = reset_time - int(time.time())
@@ -190,11 +171,11 @@ class GuestRateLimiter:
                 "message": GuestErrorMessages.limit_reached(GUEST_PROMPT_LIMIT, hours_left, minutes_left)
             }
         
-        # ALLOWED: Increment server-side count
+                                              
         session_data["count"] += 1
         IP_RATE_LIMITS[ip]["count"] += 1
         
-        # DRY: Use helpers for calculations
+                                           
         return {
             "allowed": True,
             "session_id": session_id,
@@ -233,7 +214,7 @@ class GuestRateLimiter:
         }
 
 
-# FastAPI dependency (optional - can call directly in route)
+                                                            
 async def validate_guest_rate_limit(request: Request) -> Dict:
     """
     FastAPI dependency for guest rate limiting
@@ -254,7 +235,7 @@ async def validate_guest_rate_limit(request: Request) -> Dict:
     )
 
 
-# Background cleanup task (run via cron or scheduler)
+                                                     
 def setup_cleanup_task():
     """
     Setup periodic cleanup of expired sessions
@@ -270,9 +251,9 @@ def setup_cleanup_task():
         while True:
             try:
                 GuestRateLimiter.cleanup_expired_sessions()
-                await asyncio.sleep(3600)  # Every hour
+                await asyncio.sleep(3600)              
             except Exception as e:
-                print(f"❌ Cleanup error: {e}")
-                await asyncio.sleep(60)  # Retry after 1 minute
+                print(f" Cleanup error: {e}")
+                await asyncio.sleep(60)                        
     
     return cleanup_loop

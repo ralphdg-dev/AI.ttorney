@@ -1,9 +1,3 @@
-"""
-User Moderation Status Routes
-
-Endpoints for users to view their own moderation status (strikes, suspensions).
-"""
-
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
@@ -44,7 +38,7 @@ async def get_moderation_status(
         supabase = SupabaseService()
         
         async with httpx.AsyncClient(timeout=10.0) as client:
-            # Get user data
+                           
             response = await client.get(
                 f"{supabase.rest_url}/users",
                 params={
@@ -70,12 +64,12 @@ async def get_moderation_status(
             
             user_data = users[0]
             
-            # Handle NULL values from database (for users created before migration)
+                                                                                   
             strike_count = user_data.get("strike_count") or 0
             suspension_count = user_data.get("suspension_count") or 0
             account_status = user_data.get("account_status") or "active"
             
-            # Get most recent suspension to check lifted_acknowledged status
+                                                                            
             suspension_response = await client.get(
                 f"{supabase.rest_url}/user_suspensions",
                 params={
@@ -101,7 +95,7 @@ async def get_moderation_status(
                     lifted_at = most_recent.get("lifted_at")
                     was_lifted_by_admin = most_recent.get("lifted_by") is not None
             
-            logger.info(f"📊 User {user_id[:8]}... moderation status: strikes={strike_count}, status={account_status}, lifted_ack={lifted_acknowledged}")
+            logger.info(f" User {user_id[:8]}... moderation status: strikes={strike_count}, status={account_status}, lifted_ack={lifted_acknowledged}")
             
             return ModerationStatusResponse(
                 strike_count=strike_count,
@@ -118,8 +112,8 @@ async def get_moderation_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting moderation status: {str(e)}")
-        # Return default values if columns don't exist yet (before migration)
+        logger.error(f" Error getting moderation status: {str(e)}")
+                                                                             
         logger.warning("Returning default moderation status (columns may not exist yet)")
         return ModerationStatusResponse(
             strike_count=0,
@@ -148,7 +142,7 @@ async def acknowledge_suspension_lifted(
         supabase = SupabaseService()
         
         async with httpx.AsyncClient(timeout=10.0) as client:
-            # Get the most recent suspension
+                                            
             suspension_response = await client.get(
                 f"{supabase.rest_url}/user_suspensions",
                 params={
@@ -177,7 +171,7 @@ async def acknowledge_suspension_lifted(
             
             suspension_id = suspensions[0]["id"]
             
-            # Update lifted_acknowledged to true
+                                                
             update_response = await client.patch(
                 f"{supabase.rest_url}/user_suspensions",
                 params={
@@ -196,7 +190,7 @@ async def acknowledge_suspension_lifted(
                     detail="Failed to acknowledge suspension lifted"
                 )
             
-            logger.info(f"✅ User {user_id[:8]}... acknowledged suspension lifted for suspension {suspension_id[:8]}...")
+            logger.info(f" User {user_id[:8]}... acknowledged suspension lifted for suspension {suspension_id[:8]}...")
             
             return {
                 "success": True,
@@ -206,7 +200,7 @@ async def acknowledge_suspension_lifted(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error acknowledging suspension lifted: {str(e)}")
+        logger.error(f" Error acknowledging suspension lifted: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to acknowledge suspension lifted"

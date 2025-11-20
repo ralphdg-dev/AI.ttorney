@@ -48,7 +48,7 @@ class UpdateUserProfileRequest(BaseModel):
     def validate_birthdate(cls, v):
         if v:
             try:
-                # Validate date format
+                                      
                 datetime.fromisoformat(v.replace('Z', '+00:00'))
                 return v
             except ValueError:
@@ -130,7 +130,7 @@ async def update_user_profile(
         user_id = user_data["id"]
         supabase_service = SupabaseService()
         
-        # Check if email is being changed and if it already exists (excluding current user)
+                                                                                           
         if profile_data.email != profile["email"]:
             email_check = await supabase_service.check_user_exists_excluding_current("email", profile_data.email, user_id)
             if email_check["success"] and email_check.get("exists"):
@@ -139,7 +139,7 @@ async def update_user_profile(
                     detail="Email address is already in use"
                 )
         
-        # Check if username is being changed and if it already exists (excluding current user)
+                                                                                              
         if profile_data.username != profile["username"]:
             username_check = await supabase_service.check_user_exists_excluding_current("username", profile_data.username, user_id)
             if username_check["success"] and username_check.get("exists"):
@@ -148,7 +148,7 @@ async def update_user_profile(
                     detail="Username is already taken"
                 )
         
-        # Prepare update data
+                             
         update_data = {
             "full_name": profile_data.full_name,
             "email": profile_data.email,
@@ -156,14 +156,14 @@ async def update_user_profile(
             "updated_at": datetime.utcnow().isoformat()
         }
         
-        # Add optional fields if provided
+                                         
         if profile_data.birthdate is not None:
             update_data["birthdate"] = profile_data.birthdate
         
         if profile_data.profile_photo is not None:
             update_data["profile_photo"] = profile_data.profile_photo
         
-        # Update profile in database
+                                    
         result = await supabase_service.update_user_profile(
             update_data,
             {"id": user_id}
@@ -175,13 +175,13 @@ async def update_user_profile(
                 detail=f"Failed to update profile: {result['error']}"
             )
         
-        # If email was changed, update it in Supabase Auth as well
+                                                                  
         if profile_data.email != profile["email"]:
             auth_result = await supabase_service.update_user_email(user_id, profile_data.email)
             if not auth_result["success"]:
                 logger.warning(f"Failed to update email in auth: {auth_result['error']}")
-                # Note: Profile was updated but auth email update failed
-                # This might require manual intervention or email verification
+                                                                        
+                                                                              
         
         return {
             "success": True,
@@ -216,7 +216,7 @@ async def change_password(
         
         supabase_service = SupabaseService()
         
-        # Verify current password by attempting to sign in
+                                                          
         verify_result = await supabase_service.sign_in(
             email=profile["email"],
             password=password_data.current_password
@@ -228,7 +228,7 @@ async def change_password(
                 detail="Current password is incorrect"
             )
         
-        # Update password in Supabase Auth
+                                          
         password_result = await supabase_service.update_user_password(
             user_data["id"],
             password_data.new_password
@@ -272,7 +272,7 @@ async def update_email(
         
         supabase_service = SupabaseService()
         
-        # Verify password
+                         
         verify_result = await supabase_service.sign_in(
             email=profile["email"],
             password=email_data.password
@@ -284,7 +284,7 @@ async def update_email(
                 detail="Password is incorrect"
             )
         
-        # Check if new email already exists
+                                           
         email_check = await supabase_service.check_user_exists("email", email_data.new_email)
         if email_check["success"] and email_check.get("exists"):
             raise HTTPException(
@@ -292,7 +292,7 @@ async def update_email(
                 detail="Email address is already in use"
             )
         
-        # Update email in both auth and profile
+                                               
         auth_result = await supabase_service.update_user_email(user_data["id"], email_data.new_email)
         if not auth_result["success"]:
             raise HTTPException(
@@ -300,7 +300,7 @@ async def update_email(
                 detail=f"Failed to update email: {auth_result['error']}"
             )
         
-        # Update email in profile table
+                                       
         profile_result = await supabase_service.update_user_profile(
             {"email": email_data.new_email, "updated_at": datetime.utcnow().isoformat()},
             {"id": user_data["id"]}
@@ -340,7 +340,7 @@ async def delete_user_account(
         
         supabase_service = SupabaseService()
         
-        # Soft delete by archiving the user
+                                           
         result = await supabase_service.update_user_profile(
             {
                 "archived": True,
@@ -407,7 +407,7 @@ async def check_username_availability(username: str):
 async def check_email_availability(email: str):
     """Check if email is available"""
     try:
-        # Validate email format
+                               
         import re
         email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
         if not re.match(email_regex, email.strip()):
@@ -456,14 +456,14 @@ async def send_email_change_otp(
                 detail="User not found"
             )
         
-        # Check if new email is different from current email
+                                                            
         if request.new_email == profile["email"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="New email must be different from current email"
             )
         
-        # Check if new email already exists
+                                           
         supabase_service = SupabaseService()
         email_check = await supabase_service.check_user_exists("email", request.new_email)
         if email_check["success"] and email_check.get("exists"):
@@ -472,7 +472,7 @@ async def send_email_change_otp(
                 detail="Email address is already in use"
             )
         
-        # Send OTP to new email
+                               
         otp_service = OTPService()
         result = await otp_service.send_email_change_otp(
             request.new_email, 
@@ -519,7 +519,7 @@ async def verify_email_change(
         
         logger.info(f"Verifying email change for user {user_data.get('id')}, new email: {request.new_email}")
         
-        # Verify OTP
+                    
         otp_service = OTPService()
         otp_result = await otp_service.verify_otp(
             request.new_email,
@@ -536,10 +536,10 @@ async def verify_email_change(
         
         logger.info("OTP verified successfully, updating email...")
         
-        # Update email in both auth and profile
+                                               
         supabase_service = SupabaseService()
         
-        # Update email in Supabase Auth
+                                       
         auth_result = await supabase_service.update_user_email(user_data["id"], request.new_email)
         if not auth_result["success"]:
             logger.error(f"Failed to update email in auth: {auth_result.get('error')}")
@@ -548,7 +548,7 @@ async def verify_email_change(
                 detail=f"Failed to update email: {auth_result.get('error', 'Unknown error')}"
             )
         
-        # Update email in profile table
+                                       
         profile_result = await supabase_service.update_user_profile(
             {"email": request.new_email, "updated_at": datetime.utcnow().isoformat()},
             {"id": user_data["id"]}

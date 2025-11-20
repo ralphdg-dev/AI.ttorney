@@ -5,7 +5,7 @@ from datetime import datetime
 import re
 from pathlib import Path
 
-# URLs to scrape
+                
 FAMILY_CODE_URL = "https://lawphil.net/executive/execord/eo1987/eo_209_1987.html"
 RA_9262_URL = "https://lawphil.net/statutes/repacts/ra2004/ra_9262_2004.html"
 
@@ -17,7 +17,7 @@ def classify_article_by_content(content, title="", number=""):
     """Intelligently classify articles based on content keywords"""
     content_lower = (content + " " + title).lower()
     
-    # Keywords for each topic
+                             
     marriage_keywords = [
         'marriage', 'marry', 'married', 'spouse', 'husband', 'wife', 'wedding', 'matrimony',
         'conjugal', 'marital', 'solemniz', 'ceremony', 'license', 'requisite', 'consent',
@@ -42,7 +42,7 @@ def classify_article_by_content(content, title="", number=""):
         'domestic violence', 'intimidation', 'coercion', 'deprivation', 'exploitation'
     ]
     
-    # Count keyword matches
+                           
     scores = {
         'Marriage': sum(1 for keyword in marriage_keywords if keyword in content_lower),
         'Annulment': sum(1 for keyword in annulment_keywords if keyword in content_lower),
@@ -50,10 +50,10 @@ def classify_article_by_content(content, title="", number=""):
         'VAWC': sum(1 for keyword in vawc_keywords if keyword in content_lower)
     }
     
-    # Get the topic with highest score
+                                      
     primary_topic = max(scores, key=scores.get)
     
-    # If no clear winner, use article number as fallback
+                                                        
     if scores[primary_topic] == 0:
         try:
             num = int(number)
@@ -72,7 +72,7 @@ def classify_article_by_content(content, title="", number=""):
 
 def scrape_family_code(url):
     """Scrape Family Code from LawPhil"""
-    print("🔄 Fetching Family Code content...")
+    print(" Fetching Family Code content...")
     response = requests.get(url)
     response.encoding = 'utf-8'
     soup = BeautifulSoup(response.text, "html.parser")
@@ -88,7 +88,7 @@ def scrape_family_code(url):
         if not text:
             continue
 
-        # Detect TITLE
+                      
         title_match = re.match(r"TITLE\s+([IVXLC]+)\s*[-–—]?\s*(.+)", text, re.I)
         if title_match:
             title_number = title_match.group(1)
@@ -97,13 +97,13 @@ def scrape_family_code(url):
             print(f"📖 Found: {current_title}")
             continue
         
-        # Also check for standalone TITLE lines
+                                               
         if re.match(r"^TITLE\s+[IVXLC]+\s*$", text, re.I):
             current_title = text.strip()
             print(f"📖 Found: {current_title}")
             continue
 
-        # Detect Chapter
+                        
         chapter_match = re.match(r"Chapter\s+(\d+)\.\s*(.+)", text)
         if chapter_match:
             chapter_number = chapter_match.group(1)
@@ -112,13 +112,13 @@ def scrape_family_code(url):
             print(f"📑 Found: {current_chapter}")
             continue
 
-        # Detect Article
+                        
         article_match = re.match(r"Article\s+(\d+)\.?\s*(.*)", text, re.DOTALL)
         if article_match:
             article_number = article_match.group(1)
             content = text
             
-            # Extract title (first sentence)
+                                            
             content_after_number = article_match.group(2).strip()
             title_match = re.match(r'^([^.]+)', content_after_number)
             if title_match:
@@ -126,7 +126,7 @@ def scrape_family_code(url):
             else:
                 title = f"Article {article_number}"
             
-            # Classify by content
+                                 
             topic = classify_article_by_content(content, title, article_number)
             
             article = {
@@ -151,7 +151,7 @@ def scrape_family_code(url):
 
 def scrape_ra_9262(url):
     """Scrape RA 9262 (VAWC) from LawPhil"""
-    print("🔄 Fetching RA 9262 content...")
+    print(" Fetching RA 9262 content...")
     try:
         response = requests.get(url)
         response.encoding = 'utf-8'
@@ -168,7 +168,7 @@ def scrape_ra_9262(url):
             if not text:
                 continue
 
-            # Detect centered headings
+                                      
             if p.has_attr("align") and p["align"] == "center":
                 if "TITLE" in text.upper():
                     current_title = text
@@ -178,13 +178,13 @@ def scrape_ra_9262(url):
                     print(f"📑 Found: {current_chapter}")
                 continue
 
-            # Detect Section
+                            
             section_match = re.match(r"(?:SEC\.|SECTION)\s+(\d+)\.?\s*(.*)", text, re.I | re.DOTALL)
             if section_match:
                 section_number = section_match.group(1)
                 content = text
                 
-                # Extract title
+                               
                 content_after_number = section_match.group(2).strip()
                 title_match = re.match(r'^([^.–—\-]+)', content_after_number)
                 if title_match:
@@ -192,7 +192,7 @@ def scrape_ra_9262(url):
                 else:
                     title = f"Section {section_number}"
                 
-                # All RA 9262 sections are VAWC
+                                               
                 topic = 'VAWC'
                 
                 section = {
@@ -216,7 +216,7 @@ def scrape_ra_9262(url):
         return sections
     
     except Exception as e:
-        print(f"❌ Error scraping RA 9262: {e}")
+        print(f" Error scraping RA 9262: {e}")
         return []
 
 def organize_by_topics(all_entries):
@@ -273,19 +273,19 @@ def create_comprehensive_data(family_code_articles, ra_9262_sections):
 
 def save_json(data, filename="family_code.json"):
     """Save data as JSON file"""
-    # Ensure data/raw directory exists
+                                      
     output_dir = Path(__file__).parent.parent / "data" / "raw"
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Save to data/raw directory
+                                
     output_path = output_dir / filename
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    print(f"✅ JSON saved to {output_path}")
+    print(f" JSON saved to {output_path}")
 
 def save_markdown(data, filename="family_code.md"):
     """Save data as Markdown file"""
-    # Save markdown to data/raw directory as well
+                                                 
     output_dir = Path(__file__).parent.parent / "data" / "raw"
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / filename
@@ -294,14 +294,14 @@ def save_markdown(data, filename="family_code.md"):
     md.append(f"# {data['title']}\n")
     md.append(f"{data['description']}\n")
     
-    # Laws section
+                  
     md.append("## Laws Covered\n")
     for law in data['laws']:
         md.append(f"- **{law['name']}** ({law.get('executive_order', law.get('full_name', ''))})")
         md.append(f"  - Date: {law['date']}")
         md.append(f"  - Source: {law['url']}\n")
     
-    # Statistics
+                
     stats = data['statistics']
     md.append("## Statistics\n")
     md.append(f"- **Total Entries:** {stats['total_entries']}")
@@ -312,7 +312,7 @@ def save_markdown(data, filename="family_code.md"):
     for topic, count in stats['by_topic'].items():
         md.append(f"- **{topic}:** {count} entries")
     
-    # Topics content
+                    
     for topic_name, entries in data['topics'].items():
         md.append(f"\n## {topic_name}\n")
         
@@ -332,14 +332,14 @@ def save_markdown(data, filename="family_code.md"):
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(md))
-    print(f"✅ Markdown saved to {output_path}")
+    print(f" Markdown saved to {output_path}")
 
 def display_summary(data):
     """Display clean summary"""
-    print(f"\n📊 **EXTRACTION SUMMARY**")
+    print(f"\n **EXTRACTION SUMMARY**")
     print("=" * 50)
     print(f"📖 {data['title']}")
-    print(f"📝 {data['description']}")
+    print(f" {data['description']}")
     
     print(f"\n📚 **Laws:**")
     for law in data['laws']:
@@ -350,35 +350,35 @@ def display_summary(data):
     print(f"  • Family Code: {stats['family_code_articles']} articles")
     print(f"  • RA 9262: {stats['ra_9262_sections']} sections")
     
-    print(f"\n🏷️  **By Topic:**")
+    print(f"\n🏷  **By Topic:**")
     for topic, count in stats['by_topic'].items():
         print(f"  • {topic}: {count} entries")
         
-        # Show sample entries
+                             
         sample_entries = data['topics'][topic][:2]
         for entry in sample_entries:
             print(f"    - {entry['type']} {entry['number']}: {entry['title'][:50]}...")
 
 if __name__ == "__main__":
-    print("🏛️  CLEAN FAMILY LAW SCRAPER")
+    print("🏛  CLEAN FAMILY LAW SCRAPER")
     print("📚 Simplified Structure - No Redundancy")
     print("=" * 45)
     
-    # Scrape both sources
+                         
     family_code_articles = scrape_family_code(FAMILY_CODE_URL)
     ra_9262_sections = scrape_ra_9262(RA_9262_URL)
     
-    # Create clean data structure
+                                 
     clean_data = create_comprehensive_data(family_code_articles, ra_9262_sections)
     
-    # Save outputs
+                  
     save_json(clean_data)
     save_markdown(clean_data)
     
-    # Display summary
+                     
     display_summary(clean_data)
     
-    print("\n✅ **CLEAN SCRAPING COMPLETE!**")
+    print("\n **CLEAN SCRAPING COMPLETE!**")
     print("📄 Files generated:")
     print("  • clean_family_law.json - Clean structured data")
     print("  • clean_family_law.md - Readable documentation")

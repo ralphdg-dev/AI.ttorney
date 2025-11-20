@@ -1,50 +1,3 @@
-"""
-Content Moderation Service using OpenAI's omni-moderation-latest
-
-This service provides industry-grade content moderation for forum posts and replies
-using OpenAI's most advanced moderation model (omni-moderation-latest).
-
-MULTILINGUAL SUPPORT:
-- Supports 40+ languages including English, Filipino/Tagalog, and Taglish
-- 42% improvement in multilingual performance vs previous models
-- 70% improvement for low-resource languages
-- No special configuration needed - automatically detects language
-
-INDUSTRY BEST PRACTICES:
-- Fail-open strategy (high availability over strict blocking)
-- Configurable thresholds per category
-- Comprehensive logging for audit trails
-- User-friendly error messages
-- Singleton pattern for performance
-- Async/await for non-blocking operations
-
-Features:
-- Multi-modal content analysis (text, images, etc.)
-- Category-specific flagging (hate, harassment, self-harm, sexual, violence)
-- Severity scoring for each category (0.0 to 1.0)
-- Detailed violation reports
-- Configurable thresholds via environment variables
-- Production-ready error handling
-
-Usage:
-    from services.content_moderation_service import ContentModerationService
-    
-    moderation = ContentModerationService()
-    
-    # Works with any language (English, Filipino, Tagalog, Taglish, etc.)
-    result = await moderation.moderate_content("User post content here")
-    
-    if result["flagged"]:
-        # Handle policy violation
-        categories = result["categories"]
-        severity = result["category_scores"]
-
-References:
-- OpenAI Moderation API: https://platform.openai.com/docs/guides/moderation
-- Industry Standards: Discord, Reddit, Slack moderation approaches
-- Compliance: Philippine RA 10175, RA 11313, RA 9775, RA 10173
-"""
-
 from openai import AsyncOpenAI
 import os
 from typing import Dict, Any, List, Optional
@@ -53,10 +6,10 @@ from dotenv import load_dotenv
 from services.filipino_profanity_filter import get_filipino_profanity_filter
 from services.safety_filter import get_safety_filter
 
-# Load environment variables
+                            
 load_dotenv()
 
-# Configure logging
+                   
 logger = logging.getLogger(__name__)
 
 class ContentModerationService:
@@ -97,25 +50,25 @@ class ContentModerationService:
         self.filipino_filter = get_filipino_profanity_filter()
         self.safety_filter = get_safety_filter()
         
-        # STRICT THRESHOLDS - Zero tolerance for harmful content
-        # Lower values = more sensitive detection
+                                                                
+                                                 
         self.thresholds = {
-            "hate": float(os.getenv("MODERATION_THRESHOLD_HATE", "0.05")),  # VERY STRICT - catches "I hate all lawyers"
-            "hate/threatening": float(os.getenv("MODERATION_THRESHOLD_HATE_THREATENING", "0.05")),  # VERY STRICT
-            "harassment": float(os.getenv("MODERATION_THRESHOLD_HARASSMENT", "0.3")),  # More sensitive
-            "harassment/threatening": float(os.getenv("MODERATION_THRESHOLD_HARASSMENT_THREATENING", "0.1")),  # Very sensitive
-            "self-harm": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM", "0.1")),  # Very sensitive
-            "self-harm/intent": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM_INTENT", "0.1")),  # Very sensitive
-            "self-harm/instructions": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM_INSTRUCTIONS", "0.1")),  # Very sensitive
-            "sexual": float(os.getenv("MODERATION_THRESHOLD_SEXUAL", "0.25")),  # More sensitive
-            "sexual/minors": float(os.getenv("MODERATION_THRESHOLD_SEXUAL_MINORS", "0.01")),  # CRITICAL: Near-zero tolerance
-            "violence": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE", "0.6")),  # Less sensitive for legal discussions
-            "violence/graphic": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE_GRAPHIC", "0.4")),  # Less sensitive for legal discussions
+            "hate": float(os.getenv("MODERATION_THRESHOLD_HATE", "0.05")),                                              
+            "hate/threatening": float(os.getenv("MODERATION_THRESHOLD_HATE_THREATENING", "0.05")),               
+            "harassment": float(os.getenv("MODERATION_THRESHOLD_HARASSMENT", "0.3")),                  
+            "harassment/threatening": float(os.getenv("MODERATION_THRESHOLD_HARASSMENT_THREATENING", "0.1")),                  
+            "self-harm": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM", "0.1")),                  
+            "self-harm/intent": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM_INTENT", "0.1")),                  
+            "self-harm/instructions": float(os.getenv("MODERATION_THRESHOLD_SELF_HARM_INSTRUCTIONS", "0.1")),                  
+            "sexual": float(os.getenv("MODERATION_THRESHOLD_SEXUAL", "0.25")),                  
+            "sexual/minors": float(os.getenv("MODERATION_THRESHOLD_SEXUAL_MINORS", "0.01")),                                 
+            "violence": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE", "0.6")),                                        
+            "violence/graphic": float(os.getenv("MODERATION_THRESHOLD_VIOLENCE_GRAPHIC", "0.4")),                                        
         }
         
-        logger.info(f"✅ Content moderation service initialized with model: {self.model}")
-        logger.info(f"🌐 Multilingual support: 40+ languages (English, Filipino/Tagalog, Taglish, etc.)")
-        logger.info(f"🛡️  Fail-open strategy enabled for high availability")
+        logger.info(f" Content moderation service initialized with model: {self.model}")
+        logger.info(f" Multilingual support: 40+ languages (English, Filipino/Tagalog, Taglish, etc.)")
+        logger.info(f"  Fail-open strategy enabled for high availability")
     
     async def moderate_content(self, content: str) -> Dict[str, Any]:
         """
@@ -151,12 +104,12 @@ class ContentModerationService:
             result = await moderate_content("Ang dami kong galit sa mga lawyers")
         """
         try:
-            # STEP 0: Safety filter - ZERO TOLERANCE for child safety, abuse, harassment
+                                                                                        
             safety_check = self.safety_filter.analyze(content)
             
             if safety_check["is_unsafe"]:
                 logger.error(f"🚨 SAFETY VIOLATION: {safety_check['violations']} (severity: {safety_check['severity']})")
-                # Immediate flag for safety violations
+                                                      
                 return {
                     "flagged": True,
                     "categories": {
@@ -194,12 +147,12 @@ class ContentModerationService:
                     }
                 }
             
-            # STEP 1: Check for Filipino profanity (catches what OpenAI might miss)
+                                                                                   
             profanity_check = self.filipino_filter.contains_profanity(content)
             
             if profanity_check["is_profane"]:
                 logger.warning(f"🚨 Filipino profanity detected: {profanity_check['matched_words']}")
-                # Return flagged result immediately
+                                                   
                 return {
                     "flagged": True,
                     "categories": {
@@ -240,29 +193,29 @@ class ContentModerationService:
                     }
                 }
             
-            # STEP 2: Call OpenAI Moderation API for additional checks
-            logger.info(f"🔍 Moderating content with OpenAI (length: {len(content)} chars)")
+                                                                      
+            logger.info(f" Moderating content with OpenAI (length: {len(content)} chars)")
             
             response = await self.client.moderations.create(
                 model=self.model,
                 input=content
             )
             
-            # Extract moderation results
+                                        
             result = response.results[0]
             
-            # Apply custom thresholds instead of using OpenAI's default flagged status
+                                                                                      
             category_scores = result.category_scores.model_dump()
             
-            # DEBUG: Log all category scores
-            logger.info(f"📊 Category Scores:")
+                                            
+            logger.info(f" Category Scores:")
             for category, score in category_scores.items():
                 threshold = self.thresholds.get(category, 0.5)
                 logger.info(f"   {category}: {score:.4f} (threshold: {threshold})")
             
             custom_flagged = self._apply_custom_thresholds(category_scores)
             
-            # Build detailed response with custom flagged status
+                                                                
             moderation_result = {
                 "flagged": custom_flagged,
                 "categories": result.categories.model_dump(),
@@ -271,16 +224,16 @@ class ContentModerationService:
                 "raw_response": result.model_dump()
             }
             
-            # Log results
+                         
             if custom_flagged:
-                logger.warning(f"⚠️  Content flagged: {moderation_result['violation_summary']}")
+                logger.warning(f"  Content flagged: {moderation_result['violation_summary']}")
             else:
-                logger.info("✅ Content passed moderation")
+                logger.info(" Content passed moderation")
             
             return moderation_result
             
         except Exception as e:
-            logger.error(f"❌ Content moderation failed: {str(e)}")
+            logger.error(f" Content moderation failed: {str(e)}")
             raise Exception(f"Content moderation error: {str(e)}")
     
     async def moderate_batch(self, contents: List[str]) -> List[Dict[str, Any]]:
@@ -304,7 +257,7 @@ class ContentModerationService:
             ])
         """
         try:
-            logger.info(f"🔍 Batch moderating {len(contents)} items")
+            logger.info(f" Batch moderating {len(contents)} items")
             
             response = await self.client.moderations.create(
                 model=self.model,
@@ -323,12 +276,12 @@ class ContentModerationService:
                 results.append(moderation_result)
             
             flagged_count = sum(1 for r in results if r["flagged"])
-            logger.info(f"✅ Batch moderation complete: {flagged_count}/{len(contents)} flagged")
+            logger.info(f" Batch moderation complete: {flagged_count}/{len(contents)} flagged")
             
             return results
             
         except Exception as e:
-            logger.error(f"❌ Batch moderation failed: {str(e)}")
+            logger.error(f" Batch moderation failed: {str(e)}")
             raise Exception(f"Batch moderation error: {str(e)}")
     
     def _apply_custom_thresholds(self, category_scores: Dict[str, float]) -> bool:
@@ -364,11 +317,11 @@ class ContentModerationService:
         
         violations = []
         
-        # Check each category against thresholds
+                                                
         for category, score in category_scores.items():
             threshold = self.thresholds.get(category, 0.5)
             if score >= threshold:
-                # Format category name for readability
+                                                      
                 category_name = category.replace("-", " ").replace("/", " - ").title()
                 violations.append(f"{category_name} (score: {score:.2f}, threshold: {threshold})")
         
@@ -394,13 +347,13 @@ class ContentModerationService:
         categories = result.categories.model_dump()
         scores = result.category_scores.model_dump()
         
-        # Check each category against thresholds
+                                                
         for category, is_flagged in categories.items():
             if is_flagged:
                 score = scores.get(category, 0)
                 threshold = self.thresholds.get(category, 0.5)
                 
-                # Format category name for readability
+                                                      
                 category_name = category.replace("-", " ").replace("/", " - ").title()
                 violations.append(f"{category_name} (score: {score:.2f}, threshold: {threshold})")
         
@@ -438,7 +391,7 @@ class ContentModerationService:
         categories = moderation_result["categories"]
         category_scores = moderation_result.get("category_scores", {})
         
-        # Get flagged categories with their scores
+                                                  
         flagged_with_scores = [
             (k, category_scores.get(k, 0.0)) 
             for k, v in categories.items() if v
@@ -450,11 +403,11 @@ class ContentModerationService:
             else:
                 return "Your content violates our community guidelines. Please revise and try again."
         
-        # Get the PRIMARY category (highest score) to avoid overwhelming the user
+                                                                                 
         primary_category, _ = max(flagged_with_scores, key=lambda x: x[1])
         primary_category_name = primary_category.replace("-", " ").replace("/", " - ").title()
         
-        # Simplify category names for better readability
+                                                        
         category_simplifications = {
             "Harassment - Threatening": "Threatening Behavior",
             "Self Harm - Intent": "Self-Harm Content",
@@ -466,14 +419,14 @@ class ContentModerationService:
         
         primary_category_name = category_simplifications.get(primary_category_name, primary_category_name)
         
-        # Generate message with only the primary category
+                                                         
         if context == "chatbot":
             return f"Your message was flagged for {primary_category_name}. Please be mindful of your language when using the chatbot."
         else:
             return f"Your content was flagged for {primary_category_name}. Please revise your post to comply with our community guidelines."
 
 
-# Singleton instance for reuse across the application
+                                                     
 _moderation_service_instance: Optional[ContentModerationService] = None
 
 def get_moderation_service() -> ContentModerationService:

@@ -1,8 +1,3 @@
-"""
-Admin Appeals Routes for AI.ttorney
-Admin-facing endpoints for reviewing suspension appeals
-"""
-
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from middleware.auth import require_role
 from services.appeal_service import AppealService
@@ -49,13 +44,13 @@ async def get_appeals(
                 detail=result["error"]
             )
         
-        # Transform appeals data for response
+                                             
         appeals = []
         for appeal_data in result["appeals"]:
             user_data = appeal_data.get("users")
             suspension_data = appeal_data.get("user_suspensions")
             
-            # Handle reviewed_by user data if exists
+                                                    
             reviewed_by = None
             if appeal_data.get("reviewed_by"):
                 reviewed_by = {

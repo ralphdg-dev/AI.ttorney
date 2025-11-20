@@ -1,22 +1,3 @@
-"""
-Suspension Appeals Routes
-
-Endpoints for users to appeal their suspensions and for admins to review appeals.
-
-User Endpoints:
-- POST /appeals - Submit an appeal for active suspension
-- GET /appeals/my - Get user's own appeals
-- GET /appeals/{appeal_id} - Get specific appeal details
-
-Admin Endpoints:
-- GET /admin/appeals - Get all appeals with filters
-- PATCH /admin/appeals/{appeal_id}/review - Approve or reject appeal
-- GET /admin/appeals/stats - Get appeal statistics
-
-Author: AI.ttorney Team
-Date: 2025-10-31
-"""
-
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List, Literal
@@ -28,12 +9,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Create routers
+                
 user_router = APIRouter(prefix="/appeals", tags=["appeals", "user"])
 admin_router = APIRouter(prefix="/admin/appeals", tags=["appeals", "admin"])
 
 
-# Request Models
+                
 class SubmitAppealRequest(BaseModel):
     appeal_reason: str = Field(..., min_length=1, max_length=2000, description="Reason for appeal (1-2000 characters)")
 
@@ -44,7 +25,7 @@ class ReviewAppealRequest(BaseModel):
     rejection_reason: Optional[str] = Field(None, max_length=500, description="Reason for rejection (shown to user)")
 
 
-# Response Models
+                 
 class AppealResponse(BaseModel):
     id: str
     user_id: str
@@ -76,9 +57,9 @@ class AppealStatsResponse(BaseModel):
     data: Dict[str, int]
 
 
-# ============================================================================
-# USER ENDPOINTS
-# ============================================================================
+                                                                              
+                
+                                                                              
 
 @user_router.post("", response_model=AppealResponse)
 async def submit_appeal(
@@ -97,7 +78,7 @@ async def submit_appeal(
         supabase = SupabaseService()
         
         async with httpx.AsyncClient(timeout=10.0) as client:
-            # Check if user is suspended
+                                        
             user_response = await client.get(
                 f"{supabase.rest_url}/users",
                 params={
@@ -120,7 +101,7 @@ async def submit_appeal(
                     detail="You can only appeal an active suspension"
                 )
             
-            # Get active suspension
+                                   
             suspension_response = await client.get(
                 f"{supabase.rest_url}/user_suspensions",
                 params={
@@ -147,7 +128,7 @@ async def submit_appeal(
             
             suspension_id = suspensions[0]["id"]
             
-            # Check if appeal already exists for this suspension
+                                                                
             existing_appeal_response = await client.get(
                 f"{supabase.rest_url}/suspension_appeals",
                 params={
@@ -167,7 +148,7 @@ async def submit_appeal(
                             detail=f"You already have a {existing_status} appeal for this suspension"
                         )
             
-            # Create appeal
+                           
             appeal_data = {
                 "user_id": user_id,
                 "suspension_id": suspension_id,
@@ -193,14 +174,14 @@ async def submit_appeal(
             
             appeal = create_response.json()[0]
             
-            logger.info(f"✅ User {user_id[:8]}... submitted appeal for suspension {suspension_id[:8]}...")
+            logger.info(f" User {user_id[:8]}... submitted appeal for suspension {suspension_id[:8]}...")
             
             return AppealResponse(**appeal)
     
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error submitting appeal: {str(e)}")
+        logger.error(f" Error submitting appeal: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
@@ -235,7 +216,7 @@ async def get_my_appeals(
             
             appeals = response.json()
             
-            # Format response
+                             
             formatted_appeals = []
             for appeal in appeals:
                 suspension_data = appeal.pop("user_suspensions", {})
@@ -257,7 +238,7 @@ async def get_my_appeals(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting user appeals: {str(e)}")
+        logger.error(f" Error getting user appeals: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
@@ -303,16 +284,16 @@ async def get_appeal(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting appeal: {str(e)}")
+        logger.error(f" Error getting appeal: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )
 
 
-# ============================================================================
-# ADMIN ENDPOINTS
-# ============================================================================
+                                                                              
+                 
+                                                                              
 
 @admin_router.get("", response_model=AppealsListResponse)
 async def get_all_appeals(
@@ -329,7 +310,7 @@ async def get_all_appeals(
     try:
         supabase = SupabaseService()
         
-        # Build query params
+                            
         params = {
             "select": "id,user_id,suspension_id,appeal_reason,status,reviewed_by,reviewed_at,rejection_reason,created_at,updated_at,users!inner(email,username),user_suspensions!inner(suspension_type,suspension_number)",
             "order": "created_at.desc",
@@ -355,7 +336,7 @@ async def get_all_appeals(
             
             appeals = response.json()
             
-            # Get total count
+                             
             count_params = {"select": "count"}
             if status_filter:
                 count_params["status"] = f"eq.{status_filter}"
@@ -372,7 +353,7 @@ async def get_all_appeals(
                 if "/" in content_range:
                     total = int(content_range.split("/")[1])
             
-            # Format response
+                             
             formatted_appeals = []
             for appeal in appeals:
                 user_data = appeal.pop("users", {})
@@ -386,7 +367,7 @@ async def get_all_appeals(
                 }
                 formatted_appeals.append(AppealWithUserInfo(**formatted_appeal))
             
-            logger.info(f"📊 Admin retrieved {len(appeals)} appeals (total: {total})")
+            logger.info(f" Admin retrieved {len(appeals)} appeals (total: {total})")
             
             return AppealsListResponse(
                 success=True,
@@ -397,7 +378,7 @@ async def get_all_appeals(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting appeals: {str(e)}")
+        logger.error(f" Error getting appeals: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
@@ -425,7 +406,7 @@ async def review_appeal(
         supabase = SupabaseService()
         
         async with httpx.AsyncClient(timeout=10.0) as client:
-            # Get appeal details
+                                
             appeal_response = await client.get(
                 f"{supabase.rest_url}/suspension_appeals",
                 params={
@@ -456,14 +437,14 @@ async def review_appeal(
                     detail=f"Cannot review appeal with status: {appeal['status']}"
                 )
             
-            # Validate rejection reason if rejecting
+                                                    
             if body.decision == "reject" and not body.rejection_reason:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="rejection_reason is required when rejecting an appeal"
                 )
             
-            # Update appeal
+                           
             appeal_update = {
                 "status": "approved" if body.decision == "approve" else "rejected",
                 "reviewed_by": admin_id,
@@ -491,9 +472,9 @@ async def review_appeal(
                     detail="Failed to update appeal"
                 )
             
-            # If approved, lift the suspension
+                                              
             if body.decision == "approve":
-                # Update suspension status
+                                          
                 await client.patch(
                     f"{supabase.rest_url}/user_suspensions",
                     params={"id": f"eq.{appeal['suspension_id']}"},
@@ -507,7 +488,7 @@ async def review_appeal(
                     headers=supabase._get_headers(use_service_key=True)
                 )
                 
-                # Update user status
+                                    
                 await client.patch(
                     f"{supabase.rest_url}/users",
                     params={"id": f"eq.{appeal['user_id']}"},
@@ -519,11 +500,11 @@ async def review_appeal(
                     headers=supabase._get_headers(use_service_key=True)
                 )
                 
-                logger.info(f"✅ Admin {admin_id[:8]}... APPROVED appeal {appeal_id[:8]}... and lifted suspension")
+                logger.info(f" Admin {admin_id[:8]}... APPROVED appeal {appeal_id[:8]}... and lifted suspension")
             else:
-                logger.info(f"❌ Admin {admin_id[:8]}... REJECTED appeal {appeal_id[:8]}...")
+                logger.info(f" Admin {admin_id[:8]}... REJECTED appeal {appeal_id[:8]}...")
             
-            # Get updated appeal
+                                
             final_response = await client.get(
                 f"{supabase.rest_url}/suspension_appeals",
                 params={"id": f"eq.{appeal_id}", "select": "*"},
@@ -534,13 +515,13 @@ async def review_appeal(
                 updated_appeal = final_response.json()[0]
                 return AppealResponse(**updated_appeal)
             else:
-                # Return the update response if final fetch fails
+                                                                 
                 return AppealResponse(**update_appeal_response.json()[0])
     
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error reviewing appeal: {str(e)}")
+        logger.error(f" Error reviewing appeal: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
@@ -560,7 +541,7 @@ async def get_appeal_stats(
         supabase = SupabaseService()
         
         async with httpx.AsyncClient(timeout=10.0) as client:
-            # Get counts for each status
+                                        
             stats = {}
             
             for status_value in ["pending", "under_review", "approved", "rejected"]:
@@ -578,7 +559,7 @@ async def get_appeal_stats(
                 
                 stats[status_value] = count
             
-            # Get total count
+                             
             total_response = await client.get(
                 f"{supabase.rest_url}/suspension_appeals",
                 params={"select": "count"},
@@ -593,12 +574,12 @@ async def get_appeal_stats(
             
             stats["total"] = total
             
-            logger.info(f"📊 Admin retrieved appeal stats: {stats}")
+            logger.info(f" Admin retrieved appeal stats: {stats}")
             
             return AppealStatsResponse(success=True, data=stats)
     
     except Exception as e:
-        logger.error(f"❌ Error getting appeal stats: {str(e)}")
+        logger.error(f" Error getting appeal stats: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"

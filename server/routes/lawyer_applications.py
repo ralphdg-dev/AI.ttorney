@@ -29,14 +29,14 @@ async def upload_ibp_id_card(
     try:
         user_id = current_user["user"]["id"]
         
-        # Validate file
+                       
         if not file.filename:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No file provided"
             )
         
-        # Upload to storage
+                           
         result = await storage_service.upload_ibp_id_card(file, user_id)
         
         if not result["success"]:
@@ -69,14 +69,14 @@ async def upload_selfie(
     try:
         user_id = current_user["user"]["id"]
         
-        # Validate file
+                       
         if not file.filename:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No file provided"
             )
         
-        # Upload to storage
+                           
         result = await storage_service.upload_selfie(file, user_id)
         
         if not result["success"]:
@@ -103,25 +103,25 @@ async def upload_selfie(
 @router.post("/submit", response_model=Dict[str, Any])
 async def submit_lawyer_application(
     full_name: str = Form(...),
-    roll_signing_date: str = Form(...),  # Accept as string, convert to date
+    roll_signing_date: str = Form(...),                                     
     ibp_id: str = Form(...),
     roll_number: str = Form(...),
-    selfie: str = Form(...),  # File path from previous upload
+    selfie: str = Form(...),                                  
     current_user: Dict[str, Any] = Depends(require_role("registered_user"))
 ):
     """Submit a new lawyer application"""
     try:
         user_id = current_user["user"]["id"]
         
-        # Convert string date to date object
+                                            
         from datetime import datetime
         try:
             date_obj = datetime.fromisoformat(roll_signing_date.replace('Z', '+00:00')).date()
         except ValueError:
-            # Try parsing as YYYY-MM-DD format
+                                              
             date_obj = datetime.strptime(roll_signing_date, '%Y-%m-%d').date()
         
-        # Create application data
+                                 
         application_data = LawyerApplicationSubmit(
             full_name=full_name,
             roll_signing_date=date_obj,
@@ -130,7 +130,7 @@ async def submit_lawyer_application(
             selfie=selfie
         )
         
-        # Submit application
+                            
         result = await lawyer_service.submit_application(user_id, application_data)
         
         if not result["success"]:
@@ -196,7 +196,7 @@ async def get_pending_applications(
                 detail=result["error"]
             )
         
-        # Convert to response models
+                                    
         applications = []
         for app_data in result["data"]:
             applications.append(LawyerApplicationResponse(**app_data))
@@ -321,15 +321,15 @@ async def resubmit_lawyer_application(
     try:
         user_id = current_user["user"]["id"]
         
-        # Convert string date to date object
+                                            
         from datetime import datetime
         try:
             date_obj = datetime.fromisoformat(roll_signing_date.replace('Z', '+00:00')).date()
         except ValueError:
-            # Try parsing as YYYY-MM-DD format
+                                              
             date_obj = datetime.strptime(roll_signing_date, '%Y-%m-%d').date()
         
-        # Create application data
+                                 
         application_data = LawyerApplicationSubmit(
             full_name=full_name,
             roll_signing_date=date_obj,
@@ -338,7 +338,7 @@ async def resubmit_lawyer_application(
             selfie=selfie
         )
         
-        # Resubmit application
+                              
         result = await lawyer_service.resubmit_application(user_id, application_data)
         
         if not result["success"]:

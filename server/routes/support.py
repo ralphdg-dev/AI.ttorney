@@ -1,4 +1,4 @@
-# routes/support.py
+                   
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
 from services.email_support_service import get_support_service

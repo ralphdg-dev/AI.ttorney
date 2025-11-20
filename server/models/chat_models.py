@@ -1,17 +1,12 @@
-"""
-Chat Models for AI.ttorney
-Session-based chat history with messages
-"""
-
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
 
 
-# ============================================================================
-# Database Models (match SQL schema)
-# ============================================================================
+                                                                              
+                                    
+                                                                              
 
 class ChatSessionDB(BaseModel):
     """Chat session as stored in database"""
@@ -23,7 +18,7 @@ class ChatSessionDB(BaseModel):
     last_message_at: datetime
     message_count: int = 0
     is_archived: bool = False
-    language: str = "en"  # 'en' or 'fil'
+    language: str = "en"                 
     
     class Config:
         from_attributes = True
@@ -34,7 +29,7 @@ class ChatMessageDB(BaseModel):
     id: UUID
     session_id: UUID
     user_id: Optional[UUID] = None
-    role: str  # 'user' or 'assistant'
+    role: str                         
     content: str
     metadata: Dict[str, Any] = {}
     tokens_used: Optional[int] = None
@@ -46,9 +41,9 @@ class ChatMessageDB(BaseModel):
         from_attributes = True
 
 
-# ============================================================================
-# API Request Models
-# ============================================================================
+                                                                              
+                    
+                                                                              
 
 class CreateSessionRequest(BaseModel):
     """Request to create a new chat session"""
@@ -58,9 +53,9 @@ class CreateSessionRequest(BaseModel):
 
 class SendMessageRequest(BaseModel):
     """Request to send a message in a session"""
-    session_id: Optional[UUID] = None  # If None, creates new session
+    session_id: Optional[UUID] = None                                
     message: str = Field(..., min_length=1, max_length=5000)
-    conversation_history: Optional[List[Dict[str, str]]] = []  # For backward compatibility
+    conversation_history: Optional[List[Dict[str, str]]] = []                              
 
 
 class UpdateSessionRequest(BaseModel):
@@ -69,9 +64,9 @@ class UpdateSessionRequest(BaseModel):
     is_archived: Optional[bool] = None
 
 
-# ============================================================================
-# API Response Models
-# ============================================================================
+                                                                              
+                     
+                                                                              
 
 class ChatMessageResponse(BaseModel):
     """Response model for a single message"""
@@ -83,9 +78,9 @@ class ChatMessageResponse(BaseModel):
     tokens_used: Optional[int] = None
     response_time_ms: Optional[int] = None
     
-    # Frontend compatibility fields
-    fromUser: bool = False  # Computed from role
-    timestamp: str = ""  # ISO format string
+                                   
+    fromUser: bool = False                      
+    timestamp: str = ""                     
     sources: Optional[List[Dict[str, Any]]] = None
     confidence: Optional[str] = None
     
@@ -117,7 +112,7 @@ class ChatSessionResponse(BaseModel):
     message_count: int
     is_archived: bool
     language: str
-    preview: Optional[str] = None  # Last message preview
+    preview: Optional[str] = None                        
     
     @classmethod
     def from_db(cls, db_session: ChatSessionDB, preview: Optional[str] = None) -> "ChatSessionResponse":
@@ -141,7 +136,7 @@ class ChatResponse(BaseModel):
     sources: List[Dict[str, Any]] = []
     language: str = "en"
     
-    # New fields for session-based architecture
+                                               
     session_id: Optional[str] = None
     message_id: Optional[str] = None
     tokens_used: Optional[int] = None
@@ -163,9 +158,9 @@ class SessionListResponse(BaseModel):
     has_more: bool
 
 
-# ============================================================================
-# Statistics Models
-# ============================================================================
+                                                                              
+                   
+                                                                              
 
 class SessionStatistics(BaseModel):
     """Statistics for a chat session"""

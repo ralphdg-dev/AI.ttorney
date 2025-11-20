@@ -1,13 +1,3 @@
-"""
-Moderation Enums
-
-Defines the types of content that can be moderated and suspension types.
-Must match the database enums.
-
-Author: AI.ttorney Team
-Date: 2025-10-23
-"""
-
 from enum import Enum
 
 
@@ -44,8 +34,8 @@ class SuspensionType(str, Enum):
     Database enum definition:
     CREATE TYPE suspension_type AS ENUM ('temporary', 'permanent');
     """
-    TEMPORARY = "temporary"  # 7-day suspension (1st and 2nd offense)
-    PERMANENT = "permanent"  # Permanent ban (3rd offense)
+    TEMPORARY = "temporary"                                          
+    PERMANENT = "permanent"                               
     
     @classmethod
     def values(cls) -> list[str]:
@@ -65,9 +55,9 @@ class AccountStatus(str, Enum):
     Database enum definition:
     CREATE TYPE account_status AS ENUM ('active', 'suspended', 'banned');
     """
-    ACTIVE = "active"        # User can post and interact normally
-    SUSPENDED = "suspended"  # User temporarily blocked (7 days)
-    BANNED = "banned"        # User permanently blocked
+    ACTIVE = "active"                                             
+    SUSPENDED = "suspended"                                     
+    BANNED = "banned"                                  
     
     @classmethod
     def values(cls) -> list[str]:

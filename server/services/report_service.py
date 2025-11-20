@@ -14,14 +14,14 @@ class ReportService:
     async def submit_report(self, target_id: str, target_type: str, reason: str, reporter_id: str, reason_context: str = None) -> Dict[str, Any]:
         """Submit a report for a forum post or reply"""
         try:
-            # Validate target type
+                                  
             if target_type not in ['post', 'comment', 'reply']:
                 return {"success": False, "error": "Invalid target type. Must be 'post', 'comment', or 'reply'"}
             
-            # Normalize 'comment' to 'reply' for consistency
+                                                            
             normalized_type = 'reply' if target_type == 'comment' else target_type
             
-            # Check if target exists
+                                    
             table_name = "forum_posts" if normalized_type == "post" else "forum_replies"
             async with httpx.AsyncClient() as client:
                 target_response = await client.get(
@@ -36,10 +36,10 @@ class ReportService:
             if not targets:
                 return {"success": False, "error": f"{normalized_type.capitalize()} not found"}
             
-            # Determine which table to use for reports
+                                                      
             if normalized_type == "post":
                 report_table = "forum_reports"
-                # Check if user has already reported this post
+                                                              
                 async with httpx.AsyncClient() as client:
                     existing_response = await client.get(
                         f"{self.supabase.rest_url}/forum_reports?select=id&target_id=eq.{target_id}&target_type=eq.post&reporter_id=eq.{reporter_id}",
@@ -51,7 +51,7 @@ class ReportService:
                     if existing:
                         return {"success": False, "error": "You have already reported this post"}
                 
-                # Create new post report
+                                        
                 report_data = {
                     "target_id": target_id,
                     "target_type": "post",
@@ -60,9 +60,9 @@ class ReportService:
                     "reason_context": reason_context
                 }
             else:
-                # Use reported_replies table for replies
+                                                        
                 report_table = "reported_replies"
-                # Check if user has already reported this reply
+                                                               
                 async with httpx.AsyncClient() as client:
                     existing_response = await client.get(
                         f"{self.supabase.rest_url}/reported_replies?select=id&reply_id=eq.{target_id}&reporter_id=eq.{reporter_id}",
@@ -74,7 +74,7 @@ class ReportService:
                     if existing:
                         return {"success": False, "error": "You have already reported this reply"}
                 
-                # Create new reply report
+                                         
                 report_data = {
                     "reply_id": target_id,
                     "reporter_id": reporter_id,
@@ -115,10 +115,10 @@ class ReportService:
     async def check_user_report(self, target_id: str, target_type: str, reporter_id: str) -> Dict[str, Any]:
         """Check if a user has already reported a specific target"""
         try:
-            # Normalize 'comment' to 'reply' for consistency
+                                                            
             normalized_type = 'reply' if target_type == 'comment' else target_type
             
-            logger.info(f"🔍 Checking if user {reporter_id} has reported {normalized_type} {target_id}")
+            logger.info(f" Checking if user {reporter_id} has reported {normalized_type} {target_id}")
             
             if normalized_type == "post":
                 async with httpx.AsyncClient() as client:
@@ -145,7 +145,7 @@ class ReportService:
             reports = response.json() if response.content else []
             has_reported = len(reports) > 0
             
-            logger.info(f"✅ Check result: Found {len(reports)} existing report(s), hasReported={has_reported}")
+            logger.info(f" Check result: Found {len(reports)} existing report(s), hasReported={has_reported}")
             
             return {"success": True, "data": {"hasReported": has_reported}}
             
@@ -181,7 +181,7 @@ class ReportService:
     async def get_reports_by_user(self, reporter_id: str) -> Dict[str, Any]:
         """Get all reports submitted by a specific user"""
         try:
-            # Get reports with related post/comment data
+                                                        
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     f"{self.supabase.rest_url}/forum_reports?select=*&reporter_id=eq.{reporter_id}&order=submitted_at.desc",
@@ -199,7 +199,7 @@ class ReportService:
             
             reports = response.json() if response.content else []
             
-            # Enrich reports with target data
+                                             
             enriched_reports = []
             for report in reports:
                 enriched_report = report.copy()

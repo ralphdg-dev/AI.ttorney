@@ -1,21 +1,3 @@
-# chatbot_lawyer_streaming.py
-"""
-Streaming endpoint for Legal Practice & Research API (Philippine Bar)
-
-Industry-standard streaming implementation for real-time response generation.
-Optimized for low latency and efficient token delivery.
-
-Features:
-- Server-Sent Events (SSE) for real-time streaming
-- Chunked response delivery for immediate user feedback
-- Optimized for mobile and web clients
-- Full integration with existing validation and security layers
-- Chat history persistence
-- Performance monitoring and logging
-
-Endpoint: POST /api/chatbot/lawyer/ask/stream
-"""
-
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from typing import Optional, AsyncGenerator, Dict, List
@@ -24,20 +6,20 @@ import time
 import logging
 from datetime import datetime
 
-# Shared SSE formatter utility (DRY principle)
+                                              
 from utils.sse_formatter import format_sse
 
-# Import all dependencies from main chatbot_lawyer module
+                                                         
 from api.chatbot_lawyer import (
-    # Models
+            
     ChatRequest,
     
-    # Services
+              
     get_optional_current_user,
     get_chat_history_service,
     ChatHistoryService,
     
-    # Configuration
+                   
     CHAT_MODEL,
     TOP_K_RESULTS,
     openai_client,
@@ -45,7 +27,7 @@ from api.chatbot_lawyer import (
     LAWYER_SYSTEM_PROMPT_ENGLISH,
     LAWYER_SYSTEM_PROMPT_TAGALOG,
     
-    # Validation functions
+                          
     detect_prohibited_input,
     is_gibberish_input,
     detect_language,
@@ -55,27 +37,27 @@ from api.chatbot_lawyer import (
     is_legal_question,
     is_complex_query,
     
-    # Utility functions
+                       
     generate_ai_response,
     save_chat_interaction,
-    # New roleplay detection & referral
+                                       
     is_professional_advice_roleplay_request,
     build_professional_referral_response,
     
-    # Logging
+             
     logger
 )
 
-# Import content moderation and violation tracking
+                                                  
 from services.content_moderation_service import get_moderation_service
 from services.violation_tracking_service import get_violation_tracking_service
 from services.prompt_injection_detector import get_prompt_injection_detector
 from models.violation_types import ViolationType
 
-# Import RAG utilities with web search
+                                      
 from utils.rag_utils import retrieve_relevant_context_with_web_search
 
-# Create router
+               
 router = APIRouter(prefix="/api/chatbot/lawyer", tags=["Legal Practice & Research API - Streaming"])
 
 
@@ -116,34 +98,34 @@ async def ask_legal_question(
         Industry best practice: Async generator with proper error handling.
         """
         try:
-            # Performance monitoring
+                                    
             perf_start = time.time()
             request_start_time = datetime.now()
             
-            # Extract user_id from authentication
+                                                 
             authenticated_user_id = None
             if current_user and "user" in current_user:
                 authenticated_user_id = current_user["user"]["id"]
-                print(f"✅ Authenticated user ID: {authenticated_user_id}")
+                print(f" Authenticated user ID: {authenticated_user_id}")
             else:
-                print(f"⚠️  No authenticated user found. current_user: {current_user}")
+                print(f"  No authenticated user found. current_user: {current_user}")
             
             effective_user_id = authenticated_user_id or request.user_id
-            print(f"📝 Effective user ID for chat history: {effective_user_id}")
+            print(f" Effective user ID for chat history: {effective_user_id}")
             
-            # Production logging
+                                
             logger.info(f"Streaming request - user_id={effective_user_id}, session_id={request.session_id}, question_length={len(request.question)}")
             
-            # ===== INPUT VALIDATION =====
-            # Basic validation
+                                          
+                              
             if not request.question or not request.question.strip():
                 yield format_sse({'error': 'Question cannot be empty'})
                 return
             
-            # Initialize security tracking
+                                          
             input_validation_result = None
             
-            # Guardrails input validation
+                                         
             if guardrails_instance:
                 try:
                     logger.info("Validating input with Guardrails AI...")
@@ -155,19 +137,19 @@ async def ask_legal_question(
                         yield format_sse({'content': error_message, 'done': True})
                         return
                     
-                    # Use cleaned input if available
+                                                    
                     if 'cleaned_input' in input_validation_result:
                         request.question = input_validation_result['cleaned_input']
                 except Exception as e:
                     logger.warning(f"Guardrails input validation error: {e}")
             
-            # Check for simple greeting
+                                       
             if is_simple_greeting(request.question):
                 language = detect_language(request.question)
                 greeting_response = generate_ai_response(request.question, language, 'greeting')
                 yield format_sse({'content': greeting_response, 'done': True})
                 
-                # Save to chat history (async, don't block)
+                                                           
                 if effective_user_id:
                     try:
                         await save_chat_interaction(
@@ -183,9 +165,9 @@ async def ask_legal_question(
                         logger.error(f"Failed to save greeting history: {e}")
                 return
             
-            # STEP 1: Prompt Injection Detection (Security Enhancement)
-            # Check for prompt injection/hijacking attempts BEFORE content moderation
-            # Only check for authenticated users to track violations
+                                                                       
+                                                                                     
+                                                                    
             if effective_user_id:
                 print(f"\n [STEP 1] Prompt injection detection (streaming)...")
                 injection_detector = get_prompt_injection_detector()
@@ -194,7 +176,7 @@ async def ask_legal_question(
                 try:
                     injection_result = injection_detector.detect(request.question.strip())
                     
-                    # If prompt injection detected, record violation and block
+                                                                              
                     if injection_result["is_injection"]:
                         logger.warning(
                             f" Prompt injection detected for lawyer {effective_user_id[:8]}: "
@@ -203,9 +185,9 @@ async def ask_legal_question(
                             f"risk={injection_result['risk_level']}"
                         )
                         
-                        # Record violation and get action taken
+                                                               
                         try:
-                            print(f"📝 Recording prompt injection violation for lawyer: {effective_user_id}")
+                            print(f" Recording prompt injection violation for lawyer: {effective_user_id}")
                             violation_result = await violation_service.record_violation(
                                 user_id=effective_user_id,
                                 violation_type=ViolationType.CHATBOT_PROMPT,  
@@ -213,9 +195,9 @@ async def ask_legal_question(
                                 moderation_result=injection_result,  
                                 content_id=None
                             )
-                            print(f"✅ Prompt injection violation recorded: {violation_result}")
+                            print(f" Prompt injection violation recorded: {violation_result}")
                             
-                            # Return formal legal-style error message with violation info
+                                                                                         
                             violation_message = (
                                 f"**I. PRELIMINARY STATEMENT**\n\n"
                                 f"This Counsel has detected an attempt to manipulate or compromise the operational parameters of this legal analytical service.\n\n"
@@ -235,7 +217,7 @@ async def ask_legal_question(
                             import traceback
                             print(f"Violation error traceback: {traceback.format_exc()}")
                             
-                            # Return generic error message if violation recording fails
+                                                                                       
                             yield format_sse({'content': 'Your query was flagged for attempting to manipulate the system. This violates our usage policy. Please use this service for legitimate legal research only.', 'done': True})
                             return
                     else:
@@ -243,10 +225,10 @@ async def ask_legal_question(
                         
                 except Exception as e:
                     logger.error(f" Prompt injection detection error: {str(e)}")
-                    # Fail-open: Continue without injection detection if service fails
+                                                                                      
             
-            # STEP 2: Content Moderation using OpenAI omni-moderation-latest
-            # Run moderation on ALL messages before generating any response
+                                                                            
+                                                                           
             print(f"\n [STEP 2] Content moderation check (streaming)...")
             moderation_service = get_moderation_service()
             violation_service = get_violation_tracking_service()
@@ -254,16 +236,16 @@ async def ask_legal_question(
             try:
                 moderation_result = await moderation_service.moderate_content(request.question.strip())
                 
-                # If content is flagged, record violation and apply action
+                                                                          
                 if not moderation_service.is_content_safe(moderation_result):
                     user_id_log = effective_user_id[:8] if effective_user_id else "unauthenticated"
-                    logger.warning(f"⚠️  Chatbot prompt flagged for user {user_id_log}: {moderation_result['violation_summary']}")
+                    logger.warning(f"  Chatbot prompt flagged for user {user_id_log}: {moderation_result['violation_summary']}")
                     
-                    # Record violation only for authenticated users
+                                                                   
                     violation_result = None
                     if effective_user_id:
                         try:
-                            print(f"📝 Recording violation for user: {effective_user_id}")
+                            print(f" Recording violation for user: {effective_user_id}")
                             violation_result = await violation_service.record_violation(
                                 user_id=effective_user_id,
                                 violation_type=ViolationType.CHATBOT_PROMPT,
@@ -271,12 +253,12 @@ async def ask_legal_question(
                                 moderation_result=moderation_result,
                                 content_id=None
                             )
-                            print(f"✅ Violation recorded: {violation_result}")
+                            print(f" Violation recorded: {violation_result}")
                         except Exception as violation_error:
-                            logger.error(f"❌ Failed to record violation: {str(violation_error)}")
+                            logger.error(f" Failed to record violation: {str(violation_error)}")
                             violation_result = None
                     
-                    # Set default violation result for unauthenticated users or if recording failed
+                                                                                                   
                     if not violation_result:
                         violation_result = {
                             "action_taken": "warning",
@@ -285,17 +267,17 @@ async def ask_legal_question(
                             "message": "Your content violated our community guidelines. Please be mindful of your language."
                         }
                     
-                    # Detect language for appropriate response
+                                                              
                     language = detect_language(request.question)
                     
-                    # Get contextual warning based on strike count and suspension history
+                                                                                         
                     strike_count = violation_result.get('strike_count', 0)
                     suspension_count = violation_result.get('suspension_count', 0)
                     action_taken = violation_result.get('action_taken', 'strike_added')
                     
-                    # Build contextual warning message
+                                                      
                     if language == "tagalog":
-                        # Tagalog messages
+                                          
                         if action_taken == 'banned':
                             warning = "Ang iyong account ay permanenteng na-ban dahil sa paulit-ulit na paglabag. Hindi ka na makakapag-chat."
                         elif action_taken == 'suspended':
@@ -306,7 +288,7 @@ async def ask_legal_question(
                             else:
                                 warning = f"Ang iyong account ay na-suspend ng 7 araw dahil sa paulit-ulit na paglabag."
                         else:
-                            # Strike warnings
+                                             
                             if strike_count == 1:
                                 warning = "Mayroon ka nang 1 strike. Dalawa pang paglabag ay magreresulta sa 7-araw na suspensyon."
                             elif strike_count == 2:
@@ -320,7 +302,7 @@ async def ask_legal_question(
 
 {warning}"""
                     else:
-                        # English messages
+                                          
                         if action_taken == 'banned':
                             warning = "Your account has been permanently banned due to repeated violations. You can no longer use the chatbot."
                         elif action_taken == 'suspended':
@@ -331,7 +313,7 @@ async def ask_legal_question(
                             else:
                                 warning = f"Your account has been suspended for 7 days due to repeated violations."
                         else:
-                            # Strike warnings
+                                             
                             if strike_count == 1:
                                 warning = "You now have 1 strike. Two more violations will result in a 7-day suspension."
                             elif strike_count == 2:
@@ -345,10 +327,10 @@ async def ask_legal_question(
 
 {warning}"""
                     
-                    # Send violation message
+                                            
                     yield format_sse({'content': violation_message})
                     
-                    # Send violation metadata so frontend can refresh status
+                                                                            
                     if effective_user_id and violation_result:
                         violation_metadata = {
                             'violation_detected': True,
@@ -359,7 +341,7 @@ async def ask_legal_question(
                         }
                         yield format_sse({'type': 'violation', 'violation': violation_metadata})
                         
-                        # Save violated message to chat history (for audit trail)
+                                                                                 
                         try:
                             await save_chat_interaction(
                                 chat_service=chat_service,
@@ -379,24 +361,24 @@ async def ask_legal_question(
                         except Exception as e:
                             logger.error(f"Failed to save violation to history: {e}")
                     
-                    # Done
+                          
                     yield format_sse({'done': True})
                     return
                 else:
-                    print(f"✅ Content moderation passed (streaming)")
+                    print(f" Content moderation passed (streaming)")
                     
             except Exception as e:
-                logger.error(f"❌ Content moderation error: {str(e)}")
-                # Fail-open: Continue without moderation if service fails
-                print(f"⚠️  Content moderation failed, continuing without moderation: {e}")
+                logger.error(f" Content moderation error: {str(e)}")
+                                                                         
+                print(f"  Content moderation failed, continuing without moderation: {e}")
             
-            # Check for prohibited input
+                                        
             is_prohibited, prohibition_reason = detect_prohibited_input(request.question)
             if is_prohibited:
                 yield format_sse({'error': prohibition_reason, 'done': True})
                 return
             
-            # Check for gibberish
+                                 
             is_gibberish, gibberish_reason = is_gibberish_input(request.question)
             if is_gibberish:
                 language = detect_language(request.question)
@@ -413,13 +395,13 @@ async def ask_legal_question(
                 yield format_sse({'content': clarification, 'done': True})
                 return
             
-            # Detect language
+                             
             language = detect_language(request.question)
             
-            # Send initial metadata
+                                   
             yield format_sse({'type': 'metadata', 'language': language})
             
-            # Block professional legal advice roleplay/simulation requests
+                                                                          
             if is_professional_advice_roleplay_request(request.question):
                 referral_response, referral_followups = build_professional_referral_response(language)
                 session_id = None
@@ -439,10 +421,10 @@ async def ask_legal_question(
                     except Exception as e:
                         logger.error(f"Failed to save referral to history (lawyer): {e}")
                 
-                # Send referral response
+                                        
                 yield format_sse({'content': referral_response})
                 
-                # Send metadata with session info
+                                                 
                 yield format_sse({
                     'type': 'metadata',
                     'language': language,
@@ -454,7 +436,7 @@ async def ask_legal_question(
                 yield format_sse({'done': True})
                 return
             
-            # Check for unsupported language
+                                            
             if language == "unsupported":
                 unsupported_response = (
                     "I. PRELIMINARY STATEMENT\n"
@@ -468,7 +450,7 @@ async def ask_legal_question(
                 yield format_sse({'content': unsupported_response, 'done': True})
                 return
             
-            # Check for personal advice questions
+                                                 
             if is_personal_advice_question(request.question):
                 if language == "tagalog":
                     response = (
@@ -483,7 +465,7 @@ async def ask_legal_question(
                 yield format_sse({'content': response, 'done': True})
                 return
             
-            # Check for out-of-scope topics
+                                           
             is_out_of_scope, topic_type = is_out_of_scope_topic(request.question)
             if is_out_of_scope:
                 out_of_scope_response = generate_ai_response(
@@ -495,12 +477,12 @@ async def ask_legal_question(
                 yield format_sse({'content': out_of_scope_response, 'done': True})
                 return
             
-            # Check if legal question
+                                     
             if not is_legal_question(request.question):
                 casual_response = generate_ai_response(request.question, language, 'casual')
                 yield format_sse({'content': casual_response, 'done': True})
                 
-                # Save to chat history
+                                      
                 if effective_user_id:
                     try:
                         await save_chat_interaction(
@@ -516,7 +498,7 @@ async def ask_legal_question(
                         logger.error(f"Failed to save casual history: {e}")
                 return
             
-            # ===== ENHANCED RAG WITH WEB SEARCH =====
+                                                      
             from api.chatbot_lawyer import (
                 qdrant_client, openai_client, COLLECTION_NAME, 
                 EMBEDDING_MODEL, MIN_CONFIDENCE_SCORE
@@ -533,11 +515,11 @@ async def ask_legal_question(
                 enable_web_search=True
             )
             
-            # Log RAG metadata
+                              
             if rag_metadata.get("web_search_triggered"):
-                logger.info(f"🌐 Web search triggered (streaming): {rag_metadata['search_strategy']}")
+                logger.info(f" Web search triggered (streaming): {rag_metadata['search_strategy']}")
             
-            # Check if we have sufficient context
+                                                 
             if not sources or len(sources) == 0:
                 no_context_message = (
                     "I apologize, but I don't have enough information in my database to answer this question accurately. "
@@ -549,7 +531,7 @@ async def ask_legal_question(
                 yield format_sse({'content': no_context_message, 'done': True})
                 return
             
-            # Send sources
+                          
             source_citations = [
                 {
                     'source': src['source'],
@@ -564,16 +546,16 @@ async def ask_legal_question(
             ]
             yield format_sse({'type': 'sources', 'sources': source_citations})
             
-            # ===== BUILD MESSAGES FOR STREAMING =====
-            # Use hardcore legalese prompts
+                                                      
+                                           
             system_prompt = LAWYER_SYSTEM_PROMPT_ENGLISH if language in ["english", "taglish"] else LAWYER_SYSTEM_PROMPT_TAGALOG
             messages = [{"role": "system", "content": system_prompt}]
             
-            # Add conversation history (last 8 exchanges for enhanced context awareness)
+                                                                                        
             for msg in request.conversation_history[-8:]:
                 messages.append(msg)
             
-            # Add current question with context
+                                               
             if context and context.strip():
                 user_message = f"""HEREIN ARE THE CONTROLLING STATUTES AND JURISPRUDENCE (CONTEXT):
 {context}
@@ -590,28 +572,28 @@ Note: No specific context was retrieved from the vector database. Proceed with t
             
             messages.append({"role": "user", "content": user_message})
             
-            # ===== STREAMING: Generate response with OpenAI streaming =====
+                                                                            
             full_answer = ""
             stream = openai_client.chat.completions.create(
                 model=CHAT_MODEL,
                 messages=messages,
                 max_tokens=request.max_tokens,
-                temperature=0.2,  # Low temperature for formal, strict tone
+                temperature=0.2,                                           
                 top_p=0.9,
                 presence_penalty=0.1,
                 frequency_penalty=0.1,
-                stream=True,  # Enable streaming!
-                timeout=60.0  # Increased timeout for longer generation
+                stream=True,                     
+                timeout=60.0                                           
             )
             
-            # Stream tokens as they arrive
+                                          
             for chunk in stream:
                 if chunk.choices[0].delta.content:
                     content = chunk.choices[0].delta.content
                     full_answer += content
                     yield format_sse({'content': content})
             
-            # ===== OUTPUT VALIDATION =====
+                                           
             if guardrails_instance:
                 try:
                     logger.info("Validating output with Guardrails AI...")
@@ -623,19 +605,19 @@ Note: No specific context was retrieved from the vector database. Proceed with t
                     if not output_validation_result.get('is_valid', True):
                         error_message = output_validation_result.get('error', 'Output validation failed')
                         logger.warning(f"Output validation failed: {error_message}")
-                        # Note: Output already streamed, so we can only log this
+                                                                                
                         yield format_sse({'warning': 'Response may not meet all safety standards'})
                 except Exception as e:
                     logger.warning(f"Guardrails output validation error: {e}")
             
-            # Send completion signal
+                                    
             total_time = time.time() - perf_start
             yield format_sse({'done': True, 'total_time': total_time})
             
-            # ===== SAVE TO CHAT HISTORY (async, don't block) =====
+                                                                   
             if effective_user_id:
                 try:
-                    # Calculate confidence
+                                          
                     if sources and len(sources) > 0:
                         avg_score = sum(src.get('relevance_score', 0.0) for src in sources[:3]) / min(3, len(sources))
                         if avg_score >= 0.7:
@@ -664,7 +646,7 @@ Note: No specific context was retrieved from the vector database. Proceed with t
                 except Exception as e:
                     logger.error(f"Failed to save chat history: {e}")
             
-            # Production logging
+                                
             request_duration = (datetime.now() - request_start_time).total_seconds()
             logger.info(f"Streaming request completed in {request_duration:.2f}s - sources={len(source_citations)}")
             
@@ -672,15 +654,15 @@ Note: No specific context was retrieved from the vector database. Proceed with t
             logger.error(f"Streaming error: {e}", exc_info=True)
             yield format_sse({'error': str(e), 'done': True})
     
-    # Return streaming response with proper headers
+                                                   
     return StreamingResponse(
         generate_stream(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
-            "Access-Control-Allow-Origin": "*",  # CORS support
+            "X-Accel-Buffering": "no",                           
+            "Access-Control-Allow-Origin": "*",                
         }
     )
 

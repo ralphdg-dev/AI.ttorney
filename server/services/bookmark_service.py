@@ -14,7 +14,7 @@ class BookmarkService:
     async def add_bookmark(self, post_id: str, user_id: str) -> Dict[str, Any]:
         """Add a bookmark for a forum post"""
         try:
-            # First check if the post exists
+                                            
             async with httpx.AsyncClient() as client:
                 post_response = await client.get(
                     f"{self.supabase.rest_url}/forum_posts?select=id&id=eq.{post_id}",
@@ -28,7 +28,7 @@ class BookmarkService:
             if not posts:
                 return {"success": False, "error": "Post not found"}
             
-            # Check if bookmark already exists
+                                              
             async with httpx.AsyncClient() as client:
                 existing_response = await client.get(
                     f"{self.supabase.rest_url}/user_forum_bookmarks?select=id&post_id=eq.{post_id}&user_id=eq.{user_id}",
@@ -40,7 +40,7 @@ class BookmarkService:
                 if existing:
                     return {"success": True, "data": existing[0], "message": "Bookmark already exists"}
             
-            # Create new bookmark
+                                 
             bookmark_data = {
                 "post_id": post_id,
                 "user_id": user_id,
@@ -130,7 +130,7 @@ class BookmarkService:
     async def get_user_bookmarks(self, user_id: str) -> Dict[str, Any]:
         """Get all bookmarks for a user with full post and user data"""
         try:
-            # First, get the bookmarked post IDs
+                                                
             async with httpx.AsyncClient(timeout=20.0) as client:
                 bookmarks_response = await client.get(
                     f"{self.supabase.rest_url}/user_forum_bookmarks?select=post_id,bookmarked_at&user_id=eq.{user_id}&order=bookmarked_at.desc",
@@ -151,13 +151,13 @@ class BookmarkService:
             if not bookmarks:
                 return {"success": True, "data": []}
             
-            # Get the post IDs
+                              
             post_ids = [str(b.get("post_id")) for b in bookmarks if b.get("post_id")]
             
             if not post_ids:
                 return {"success": True, "data": []}
             
-            # Fetch the full post data with user information and replies
+                                                                        
             ids_param = ",".join(post_ids)
             async with httpx.AsyncClient(timeout=20.0) as client:
                 posts_response = await client.get(
@@ -171,7 +171,7 @@ class BookmarkService:
             
             posts = posts_response.json() if posts_response.content else []
             
-            # Fetch replies for these posts
+                                           
             if posts:
                 try:
                     async with httpx.AsyncClient(timeout=15.0) as client:
@@ -183,7 +183,7 @@ class BookmarkService:
                     if replies_response.status_code == 200:
                         all_replies = replies_response.json() if replies_response.content else []
                         
-                        # Group replies by post_id
+                                                  
                         replies_by_post = {}
                         for reply in all_replies:
                             post_id = str(reply.get("post_id"))
@@ -191,12 +191,12 @@ class BookmarkService:
                                 replies_by_post[post_id] = []
                             replies_by_post[post_id].append(reply)
                         
-                        # Add replies to each post
+                                                  
                         for post in posts:
                             post_id = str(post.get("id"))
                             post["replies"] = replies_by_post.get(post_id, [])
                     else:
-                        # Add empty replies if fetch fails
+                                                          
                         for post in posts:
                             post["replies"] = []
                 except Exception as e:
@@ -204,7 +204,7 @@ class BookmarkService:
                     for post in posts:
                         post["replies"] = []
             
-            # Sort posts by bookmark date (maintain bookmark order)
+                                                                   
             post_order = {str(b.get("post_id")): i for i, b in enumerate(bookmarks)}
             posts.sort(key=lambda p: post_order.get(str(p.get("id")), 999))
             
@@ -217,7 +217,7 @@ class BookmarkService:
     async def toggle_bookmark(self, post_id: str, user_id: str) -> Dict[str, Any]:
         """Toggle bookmark status (add if not bookmarked, remove if bookmarked)"""
         try:
-            # Check current status
+                                  
             check_result = await self.check_bookmark(post_id, user_id)
             if not check_result["success"]:
                 return check_result
@@ -225,13 +225,13 @@ class BookmarkService:
             is_bookmarked = check_result["data"]["bookmarked"]
             
             if is_bookmarked:
-                # Remove bookmark
+                                 
                 result = await self.remove_bookmark(post_id, user_id)
                 if result["success"]:
                     result["data"] = {"bookmarked": False}
                 return result
             else:
-                # Add bookmark
+                              
                 result = await self.add_bookmark(post_id, user_id)
                 if result["success"]:
                     result["data"] = {"bookmarked": True}

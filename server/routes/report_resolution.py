@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 class ResolveReportRequest(BaseModel):
-    action: str  # 'sanctioned' or 'dismissed'
+    action: str                               
 
 @router.put("/replies/{report_id}/resolve")
 async def resolve_reply_report(
@@ -37,7 +37,7 @@ async def resolve_reply_report(
         violation_service = get_violation_tracking_service()
         notification_service = NotificationService(supabase.supabase)
         
-        # 1. Get the report details
+                                   
         async with httpx.AsyncClient() as client:
             report_response = await client.get(
                 f"{supabase.rest_url}/reported_replies?select=*,reply:forum_replies(*,user:users(*)),reporter:users!reported_replies_reporter_id_fkey(*)&id=eq.{report_id}",
@@ -63,7 +63,7 @@ async def resolve_reply_report(
         if not violating_user_id:
             raise HTTPException(status_code=400, detail="Cannot identify violating user")
         
-        # 2. Update report status
+                                 
         async with httpx.AsyncClient() as client:
             update_response = await client.patch(
                 f"{supabase.rest_url}/reported_replies?id=eq.{report_id}",
@@ -77,7 +77,7 @@ async def resolve_reply_report(
         if update_response.status_code not in [200, 204]:
             raise HTTPException(status_code=500, detail="Failed to update report status")
         
-        # If dismissed, just return success
+                                           
         if request.action == "dismissed":
             logger.info(f"Report {report_id} dismissed by admin {current_user['user']['id']}")
             return {
@@ -85,9 +85,9 @@ async def resolve_reply_report(
                 "message": "Report dismissed successfully"
             }
         
-        # 3. If sanctioned (approved), perform additional actions
+                                                                 
         if request.action == "sanctioned":
-            # Prepare moderation_result based on report reason
+                                                              
             reason = report.get('reason', 'other')
             moderation_result = {
                 "categories": {reason: True},
@@ -96,7 +96,7 @@ async def resolve_reply_report(
             }
 
             try:
-                # 4. Create user_violations record and apply action via service
+                                                                               
                 violation_outcome = await violation_service.record_violation(
                     user_id=violating_user_id,
                     violation_type=ViolationType.FORUM_REPLY,
@@ -109,7 +109,7 @@ async def resolve_reply_report(
                     logger.error("Failed to record violation via ViolationTrackingService")
                     raise Exception("Failed to record violation")
 
-                # 5. Hide the reply
+                                   
                 async with httpx.AsyncClient() as client:
                     hide_response = await client.patch(
                         f"{supabase.rest_url}/forum_replies?id=eq.{reply_id}",
@@ -120,14 +120,14 @@ async def resolve_reply_report(
                 if hide_response.status_code not in [200, 204]:
                     logger.error(f"Failed to hide reply {reply_id}")
                 else:
-                    # Clear caches so hidden replies are not served from cache
+                                                                              
                     try:
                         clear_posts_cache()
                         clear_reply_counts_cache()
                     except Exception as cache_err:
                         logger.warning(f"Failed to clear forum caches after hiding reply: {cache_err}")
 
-                # 6. Send notification to the violating user (non-critical)
+                                                                           
                 try:
                     action_taken = violation_outcome.get("action_taken")
                     strike_count = violation_outcome.get("strike_count")
@@ -172,7 +172,7 @@ async def resolve_reply_report(
                     }
                 }
             except Exception as critical_error:
-                # Rollback report status to pending on critical failure
+                                                                       
                 try:
                     async with httpx.AsyncClient() as client:
                         await client.patch(

@@ -41,7 +41,7 @@ class NotificationService:
             
             if result.data:
                 notification_id = result.data[0]["id"]
-                logger.info(f"✅ Notification created: {type} for user {user_id[:8]}...")
+                logger.info(f" Notification created: {type} for user {user_id[:8]}...")
                 return notification_id
             
             return None
@@ -59,42 +59,42 @@ class NotificationService:
     ) -> List[Dict[str, Any]]:
         """Get notifications with pagination"""
         try:
-            # Build query
+                         
             query = self.supabase.table("notifications").select("*").eq("user_id", user_id)
             
             if unread_only:
                 query = query.eq("read", False)
             
-            # Execute query
+                           
             result = query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
             
-            # Get notifications
+                               
             notifications = result.data if result.data else []
             
-            # Parse JSON data field if it's a string
+                                                    
             for notif in notifications:
                 data_field = notif.get('data')
                 
-                # Handle string JSON data
+                                         
                 if isinstance(data_field, str):
                     try:
                         notif['data'] = json.loads(data_field)
                     except Exception as parse_error:
                         logger.warning(f"Failed to parse notification data: {parse_error}")
                         notif['data'] = {}
-                # Handle None data
+                                  
                 elif data_field is None:
                     notif['data'] = {}
-                # Data is already a dict, keep it
+                                                 
                 elif not isinstance(data_field, dict):
                     notif['data'] = {}
             
-            logger.info(f"✅ Fetched {len(notifications)} notifications for user {user_id[:8]}... (types: {[n.get('type') for n in notifications[:5]]})")
+            logger.info(f" Fetched {len(notifications)} notifications for user {user_id[:8]}... (types: {[n.get('type') for n in notifications[:5]]})")
             return notifications
             
         except Exception as e:
             logger.error(f"Failed to fetch notifications: {e}", exc_info=True)
-            # Return empty list on error
+                                        
             return []
     
     async def mark_as_read(self, notification_id: str, user_id: str) -> bool:

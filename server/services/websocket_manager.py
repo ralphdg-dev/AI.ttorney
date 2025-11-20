@@ -1,4 +1,4 @@
-# websocket_manager.py
+                      
 from fastapi import WebSocket
 import json
 import time
@@ -30,7 +30,7 @@ class ConnectionManager:
         for connection in disconnected:
             self.disconnect(connection)
 
-# Global instance
+                 
 manager = ConnectionManager()
 
 async def notify_lawyers_update():

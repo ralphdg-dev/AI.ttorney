@@ -24,7 +24,7 @@ class SupabaseService:
         self.auth_url = f"{self.url}/auth/v1"
         self.rest_url = f"{self.url}/rest/v1"
         
-        # Create Supabase client for direct database operations
+                                                               
         self.supabase: Client = create_client(self.url, self.anon_key)
     
     def _get_headers(self, use_service_key: bool = False) -> Dict[str, str]:
@@ -44,12 +44,12 @@ class SupabaseService:
                     "email": email,
                     "password": password,
                     "user_metadata": user_metadata or {},
-                    "email_confirm": False,   # Email will be confirmed via custom OTP
-                    "phone_confirm": False,   # Disable phone confirmation
-                    "confirm": False          # User must verify via custom OTP system
+                    "email_confirm": False,                                           
+                    "phone_confirm": False,                               
+                    "confirm": False                                                  
                 }
                 
-                # Use service role key to bypass email confirmation entirely
+                                                                            
                 response = await client.post(
                     f"{self.auth_url}/admin/users",
                     json=payload,
@@ -155,16 +155,16 @@ class SupabaseService:
             logger.error(f"Password reset error: {str(e)}")
             return {"success": False, "error": str(e)}
     
-    # Database operations
+                         
     async def insert_user_profile(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
         """Insert user profile into users table"""
         try:
             async with httpx.AsyncClient() as client:
-                # Create a copy of user_data without None values
+                                                                
                 clean_user_data = {k: v for k, v in user_data.items() if v is not None}
                 
-                logger.info(f"🔍 Attempting to insert user profile: {clean_user_data.get('email')}")
-                logger.debug(f"📊 Profile data: {clean_user_data}")
+                logger.info(f" Attempting to insert user profile: {clean_user_data.get('email')}")
+                logger.debug(f" Profile data: {clean_user_data}")
                 
                 response = await client.post(
                     f"{self.rest_url}/users",
@@ -177,23 +177,23 @@ class SupabaseService:
                 if response.status_code in [200, 201]:
                     if response.content:
                         data = response.json()
-                        logger.info(f"✅ User profile created successfully")
+                        logger.info(f" User profile created successfully")
                         return {"success": True, "data": data}
                     else:
-                        # Success but no content (common with Supabase inserts)
-                        logger.info(f"✅ User profile created (no content returned)")
+                                                                               
+                        logger.info(f" User profile created (no content returned)")
                         return {"success": True, "data": {"message": "User profile created successfully"}}
                 else:
                     error_data = response.json() if response.content else {}
                     error_msg = error_data.get("message") or error_data.get("msg") or error_data.get("hint") or str(error_data)
-                    logger.error(f"❌ Insert user profile failed: {response.status_code}")
-                    logger.error(f"📋 Error details: {error_data}")
+                    logger.error(f" Insert user profile failed: {response.status_code}")
+                    logger.error(f" Error details: {error_data}")
                     return {"success": False, "error": f"Database error creating new user: {error_msg}"}
                     
         except Exception as e:
-            logger.error(f"❌ Insert user profile exception: {str(e)}")
+            logger.error(f" Insert user profile exception: {str(e)}")
             import traceback
-            logger.error(f"📋 Traceback: {traceback.format_exc()}")
+            logger.error(f" Traceback: {traceback.format_exc()}")
             return {"success": False, "error": f"Database error creating new user: {str(e)}"}
     
     async def get_user_profile(self, user_id: str) -> Dict[str, Any]:
@@ -244,14 +244,14 @@ class SupabaseService:
         """Update user profile in users table"""
         try:
             async with httpx.AsyncClient() as client:
-                # Build query parameters for WHERE clause
+                                                         
                 query_params = []
                 for key, value in where_clause.items():
                     query_params.append(f"{key}=eq.{value}")
                 query_string = "&".join(query_params)
                 
-                logger.info(f"🔄 Updating user profile with where: {where_clause}")
-                logger.debug(f"📊 Update data: {update_data}")
+                logger.info(f" Updating user profile with where: {where_clause}")
+                logger.debug(f" Update data: {update_data}")
                 
                 response = await client.patch(
                     f"{self.rest_url}/users?{query_string}",
@@ -262,7 +262,7 @@ class SupabaseService:
                 logger.info(f"📡 Update response status: {response.status_code}")
                 
                 if response.status_code in [200, 204]:
-                    logger.info(f"✅ User profile updated successfully")
+                    logger.info(f" User profile updated successfully")
                     return {"success": True, "message": "User profile updated"}
                 else:
                     error_data = response.json() if response.content else {}
@@ -276,11 +276,11 @@ class SupabaseService:
         """Check if a user exists by field (email or username) in both auth.users and public.users tables"""
         try:
             async with httpx.AsyncClient() as client:
-                # Initialize data variables
+                                           
                 public_data = []
                 auth_data = {"users": []}
                 
-                # Check public.users table
+                                          
                 public_response = await client.get(
                     f"{self.rest_url}/users?select=id&{field}=eq.{value}",
                     headers=self._get_headers(use_service_key=True)
@@ -295,10 +295,10 @@ class SupabaseService:
                     logger.error(f"Check public.users error: {public_response.status_code} - {public_response.text}")
                     return {"success": False, "error": f"Database query failed: {public_response.status_code}"}
                 
-                # Check auth.users table (only for email field)
+                                                               
                 auth_exists = False
                 if field == "email":
-                    # Use the get user by email endpoint instead of listing all users
+                                                                                     
                     auth_response = await client.get(
                         f"{self.auth_url}/admin/users",
                         headers=self._get_headers(use_service_key=True)
@@ -306,18 +306,18 @@ class SupabaseService:
                     
                     if auth_response.status_code == 200:
                         auth_data = auth_response.json()
-                        # Filter users by email manually since Supabase admin API doesn't support email filtering
+                                                                                                                 
                         all_users = auth_data.get("users", [])
                         matching_users = [user for user in all_users if user.get("email") == value]
                         auth_exists = len(matching_users) > 0
                         logger.info(f"Auth users check: found {len(matching_users)} records for email={value}")
-                        # Update auth_data to only include matching users
+                                                                         
                         auth_data = {"users": matching_users}
                     else:
                         logger.error(f"Check auth.users error: {auth_response.status_code} - {auth_response.text}")
                         return {"success": False, "error": f"Auth query failed: {auth_response.status_code}"}
                 
-                # User exists if found in either table
+                                                      
                 exists = public_exists or auth_exists
                 
                 logger.info(f"Final result: exists={exists}, public_exists={public_exists}, auth_exists={auth_exists}")
@@ -411,7 +411,7 @@ class SupabaseService:
             logger.error(f"Update user email error: {str(e)}")
             return {"success": False, "error": str(e)}
     
-    # Forum Posts Operations
+                            
     async def create_forum_post(self, post_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new forum post"""
         try:
@@ -477,7 +477,7 @@ class SupabaseService:
             logger.error(f"Get forum post error: {str(e)}")
             return {"success": False, "error": str(e)}
 
-    # Bookmark Operations
+                         
     async def create_bookmark(self, bookmark_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new bookmark"""
         try:
@@ -539,7 +539,7 @@ class SupabaseService:
             logger.error(f"Check bookmark error: {str(e)}")
             return {"success": False, "error": str(e)}
 
-    # Report Operations
+                       
     async def create_report(self, report_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new report"""
         try:

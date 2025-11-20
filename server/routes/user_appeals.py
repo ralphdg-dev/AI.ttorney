@@ -1,8 +1,3 @@
-"""
-User Appeals Routes for AI.ttorney
-User-facing endpoints for suspension appeals
-"""
-
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from config.dependencies import get_current_user
 from services.appeal_service import AppealService
@@ -180,7 +175,7 @@ async def upload_appeal_evidence(
     try:
         user_id = str(current_user.id)
         
-        # Validate file type
+                            
         allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.webp']
         file_ext = os.path.splitext(file.filename)[1].lower()
         
@@ -190,23 +185,23 @@ async def upload_appeal_evidence(
                 detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}"
             )
         
-        # Read file content
+                           
         file_content = await file.read()
         file_size = len(file_content)
         
-        # Validate file size (5MB)
-        max_size = 5 * 1024 * 1024  # 5MB
+                                  
+        max_size = 5 * 1024 * 1024       
         if file_size > max_size:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"File too large. Max size: 5MB"
             )
         
-        # Generate unique filename
+                                  
         unique_filename = f"{uuid4()}{file_ext}"
         file_path = f"{user_id}/{unique_filename}"
         
-        # Upload to Supabase Storage
+                                    
         try:
             upload_result = supabase_service.client.storage\
                 .from_("appeals_evidence")\
@@ -215,7 +210,7 @@ async def upload_appeal_evidence(
                     "upsert": "false"
                 })
             
-            # Get public URL
+                            
             url_result = supabase_service.client.storage\
                 .from_("appeals_evidence")\
                 .get_public_url(file_path)
@@ -262,7 +257,7 @@ async def delete_appeal_evidence(
         user_id = str(current_user.id)
         file_path = f"{user_id}/{filename}"
         
-        # Delete from Supabase Storage
+                                      
         try:
             supabase_service.client.storage\
                 .from_("appeals_evidence")\

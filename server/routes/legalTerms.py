@@ -18,7 +18,7 @@ async def get_glossary_terms(
     try:
         supabase_service = SupabaseService()
         
-        # Build the base query
+                              
         base_url = f"{supabase_service.rest_url}/glossary_terms"
         params = {
             "select": "id,term_en,term_fil,definition_en,definition_fil,example_en,example_fil,category,created_at",
@@ -27,17 +27,17 @@ async def get_glossary_terms(
             "offset": str((page - 1) * limit)
         }
         
-        # Add category filter if provided
+                                         
         if category and category.lower() != "all":
             params["category"] = f"eq.{category}"
         
-        # Add search filter if provided
+                                       
         if search and search.strip():
             search_term = search.strip()
             search_param = f"(term_en.ilike.*{search_term}*,term_fil.ilike.*{search_term}*,definition_en.ilike.*{search_term}*,definition_fil.ilike.*{search_term}*)"
             params["or"] = search_param
         
-        # Execute the query
+                           
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 base_url,
@@ -48,7 +48,7 @@ async def get_glossary_terms(
             if response.status_code == 200:
                 terms = response.json()
                 
-                # Get total count for pagination
+                                                
                 count_params = {"select": "count"}
                 if category and category.lower() != "all":
                     count_params["category"] = f"eq.{category}"
@@ -62,7 +62,7 @@ async def get_glossary_terms(
                 )
                 
                 if count_response.status_code == 200:
-                    # Supabase returns count in a range header or in the response
+                                                                                 
                     count_data = count_response.json()
                     total_count = count_data[0]["count"] if isinstance(count_data, list) and count_data else 0
                 else:
@@ -91,7 +91,7 @@ async def get_all_glossary_terms():
     try:
         supabase_service = SupabaseService()
         
-        # Fetch all terms at once
+                                 
         base_url = f"{supabase_service.rest_url}/glossary_terms"
         params = {
             "select": "id,term_en,term_fil,definition_en,definition_fil,example_en,example_fil,category,created_at",
@@ -158,7 +158,7 @@ async def get_categories():
             
             if response.status_code == 200:
                 categories_data = response.json()
-                # Extract unique categories
+                                           
                 categories = list(set([item["category"] for item in categories_data if item["category"]]))
                 return {"categories": sorted(categories)}
             else:

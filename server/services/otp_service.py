@@ -46,7 +46,7 @@ class InMemoryOTPStore:
     
     def _cleanup_expired(self):
         """Background thread to clean up expired OTPs"""
-        while not self._stop_cleanup.wait(30):  # Check every 30 seconds
+        while not self._stop_cleanup.wait(30):                          
             current_time = time.time()
             with self._lock:
                 expired_keys = []
@@ -54,7 +54,7 @@ class InMemoryOTPStore:
                     if current_time > otp_data.expires_at:
                         expired_keys.append(key)
                     elif otp_data.locked_until and current_time > otp_data.locked_until:
-                        # Clear lockout but keep OTP if not expired
+                                                                   
                         otp_data.locked_until = None
                         otp_data.attempts = 0
                 
@@ -76,7 +76,7 @@ class InMemoryOTPStore:
             if otp_data and time.time() <= otp_data.expires_at:
                 return otp_data
             elif otp_data:
-                # Expired, remove it
+                                    
                 del self._store[key]
             return None
     
@@ -102,7 +102,7 @@ class InMemoryOTPStore:
                 if current_time < otp_data.locked_until:
                     return True, otp_data.locked_until - current_time
                 else:
-                    # Lockout expired, clear it
+                                               
                     otp_data.locked_until = None
                     otp_data.attempts = 0
             return False, None
@@ -120,7 +120,7 @@ class InMemoryOTPStore:
         if self._cleanup_thread and self._cleanup_thread.is_alive():
             self._cleanup_thread.join(timeout=5)
 
-# Global OTP store singleton
+                            
 _global_otp_store = None
 
 def get_otp_store():
@@ -132,7 +132,7 @@ def get_otp_store():
 
 class OTPService:
     def __init__(self):
-        # SMTP Configuration
+                            
         self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
         self.smtp_username = os.getenv("SMTP_USERNAME")
@@ -140,13 +140,13 @@ class OTPService:
         self.from_email = os.getenv("FROM_EMAIL", "noreply@ai.ttorney.com")
         self.from_name = os.getenv("FROM_NAME", "AI.ttorney")
         
-        # Log SMTP configuration for debugging (without password)
+                                                                 
         logger.info(f"OTP Service initialized with SMTP server: {self.smtp_server}:{self.smtp_port}")
         logger.info(f"SMTP username configured: {'Yes' if self.smtp_username else 'No'}")
         logger.info(f"SMTP password configured: {'Yes' if self.smtp_password else 'No'}")
         logger.info(f"From email: {self.from_email}")
         
-        # Use global OTP store singleton
+                                        
         self.otp_store = get_otp_store()
         
     def generate_otp(self, length: int = 6) -> str:
@@ -159,15 +159,15 @@ class OTPService:
     
     def get_otp_key(self, email: str, otp_type: str) -> str:
         """Generate key for OTP storage with normalized email"""
-        # Normalize email to lowercase to ensure consistency
+                                                            
         normalized_email = email.lower().strip()
         return f"otp:{otp_type}:{normalized_email}"
     
-    # OTP Configuration Constants
-    OTP_TTL_SECONDS = 120  # 2 minutes for all OTP types
+                                 
+    OTP_TTL_SECONDS = 120                               
     OTP_TTL_MINUTES = 2
     
-    # OTP Type Configuration
+                            
     OTP_TYPES = {
         "email_verification": {
             "email_template": "verification",
@@ -189,17 +189,17 @@ class OTPService:
     async def _send_otp_core(self, email: str, otp_type: str, user_name: str = "User") -> Dict[str, Any]:
         """Core OTP sending logic - DRY implementation"""
         try:
-            # Validate OTP type
+                               
             if otp_type not in self.OTP_TYPES:
                 raise ValueError(f"Invalid OTP type: {otp_type}")
             
             config = self.OTP_TYPES[otp_type]
             
-            # Generate OTP
+                          
             otp_code = self.generate_otp()
             otp_hash = self.hash_otp(otp_code)
             
-            # Create OTP data
+                             
             otp_key = self.get_otp_key(email, otp_type)
             otp_data = OTPData(
                 hash=otp_hash,
@@ -210,16 +210,16 @@ class OTPService:
                 locked_until=None
             )
             
-            # Store in memory
+                             
             self.otp_store.store_otp(otp_key, otp_data)
             logger.info(f"{config['log_prefix']} OTP stored with key: {otp_key}, expires in: {self.OTP_TTL_SECONDS}s")
             
-            # Debug: Log current store state
+                                            
             with self.otp_store._lock:
                 store_keys = list(self.otp_store._store.keys())
                 logger.info(f"OTP store now contains {len(store_keys)} keys: {store_keys}")
             
-            # Send email
+                        
             email_response = await self.send_otp_email(email, otp_code, user_name, config["email_template"])
             
             if email_response["success"]:
@@ -250,11 +250,11 @@ class OTPService:
     async def verify_otp(self, email: str, otp_code: str, otp_type: str) -> Dict[str, Any]:
         """Verify OTP code with attempt tracking and lockout"""
         try:
-            # Get OTP key
+                         
             otp_key = self.get_otp_key(email, otp_type)
             logger.info(f"Verifying OTP with key: {otp_key}, email: {email}, otp_type: {otp_type}")
             
-            # Check if user is locked out
+                                         
             is_locked, remaining_lockout = self.otp_store.is_locked(otp_key)
             if is_locked:
                 minutes = int(remaining_lockout // 60)
@@ -267,29 +267,29 @@ class OTPService:
                     "retry_after": int(remaining_lockout)
                 }
             
-            # Get stored OTP data
+                                 
             otp_data = self.otp_store.get_otp(otp_key)
             
             if not otp_data:
                 logger.error(f"OTP not found in store for key: {otp_key}")
-                # Debug: List all keys in store
+                                               
                 with self.otp_store._lock:
                     all_keys = list(self.otp_store._store.keys())
                     logger.error(f"Available OTP keys in store: {all_keys}")
                 return {"success": False, "error": "OTP not found or expired"}
             
-            # Hash the provided OTP
+                                   
             provided_hash = self.hash_otp(otp_code)
             
-            # Compare hashes
+                            
             if otp_data.hash != provided_hash:
-                # Increment attempt counter
+                                           
                 attempt_count = otp_data.attempts + 1
                 
-                # Check if max attempts reached
+                                               
                 if attempt_count >= 5:
-                    # Set lockout for 15 minutes
-                    lockout_until = time.time() + 900  # 15 minutes
+                                                
+                    lockout_until = time.time() + 900              
                     self.otp_store.update_attempts(otp_key, attempt_count, lockout_until)
                     
                     logger.warning(f"User {email} locked out after {attempt_count} failed OTP attempts")
@@ -301,7 +301,7 @@ class OTPService:
                         "retry_after": 900
                     }
                 
-                # Update attempt count
+                                      
                 self.otp_store.update_attempts(otp_key, attempt_count)
                 
                 remaining_attempts = 5 - attempt_count
@@ -311,7 +311,7 @@ class OTPService:
                     "attempts_remaining": remaining_attempts
                 }
             
-            # OTP is correct - delete from memory
+                                                 
             self.otp_store.delete_otp(otp_key)
             logger.info(f"OTP verified and deleted from memory: {otp_key}")
             
@@ -339,26 +339,26 @@ class OTPService:
             else:
                 return {"success": False, "error": "Invalid OTP type"}
             
-            # Create message
+                            
             message = MIMEMultipart("alternative")
             message["Subject"] = subject
             message["From"] = f"{self.from_name} <{self.from_email}>"
             message["To"] = email
             
-            # Add HTML content
+                              
             html_part = MIMEText(html_content, "html")
             message.attach(html_part)
             
-            # Send email with Gmail-optimized secure strategies
+                                                               
             logger.info(f"Attempting to send OTP email to {email} using Gmail SMTP")
             
-            # Strategy 1: Try Gmail's preferred SSL port 465 first
+                                                                  
             try:
                 logger.info("Strategy 1: Attempting Gmail SMTP_SSL on port 465 (recommended)")
                 
-                # Create SSL context for Gmail
+                                              
                 context = ssl.create_default_context()
-                # For development, allow self-signed certificates but keep encryption
+                                                                                     
                 context.check_hostname = False
                 context.verify_mode = ssl.CERT_NONE
                 
@@ -372,14 +372,14 @@ class OTPService:
             except Exception as strategy1_error:
                 logger.error(f"Strategy 1 FAILED: {strategy1_error}")
                 
-                # Strategy 2: Try STARTTLS on port 587 with relaxed SSL
+                                                                       
                 try:
                     logger.info("Strategy 2: Attempting Gmail STARTTLS on port 587 with relaxed SSL")
                     
                     context = ssl.create_default_context()
                     context.check_hostname = False
                     context.verify_mode = ssl.CERT_NONE
-                    # Set minimum TLS version for Gmail compatibility
+                                                                     
                     context.minimum_version = ssl.TLSVersion.TLSv1_2
                     
                     with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
@@ -393,7 +393,7 @@ class OTPService:
                 except Exception as strategy2_error:
                     logger.error(f"Strategy 2 FAILED: {strategy2_error}")
                     
-                    # Strategy 3: Try with even more relaxed SSL settings
+                                                                         
                     try:
                         logger.info("Strategy 3: Attempting with maximum SSL compatibility")
                         
@@ -401,7 +401,7 @@ class OTPService:
                         context.check_hostname = False
                         context.verify_mode = ssl.CERT_NONE
                         context.set_ciphers('DEFAULT@SECLEVEL=1')
-                        # Allow older TLS versions if needed
+                                                            
                         context.minimum_version = ssl.TLSVersion.TLSv1
                         
                         with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
@@ -416,7 +416,7 @@ class OTPService:
                         logger.error(f"Strategy 3 FAILED: {strategy3_error}")
                         logger.error("ALL SECURE STRATEGIES FAILED")
                         
-                        # Log the SMTP configuration for debugging
+                                                                  
                         logger.error(f"SMTP Server: {self.smtp_server}:{self.smtp_port}")
                         logger.error(f"Username: {self.smtp_username}")
                         logger.error(f"Password configured: {'Yes' if self.smtp_password else 'No'}")

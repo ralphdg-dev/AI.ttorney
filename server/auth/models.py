@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, Literal
 from datetime import datetime, date
 
-# User role enum based on database schema
+                                         
 UserRole = Literal["guest", "registered_user", "verified_lawyer", "admin", "superadmin"]
 
 class UserSignUp(BaseModel):
@@ -44,7 +44,7 @@ class TokenResponse(BaseModel):
     expires_in: int
     user: UserResponse
 
-# OTP-related models
+                    
 class OTPRequest(BaseModel):
     email: EmailStr
     otp_type: Literal["email_verification", "password_reset"]

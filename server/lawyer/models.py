@@ -3,7 +3,7 @@ from typing import Optional, Literal, List
 from datetime import datetime, date
 from uuid import UUID
 
-# Lawyer application status enum based on database schema
+                                                         
 LawyerApplicationStatus = Literal["pending", "accepted", "rejected", "resubmission"]
 
 class LawyerApplicationSubmit(BaseModel):
@@ -11,7 +11,7 @@ class LawyerApplicationSubmit(BaseModel):
     roll_signing_date: date
     ibp_id: str
     roll_number: str
-    selfie: str  # File path in storage bucket
+    selfie: str                               
     
     @validator('full_name')
     def validate_full_name(cls, v):
@@ -21,7 +21,7 @@ class LawyerApplicationSubmit(BaseModel):
     
     @validator('ibp_id')
     def validate_ibp_id(cls, v):
-        # Allow empty string for cases where upload failed
+                                                          
         return v.strip() if v else ''
     
     @validator('roll_number')
@@ -32,7 +32,7 @@ class LawyerApplicationSubmit(BaseModel):
     
     @validator('selfie')
     def validate_selfie(cls, v):
-        # Allow empty string for cases where upload failed
+                                                          
         return v.strip() if v else ''
 
 class LawyerApplicationReview(BaseModel):
@@ -62,11 +62,11 @@ class LawyerApplicationResponse(BaseModel):
     matched_at: Optional[datetime] = None
     submitted_at: datetime
     updated_at: datetime
-    # New versioning fields
+                           
     version: Optional[int] = 1
     parent_application_id: Optional[UUID] = None
     is_latest: Optional[bool] = True
-    # Acknowledgment field for rejected applications
+                                                    
     acknowledged: Optional[bool] = False
 
 class LawyerApplicationStatusResponse(BaseModel):

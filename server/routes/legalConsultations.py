@@ -13,8 +13,8 @@ import uuid
 router = APIRouter(prefix="/legal-consultations", tags=["legal-consultations"])
 logger = logging.getLogger(__name__)
 
-lawyers_cache = TTLCache(maxsize=100, ttl=60)  # 1 minute for fresher data
-single_lawyer_cache = TTLCache(maxsize=500, ttl=120)  # 2 minutes for individual lawyers
+lawyers_cache = TTLCache(maxsize=100, ttl=60)                             
+single_lawyer_cache = TTLCache(maxsize=500, ttl=120)                                    
 
 pending_requests = {}
 request_lock = asyncio.Lock()
@@ -24,12 +24,12 @@ class Lawyer(BaseModel):
     lawyer_id: uuid.UUID
     name: str
     bio: str
-    specialization: Optional[List[str]] = None  # Fixed: Array to match frontend
+    specialization: Optional[List[str]] = None                                  
     location: Optional[str] = None
-    hours: Optional[str] = None  # Deprecated
-    days: Optional[str] = None  # Deprecated
+    hours: Optional[str] = None              
+    days: Optional[str] = None              
     available: bool
-    hours_available: Optional[dict] = None  # JSONB format: {"Monday": ["09:00", "11:00"]}
+    hours_available: Optional[dict] = None                                                
     created_at: datetime
 
     class Config:
@@ -51,7 +51,7 @@ def normalize_specialization(specialization):
         return [spec.strip() for spec in specialization if spec.strip()]
     
     if isinstance(specialization, str):
-        # Split by comma and clean up whitespace
+                                                
         return [spec.strip() for spec in specialization.split(',') if spec.strip()]
     
     return []
@@ -114,7 +114,7 @@ async def get_lawyers_with_cache(supabase_service, use_cache=True):
 async def fetch_lawyers_from_db(supabase_service):
     """Fetch lawyers from database with optimized query - HTTP first for speed"""
     try:
-        # Use HTTP API directly for better performance
+                                                      
         async with httpx.AsyncClient(timeout=10.0) as client:
             url = f"{supabase_service.rest_url}/lawyer_info"
             response = await client.get(
@@ -162,7 +162,7 @@ async def fetch_lawyers_from_db(supabase_service):
     except Exception as http_error:
         logger.warning(f"HTTP API failed, falling back to Supabase client: {str(http_error)}")
         
-        # Fallback to Supabase client
+                                     
         try:
             response = supabase_service.supabase.table("lawyer_info").select("*").execute()
             
@@ -230,7 +230,7 @@ async def get_lawyer(
 ):
     """Get a specific lawyer by ID with caching"""
     try:
-        # Validate UUID format
+                              
         try:
             uuid.UUID(lawyer_id)
         except ValueError:
@@ -292,12 +292,12 @@ async def cache_status():
         "pending_requests": len(pending_requests)
     }
     
-# Add this to your consultation_requests.py router
+                                                  
 @router.get("/user/{user_id}/active-requests")
 async def check_active_consultation_requests(user_id: str):
     """Check if user has any active consultation requests"""
     try:
-        # Check for pending or accepted requests
+                                                
         supabase_service = SupabaseService()
         
         response = (

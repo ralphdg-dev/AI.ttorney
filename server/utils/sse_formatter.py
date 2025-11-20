@@ -1,10 +1,3 @@
-"""
-Server-Sent Events (SSE) Formatter Utility
-
-Shared utility for formatting SSE messages consistently across all streaming endpoints.
-Follows DRY principles to avoid code duplication.
-"""
-
 import json
 from typing import Dict, Any
 

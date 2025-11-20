@@ -27,7 +27,7 @@ def classify_article(content):
     return best if scores[best] > 0 else "General Provisions"
 
 def scrape_labor_code(url):
-    print("🔄 Fetching from LawPhil...")
+    print(" Fetching from LawPhil...")
     response = requests.get(url)
     response.encoding = "utf-8"
     soup = BeautifulSoup(response.text, "html.parser")
@@ -43,7 +43,7 @@ def scrape_labor_code(url):
         if not text:
             continue
 
-        # Detect Book, Title, Chapter
+                                     
         if re.match(r"^BOOK\s+[IVXLC]+\b", text, re.IGNORECASE):
             current_book = text
             continue
@@ -54,10 +54,10 @@ def scrape_labor_code(url):
             current_chapter = text
             continue
 
-        # Detect new Article
+                            
         article_match = re.match(r"^(ART\.|ARTICLE)\s*(\d+)\.?\s*(.*)", text, re.IGNORECASE)
         if article_match:
-            # Save previous article
+                                   
             if current_article:
                 current_article["content"] = clean_text(" ".join(buffer))
                 articles.append(current_article)
@@ -66,7 +66,7 @@ def scrape_labor_code(url):
             article_num = article_match.group(2)
             article_title = article_match.group(3).strip()
 
-            # If article line already contains a long body, split it
+                                                                    
             split_parts = re.split(r'[\.\-–:]\s+', article_title, 1)
             if len(split_parts) > 1 and len(split_parts[1].split()) > 5:
                 article_title, first_content = split_parts[0].strip(), split_parts[1].strip()
@@ -88,29 +88,29 @@ def scrape_labor_code(url):
                 }
             }
 
-            # Also check if the next <p> continues the article
+                                                              
             if idx + 1 < len(paragraphs):
                 next_p = clean_text(paragraphs[idx + 1].get_text(" ", strip=True))
                 if next_p and not re.match(r"^(ART\.|ARTICLE)\s*\d+", next_p, re.IGNORECASE):
-                    # Only append if we didn't already push first_content into buffer
+                                                                                     
                     if not (len(buffer) == 1 and buffer[0] == first_content if 'first_content' in locals() else False):
                         buffer.append(next_p)
             continue
 
-        # Accumulate article content
+                                    
         if current_article:
             buffer.append(text)
 
-    # Add last article after loop
+                                 
     if current_article:
         current_article["content"] = clean_text(" ".join(buffer))
         articles.append(current_article)
 
-    # Classify all articles
+                           
     for art in articles:
         art["topic"] = classify_article(art.get("content", "") or art.get("title", ""))
 
-    print(f"✅ Extracted {len(articles)} articles.")
+    print(f" Extracted {len(articles)} articles.")
     return articles
 
 def organize_by_topic(articles):
@@ -144,18 +144,18 @@ def create_data_structure(articles):
     }
 
 def save_json(data):
-    # Ensure data/raw directory exists
+                                      
     output_dir = Path(__file__).parent.parent / "data" / "raw"
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Save to data/raw directory
+                                
     output_path = output_dir / "labor_code.json"
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    print(f"💾 Saved to {output_path}")
+    print(f" Saved to {output_path}")
 
 def save_markdown(data):
-    # Save markdown to data/raw directory as well
+                                                 
     output_dir = Path(__file__).parent.parent / "data" / "raw"
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "labor_code.md"
@@ -170,14 +170,14 @@ def save_markdown(data):
             md.append(f"\n{art['content']}\n")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(md))
-    print(f"💾 Saved to {output_path}")
+    print(f" Saved to {output_path}")
 
 def main():
     articles = scrape_labor_code(LABOR_CODE_URL)
     data = create_data_structure(articles)
     save_json(data)
     save_markdown(data)
-    print("\n📊 SUMMARY:")
+    print("\n SUMMARY:")
     for topic, count in data["statistics"]["by_topic"].items():
         print(f"• {topic}: {count} articles")
 

@@ -1,17 +1,12 @@
-"""
-Appeal Models for AI.ttorney
-User suspension appeal system models
-"""
-
 from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Literal
 from datetime import datetime
 from uuid import UUID
 
 
-# ============================================================================
-# Database Models (match SQL schema)
-# ============================================================================
+                                                                              
+                                    
+                                                                              
 
 class SuspensionAppealDB(BaseModel):
     """Suspension appeal as stored in database"""
@@ -21,12 +16,12 @@ class SuspensionAppealDB(BaseModel):
     appeal_reason: str
     appeal_message: str
     evidence_urls: List[str] = []
-    status: str  # pending, under_review, approved, rejected
+    status: str                                             
     reviewed_by: Optional[UUID] = None
     reviewed_at: Optional[datetime] = None
     admin_response: Optional[str] = None
     admin_notes: Optional[str] = None
-    decision: Optional[str] = None  # lift_suspension, reduce_duration, reject
+    decision: Optional[str] = None                                            
     original_end_date: Optional[datetime] = None
     new_end_date: Optional[datetime] = None
     created_at: datetime
@@ -40,14 +35,14 @@ class UserSuspensionDB(BaseModel):
     """User suspension as stored in database"""
     id: UUID
     user_id: UUID
-    suspension_type: str  # temporary, permanent
+    suspension_type: str                        
     reason: str
     violation_ids: List[UUID] = []
     suspension_number: int
     strikes_at_suspension: int
     started_at: datetime
     ends_at: Optional[datetime] = None
-    status: str  # active, lifted, expired
+    status: str                           
     lifted_at: Optional[datetime] = None
     lifted_by: Optional[UUID] = None
     lifted_reason: Optional[str] = None
@@ -60,9 +55,9 @@ class UserSuspensionDB(BaseModel):
         from_attributes = True
 
 
-# ============================================================================
-# API Request Models
-# ============================================================================
+                                                                              
+                    
+                                                                              
 
 class SubmitAppealRequest(BaseModel):
     """Request to submit a suspension appeal"""
@@ -107,9 +102,9 @@ class UpdateAppealStatusRequest(BaseModel):
     status: Literal["pending", "under_review", "approved", "rejected"]
 
 
-# ============================================================================
-# API Response Models
-# ============================================================================
+                                                                              
+                     
+                                                                              
 
 class AppealResponse(BaseModel):
     """Response model for a single appeal"""
@@ -182,8 +177,8 @@ class SuspensionResponse(BaseModel):
 class AppealWithUserResponse(BaseModel):
     """Appeal with user information for admin view"""
     id: str
-    user: dict  # Contains id, username, email, full_name
-    suspension: dict  # Contains suspension details
+    user: dict                                           
+    suspension: dict                               
     appeal_reason: str
     appeal_message: str
     evidence_urls: List[str]

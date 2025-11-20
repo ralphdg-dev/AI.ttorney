@@ -1,15 +1,3 @@
-# rag_utils.py
-"""
-Retrieval Augmented Generation (RAG) Utilities
-
-Enhanced context retrieval combining:
-1. Qdrant vector embeddings (primary source)
-2. Google Web Search (fallback for low confidence)
-
-This module provides a unified interface for retrieving legal context
-from multiple sources with intelligent fallback mechanisms.
-"""
-
 import logging
 from typing import List, Dict, Tuple
 from qdrant_client import QdrantClient
@@ -63,21 +51,21 @@ def retrieve_relevant_context_with_web_search(
         "search_strategy": "qdrant_only"
     }
     
-    # Step 1: Get embedding for question
+                                        
     try:
-        logger.info(f"🔍 Generating embedding for query: {question[:60]}...")
+        logger.info(f" Generating embedding for query: {question[:60]}...")
         embedding_response = openai_client.embeddings.create(
             model=embedding_model,
             input=question
         )
         question_embedding = embedding_response.data[0].embedding
     except Exception as e:
-        logger.error(f"❌ Failed to generate embedding: {e}")
+        logger.error(f" Failed to generate embedding: {e}")
         return "", [], metadata
     
-    # Step 2: Query Qdrant vector database
+                                          
     try:
-        logger.info(f"📊 Querying Qdrant collection: {collection_name}")
+        logger.info(f" Querying Qdrant collection: {collection_name}")
         qdrant_results = qdrant_client.search(
             collection_name=collection_name,
             query_vector=question_embedding,
@@ -90,15 +78,15 @@ def retrieve_relevant_context_with_web_search(
         if qdrant_results:
             max_score = max(r.score for r in qdrant_results)
             metadata["max_confidence"] = max_score
-            logger.info(f"✅ Qdrant: Found {len(qdrant_results)} results, max score: {max_score:.3f}")
+            logger.info(f" Qdrant: Found {len(qdrant_results)} results, max score: {max_score:.3f}")
         else:
-            logger.warning("⚠️  Qdrant: No results found")
+            logger.warning("  Qdrant: No results found")
             
     except Exception as e:
-        logger.error(f"❌ Qdrant search error: {e}")
+        logger.error(f" Qdrant search error: {e}")
         qdrant_results = []
     
-    # Step 3: Build context from Qdrant results
+                                               
     qdrant_context_parts = []
     qdrant_sources = []
     
@@ -106,19 +94,19 @@ def retrieve_relevant_context_with_web_search(
         payload = result.payload
         doc = payload.get('text', '')
         
-        # Skip if no text content
+                                 
         if not doc or len(doc.strip()) < 10:
             continue
         
         source_url = payload.get('source_url', '')
         
-        # Add to context with URL
+                                 
         source_info = f"[Qdrant Source {i}: {payload.get('law', 'Unknown')} - Article {payload.get('article_number', 'N/A')}]"
         if source_url:
             source_info += f"\n[URL: {source_url}]"
         qdrant_context_parts.append(f"{source_info}\n{doc}\n")
         
-        # Store source metadata
+                               
         qdrant_sources.append({
             'source': payload.get('source', 'Qdrant Database'),
             'law': payload.get('law', 'Unknown Law'),
@@ -130,13 +118,13 @@ def retrieve_relevant_context_with_web_search(
             'source_type': 'qdrant'
         })
     
-    # Step 4: Check if web search should be triggered
+                                                     
     web_search_service = get_web_search_service()
     web_context_parts = []
     web_sources = []
     
     if enable_web_search and web_search_service.is_enabled():
-        # Determine if we should trigger web search
+                                                   
         max_qdrant_score = metadata["max_confidence"]
         num_qdrant_results = len(qdrant_sources)
         
@@ -146,29 +134,29 @@ def retrieve_relevant_context_with_web_search(
         )
         
         if should_search_web:
-            logger.info("🌐 Triggering web search to augment context...")
+            logger.info(" Triggering web search to augment context...")
             metadata["web_search_triggered"] = True
             metadata["search_strategy"] = "hybrid" if qdrant_sources else "web_only"
             
-            # Perform web search AND scrape content from websites
+                                                                 
             web_results = web_search_service.search_and_scrape(question)
             metadata["web_results"] = len(web_results)
             
             if web_results:
-                # Format web results with scraped content into context
+                                                                      
                 for i, result in enumerate(web_results, 1):
-                    # Use scraped content if available, otherwise use snippet
+                                                                             
                     content = result.get('scraped_content', result.get('snippet', ''))
                     
                     if content:
-                        # Format context entry with full scraped content
+                                                                        
                         context_entry = f"""[Web Source {i}: {result.get('title', 'Untitled')}]
 [URL: {result.get('url', '')}]
 {content}
 """
                         web_context_parts.append(context_entry)
                         
-                        # Create source citation
+                                                
                         web_sources.append({
                             "source": "Web Search",
                             "law": result.get("source", "Web"),
@@ -181,20 +169,20 @@ def retrieve_relevant_context_with_web_search(
                             "source_type": "web_scraped"
                         })
                 
-                logger.info(f"✅ Added {len(web_results)} web search results with scraped content to context")
+                logger.info(f" Added {len(web_results)} web search results with scraped content to context")
             else:
-                logger.warning("⚠️  Web search returned no results")
+                logger.warning("  Web search returned no results")
     
-    # Step 5: Combine all contexts - PRIORITIZE WEB SEARCH OVER QDRANT
-    # Put web search results FIRST so LLM sees them as primary sources
+                                                                      
+                                                                      
     all_context_parts = web_context_parts + qdrant_context_parts
     all_sources = web_sources + qdrant_sources
     
     if not all_context_parts:
-        logger.warning("❌ No context available from any source")
+        logger.warning(" No context available from any source")
         return "", [], metadata
     
-    # Add separator between web and Qdrant results (web search first)
+                                                                     
     if qdrant_context_parts and web_context_parts:
         combined_context = (
             "=== PRIMARY SOURCES: WEB SEARCH (Most Recent & Comprehensive) ===\n\n" +

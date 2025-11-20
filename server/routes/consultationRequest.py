@@ -23,14 +23,14 @@ async def create_consultation_request(
 ):
     """Create a new consultation request with validation"""
     try:
-        # Always derive the user_id from the authenticated user to prevent spoofing
+                                                                                   
         req_user_id = getattr(current_user, 'id', None)
         if not req_user_id:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
-        logger.info(f"📝 Creating consultation request: user={req_user_id}, lawyer={request.lawyer_id}, mode={request.consultation_mode}")
+        logger.info(f" Creating consultation request: user={req_user_id}, lawyer={request.lawyer_id}, mode={request.consultation_mode}")
         
-        # Check if user is banned from booking consultations
+                                                            
         ban_service = get_consultation_ban_service()
         eligibility = await ban_service.check_booking_eligibility(req_user_id)
         
@@ -53,10 +53,10 @@ async def create_consultation_request(
         )
         return result
     except ConsultationError as e:
-        logger.error(f"❌ Consultation error: {e.code} - {e.message}")
+        logger.error(f" Consultation error: {e.code} - {e.message}")
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        logger.error(f"❌ Error creating consultation: {e}")
+        logger.error(f" Error creating consultation: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.get("/user/{user_id}")
@@ -113,7 +113,7 @@ async def get_consultation_request(
 ):
     """Get a specific consultation request by ID"""
     try:
-        # Note: Add ownership validation in service if needed
+                                                             
         result = await service.get_consultation_by_id(request_id)
         return result
     except ConsultationError as e:
@@ -163,8 +163,8 @@ async def delete_consultation_request(
         logger.error(f"Error deleting consultation: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-# Statistics endpoints removed - use pagination metadata instead
-# Total counts available in pagination response
+                                                                
+                                               
 
 @router.get("/ban-status/{user_id}")
 async def check_consultation_ban_status(
@@ -173,7 +173,7 @@ async def check_consultation_ban_status(
 ):
     """Check if user is banned from booking consultations"""
     try:
-        # Ensure user can only check their own ban status (or admin can check any)
+                                                                                  
         if current_user.id != user_id and not getattr(current_user, 'is_admin', False):
             raise HTTPException(status_code=403, detail="Access denied")
         

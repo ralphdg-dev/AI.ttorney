@@ -1,18 +1,3 @@
-"""
-Account Status Middleware
-
-Middleware to check if users are suspended or banned before allowing access to protected routes.
-
-Features:
-- Automatic suspension expiry checking
-- Clear error messages for suspended/banned users
-- Fail-open for high availability
-- Comprehensive logging
-
-Author: AI.ttorney Team
-Date: 2025-10-22
-"""
-
 from fastapi import HTTPException, Depends, status
 from typing import Dict, Any
 import logging
@@ -50,7 +35,7 @@ async def check_account_status(
     try:
         user_id = current_user["user"]["id"]
         
-        # Check user status
+                           
         violation_service = get_violation_tracking_service()
         user_status = await violation_service.check_user_status(user_id)
         
@@ -66,8 +51,8 @@ async def check_account_status(
     except HTTPException:
         raise
     except Exception as e:
-        # Fail-open: if status check fails, allow access
-        logger.error(f"⚠️  Account status check failed: {str(e)} - allowing access")
+                                                        
+        logger.error(f"  Account status check failed: {str(e)} - allowing access")
         return current_user
 
 
@@ -98,13 +83,13 @@ async def check_account_status_optional(
     try:
         user_id = current_user["user"]["id"]
         
-        # Check user status
+                           
         violation_service = get_violation_tracking_service()
         user_status = await violation_service.check_user_status(user_id)
         
         return (current_user, user_status["is_allowed"])
         
     except Exception as e:
-        # Fail-open: if status check fails, assume active
-        logger.error(f"⚠️  Account status check failed: {str(e)} - assuming active")
+                                                         
+        logger.error(f"  Account status check failed: {str(e)} - assuming active")
         return (current_user, True)

@@ -15,7 +15,7 @@ class EmailSupportService:
     """Service for handling support email requests"""
     
     def __init__(self):
-        # SMTP Configuration
+                            
         self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
         self.smtp_username = os.getenv("SMTP_USERNAME")
@@ -23,7 +23,7 @@ class EmailSupportService:
         self.support_email = os.getenv("SUPPORT_EMAIL", "aittorney.otp@gmail.com")
         self.from_name = os.getenv("FROM_NAME", "AI.ttorney Support System")
         
-        # Validate configuration
+                                
         if not self.smtp_username or not self.smtp_password:
             logger.warning("SMTP credentials not configured. Email support will not work.")
     
@@ -47,24 +47,24 @@ class EmailSupportService:
             Dictionary with success status and message/error
         """
         try:
-            # Validate inputs
+                             
             if not all([sender_name, sender_email, subject, message]):
                 return {
                     "success": False,
                     "error": "All fields are required"
                 }
             
-            # Basic email validation
+                                    
             if "@" not in sender_email or "." not in sender_email:
                 return {
                     "success": False,
                     "error": "Invalid email address"
                 }
             
-            # Log support request
+                                 
             logger.info(f"Processing support request from {sender_name} ({sender_email})")
             
-            # Send email to support team
+                                        
             email_response = await self._send_support_email(
                 sender_name,
                 sender_email,
@@ -73,7 +73,7 @@ class EmailSupportService:
             )
             
             if email_response["success"]:
-                # Send confirmation email to user
+                                                 
                 await self._send_confirmation_email(sender_name, sender_email, subject)
                 
                 return {
@@ -110,20 +110,20 @@ class EmailSupportService:
                 message
             )
             
-            # Create message
+                            
             mime_message = MIMEMultipart("alternative")
             mime_message["Subject"] = email_subject
             mime_message["From"] = f"{self.from_name} <{self.support_email}>"
             mime_message["To"] = self.support_email
             mime_message["Reply-To"] = sender_email
             
-            # Add HTML content
+                              
             html_part = MIMEText(html_content, "html")
             mime_message.attach(html_part)
             
-            # Send email with SSL context that handles certificate issues
+                                                                         
             context = ssl.create_default_context()
-            # For development/local environments, allow unverified certificates
+                                                                               
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
             
@@ -159,19 +159,19 @@ class EmailSupportService:
             email_subject = "We've Received Your Support Request"
             html_content = self._get_confirmation_email_template(sender_name, subject)
             
-            # Create message
+                            
             mime_message = MIMEMultipart("alternative")
             mime_message["Subject"] = email_subject
             mime_message["From"] = f"{self.from_name} <{self.support_email}>"
             mime_message["To"] = sender_email
             
-            # Add HTML content
+                              
             html_part = MIMEText(html_content, "html")
             mime_message.attach(html_part)
             
-            # Send email with SSL context that handles certificate issues
+                                                                         
             context = ssl.create_default_context()
-            # For development/local environments, allow unverified certificates
+                                                                               
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
             
@@ -191,7 +191,7 @@ class EmailSupportService:
             
         except Exception as e:
             logger.error(f"Send confirmation email error: {str(e)}")
-            # Don't fail the main request if confirmation fails
+                                                               
             return {
                 "success": False,
                 "error": str(e)
@@ -347,7 +347,7 @@ class EmailSupportService:
         </html>
         """
 
-# Global service instance
+                         
 _support_service = None
 
 

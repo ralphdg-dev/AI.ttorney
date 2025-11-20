@@ -23,7 +23,7 @@ class LawyerApplicationService:
     async def submit_application(self, user_id: str, application_data: LawyerApplicationSubmit) -> Dict[str, Any]:
         """Submit a new lawyer application"""
         try:
-            # First, check if user can apply
+                                            
             can_apply_result = await self._can_user_apply(user_id)
             if not can_apply_result["can_apply"]:
                 return {
@@ -31,7 +31,7 @@ class LawyerApplicationService:
                     "error": can_apply_result["reason"]
                 }
             
-            # Create application record
+                                       
             application_id = str(uuid.uuid4())
             application_record = {
                 "id": application_id,
@@ -49,15 +49,15 @@ class LawyerApplicationService:
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
             
-            # Insert application
+                                
             insert_result = await self._insert_application(application_record)
             if not insert_result["success"]:
                 return insert_result
             
-            # Update user status: role = 'registered_user', pending_lawyer = true
+                                                                                 
             user_update_result = await self._update_user_for_pending_application(user_id)
             if not user_update_result["success"]:
-                # Rollback application if user update fails
+                                                           
                 await self._delete_application(application_id)
                 return {
                     "success": False,
@@ -77,7 +77,7 @@ class LawyerApplicationService:
     async def resubmit_application(self, user_id: str, application_data: LawyerApplicationSubmit) -> Dict[str, Any]:
         """Resubmit a lawyer application (creates new version)"""
         try:
-            # First, check if user can resubmit
+                                               
             can_apply_result = await self._can_user_resubmit(user_id)
             if not can_apply_result["can_apply"]:
                 return {
@@ -85,7 +85,7 @@ class LawyerApplicationService:
                     "error": can_apply_result["reason"]
                 }
             
-            # Get current latest application
+                                            
             current_app_result = await self._get_latest_user_application(user_id)
             if not current_app_result["success"]:
                 return {
@@ -97,12 +97,12 @@ class LawyerApplicationService:
             current_version = current_app.get("version", 1)
             current_app_id = current_app["id"]
             
-            # Mark current application as not latest
+                                                    
             mark_old_result = await self._mark_application_as_old(current_app_id)
             if not mark_old_result["success"]:
                 return mark_old_result
             
-            # Create new application record with incremented version
+                                                                    
             new_application_id = str(uuid.uuid4())
             new_application_record = {
                 "id": new_application_id,
@@ -112,7 +112,7 @@ class LawyerApplicationService:
                 "ibp_id": application_data.ibp_id,
                 "roll_number": application_data.roll_number,
                 "selfie": application_data.selfie,
-                "status": "pending",  # New resubmissions start as pending for admin review
+                "status": "pending",                                                       
                 "version": current_version + 1,
                 "parent_application_id": current_app_id,
                 "is_latest": True,
@@ -120,17 +120,17 @@ class LawyerApplicationService:
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
             
-            # Insert new application
+                                    
             insert_result = await self._insert_application(new_application_record)
             if not insert_result["success"]:
-                # Rollback: mark old application as latest again
+                                                                
                 await self._mark_application_as_latest(current_app_id)
                 return insert_result
             
-            # Update user status: role = 'registered_user', pending_lawyer = true
+                                                                                 
             user_update_result = await self._update_user_for_pending_application(user_id)
             if not user_update_result["success"]:
-                # Rollback both changes
+                                       
                 await self._delete_application(new_application_id)
                 await self._mark_application_as_latest(current_app_id)
                 return {
@@ -152,14 +152,14 @@ class LawyerApplicationService:
     async def get_user_application_status(self, user_id: str) -> Dict[str, Any]:
         """Get user's current application status"""
         try:
-            # Get user info
+                           
             user_result = await self.supabase.get_user_profile(user_id)
             if not user_result["success"]:
                 return {"success": False, "error": "User not found"}
             
             user_data = user_result["data"]
             
-            # Get latest application
+                                    
             application_result = await self._get_latest_user_application(user_id)
             
             status_response = LawyerApplicationStatusResponse(
@@ -193,7 +193,7 @@ class LawyerApplicationService:
     async def review_application(self, application_id: str, review_data: LawyerApplicationReview, admin_id: str) -> Dict[str, Any]:
         """Review an application (admin only)"""
         try:
-            # Get application
+                             
             app_result = await self._get_application_by_id(application_id)
             if not app_result["success"]:
                 return {"success": False, "error": "Application not found"}
@@ -201,7 +201,7 @@ class LawyerApplicationService:
             application = app_result["data"]
             user_id = application["user_id"]
             
-            # Update application with review
+                                            
             review_record = {
                 "status": review_data.status,
                 "reviewed_by": admin_id,
@@ -214,12 +214,12 @@ class LawyerApplicationService:
             if review_data.matched_roll_id:
                 review_record["matched_at"] = datetime.now(timezone.utc).isoformat()
             
-            # Update application
+                                
             update_result = await self._update_application(application_id, review_record)
             if not update_result["success"]:
                 return update_result
             
-            # Apply role/pending logic based on status
+                                                      
             user_update_result = await self._apply_review_logic(user_id, review_data.status)
             if not user_update_result["success"]:
                 return user_update_result
@@ -233,25 +233,25 @@ class LawyerApplicationService:
             logger.error(f"Review application error: {str(e)}")
             return {"success": False, "error": str(e)}
     
-    # Private helper methods
+                            
     async def _can_user_apply(self, user_id: str) -> Dict[str, Any]:
         """Check if user can submit an application"""
         try:
-            # Get user profile
+                              
             user_result = await self.supabase.get_user_profile(user_id)
             if not user_result["success"]:
                 return {"can_apply": False, "reason": "User not found"}
             
             user_data = user_result["data"]
             
-            # Check if blocked from applying
+                                            
             if user_data.get("is_blocked_from_applying", False):
                 return {
                     "can_apply": False,
                     "reason": "You are blocked from applying due to multiple rejections"
                 }
             
-            # Check if user has pending application
+                                                   
             if user_data.get("pending_lawyer", False):
                 return {
                     "can_apply": False,
@@ -302,7 +302,7 @@ class LawyerApplicationService:
         """Apply role/pending logic based on review status"""
         try:
             if status == "accepted":
-                # Accepted: role = 'verified_lawyer', pending_lawyer = false
+                                                                            
                 update_data = {
                     "role": "verified_lawyer",
                     "pending_lawyer": False,
@@ -310,7 +310,7 @@ class LawyerApplicationService:
                 }
                 
             elif status == "rejected":
-                # Get current user data to increment reject_count
+                                                                 
                 user_result = await self.supabase.get_user_profile(user_id)
                 if not user_result["success"]:
                     return {"success": False, "error": "User not found"}
@@ -319,7 +319,7 @@ class LawyerApplicationService:
                 current_reject_count = user_data.get("reject_count", 0)
                 new_reject_count = current_reject_count + 1
                 
-                # Rejected: role = 'registered_user', pending_lawyer = false, increment reject_count
+                                                                                                    
                 update_data = {
                     "role": "registered_user",
                     "pending_lawyer": False,
@@ -328,12 +328,12 @@ class LawyerApplicationService:
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }
                 
-                # Block if reject_count >= 3
+                                            
                 if new_reject_count >= 3:
                     update_data["is_blocked_from_applying"] = True
                     
             elif status == "resubmission":
-                # Resubmission: role = 'registered_user', pending_lawyer = false
+                                                                                
                 update_data = {
                     "role": "registered_user",
                     "pending_lawyer": False,
@@ -456,7 +456,7 @@ class LawyerApplicationService:
     async def clear_pending_lawyer_status(self, user_id: str) -> Dict[str, Any]:
         """Clear pending_lawyer flag when user completes accepted flow"""
         try:
-            # Update user: pending_lawyer = false
+                                                 
             update_data = {
                 "pending_lawyer": False,
                 "updated_at": datetime.now(timezone.utc).isoformat()
@@ -496,7 +496,7 @@ class LawyerApplicationService:
     async def activate_verified_lawyer(self, user_id: str) -> Dict[str, Any]:
         """Update user role to verified_lawyer after accepting application approval"""
         try:
-            # First, verify the user has an accepted application
+                                                                
             application = await self.get_user_application(user_id)
             
             if not application or application.get("status") != "accepted":
@@ -505,7 +505,7 @@ class LawyerApplicationService:
                     "error": "No accepted application found for this user"
                 }
             
-            # Update user: role = verified_lawyer, pending_lawyer = false
+                                                                         
             update_data = {
                 "role": "verified_lawyer",
                 "pending_lawyer": False,
@@ -561,18 +561,18 @@ class LawyerApplicationService:
     async def acknowledge_rejection(self, user_id: str) -> Dict[str, Any]:
         """Acknowledge that user has seen their rejection"""
         try:
-            # Get the latest application
+                                        
             app_result = await self._get_latest_user_application(user_id)
             if not app_result["success"]:
                 return {"success": False, "error": "No application found"}
             
             application = app_result["data"]
             
-            # Check if application is rejected
+                                              
             if application.get("status") != "rejected":
                 return {"success": False, "error": "Application is not rejected"}
             
-            # Update acknowledged field
+                                       
             async with httpx.AsyncClient() as client:
                 response = await client.patch(
                     f"{self.supabase.rest_url}/lawyer_applications?id=eq.{application['id']}",
@@ -581,7 +581,7 @@ class LawyerApplicationService:
                 )
                 
                 if response.status_code in [200, 204]:
-                    logger.info(f"✅ User {user_id[:8]}... acknowledged rejection for application {application['id']}")
+                    logger.info(f" User {user_id[:8]}... acknowledged rejection for application {application['id']}")
                     return {
                         "success": True,
                         "message": "Rejection acknowledged successfully"
@@ -594,25 +594,25 @@ class LawyerApplicationService:
             logger.error(f"Acknowledge rejection error: {str(e)}")
             return {"success": False, "error": str(e)}
 
-    # Helper methods for resubmission logic
+                                           
     async def _can_user_resubmit(self, user_id: str) -> Dict[str, Any]:
         """Check if user can resubmit an application"""
         try:
-            # Get user profile
+                              
             user_result = await self.supabase.get_user_profile(user_id)
             if not user_result["success"]:
                 return {"can_apply": False, "reason": "User not found"}
             
             user_data = user_result["data"]
             
-            # Check if blocked from applying
+                                            
             if user_data.get("is_blocked_from_applying", False):
                 return {
                     "can_apply": False,
                     "reason": "You are blocked from applying due to multiple rejections"
                 }
             
-            # Get current application status
+                                            
             current_app_result = await self._get_latest_user_application(user_id)
             if not current_app_result["success"]:
                 return {
@@ -623,7 +623,7 @@ class LawyerApplicationService:
             current_app = current_app_result["data"]
             current_status = current_app.get("status")
             
-            # Can only resubmit if status is 'rejected' or 'resubmission'
+                                                                         
             if current_status not in ["rejected", "resubmission"]:
                 return {
                     "can_apply": False,

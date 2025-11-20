@@ -23,7 +23,7 @@ def get_availability_service(supabase: Client = Depends(get_supabase)) -> Lawyer
 
 class AvailabilityUpdate(BaseModel):
     """Model for updating lawyer availability"""
-    availability: Dict[str, List[str]]  # {"Monday": ["09:00", "11:00"]}
+    availability: Dict[str, List[str]]                                  
 
 class TimeSlotUpdate(BaseModel):
     """Model for adding/removing a single time slot"""
@@ -50,7 +50,7 @@ def format_time_12h(time_24h: str) -> str:
 def generate_time_slots(start_time: str, end_time: str) -> str:
     """Generate available time slots like '9:00AM, 11:00AM, 1:00PM, 3:00PM'"""
     try:
-        # Convert to 24h for calculations
+                                         
         def to_24h(time_str):
             time_str = time_str.upper()
             if 'AM' in time_str:
@@ -60,7 +60,7 @@ def generate_time_slots(start_time: str, end_time: str) -> str:
                 if hour == 12:
                     hour = 0
                 return hour, int(minute)
-            else:  # PM
+            else:      
                 time_clean = time_str.replace('PM', '').strip()
                 hour, minute = time_clean.split(':')
                 hour = int(hour)
@@ -71,12 +71,12 @@ def generate_time_slots(start_time: str, end_time: str) -> str:
         start_hour, start_minute = to_24h(start_time)
         end_hour, end_minute = to_24h(end_time)
         
-        # Generate 2-hour slots
+                               
         slots = []
         current_hour = start_hour
         
         while current_hour < end_hour:
-            # Format back to 12h
+                                
             if current_hour == 0:
                 slot = f"12:{start_minute:02d}AM"
             elif current_hour < 12:
@@ -87,7 +87,7 @@ def generate_time_slots(start_time: str, end_time: str) -> str:
                 slot = f"{current_hour - 12}:{start_minute:02d}PM"
             
             slots.append(slot)
-            current_hour += 2  # 2-hour intervals
+            current_hour += 2                    
         
         return ', '.join(slots)
     except:
@@ -104,7 +104,7 @@ async def save_lawyer_profile(
         result = await service.upsert_profile(
             user_id=user.id,
             profile_data=profile_data.dict(),
-            availability_slots=[]  # Simplified for <5000 users
+            availability_slots=[]                              
         )
         return result
     except Exception as e:
@@ -179,9 +179,9 @@ async def get_accepting_consultations(
         )
 
 
-# ============================================================================
-# AVAILABILITY MANAGEMENT ENDPOINTS
-# ============================================================================
+                                                                              
+                                   
+                                                                              
 
 @router.get("/api/lawyer/availability")
 async def get_availability(
@@ -212,7 +212,7 @@ async def set_availability(
     try:
         result = await service.set_availability(user.id, payload.availability)
         
-        # Invalidate profile cache since availability changed
+                                                             
         profile_service.invalidate_cache(user.id)
         
         return result
@@ -240,7 +240,7 @@ async def add_time_slot(
     try:
         result = await service.add_time_slot(user.id, payload.day, payload.time_slot)
         
-        # Invalidate profile cache
+                                  
         profile_service.invalidate_cache(user.id)
         
         return result
@@ -268,7 +268,7 @@ async def remove_time_slot(
     try:
         result = await service.remove_time_slot(user.id, payload.day, payload.time_slot)
         
-        # Invalidate profile cache
+                                  
         profile_service.invalidate_cache(user.id)
         
         return result

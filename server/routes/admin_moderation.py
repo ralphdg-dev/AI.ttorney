@@ -1,24 +1,3 @@
-"""
-Admin Moderation Routes
-
-Endpoints for administrators to view and manage user violations, suspensions, and bans.
-
-Features:
-- View all suspended/banned users
-- View user violation history
-- View suspension history
-- Lift suspensions early (admin override)
-- View moderation statistics
-
-Security:
-- Requires admin role
-- Comprehensive audit logging
-- GDPR compliant (data access controls)
-
-Author: AI.ttorney Team
-Date: 2025-10-22
-"""
-
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List, Literal
@@ -34,7 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin/moderation", tags=["admin", "moderation"])
 
 
-# Response Models
+                 
 class UserModerationStatus(BaseModel):
     user_id: str
     username: Optional[str] = None
@@ -116,7 +95,7 @@ class LiftSuspensionResponse(BaseModel):
     message: str
 
 
-# Endpoints
+           
 
 @router.get("/suspended-users", response_model=SuspendedUsersResponse)
 async def get_suspended_users(
@@ -133,7 +112,7 @@ async def get_suspended_users(
     try:
         supabase = SupabaseService()
         
-        # Build query
+                     
         params = {
             "select": "id,username,email,account_status,strike_count,suspension_count,suspension_end,last_violation_at,banned_at,banned_reason",
             "order": "last_violation_at.desc.nullslast",
@@ -141,7 +120,7 @@ async def get_suspended_users(
             "offset": offset
         }
         
-        # Apply status filter
+                             
         if status_filter == "suspended":
             params["account_status"] = "eq.suspended"
         elif status_filter == "banned":
@@ -159,7 +138,7 @@ async def get_suspended_users(
             if response.status_code == 200:
                 users = response.json()
                 
-                # Get total count
+                                 
                 count_params = {"select": "count", "account_status": params.get("account_status", "in.(suspended,banned)")}
                 count_response = await client.get(
                     f"{supabase.rest_url}/users",
@@ -173,7 +152,7 @@ async def get_suspended_users(
                     if "/" in content_range:
                         total = int(content_range.split("/")[1])
                 
-                logger.info(f"📊 Admin retrieved {len(users)} suspended/banned users (total: {total})")
+                logger.info(f" Admin retrieved {len(users)} suspended/banned users (total: {total})")
                 
                 return SuspendedUsersResponse(
                     success=True,
@@ -190,7 +169,7 @@ async def get_suspended_users(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting suspended users: {str(e)}")
+        logger.error(f" Error getting suspended users: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
@@ -217,7 +196,7 @@ async def get_violations(
     try:
         supabase = SupabaseService()
         
-        # Build query
+                     
         params = {
             "select": "id,user_id,violation_type,content_text,flagged_categories,violation_summary,action_taken,strike_count_after,suspension_count_after,created_at,appeal_status",
             "order": "created_at.desc",
@@ -225,11 +204,11 @@ async def get_violations(
             "offset": offset
         }
         
-        # Apply filters
+                       
         if user_id:
             params["user_id"] = f"eq.{user_id}"
         if violation_type:
-            # Validate violation type
+                                     
             if not ViolationType.is_valid(violation_type):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -249,7 +228,7 @@ async def get_violations(
             if response.status_code == 200:
                 violations = response.json()
                 
-                # Get total count
+                                 
                 count_params = {k: v for k, v in params.items() if k != "select" and k != "order" and k != "limit" and k != "offset"}
                 count_params["select"] = "count"
                 count_response = await client.get(
@@ -264,7 +243,7 @@ async def get_violations(
                     if "/" in content_range:
                         total = int(content_range.split("/")[1])
                 
-                logger.info(f"📊 Admin retrieved {len(violations)} violations (total: {total})")
+                logger.info(f" Admin retrieved {len(violations)} violations (total: {total})")
                 
                 return ViolationsResponse(
                     success=True,
@@ -281,7 +260,7 @@ async def get_violations(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting violations: {str(e)}")
+        logger.error(f" Error getting violations: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
@@ -304,7 +283,7 @@ async def get_suspensions(
     try:
         supabase = SupabaseService()
         
-        # Build query
+                     
         params = {
             "select": "id,user_id,suspension_type,reason,started_at,ends_at,suspension_number,strikes_at_suspension,status",
             "order": "started_at.desc",
@@ -312,7 +291,7 @@ async def get_suspensions(
             "offset": offset
         }
         
-        # Apply filters
+                       
         if user_id:
             params["user_id"] = f"eq.{user_id}"
         if status_filter:
@@ -328,7 +307,7 @@ async def get_suspensions(
             if response.status_code == 200:
                 suspensions = response.json()
                 
-                # Get total count
+                                 
                 count_params = {k: v for k, v in params.items() if k != "select" and k != "order" and k != "limit" and k != "offset"}
                 count_params["select"] = "count"
                 count_response = await client.get(
@@ -343,7 +322,7 @@ async def get_suspensions(
                     if "/" in content_range:
                         total = int(content_range.split("/")[1])
                 
-                logger.info(f"📊 Admin retrieved {len(suspensions)} suspensions (total: {total})")
+                logger.info(f" Admin retrieved {len(suspensions)} suspensions (total: {total})")
                 
                 return SuspensionsResponse(
                     success=True,
@@ -360,7 +339,7 @@ async def get_suspensions(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error getting suspensions: {str(e)}")
+        logger.error(f" Error getting suspensions: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
@@ -380,7 +359,7 @@ async def get_moderation_stats(
         supabase = SupabaseService()
         
         async with httpx.AsyncClient(timeout=10.0) as client:
-            # Get total violations
+                                  
             violations_response = await client.get(
                 f"{supabase.rest_url}/user_violations",
                 params={"select": "count"},
@@ -392,7 +371,7 @@ async def get_moderation_stats(
                 if "/" in content_range:
                     total_violations = int(content_range.split("/")[1])
             
-            # Get total suspensions
+                                   
             suspensions_response = await client.get(
                 f"{supabase.rest_url}/user_suspensions",
                 params={"select": "count"},
@@ -404,7 +383,7 @@ async def get_moderation_stats(
                 if "/" in content_range:
                     total_suspensions = int(content_range.split("/")[1])
             
-            # Get total bans
+                            
             bans_response = await client.get(
                 f"{supabase.rest_url}/users",
                 params={"select": "count", "account_status": "eq.banned"},
@@ -416,7 +395,7 @@ async def get_moderation_stats(
                 if "/" in content_range:
                     total_bans = int(content_range.split("/")[1])
             
-            # Get active suspensions
+                                    
             active_suspensions_response = await client.get(
                 f"{supabase.rest_url}/users",
                 params={"select": "count", "account_status": "eq.suspended"},
@@ -428,7 +407,7 @@ async def get_moderation_stats(
                 if "/" in content_range:
                     active_suspensions = int(content_range.split("/")[1])
             
-            # Get violations today (last 24 hours)
+                                                  
             now = datetime.utcnow()
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
             violations_today_response = await client.get(
@@ -442,7 +421,7 @@ async def get_moderation_stats(
                 if "/" in content_range:
                     violations_today = int(content_range.split("/")[1])
             
-            # Get violations this week (last 7 days)
+                                                    
             from datetime import timedelta
             week_start = (now - timedelta(days=7)).isoformat()
             violations_week_response = await client.get(
@@ -456,7 +435,7 @@ async def get_moderation_stats(
                 if "/" in content_range:
                     violations_this_week = int(content_range.split("/")[1])
             
-            # Get violations this month (last 30 days)
+                                                      
             month_start = (now - timedelta(days=30)).isoformat()
             violations_month_response = await client.get(
                 f"{supabase.rest_url}/user_violations",
@@ -479,12 +458,12 @@ async def get_moderation_stats(
                 violations_this_month=violations_this_month
             )
             
-            logger.info(f"📊 Admin retrieved moderation stats: {total_violations} violations, {total_suspensions} suspensions, {total_bans} bans")
+            logger.info(f" Admin retrieved moderation stats: {total_violations} violations, {total_suspensions} suspensions, {total_bans} bans")
             
             return StatsResponse(success=True, data=stats)
     
     except Exception as e:
-        logger.error(f"❌ Error getting moderation stats: {str(e)}")
+        logger.error(f" Error getting moderation stats: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
@@ -507,7 +486,7 @@ async def lift_suspension(
         supabase = SupabaseService()
         
         async with httpx.AsyncClient(timeout=10.0) as client:
-            # Check if user is actually suspended
+                                                 
             user_response = await client.get(
                 f"{supabase.rest_url}/users",
                 params={"id": f"eq.{user_id}", "select": "id,account_status,strike_count,suspension_count"},
@@ -534,13 +513,13 @@ async def lift_suspension(
                     detail="User is not currently suspended"
                 )
             
-            # Update user status
+                                
             update_response = await client.patch(
                 f"{supabase.rest_url}/users",
                 params={"id": f"eq.{user_id}"},
                 json={
                     "account_status": "active",
-                    "strike_count": 0,  # Reset strikes when lifting suspension
+                    "strike_count": 0,                                         
                     "suspension_end": None
                 },
                 headers=supabase._get_headers(use_service_key=True)
@@ -552,7 +531,7 @@ async def lift_suspension(
                     detail="Failed to lift suspension"
                 )
             
-            # Mark suspension as lifted
+                                       
             suspension_update_response = await client.patch(
                 f"{supabase.rest_url}/user_suspensions",
                 params={"user_id": f"eq.{user_id}", "status": "eq.active"},
@@ -566,7 +545,7 @@ async def lift_suspension(
                 headers=supabase._get_headers(use_service_key=True)
             )
             
-            logger.info(f"✅ Admin {admin_id[:8]}... lifted suspension for user {user_id[:8]}... (reason: {body.reason})")
+            logger.info(f" Admin {admin_id[:8]}... lifted suspension for user {user_id[:8]}... (reason: {body.reason})")
             
             return LiftSuspensionResponse(
                 success=True,
@@ -576,7 +555,7 @@ async def lift_suspension(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error lifting suspension: {str(e)}")
+        logger.error(f" Error lifting suspension: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
@@ -602,7 +581,7 @@ async def lift_ban(
         supabase = SupabaseService()
         
         async with httpx.AsyncClient(timeout=10.0) as client:
-            # Check if user is actually banned
+                                              
             user_response = await client.get(
                 f"{supabase.rest_url}/users",
                 params={"id": f"eq.{user_id}", "select": "id,account_status,strike_count,suspension_count,banned_at"},
@@ -629,14 +608,14 @@ async def lift_ban(
                     detail="User is not currently banned"
                 )
             
-            # Update user status - Reset strikes only, keep suspension history
+                                                                              
             update_response = await client.patch(
                 f"{supabase.rest_url}/users",
                 params={"id": f"eq.{user_id}"},
                 json={
                     "account_status": "active",
-                    "strike_count": 0,  # Reset strikes
-                    # suspension_count stays - permanent record of past suspensions
+                    "strike_count": 0,                 
+                                                                                   
                     "suspension_end": None,
                     "banned_at": None,
                     "banned_reason": None
@@ -650,7 +629,7 @@ async def lift_ban(
                     detail="Failed to lift ban"
                 )
             
-            # Mark all suspensions as lifted
+                                            
             suspension_update_response = await client.patch(
                 f"{supabase.rest_url}/user_suspensions",
                 params={"user_id": f"eq.{user_id}", "status": "eq.active"},
@@ -664,8 +643,8 @@ async def lift_ban(
                 headers=supabase._get_headers(use_service_key=True)
             )
             
-            logger.info(f"✅ Admin {admin_id[:8]}... lifted PERMANENT BAN for user {user_id[:8]}... (reason: {body.reason})")
-            logger.info(f"🔄 User {user_id[:8]}... reset: strikes=0, status=active (suspension_count preserved)")
+            logger.info(f" Admin {admin_id[:8]}... lifted PERMANENT BAN for user {user_id[:8]}... (reason: {body.reason})")
+            logger.info(f" User {user_id[:8]}... reset: strikes=0, status=active (suspension_count preserved)")
             
             return LiftSuspensionResponse(
                 success=True,
@@ -675,7 +654,7 @@ async def lift_ban(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error lifting ban: {str(e)}")
+        logger.error(f" Error lifting ban: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"

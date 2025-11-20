@@ -13,7 +13,7 @@ class LegalArticleService:
     def __init__(self):
         self.supabase_service = SupabaseService()
         self._article_cache = {}
-        self._cache_duration = 300  # 5 minutes
+        self._cache_duration = 300             
     
     async def get_articles(self, params: SearchParams) -> tuple[List[LegalArticle], int]:
         """
@@ -21,15 +21,15 @@ class LegalArticleService:
         Returns tuple of (articles, total_count)
         """
         try:
-            # Build query parameters
+                                    
             query_params = ["is_verified=eq.true"]
             
-            # Apply category filter
+                                   
             if params.category:
                 db_category = "labor" if params.category.lower() == "work" else params.category
                 query_params.append(f"category=eq.{db_category}")
             
-            # Apply search filter
+                                 
             if params.search:
                 search_term = params.search.replace(" ", "%20")
                 search_filter = (
@@ -42,11 +42,11 @@ class LegalArticleService:
                 )
                 query_params.append(search_filter)
             
-            # Build the query string
+                                    
             query_string = "&".join(query_params)
             
             async with httpx.AsyncClient() as client:
-                # Get total count
+                                 
                 count_url = f"{self.supabase_service.rest_url}/legal_articles?select=id&{query_string}"
                 count_response = await client.get(
                     count_url,
@@ -62,7 +62,7 @@ class LegalArticleService:
                     if content_range and "/" in content_range:
                         total_count = int(content_range.split("/")[-1])
                 
-                # Get articles with pagination
+                                              
                 select_fields = (
                     "id,title_en,title_fil,description_en,description_fil,"
                     "content_en,content_fil,category,image_article,is_verified,created_at,updated_at"
@@ -87,7 +87,7 @@ class LegalArticleService:
                 if not articles_data:
                     return [], total_count
                 
-                # Convert to Pydantic models
+                                            
                 articles = [LegalArticle(**article) for article in articles_data]
                 return articles, total_count
             
@@ -114,7 +114,7 @@ class LegalArticleService:
         Get a specific article by ID using HTTP requests with caching
         """
         try:
-            # Check cache first
+                               
             cache_key = f"article_{article_id}"
             cached_data = self._get_cached_data(cache_key)
             if cached_data:
@@ -127,7 +127,7 @@ class LegalArticleService:
             )
             
             async with httpx.AsyncClient() as client:
-                # Sanitize article_id to prevent SQL injection
+                                                              
                 import urllib.parse
                 sanitized_article_id = urllib.parse.quote(str(article_id), safe='')
                 
@@ -151,9 +151,9 @@ class LegalArticleService:
                 
                 article_data = articles_data[0]
                 
-                # Cache the result
+                                  
                 self._set_cache(cache_key, article_data)
-                logger.info(f"✅ CACHED ARTICLE: {article_id} - {article_data.get('title_en', 'Unknown')}")
+                logger.info(f" CACHED ARTICLE: {article_id} - {article_data.get('title_en', 'Unknown')}")
                 
                 return LegalArticle(**article_data)
             
@@ -182,7 +182,7 @@ class LegalArticleService:
                 if not articles_data:
                     return []
                 
-                # Extract unique categories
+                                           
                 categories = list(set([
                     article.get("category") 
                     for article in articles_data 
@@ -215,7 +215,7 @@ class LegalArticleService:
             if time.time() - cached_item['timestamp'] < self._cache_duration:
                 return cached_item['data']
             else:
-                # Remove expired cache
+                                      
                 del self._article_cache[cache_key]
         return None
     
@@ -229,7 +229,7 @@ class LegalArticleService:
     def clear_cache(self):
         """Clear all cached data"""
         self._article_cache.clear()
-        logger.info("🗑️ Article cache cleared")
+        logger.info("🗑 Article cache cleared")
 
     async def notify_article_published(self, article_id: str, title: str):
         """Notify all users of new article"""
@@ -246,7 +246,7 @@ class LegalArticleService:
                     title=title,
                     content_id=article_id
                 )
-                logger.info(f"✅ Sent article published notifications to {len(user_ids)} users")
+                logger.info(f" Sent article published notifications to {len(user_ids)} users")
         except Exception as e:
             logger.error(f"Failed to send article published notifications: {e}")
 
@@ -265,6 +265,6 @@ class LegalArticleService:
                     title=title,
                     content_id=article_id
                 )
-                logger.info(f"✅ Sent article updated notifications to {len(user_ids)} users")
+                logger.info(f" Sent article updated notifications to {len(user_ids)} users")
         except Exception as e:
             logger.error(f"Failed to send article updated notifications: {e}")

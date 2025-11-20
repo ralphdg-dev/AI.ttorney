@@ -1,19 +1,3 @@
-"""
-Permanent Ban Middleware
-
-Strict middleware to block ALL access from permanently banned users.
-This middleware should be applied globally to all authenticated routes.
-
-Features:
-- Blocks banned users from ALL API access
-- Returns specific PERMANENTLY_BANNED error
-- No fail-open - banned users are always blocked
-- Comprehensive logging for security
-
-Author: AI.ttorney Team
-Date: 2025-11-15
-"""
-
 from fastapi import HTTPException, Depends, status, Request
 from typing import Dict, Any
 import logging
@@ -49,7 +33,7 @@ async def block_permanently_banned_users(
         HTTPException: 403 with PERMANENTLY_BANNED error if user is banned
     """
     try:
-        # Check user profile for account status
+                                               
         profile = current_user.get("profile")
         if not profile:
             logger.error("🚫 User profile missing in permanent ban check")
@@ -61,7 +45,7 @@ async def block_permanently_banned_users(
         account_status = profile.get("account_status")
         user_id = profile.get("id", "unknown")
         
-        # STRICT: No fail-open for banned users
+                                               
         if account_status == "banned":
             logger.warning(f"🚫 PERMANENTLY_BANNED user blocked: {user_id[:8]}...")
             raise HTTPException(
@@ -72,14 +56,14 @@ async def block_permanently_banned_users(
                 }
             )
         
-        logger.debug(f"✅ User {user_id[:8]}... passed permanent ban check (status: {account_status})")
+        logger.debug(f" User {user_id[:8]}... passed permanent ban check (status: {account_status})")
         return current_user
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"🚫 Permanent ban check failed: {str(e)}", exc_info=True)
-        # For security, fail closed on errors - block access if we can't verify status
+                                                                                      
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
@@ -114,5 +98,5 @@ async def block_permanently_banned_users_optional(
         return (current_user, is_not_banned)
         
     except Exception as e:
-        logger.error(f"⚠️  Optional permanent ban check failed: {str(e)}")
+        logger.error(f"  Optional permanent ban check failed: {str(e)}")
         return (current_user, False)

@@ -1,7 +1,3 @@
-"""
-Lawyer Availability Service - JSONB-based availability management
-Simple and efficient for <5000 users, industry-standard structured data
-"""
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from supabase import Client
@@ -14,7 +10,7 @@ logger = logging.getLogger(__name__)
 class LawyerAvailabilityService:
     """Service for managing lawyer availability using JSONB column"""
     
-    # Day mapping for convenience
+                                 
     DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
     
     def __init__(self, supabase: Client):
@@ -43,7 +39,7 @@ class LawyerAvailabilityService:
             
             for time_str in times:
                 try:
-                    # Validate 24-hour format HH:MM
+                                                   
                     datetime.strptime(time_str, "%H:%M")
                 except ValueError:
                     raise ValueError(f"Invalid time format: {time_str}. Use HH:MM (24-hour)")
@@ -66,10 +62,10 @@ class LawyerAvailabilityService:
             Dict with success status
         """
         try:
-            # Validate structure
+                                
             self.validate_availability(availability)
             
-            # Update lawyer_info table
+                                      
             result = self.supabase.table("lawyer_info")\
                 .update({"hours_available": json.dumps(availability)})\
                 .eq("lawyer_id", lawyer_id)\
@@ -113,7 +109,7 @@ class LawyerAvailabilityService:
             
             availability = result.data[0].get("hours_available", {})
             
-            # Filter by day if specified
+                                        
             if day and isinstance(availability, dict):
                 availability = {day: availability.get(day, [])}
             
@@ -144,24 +140,24 @@ class LawyerAvailabilityService:
             Dict with success status
         """
         try:
-            # Validate inputs
+                             
             if day not in self.DAYS:
                 raise ValueError(f"Invalid day: {day}")
             datetime.strptime(time_slot, "%H:%M")
             
-            # Get current availability
+                                      
             current = await self.get_availability(lawyer_id)
             availability = current["data"] if isinstance(current["data"], dict) else {}
             
-            # Add time slot
+                           
             if day not in availability:
                 availability[day] = []
             
             if time_slot not in availability[day]:
                 availability[day].append(time_slot)
-                availability[day].sort()  # Keep times sorted
+                availability[day].sort()                     
             
-            # Update
+                    
             return await self.set_availability(lawyer_id, availability)
         
         except Exception as e:
@@ -186,19 +182,19 @@ class LawyerAvailabilityService:
             Dict with success status
         """
         try:
-            # Get current availability
+                                      
             current = await self.get_availability(lawyer_id)
             availability = current["data"] if isinstance(current["data"], dict) else {}
             
-            # Remove time slot
+                              
             if day in availability and time_slot in availability[day]:
                 availability[day].remove(time_slot)
                 
-                # Remove day if no more slots
+                                             
                 if not availability[day]:
                     del availability[day]
             
-            # Update
+                    
             return await self.set_availability(lawyer_id, availability)
         
         except Exception as e:
@@ -224,14 +220,14 @@ class LawyerAvailabilityService:
             List of available time slots in HH:MM format
         """
         try:
-            # Get availability for the day
+                                          
             result = await self.get_availability(lawyer_id, day)
             slots = result["data"].get(day, [])
             
             if not date:
                 return slots
             
-            # Filter out booked slots
+                                     
             bookable = []
             for slot in slots:
                 is_booked = await self._is_slot_booked(lawyer_id, date, slot)

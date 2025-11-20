@@ -6,7 +6,7 @@ import os
 import logging
 from typing import Optional
 
-# Configure logging
+                   
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -23,13 +23,13 @@ class GeocodeRequest(BaseModel):
 
 class LocationSearchRequest(BaseModel):
     location_name: str
-    radius: int = 15000  # Reduced to 15km for more location-specific results
-    type: str = "lawyer"  # This will be overridden in the search logic
+    radius: int = 15000                                                      
+    type: str = "lawyer"                                               
 
 class AutocompleteRequest(BaseModel):
     input: str
-    location: Optional[str] = None  # Bias results to a specific location
-    radius: int = 25000  # 25km radius for autocomplete suggestions
+    location: Optional[str] = None                                       
+    radius: int = 25000                                            
 
 @router.post("/nearby")
 async def get_nearby_places(request: NearbySearchRequest):
@@ -37,7 +37,7 @@ async def get_nearby_places(request: NearbySearchRequest):
     Proxy Google Places API nearby search to avoid CORS issues
     """
     try:
-        # Get Google Maps API key from environment
+                                                  
         api_key = os.getenv("GOOGLE_MAPS_API_KEY")
         if not api_key:
             return JSONResponse(
@@ -45,7 +45,7 @@ async def get_nearby_places(request: NearbySearchRequest):
                 content={"success": False, "error": "Google Maps API key not configured"}
             )
         
-        # Construct Google Places API URL
+                                         
         url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
         params = {
             "location": f"{request.latitude},{request.longitude}",
@@ -56,7 +56,7 @@ async def get_nearby_places(request: NearbySearchRequest):
         
         logger.info(f"Proxying Google Places API request for location: {request.latitude}, {request.longitude}")
         
-        # Make request to Google Places API
+                                           
         async with httpx.AsyncClient() as client:
             response = await client.get(url, params=params)
             
@@ -191,7 +191,7 @@ async def search_by_location(request: LocationSearchRequest):
                 content={"success": False, "error": "Google Maps API key not configured"}
             )
         
-        # First, geocode the location name
+                                          
         geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
         geocode_params = {
             "address": request.location_name,
@@ -201,7 +201,7 @@ async def search_by_location(request: LocationSearchRequest):
         logger.info(f"Searching for {request.type} in: {request.location_name}")
         
         async with httpx.AsyncClient() as client:
-            # Geocode the location
+                                  
             geocode_response = await client.get(geocode_url, params=geocode_params)
             
             if geocode_response.status_code != 200:
@@ -220,17 +220,17 @@ async def search_by_location(request: LocationSearchRequest):
                     "count": 0
                 }
             
-            # Get coordinates from geocoding result
+                                                   
             location = geocode_data["results"][0]["geometry"]["location"]
             formatted_address = geocode_data["results"][0]["formatted_address"]
             
-            # Fixed max radius search - fetch all within 50km for client-side filtering
-            # This ensures consistent results regardless of selected filter
-            max_search_radius = 50000  # 50km - fetch everything within this range
+                                                                                       
+                                                                           
+            max_search_radius = 50000                                             
             all_results = []
             search_radius_used = max_search_radius
             
-            # Multiple search strategies for comprehensive law firm coverage
+                                                                            
             search_strategies = [
                 {"type": "lawyer", "description": "law firms and legal services"},
                 {"keyword": "law firm", "description": "law firms by keyword"},
@@ -239,7 +239,7 @@ async def search_by_location(request: LocationSearchRequest):
                 {"keyword": "attorney office", "description": "attorney offices"}
             ]
             
-            # Search at max radius to get ALL results for client-side filtering
+                                                                               
             logger.info(f"Searching within {max_search_radius/1000}km radius of {formatted_address}")
             
             for strategy in search_strategies:
@@ -250,7 +250,7 @@ async def search_by_location(request: LocationSearchRequest):
                     "key": api_key
                 }
                 
-                # Add either type or keyword parameter
+                                                      
                 if "type" in strategy:
                     places_params["type"] = strategy["type"]
                 else:
@@ -260,12 +260,12 @@ async def search_by_location(request: LocationSearchRequest):
                 places_response = await client.get(places_url, params=places_params)
                 
                 if places_response.status_code != 200:
-                    continue  # Try next strategy
+                    continue                     
                 
                 places_data = places_response.json()
                 
                 if places_data.get("status") == "OK" and places_data.get("results"):
-                    # Combine results from all strategies, avoiding duplicates
+                                                                              
                     existing_place_ids = {result.get("place_id") for result in all_results}
                     new_results = [
                         result for result in places_data["results"] 
@@ -274,11 +274,11 @@ async def search_by_location(request: LocationSearchRequest):
                     all_results.extend(new_results)
                     logger.info(f"Found {len(new_results)} new results from {strategy['description']} (total: {len(all_results)})")
                     
-                    # Handle pagination - Google Places API returns max 20 results per request
-                    # Check if there's a next_page_token for more results
+                                                                                              
+                                                                         
                     next_page_token = places_data.get("next_page_token")
-                    while next_page_token and len(all_results) < 100:  # Limit to 100 total results
-                        # Wait 2 seconds before requesting next page (Google requirement)
+                    while next_page_token and len(all_results) < 100:                              
+                                                                                         
                         import asyncio
                         await asyncio.sleep(2)
                         
@@ -326,12 +326,12 @@ async def search_by_location(request: LocationSearchRequest):
                     }
                 }
             
-            # Calculate precise distances and add to results
+                                                            
             import math
             
             def calculate_distance(lat1, lon1, lat2, lon2):
                 """Calculate precise distance using Haversine formula"""
-                R = 6371  # Earth's radius in kilometers
+                R = 6371                                
                 
                 lat1_rad = math.radians(lat1)
                 lon1_rad = math.radians(lon1)
@@ -346,7 +346,7 @@ async def search_by_location(request: LocationSearchRequest):
                 
                 return R * c
             
-            # Add distance to each result and sort by distance
+                                                              
             for result in all_results:
                 result_location = result.get("geometry", {}).get("location", {})
                 if result_location:
@@ -356,17 +356,17 @@ async def search_by_location(request: LocationSearchRequest):
                     )
                     result["distance_km"] = round(distance, 2)
                 else:
-                    result["distance_km"] = 999  # Unknown distance, put at end
+                    result["distance_km"] = 999                                
             
-            # Sort by distance (nearest first)
+                                              
             all_results.sort(key=lambda x: x.get("distance_km", 999))
             
-            # Categorize results by distance
-            very_close = [r for r in all_results if r.get("distance_km", 999) <= 2]  # Within 2km
-            close = [r for r in all_results if 2 < r.get("distance_km", 999) <= 10]  # 2-10km
-            nearby = [r for r in all_results if r.get("distance_km", 999) > 10]  # >10km
+                                            
+            very_close = [r for r in all_results if r.get("distance_km", 999) <= 2]              
+            close = [r for r in all_results if 2 < r.get("distance_km", 999) <= 10]          
+            nearby = [r for r in all_results if r.get("distance_km", 999) > 10]         
             
-            # Generate appropriate message for law firms/offices
+                                                                
             entity_type = "law firms & offices"
             if very_close:
                 message = f"Found {len(very_close)} {entity_type} in {formatted_address}"
@@ -417,7 +417,7 @@ async def autocomplete_places(request: AutocompleteRequest):
     Provides smart suggestions for streets, barangays, cities, etc.
     """
     try:
-        # Input validation and sanitization
+                                           
         if not request.input or len(request.input.strip()) < 2:
             return {
                 "success": True,
@@ -425,7 +425,7 @@ async def autocomplete_places(request: AutocompleteRequest):
                 "message": "Minimum 2 characters required"
             }
         
-        input_text = request.input.strip()[:100]  # Limit input length
+        input_text = request.input.strip()[:100]                      
         
         api_key = os.getenv("GOOGLE_MAPS_API_KEY")
         if not api_key:
@@ -435,25 +435,25 @@ async def autocomplete_places(request: AutocompleteRequest):
                 "predictions": []
             }
         
-        # Google Places Autocomplete API parameters (Philippines-focused)
+                                                                         
         url = "https://maps.googleapis.com/maps/api/place/autocomplete/json"
         params = {
             "input": input_text,
             "key": api_key,
-            "components": "country:ph",  # Restrict to Philippines only
-            "language": "en",  # Consistent language
+            "components": "country:ph",                                
+            "language": "en",                       
         }
         
-        # Add location bias if provided
+                                       
         if request.location and "," in request.location:
-            # Expect location in "lat,lng" format
+                                                 
             params["location"] = request.location
             params["radius"] = request.radius
         
         logger.info(f"Autocomplete search for: {input_text}")
         
-        # Use timeout and connection limits for better performance
-        timeout = httpx.Timeout(5.0)  # 5 second timeout
+                                                                  
+        timeout = httpx.Timeout(5.0)                    
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(url, params=params)
             
@@ -475,9 +475,9 @@ async def autocomplete_places(request: AutocompleteRequest):
             
             predictions = data.get("predictions", [])
             
-            # Format predictions for frontend use (limit to 5 for performance)
+                                                                              
             formatted_predictions = []
-            for prediction in predictions[:5]:  # Limit to top 5 results
+            for prediction in predictions[:5]:                          
                 formatted_predictions.append({
                     "place_id": prediction.get("place_id"),
                     "description": prediction.get("description"),

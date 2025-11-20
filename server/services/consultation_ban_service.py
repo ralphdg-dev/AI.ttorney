@@ -1,20 +1,3 @@
-"""
-Consultation Ban Service
-
-Handles temporary bans for users who cancel accepted consultations.
-This prevents abuse of the consultation system by users who repeatedly
-cancel after lawyers have already accepted their requests.
-
-Business Rules:
-- Cancelling an accepted consultation results in a 7-day booking ban
-- Multiple cancellations extend the ban duration
-- Bans are automatically lifted after the ban period expires
-- Admins can manually lift bans if needed
-
-Author: AI.ttorney Team
-Date: 2024-11-14
-"""
-
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta, timezone
@@ -36,16 +19,16 @@ class ConsultationBanService:
     6. Users can still view consultations but cannot book new ones
     """
     
-    # Constants
-    FIRST_BAN_DAYS = 1      # 24 hours
-    SECOND_BAN_DAYS = 3     # 3 days
-    THIRD_BAN_DAYS = 7      # 7 days
-    CANCELLATION_TRACKING_DAYS = 30  # Track cancellations within this period
+               
+    FIRST_BAN_DAYS = 1                
+    SECOND_BAN_DAYS = 3             
+    THIRD_BAN_DAYS = 7              
+    CANCELLATION_TRACKING_DAYS = 30                                          
     
     def __init__(self):
         """Initialize the consultation ban service."""
         self.supabase = SupabaseService()
-        logger.info("✅ Consultation ban service initialized")
+        logger.info(" Consultation ban service initialized")
     
     async def apply_cancellation_ban(
         self,
@@ -75,20 +58,20 @@ class ConsultationBanService:
         try:
             logger.info(f"🚫 Applying consultation ban for user {user_id[:8]}... (consultation: {consultation_id[:8]}...)")
             
-            # Step 1: Count recent accepted consultation cancellations
+                                                                      
             recent_cancellations = await self._count_recent_cancellations(user_id)
-            logger.info(f"📊 Recent cancellations: {recent_cancellations}")
+            logger.info(f" Recent cancellations: {recent_cancellations}")
             
-            # Step 2: Determine ban duration based on cancellation history
+                                                                          
             ban_duration_days = self._calculate_ban_duration(recent_cancellations)
             ban_end = datetime.now(timezone.utc) + timedelta(days=ban_duration_days)
             
-            logger.info(f"⏰ Ban duration: {ban_duration_days} days (until {ban_end.strftime('%Y-%m-%d %H:%M UTC')})")
+            logger.info(f" Ban duration: {ban_duration_days} days (until {ban_end.strftime('%Y-%m-%d %H:%M UTC')})")
             
-            # Step 3: Update user's consultation ban status
+                                                           
             await self._update_user_ban_status(user_id, ban_end)
             
-            # Step 4: Record the cancellation for tracking
+                                                          
             await self._record_consultation_cancellation(
                 user_id=user_id,
                 consultation_id=consultation_id,
@@ -97,10 +80,10 @@ class ConsultationBanService:
                 ban_duration_days=ban_duration_days
             )
             
-            # Step 5: Generate user-friendly message
+                                                    
             message = self._generate_ban_message(ban_duration_days, ban_end, recent_cancellations)
             
-            logger.info(f"✅ Consultation ban applied: {ban_duration_days} days")
+            logger.info(f" Consultation ban applied: {ban_duration_days} days")
             
             return {
                 "ban_applied": True,
@@ -111,7 +94,7 @@ class ConsultationBanService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Failed to apply consultation ban: {str(e)}")
+            logger.error(f" Failed to apply consultation ban: {str(e)}")
             raise Exception(f"Consultation ban error: {str(e)}")
     
     async def check_booking_eligibility(self, user_id: str) -> Dict[str, Any]:
@@ -129,7 +112,7 @@ class ConsultationBanService:
                 - message: reason if cannot book
         """
         try:
-            # Check for expired bans first
+                                          
             await self._check_expired_bans(user_id)
             
             user_data = await self._get_user_ban_status(user_id)
@@ -148,7 +131,7 @@ class ConsultationBanService:
                 if ban_end_dt.tzinfo is None:
                     ban_end_dt = ban_end_dt.replace(tzinfo=timezone.utc)
                 if ban_end_dt > datetime.now(timezone.utc):
-                    # Ban is still active
+                                         
                     return {
                         "can_book": False,
                         "ban_status": "active",
@@ -164,8 +147,8 @@ class ConsultationBanService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Failed to check booking eligibility: {str(e)}")
-            # Fail-closed: disallow booking if we cannot verify eligibility
+            logger.error(f" Failed to check booking eligibility: {str(e)}")
+                                                                           
             return {
                 "can_book": False,
                 "ban_status": "unknown",
@@ -188,11 +171,11 @@ class ConsultationBanService:
         try:
             logger.info(f"🔓 Admin {admin_id[:8]}... lifting consultation ban for user {user_id[:8]}...")
             
-            # Update user's ban status
+                                      
             await self._update_user_ban_status(user_id, None)
             
-            # Log the admin action
-            logger.info(f"✅ Consultation ban lifted by admin: {reason}")
+                                  
+            logger.info(f" Consultation ban lifted by admin: {reason}")
             
             return {
                 "success": True,
@@ -200,10 +183,10 @@ class ConsultationBanService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Failed to lift consultation ban: {str(e)}")
+            logger.error(f" Failed to lift consultation ban: {str(e)}")
             raise Exception(f"Failed to lift ban: {str(e)}")
     
-    # Private helper methods
+                            
     
     async def _count_recent_cancellations(self, user_id: str) -> int:
         """Count accepted consultation cancellations within the tracking period."""
@@ -224,12 +207,12 @@ class ConsultationBanService:
                 
                 if response.status_code == 200:
                     cancellations = response.json()
-                    # Filter for consultations that were accepted before being cancelled
-                    # (we'll need to check if they had responded_at set, indicating acceptance)
+                                                                                        
+                                                                                               
                     return len([c for c in cancellations if c.get("responded_at")])
                 return 0
         except Exception as e:
-            logger.error(f"❌ Failed to count recent cancellations: {str(e)}")
+            logger.error(f" Failed to count recent cancellations: {str(e)}")
             return 0
     
     def _calculate_ban_duration(self, recent_cancellations: int) -> int:
@@ -242,11 +225,11 @@ class ConsultationBanService:
         - 3rd+ cancellation: 7 days
         """
         if recent_cancellations == 0:
-            return self.FIRST_BAN_DAYS    # 1 day
+            return self.FIRST_BAN_DAYS           
         elif recent_cancellations == 1:
-            return self.SECOND_BAN_DAYS   # 3 days
+            return self.SECOND_BAN_DAYS           
         else:
-            return self.THIRD_BAN_DAYS    # 7 days
+            return self.THIRD_BAN_DAYS            
     
     async def _get_user_ban_status(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user's current consultation ban status."""
@@ -266,7 +249,7 @@ class ConsultationBanService:
                     return data[0] if data else None
                 return None
         except Exception as e:
-            logger.error(f"❌ Failed to get user ban status: {str(e)}")
+            logger.error(f" Failed to get user ban status: {str(e)}")
             return None
     
     async def _update_user_ban_status(self, user_id: str, ban_end: Optional[datetime]) -> bool:
@@ -286,7 +269,7 @@ class ConsultationBanService:
                 
                 return response.status_code in [200, 204]
         except Exception as e:
-            logger.error(f"❌ Failed to update user ban status: {str(e)}")
+            logger.error(f" Failed to update user ban status: {str(e)}")
             return False
     
     async def _record_consultation_cancellation(
@@ -299,9 +282,9 @@ class ConsultationBanService:
     ) -> bool:
         """Record consultation cancellation for audit trail."""
         try:
-            # We could create a separate table for this, but for now we'll log it
+                                                                                 
             logger.info(
-                f"📝 Consultation cancellation recorded: "
+                f" Consultation cancellation recorded: "
                 f"user={user_id[:8]}..., "
                 f"consultation={consultation_id[:8]}..., "
                 f"lawyer={consultation_data.get('lawyer_id', 'unknown')[:8]}..., "
@@ -310,7 +293,7 @@ class ConsultationBanService:
             )
             return True
         except Exception as e:
-            logger.error(f"❌ Failed to record consultation cancellation: {str(e)}")
+            logger.error(f" Failed to record consultation cancellation: {str(e)}")
             return False
     
     async def _check_expired_bans(self, user_id: str) -> bool:
@@ -326,13 +309,13 @@ class ConsultationBanService:
                 if ban_end_dt.tzinfo is None:
                     ban_end_dt = ban_end_dt.replace(tzinfo=timezone.utc)
                 if ban_end_dt <= datetime.now(timezone.utc):
-                    # Ban has expired, clear it
-                    logger.info(f"⏰ Clearing expired consultation ban for user {user_id[:8]}...")
+                                               
+                    logger.info(f" Clearing expired consultation ban for user {user_id[:8]}...")
                     await self._update_user_ban_status(user_id, None)
                     return True
             return False
         except Exception as e:
-            logger.error(f"❌ Failed to check expired bans: {str(e)}")
+            logger.error(f" Failed to check expired bans: {str(e)}")
             return False
     
     def _generate_ban_message(
@@ -359,7 +342,7 @@ class ConsultationBanService:
             )
 
 
-# Singleton instance
+                    
 _consultation_ban_service_instance: Optional[ConsultationBanService] = None
 
 def get_consultation_ban_service() -> ConsultationBanService:

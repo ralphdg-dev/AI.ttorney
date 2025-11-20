@@ -1,8 +1,3 @@
-"""
-Chat History Routes for AI.ttorney
-RESTful API for managing chat sessions and messages
-"""
-
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
 from uuid import UUID
@@ -25,9 +20,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat-history", tags=["chat-history"])
 
 
-# ============================================================================
-# Session Endpoints
-# ============================================================================
+                                                                              
+                   
+                                                                              
 
 @router.post("/sessions", response_model=ChatSessionResponse)
 async def create_session(
@@ -108,7 +103,7 @@ async def get_session_with_messages(
     - **message_limit**: Optional limit on number of messages (default: all)
     """
     try:
-        # Verify session belongs to user
+                                        
         session = await service.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
@@ -147,7 +142,7 @@ async def update_session(
     - **is_archived**: Archive/unarchive session
     """
     try:
-        # Verify session belongs to user
+                                        
         session = await service.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
@@ -194,7 +189,7 @@ async def delete_session(
         user_id = current_user["user"]["id"]
         logger.info(f"Delete request for session {session_id} by user {user_id}")
         
-        # Verify session exists and belongs to user
+                                                   
         session = await service.get_session(session_id)
         if not session:
             logger.warning(f"Session {session_id} not found")
@@ -204,7 +199,7 @@ async def delete_session(
             logger.warning(f"Unauthorized delete attempt: session {session_id} by user {user_id}")
             raise HTTPException(status_code=403, detail="Access denied: You don't own this session")
         
-        # Perform deletion (CASCADE will delete all messages)
+                                                             
         success = await service.delete_session(session_id)
         
         if not success:
@@ -237,7 +232,7 @@ async def archive_session(
     - **session_id**: UUID of the session to archive
     """
     try:
-        # Verify session belongs to user
+                                        
         session = await service.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
@@ -259,9 +254,9 @@ async def archive_session(
         raise HTTPException(status_code=500, detail="Failed to archive session")
 
 
-# ============================================================================
-# Statistics Endpoints
-# ============================================================================
+                                                                              
+                      
+                                                                              
 
 @router.get("/sessions/{session_id}/statistics", response_model=SessionStatistics)
 async def get_session_statistics(
@@ -275,7 +270,7 @@ async def get_session_statistics(
     - **session_id**: UUID of the session
     """
     try:
-        # Verify session belongs to user
+                                        
         session = await service.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
@@ -324,9 +319,9 @@ async def get_user_statistics(
         raise HTTPException(status_code=500, detail="Failed to retrieve statistics")
 
 
-# ============================================================================
-# Search Endpoint
-# ============================================================================
+                                                                              
+                 
+                                                                              
 
 @router.get("/search")
 async def search_messages(
@@ -350,7 +345,7 @@ async def search_messages(
             limit=limit
         )
         
-        # Format results
+                        
         formatted_results = []
         for session, message in results:
             formatted_results.append({
@@ -373,9 +368,9 @@ async def search_messages(
         raise HTTPException(status_code=500, detail="Failed to search messages")
 
 
-# ============================================================================
-# Health Check
-# ============================================================================
+                                                                              
+              
+                                                                              
 
 @router.get("/health")
 async def health_check():

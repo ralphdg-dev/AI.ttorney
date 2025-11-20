@@ -1,20 +1,3 @@
-"""
-Safety Filter - Zero Tolerance for Harmful Content
-
-This filter catches subtle forms of abuse, sexualization, and harmful content
-that might bypass OpenAI's moderation due to tone or phrasing.
-
-ZERO TOLERANCE POLICY:
-- Child safety (any sexualization of minors)
-- Sexual harassment (regardless of tone)
-- Grooming behavior
-- Abuse (physical, emotional, sexual)
-- Exploitation
-- Threats (direct or veiled)
-
-This is a STRICT filter - when in doubt, flag it.
-"""
-
 import re
 from typing import Dict, Any, List, Tuple
 import logging
@@ -36,7 +19,7 @@ class SafetyFilter:
     legal questions about criminal cases, VAWC, relationships, etc.
     """
     
-    # Legal context indicators (legitimate legal questions)
+                                                           
     LEGAL_CONTEXT_INDICATORS = [
         "criminal complaint", "filed a case", "violation of", "republic act",
         "anti-vawc", "vawc", "criminal liability", "criminally liable",
@@ -48,7 +31,7 @@ class SafetyFilter:
         "demanda", "kaso", "batas", "korte", "abogado"
     ]
     
-    # CHILD SAFETY - ZERO TOLERANCE
+                                   
     CHILD_KEYWORDS = [
         "child", "children", "kid", "kids", "minor", "minors",
         "boy", "girl", "teen", "teenager", "youth", "young",
@@ -68,7 +51,7 @@ class SafetyFilter:
         "like", "prefer", "enjoy", "watching", "looking at"
     ]
     
-    # GROOMING PATTERNS
+                       
     GROOMING_PATTERNS = [
         r"(our|this|the)\s+(little\s+)?secret",
         r"don'?t\s+tell\s+(anyone|your\s+parents|mom|dad)",
@@ -78,7 +61,7 @@ class SafetyFilter:
         r"between\s+(you\s+and\s+me|us)",
     ]
     
-    # SEXUAL HARASSMENT (regardless of tone)
+                                            
     HARASSMENT_PATTERNS = [
         r"send\s+(me\s+)?(pic|photo|picture|image|selfie)",
         r"show\s+me\s+your",
@@ -89,7 +72,7 @@ class SafetyFilter:
         r"add\s+me\s+on\s+(snap|instagram|whatsapp|telegram)",
     ]
     
-    # ABUSE INDICATORS
+                      
     ABUSE_KEYWORDS = [
         "hit", "beat", "punch", "slap", "kick", "hurt",
         "deserve", "punishment", "teach you a lesson",
@@ -99,7 +82,7 @@ class SafetyFilter:
         "saktan", "suntukin", "sampalin", "patayin"
     ]
     
-    # VEILED THREATS
+                    
     THREAT_PATTERNS = [
         r"you'?ll\s+regret",
         r"watch\s+your\s+back",
@@ -114,7 +97,7 @@ class SafetyFilter:
         self.compiled_grooming = [re.compile(p, re.IGNORECASE) for p in self.GROOMING_PATTERNS]
         self.compiled_harassment = [re.compile(p, re.IGNORECASE) for p in self.HARASSMENT_PATTERNS]
         self.compiled_threats = [re.compile(p, re.IGNORECASE) for p in self.THREAT_PATTERNS]
-        logger.info("✅ Safety filter initialized (ZERO TOLERANCE mode)")
+        logger.info(" Safety filter initialized (ZERO TOLERANCE mode)")
     
     def _is_legal_context(self, text: str) -> bool:
         """
@@ -137,12 +120,12 @@ class SafetyFilter:
         text_lower = text.lower()
         violations = []
         
-        # Check if this is a legitimate legal question
+                                                      
         if self._is_legal_context(text):
-            # Allow legal questions about child-related cases
+                                                             
             return False, []
         
-        # Check if text mentions children
+                                         
         has_child_mention = any(
             re.search(r'\b' + re.escape(keyword) + r'\b', text_lower)
             for keyword in self.CHILD_KEYWORDS
@@ -151,7 +134,7 @@ class SafetyFilter:
         if not has_child_mention:
             return False, []
         
-        # If children mentioned, check for ANY sexual context
+                                                             
         has_sexual_context = any(
             re.search(r'\b' + re.escape(keyword) + r'\b', text_lower)
             for keyword in self.SEXUAL_CONTEXT_KEYWORDS
@@ -184,15 +167,15 @@ class SafetyFilter:
         """
         violations = []
         
-        # Check if this is a legitimate legal question
+                                                      
         if self._is_legal_context(text):
-            # Allow legal questions about harassment cases
+                                                          
             return False, []
         
         for pattern in self.compiled_harassment:
             if pattern.search(text):
                 violations.append("sexual_harassment")
-                logger.warning(f"⚠️  Sexual harassment pattern detected")
+                logger.warning(f"  Sexual harassment pattern detected")
                 return True, violations
         
         return False, []
@@ -204,7 +187,7 @@ class SafetyFilter:
         for pattern in self.compiled_threats:
             if pattern.search(text):
                 violations.append("veiled_threat")
-                logger.warning(f"⚠️  Threat pattern detected")
+                logger.warning(f"  Threat pattern detected")
                 return True, violations
         
         return False, []
@@ -218,9 +201,9 @@ class SafetyFilter:
         text_lower = text.lower()
         violations = []
         
-        # Check if this is a legitimate legal question
+                                                      
         if self._is_legal_context(text):
-            # Allow legal questions about abuse cases
+                                                     
             return False, []
         
         abuse_count = sum(
@@ -228,10 +211,10 @@ class SafetyFilter:
             if re.search(r'\b' + re.escape(keyword) + r'\b', text_lower)
         )
         
-        # Flag if multiple abuse keywords (indicates pattern)
+                                                             
         if abuse_count >= 2:
             violations.append("abuse_pattern")
-            logger.warning(f"⚠️  Abuse pattern detected ({abuse_count} keywords)")
+            logger.warning(f"  Abuse pattern detected ({abuse_count} keywords)")
             return True, violations
         
         return False, []
@@ -249,7 +232,7 @@ class SafetyFilter:
         """
         all_violations = []
         
-        # Check all safety categories
+                                     
         child_unsafe, child_violations = self.check_child_safety(text)
         grooming_unsafe, grooming_violations = self.check_grooming(text)
         harassment_unsafe, harassment_violations = self.check_harassment(text)
@@ -264,16 +247,16 @@ class SafetyFilter:
         
         is_unsafe = len(all_violations) > 0
         
-        # Determine severity
+                            
         severity = "none"
         if "child_sexualization" in all_violations or "grooming_behavior" in all_violations:
-            severity = "critical"  # Immediate action required
+            severity = "critical"                             
         elif "sexual_harassment" in all_violations or "veiled_threat" in all_violations:
             severity = "high"
         elif "abuse_pattern" in all_violations:
             severity = "medium"
         
-        # Generate message
+                          
         message = self._get_violation_message(all_violations, severity)
         
         if is_unsafe:
@@ -316,7 +299,7 @@ class SafetyFilter:
             )
 
 
-# Singleton instance
+                    
 _safety_filter_instance = None
 
 def get_safety_filter() -> SafetyFilter:

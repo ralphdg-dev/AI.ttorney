@@ -1,8 +1,3 @@
-"""
-Chat History Service for AI.ttorney
-Manages chat sessions and messages using Supabase
-"""
-
 import logging
 from typing import List, Optional, Dict, Any, Tuple
 from uuid import UUID
@@ -32,7 +27,7 @@ class ChatHistoryService:
     def __init__(self):
         """Initialize Supabase client"""
         self.url = os.getenv("SUPABASE_URL")
-        # Use SERVICE_ROLE_KEY to bypass RLS for backend operations
+                                                                   
         self.key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         
         if not self.url or not self.key:
@@ -42,9 +37,9 @@ class ChatHistoryService:
         self.supabase: Client = create_client(self.url, self.key)
         logger.info("ChatHistoryService initialized with SERVICE_ROLE_KEY")
     
-    # ========================================================================
-    # Session Management
-    # ========================================================================
+                                                                              
+                        
+                                                                              
     
     async def create_session(
         self, 
@@ -102,7 +97,7 @@ class ChatHistoryService:
     ) -> SessionListResponse:
         """Get all sessions for a user with pagination"""
         try:
-            # Build query
+                         
             query = self.supabase.table("chat_sessions")\
                 .select("*", count="exact")\
                 .eq("user_id", str(user_id))
@@ -110,19 +105,19 @@ class ChatHistoryService:
             if not include_archived:
                 query = query.eq("is_archived", False)
             
-            # Add pagination
+                            
             offset = (page - 1) * page_size
             query = query.order("last_message_at", desc=True)\
                 .range(offset, offset + page_size - 1)
             
             response = query.execute()
             
-            # Get last message preview for each session
+                                                       
             sessions = []
             for session_data in response.data:
                 session = ChatSessionDB(**session_data)
                 
-                # Get last message as preview
+                                             
                 preview = await self._get_last_message_preview(session.id)
                 
                 sessions.append(
@@ -193,19 +188,19 @@ class ChatHistoryService:
         try:
             logger.info(f"Attempting to delete session {session_id}")
             
-            # Verify session exists first
+                                         
             session = await self.get_session(session_id)
             if not session:
                 logger.warning(f"Cannot delete non-existent session {session_id}")
                 return False
             
-            # Perform deletion (CASCADE will delete all related messages)
+                                                                         
             response = self.supabase.table("chat_sessions")\
                 .delete()\
                 .eq("id", str(session_id))\
                 .execute()
             
-            # Verify deletion was successful
+                                            
             if response.data is not None:
                 logger.info(f"Successfully deleted session {session_id} and all related messages")
                 return True
@@ -226,9 +221,9 @@ class ChatHistoryService:
             logger.error(f"Error archiving session {session_id}: {str(e)}")
             return False
     
-    # ========================================================================
-    # Message Management
-    # ========================================================================
+                                                                              
+                        
+                                                                              
     
     async def save_message(
         self,
@@ -335,10 +330,10 @@ class ChatHistoryService:
             
             messages_db = await self.get_session_messages(session_id, limit=message_limit)
             
-            # Convert to response models
+                                        
             messages = [ChatMessageResponse.from_db(msg) for msg in messages_db]
             
-            # Get preview from last message
+                                           
             preview = messages[-1].content[:100] if messages else None
             
             return SessionWithMessagesResponse(
@@ -350,14 +345,14 @@ class ChatHistoryService:
             logger.error(f"Error getting session with messages: {str(e)}")
             return None
     
-    # ========================================================================
-    # Statistics & Analytics
-    # ========================================================================
+                                                                              
+                            
+                                                                              
     
     async def get_session_statistics(self, session_id: UUID) -> Optional[SessionStatistics]:
         """Get statistics for a session"""
         try:
-            # Use the view created in migration
+                                               
             response = self.supabase.table("v_session_statistics")\
                 .select("*")\
                 .eq("session_id", str(session_id))\
@@ -383,7 +378,7 @@ class ChatHistoryService:
     async def get_user_statistics(self, user_id: UUID) -> Optional[UserChatStatistics]:
         """Get overall chat statistics for a user"""
         try:
-            # Get session counts
+                                
             sessions_response = self.supabase.table("chat_sessions")\
                 .select("id, is_archived, language", count="exact")\
                 .eq("user_id", str(user_id))\
@@ -393,7 +388,7 @@ class ChatHistoryService:
             active_sessions = sum(1 for s in sessions_response.data if not s["is_archived"])
             archived_sessions = total_sessions - active_sessions
             
-            # Get language distribution
+                                       
             language_counts = {}
             for session in sessions_response.data:
                 lang = session["language"]
@@ -401,7 +396,7 @@ class ChatHistoryService:
             
             most_used_language = max(language_counts, key=language_counts.get) if language_counts else "en"
             
-            # Get message statistics
+                                    
             messages_response = self.supabase.table("chat_messages")\
                 .select("tokens_used, response_time_ms", count="exact")\
                 .eq("user_id", str(user_id))\
@@ -409,7 +404,7 @@ class ChatHistoryService:
             
             total_messages = messages_response.count or 0
             
-            # Calculate averages
+                                
             total_tokens = sum(m.get("tokens_used", 0) or 0 for m in messages_response.data)
             response_times = [m.get("response_time_ms") for m in messages_response.data if m.get("response_time_ms")]
             avg_response_time = sum(response_times) / len(response_times) if response_times else 0.0
@@ -428,9 +423,9 @@ class ChatHistoryService:
             logger.error(f"Error getting user statistics: {str(e)}")
             return None
     
-    # ========================================================================
-    # Helper Methods
-    # ========================================================================
+                                                                              
+                    
+                                                                              
     
     async def _get_last_message_preview(self, session_id: UUID) -> Optional[str]:
         """Get preview of last message in session"""
@@ -460,8 +455,8 @@ class ChatHistoryService:
     ) -> List[Tuple[ChatSessionDB, ChatMessageDB]]:
         """Search messages by content (requires full-text search setup)"""
         try:
-            # Basic text search using ILIKE
-            # For production, consider using PostgreSQL full-text search
+                                           
+                                                                        
             response = self.supabase.table("chat_messages")\
                 .select("*, chat_sessions!inner(*)")\
                 .eq("user_id", str(user_id))\
@@ -482,7 +477,7 @@ class ChatHistoryService:
             return []
 
 
-# Singleton instance
+                    
 _chat_history_service: Optional[ChatHistoryService] = None
 
 

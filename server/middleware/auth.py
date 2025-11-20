@@ -6,13 +6,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-security = HTTPBearer(auto_error=False)  # Don't auto-error so we can log the issue
+security = HTTPBearer(auto_error=False)                                            
 
 async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[Dict[str, Any]]:
     """Get current authenticated user"""
     try:
         if not credentials:
-            logger.error("🔐 No credentials provided - Authorization header missing")
+            logger.error(" No credentials provided - Authorization header missing")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authorization header missing",
@@ -20,13 +20,13 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
             )
         
         token = credentials.credentials
-        logger.info(f"🔐 Authenticating user with token: {token[:20]}...")
+        logger.info(f" Authenticating user with token: {token[:20]}...")
         user_data = await AuthService.get_user(token)
         
-        logger.info(f"🔐 User data received: {user_data}")
+        logger.info(f" User data received: {user_data}")
         
         if not user_data:
-            logger.warning("🔐 No user data returned from AuthService")
+            logger.warning(" No user data returned from AuthService")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication credentials",
@@ -37,7 +37,7 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"🔐 Authentication error: {str(e)}", exc_info=True)
+        logger.error(f" Authentication error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -52,7 +52,7 @@ async def get_current_active_user(current_user: Dict[str, Any] = Depends(get_cur
     
     account_status = profile.get("account_status")
     
-    # Check for permanent ban - this must block ALL access
+                                                          
     if account_status == "banned":
         logger.warning(f"🚫 PERMANENTLY_BANNED user attempted access: {profile.get('id', 'unknown')[:8]}...")
         raise HTTPException(
@@ -63,10 +63,10 @@ async def get_current_active_user(current_user: Dict[str, Any] = Depends(get_cur
             }
         )
     
-    # Check for deactivated status - allow auth but return special status
+                                                                         
     if account_status == "deactivated":
-        logger.info(f"⏸️ DEACTIVATED user accessed: {profile.get('id', 'unknown')[:8]}...")
-        # Add status to user data for frontend handling
+        logger.info(f"⏸ DEACTIVATED user accessed: {profile.get('id', 'unknown')[:8]}...")
+                                                       
         current_user["deactivated"] = True
         return current_user
     
@@ -78,9 +78,9 @@ def require_role(required_role: str):
         profile = current_user.get("profile", {})
         user_role = profile.get("role")
         
-        # Block deactivated users from accessing protected routes
+                                                                 
         if current_user.get("deactivated") or profile.get("account_status") == "deactivated":
-            logger.warning(f"⏸️ DEACTIVATED user attempted protected route: {profile.get('id', 'unknown')[:8]}...")
+            logger.warning(f"⏸ DEACTIVATED user attempted protected route: {profile.get('id', 'unknown')[:8]}...")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
@@ -89,7 +89,7 @@ def require_role(required_role: str):
                 }
             )
         
-        # Role hierarchy: guest < registered_user < verified_lawyer < admin < superadmin
+                                                                                        
         role_hierarchy = {
             "guest": 0,
             "registered_user": 1,

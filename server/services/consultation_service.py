@@ -1,7 +1,3 @@
-"""
-Consultation Service - Centralized business logic for consultation management
-Follows DRY principles and FAANG best practices for <5000 users
-"""
 from typing import Dict, Any, Optional, List
 from datetime import datetime, date, time, timedelta
 from supabase import Client
@@ -95,7 +91,7 @@ class ConsultationService:
             return len(result.data) > 0 if result.data else False
         except Exception as e:
             logger.error(f"Error checking booking conflict: {e}")
-            return False  # Fail open - allow booking if check fails
+            return False                                            
     
     def _validate_time_format(self, time_str: str) -> bool:
         """Validate time is in HH:MM format (24-hour)"""
@@ -106,7 +102,7 @@ class ConsultationService:
         """Validate time is within business hours (8 AM - 8 PM)"""
         try:
             hour = int(time_str.split(':')[0])
-            return 8 <= hour < 20  # 8 AM to 8 PM
+            return 8 <= hour < 20                
         except:
             return False
     
@@ -127,7 +123,7 @@ class ConsultationService:
             return len(result.data) > 0 if result.data else False
         except Exception as e:
             logger.error(f"Error checking duplicate pending: {e}")
-            return False  # Fail open
+            return False             
     
     async def create_consultation_request(
         self, 
@@ -155,28 +151,28 @@ class ConsultationService:
             Dict with success status and data/error
         """
         try:
-            # 1. Validate date is in the future (at least tomorrow)
+                                                                   
             consultation_date_obj = date.fromisoformat(consultation_date)
             tomorrow = date.today() + timedelta(days=1)
             
             if consultation_date_obj < tomorrow:
                 raise InvalidDateError()
             
-            # 2. Validate time format
+                                     
             if not self._validate_time_format(consultation_time):
                 raise InvalidTimeError()
             
-            # 4. Verify lawyer exists and is accepting consultations
-            logger.info(f"🔍 Checking if lawyer exists: {lawyer_id}")
+                                                                    
+            logger.info(f" Checking if lawyer exists: {lawyer_id}")
             lawyer_result = self.supabase.table("lawyer_info")\
                 .select("name, accepting_consultations, lawyer_id")\
                 .eq("id", lawyer_id)\
                 .execute()
             
-            logger.info(f"🔍 Query result: {lawyer_result.data}")
+            logger.info(f" Query result: {lawyer_result.data}")
             
             if not lawyer_result.data:
-                logger.error(f"❌ Lawyer not found in lawyer_info table: {lawyer_id}")
+                logger.error(f" Lawyer not found in lawyer_info table: {lawyer_id}")
                 raise ConsultationError(
                     "This lawyer profile does not exist or is not available for consultations",
                     "LAWYER_NOT_FOUND",
@@ -184,7 +180,7 @@ class ConsultationService:
                 )
             
             lawyer_name = lawyer_result.data[0]["name"]
-            lawyer_user_id = lawyer_result.data[0]["lawyer_id"]  # This is the users.id for the lawyer
+            lawyer_user_id = lawyer_result.data[0]["lawyer_id"]                                       
             accepting_consultations = lawyer_result.data[0].get("accepting_consultations", False)
             
             if not accepting_consultations:
@@ -194,13 +190,13 @@ class ConsultationService:
                     400
                 )
             
-            # 5. Check for duplicate pending consultation
+                                                         
             has_duplicate = await self.check_duplicate_pending(user_id, lawyer_id)
             
             if has_duplicate:
                 raise DuplicatePendingError(lawyer_name)
             
-            # 6. Check for booking conflict (overlapping time slots)
+                                                                    
             has_conflict = await self.check_booking_conflict(
                 lawyer_id, consultation_date, consultation_time
             )
@@ -208,7 +204,7 @@ class ConsultationService:
             if has_conflict:
                 raise BookingConflictError(lawyer_name, consultation_time)
             
-            # 7. Create consultation request
+                                            
             consultation_data = {
                 "user_id": user_id,
                 "lawyer_id": lawyer_id,
@@ -219,24 +215,24 @@ class ConsultationService:
                 "consultation_date": consultation_date,
                 "consultation_time": consultation_time,
                 "consultation_mode": consultation_mode
-                # Note: created_at and updated_at are auto-generated by database
+                                                                                
             }
             
-            logger.info(f"💾 Inserting consultation: user_id={user_id}, lawyer_id={lawyer_id}")
+            logger.info(f" Inserting consultation: user_id={user_id}, lawyer_id={lawyer_id}")
             
             result = self.supabase.table("consultation_requests")\
                 .insert(consultation_data)\
                 .execute()
             
-            logger.info(f"📊 Insert result: {result.data if result.data else 'No data'}")
+            logger.info(f" Insert result: {result.data if result.data else 'No data'}")
             
             if result.data:
                 consultation_id = result.data[0]['id']
                 logger.info(f"Consultation created: {consultation_id} for lawyer {lawyer_id}")
                 
-                # Send real-time notification to lawyer (use lawyer_user_id, not lawyer_info.id)
+                                                                                                
                 await self._notify_lawyer_new_consultation(
-                    lawyer_id=lawyer_user_id,  # Use users.id, not lawyer_info.id
+                    lawyer_id=lawyer_user_id,                                    
                     consultation_id=consultation_id,
                     consultation_date=consultation_date,
                     consultation_time=consultation_time,
@@ -255,7 +251,7 @@ class ConsultationService:
                 )
         
         except (BookingConflictError, InvalidDateError, InvalidTimeError, DuplicatePendingError, ConsultationError):
-            raise  # Re-raise custom errors
+            raise                          
         except Exception as e:
             logger.error(f"Error creating consultation: {e}")
             raise ConsultationError(
@@ -294,12 +290,12 @@ class ConsultationService:
             )
             
             if result:
-                logger.info(f"✅ Notification sent successfully to lawyer {lawyer_id[:8]}...")
+                logger.info(f" Notification sent successfully to lawyer {lawyer_id[:8]}...")
             else:
-                logger.error(f"❌ Notification failed - no result returned")
+                logger.error(f" Notification failed - no result returned")
                 
         except Exception as e:
-            logger.error(f"⚠️ Failed to send notification: {e}")
+            logger.error(f" Failed to send notification: {e}")
             import traceback
             logger.error(traceback.format_exc())
     
@@ -323,11 +319,11 @@ class ConsultationService:
             Dict with consultations and pagination info
         """
         try:
-            # Limit page size to prevent abuse
+                                              
             page_size = min(page_size, 100)
             offset = (page - 1) * page_size
             
-            # Build query
+                         
             query = self.supabase.table("consultation_requests")\
                 .select("""
                     *,
@@ -337,12 +333,12 @@ class ConsultationService:
                     )
                 """, count="exact")\
                 .eq("user_id", user_id)\
-                .is_("deleted_at", None)  # Exclude soft-deleted
+                .is_("deleted_at", None)                        
             
             if status_filter and status_filter != "all":
                 query = query.eq("status", status_filter)
             
-            # Execute with pagination
+                                     
             result = query.order("created_at", desc=True)\
                 .range(offset, offset + page_size - 1)\
                 .execute()
@@ -437,7 +433,7 @@ class ConsultationService:
             is_lawyer: True if lawyer is updating, False if user
         """
         try:
-            # Validate status
+                             
             valid_statuses = ["pending", "accepted", "rejected", "completed", "cancelled"]
             if new_status not in valid_statuses:
                 raise ConsultationError(
@@ -446,7 +442,7 @@ class ConsultationService:
                     400
                 )
             
-            # Verify ownership
+                              
             field = "lawyer_id" if is_lawyer else "user_id"
             consultation = self.supabase.table("consultation_requests")\
                 .select("*")\
@@ -461,12 +457,12 @@ class ConsultationService:
                     404
                 )
             
-            # Update status (updated_at is auto-generated by trigger)
+                                                                     
             update_data = {
                 "status": new_status
             }
             
-            # Set responded_at for first response (if column exists)
+                                                                    
             if new_status in ["accepted", "rejected"] and not consultation.data[0].get("responded_at"):
                 update_data["responded_at"] = datetime.utcnow().isoformat()
             
