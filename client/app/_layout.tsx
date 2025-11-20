@@ -18,7 +18,7 @@ import { NotificationProvider } from "../contexts/NotificationContext";
 import { SidebarProvider } from "../components/AppSidebar";
 import NoInternetModal from "../components/common/NoInternetModal";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
-import AuthGuard from "../components/auth/AuthGuard";
+import { AuthGuard } from "../components/AuthGuard";
 
 SplashScreen.preventAutoHideAsync();
 

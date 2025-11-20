@@ -7,7 +7,7 @@ import { LawyerNavbar } from '../../components/lawyer/shared';
 import Header from '../../components/Header';
 import { SidebarWrapper } from '../../components/AppSidebar';
 import Colors from '../../constants/Colors';
-import AuthGuard from '../../components/auth/AuthGuard';
+import { AuthGuard } from '../../components/AuthGuard';
 
 const LawyerForum: React.FC = () => {
   const router = useRouter();
@@ -17,7 +17,7 @@ const LawyerForum: React.FC = () => {
   }, [router]);
 
   return (
-    <AuthGuard requireAuth={true} allowedRoles={['verified_lawyer']}>
+    <AuthGuard>
       <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header 

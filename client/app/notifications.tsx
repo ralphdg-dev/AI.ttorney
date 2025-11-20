@@ -16,7 +16,7 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { LawyerNavbar } from "@/components/lawyer/shared";
 import { useRouter } from "expo-router";
-import AuthGuard from "@/components/auth/AuthGuard";
+import { AuthGuard } from "@/components/AuthGuard";
 
 export default function NotificationsScreen() {
   const { user } = useAuth();
@@ -181,7 +181,7 @@ export default function NotificationsScreen() {
   );
 
   return (
-    <AuthGuard requireAuth={true}>
+    <AuthGuard>
       <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header title="Notifications" showMenu={true} />

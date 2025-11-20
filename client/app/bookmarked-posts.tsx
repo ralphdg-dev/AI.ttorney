@@ -10,7 +10,7 @@ import Header from '../components/Header';
 import Navbar from '../components/Navbar';
 import { SidebarWrapper } from '../components/AppSidebar';
 import { useAuth } from '../contexts/AuthContext';
-import AuthGuard from "../components/auth/AuthGuard";
+import { AuthGuard } from "../components/AuthGuard";
 import { usePostBookmarks } from '../contexts/PostBookmarksContext';
 import { BookmarkService } from '../services/bookmarkService';
 import Colors from '../constants/Colors';
@@ -363,7 +363,7 @@ export default function BookmarkedPostsScreen() {
   ), [handleCommentPress, handleBookmarkPress, handleReportPress, handlePostPress, handleMenuToggle, openMenuPostId, handleBookmarkStatusChange]);
 
   return (
-    <AuthGuard requireAuth={true}>
+    <AuthGuard>
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header title="Bookmarked Posts" showMenu={true} />

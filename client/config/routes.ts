@@ -349,21 +349,8 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
 };
 
 export const getRoleBasedRedirect = (role: UserRole, isVerified?: boolean, pendingLawyer?: boolean, applicationStatus?: string): string => {
-  if (pendingLawyer) {
-    if (applicationStatus) {
-      switch (applicationStatus) {
-        case 'accepted':
-          return '/onboarding/lawyer/lawyer-status/accepted';
-        case 'pending':
-        case 'resubmission':
-        case 'rejected':
-        default:
-          return '/home';
-      }
-    } else {
-      return '/home';
-    }
-  }
+  // Pending lawyers are treated as regular users unless explicitly navigating to status pages
+  // They only get auto-redirected to status pages in specific cases (handled in AuthContext)
 
   switch (role) {
     case 'verified_lawyer':

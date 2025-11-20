@@ -8,7 +8,7 @@ import Header from '../../components/Header';
 import { SidebarWrapper } from '../../components/AppSidebar';
 import Colors from '../../constants/Colors';
 import RegisteredOnboardingOverlay from '../../components/onboarding/RegisteredOnboardingOverlay';
-import AuthGuard from '../../components/auth/AuthGuard';
+import { AuthGuard } from '../../components/AuthGuard';
 
 const HomePage: React.FC = () => {
   const router = useRouter();
@@ -20,7 +20,7 @@ const HomePage: React.FC = () => {
   };
 
   return (
-    <AuthGuard requireAuth={true}>
+    <AuthGuard>
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header 

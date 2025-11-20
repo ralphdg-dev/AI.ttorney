@@ -306,13 +306,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           applicationStatus = await checkLawyerApplicationStatus();
         }
         
-        if (profile.pending_lawyer) {
-          const redirectPath = `/lawyer-status/${applicationStatus || 'pending'}`;
-          console.log(`🚀 Navigating to: ${redirectPath} (pending lawyer)`);
+        if (profile.pending_lawyer && applicationStatus === 'accepted') {
+          // Only auto-redirect to status page if application is accepted
+          const redirectPath = `/onboarding/lawyer/lawyer-status/accepted`;
+          console.log(`🚀 Navigating to: ${redirectPath} (accepted lawyer)`);
           setIsLoading(false);
           clearTimeout(timeoutId);
           router.replace(redirectPath as any);
         } else {
+          // For pending/rejected lawyers or regular users, use normal role-based redirect
           const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
           console.log(`🚀 Navigating to: ${redirectPath} (role: ${profile.role})`);
           setIsLoading(false);

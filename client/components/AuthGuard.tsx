@@ -156,7 +156,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
         }
         
         // Redirect authenticated users away from login/registration
-        const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, user.pending_lawyer);
+        const redirectPath = getRoleBasedRedirect(user.role, user.is_verified, false);
         logRouteAccess(currentPath, user, 'denied', 'Already authenticated');
         redirectIfNeeded(redirectPath);
         return;
@@ -164,9 +164,17 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
 
       // Check route permissions
       if (!hasRoutePermission(routeConfig, user.role)) {
-        // Allow users with pending_lawyer to access most routes
+        // Allow users with pending_lawyer to access most routes, but redirect them away from lawyer-only routes
         if (user.pending_lawyer) {
-          logRouteAccess(currentPath, user, 'granted', 'Pending lawyer access');
+          // For lawyer-specific routes, redirect pending lawyers to home (they're treated as regular users)
+          if (routeConfig.requiredRole === 'verified_lawyer') {
+            const redirectPath = '/home';
+            logRouteAccess(currentPath, user, 'denied', 'Pending lawyer redirected to home from lawyer-only route');
+            redirectIfNeeded(redirectPath);
+            return;
+          }
+          // For other routes, allow access (they have registered_user permissions)
+          logRouteAccess(currentPath, user, 'granted', 'Pending lawyer access to regular route');
           return;
         }
         

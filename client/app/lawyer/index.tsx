@@ -14,7 +14,7 @@ import { useLawyerDashboard } from '../../hooks/useLawyerDashboard';
 import { getClientName } from '../../utils/consultationStyles';
 import { QUICK_STATS_CONFIG, DASHBOARD_CONSTANTS } from '../../constants/dashboardConfig';
 import RegisteredOnboardingOverlay from '../../components/onboarding/RegisteredOnboardingOverlay';
-import AuthGuard from '../../components/auth/AuthGuard';
+import { AuthGuard } from '../../components/AuthGuard';
 
 const LawyerDashboard: React.FC = () => {
   const router = useRouter();
@@ -87,7 +87,7 @@ const LawyerDashboard: React.FC = () => {
   // Loading state
   if (loading) {
     return (
-      <AuthGuard requireAuth={true} allowedRoles={['verified_lawyer']}>
+      <AuthGuard>
         <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
           <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
           <Header 
@@ -108,7 +108,7 @@ const LawyerDashboard: React.FC = () => {
   }
 
   return (
-    <AuthGuard requireAuth={true} allowedRoles={['verified_lawyer']}>
+    <AuthGuard>
       <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header 

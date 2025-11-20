@@ -19,7 +19,7 @@ import CategoryScroller from "@/components/glossary/CategoryScroller";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { NetworkConfig } from '@/utils/networkConfig';
 import { useAuth } from "../contexts/AuthContext";
-import AuthGuard from "../components/auth/AuthGuard";
+import { AuthGuard } from "../components/AuthGuard";
 
 const API_BASE_URL = NetworkConfig.getApiUrl();
 
@@ -116,7 +116,7 @@ export default function FavoritesScreen() {
   };
 
   return (
-    <AuthGuard requireAuth={true}>
+    <AuthGuard>
       <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header title="Favorite Terms" showMenu={true} />

@@ -27,7 +27,7 @@ import { EditProfileModal } from "../../components/lawyer/profile";
 import { SidebarWrapper } from "../../components/AppSidebar";
 import Colors from "../../constants/Colors";
 import { useAuth } from "../../contexts/AuthContext";
-import AuthGuard from "../../components/auth/AuthGuard";
+import { AuthGuard } from "../../components/AuthGuard";
 import tw from "tailwind-react-native-classnames";
 import { useLawyerProfile, TimeSlot } from "../../services/lawyerProfileServices";
 import { supabase } from "../../config/supabase";
@@ -793,7 +793,7 @@ const LawyerProfilePage: React.FC = () => {
   };
 
   return (
-    <AuthGuard requireAuth={true} allowedRoles={['verified_lawyer']}>
+    <AuthGuard>
       <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header title="Profile" showMenu={true} />

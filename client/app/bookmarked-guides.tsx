@@ -15,7 +15,7 @@ import { SidebarWrapper } from "@/components/AppSidebar";
 import { ArticleCard, ArticleItem } from "@/components/guides/ArticleCard";
 import { useBookmarks } from "@/contexts/BookmarksContext";
 import { useAuth } from "../contexts/AuthContext";
-import AuthGuard from "../components/auth/AuthGuard";
+import { AuthGuard } from "../components/AuthGuard";
 import { NetworkConfig } from '@/utils/networkConfig';
 import Button from "@/components/ui/Button";
 import { ArticleCardSkeletonList } from "@/components/guides/ArticleCardSkeleton";
@@ -163,7 +163,7 @@ export default function BookmarkedGuidesScreen() {
   );
 
   return (
-    <AuthGuard requireAuth={true}>
+    <AuthGuard>
       <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header title="Bookmarked Guides" showMenu={true} />
