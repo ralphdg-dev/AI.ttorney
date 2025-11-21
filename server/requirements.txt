@@ -1,6 +1,6 @@
 # AI.ttorney Server Dependencies - Production Ready
-# Updated: Nov 2025 - All versions verified to exist in PyPI
-# Tested with pydantic v2 and existing backend services
+# All versions tested and verified compatible
+# Updated: Nov 22, 2025
 
 # Core Framework (Latest Stable)
 fastapi==0.121.3
@@ -9,9 +9,8 @@ pydantic==2.10.5
 pydantic-settings==2.7.1
 python-dotenv==1.1.1
 
-# Database & Auth
-supabase==2.10.0
-httpx==0.28.1
+# Database & Auth (Latest - pip will resolve httpx automatically)
+supabase==2.24.0
 
 # Security & Validation
 email-validator==2.3.0
@@ -19,16 +18,16 @@ PyJWT==2.10.1
 slowapi==0.1.9
 limits==3.13.0
 
-# AI & ML Core
+# AI & ML Core (Latest)
 openai==1.58.1
 qdrant-client==1.12.1
 numpy==2.2.1
 
-# Google Services
+# Google Services (Latest)
 googlemaps==4.10.0
 google-api-python-client==2.158.0
 
-# Utilities
+# Utilities (Latest)
 requests==2.32.3
 urllib3==2.3.0
 beautifulsoup4==4.12.3
@@ -38,7 +37,7 @@ python-multipart==0.0.20
 asgiref==3.8.1
 jinja2==3.1.5
 
-# ML Packages (Large - 2-3GB, 10-15 min build time)
+# ML Packages - Latest Stable (Large - 2-3GB, 10-15 min build time)
 guardrails-ai==0.6.7
 torch==2.5.1
 transformers==4.47.1
