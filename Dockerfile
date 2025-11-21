@@ -21,10 +21,16 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Stage 2: Install BeautifulSoup with only soupsieve (no lxml)
 RUN pip install --no-cache-dir beautifulsoup4==4.12.3 "soupsieve>=2.5"
 
-# Stage 3: Install ML packages (may try to pull lxml, but we continue anyway)
-RUN pip install --no-cache-dir "numpy>=2.1.0" "qdrant-client>=1.15.1" || true && \
-    pip install --no-cache-dir "guardrails-ai>=0.4.0" "torch>=2.0.0" \
-        "transformers>=4.30.0" "peft>=0.4.0" || true
+# Stage 3: Install numpy and qdrant (should work fine)
+RUN pip install --no-cache-dir "numpy>=2.1.0" "qdrant-client>=1.15.1"
+
+# Stage 4: Try ML packages, but don't fail the build if they need lxml
+RUN set -e; \
+    pip install --no-cache-dir "torch>=2.0.0" || true; \
+    pip install --no-cache-dir "transformers>=4.30.0" || true; \
+    pip install --no-cache-dir "peft>=0.4.0" || true; \
+    pip install --no-cache-dir "guardrails-ai>=0.4.0" || true; \
+    exit 0
 
 # Copy server code
 COPY server/ .
