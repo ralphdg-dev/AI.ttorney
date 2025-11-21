@@ -1,5 +1,6 @@
 import logging
 from typing import List, Dict, Tuple
+from openai import OpenAI
 
 # Import cached clients instead of creating new instances
 from services.client_cache import get_qdrant_client, get_openai_client

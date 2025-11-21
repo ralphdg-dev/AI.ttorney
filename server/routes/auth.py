@@ -8,6 +8,9 @@ from typing import Dict, Any
 import logging
 from supabase import create_client
 import os
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +18,18 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 auth_service = AuthService()
 otp_service = OTPService()
 
+# Rate limiter for auth endpoints
+limiter = Limiter(key_func=get_remote_address)
+
+# Rate limiting decorator for auth endpoints
+def rate_limit_auth(limit: str):
+    """Apply rate limiting to auth endpoints"""
+    def decorator(func):
+        return limiter.limit(limit)(func)
+    return decorator
+
 @router.post("/signup", response_model=Dict[str, Any])
+@rate_limit_auth("10/minute")  # Increased for mobile network variability
 async def sign_up(user_data: UserSignUp):
     """Register a new user in both auth.users and public.users"""
     result = await auth_service.sign_up(user_data)
@@ -34,6 +48,7 @@ async def sign_up(user_data: UserSignUp):
     }
 
 @router.post("/signin", response_model=Dict[str, Any])
+@rate_limit_auth("10/minute")
 async def sign_in(credentials: UserSignIn):
     """Sign in user with verification check and RBAC"""
     result = await auth_service.sign_in(credentials)
@@ -161,6 +176,7 @@ async def check_email_exists(request: Dict[str, str] = Body(...)):
         )
 
 @router.post("/forgot-password")
+@rate_limit_auth("5/minute")  # Increased for mobile network variability
 async def forgot_password(request: Dict[str, str] = Body(...)):
     """Send OTP for password reset - only to registered users"""
     try:
@@ -236,6 +252,7 @@ async def verify_token(current_user: Dict[str, Any] = Depends(get_current_user))
 
                
 @router.post("/send-otp", response_model=OTPResponse)
+@rate_limit_auth("10/minute")  # Increased for mobile network variability
 async def send_otp(request: SendOTPRequest):
     """Send OTP for email verification or password reset"""
     try:
@@ -289,6 +306,7 @@ async def send_otp(request: SendOTPRequest):
 
 
 @router.post("/verify-reset-otp")
+@rate_limit_auth("10/minute")
 async def verify_reset_otp(request: Dict[str, str] = Body(...)):
     """Verify OTP for password reset and issue JWT token"""
     try:
@@ -517,6 +535,7 @@ async def reset_password_with_token(request: Dict[str, str] = Body(...)):
         )
 
 @router.post("/verify-otp", response_model=OTPResponse)
+@rate_limit_auth("10/minute")
 async def verify_otp(request: VerifyOTPRequest):
     """Verify OTP code"""
     try:

@@ -12,9 +12,20 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 
+# Import all routers
+from routes.auth import router as auth_router
+from routes.legalTerms import router as legalTerms
+from routes.legalConsultations import router as legal_consultations_router
+from routes.consultationRequest import router as consultation_router
+from routes.lawyerInfo import router as lawyer_info_router
+from routes.legalConsultAction import router as consult_action
+from routes.route_validation import router as route_validation_router
+from routes.support import router as support
+from routes.auth_reset import router as auth_reset_router
+from routes.forum import router as forum_router
 
-                            
 load_dotenv()
 
 # Industry-grade logging configuration
@@ -50,10 +61,22 @@ async def lifespan(app: FastAPI):
             raise Exception("Database connection failed")
             
         # Validate critical environment variables
-        required_vars = ["SUPABASE_URL", "OPENAI_API_KEY"]
+        required_vars = [
+            "SUPABASE_URL", 
+            "SUPABASE_ANON_KEY", 
+            "OPENAI_API_KEY",
+            "SUPABASE_SERVICE_ROLE_KEY"
+        ]
         missing_vars = [var for var in required_vars if not os.getenv(var)]
         if missing_vars:
             raise Exception(f"Missing required environment variables: {missing_vars}")
+        
+        # Warn about recommended production variables
+        if os.getenv("NODE_ENV") == "production":
+            recommended_vars = ["ALLOWED_ORIGINS", "ALLOWED_HOSTS"]
+            missing_recommended = [var for var in recommended_vars if not os.getenv(var)]
+            if missing_recommended:
+                logger.warning(f"⚠️  Recommended production vars not set: {missing_recommended}")
             
         logger.info("✅ All startup checks passed")
         
@@ -103,8 +126,12 @@ async def request_logging_middleware(request: Request, call_next):
     """Enhanced request logging with timing"""
     start_time = time.time()
     
-    logger.info(f" {request.method} {request.url.path}")
-    logger.info(f" Headers: {dict(request.headers)}")
+    # Log basic info, not headers in production
+    if os.getenv("NODE_ENV") == "development":
+        logger.info(f" {request.method} {request.url.path}")
+        logger.info(f" Headers: {dict(request.headers)}")
+    else:
+        logger.info(f" {request.method} {request.url.path}")
     
     response = await call_next(request)
     
@@ -117,16 +144,19 @@ async def request_logging_middleware(request: Request, call_next):
 app.state.limiter = limiter
 
 # Production-grade middleware stack
+if os.getenv("NODE_ENV") == "production":
+    app.add_middleware(HTTPSRedirectMiddleware)
+
 app.add_middleware(
     TrustedHostMiddleware, 
-    allowed_hosts=["*"] if os.getenv("NODE_ENV") == "development" else ["yourapp.com", "*.railway.app"]
+    allowed_hosts=["*"] if os.getenv("NODE_ENV") == "development" else os.getenv("ALLOWED_HOSTS", "*.railway.app,localhost,127.0.0.1").split(",")
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("ALLOWED_ORIGINS", "*").split(","),
+    allow_origins=["*"],  # Native mobile apps don't need CORS restrictions
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
@@ -158,14 +188,13 @@ async def global_exception_handler(request: Request, exc: Exception):
         )
 
 app.include_router(auth_router)
-app.include_router(legal_router)
-app.include_router(legalTerms.router)
+app.include_router(legalTerms)
 app.include_router(legal_consultations_router)
 app.include_router(consultation_router)
 app.include_router(lawyer_info_router)
 app.include_router(consult_action)
 app.include_router(route_validation_router, prefix="/api")
-app.include_router(support.router, prefix="/api")
+app.include_router(support, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(auth_reset_router, prefix="/api")
 

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
                                                             
 STREAMING_TOKEN_BATCH_SIZE = 3                                               
 STREAMING_MAX_INTERVAL_MS = 80                                     
-STREAMING_TIMEOUT_SECONDS = 10.0                                         
+STREAMING_TIMEOUT_SECONDS = 60.0  # Optimized for mobile networks                                         
 
                                                  
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
