@@ -4,15 +4,12 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
-# Copy requirements
-COPY server/requirements.txt ./
+# Copy Docker-specific requirements (no lxml)
+COPY server/requirements-docker.txt ./requirements.txt
 
 # Install Python dependencies
-# Install everything except beautifulsoup4 first, then install bs4 without lxml
 RUN pip install --no-cache-dir --upgrade pip && \
-    grep -v "beautifulsoup4" requirements.txt > /tmp/requirements_no_bs4.txt && \
-    pip install --no-cache-dir -r /tmp/requirements_no_bs4.txt && \
-    pip install --no-cache-dir beautifulsoup4 soupsieve
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy server code
 COPY server/ .
