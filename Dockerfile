@@ -4,14 +4,15 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first (for caching)
-COPY server/requirements.txt .
+# Copy requirements
+COPY server/requirements.txt ./
 
 # Install Python dependencies
-# Set PIP_NO_BUILD_ISOLATION=false to prevent building lxml from source
-ENV PIP_NO_BUILD_ISOLATION=false
+# Install everything except beautifulsoup4 first, then install bs4 without lxml
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --prefer-binary -r requirements.txt
+    grep -v "beautifulsoup4" requirements.txt > /tmp/requirements_no_bs4.txt && \
+    pip install --no-cache-dir -r /tmp/requirements_no_bs4.txt && \
+    pip install --no-cache-dir beautifulsoup4 soupsieve
 
 # Copy server code
 COPY server/ .
