@@ -2,7 +2,7 @@
 # Railway Pro Plan: Enhanced security with Guardrails AI enabled
 
 # Core Dependencies
-supabase==2.21.1
+supabase>=2.23.0,<2.25.0
 python-dotenv==1.1.1
 fastapi==0.118.0
 uvicorn==0.32.1
