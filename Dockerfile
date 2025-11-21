@@ -4,21 +4,14 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for building Python packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    g++ \
-    libxml2-dev \
-    libxslt1-dev \
-    zlib1g-dev \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy requirements first (for caching)
 COPY server/requirements.txt .
 
 # Install Python dependencies
+# Set PIP_NO_BUILD_ISOLATION=false to prevent building lxml from source
+ENV PIP_NO_BUILD_ISOLATION=false
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir --prefer-binary -r requirements.txt
 
 # Copy server code
 COPY server/ .
