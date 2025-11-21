@@ -1,0 +1,5 @@
+[phases.setup]
+nixPkgs = ["libxml2", "libxslt"]
+
+[start]
+cmd = "cd server && uvicorn main:app --host 0.0.0.0 --port $PORT"
