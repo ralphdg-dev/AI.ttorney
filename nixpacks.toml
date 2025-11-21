@@ -1,9 +1,0 @@
-[phases.setup]
-nixPkgs = ["libxml2", "libxslt", "pkg-config"]
-aptPkgs = ["libxml2-dev", "libxslt1-dev"]
-
-[phases.install]
-cmds = ["pip install -r server/requirements.txt"]
-
-[start]
-cmd = "cd server && uvicorn main:app --host 0.0.0.0 --port $PORT"
