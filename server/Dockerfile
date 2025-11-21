@@ -4,14 +4,12 @@ WORKDIR /app
 
 COPY requirements.txt .
 
-# Install core dependencies from requirements.txt (excluding ML packages)
-RUN pip install --no-cache-dir --upgrade pip && \
-    grep -v -E "^(torch|transformers|peft|guardrails-ai)" requirements.txt | \
-    pip install --no-cache-dir -r /dev/stdin
-
-# Install ML packages (optional - graceful degradation if they fail)
-RUN pip install --no-cache-dir torch>=2.0.0 transformers>=4.30.0 peft>=0.4.0 guardrails-ai>=0.4.0 || \
-    echo "Warning: Some ML packages failed to install. App will run without Guardrails AI."
+# Install all dependencies from requirements.txt
+# Note: ML packages (torch, transformers, etc.) are 2-3GB and will take 10-20 minutes
+RUN echo "📦 Installing all dependencies (this may take 15-20 minutes for ML packages)..." && \
+    pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --verbose -r requirements.txt && \
+    echo "✅ All dependencies installed successfully"
 
 COPY . .
 
