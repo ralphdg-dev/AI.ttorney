@@ -16,8 +16,6 @@ cachetools==6.2.0
 openai==1.54.0
 google-api-python-client==2.108.0
 numpy>=2.1.0
-beautifulsoup4==4.12.3
-soupsieve>=2.5
 requests==2.31.0
 tqdm==4.66.1
 qdrant-client>=1.15.1
@@ -28,10 +26,7 @@ starlette>=0.27.0
 slowapi==0.1.9
 limits==3.7.0
 asgiref==3.8.1
-
-# Guardrails AI Security - ENABLED for Railway Pro
-guardrails-ai>=0.4.0
-torch>=2.0.0
-transformers>=4.30.0
-peft>=0.4.0
 jinja2>=3.1.0
+
+# Note: ML packages (torch, transformers, peft, guardrails-ai) installed separately in Dockerfile Stage 4
+# Note: beautifulsoup4 installed separately in Dockerfile Stage 2 to avoid lxml dependency

@@ -4,10 +4,7 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
-# Copy Docker-specific requirements (no lxml)
-COPY server/requirements-docker.txt ./requirements.txt
-
-# Install Python dependencies in stages
+# Install Python dependencies in stages (no requirements.txt to avoid lxml)
 # Stage 1: Install core dependencies that definitely work
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir \
