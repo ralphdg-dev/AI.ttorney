@@ -1,8 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
-from qdrant_client import QdrantClient
-from openai import OpenAI
 import os
 import re
 from dotenv import load_dotenv
@@ -11,6 +9,9 @@ from uuid import UUID
 from datetime import datetime
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
+
+# Import cached clients instead of creating new instances
+from services.client_cache import get_qdrant_client, get_openai_client
 
                                                                    
 logging.basicConfig(
@@ -179,11 +180,8 @@ HISTORICAL_KEYWORDS = [
 
                                               
 try:
-    qdrant_client = QdrantClient(
-        url=QDRANT_URL,
-        api_key=QDRANT_API_KEY,
-        timeout=30.0                                    
-    )
+    # Use cached singleton client instead of creating new instance
+    qdrant_client = get_qdrant_client()
                        
     qdrant_client.get_collections()
     logger.info(" Qdrant client initialized successfully")
@@ -197,11 +195,8 @@ if not OPENAI_API_KEY:
 
                                                                         
 try:
-    openai_client = OpenAI(
-        api_key=OPENAI_API_KEY,
-        timeout=120.0,                            
-        max_retries=2                                           
-    )
+    # Use cached singleton client instead of creating new instance
+    openai_client = get_openai_client()
     logger.info(" OpenAI client initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize OpenAI client: {e}")

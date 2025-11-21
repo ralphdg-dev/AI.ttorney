@@ -1,15 +1,14 @@
 import logging
 from typing import List, Dict, Tuple
-from qdrant_client import QdrantClient
-from openai import OpenAI
+
+# Import cached clients instead of creating new instances
+from services.client_cache import get_qdrant_client, get_openai_client
 
 logger = logging.getLogger(__name__)
 
 
 def retrieve_relevant_context_with_web_search(
     question: str,
-    qdrant_client: QdrantClient,
-    openai_client: OpenAI,
     collection_name: str,
     embedding_model: str,
     top_k: int = 5,
@@ -20,27 +19,29 @@ def retrieve_relevant_context_with_web_search(
     Enhanced context retrieval with web search fallback
     
     Flow:
-    1. Query Qdrant vector database
-    2. Check confidence score
-    3. If low confidence → Trigger Google Search
-    4. Combine and return context
+    1. Get cached Qdrant and OpenAI clients
+    2. Query Qdrant vector database
+    3. Check confidence score
+    4. If low confidence → Trigger Google Search
+    5. Combine and return context
     
     Args:
-        question: User's legal question
-        qdrant_client: Qdrant client instance
-        openai_client: OpenAI client for embeddings
-        collection_name: Qdrant collection name
-        embedding_model: OpenAI embedding model name
+        question: User's question
+        collection_name: Qdrant collection to search
+        embedding_model: OpenAI embedding model
         top_k: Number of results to retrieve
-        min_confidence_score: Minimum relevance threshold
-        enable_web_search: Whether to use web search fallback
-    
+        min_confidence_score: Minimum confidence threshold
+        enable_web_search: Enable Google search fallback
+        
     Returns:
         Tuple of (context_text, sources, metadata)
-        - context_text: Combined context string
-        - sources: List of source citations
-        - metadata: Additional info (web_search_triggered, confidence, etc.)
     """
+    # Use cached singleton clients
+    qdrant_client = get_qdrant_client()
+    openai_client = get_openai_client()
+    
+    logger.info(f"🔍 Searching for context: {question[:100]}...")
+    
     from services.web_search_service import get_web_search_service
     
     metadata = {

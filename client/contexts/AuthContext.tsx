@@ -200,7 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }).then(async (response) => {
           if (!response.ok) {
             const errorText = await response.text();
-            console.error('Profile fetch HTTP error:', response.status, errorText);
+            console.error('Profile fetch failed:', response.status, errorText);
             throw new Error(`Profile fetch failed: ${response.status}`);
           }
           const data = await response.json();

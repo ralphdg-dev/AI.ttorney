@@ -4,8 +4,6 @@ from pydantic import BaseModel, Field, model_validator
 from typing import List, Dict, Optional, AsyncGenerator
 import json
 import time
-from qdrant_client import QdrantClient
-from openai import OpenAI
 import os
 import re
 from dotenv import load_dotenv
@@ -15,6 +13,9 @@ from datetime import datetime
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
 import time
+
+# Import cached clients instead of creating new instances
+from services.client_cache import get_qdrant_client, get_openai_client
 
                                                                    
 logging.basicConfig(
@@ -192,12 +193,8 @@ HISTORICAL_KEYWORDS = [
                                               
 try:
                                                  
-    qdrant_client = QdrantClient(
-        url=QDRANT_URL,
-        api_key=QDRANT_API_KEY,
-        timeout=30.0,                                   
-        prefer_grpc=False                                                     
-    )
+    # Use cached singleton client instead of creating new instance
+    qdrant_client = get_qdrant_client()
     
                                         
     max_retries = 3
@@ -235,11 +232,8 @@ if not OPENAI_API_KEY:
 
                                                                         
 try:
-    openai_client = OpenAI(
-        api_key=OPENAI_API_KEY,
-        timeout=30.0,                                                
-        max_retries=1                                                               
-    )
+    # Use cached singleton client instead of creating new instance
+    openai_client = get_openai_client()
     logger.info(" OpenAI client initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize OpenAI client: {e}")
