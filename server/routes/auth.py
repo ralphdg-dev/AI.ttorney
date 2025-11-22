@@ -30,7 +30,7 @@ def rate_limit_auth(limit: str):
 
 @router.post("/signup", response_model=Dict[str, Any])
 @rate_limit_auth("10/minute")  # Increased for mobile network variability
-async def sign_up(user_data: UserSignUp):
+async def sign_up(request: Request, user_data: UserSignUp):
     """Register a new user in both auth.users and public.users"""
     result = await auth_service.sign_up(user_data)
     
@@ -49,7 +49,7 @@ async def sign_up(user_data: UserSignUp):
 
 @router.post("/signin", response_model=Dict[str, Any])
 @rate_limit_auth("10/minute")
-async def sign_in(credentials: UserSignIn):
+async def sign_in(request: Request, credentials: UserSignIn):
     """Sign in user with verification check and RBAC"""
     result = await auth_service.sign_in(credentials)
     
@@ -177,7 +177,7 @@ async def check_email_exists(request: Dict[str, str] = Body(...)):
 
 @router.post("/forgot-password")
 @rate_limit_auth("5/minute")  # Increased for mobile network variability
-async def forgot_password(request: Dict[str, str] = Body(...)):
+async def forgot_password(http_request: Request, request: Dict[str, str] = Body(...)):
     """Send OTP for password reset - only to registered users"""
     try:
         email = request.get("email")
@@ -253,7 +253,7 @@ async def verify_token(current_user: Dict[str, Any] = Depends(get_current_user))
                
 @router.post("/send-otp", response_model=OTPResponse)
 @rate_limit_auth("10/minute")  # Increased for mobile network variability
-async def send_otp(request: SendOTPRequest):
+async def send_otp(http_request: Request, request: SendOTPRequest):
     """Send OTP for email verification or password reset"""
     try:
         if request.otp_type == "email_verification":
@@ -307,7 +307,7 @@ async def send_otp(request: SendOTPRequest):
 
 @router.post("/verify-reset-otp")
 @rate_limit_auth("10/minute")
-async def verify_reset_otp(request: Dict[str, str] = Body(...)):
+async def verify_reset_otp(http_request: Request, request: Dict[str, str] = Body(...)):
     """Verify OTP for password reset and issue JWT token"""
     try:
         email = request.get("email")
@@ -536,7 +536,7 @@ async def reset_password_with_token(request: Dict[str, str] = Body(...)):
 
 @router.post("/verify-otp", response_model=OTPResponse)
 @rate_limit_auth("10/minute")
-async def verify_otp(request: VerifyOTPRequest):
+async def verify_otp(http_request: Request, request: VerifyOTPRequest):
     """Verify OTP code"""
     try:
                                                                    
