@@ -1,15 +1,15 @@
 # AI.ttorney Server Dependencies - Production Ready
-# All versions tested and verified compatible
+# Using pydantic 2.11.7 with legacy validators for backward compatibility
 # Updated: Nov 22, 2025
 
 # Core Framework (Latest Stable)
 fastapi==0.121.3
 uvicorn[standard]==0.34.0
-pydantic==2.10.5
+pydantic==2.11.7
 pydantic-settings==2.7.1
 python-dotenv==1.1.1
 
-# Database & Auth (Latest - pip will resolve httpx automatically)
+# Database & Auth (Latest - compatible with pydantic 2.11.7)
 supabase==2.24.0
 
 # Security & Validation
