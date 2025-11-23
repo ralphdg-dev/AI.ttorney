@@ -1,6 +1,11 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const { withNativeWind } = require('nativewind/metro');
 
+// Set EXPO_ROUTER_APP_ROOT before Metro starts (required for require.context resolution)
+if (!process.env.EXPO_ROUTER_APP_ROOT) {
+  process.env.EXPO_ROUTER_APP_ROOT = './app';
+}
+
 const config = getDefaultConfig(__dirname);
 
 // Fix for stream pipeline and header issues with Expo web
@@ -34,7 +39,7 @@ config.server = {
           responseHandled = true;
           try {
             res.end();
-          } catch (e) {
+          } catch (_e) {
             // Ignore errors on close
           }
         }
