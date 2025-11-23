@@ -20,6 +20,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           CFBundleURLSchemes: ['ai-ttorney', 'exp+ai-ttorney'],
         },
       ],
+      NSCameraUsageDescription: 'AI.ttorney needs camera access for lawyer verification and document scanning.',
+      NSPhotoLibraryUsageDescription: 'AI.ttorney needs photo library access for profile pictures and document uploads.',
+      NSMicrophoneUsageDescription: 'AI.ttorney needs microphone access for video recording in lawyer verification.',
     },
     config: {
       googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
@@ -32,6 +35,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     edgeToEdgeEnabled: true,
     package: 'com.aittorney.app',
+    permissions: [
+      'android.permission.CAMERA',
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+      'android.permission.RECORD_AUDIO',
+      'android.permission.ACCESS_FINE_LOCATION',
+      'android.permission.ACCESS_COARSE_LOCATION',
+    ],
     intentFilters: [
       {
         action: 'VIEW',
@@ -71,6 +82,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     'expo-font',
+    'expo-secure-store',
     [
       'expo-location',
       {
