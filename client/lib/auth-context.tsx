@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase, onAuthStateChange } from './supabase';
 import { apiClient } from './api-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { secureStorage } from '../services/secureStorageService';
 
 interface UserProfile {
   id: string;
@@ -64,7 +65,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        await AsyncStorage.setItem('access_token', session.access_token);
+        await secureStorage.setSecureItem('access_token', session.access_token);
         await loadUserProfile(session.user.id);
       }
       
@@ -77,10 +78,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        await AsyncStorage.setItem('access_token', session.access_token);
+        await secureStorage.setSecureItem('access_token', session.access_token);
         await loadUserProfile(session.user.id);
       } else {
-        await AsyncStorage.removeItem('access_token');
+        await secureStorage.removeSecureItem('access_token');
         setProfile(null);
       }
       

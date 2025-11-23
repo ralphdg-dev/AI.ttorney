@@ -16,8 +16,8 @@ module.exports = function (api) {
         include: [
           "EXPO_PUBLIC_SUPABASE_URL",
           "EXPO_PUBLIC_SUPABASE_ANON_KEY",
-          "EXPO_PUBLIC_USE_SERVER_API",
-          "EXPO_PUBLIC_SERVER_API_URL"
+          "EXPO_PUBLIC_API_URL",
+          "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY"
         ]
       }],
       'react-native-reanimated/plugin',
