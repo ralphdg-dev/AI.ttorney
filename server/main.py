@@ -144,8 +144,10 @@ async def request_logging_middleware(request: Request, call_next):
 app.state.limiter = limiter
 
 # Production-grade middleware stack
-if os.getenv("NODE_ENV") == "production":
-    app.add_middleware(HTTPSRedirectMiddleware)
+# Note: HTTPSRedirectMiddleware disabled for Railway compatibility
+# Railway handles HTTPS termination at the edge
+# if os.getenv("NODE_ENV") == "production":
+#     app.add_middleware(HTTPSRedirectMiddleware)
 
 app.add_middleware(
     TrustedHostMiddleware, 

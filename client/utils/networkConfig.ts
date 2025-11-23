@@ -25,8 +25,9 @@ export class NetworkConfig {
    * Development: Auto-detects from Expo manifest
    */
   static getApiUrl(): string {
-    // Production: Use environment variable
+    // Production: Use environment variable (takes precedence over everything)
     if (this.PRODUCTION_API_URL) {
+      console.log(`🌐 Using EXPO_PUBLIC_API_URL: ${this.PRODUCTION_API_URL}`);
       return this.PRODUCTION_API_URL;
     }
 

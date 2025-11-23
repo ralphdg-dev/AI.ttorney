@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 13.2.1"
+    "version": ">= 13.2.1",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -11,6 +12,9 @@
       },
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "NODE_ENV": "development"
       }
     },
     "preview": {
@@ -20,11 +24,17 @@
       },
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "NODE_ENV": "staging"
       }
     },
     "production": {
       "ios": {
         "resourceClass": "m-medium"
+      },
+      "env": {
+        "NODE_ENV": "production"
       }
     }
   },
