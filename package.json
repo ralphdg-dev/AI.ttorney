@@ -1,7 +1,5 @@
 {
-  "dependencies": {
-    "react-native-svg": "^15.15.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/detox": "^17.14.3",
     "detox": "^20.46.0",
