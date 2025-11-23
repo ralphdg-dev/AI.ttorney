@@ -1,13 +1,14 @@
 {
   "expo": {
-    "name": "client",
-    "slug": "client",
+    "name": "Ai.ttorney",
+    "slug": "aittorney",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "client",
+    "scheme": "ai-ttorney",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "owner": "j24angeles",
     "ios": {
       "supportsTablet": true
     },
@@ -37,6 +38,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "586d8e19-554a-4ea4-821f-635b25e93de9"
+      }
     }
   }
 }
