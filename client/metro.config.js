@@ -1,10 +1,10 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const { withNativeWind } = require('nativewind/metro');
 
-// Hardcode EXPO_ROUTER_APP_ROOT - this is a build-time constant
-// Required for expo-router's require.context() to resolve correctly
-// Set it BEFORE getDefaultConfig() so Metro has it during initialization
-process.env.EXPO_ROUTER_APP_ROOT = './app';
+// Fallback: ensure EXPO_ROUTER_APP_ROOT is set (primary source is app.config.ts)
+if (!process.env.EXPO_ROUTER_APP_ROOT) {
+  process.env.EXPO_ROUTER_APP_ROOT = './app';
+}
 
 const config = getDefaultConfig(__dirname);
 

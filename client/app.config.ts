@@ -1,5 +1,9 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
+// Set EXPO_ROUTER_APP_ROOT at the earliest possible point
+// This runs before Metro bundler initialization in all environments (local, EAS, CI/CD)
+process.env.EXPO_ROUTER_APP_ROOT = './app';
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Ai.ttorney',
