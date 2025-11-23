@@ -96,6 +96,10 @@ android {
         versionName "1.0.0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
+        
+        // Detox configuration
+        testBuildType System.getProperty('testBuildType', 'debug')
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     signingConfigs {
         debug {
@@ -126,9 +130,50 @@ android {
             def enableLegacyPackaging = findProperty('expo.useLegacyPackaging') ?: 'false'
             useLegacyPackaging enableLegacyPackaging.toBoolean()
         }
+        // Fix for Detox duplicate library issues - comprehensive list
+        pickFirst '**/libc++_shared.so'
+        pickFirst '**/libfbjni.so'
+        pickFirst '**/libhermestooling.so'
+        pickFirst '**/libimagepipeline.so'
+        pickFirst '**/libjsi.so'
+        pickFirst '**/libnative-filters.so'
+        pickFirst '**/libnative-imagetranscoder.so'
+        pickFirst '**/libreactnative.so'
+        pickFirst '**/libhermes.so'
+        pickFirst '**/libjsc.so'
+        pickFirst '**/libicu_common.so'
+        pickFirst '**/libmockkjvmtiagent.so'
+        pickFirst '**/libandroidx.graphics.path.so'
+        pickFirst '**/libbarhopper_v3.so'
+        pickFirst '**/libexpo-modules-core.so'
+        pickFirst '**/libexpo-av.so'
+        pickFirst '**/libimage_processing_util_jni.so'
+        pickFirst '**/libsurface_util_jni.so'
+        pickFirst '**/libanimation-decoder-gif.so'
+        pickFirst '**/libavif_android.so'
+        
+        // Exclude problematic files
+        exclude 'META-INF/DEPENDENCIES'
+        exclude 'META-INF/LICENSE'
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/license.txt'
+        exclude 'META-INF/NOTICE'
+        exclude 'META-INF/NOTICE.txt'
+        exclude 'META-INF/notice.txt'
+        exclude 'META-INF/ASL2.0'
+        exclude 'META-INF/*.kotlin_module'
     }
+    
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
+    }
+    
+    // Additional configuration for Detox
+    configurations.all {
+        resolutionStrategy {
+            force 'androidx.test:monitor:1.6.1'
+            force 'androidx.test.espresso:espresso-core:3.5.1'
+        }
     }
 }
 
@@ -179,4 +224,18 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+    
+    // Detox dependencies
+    androidTestImplementation('com.wix:detox:+') {
+        transitive = false
+    }
+    androidTestImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test:rules:1.5.0'
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.2.0'
+    
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.test.espresso:espresso-idling-resource:3.5.1'
 }

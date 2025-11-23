@@ -9,7 +9,65 @@
     "ios": "DARK_MODE=media expo start --ios",
     "web": "cross-env DARK_MODE=media expo start --web",
     "lint": "expo lint",
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    
+    "e2e:setup": "detox build --configuration android.emu.debug",
+    "e2e:test": "./e2e/run-tests.sh",
+    
+    "e2e:test:login": "TEST_SUITE=login ./e2e/run-tests.sh",
+    "e2e:test:registration": "TEST_SUITE=registration ./e2e/run-tests.sh",
+    "e2e:test:guest-onboarding": "TEST_SUITE=guest-onboarding ./e2e/run-tests.sh",
+    "e2e:test:chatbot": "TEST_SUITE=chatbot ./e2e/run-tests.sh",
+    "e2e:test:lawyer-dashboard": "TEST_SUITE=lawyer-dashboard ./e2e/run-tests.sh",
+    
+    "e2e:test:smoke": "TEST_SUITE=smoke ./e2e/run-tests.sh",
+    "e2e:test:system": "TEST_SUITE=system ./e2e/run-tests.sh",
+    "e2e:test:simple": "node ./e2e/simple-test-runner.js",
+    "e2e:test:comprehensive": "node ./e2e/simple-test-runner.js",
+    "e2e:test:quick": "QUICK_MODE=true node ./e2e/simple-test-runner.js",
+    
+    "e2e:detox:build": "detox build --configuration android.emu.debug",
+    "e2e:detox:test": "detox test --configuration android.emu.debug",
+    "e2e:detox:test:app-launch": "detox test --configuration android.emu.debug e2e/tests/app-launch.e2e.js",
+    "e2e:detox:test:guest-flow": "detox test --configuration android.emu.debug e2e/tests/guest-flow.e2e.js",
+    "e2e:detox:test:chatbot": "detox test --configuration android.emu.debug e2e/tests/chatbot.e2e.js",
+    
+    "e2e:hybrid:test": "node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:quick": "QUICK_MODE=true node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:auth": "TEST_CATEGORY=auth node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:guest": "TEST_CATEGORY=guest node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:chatbot": "TEST_CATEGORY=chatbot node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:knowledge": "TEST_CATEGORY=knowledge_base node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:consultation": "TEST_CATEGORY=consultation node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:locator": "TEST_CATEGORY=locator node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:forum": "TEST_CATEGORY=forum node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:lawyer-app": "TEST_CATEGORY=lawyer_application node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:ai-moderation": "TEST_CATEGORY=ai_moderation node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:admin": "TEST_CATEGORY=admin_cms node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:support": "TEST_CATEGORY=support node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:performance": "TEST_CATEGORY=performance node ./e2e/hybrid-detox-runner.js",
+    "e2e:hybrid:test:security": "TEST_CATEGORY=security node ./e2e/hybrid-detox-runner.js",
+    
+    "e2e:test:device": "ANDROID_DEVICE=attached ./e2e/run-tests.sh",
+    "e2e:test:device:smoke": "ANDROID_DEVICE=attached TEST_SUITE=smoke ./e2e/run-tests.sh",
+    "e2e:test:device:system": "ANDROID_DEVICE=attached TEST_SUITE=system ./e2e/run-tests.sh",
+    
+    "e2e:build:android": "detox build --configuration android.emu.debug",
+    "e2e:test:android": "detox test --configuration android.emu.debug",
+    "e2e:test:android:device": "detox test --configuration android.att.debug",
+    "e2e:clean": "detox clean-framework-cache && detox build --configuration android.emu.debug",
+    
+    "e2e:report": "open ./e2e/test-reports/all-features-test-report.html",
+    "e2e:report:login": "open ./e2e/test-reports/login-test-report.html",
+    "e2e:report:registration": "open ./e2e/test-reports/registration-test-report.html",
+    "e2e:report:guest-onboarding": "open ./e2e/test-reports/guest-onboarding-test-report.html",
+    "e2e:report:chatbot": "open ./e2e/test-reports/chatbot-test-report.html",
+    "e2e:report:lawyer-dashboard": "open ./e2e/test-reports/lawyer-dashboard-test-report.html",
+    "e2e:report:smoke": "open ./e2e/test-reports/guest-onboarding-test-report.html && open ./e2e/test-reports/chatbot-test-report.html",
+    "e2e:report:system": "open ./e2e/test-reports/guest-onboarding-test-report.html && open ./e2e/test-reports/chatbot-test-report.html && open ./e2e/test-reports/lawyer-dashboard-test-report.html",
+    "e2e:report:all": "open ./e2e/test-reports/login-test-report.html && open ./e2e/test-reports/registration-test-report.html && open ./e2e/test-reports/guest-onboarding-test-report.html && open ./e2e/test-reports/chatbot-test-report.html && open ./e2e/test-reports/lawyer-dashboard-test-report.html",
+    "e2e:report:simple": "open ./e2e/test-reports/simple-e2e-report.html",
+    "e2e:report:hybrid": "open ./e2e/test-reports/hybrid-detox-report.html"
   },
   "dependencies": {
     "22": "^0.0.0",
@@ -110,7 +168,14 @@
     "eslint-config-expo": "~10.0.0",
     "expo-module-scripts": "^5.0.7",
     "jscodeshift": "^0.15.2",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    
+    "detox": "^20.13.0",
+    "@types/detox": "^18.1.0",
+    "jest": "^29.7.0",
+    "jest-html-reporters": "^3.1.5",
+    "jest-junit": "^16.0.0",
+    "jest-sonar-reporter": "^2.0.0"
   },
   "private": true
 }

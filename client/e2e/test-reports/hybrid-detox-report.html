@@ -1,0 +1,2143 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI.ttorney Mobile Application - End-to-End Test Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Arial', sans-serif; 
+            line-height: 1.4; 
+            color: #000; 
+            background: white; 
+            font-size: 12px;
+        }
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: white; 
+            border: 1px solid #000;
+        }
+        
+        /* Header Styles */
+        .header { 
+            background: white; 
+            color: black; 
+            padding: 20px; 
+            text-align: center; 
+            border-bottom: 2px solid #000;
+        }
+        .header h1 { 
+            font-size: 18px; 
+            margin-bottom: 8px; 
+            font-weight: bold; 
+            text-transform: uppercase;
+        }
+        .header .subtitle { 
+            font-size: 14px; 
+            margin-bottom: 10px; 
+            font-weight: normal;
+        }
+        .header .meta { 
+            font-size: 10px; 
+        }
+        
+        /* Content Styles */
+        .content { padding: 20px; }
+        .section { margin-bottom: 25px; }
+        .section h2 { 
+            color: black; 
+            border-bottom: 1px solid #000; 
+            padding-bottom: 5px; 
+            margin-bottom: 15px; 
+            font-size: 14px; 
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .section h3 { 
+            color: black; 
+            margin-bottom: 10px; 
+            font-size: 12px; 
+            font-weight: bold;
+        }
+        
+        /* Executive Summary */
+        .executive-summary { 
+            background: white; 
+            padding: 15px; 
+            border: 1px solid #000; 
+            margin-bottom: 25px; 
+        }
+        .summary-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
+            gap: 10px; 
+            margin-top: 10px; 
+        }
+        .summary-card { 
+            background: white; 
+            padding: 10px; 
+            text-align: center; 
+            border: 1px solid #000; 
+        }
+        .summary-number { 
+            font-size: 20px; 
+            font-weight: bold; 
+            margin-bottom: 3px; 
+            color: black;
+        }
+        
+        /* Tables */
+        .test-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 15px 0; 
+            background: white; 
+            font-size: 10px;
+        }
+        .test-table th, .test-table td { 
+            padding: 6px 8px; 
+            text-align: left; 
+            border: 1px solid #000; 
+        }
+        .test-table th { 
+            background: white; 
+            color: black; 
+            font-weight: bold; 
+            text-transform: uppercase;
+        }
+        
+        /* Status Badges */
+        .status-badge { 
+            display: inline-block; 
+            padding: 2px 6px; 
+            font-size: 9px; 
+            font-weight: bold; 
+            text-transform: uppercase; 
+            border: 1px solid #000;
+            background: white;
+            color: black;
+        }
+        
+        /* Framework Info */
+        .framework-info { 
+            background: white; 
+            border: 1px solid #000; 
+            padding: 15px; 
+        }
+        .framework-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 10px;
+        }
+        .framework-table td { 
+            padding: 4px 8px; 
+            border-bottom: 1px solid #000; 
+        }
+        .framework-table td:first-child { 
+            font-weight: bold; 
+            width: 150px; 
+        }
+        
+        /* Charts - Simple text-based */
+        .chart-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin: 20px 0;
+            gap: 20px;
+        }
+        
+        .chart-section {
+            flex: 1;
+            text-align: center;
+            padding: 15px;
+            border: 1px solid #000;
+        }
+        
+        .chart-canvas {
+            max-width: 200px;
+            max-height: 200px;
+            margin: 5px auto;
+        }
+        
+        .chart-text {
+            text-align: center;
+            padding: 20px;
+            border: 1px solid #000;
+            margin-right: 20px;
+        }
+        
+        .chart-number {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .progress-charts {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            gap: 15px;
+        }
+        
+        .progress-chart {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+        }
+        
+        .progress-chart h4 {
+            font-size: 11px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        /* Category Results */
+        .category-section { 
+            margin: 20px 0; 
+            border: 1px solid #000; 
+        }
+        .category-header { 
+            background: white; 
+            padding: 8px 15px; 
+            border-bottom: 1px solid #000; 
+            font-weight: bold; 
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        .category-content { padding: 0; }
+        
+        /* Test Results */
+        .test-results {
+            margin: 20px 0;
+        }
+        
+        .test-item {
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            background: #f9f9f9;
+            page-break-inside: avoid;
+        }
+        
+        .test-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 8px;
+        }
+        
+        .test-name {
+            font-weight: bold;
+            font-size: 12px;
+            margin: 0;
+        }
+        
+        .test-meta {
+            font-size: 9px;
+            color: #666;
+        }
+        
+        .test-status {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 2px;
+            display: inline-block;
+            font-weight: bold;
+        }
+        
+        .status-pass {
+            background: #f0f0f0;
+            border: 1px solid #999;
+        }
+        
+        .status-fail {
+            background: #f5f5f5;
+            border: 1px solid #666;
+        }
+        
+        .test-description {
+            font-size: 10px;
+            margin: 8px 0;
+            line-height: 1.4;
+            color: #444;
+            font-style: italic;
+        }
+        
+        .test-steps {
+            margin: 10px 0;
+        }
+        
+        .test-steps h4 {
+            font-size: 10px;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+        
+        .step-item {
+            font-size: 9px;
+            margin: 3px 0;
+            padding: 3px 8px;
+            background: #fff;
+            border-left: 2px solid #ccc;
+            line-height: 1.3;
+        }
+        
+        .step-order {
+            font-weight: bold;
+            margin-right: 5px;
+            color: #666;
+        }
+        
+        .test-comments {
+            margin: 10px 0;
+        }
+        
+        .comment-item {
+            font-size: 9px;
+            margin: 3px 0;
+            padding: 3px 8px;
+            background: #f8f8f8;
+            border-left: 2px solid #999;
+            font-style: italic;
+            line-height: 1.3;
+        }
+        
+        .test-duration {
+            font-size: 9px;
+            color: #666;
+            margin: 5px 0;
+        }
+        
+        .test-error {
+            font-size: 9px;
+            margin-top: 8px;
+            padding: 8px;
+            background: #f8f8f8;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            line-height: 1.3;
+        }
+        
+        /* Footer */
+        .footer { 
+            background: white; 
+            color: black; 
+            text-align: center; 
+            padding: 15px; 
+            border-top: 2px solid #000;
+            font-size: 10px;
+        }
+        .footer p { margin: 3px 0; }
+        
+        /* Print Styles */
+        @media print {
+            body { background: white; }
+            .container { box-shadow: none; border: 1px solid #000; }
+            .test-table { break-inside: avoid; }
+            .category-section { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>AI.ttorney Mobile Application</h1>
+            <div class="subtitle">End-to-End Test Execution Report</div>
+            <div class="meta">
+                <div>Report Generated: 11/23/2025, 2:21:36 PM</div>
+                <div>Test Environment: Android Emulator</div>
+                <div>Application Version: Production Build</div>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <!-- Executive Summary -->
+            <div class="section">
+                <h2>Executive Summary</h2>
+                <div class="executive-summary">
+                    <p>This report presents the results of comprehensive end-to-end testing performed on the AI.ttorney mobile application. The testing framework validates critical user journeys, system functionality, and application reliability across multiple test categories.</p>
+                    
+                    <div class="summary-grid">
+                        <div class="summary-card">
+                            <div class="summary-number">74</div>
+                            <div>Total Test Cases</div>
+                        </div>
+                        <div class="summary-card success">
+                            <div class="summary-number success">74</div>
+                            <div>Passed</div>
+                        </div>
+                        <div class="summary-card failure">
+                            <div class="summary-number failure">0</div>
+                            <div>Failed</div>
+                        </div>
+                        <div class="summary-card info">
+                            <div class="summary-number info">100.0%</div>
+                            <div>Success Rate</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Testing Framework Information -->
+            <div class="section">
+                <h2>Testing Framework & Methodology</h2>
+                <div class="framework-info">
+                    <table class="framework-table">
+                        <tr>
+                            <td>Framework Name</td>
+                            <td>Hybrid Detox + UI Automator Framework</td>
+                        </tr>
+                        <tr>
+                            <td>Framework Version</td>
+                            <td>1.0.0</td>
+                        </tr>
+                        <tr>
+                            <td>Target Platform</td>
+                            <td>Android</td>
+                        </tr>
+                        <tr>
+                            <td>Automation Technology</td>
+                            <td>UI Automator + Detox Concepts</td>
+                        </tr>
+                        <tr>
+                            <td>Implementation Language</td>
+                            <td>Node.js</td>
+                        </tr>
+                        <tr>
+                            <td>Reporting Engine</td>
+                            <td>Custom HTML Generator</td>
+                        </tr>
+                        <tr>
+                            <td>Test Execution Mode</td>
+                            <td>Comprehensive Suite</td>
+                        </tr>
+                        <tr>
+                            <td>Screenshot Capture</td>
+                            <td>Enabled - Visual verification at key test points</td>
+                        </tr>
+                        <tr>
+                            <td>Framework Note</td>
+                            <td>Enhanced automation using UI Automator with Detox testing patterns.</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Test Results Overview -->
+            <div class="section">
+                <h2>Test Results Overview</h2>
+                <div class="chart-container">
+                    <div class="chart-section">
+                        <h3>Overall Pass Rate</h3>
+                        <canvas id="passRateChart" class="chart-canvas"></canvas>
+                        <div class="chart-number">100.0%</div>
+                        <div>Success Rate</div>
+                    </div>
+                    <div class="chart-section">
+                        <h3>Test Distribution</h3>
+                        <canvas id="testDistributionChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="chart-section">
+                        <h3>Test Execution Statistics</h3>
+                        <table class="test-table" style="width: 100%;">
+                            <tr>
+                                <th>Metric</th>
+                                <th>Value</th>
+                                <th>Percentage</th>
+                            </tr>
+                            <tr>
+                                <td>Successful Tests</td>
+                                <td>74</td>
+                                <td>100.0%</td>
+                            </tr>
+                            <tr>
+                                <td>Failed Tests</td>
+                                <td>0</td>
+                                <td>0.0%</td>
+                            </tr>
+                            <tr>
+                                <td>Total Executed</td>
+                                <td>74</td>
+                                <td>100%</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Detailed Test Results by Category -->
+            <div class="section">
+                <h2>Detailed Test Results by Category</h2>
+                
+                    <div class="category-section">
+                        <div class="category-header">
+                            Core Application Tests (3/3 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">App Launch Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Verifies that the application launches successfully and UI elements are loaded properly using multiple verification methods including UI Automator dump, process check, and activity validation.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize app launch verification process<br>2. Attempt UI Automator dump for app verification<br>3. UI Automator dump successful - app verified as running<br>4. Capture screenshot for visual verification<br>5. App launch test completed successfully
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Primary verification method succeeded
+                                            </td>
+                                            <td style="font-size: 9px;">4151ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">UI Elements Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates that UI elements are properly rendered and accessible, using UI Automator dump analysis with fallback to screenshot capture for verification.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">3607ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">App Startup Performance</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Measures application startup time from launch to UI ready state, ensuring performance meets acceptable thresholds (< 10 seconds).</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">3720ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Authentication & Registration (5/5 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">User Registration Flow</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests complete user registration process including form validation, email verification, role selection, and account creation.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize user registration flow test<br>2. Navigate to registration screen<br>3. Fill registration form<br>4. Select user role<br>5. Submit registration
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                User registration process validated
+                                            </td>
+                                            <td style="font-size: 9px;">17817ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Login Authentication</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates secure login functionality including credential verification, session management, and role-based redirects.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize login authentication test<br>2. Navigate to login screen<br>3. Enter valid credentials<br>4. Submit login credentials<br>5. Verify successful authentication
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Login authentication process validated
+                                            </td>
+                                            <td style="font-size: 9px;">13227ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Role-Based Access Control</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests access restrictions and permissions for different user roles (guest, user, lawyer, admin).</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize role-based access control test<br>2. Test different user role access<br>3. Verify role-based navigation restrictions
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Role-based access control validated
+                                            </td>
+                                            <td style="font-size: 9px;">8273ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Guest Access Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests guest user access functionality, verifying that users can access the application without authentication and navigate to guest-specific features.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">5124ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Authentication Edge Cases</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests authentication with edge cases including empty credentials, invalid email formats, empty passwords, and extremely long email addresses.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">36575ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Guest User Features (4/4 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Guest Onboarding Flow</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Verifies the guest onboarding process, testing tutorial navigation, step progression, and completion flow for new guest users.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">11224ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Guest Chatbot Access</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests guest user access to chatbot functionality, including navigation to chatbot screen and basic interaction capabilities.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize guest chatbot access test<br>2. Navigate to chatbot screen<br>3. Attempt to find chatbot button using UI Automator<br>4. UI Automator failed - using coordinate tap fallback<br>5. Wait for chatbot screen to load<br>6. Capture screenshot of chatbot access<br>7. Begin chatbot interaction test<br>8. Input test query: "What is contract law?"<br>9. Attempt to send message<br>10. Find and tap send button using UI Automator<br>11. UI Automator failed - using coordinate tap for send button<br>12. Wait for chatbot response<br>13. Capture screenshot of chatbot interaction<br>14. Guest chatbot interaction test completed successfully
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Coordinate tap fallback used for chatbot navigation<br>Coordinate tap fallback used for send button<br>Chatbot interaction flow validated for guest users
+                                            </td>
+                                            <td style="font-size: 9px;">12636ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Guest Legal Glossary Access</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Verifies that guest users can access and search the legal glossary without authentication requirements.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize guest legal glossary access test<br>2. Verify guest can access legal glossary without authentication<br>3. Test guest glossary search functionality<br>4. Verify guest can view glossary terms
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Guest legal glossary access validated successfully
+                                            </td>
+                                            <td style="font-size: 9px;">15702ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Guest Session Limits</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates guest session limitations and boundaries by testing multiple consecutive requests and session management.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">62557ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            AI Chatbot System (4/4 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">User-Side AI Chatbot</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests general legal question handling, response accuracy, and context management for regular users.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize user-side AI chatbot test<br>2. Navigate to user chatbot interface<br>3. Test general legal question handling<br>4. Test follow-up question context
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                User-side chatbot functionality validated
+                                            </td>
+                                            <td style="font-size: 9px;">18860ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Lawyer-Side AI Chatbot</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates advanced legal query processing, complex case analysis, and professional-level responses for lawyers.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize lawyer-side AI chatbot test<br>2. Switch to lawyer interface<br>3. Access lawyer chatbot<br>4. Test complex legal query processing
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Lawyer-side chatbot advanced functionality validated
+                                            </td>
+                                            <td style="font-size: 9px;">19997ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Chatbot Bilingual Support</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests language switching, multilingual responses, and context preservation across different languages.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize chatbot bilingual support test<br>2. Test language switching in chatbot<br>3. Test English query<br>4. Test language switch
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Bilingual support functionality tested
+                                            </td>
+                                            <td style="font-size: 9px;">27620ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Chatbot Context Handling</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Verifies conversation continuity, context retention, and follow-up question processing.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize chatbot context handling test<br>2. Test conversation context retention<br>3. Send initial query<br>4. Send follow-up query testing context
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Context handling validated
+                                            </td>
+                                            <td style="font-size: 9px;">17697ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Legal Knowledge Base (4/4 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Legal Articles Management</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests article creation, editing, publication, categorization, and search functionality.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize legal articles management test<br>2. Navigate to articles section<br>3. Test article search and filtering
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Articles management tested
+                                            </td>
+                                            <td style="font-size: 9px;">14385ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Legal Glossary Management</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates glossary term management, definitions, cross-references, and search capabilities.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize legal glossary management test<br>2. Navigate to glossary management<br>3. Test glossary search and definitions
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Glossary management validated
+                                            </td>
+                                            <td style="font-size: 9px;">13716ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Knowledge Base Search</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests search functionality across articles, glossary, and FAQs with filtering and relevance ranking.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize knowledge base search test<br>2. Test comprehensive knowledge base search<br>3. Verify search results across articles and glossary
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Knowledge base search validated
+                                            </td>
+                                            <td style="font-size: 9px;">13492ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">FAQ System</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Verifies FAQ display, categorization, search, and user interaction with frequently asked questions.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize FAQ system test<br>2. Navigate to FAQ section<br>3. Test FAQ categories and search
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                FAQ system functionality validated
+                                            </td>
+                                            <td style="font-size: 9px;">12520ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Consultation System (6/6 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Consultation Request Creation</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests the consultation request creation process including form completion, validation, and successful submission.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize consultation request creation test<br>2. Navigate to consultation request form<br>3. Fill consultation request form<br>4. Submit consultation request
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Consultation request creation flow validated
+                                            </td>
+                                            <td style="font-size: 9px;">13203ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Consultation Response Tracking</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates tracking of lawyer responses, status updates, and communication throughout consultation process.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize consultation response tracking test<br>2. Navigate to consultation tracking<br>3. Check consultation status and responses<br>4. Verify response tracking interface
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Response tracking validated
+                                            </td>
+                                            <td style="font-size: 9px;">12045ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Lawyer Consultation Management</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests the lawyer-side consultation management interface including request viewing and management capabilities.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize lawyer consultation management test<br>2. Navigate to lawyer consultation dashboard<br>3. Access consultation management interface
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Lawyer consultation management interface validated
+                                            </td>
+                                            <td style="font-size: 9px;">11193ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Consultation Accept Flow</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates the complete consultation acceptance workflow from lawyer perspective including acceptance confirmation and status updates.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize consultation accept flow test<br>2. Select consultation request to accept<br>3. Execute consultation acceptance
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Consultation acceptance workflow validated
+                                            </td>
+                                            <td style="font-size: 9px;">18297ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Consultation Reject Flow</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests the consultation rejection process including rejection reasons, client notification, and status management.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize consultation reject flow test<br>2. Select consultation request to reject<br>3. Execute consultation rejection<br>4. Provide rejection reason
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Consultation rejection workflow validated
+                                            </td>
+                                            <td style="font-size: 9px;">19710ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Consultation Status Updates</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Verifies consultation status tracking and updates throughout the consultation lifecycle for both clients and lawyers.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize consultation status updates test<br>2. Test consultation status tracking<br>3. Update consultation status
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Consultation status update functionality validated
+                                            </td>
+                                            <td style="font-size: 9px;">20460ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Law Firm Locator (3/3 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Law Firm Location Accuracy</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests GPS accuracy, address verification, and correct positioning of law firms on map interface.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize law firm location accuracy test<br>2. Navigate to law firm map<br>3. Test GPS accuracy and firm positioning<br>4. Verify address accuracy
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Location accuracy validated
+                                            </td>
+                                            <td style="font-size: 9px;">16373ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Law Firm Search Results</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates search functionality, result relevance, and proper display of law firm information.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize law firm search results test<br>2. Test law firm search functionality<br>3. Search for specific law firms
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Search results validated
+                                            </td>
+                                            <td style="font-size: 9px;">16775ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Law Firm Filtering</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests filtering by specialization, location, ratings, and other criteria for law firm discovery.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize law firm filtering test<br>2. Test law firm filtering options<br>3. Apply specialization filters
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Filtering functionality validated
+                                            </td>
+                                            <td style="font-size: 9px;">15498ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Community Forum (4/4 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Forum Post Creation</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests post creation workflow, content validation, category assignment, and publication process.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize forum post creation test<br>2. Attempt to create new forum post<br>3. Fill forum post form<br>4. Submit forum post
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Forum post creation flow validated
+                                            </td>
+                                            <td style="font-size: 9px;">14954ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Forum Commenting System</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates comment functionality, threading, replies, and user interaction within forum discussions.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize forum commenting system test<br>2. Navigate to forum discussions<br>3. Test commenting on existing post
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Forum commenting validated
+                                            </td>
+                                            <td style="font-size: 9px;">16840ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Forum Content Reporting</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests reporting mechanism for inappropriate content, spam, or policy violations.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize forum content reporting test<br>2. Test content reporting mechanism<br>3. Report inappropriate content<br>4. Select report reason
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Content reporting validated
+                                            </td>
+                                            <td style="font-size: 9px;">20054ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Forum Discussion Viewing</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Verifies proper display of discussions, sorting, pagination, and user engagement features.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize forum discussion viewing test<br>2. Test discussion viewing and navigation<br>3. View discussion threads<br>4. Test thread navigation and sorting
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Discussion viewing validated
+                                            </td>
+                                            <td style="font-size: 9px;">16360ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Lawyer Application System (3/3 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Lawyer Credential Upload</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests document upload functionality, file validation, security, and credential storage.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize lawyer credential upload test<br>2. Navigate to lawyer application<br>3. Test document upload functionality
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Credential upload validated
+                                            </td>
+                                            <td style="font-size: 9px;">13208ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Lawyer Application Submission</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates complete application process, form validation, and submission workflow.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize lawyer application submission test<br>2. Test complete application process<br>3. Fill application form<br>4. Submit application
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Application submission validated
+                                            </td>
+                                            <td style="font-size: 9px;">16409ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Lawyer Verification Status</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests status tracking, notification system, and verification progress display.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize lawyer verification status test<br>2. Check verification status tracking<br>3. Verify status display and notifications
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Verification status validated
+                                            </td>
+                                            <td style="font-size: 9px;">11020ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            AI Moderation System (2/2 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Chatbot AI Moderation</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests automatic detection and filtering of inappropriate, harmful, or off-topic content in chatbot interactions.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize chatbot AI moderation test<br>2. Navigate to chatbot for moderation testing<br>3. Test inappropriate content detection<br>4. Test off-topic content filtering
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Chatbot AI moderation functionality tested
+                                            </td>
+                                            <td style="font-size: 9px;">14509ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Forum AI Moderation</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests automatic content moderation, inappropriate content detection, and policy enforcement in forum posts.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize forum AI moderation test<br>2. Navigate to forum for moderation testing<br>3. Test forum post moderation<br>4. Submit content for AI moderation review<br>5. Test comment moderation
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Forum AI moderation system validated
+                                            </td>
+                                            <td style="font-size: 9px;">22874ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Administrative CMS (9/9 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Admin Lawyer Management</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests admin capabilities for viewing, filtering, approving, rejecting, and updating lawyer records.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize admin lawyer management test<br>2. Access admin panel<br>3. Test lawyer record management
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Lawyer management validated
+                                            </td>
+                                            <td style="font-size: 9px;">13119ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Admin Legal Seeker Management</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates admin tools for managing user accounts, permissions, and user data.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize admin legal seeker management test<br>2. Access user management<br>3. Test user account management
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                User management validated
+                                            </td>
+                                            <td style="font-size: 9px;">13165ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Admin Content Management</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests creation, editing, deletion, and publication management for articles and glossary terms.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize admin content management test<br>2. Access content management<br>3. Test article and glossary management
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Content management validated
+                                            </td>
+                                            <td style="font-size: 9px;">13386ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Admin Forum Management</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates admin moderation tools, content management, and forum oversight capabilities.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize admin forum management test<br>2. Access forum moderation tools<br>3. Test moderation capabilities
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Forum management validated
+                                            </td>
+                                            <td style="font-size: 9px;">13282ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Admin Appeals Management</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests appeals process handling, review workflow, and decision management.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize admin appeals management test<br>2. Access appeals system<br>3. Test appeals processing
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Appeals management validated
+                                            </td>
+                                            <td style="font-size: 9px;">13279ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Admin Account Management</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates admin account creation, role assignment, and permission management.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize admin account management test<br>2. Access admin account tools<br>3. Test admin role management
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Account management validated
+                                            </td>
+                                            <td style="font-size: 9px;">13352ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Admin Audit Logs</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests comprehensive logging, action tracking, and audit trail functionality.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize admin audit logs test<br>2. Access audit logging system<br>3. Test log viewing and filtering
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Audit logs validated
+                                            </td>
+                                            <td style="font-size: 9px;">13400ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Admin Dashboard Statistics</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Verifies accuracy of displayed metrics, system activity, and performance statistics.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize admin dashboard statistics test<br>2. Access admin dashboard<br>3. Verify statistics accuracy
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Dashboard statistics validated
+                                            </td>
+                                            <td style="font-size: 9px;">13347ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Lawyer Verification Management</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests admin review process for lawyer credentials, approval workflow, and verification decisions.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize lawyer verification management test<br>2. Access verification workflow<br>3. Test verification decisions
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Verification management validated
+                                            </td>
+                                            <td style="font-size: 9px;">13594ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Help & Support (3/3 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Help Support Requests</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests support ticket creation, categorization, and submission process.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize help support requests test<br>2. Access support system<br>3. Create support request
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Support requests validated
+                                            </td>
+                                            <td style="font-size: 9px;">15302ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Support FAQ Display</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates FAQ organization, search functionality, and user-friendly display.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize support FAQ display test<br>2. Access FAQ section<br>3. Test FAQ navigation and search
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                FAQ display validated
+                                            </td>
+                                            <td style="font-size: 9px;">17035ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Support Request Processing</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests support workflow, response tracking, and resolution management.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                1. Initialize support request processing test<br>2. Test support workflow<br>3. Check request status and responses
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                Request processing validated
+                                            </td>
+                                            <td style="font-size: 9px;">16338ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            User Interface & Experience (4/4 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Screen Rotation Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates application behavior during device orientation changes, testing UI adaptation and state preservation.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">8739ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Back Button Navigation</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests Android back button functionality and navigation stack management throughout the application.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">10161ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Multi-Touch Gestures</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates multi-touch gesture recognition including swipe gestures in different directions and touch interaction handling.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">17047ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Accessibility Features</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests accessibility compliance including screen reader compatibility, navigation accessibility, and assistive technology support.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">7857ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Performance & Reliability (4/4 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">App Responsiveness Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Measures application responsiveness to user interactions, testing UI response times and performance under rapid input conditions.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">1529ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Network Connectivity Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates application behavior under different network conditions and tests network-dependent operations.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">11122ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Memory Usage Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Monitors application memory consumption during various operations, detecting memory leaks and optimization opportunities.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">17826ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Battery Usage Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Analyzes application power consumption during intensive operations and monitors battery usage patterns.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">5438ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Security & Privacy (3/3 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Data Privacy Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Ensures sensitive user data is properly protected, not exposed in logs, screenshots, or other potential leak vectors.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">12414ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Session Security Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates session security measures including timeout handling, background state security, and authentication persistence.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">17858ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Input Sanitization Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests input sanitization and validation to prevent XSS, injection attacks, and other security vulnerabilities.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">30045ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Stress & Load Testing (4/4 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Rapid Input Stress Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Stress tests the application with rapid, high-frequency user inputs to validate stability and performance under extreme conditions.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">11228ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Long Session Stress Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Simulates extended user sessions (5+ minutes) with continuous operations to test long-term stability and performance.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">303200ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Concurrent Operations Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests application stability when multiple operations are performed simultaneously, validating thread safety and resource management.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">4960ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Large Data Handling</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates application behavior when processing large data payloads, testing input limits and data processing capabilities.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">14486ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Edge Cases & Error Handling (6/6 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Invalid Input Handling</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests application resilience against invalid, malformed, and edge case inputs to ensure proper error handling and security.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">14238ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">App Recovery Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates application recovery capabilities after being backgrounded, testing state preservation and session management.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">7112ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Network Interruption Test</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests application behavior during network connectivity loss and recovery, validating offline capabilities and reconnection handling.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">13449ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Low Storage Conditions</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Simulates low device storage conditions to test application behavior and graceful degradation under storage constraints.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">10465ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Device Resource Limits</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests application performance and stability under device resource limitations including CPU and memory constraints.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">6488ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Malformed Data Handling</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates application security and stability when processing malformed, malicious, or unexpected data inputs.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">23278ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+                    <div class="category-section">
+                        <div class="category-header">
+                            Compatibility Testing (3/3 passed - 100.0%)
+                        </div>
+                        <div class="category-content">
+                            <table class="test-table">
+                                <thead>
+                                    <tr>
+                                        <th>Test Case</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Comments</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Error Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Different Screen Sizes</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests application compatibility across different screen sizes, resolutions, and orientations for responsive design validation.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">17112ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">System Theme Changes</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Validates application adaptation to system theme changes including dark mode, light mode, and dynamic theme switching.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">12951ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                        <tr>
+                                            <td style="font-weight: bold;">Language Switching</td>
+                                            <td style="font-size: 9px; max-width: 200px;">Tests internationalization support and application behavior when system language settings are changed.</td>
+                                            <td style="font-size: 8px; max-width: 150px;">
+                                                Standard test execution
+                                            </td>
+                                            <td style="font-size: 8px; max-width: 120px; font-style: italic;">
+                                                No additional comments
+                                            </td>
+                                            <td style="font-size: 9px;">24402ms</td>
+                                            <td><span class="status-badge pass">PASS</span></td>
+                                            <td style="font-size: 8px; max-width: 150px;">N/A</td>
+                                        </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  
+            </div>
+
+            <!-- Test Coverage & Scope -->
+            <div class="section">
+                <h2>Test Coverage & Scope</h2>
+                <table class="test-table">
+                    <thead>
+                        <tr>
+                            <th>Test Category</th>
+                            <th>Coverage Area</th>
+                            <th>Test Count</th>
+                            <th>Business Impact</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Core Application Tests</td>
+                            <td>Application lifecycle, startup, UI initialization</td>
+                            <td>3</td>
+                            <td>Critical - Core functionality</td>
+                        </tr>
+                        <tr>
+                            <td>Authentication & Access Control</td>
+                            <td>User authentication, guest access, security</td>
+                            <td>3</td>
+                            <td>High - User access management</td>
+                        </tr>
+                        <tr>
+                            <td>Guest User Journey</td>
+                            <td>Guest onboarding, feature access, user flow</td>
+                            <td>3</td>
+                            <td>High - User acquisition</td>
+                        </tr>
+                        <tr>
+                            <td>Core Feature Validation</td>
+                            <td>Chatbot functionality, legal queries, navigation</td>
+                            <td>3</td>
+                            <td>Critical - Primary features</td>
+                        </tr>
+                        <tr>
+                            <td>Legal Platform Features</td>
+                            <td>Forum, glossary, articles, lawyer directory, law firm map</td>
+                            <td>11</td>
+                            <td>Critical - Main legal features</td>
+                        </tr>
+                        <tr>
+                            <td>Consultation System</td>
+                            <td>Request creation, lawyer management, accept/reject flows</td>
+                            <td>6</td>
+                            <td>Critical - Core business functionality</td>
+                        </tr>
+                        <tr>
+                            <td>User Interface & Experience</td>
+                            <td>UI responsiveness, accessibility, device compatibility</td>
+                            <td>4</td>
+                            <td>Medium - User experience</td>
+                        </tr>
+                        <tr>
+                            <td>Performance & Reliability</td>
+                            <td>App performance, memory usage, network handling</td>
+                            <td>4</td>
+                            <td>High - System reliability</td>
+                        </tr>
+                        <tr>
+                            <td>Security & Privacy</td>
+                            <td>Data protection, session security, input sanitization</td>
+                            <td>3</td>
+                            <td>High - Security compliance</td>
+                        </tr>
+                        <tr>
+                            <td>Stress & Load Testing</td>
+                            <td>High-frequency operations, extended sessions, data handling</td>
+                            <td>4</td>
+                            <td>Medium - Performance validation</td>
+                        </tr>
+                        <tr>
+                            <td>Edge Cases & Error Handling</td>
+                            <td>Error scenarios, recovery mechanisms, resilience</td>
+                            <td>6</td>
+                            <td>Medium - System robustness</td>
+                        </tr>
+                        <tr>
+                            <td>Compatibility Testing</td>
+                            <td>Screen sizes, themes, language support</td>
+                            <td>3</td>
+                            <td>Low - Cross-platform compatibility</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Recommendations & Next Steps -->
+            <div class="section">
+                <h2>Recommendations & Next Steps</h2>
+                <div class="framework-info">
+                    <h3>Quality Assessment</h3>
+                    <p><strong>Overall Quality Score:</strong> 100.0% - Excellent</p>
+                    
+                    <h3>Recommendations</h3>
+                    <ul style="margin: 15px 0; padding-left: 20px;">
+                        <li>All tests passed successfully. Application is ready for production deployment.</li><li>Consider expanding test coverage to include edge cases and stress testing.</li><li>Implement continuous integration to run these tests automatically.</li>
+                        <li>Maintain regular test execution schedule for regression testing.</li>
+                        <li>Consider performance optimization based on responsiveness test results.</li>
+                        <li>Expand test coverage to include iOS platform testing.</li>
+                    </ul>
+                    
+                    <h3>Test Artifacts</h3>
+                    <p>Screenshots and detailed logs are available in the <code>e2e/screenshots/</code> directory for further analysis and debugging purposes.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>AI.ttorney Quality Assurance Team</strong></p>
+            <p>End-to-End Testing Framework | Automated System Validation</p>
+            <p>Report generated on 11/23/2025 at 2:21:36 PM</p>
+        </div>
+    </div>
+
+    <script>
+        // Chart.js configuration for black and white professional charts
+        Chart.defaults.color = '#000';
+        Chart.defaults.borderColor = '#ccc';
+        Chart.defaults.backgroundColor = '#f5f5f5';
+
+        // Pass Rate Donut Chart
+        const passRateCtx = document.getElementById('passRateChart').getContext('2d');
+        new Chart(passRateCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Passed', 'Failed'],
+                datasets: [{
+                    data: [74, 0],
+                    backgroundColor: ['#e0e0e0', '#999999'],
+                    borderColor: ['#000', '#000'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#000',
+                            font: { size: 10 }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Test Distribution Bar Chart
+        const distributionCtx = document.getElementById('testDistributionChart').getContext('2d');
+        new Chart(distributionCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Passed', 'Failed'],
+                datasets: [{
+                    label: 'Test Count',
+                    data: [74, 0],
+                    backgroundColor: ['#e0e0e0', '#999999'],
+                    borderColor: ['#000', '#000'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#000', font: { size: 9 } },
+                        grid: { color: '#ccc' }
+                    },
+                    x: {
+                        ticks: { color: '#000', font: { size: 9 } },
+                        grid: { color: '#ccc' }
+                    }
+                }
+            }
+        });
+
+    </script>
+</body>
+</html>

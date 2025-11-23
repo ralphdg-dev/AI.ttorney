@@ -257,8 +257,268 @@ class HomePage {
   }
 }
 
+class GuestOnboardingPage {
+  constructor() {
+    // Guest onboarding elements
+    this.continueAsGuestButton = element(by.id('continue-as-guest-button'));
+    this.signInButton = element(by.id('sign-in-button'));
+    this.startExploringButton = element(by.id('start-exploring-button'));
+    this.guestWelcomeText = element(by.id('guest-welcome-text'));
+    this.chatbotFeatureCard = element(by.id('chatbot-feature-card'));
+    this.glossaryFeatureCard = element(by.id('glossary-feature-card'));
+    
+    // Tutorial elements
+    this.tutorialOverlay = element(by.id('tutorial-overlay'));
+    this.tutorialNextButton = element(by.id('tutorial-next-button'));
+    this.tutorialSkipButton = element(by.id('tutorial-skip-button'));
+    this.tutorialCloseButton = element(by.id('tutorial-close-button'));
+    this.spotlightArea = element(by.id('tutorial-spotlight'));
+  }
+
+  async navigateToGuestOnboarding() {
+    await device.launchApp({ newInstance: true });
+    await testUtils.waitForElement(this.continueAsGuestButton);
+    await this.continueAsGuestButton.tap();
+  }
+
+  async verifyGuestOnboardingScreen() {
+    await testUtils.waitForElement(this.guestWelcomeText);
+    await expect(this.guestWelcomeText).toBeVisible();
+    await expect(this.chatbotFeatureCard).toBeVisible();
+    await expect(this.glossaryFeatureCard).toBeVisible();
+  }
+
+  async startExploring() {
+    await this.startExploringButton.tap();
+  }
+
+  async waitForTutorial() {
+    await testUtils.waitForElement(this.tutorialOverlay, 10000);
+  }
+
+  async skipTutorial() {
+    try {
+      await this.tutorialSkipButton.tap();
+    } catch (error) {
+      // Tutorial might not be showing
+    }
+  }
+
+  async completeTutorial() {
+    let tutorialStep = 0;
+    const maxSteps = 5; // Adjust based on your tutorial steps
+    
+    while (tutorialStep < maxSteps) {
+      try {
+        await testUtils.waitForElement(this.tutorialNextButton, 3000);
+        await this.tutorialNextButton.tap();
+        tutorialStep++;
+        await device.sleep(1000); // Wait for animation
+      } catch (error) {
+        // Tutorial completed or next button not found
+        break;
+      }
+    }
+    
+    // Close tutorial if close button exists
+    try {
+      await this.tutorialCloseButton.tap();
+    } catch (error) {
+      // Tutorial might auto-close
+    }
+  }
+}
+
+class ChatbotPage {
+  constructor() {
+    // Chatbot elements
+    this.chatbotScreen = element(by.id('chatbot-screen'));
+    this.messageInput = element(by.id('message-input'));
+    this.sendButton = element(by.id('send-button'));
+    this.messagesContainer = element(by.id('messages-container'));
+    this.typingIndicator = element(by.id('typing-indicator'));
+    this.sourcesContainer = element(by.id('sources-container'));
+    this.newChatButton = element(by.id('new-chat-button'));
+    
+    // Message elements
+    this.userMessage = element(by.id('user-message'));
+    this.botMessage = element(by.id('bot-message'));
+    this.messageTimestamp = element(by.id('message-timestamp'));
+    
+    // Error elements
+    this.errorMessage = element(by.id('error-message'));
+    this.retryButton = element(by.id('retry-button'));
+    this.networkErrorHandler = element(by.id('network-error-handler'));
+    
+    // Navigation elements
+    this.backButton = element(by.id('back-button'));
+    this.menuButton = element(by.id('menu-button'));
+  }
+
+  async verifyChatbotScreen() {
+    await testUtils.waitForElement(this.chatbotScreen, 15000);
+    await expect(this.chatbotScreen).toBeVisible();
+    await expect(this.messageInput).toBeVisible();
+    await expect(this.sendButton).toBeVisible();
+  }
+
+  async sendMessage(message) {
+    await testUtils.waitForElement(this.messageInput);
+    await testUtils.typeText(this.messageInput, message);
+    await this.sendButton.tap();
+  }
+
+  async waitForBotResponse(timeout = 30000) {
+    // Wait for typing indicator to appear
+    try {
+      await testUtils.waitForElement(this.typingIndicator, 5000);
+    } catch (error) {
+      // Typing indicator might not show for fast responses
+    }
+    
+    // Wait for bot message to appear
+    await testUtils.waitForElement(this.botMessage, timeout);
+  }
+
+  async verifyMessageSent(message) {
+    const userMessageElement = element(by.text(message));
+    await expect(userMessageElement).toBeVisible();
+  }
+
+  async verifyBotResponse() {
+    await expect(this.botMessage).toBeVisible();
+    // Verify message has content (not empty)
+    const messageText = await this.botMessage.getText();
+    expect(messageText.length).toBeGreaterThan(0);
+  }
+
+  async verifySources() {
+    try {
+      await testUtils.waitForElement(this.sourcesContainer, 5000);
+      await expect(this.sourcesContainer).toBeVisible();
+    } catch (error) {
+      // Sources might not always be present
+      console.log('No sources found for this response');
+    }
+  }
+
+  async startNewChat() {
+    await this.newChatButton.tap();
+  }
+
+  async handleNetworkError() {
+    try {
+      await testUtils.waitForElement(this.networkErrorHandler, 5000);
+      await this.retryButton.tap();
+    } catch (error) {
+      // No network error occurred
+    }
+  }
+}
+
+class LawyerDashboardPage {
+  constructor() {
+    // Dashboard elements
+    this.dashboardScreen = element(by.id('lawyer-dashboard-screen'));
+    this.welcomeMessage = element(by.id('lawyer-welcome-message'));
+    this.timelineContainer = element(by.id('timeline-container'));
+    this.forumButton = element(by.id('forum-button'));
+    this.profileButton = element(by.id('profile-button'));
+    this.consultationsButton = element(by.id('consultations-button'));
+    
+    // Timeline elements
+    this.timelineItem = element(by.id('timeline-item'));
+    this.timelineLoadingIndicator = element(by.id('timeline-loading'));
+    this.timelineErrorMessage = element(by.id('timeline-error'));
+    this.refreshButton = element(by.id('refresh-timeline-button'));
+    
+    // Navigation elements
+    this.navigationTabs = element(by.id('navigation-tabs'));
+    this.bottomNavigation = element(by.id('bottom-navigation'));
+  }
+
+  async verifyDashboardScreen() {
+    await testUtils.waitForElement(this.dashboardScreen, 15000);
+    await expect(this.dashboardScreen).toBeVisible();
+    await expect(this.welcomeMessage).toBeVisible();
+  }
+
+  async verifyTimelineLoaded() {
+    await testUtils.waitForLoading(this.timelineLoadingIndicator);
+    try {
+      await expect(this.timelineContainer).toBeVisible();
+    } catch (error) {
+      // Timeline might be empty
+      console.log('Timeline appears to be empty');
+    }
+  }
+
+  async navigateToForum() {
+    await this.forumButton.tap();
+  }
+
+  async navigateToProfile() {
+    await this.profileButton.tap();
+  }
+
+  async navigateToConsultations() {
+    await this.consultationsButton.tap();
+  }
+
+  async refreshTimeline() {
+    await this.refreshButton.tap();
+    await this.verifyTimelineLoaded();
+  }
+}
+
+class GlossaryPage {
+  constructor() {
+    // Glossary elements
+    this.glossaryScreen = element(by.id('glossary-screen'));
+    this.searchInput = element(by.id('glossary-search-input'));
+    this.searchButton = element(by.id('glossary-search-button'));
+    this.termsList = element(by.id('terms-list'));
+    this.termItem = element(by.id('term-item'));
+    this.termDefinition = element(by.id('term-definition'));
+    
+    // Navigation elements
+    this.backButton = element(by.id('glossary-back-button'));
+    this.categoryFilter = element(by.id('category-filter'));
+  }
+
+  async verifyGlossaryScreen() {
+    await testUtils.waitForElement(this.glossaryScreen, 10000);
+    await expect(this.glossaryScreen).toBeVisible();
+    await expect(this.searchInput).toBeVisible();
+  }
+
+  async searchTerm(term) {
+    await testUtils.typeText(this.searchInput, term);
+    await this.searchButton.tap();
+  }
+
+  async verifySearchResults() {
+    await testUtils.waitForElement(this.termsList, 10000);
+    await expect(this.termsList).toBeVisible();
+  }
+
+  async selectFirstTerm() {
+    await testUtils.waitForElement(this.termItem);
+    await this.termItem.tap();
+  }
+
+  async verifyTermDefinition() {
+    await testUtils.waitForElement(this.termDefinition);
+    await expect(this.termDefinition).toBeVisible();
+  }
+}
+
 module.exports = {
   LoginPage,
   RegistrationPage,
-  HomePage
+  HomePage,
+  GuestOnboardingPage,
+  ChatbotPage,
+  LawyerDashboardPage,
+  GlossaryPage
 };

@@ -1,0 +1,28 @@
+# Fix for Detox Android build issues
+# Add this to android/app/build.gradle
+
+# Add to the android block:
+android {
+    ...
+    
+    packagingOptions {
+        pickFirst '**/libc++_shared.so'
+        pickFirst '**/libfbjni.so'
+        pickFirst '**/libhermestooling.so'
+        pickFirst '**/libimagepipeline.so'
+        pickFirst '**/libjsi.so'
+        pickFirst '**/libnative-filters.so'
+        pickFirst '**/libnative-imagetranscoder.so'
+        pickFirst '**/libreactnative.so'
+    }
+    
+    testBuildType System.getProperty('testBuildType', 'debug')
+    testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+}
+
+# Add to dependencies:
+dependencies {
+    ...
+    androidTestImplementation('com.wix:detox:+')
+    implementation 'androidx.appcompat:appcompat:1.1.0'
+}

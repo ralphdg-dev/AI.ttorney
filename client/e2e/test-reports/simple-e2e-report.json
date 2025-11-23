@@ -1,0 +1,48 @@
+{
+  "timestamp": "2025-11-22T18:09:53.428Z",
+  "totalTests": 8,
+  "passed": 8,
+  "failed": 0,
+  "results": [
+    {
+      "name": "App Launch Test",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "name": "Splash Screen Test",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "name": "Initial UI Load Test",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "name": "Guest Access Test",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "name": "Guest Onboarding Flow",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "name": "Guest Chatbot Access",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "name": "Chatbot Functionality",
+      "status": "PASS",
+      "error": null
+    },
+    {
+      "name": "App Responsiveness Test",
+      "status": "PASS",
+      "error": null
+    }
+  ]
+}

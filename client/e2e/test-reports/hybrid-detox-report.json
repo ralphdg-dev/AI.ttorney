@@ -1,0 +1,1921 @@
+{
+  "timestamp": "2025-11-23T06:21:36.450Z",
+  "totalTests": 74,
+  "passed": 74,
+  "failed": 0,
+  "results": [
+    {
+      "name": "App Launch Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Verifies that the application launches successfully and UI elements are loaded properly using multiple verification methods including UI Automator dump, process check, and activity validation.",
+      "steps": [
+        {
+          "step": "Initialize app launch verification process",
+          "timestamp": "2025-11-23T05:57:07.668Z",
+          "order": 1
+        },
+        {
+          "step": "Attempt UI Automator dump for app verification",
+          "timestamp": "2025-11-23T05:57:07.668Z",
+          "order": 2
+        },
+        {
+          "step": "UI Automator dump successful - app verified as running",
+          "timestamp": "2025-11-23T05:57:10.158Z",
+          "order": 3
+        },
+        {
+          "step": "Capture screenshot for visual verification",
+          "timestamp": "2025-11-23T05:57:10.158Z",
+          "order": 4
+        },
+        {
+          "step": "App launch test completed successfully",
+          "timestamp": "2025-11-23T05:57:11.819Z",
+          "order": 5
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Primary verification method succeeded",
+          "timestamp": "2025-11-23T05:57:10.158Z"
+        }
+      ],
+      "duration": 4151,
+      "category": "core",
+      "priority": "high"
+    },
+    {
+      "name": "UI Elements Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates that UI elements are properly rendered and accessible, using UI Automator dump analysis with fallback to screenshot capture for verification.",
+      "steps": [],
+      "comments": [],
+      "duration": 3607,
+      "category": "core",
+      "priority": "high"
+    },
+    {
+      "name": "App Startup Performance",
+      "status": "PASS",
+      "error": null,
+      "description": "Measures application startup time from launch to UI ready state, ensuring performance meets acceptable thresholds (< 10 seconds).",
+      "steps": [],
+      "comments": [],
+      "duration": 3720,
+      "category": "performance",
+      "priority": "high"
+    },
+    {
+      "name": "User Registration Flow",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests complete user registration process including form validation, email verification, role selection, and account creation.",
+      "steps": [
+        {
+          "step": "Initialize user registration flow test",
+          "timestamp": "2025-11-23T05:57:22.153Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to registration screen",
+          "timestamp": "2025-11-23T05:57:24.153Z",
+          "order": 2
+        },
+        {
+          "step": "Fill registration form",
+          "timestamp": "2025-11-23T05:57:27.290Z",
+          "order": 3
+        },
+        {
+          "step": "Select user role",
+          "timestamp": "2025-11-23T05:57:31.626Z",
+          "order": 4
+        },
+        {
+          "step": "Submit registration",
+          "timestamp": "2025-11-23T05:57:33.728Z",
+          "order": 5
+        }
+      ],
+      "comments": [
+        {
+          "comment": "User registration process validated",
+          "timestamp": "2025-11-23T05:57:39.969Z"
+        }
+      ],
+      "duration": 17817,
+      "category": "auth",
+      "priority": "high"
+    },
+    {
+      "name": "Login Authentication",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates secure login functionality including credential verification, session management, and role-based redirects.",
+      "steps": [
+        {
+          "step": "Initialize login authentication test",
+          "timestamp": "2025-11-23T05:57:40.972Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to login screen",
+          "timestamp": "2025-11-23T05:57:42.974Z",
+          "order": 2
+        },
+        {
+          "step": "Enter valid credentials",
+          "timestamp": "2025-11-23T05:57:46.072Z",
+          "order": 3
+        },
+        {
+          "step": "Submit login credentials",
+          "timestamp": "2025-11-23T05:57:48.799Z",
+          "order": 4
+        },
+        {
+          "step": "Verify successful authentication",
+          "timestamp": "2025-11-23T05:57:53.907Z",
+          "order": 5
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Login authentication process validated",
+          "timestamp": "2025-11-23T05:57:54.198Z"
+        }
+      ],
+      "duration": 13227,
+      "category": "auth",
+      "priority": "high"
+    },
+    {
+      "name": "Role-Based Access Control",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests access restrictions and permissions for different user roles (guest, user, lawyer, admin).",
+      "steps": [
+        {
+          "step": "Initialize role-based access control test",
+          "timestamp": "2025-11-23T05:57:55.200Z",
+          "order": 1
+        },
+        {
+          "step": "Test different user role access",
+          "timestamp": "2025-11-23T05:57:57.202Z",
+          "order": 2
+        },
+        {
+          "step": "Verify role-based navigation restrictions",
+          "timestamp": "2025-11-23T05:57:59.339Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Role-based access control validated",
+          "timestamp": "2025-11-23T05:58:03.473Z"
+        }
+      ],
+      "duration": 8273,
+      "category": "auth",
+      "priority": "high"
+    },
+    {
+      "name": "Guest Access Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests guest user access functionality, verifying that users can access the application without authentication and navigate to guest-specific features.",
+      "steps": [],
+      "comments": [],
+      "duration": 5124,
+      "category": "auth",
+      "priority": "high"
+    },
+    {
+      "name": "Authentication Edge Cases",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests authentication with edge cases including empty credentials, invalid email formats, empty passwords, and extremely long email addresses.",
+      "steps": [],
+      "comments": [],
+      "duration": 36575,
+      "category": "auth",
+      "priority": "medium"
+    },
+    {
+      "name": "Guest Onboarding Flow",
+      "status": "PASS",
+      "error": null,
+      "description": "Verifies the guest onboarding process, testing tutorial navigation, step progression, and completion flow for new guest users.",
+      "steps": [],
+      "comments": [],
+      "duration": 11224,
+      "category": "guest",
+      "priority": "high"
+    },
+    {
+      "name": "Guest Chatbot Access",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests guest user access to chatbot functionality, including navigation to chatbot screen and basic interaction capabilities.",
+      "steps": [
+        {
+          "step": "Initialize guest chatbot access test",
+          "timestamp": "2025-11-23T05:59:00.403Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to chatbot screen",
+          "timestamp": "2025-11-23T05:59:02.404Z",
+          "order": 2
+        },
+        {
+          "step": "Attempt to find chatbot button using UI Automator",
+          "timestamp": "2025-11-23T05:59:02.404Z",
+          "order": 3
+        },
+        {
+          "step": "UI Automator failed - using coordinate tap fallback",
+          "timestamp": "2025-11-23T05:59:02.466Z",
+          "order": 4
+        },
+        {
+          "step": "Wait for chatbot screen to load",
+          "timestamp": "2025-11-23T05:59:02.548Z",
+          "order": 5
+        },
+        {
+          "step": "Capture screenshot of chatbot access",
+          "timestamp": "2025-11-23T05:59:05.549Z",
+          "order": 6
+        },
+        {
+          "step": "Begin chatbot interaction test",
+          "timestamp": "2025-11-23T05:59:06.461Z",
+          "order": 7
+        },
+        {
+          "step": "Input test query: \"What is contract law?\"",
+          "timestamp": "2025-11-23T05:59:06.461Z",
+          "order": 8
+        },
+        {
+          "step": "Attempt to send message",
+          "timestamp": "2025-11-23T05:59:07.600Z",
+          "order": 9
+        },
+        {
+          "step": "Find and tap send button using UI Automator",
+          "timestamp": "2025-11-23T05:59:07.600Z",
+          "order": 10
+        },
+        {
+          "step": "UI Automator failed - using coordinate tap for send button",
+          "timestamp": "2025-11-23T05:59:07.663Z",
+          "order": 11
+        },
+        {
+          "step": "Wait for chatbot response",
+          "timestamp": "2025-11-23T05:59:07.737Z",
+          "order": 12
+        },
+        {
+          "step": "Capture screenshot of chatbot interaction",
+          "timestamp": "2025-11-23T05:59:12.743Z",
+          "order": 13
+        },
+        {
+          "step": "Guest chatbot interaction test completed successfully",
+          "timestamp": "2025-11-23T05:59:13.038Z",
+          "order": 14
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Coordinate tap fallback used for chatbot navigation",
+          "timestamp": "2025-11-23T05:59:02.548Z"
+        },
+        {
+          "comment": "Coordinate tap fallback used for send button",
+          "timestamp": "2025-11-23T05:59:07.737Z"
+        },
+        {
+          "comment": "Chatbot interaction flow validated for guest users",
+          "timestamp": "2025-11-23T05:59:13.038Z"
+        }
+      ],
+      "duration": 12636,
+      "category": "guest",
+      "priority": "high"
+    },
+    {
+      "name": "Guest Legal Glossary Access",
+      "status": "PASS",
+      "error": null,
+      "description": "Verifies that guest users can access and search the legal glossary without authentication requirements.",
+      "steps": [
+        {
+          "step": "Initialize guest legal glossary access test",
+          "timestamp": "2025-11-23T05:59:14.040Z",
+          "order": 1
+        },
+        {
+          "step": "Verify guest can access legal glossary without authentication",
+          "timestamp": "2025-11-23T05:59:16.041Z",
+          "order": 2
+        },
+        {
+          "step": "Test guest glossary search functionality",
+          "timestamp": "2025-11-23T05:59:21.162Z",
+          "order": 3
+        },
+        {
+          "step": "Verify guest can view glossary terms",
+          "timestamp": "2025-11-23T05:59:27.401Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Guest legal glossary access validated successfully",
+          "timestamp": "2025-11-23T05:59:29.741Z"
+        }
+      ],
+      "duration": 15702,
+      "category": "guest",
+      "priority": "high"
+    },
+    {
+      "name": "Guest Session Limits",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates guest session limitations and boundaries by testing multiple consecutive requests and session management.",
+      "steps": [],
+      "comments": [],
+      "duration": 62557,
+      "category": "guest",
+      "priority": "medium"
+    },
+    {
+      "name": "User-Side AI Chatbot",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests general legal question handling, response accuracy, and context management for regular users.",
+      "steps": [
+        {
+          "step": "Initialize user-side AI chatbot test",
+          "timestamp": "2025-11-23T06:00:34.302Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to user chatbot interface",
+          "timestamp": "2025-11-23T06:00:36.304Z",
+          "order": 2
+        },
+        {
+          "step": "Test general legal question handling",
+          "timestamp": "2025-11-23T06:00:39.393Z",
+          "order": 3
+        },
+        {
+          "step": "Test follow-up question context",
+          "timestamp": "2025-11-23T06:00:45.633Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "User-side chatbot functionality validated",
+          "timestamp": "2025-11-23T06:00:53.161Z"
+        }
+      ],
+      "duration": 18860,
+      "category": "chatbot",
+      "priority": "high"
+    },
+    {
+      "name": "Lawyer-Side AI Chatbot",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates advanced legal query processing, complex case analysis, and professional-level responses for lawyers.",
+      "steps": [
+        {
+          "step": "Initialize lawyer-side AI chatbot test",
+          "timestamp": "2025-11-23T06:00:54.163Z",
+          "order": 1
+        },
+        {
+          "step": "Switch to lawyer interface",
+          "timestamp": "2025-11-23T06:00:56.165Z",
+          "order": 2
+        },
+        {
+          "step": "Access lawyer chatbot",
+          "timestamp": "2025-11-23T06:01:01.331Z",
+          "order": 3
+        },
+        {
+          "step": "Test complex legal query processing",
+          "timestamp": "2025-11-23T06:01:04.443Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Lawyer-side chatbot advanced functionality validated",
+          "timestamp": "2025-11-23T06:01:14.160Z"
+        }
+      ],
+      "duration": 19997,
+      "category": "chatbot",
+      "priority": "high"
+    },
+    {
+      "name": "Chatbot Bilingual Support",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests language switching, multilingual responses, and context preservation across different languages.",
+      "steps": [
+        {
+          "step": "Initialize chatbot bilingual support test",
+          "timestamp": "2025-11-23T06:01:15.162Z",
+          "order": 1
+        },
+        {
+          "step": "Test language switching in chatbot",
+          "timestamp": "2025-11-23T06:01:17.164Z",
+          "order": 2
+        },
+        {
+          "step": "Test English query",
+          "timestamp": "2025-11-23T06:01:20.273Z",
+          "order": 3
+        },
+        {
+          "step": "Test language switch",
+          "timestamp": "2025-11-23T06:01:26.527Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Bilingual support functionality tested",
+          "timestamp": "2025-11-23T06:01:42.781Z"
+        }
+      ],
+      "duration": 27620,
+      "category": "chatbot",
+      "priority": "medium"
+    },
+    {
+      "name": "Chatbot Context Handling",
+      "status": "PASS",
+      "error": null,
+      "description": "Verifies conversation continuity, context retention, and follow-up question processing.",
+      "steps": [
+        {
+          "step": "Initialize chatbot context handling test",
+          "timestamp": "2025-11-23T06:01:43.783Z",
+          "order": 1
+        },
+        {
+          "step": "Test conversation context retention",
+          "timestamp": "2025-11-23T06:01:45.784Z",
+          "order": 2
+        },
+        {
+          "step": "Send initial query",
+          "timestamp": "2025-11-23T06:01:48.862Z",
+          "order": 3
+        },
+        {
+          "step": "Send follow-up query testing context",
+          "timestamp": "2025-11-23T06:01:54.983Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Context handling validated",
+          "timestamp": "2025-11-23T06:02:01.479Z"
+        }
+      ],
+      "duration": 17697,
+      "category": "chatbot",
+      "priority": "medium"
+    },
+    {
+      "name": "Chatbot AI Moderation",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests automatic detection and filtering of inappropriate, harmful, or off-topic content in chatbot interactions.",
+      "steps": [
+        {
+          "step": "Initialize chatbot AI moderation test",
+          "timestamp": "2025-11-23T06:02:02.481Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to chatbot for moderation testing",
+          "timestamp": "2025-11-23T06:02:04.481Z",
+          "order": 2
+        },
+        {
+          "step": "Test inappropriate content detection",
+          "timestamp": "2025-11-23T06:02:07.554Z",
+          "order": 3
+        },
+        {
+          "step": "Test off-topic content filtering",
+          "timestamp": "2025-11-23T06:02:11.707Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Chatbot AI moderation functionality tested",
+          "timestamp": "2025-11-23T06:02:16.989Z"
+        }
+      ],
+      "duration": 14509,
+      "category": "ai_moderation",
+      "priority": "high"
+    },
+    {
+      "name": "Legal Articles Management",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests article creation, editing, publication, categorization, and search functionality.",
+      "steps": [
+        {
+          "step": "Initialize legal articles management test",
+          "timestamp": "2025-11-23T06:02:17.991Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to articles section",
+          "timestamp": "2025-11-23T06:02:19.992Z",
+          "order": 2
+        },
+        {
+          "step": "Test article search and filtering",
+          "timestamp": "2025-11-23T06:02:25.104Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Articles management tested",
+          "timestamp": "2025-11-23T06:02:32.375Z"
+        }
+      ],
+      "duration": 14385,
+      "category": "knowledge_base",
+      "priority": "high"
+    },
+    {
+      "name": "Legal Glossary Management",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates glossary term management, definitions, cross-references, and search capabilities.",
+      "steps": [
+        {
+          "step": "Initialize legal glossary management test",
+          "timestamp": "2025-11-23T06:02:33.377Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to glossary management",
+          "timestamp": "2025-11-23T06:02:35.377Z",
+          "order": 2
+        },
+        {
+          "step": "Test glossary search and definitions",
+          "timestamp": "2025-11-23T06:02:40.540Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Glossary management validated",
+          "timestamp": "2025-11-23T06:02:47.092Z"
+        }
+      ],
+      "duration": 13716,
+      "category": "knowledge_base",
+      "priority": "high"
+    },
+    {
+      "name": "Knowledge Base Search",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests search functionality across articles, glossary, and FAQs with filtering and relevance ranking.",
+      "steps": [
+        {
+          "step": "Initialize knowledge base search test",
+          "timestamp": "2025-11-23T06:02:48.094Z",
+          "order": 1
+        },
+        {
+          "step": "Test comprehensive knowledge base search",
+          "timestamp": "2025-11-23T06:02:50.095Z",
+          "order": 2
+        },
+        {
+          "step": "Verify search results across articles and glossary",
+          "timestamp": "2025-11-23T06:02:58.273Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Knowledge base search validated",
+          "timestamp": "2025-11-23T06:03:01.585Z"
+        }
+      ],
+      "duration": 13492,
+      "category": "knowledge_base",
+      "priority": "medium"
+    },
+    {
+      "name": "FAQ System",
+      "status": "PASS",
+      "error": null,
+      "description": "Verifies FAQ display, categorization, search, and user interaction with frequently asked questions.",
+      "steps": [
+        {
+          "step": "Initialize FAQ system test",
+          "timestamp": "2025-11-23T06:03:02.586Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to FAQ section",
+          "timestamp": "2025-11-23T06:03:04.587Z",
+          "order": 2
+        },
+        {
+          "step": "Test FAQ categories and search",
+          "timestamp": "2025-11-23T06:03:09.737Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "FAQ system functionality validated",
+          "timestamp": "2025-11-23T06:03:15.106Z"
+        }
+      ],
+      "duration": 12520,
+      "category": "knowledge_base",
+      "priority": "medium"
+    },
+    {
+      "name": "Consultation Request Creation",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests the consultation request creation process including form completion, validation, and successful submission.",
+      "steps": [
+        {
+          "step": "Initialize consultation request creation test",
+          "timestamp": "2025-11-23T06:03:16.107Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to consultation request form",
+          "timestamp": "2025-11-23T06:03:18.109Z",
+          "order": 2
+        },
+        {
+          "step": "Fill consultation request form",
+          "timestamp": "2025-11-23T06:03:23.253Z",
+          "order": 3
+        },
+        {
+          "step": "Submit consultation request",
+          "timestamp": "2025-11-23T06:03:25.984Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Consultation request creation flow validated",
+          "timestamp": "2025-11-23T06:03:29.310Z"
+        }
+      ],
+      "duration": 13203,
+      "category": "consultation",
+      "priority": "high"
+    },
+    {
+      "name": "Consultation Response Tracking",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates tracking of lawyer responses, status updates, and communication throughout consultation process.",
+      "steps": [
+        {
+          "step": "Initialize consultation response tracking test",
+          "timestamp": "2025-11-23T06:03:30.312Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to consultation tracking",
+          "timestamp": "2025-11-23T06:03:32.313Z",
+          "order": 2
+        },
+        {
+          "step": "Check consultation status and responses",
+          "timestamp": "2025-11-23T06:03:35.390Z",
+          "order": 3
+        },
+        {
+          "step": "Verify response tracking interface",
+          "timestamp": "2025-11-23T06:03:38.453Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Response tracking validated",
+          "timestamp": "2025-11-23T06:03:42.356Z"
+        }
+      ],
+      "duration": 12045,
+      "category": "consultation",
+      "priority": "high"
+    },
+    {
+      "name": "Lawyer Consultation Management",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests the lawyer-side consultation management interface including request viewing and management capabilities.",
+      "steps": [
+        {
+          "step": "Initialize lawyer consultation management test",
+          "timestamp": "2025-11-23T06:03:43.357Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to lawyer consultation dashboard",
+          "timestamp": "2025-11-23T06:03:45.358Z",
+          "order": 2
+        },
+        {
+          "step": "Access consultation management interface",
+          "timestamp": "2025-11-23T06:03:50.510Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Lawyer consultation management interface validated",
+          "timestamp": "2025-11-23T06:03:54.550Z"
+        }
+      ],
+      "duration": 11193,
+      "category": "consultation",
+      "priority": "high"
+    },
+    {
+      "name": "Consultation Accept Flow",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates the complete consultation acceptance workflow from lawyer perspective including acceptance confirmation and status updates.",
+      "steps": [
+        {
+          "step": "Initialize consultation accept flow test",
+          "timestamp": "2025-11-23T06:03:55.552Z",
+          "order": 1
+        },
+        {
+          "step": "Select consultation request to accept",
+          "timestamp": "2025-11-23T06:04:05.843Z",
+          "order": 2
+        },
+        {
+          "step": "Execute consultation acceptance",
+          "timestamp": "2025-11-23T06:04:07.953Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Consultation acceptance workflow validated",
+          "timestamp": "2025-11-23T06:04:13.848Z"
+        }
+      ],
+      "duration": 18297,
+      "category": "consultation",
+      "priority": "high"
+    },
+    {
+      "name": "Consultation Reject Flow",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests the consultation rejection process including rejection reasons, client notification, and status management.",
+      "steps": [
+        {
+          "step": "Initialize consultation reject flow test",
+          "timestamp": "2025-11-23T06:04:14.850Z",
+          "order": 1
+        },
+        {
+          "step": "Select consultation request to reject",
+          "timestamp": "2025-11-23T06:04:25.167Z",
+          "order": 2
+        },
+        {
+          "step": "Execute consultation rejection",
+          "timestamp": "2025-11-23T06:04:27.271Z",
+          "order": 3
+        },
+        {
+          "step": "Provide rejection reason",
+          "timestamp": "2025-11-23T06:04:29.367Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Consultation rejection workflow validated",
+          "timestamp": "2025-11-23T06:04:34.559Z"
+        }
+      ],
+      "duration": 19710,
+      "category": "consultation",
+      "priority": "medium"
+    },
+    {
+      "name": "Consultation Status Updates",
+      "status": "PASS",
+      "error": null,
+      "description": "Verifies consultation status tracking and updates throughout the consultation lifecycle for both clients and lawyers.",
+      "steps": [
+        {
+          "step": "Initialize consultation status updates test",
+          "timestamp": "2025-11-23T06:04:35.561Z",
+          "order": 1
+        },
+        {
+          "step": "Test consultation status tracking",
+          "timestamp": "2025-11-23T06:04:45.864Z",
+          "order": 2
+        },
+        {
+          "step": "Update consultation status",
+          "timestamp": "2025-11-23T06:04:47.964Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Consultation status update functionality validated",
+          "timestamp": "2025-11-23T06:04:56.020Z"
+        }
+      ],
+      "duration": 20460,
+      "category": "consultation",
+      "priority": "medium"
+    },
+    {
+      "name": "Law Firm Location Accuracy",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests GPS accuracy, address verification, and correct positioning of law firms on map interface.",
+      "steps": [
+        {
+          "step": "Initialize law firm location accuracy test",
+          "timestamp": "2025-11-23T06:04:57.022Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to law firm map",
+          "timestamp": "2025-11-23T06:04:59.023Z",
+          "order": 2
+        },
+        {
+          "step": "Test GPS accuracy and firm positioning",
+          "timestamp": "2025-11-23T06:05:06.231Z",
+          "order": 3
+        },
+        {
+          "step": "Verify address accuracy",
+          "timestamp": "2025-11-23T06:05:09.338Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Location accuracy validated",
+          "timestamp": "2025-11-23T06:05:13.394Z"
+        }
+      ],
+      "duration": 16373,
+      "category": "locator",
+      "priority": "high"
+    },
+    {
+      "name": "Law Firm Search Results",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates search functionality, result relevance, and proper display of law firm information.",
+      "steps": [
+        {
+          "step": "Initialize law firm search results test",
+          "timestamp": "2025-11-23T06:05:14.396Z",
+          "order": 1
+        },
+        {
+          "step": "Test law firm search functionality",
+          "timestamp": "2025-11-23T06:05:16.398Z",
+          "order": 2
+        },
+        {
+          "step": "Search for specific law firms",
+          "timestamp": "2025-11-23T06:05:21.600Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Search results validated",
+          "timestamp": "2025-11-23T06:05:31.170Z"
+        }
+      ],
+      "duration": 16775,
+      "category": "locator",
+      "priority": "medium"
+    },
+    {
+      "name": "Law Firm Filtering",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests filtering by specialization, location, ratings, and other criteria for law firm discovery.",
+      "steps": [
+        {
+          "step": "Initialize law firm filtering test",
+          "timestamp": "2025-11-23T06:05:32.172Z",
+          "order": 1
+        },
+        {
+          "step": "Test law firm filtering options",
+          "timestamp": "2025-11-23T06:05:34.174Z",
+          "order": 2
+        },
+        {
+          "step": "Apply specialization filters",
+          "timestamp": "2025-11-23T06:05:39.377Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Filtering functionality validated",
+          "timestamp": "2025-11-23T06:05:47.669Z"
+        }
+      ],
+      "duration": 15498,
+      "category": "locator",
+      "priority": "medium"
+    },
+    {
+      "name": "Forum Post Creation",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests post creation workflow, content validation, category assignment, and publication process.",
+      "steps": [
+        {
+          "step": "Initialize forum post creation test",
+          "timestamp": "2025-11-23T06:05:48.671Z",
+          "order": 1
+        },
+        {
+          "step": "Attempt to create new forum post",
+          "timestamp": "2025-11-23T06:05:55.846Z",
+          "order": 2
+        },
+        {
+          "step": "Fill forum post form",
+          "timestamp": "2025-11-23T06:05:57.912Z",
+          "order": 3
+        },
+        {
+          "step": "Submit forum post",
+          "timestamp": "2025-11-23T06:05:59.144Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Forum post creation flow validated",
+          "timestamp": "2025-11-23T06:06:03.625Z"
+        }
+      ],
+      "duration": 14954,
+      "category": "forum",
+      "priority": "high"
+    },
+    {
+      "name": "Forum Commenting System",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates comment functionality, threading, replies, and user interaction within forum discussions.",
+      "steps": [
+        {
+          "step": "Initialize forum commenting system test",
+          "timestamp": "2025-11-23T06:06:04.627Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to forum discussions",
+          "timestamp": "2025-11-23T06:06:06.626Z",
+          "order": 2
+        },
+        {
+          "step": "Test commenting on existing post",
+          "timestamp": "2025-11-23T06:06:11.796Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Forum commenting validated",
+          "timestamp": "2025-11-23T06:06:21.466Z"
+        }
+      ],
+      "duration": 16840,
+      "category": "forum",
+      "priority": "high"
+    },
+    {
+      "name": "Forum Content Reporting",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests reporting mechanism for inappropriate content, spam, or policy violations.",
+      "steps": [
+        {
+          "step": "Initialize forum content reporting test",
+          "timestamp": "2025-11-23T06:06:22.469Z",
+          "order": 1
+        },
+        {
+          "step": "Test content reporting mechanism",
+          "timestamp": "2025-11-23T06:06:24.469Z",
+          "order": 2
+        },
+        {
+          "step": "Report inappropriate content",
+          "timestamp": "2025-11-23T06:06:29.679Z",
+          "order": 3
+        },
+        {
+          "step": "Select report reason",
+          "timestamp": "2025-11-23T06:06:35.937Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Content reporting validated",
+          "timestamp": "2025-11-23T06:06:42.522Z"
+        }
+      ],
+      "duration": 20054,
+      "category": "forum",
+      "priority": "medium"
+    },
+    {
+      "name": "Forum Discussion Viewing",
+      "status": "PASS",
+      "error": null,
+      "description": "Verifies proper display of discussions, sorting, pagination, and user engagement features.",
+      "steps": [
+        {
+          "step": "Initialize forum discussion viewing test",
+          "timestamp": "2025-11-23T06:06:43.523Z",
+          "order": 1
+        },
+        {
+          "step": "Test discussion viewing and navigation",
+          "timestamp": "2025-11-23T06:06:45.524Z",
+          "order": 2
+        },
+        {
+          "step": "View discussion threads",
+          "timestamp": "2025-11-23T06:06:50.693Z",
+          "order": 3
+        },
+        {
+          "step": "Test thread navigation and sorting",
+          "timestamp": "2025-11-23T06:06:53.778Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Discussion viewing validated",
+          "timestamp": "2025-11-23T06:06:59.883Z"
+        }
+      ],
+      "duration": 16360,
+      "category": "forum",
+      "priority": "medium"
+    },
+    {
+      "name": "Forum AI Moderation",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests automatic content moderation, inappropriate content detection, and policy enforcement in forum posts.",
+      "steps": [
+        {
+          "step": "Initialize forum AI moderation test",
+          "timestamp": "2025-11-23T06:07:00.886Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to forum for moderation testing",
+          "timestamp": "2025-11-23T06:07:02.887Z",
+          "order": 2
+        },
+        {
+          "step": "Test forum post moderation",
+          "timestamp": "2025-11-23T06:07:08.107Z",
+          "order": 3
+        },
+        {
+          "step": "Submit content for AI moderation review",
+          "timestamp": "2025-11-23T06:07:10.215Z",
+          "order": 4
+        },
+        {
+          "step": "Test comment moderation",
+          "timestamp": "2025-11-23T06:07:14.548Z",
+          "order": 5
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Forum AI moderation system validated",
+          "timestamp": "2025-11-23T06:07:23.759Z"
+        }
+      ],
+      "duration": 22874,
+      "category": "ai_moderation",
+      "priority": "high"
+    },
+    {
+      "name": "Lawyer Credential Upload",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests document upload functionality, file validation, security, and credential storage.",
+      "steps": [
+        {
+          "step": "Initialize lawyer credential upload test",
+          "timestamp": "2025-11-23T06:07:24.762Z",
+          "order": 1
+        },
+        {
+          "step": "Navigate to lawyer application",
+          "timestamp": "2025-11-23T06:07:26.763Z",
+          "order": 2
+        },
+        {
+          "step": "Test document upload functionality",
+          "timestamp": "2025-11-23T06:07:31.971Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Credential upload validated",
+          "timestamp": "2025-11-23T06:07:37.970Z"
+        }
+      ],
+      "duration": 13208,
+      "category": "lawyer_application",
+      "priority": "high"
+    },
+    {
+      "name": "Lawyer Application Submission",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates complete application process, form validation, and submission workflow.",
+      "steps": [
+        {
+          "step": "Initialize lawyer application submission test",
+          "timestamp": "2025-11-23T06:07:38.972Z",
+          "order": 1
+        },
+        {
+          "step": "Test complete application process",
+          "timestamp": "2025-11-23T06:07:40.973Z",
+          "order": 2
+        },
+        {
+          "step": "Fill application form",
+          "timestamp": "2025-11-23T06:07:46.263Z",
+          "order": 3
+        },
+        {
+          "step": "Submit application",
+          "timestamp": "2025-11-23T06:07:49.297Z",
+          "order": 4
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Application submission validated",
+          "timestamp": "2025-11-23T06:07:55.381Z"
+        }
+      ],
+      "duration": 16409,
+      "category": "lawyer_application",
+      "priority": "high"
+    },
+    {
+      "name": "Lawyer Verification Status",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests status tracking, notification system, and verification progress display.",
+      "steps": [
+        {
+          "step": "Initialize lawyer verification status test",
+          "timestamp": "2025-11-23T06:07:56.384Z",
+          "order": 1
+        },
+        {
+          "step": "Check verification status tracking",
+          "timestamp": "2025-11-23T06:07:58.385Z",
+          "order": 2
+        },
+        {
+          "step": "Verify status display and notifications",
+          "timestamp": "2025-11-23T06:08:03.534Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Verification status validated",
+          "timestamp": "2025-11-23T06:08:07.403Z"
+        }
+      ],
+      "duration": 11020,
+      "category": "lawyer_application",
+      "priority": "medium"
+    },
+    {
+      "name": "Admin Lawyer Management",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests admin capabilities for viewing, filtering, approving, rejecting, and updating lawyer records.",
+      "steps": [
+        {
+          "step": "Initialize admin lawyer management test",
+          "timestamp": "2025-11-23T06:08:08.405Z",
+          "order": 1
+        },
+        {
+          "step": "Access admin panel",
+          "timestamp": "2025-11-23T06:08:10.407Z",
+          "order": 2
+        },
+        {
+          "step": "Test lawyer record management",
+          "timestamp": "2025-11-23T06:08:15.560Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Lawyer management validated",
+          "timestamp": "2025-11-23T06:08:21.524Z"
+        }
+      ],
+      "duration": 13119,
+      "category": "admin_cms",
+      "priority": "high"
+    },
+    {
+      "name": "Admin Legal Seeker Management",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates admin tools for managing user accounts, permissions, and user data.",
+      "steps": [
+        {
+          "step": "Initialize admin legal seeker management test",
+          "timestamp": "2025-11-23T06:08:22.526Z",
+          "order": 1
+        },
+        {
+          "step": "Access user management",
+          "timestamp": "2025-11-23T06:08:24.527Z",
+          "order": 2
+        },
+        {
+          "step": "Test user account management",
+          "timestamp": "2025-11-23T06:08:29.680Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "User management validated",
+          "timestamp": "2025-11-23T06:08:35.691Z"
+        }
+      ],
+      "duration": 13165,
+      "category": "admin_cms",
+      "priority": "high"
+    },
+    {
+      "name": "Admin Content Management",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests creation, editing, deletion, and publication management for articles and glossary terms.",
+      "steps": [
+        {
+          "step": "Initialize admin content management test",
+          "timestamp": "2025-11-23T06:08:36.693Z",
+          "order": 1
+        },
+        {
+          "step": "Access content management",
+          "timestamp": "2025-11-23T06:08:38.694Z",
+          "order": 2
+        },
+        {
+          "step": "Test article and glossary management",
+          "timestamp": "2025-11-23T06:08:43.895Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Content management validated",
+          "timestamp": "2025-11-23T06:08:50.078Z"
+        }
+      ],
+      "duration": 13386,
+      "category": "admin_cms",
+      "priority": "high"
+    },
+    {
+      "name": "Admin Forum Management",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates admin moderation tools, content management, and forum oversight capabilities.",
+      "steps": [
+        {
+          "step": "Initialize admin forum management test",
+          "timestamp": "2025-11-23T06:08:51.080Z",
+          "order": 1
+        },
+        {
+          "step": "Access forum moderation tools",
+          "timestamp": "2025-11-23T06:08:53.082Z",
+          "order": 2
+        },
+        {
+          "step": "Test moderation capabilities",
+          "timestamp": "2025-11-23T06:08:58.280Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Forum management validated",
+          "timestamp": "2025-11-23T06:09:04.362Z"
+        }
+      ],
+      "duration": 13282,
+      "category": "admin_cms",
+      "priority": "medium"
+    },
+    {
+      "name": "Admin Appeals Management",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests appeals process handling, review workflow, and decision management.",
+      "steps": [
+        {
+          "step": "Initialize admin appeals management test",
+          "timestamp": "2025-11-23T06:09:05.364Z",
+          "order": 1
+        },
+        {
+          "step": "Access appeals system",
+          "timestamp": "2025-11-23T06:09:07.365Z",
+          "order": 2
+        },
+        {
+          "step": "Test appeals processing",
+          "timestamp": "2025-11-23T06:09:12.609Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Appeals management validated",
+          "timestamp": "2025-11-23T06:09:18.642Z"
+        }
+      ],
+      "duration": 13279,
+      "category": "admin_cms",
+      "priority": "medium"
+    },
+    {
+      "name": "Admin Account Management",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates admin account creation, role assignment, and permission management.",
+      "steps": [
+        {
+          "step": "Initialize admin account management test",
+          "timestamp": "2025-11-23T06:09:19.643Z",
+          "order": 1
+        },
+        {
+          "step": "Access admin account tools",
+          "timestamp": "2025-11-23T06:09:21.645Z",
+          "order": 2
+        },
+        {
+          "step": "Test admin role management",
+          "timestamp": "2025-11-23T06:09:26.864Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Account management validated",
+          "timestamp": "2025-11-23T06:09:32.995Z"
+        }
+      ],
+      "duration": 13352,
+      "category": "admin_cms",
+      "priority": "medium"
+    },
+    {
+      "name": "Admin Audit Logs",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests comprehensive logging, action tracking, and audit trail functionality.",
+      "steps": [
+        {
+          "step": "Initialize admin audit logs test",
+          "timestamp": "2025-11-23T06:09:33.997Z",
+          "order": 1
+        },
+        {
+          "step": "Access audit logging system",
+          "timestamp": "2025-11-23T06:09:35.998Z",
+          "order": 2
+        },
+        {
+          "step": "Test log viewing and filtering",
+          "timestamp": "2025-11-23T06:09:41.217Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Audit logs validated",
+          "timestamp": "2025-11-23T06:09:47.397Z"
+        }
+      ],
+      "duration": 13400,
+      "category": "admin_cms",
+      "priority": "medium"
+    },
+    {
+      "name": "Admin Dashboard Statistics",
+      "status": "PASS",
+      "error": null,
+      "description": "Verifies accuracy of displayed metrics, system activity, and performance statistics.",
+      "steps": [
+        {
+          "step": "Initialize admin dashboard statistics test",
+          "timestamp": "2025-11-23T06:09:48.400Z",
+          "order": 1
+        },
+        {
+          "step": "Access admin dashboard",
+          "timestamp": "2025-11-23T06:09:50.400Z",
+          "order": 2
+        },
+        {
+          "step": "Verify statistics accuracy",
+          "timestamp": "2025-11-23T06:09:55.557Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Dashboard statistics validated",
+          "timestamp": "2025-11-23T06:10:01.746Z"
+        }
+      ],
+      "duration": 13347,
+      "category": "admin_cms",
+      "priority": "high"
+    },
+    {
+      "name": "Lawyer Verification Management",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests admin review process for lawyer credentials, approval workflow, and verification decisions.",
+      "steps": [
+        {
+          "step": "Initialize lawyer verification management test",
+          "timestamp": "2025-11-23T06:10:02.747Z",
+          "order": 1
+        },
+        {
+          "step": "Access verification workflow",
+          "timestamp": "2025-11-23T06:10:04.748Z",
+          "order": 2
+        },
+        {
+          "step": "Test verification decisions",
+          "timestamp": "2025-11-23T06:10:09.992Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Verification management validated",
+          "timestamp": "2025-11-23T06:10:16.340Z"
+        }
+      ],
+      "duration": 13594,
+      "category": "admin_cms",
+      "priority": "high"
+    },
+    {
+      "name": "Help Support Requests",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests support ticket creation, categorization, and submission process.",
+      "steps": [
+        {
+          "step": "Initialize help support requests test",
+          "timestamp": "2025-11-23T06:10:17.342Z",
+          "order": 1
+        },
+        {
+          "step": "Access support system",
+          "timestamp": "2025-11-23T06:10:19.343Z",
+          "order": 2
+        },
+        {
+          "step": "Create support request",
+          "timestamp": "2025-11-23T06:10:24.550Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Support requests validated",
+          "timestamp": "2025-11-23T06:10:32.643Z"
+        }
+      ],
+      "duration": 15302,
+      "category": "support",
+      "priority": "medium"
+    },
+    {
+      "name": "Support FAQ Display",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates FAQ organization, search functionality, and user-friendly display.",
+      "steps": [
+        {
+          "step": "Initialize support FAQ display test",
+          "timestamp": "2025-11-23T06:10:33.645Z",
+          "order": 1
+        },
+        {
+          "step": "Access FAQ section",
+          "timestamp": "2025-11-23T06:10:35.646Z",
+          "order": 2
+        },
+        {
+          "step": "Test FAQ navigation and search",
+          "timestamp": "2025-11-23T06:10:42.881Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "FAQ display validated",
+          "timestamp": "2025-11-23T06:10:50.680Z"
+        }
+      ],
+      "duration": 17035,
+      "category": "support",
+      "priority": "medium"
+    },
+    {
+      "name": "Support Request Processing",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests support workflow, response tracking, and resolution management.",
+      "steps": [
+        {
+          "step": "Initialize support request processing test",
+          "timestamp": "2025-11-23T06:10:51.683Z",
+          "order": 1
+        },
+        {
+          "step": "Test support workflow",
+          "timestamp": "2025-11-23T06:10:53.684Z",
+          "order": 2
+        },
+        {
+          "step": "Check request status and responses",
+          "timestamp": "2025-11-23T06:11:00.926Z",
+          "order": 3
+        }
+      ],
+      "comments": [
+        {
+          "comment": "Request processing validated",
+          "timestamp": "2025-11-23T06:11:08.020Z"
+        }
+      ],
+      "duration": 16338,
+      "category": "support",
+      "priority": "medium"
+    },
+    {
+      "name": "Screen Rotation Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates application behavior during device orientation changes, testing UI adaptation and state preservation.",
+      "steps": [],
+      "comments": [],
+      "duration": 8739,
+      "category": "ui",
+      "priority": "low"
+    },
+    {
+      "name": "Back Button Navigation",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests Android back button functionality and navigation stack management throughout the application.",
+      "steps": [],
+      "comments": [],
+      "duration": 10161,
+      "category": "ui",
+      "priority": "medium"
+    },
+    {
+      "name": "Multi-Touch Gestures",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates multi-touch gesture recognition including swipe gestures in different directions and touch interaction handling.",
+      "steps": [],
+      "comments": [],
+      "duration": 17047,
+      "category": "ui",
+      "priority": "low"
+    },
+    {
+      "name": "Accessibility Features",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests accessibility compliance including screen reader compatibility, navigation accessibility, and assistive technology support.",
+      "steps": [],
+      "comments": [],
+      "duration": 7857,
+      "category": "ui",
+      "priority": "medium"
+    },
+    {
+      "name": "App Responsiveness Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Measures application responsiveness to user interactions, testing UI response times and performance under rapid input conditions.",
+      "steps": [],
+      "comments": [],
+      "duration": 1529,
+      "category": "performance",
+      "priority": "high"
+    },
+    {
+      "name": "Network Connectivity Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates application behavior under different network conditions and tests network-dependent operations.",
+      "steps": [],
+      "comments": [],
+      "duration": 11122,
+      "category": "performance",
+      "priority": "medium"
+    },
+    {
+      "name": "Memory Usage Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Monitors application memory consumption during various operations, detecting memory leaks and optimization opportunities.",
+      "steps": [],
+      "comments": [],
+      "duration": 17826,
+      "category": "performance",
+      "priority": "medium"
+    },
+    {
+      "name": "Battery Usage Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Analyzes application power consumption during intensive operations and monitors battery usage patterns.",
+      "steps": [],
+      "comments": [],
+      "duration": 5438,
+      "category": "performance",
+      "priority": "low"
+    },
+    {
+      "name": "Rapid Input Stress Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Stress tests the application with rapid, high-frequency user inputs to validate stability and performance under extreme conditions.",
+      "steps": [],
+      "comments": [],
+      "duration": 11228,
+      "category": "stress",
+      "priority": "medium"
+    },
+    {
+      "name": "Long Session Stress Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Simulates extended user sessions (5+ minutes) with continuous operations to test long-term stability and performance.",
+      "steps": [],
+      "comments": [],
+      "duration": 303200,
+      "category": "stress",
+      "priority": "low"
+    },
+    {
+      "name": "Concurrent Operations Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests application stability when multiple operations are performed simultaneously, validating thread safety and resource management.",
+      "steps": [],
+      "comments": [],
+      "duration": 4960,
+      "category": "stress",
+      "priority": "medium"
+    },
+    {
+      "name": "Large Data Handling",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates application behavior when processing large data payloads, testing input limits and data processing capabilities.",
+      "steps": [],
+      "comments": [],
+      "duration": 14486,
+      "category": "stress",
+      "priority": "medium"
+    },
+    {
+      "name": "Invalid Input Handling",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests application resilience against invalid, malformed, and edge case inputs to ensure proper error handling and security.",
+      "steps": [],
+      "comments": [],
+      "duration": 14238,
+      "category": "edge",
+      "priority": "low"
+    },
+    {
+      "name": "App Recovery Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates application recovery capabilities after being backgrounded, testing state preservation and session management.",
+      "steps": [],
+      "comments": [],
+      "duration": 7112,
+      "category": "edge",
+      "priority": "medium"
+    },
+    {
+      "name": "Network Interruption Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests application behavior during network connectivity loss and recovery, validating offline capabilities and reconnection handling.",
+      "steps": [],
+      "comments": [],
+      "duration": 13449,
+      "category": "edge",
+      "priority": "medium"
+    },
+    {
+      "name": "Low Storage Conditions",
+      "status": "PASS",
+      "error": null,
+      "description": "Simulates low device storage conditions to test application behavior and graceful degradation under storage constraints.",
+      "steps": [],
+      "comments": [],
+      "duration": 10465,
+      "category": "edge",
+      "priority": "low"
+    },
+    {
+      "name": "Device Resource Limits",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests application performance and stability under device resource limitations including CPU and memory constraints.",
+      "steps": [],
+      "comments": [],
+      "duration": 6488,
+      "category": "edge",
+      "priority": "low"
+    },
+    {
+      "name": "Malformed Data Handling",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates application security and stability when processing malformed, malicious, or unexpected data inputs.",
+      "steps": [],
+      "comments": [],
+      "duration": 23278,
+      "category": "edge",
+      "priority": "medium"
+    },
+    {
+      "name": "Data Privacy Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Ensures sensitive user data is properly protected, not exposed in logs, screenshots, or other potential leak vectors.",
+      "steps": [],
+      "comments": [],
+      "duration": 12414,
+      "category": "security",
+      "priority": "medium"
+    },
+    {
+      "name": "Session Security Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates session security measures including timeout handling, background state security, and authentication persistence.",
+      "steps": [],
+      "comments": [],
+      "duration": 17858,
+      "category": "security",
+      "priority": "medium"
+    },
+    {
+      "name": "Input Sanitization Test",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests input sanitization and validation to prevent XSS, injection attacks, and other security vulnerabilities.",
+      "steps": [],
+      "comments": [],
+      "duration": 30045,
+      "category": "security",
+      "priority": "high"
+    },
+    {
+      "name": "Different Screen Sizes",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests application compatibility across different screen sizes, resolutions, and orientations for responsive design validation.",
+      "steps": [],
+      "comments": [],
+      "duration": 17112,
+      "category": "compatibility",
+      "priority": "low"
+    },
+    {
+      "name": "System Theme Changes",
+      "status": "PASS",
+      "error": null,
+      "description": "Validates application adaptation to system theme changes including dark mode, light mode, and dynamic theme switching.",
+      "steps": [],
+      "comments": [],
+      "duration": 12951,
+      "category": "compatibility",
+      "priority": "low"
+    },
+    {
+      "name": "Language Switching",
+      "status": "PASS",
+      "error": null,
+      "description": "Tests internationalization support and application behavior when system language settings are changed.",
+      "steps": [],
+      "comments": [],
+      "duration": 24402,
+      "category": "compatibility",
+      "priority": "low"
+    }
+  ],
+  "executionTime": 1476547,
+  "framework": "Hybrid Detox + UI Automator Framework"
+}

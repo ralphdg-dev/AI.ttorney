@@ -177,13 +177,36 @@ EOF
             echo "- HTML Report: \`registration-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
             echo "- JUnit XML: \`registration-junit.xml\`" >> "$REPORT_DIR/test-summary.md"
             ;;
+        "guest-onboarding")
+            echo "- HTML Report: \`guest-onboarding-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
+            echo "- JUnit XML: \`guest-onboarding-junit.xml\`" >> "$REPORT_DIR/test-summary.md"
+            ;;
+        "chatbot")
+            echo "- HTML Report: \`chatbot-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
+            echo "- JUnit XML: \`chatbot-junit.xml\`" >> "$REPORT_DIR/test-summary.md"
+            ;;
+        "lawyer-dashboard")
+            echo "- HTML Report: \`lawyer-dashboard-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
+            echo "- JUnit XML: \`lawyer-dashboard-junit.xml\`" >> "$REPORT_DIR/test-summary.md"
+            ;;
+        "smoke")
+            echo "- Guest Onboarding HTML Report: \`guest-onboarding-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
+            echo "- Chatbot HTML Report: \`chatbot-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
+            echo "- Smoke Test Summary: \`smoke-test-summary.html\`" >> "$REPORT_DIR/test-summary.md"
+            ;;
+        "system")
+            echo "- Guest Onboarding HTML Report: \`guest-onboarding-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
+            echo "- Chatbot HTML Report: \`chatbot-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
+            echo "- Lawyer Dashboard HTML Report: \`lawyer-dashboard-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
+            echo "- System Test Summary: \`system-test-summary.html\`" >> "$REPORT_DIR/test-summary.md"
+            ;;
         "all"|*)
             echo "- Login HTML Report: \`login-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
             echo "- Registration HTML Report: \`registration-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
+            echo "- Guest Onboarding HTML Report: \`guest-onboarding-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
+            echo "- Chatbot HTML Report: \`chatbot-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
+            echo "- Lawyer Dashboard HTML Report: \`lawyer-dashboard-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
             echo "- Combined HTML Report: \`all-features-test-report.html\`" >> "$REPORT_DIR/test-summary.md"
-            echo "- Login JUnit XML: \`login-junit.xml\`" >> "$REPORT_DIR/test-summary.md"
-            echo "- Registration JUnit XML: \`registration-junit.xml\`" >> "$REPORT_DIR/test-summary.md"
-            echo "- Combined JUnit XML: \`all-features-junit.xml\`" >> "$REPORT_DIR/test-summary.md"
             ;;
     esac
     
@@ -216,12 +239,35 @@ main() {
         "registration")
             run_tests "Registration Feature Tests" "Registration" "registration" || test_failed=true
             ;;
+        "guest-onboarding")
+            run_tests "Guest Onboarding Feature Tests" "Guest Onboarding" "guest-onboarding" || test_failed=true
+            ;;
+        "chatbot")
+            run_tests "Chatbot Feature Tests" "Chatbot" "chatbot" || test_failed=true
+            ;;
+        "lawyer-dashboard")
+            run_tests "Lawyer Dashboard Feature Tests" "Lawyer Dashboard" "lawyer-dashboard" || test_failed=true
+            ;;
+        "smoke")
+            print_status "Running smoke test suite (critical paths only)..."
+            run_tests "Guest Onboarding Feature Tests" "Guest Onboarding" "guest-onboarding" || test_failed=true
+            run_tests "Chatbot Feature Tests" "Chatbot" "chatbot" || test_failed=true
+            ;;
+        "system")
+            print_status "Running system test suite (all user journeys)..."
+            run_tests "Guest Onboarding Feature Tests" "Guest Onboarding" "guest-onboarding" || test_failed=true
+            run_tests "Chatbot Feature Tests" "Chatbot" "chatbot" || test_failed=true
+            run_tests "Lawyer Dashboard Feature Tests" "Lawyer Dashboard" "lawyer-dashboard" || test_failed=true
+            ;;
         "all"|*)
             print_status "Running all test suites..."
             # Clear TEST_FEATURE for combined report
             unset TEST_FEATURE
             run_tests "Login Feature Tests" "Login" "login" || test_failed=true
             run_tests "Registration Feature Tests" "Registration" "registration" || test_failed=true
+            run_tests "Guest Onboarding Feature Tests" "Guest Onboarding" "guest-onboarding" || test_failed=true
+            run_tests "Chatbot Feature Tests" "Chatbot" "chatbot" || test_failed=true
+            run_tests "Lawyer Dashboard Feature Tests" "Lawyer Dashboard" "lawyer-dashboard" || test_failed=true
             ;;
     esac
     
@@ -235,15 +281,40 @@ main() {
     print_status "📊 Test Results Summary:"
     
     # List all generated HTML reports
-    if [ "$TEST_SUITE" = "all" ]; then
-        echo "  - Login Report: file://$PWD/$REPORT_DIR/login-test-report.html"
-        echo "  - Registration Report: file://$PWD/$REPORT_DIR/registration-test-report.html"
-        echo "  - Combined Report: file://$PWD/$REPORT_DIR/all-features-test-report.html"
-    elif [ "$TEST_SUITE" = "login" ]; then
-        echo "  - Login Report: file://$PWD/$REPORT_DIR/login-test-report.html"
-    elif [ "$TEST_SUITE" = "registration" ]; then
-        echo "  - Registration Report: file://$PWD/$REPORT_DIR/registration-test-report.html"
-    fi
+    case "$TEST_SUITE" in
+        "login")
+            echo "  - Login Report: file://$PWD/$REPORT_DIR/login-test-report.html"
+            ;;
+        "registration")
+            echo "  - Registration Report: file://$PWD/$REPORT_DIR/registration-test-report.html"
+            ;;
+        "guest-onboarding")
+            echo "  - Guest Onboarding Report: file://$PWD/$REPORT_DIR/guest-onboarding-test-report.html"
+            ;;
+        "chatbot")
+            echo "  - Chatbot Report: file://$PWD/$REPORT_DIR/chatbot-test-report.html"
+            ;;
+        "lawyer-dashboard")
+            echo "  - Lawyer Dashboard Report: file://$PWD/$REPORT_DIR/lawyer-dashboard-test-report.html"
+            ;;
+        "smoke")
+            echo "  - Guest Onboarding Report: file://$PWD/$REPORT_DIR/guest-onboarding-test-report.html"
+            echo "  - Chatbot Report: file://$PWD/$REPORT_DIR/chatbot-test-report.html"
+            ;;
+        "system")
+            echo "  - Guest Onboarding Report: file://$PWD/$REPORT_DIR/guest-onboarding-test-report.html"
+            echo "  - Chatbot Report: file://$PWD/$REPORT_DIR/chatbot-test-report.html"
+            echo "  - Lawyer Dashboard Report: file://$PWD/$REPORT_DIR/lawyer-dashboard-test-report.html"
+            ;;
+        "all"|*)
+            echo "  - Login Report: file://$PWD/$REPORT_DIR/login-test-report.html"
+            echo "  - Registration Report: file://$PWD/$REPORT_DIR/registration-test-report.html"
+            echo "  - Guest Onboarding Report: file://$PWD/$REPORT_DIR/guest-onboarding-test-report.html"
+            echo "  - Chatbot Report: file://$PWD/$REPORT_DIR/chatbot-test-report.html"
+            echo "  - Lawyer Dashboard Report: file://$PWD/$REPORT_DIR/lawyer-dashboard-test-report.html"
+            echo "  - Combined Report: file://$PWD/$REPORT_DIR/all-features-test-report.html"
+            ;;
+    esac
     
     echo "  - Summary: $REPORT_DIR/test-summary.md"
     echo "  - Screenshots: $SCREENSHOT_DIR/"
@@ -264,19 +335,32 @@ case "${1:-}" in
         echo "Usage: $0 [OPTIONS]"
         echo ""
         echo "Options:"
-        echo "  --suite=SUITE     Run specific test suite (login|registration|all)"
+        echo "  --suite=SUITE     Run specific test suite"
         echo "  --device=DEVICE   Use specific device (emulator|attached)"
         echo "  --help, -h        Show this help message"
         echo ""
+        echo "Available Test Suites:"
+        echo "  login             Login functionality tests"
+        echo "  registration      Registration functionality tests"
+        echo "  guest-onboarding  Guest user onboarding flow tests"
+        echo "  chatbot           Chatbot interaction tests"
+        echo "  lawyer-dashboard  Lawyer dashboard and timeline tests"
+        echo "  smoke             Critical user journeys (guest + chatbot)"
+        echo "  system            All user journeys (guest + chatbot + lawyer)"
+        echo "  all               All test suites including auth flows"
+        echo ""
         echo "Environment Variables:"
         echo "  ANDROID_DEVICE    Android device type (emulator|attached)"
-        echo "  TEST_SUITE        Test suite to run (login|registration|all)"
+        echo "  TEST_SUITE        Test suite to run"
         echo ""
         echo "Examples:"
-        echo "  $0                           # Run all tests on emulator"
-        echo "  $0 --suite=login            # Run only login tests"
-        echo "  $0 --device=attached        # Run on connected device"
-        echo "  TEST_SUITE=login $0         # Run login tests via env var"
+        echo "  $0                              # Run all tests on emulator"
+        echo "  $0 --suite=smoke               # Run smoke tests (critical paths)"
+        echo "  $0 --suite=system              # Run system tests (user journeys)"
+        echo "  $0 --suite=chatbot             # Run only chatbot tests"
+        echo "  $0 --suite=guest-onboarding    # Run guest onboarding tests"
+        echo "  $0 --device=attached           # Run on connected device"
+        echo "  TEST_SUITE=smoke $0            # Run smoke tests via env var"
         exit 0
         ;;
     --suite=*)

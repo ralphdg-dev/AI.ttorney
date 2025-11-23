@@ -109,27 +109,70 @@ global.testUtils = {
 
 // Test data constants
 global.testData = {
-  users: {
-    validUser: {
-      email: 'test.user@example.com',
-      password: 'TestPass123!',
-      username: 'testuser123',
-      firstName: 'Test',
-      lastName: 'User',
-      birthdate: '1990-01-01'
-    },
-    invalidUser: {
-      email: 'invalid-email',
-      password: '123',
-      username: 'tu',
-      firstName: '',
-      lastName: '',
-      birthdate: '2025-01-01'
-    },
-    existingUser: {
-      email: 'existing@example.com',
-      password: 'ExistingPass123!'
-    }
+  validUser: {
+    email: 'test.user@example.com',
+    password: 'TestPass123!',
+    username: 'testuser123',
+    firstName: 'Test',
+    lastName: 'User',
+    birthdate: '1990-01-01'
+  },
+  
+  validLawyer: {
+    email: 'test.lawyer@example.com',
+    password: 'LawyerPass123!',
+    username: 'testlawyer123',
+    firstName: 'Test',
+    lastName: 'Lawyer',
+    birthdate: '1985-01-01',
+    role: 'lawyer'
+  },
+  
+  pendingLawyer: {
+    email: 'pending.lawyer@example.com',
+    password: 'PendingPass123!',
+    username: 'pendinglawyer123',
+    firstName: 'Pending',
+    lastName: 'Lawyer',
+    birthdate: '1988-01-01',
+    role: 'lawyer',
+    status: 'pending'
+  },
+  
+  invalidUser: {
+    email: 'invalid-email',
+    password: '123',
+    username: 'tu',
+    firstName: '',
+    lastName: '',
+    birthdate: '2025-01-01'
+  },
+  
+  existingUser: {
+    email: 'existing@example.com',
+    password: 'ExistingPass123!'
+  },
+  
+  chatbotQueries: {
+    contractLaw: 'What are the essential elements of a valid contract?',
+    tortLaw: 'Explain negligence in tort law',
+    constitutionalLaw: 'What are the key principles of constitutional law?',
+    criminalLaw: 'What is the difference between civil and criminal law?',
+    complexScenario: 'A person signed a contract to buy a house but the seller failed to disclose that the property has structural damage. What legal options does the buyer have?',
+    nonLegal: 'What is the weather like today?',
+    followUpQueries: [
+      'What is a breach of contract?',
+      'What are the remedies for breach of contract?',
+      'Can you give me an example of specific performance?'
+    ]
+  },
+  
+  glossaryTerms: {
+    contract: 'contract',
+    tort: 'tort',
+    negligence: 'negligence',
+    liability: 'liability',
+    damages: 'damages'
   },
   
   validation: {
@@ -144,5 +187,12 @@ global.testData = {
     lastNameRequired: 'Please enter your last name',
     birthdateRequired: 'Please select your birthdate',
     invalidBirthdate: 'You must be at least 18 years old'
+  },
+  
+  performance: {
+    maxLoginTime: 15000,
+    maxChatbotResponseTime: 30000,
+    maxDashboardLoadTime: 20000,
+    maxOnboardingTime: 15000
   }
 };
