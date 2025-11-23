@@ -14,6 +14,7 @@ module.exports = function (api) {
       }],
       ["babel-plugin-transform-inline-environment-variables", {
         include: [
+          "EXPO_ROUTER_APP_ROOT",
           "EXPO_PUBLIC_SUPABASE_URL",
           "EXPO_PUBLIC_SUPABASE_ANON_KEY",
           "EXPO_PUBLIC_API_URL",
