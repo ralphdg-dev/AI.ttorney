@@ -49,7 +49,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     router: {},
     eas: {
-      projectId: '586d8e19-554a-4ea4-821f-635b25e93de9',
+      projectId: '3a516245-8faa-40f9-87b8-0d369afde669',
     },
     apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://aittorney-staging.up.railway.app',
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://vmlbrckrlgwlobhnpstx.supabase.co',
