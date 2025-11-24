@@ -17,10 +17,23 @@
         "buildType": "apk"
       }
     },
+    "preview-fresh": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "NODE_ENV": "test",
+        "EXPO_ROUTER_APP_ROOT": "./app"
+      }
+    },
     "production": {
       "distribution": "store",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_ROUTER_APP_ROOT": "./app"
       }
     }
   }
