@@ -1,9 +1,5 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
-// Set EXPO_ROUTER_APP_ROOT at the earliest possible point
-// This runs before Metro bundler initialization in all environments (local, EAS, CI/CD)
-process.env.EXPO_ROUTER_APP_ROOT = './app';
-
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Ai.ttorney',
@@ -28,45 +24,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       NSPhotoLibraryUsageDescription: 'AI.ttorney needs photo library access for profile pictures and document uploads.',
       NSMicrophoneUsageDescription: 'AI.ttorney needs microphone access for video recording in lawyer verification.',
     },
-    config: {
-      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-    },
   },
   android: {
+    package: 'com.aittorney.app',
     adaptiveIcon: {
       foregroundImage: './assets/images/adaptive-icon.png',
       backgroundColor: '#ffffff',
     },
-    edgeToEdgeEnabled: true,
-    package: 'com.aittorney.app',
-    permissions: [
-      'android.permission.CAMERA',
-      'android.permission.READ_EXTERNAL_STORAGE',
-      'android.permission.WRITE_EXTERNAL_STORAGE',
-      'android.permission.RECORD_AUDIO',
-      'android.permission.ACCESS_FINE_LOCATION',
-      'android.permission.ACCESS_COARSE_LOCATION',
-    ],
     intentFilters: [
       {
         action: 'VIEW',
-        autoVerify: true,
-        data: [
-          {
-            scheme: 'ai-ttorney',
-          },
-          {
-            scheme: 'exp+ai-ttorney',
-          },
-        ],
+        data: [{ scheme: 'ai-ttorney' }],
         category: ['BROWSABLE', 'DEFAULT'],
       },
     ],
-    config: {
-      googleMaps: {
-        apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-      },
-    },
   },
   web: {
     bundler: 'metro',
@@ -75,7 +46,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     'expo-router',
-    'expo-web-browser',
     [
       'expo-splash-screen',
       {
@@ -86,24 +56,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     'expo-font',
-    'expo-secure-store',
-    [
-      'expo-location',
-      {
-        locationAlwaysAndWhenInUsePermission: 'Allow AI.ttorney to use your location to find nearby law firms and legal services.',
-      },
-    ],
   ],
   experiments: {
     typedRoutes: true,
   },
   extra: {
-    supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
-    supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
-    apiUrl: process.env.EXPO_PUBLIC_API_URL,
-    googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+    router: {},
     eas: {
       projectId: '586d8e19-554a-4ea4-821f-635b25e93de9',
     },
+    apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://aittorney-staging.up.railway.app',
+    supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://vmlbrckrlgwlobhnpstx.supabase.co',
+    supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtbGJyY2tybGd3bG9iaG5wc3R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4MDI5MDksImV4cCI6MjA2OTM3ODkwOX0.ucK9BXmRg7wYaamFBkTKWTkOavlp7SzNrZwDvNmKsK8',
+    googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyD0OPK0U7WdEwlzNh7XKsYpYVMyHea-G80',
   },
 });

@@ -1,53 +1,6 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const { withNativeWind } = require('nativewind/metro');
 
-// Fallback: ensure EXPO_ROUTER_APP_ROOT is set (primary source is app.config.ts)
-if (!process.env.EXPO_ROUTER_APP_ROOT) {
-  process.env.EXPO_ROUTER_APP_ROOT = './app';
-}
-
 const config = getDefaultConfig(__dirname);
-
-// Fix for stream pipeline and header issues with Expo web
-config.server = {
-  ...config.server,
-  enhanceMiddleware: (middleware) => {
-    return (req, res, next) => {
-      // Track if response has been handled
-      let responseHandled = false;
-      
-      // Override end method to track completion
-      const originalEnd = res.end.bind(res);
-      res.end = function(...args) {
-        if (!responseHandled) {
-          responseHandled = true;
-          return originalEnd(...args);
-        }
-      };
-      
-      // Override writeHead to prevent duplicate headers
-      const originalWriteHead = res.writeHead.bind(res);
-      res.writeHead = function(...args) {
-        if (!res.headersSent) {
-          return originalWriteHead(...args);
-        }
-      };
-      
-      // Handle premature connection close
-      res.on('close', () => {
-        if (!responseHandled && !res.writableEnded) {
-          responseHandled = true;
-          try {
-            res.end();
-          } catch (_e) {
-            // Ignore errors on close
-          }
-        }
-      });
-      
-      return middleware(req, res, next);
-    };
-  },
-};
 
 module.exports = withNativeWind(config, { input: './global.css' });
