@@ -10,23 +10,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   scheme: 'ai-ttorney',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
-  ios: {
-    supportsTablet: true,
-    bundleIdentifier: 'com.aittorney.app',
-    infoPlist: {
-      CFBundleURLTypes: [
-        {
-          CFBundleURLName: 'ai-ttorney',
-          CFBundleURLSchemes: ['ai-ttorney', 'exp+ai-ttorney'],
-        },
-      ],
-      NSCameraUsageDescription: 'AI.ttorney needs camera access for lawyer verification and document scanning.',
-      NSPhotoLibraryUsageDescription: 'AI.ttorney needs photo library access for profile pictures and document uploads.',
-      NSMicrophoneUsageDescription: 'AI.ttorney needs microphone access for video recording in lawyer verification.',
-    },
-  },
+  owner: 'j24a',
   android: {
-    package: 'com.aittorney.app',
+    package: 'com.j24a.aittorney',
     adaptiveIcon: {
       foregroundImage: './assets/images/adaptive-icon.png',
       backgroundColor: '#ffffff',
