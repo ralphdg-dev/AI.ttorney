@@ -7,9 +7,6 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "ios": {
-        "resourceClass": "m-medium"
-      },
       "android": {
         "buildType": "apk"
       },
@@ -18,10 +15,8 @@
       }
     },
     "preview": {
+      "developmentClient": true,
       "distribution": "internal",
-      "ios": {
-        "resourceClass": "m-medium"
-      },
       "android": {
         "buildType": "apk"
       },
@@ -34,8 +29,8 @@
       }
     },
     "production": {
-      "ios": {
-        "resourceClass": "m-medium"
+      "android": {
+        "buildType": "apk"
       },
       "env": {
         "NODE_ENV": "production",
@@ -45,8 +40,5 @@
         "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD0OPK0U7WdEwlzNh7XKsYpYVMyHea-G80"
       }
     }
-  },
-  "submit": {
-    "production": {}
   }
 }

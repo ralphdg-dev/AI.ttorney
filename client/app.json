@@ -9,9 +9,6 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "owner": "j24angeles",
-    "ios": {
-      "supportsTablet": true
-    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
