@@ -1,6 +1,5 @@
 {
   "expo": {
-    "entryPoint": "expo-router/entry",
     "name": "Ai.ttorney",
     "slug": "aittorney",
     "version": "1.0.0",
