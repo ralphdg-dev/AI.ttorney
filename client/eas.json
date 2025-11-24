@@ -1,24 +1,26 @@
 {
   "cli": {
     "version": ">= 13.2.1",
-    "appVersionSource": "remote",
-    "defaultBuildProfile": "preview"
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
       },
       "env": {
         "NODE_ENV": "development"
       }
     },
     "preview": {
+      "developmentClient": false,
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       },
       "env": {
         "NODE_ENV": "test",
@@ -29,8 +31,11 @@
       }
     },
     "production": {
+      "developmentClient": false,
+      "distribution": "store",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       },
       "env": {
         "NODE_ENV": "production",
