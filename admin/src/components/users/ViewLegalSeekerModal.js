@@ -1,39 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import Modal from '../ui/Modal';
-import Tooltip from '../ui/Tooltip';
-import { History, Activity, Download, Eye, Loader2, AlertCircle } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import legalSeekerService from '../../services/legalSeekerService';
+import React, { useState, useEffect } from "react";
+import Modal from "../ui/Modal";
+import Tooltip from "../ui/Tooltip";
+import {
+  History,
+  Activity,
+  Download,
+  Eye,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import legalSeekerService from "../../services/legalSeekerService";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import {
+  addPDFHeader,
+  addAdminInfo,
+  addPDFFooter,
+} from "../admin/AdminPDFExportUtils";
 
 const StatusBadge = ({ status }) => {
   const getStatusStyles = (status) => {
     switch (status?.toLowerCase()) {
-      case 'verified_lawyer':
-        return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-      case 'admin':
-      case 'superadmin':
-        return 'bg-blue-50 text-blue-700 border border-blue-200';
-      case 'registered_user':
-        return 'bg-amber-50 text-amber-700 border border-amber-200';
-      case 'guest':
+      case "verified_lawyer":
+        return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+      case "admin":
+      case "superadmin":
+        return "bg-blue-50 text-blue-700 border border-blue-200";
+      case "registered_user":
+        return "bg-amber-50 text-amber-700 border border-amber-200";
+      case "guest":
       default:
-        return 'bg-gray-50 text-gray-700 border border-gray-200';
+        return "bg-gray-50 text-gray-700 border border-gray-200";
     }
   };
 
   const getStatusLabel = (status) => {
     switch (status?.toLowerCase()) {
-      case 'verified_lawyer': return 'Verified Lawyer';
-      case 'admin': return 'Admin';
-      case 'superadmin': return 'Super Admin';
-      case 'registered_user': return 'Registered User';
-      case 'guest': return 'Guest';
-      default: return 'Unknown';
+      case "verified_lawyer":
+        return "Verified Lawyer";
+      case "admin":
+        return "Admin";
+      case "superadmin":
+        return "Super Admin";
+      case "registered_user":
+        return "Registered User";
+      case "guest":
+        return "Guest";
+      default:
+        return "Unknown";
     }
   };
 
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${getStatusStyles(status)}`}>
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${getStatusStyles(
+        status
+      )}`}
+    >
       {getStatusLabel(status)}
     </span>
   );
@@ -49,18 +73,26 @@ const VerificationBadge = ({ isVerified }) => {
   }
 
   const styles = isVerified
-    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-    : 'bg-red-50 text-red-700 border border-red-200';
-  const label = isVerified ? 'Verified' : 'Not Verified';
+    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+    : "bg-red-50 text-red-700 border border-red-200";
+  const label = isVerified ? "Verified" : "Not Verified";
 
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}
+    >
       {label}
     </span>
   );
 };
 
-const BooleanBadge = ({ value, trueLabel = 'Yes', falseLabel = 'No', invertColors = false, grayForFalse = false }) => {
+const BooleanBadge = ({
+  value,
+  trueLabel = "Yes",
+  falseLabel = "No",
+  invertColors = false,
+  grayForFalse = false,
+}) => {
   if (value === null || value === undefined) {
     return (
       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-700 border border-gray-200">
@@ -73,24 +105,26 @@ const BooleanBadge = ({ value, trueLabel = 'Yes', falseLabel = 'No', invertColor
   if (grayForFalse) {
     // For cases like "Pending Lawyer Application" where false (None) should be gray
     styles = value
-      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-      : 'bg-gray-50 text-gray-700 border border-gray-200';
+      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+      : "bg-gray-50 text-gray-700 border border-gray-200";
   } else if (invertColors) {
     // For cases like "Blocked from Applying" where false (Allowed) should be green
     styles = value
-      ? 'bg-red-50 text-red-700 border border-red-200'
-      : 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+      ? "bg-red-50 text-red-700 border border-red-200"
+      : "bg-emerald-50 text-emerald-700 border border-emerald-200";
   } else {
     // Normal case where true is green, false is red
     styles = value
-      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-      : 'bg-red-50 text-red-700 border border-red-200';
+      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+      : "bg-red-50 text-red-700 border border-red-200";
   }
-  
+
   const label = value ? trueLabel : falseLabel;
 
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}
+    >
       {label}
     </span>
   );
@@ -99,16 +133,16 @@ const BooleanBadge = ({ value, trueLabel = 'Yes', falseLabel = 'No', invertColor
 const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
   // Extract the actual user data from the API response
   const userData = user?.data || user;
-  
+
   // State for audit logs and recent activity
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState(null);
-  
+
   const [recentActivity, setRecentActivity] = useState([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityError, setActivityError] = useState(null);
-  
+
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [showActivityModal, setShowActivityModal] = useState(false);
   const { admin: currentAdmin } = useAuth();
@@ -116,37 +150,39 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
   // Load audit logs when modal opens
   const loadAuditLogs = async () => {
     if (!userData?.id) return;
-    
+
     try {
       setAuditLoading(true);
       setAuditError(null);
-      
-      const response = await legalSeekerService.getAuditLogs(userData.id, { limit: 50 });
+
+      const response = await legalSeekerService.getAuditLogs(userData.id, {
+        limit: 50,
+      });
       setAuditLogs(response.data || []);
     } catch (error) {
-      console.error('Failed to load audit logs:', error);
+      console.error("Failed to load audit logs:", error);
       setAuditError(error.message);
-      
+
       // Fallback to mock data if API fails
       const mockAuditLogs = [
         {
           id: 1,
-          action: 'Account created',
-          actor_name: 'System',
-          role: 'system',
+          action: "Account created",
+          actor_name: "System",
+          role: "system",
           created_at: userData.created_at,
-          details: JSON.stringify({ action: 'User account created' })
+          details: JSON.stringify({ action: "User account created" }),
         },
         {
           id: 2,
-          action: 'Email verified',
-          actor_name: userData.full_name || 'User',
-          role: 'user',
+          action: "Email verified",
+          actor_name: userData.full_name || "User",
+          role: "user",
           created_at: userData.updated_at || userData.created_at,
-          details: JSON.stringify({ action: 'Email verification completed' })
-        }
+          details: JSON.stringify({ action: "Email verification completed" }),
+        },
       ];
-      
+
       setAuditLogs(mockAuditLogs);
     } finally {
       setAuditLoading(false);
@@ -156,15 +192,17 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
   // Load recent activity when modal opens
   const loadRecentActivity = async () => {
     if (!userData?.id) return;
-    
+
     try {
       setActivityLoading(true);
       setActivityError(null);
-      
-      const response = await legalSeekerService.getRecentActivity(userData.id, { limit: 50 });
+
+      const response = await legalSeekerService.getRecentActivity(userData.id, {
+        limit: 50,
+      });
       setRecentActivity(response.data || []);
     } catch (error) {
-      console.error('Failed to load recent activity:', error);
+      console.error("Failed to load recent activity:", error);
       setActivityError(error.message);
       setRecentActivity([]);
     } finally {
@@ -187,41 +225,267 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
   }, [user, userData]);
 
   // Transform audit logs for display
-  const auditTrail = auditLogs.map(log => ({
+  const auditTrail = auditLogs.map((log) => ({
     id: log.id,
     action: log.action,
-    admin: log.actor_name || 'Unknown Admin',
-    role: log.actor_role || 'User',
+    admin: log.actor_name || "Unknown Admin",
+    role: log.actor_role || "User",
     date: log.created_at,
     details: (() => {
       try {
-        const parsed = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+        const parsed =
+          typeof log.details === "string"
+            ? JSON.parse(log.details)
+            : log.details;
         return parsed?.action || log.action;
       } catch {
         return log.action;
       }
-    })()
+    })(),
   }));
 
-  // Handle PDF export for audit trail (placeholder)
+  // Handle PDF export for audit trail (admin-style layout)
   const handleExportAuditTrail = async () => {
     try {
-      // TODO: Implement PDF export functionality
-      alert('PDF export functionality will be implemented soon');
+      if (!auditTrail || auditTrail.length === 0) {
+        alert("No audit trail entries to export.");
+        return;
+      }
+
+      const doc = new jsPDF("landscape");
+
+      doc.setProperties({
+        title: "Legal Seeker Audit Trail",
+        subject: `Audit trail for ${
+          userData.full_name || userData.email || "User"
+        }`,
+        author: "AI.ttorney Admin Panel",
+        creator: "AI.ttorney Admin Panel",
+      });
+
+      const reportNumber = Date.now().toString().slice(-6);
+      const generatedBy = currentAdmin
+        ? `${
+            currentAdmin.full_name ||
+            currentAdmin.name ||
+            currentAdmin.email ||
+            "Admin"
+          } (${currentAdmin.role || "admin"})`
+        : null;
+
+      await addPDFHeader(
+        doc,
+        "LEGAL SEEKER AUDIT TRAIL",
+        reportNumber,
+        generatedBy
+      );
+
+      const fullName = userData.full_name || "Unknown";
+      const email = userData.email || "Unknown";
+
+      let yPos = addAdminInfo(
+        doc,
+        fullName,
+        email,
+        auditTrail.length,
+        48,
+        "LEGAL SEEKER INFORMATION"
+      );
+
+      const tableHeaders = ["Action", "Date", "Details"];
+
+      const tableData = auditTrail.map((log) => {
+        const dateStr = log.date
+          ? new Date(log.date).toLocaleString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "-";
+
+        const baseDetails = log.details || "-";
+        const adminPart = log.admin
+          ? `${log.admin}${log.role ? ` (${log.role})` : ""}`
+          : null;
+        const combinedDetails = adminPart
+          ? `${adminPart} — ${baseDetails}`
+          : baseDetails;
+
+        const trimmedDetails =
+          combinedDetails.length > 80
+            ? combinedDetails.substring(0, 80) + "..."
+            : combinedDetails;
+
+        return [log.action || "Unknown Action", dateStr, trimmedDetails];
+      });
+
+      autoTable(doc, {
+        head: [tableHeaders],
+        body: tableData,
+        startY: yPos,
+        styles: {
+          fontSize: 7,
+          cellPadding: 2,
+          lineColor: [0, 0, 0],
+          lineWidth: 0.3,
+          textColor: [0, 0, 0],
+          fontStyle: "normal",
+          overflow: "linebreak",
+        },
+        headStyles: {
+          fillColor: [255, 255, 255],
+          textColor: [0, 0, 0],
+          fontStyle: "bold",
+          fontSize: 7,
+          halign: "left",
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245],
+        },
+        columnStyles: {
+          0: { cellWidth: 85, halign: "left" }, // Action
+          1: { cellWidth: 60, halign: "left" }, // Date
+          2: { cellWidth: 112, halign: "left" }, // Details
+        },
+        margin: { left: 20, right: 20 },
+        tableWidth: 257,
+        theme: "grid",
+      });
+
+      addPDFFooter(doc);
+
+      const safeName =
+        (fullName || email || "legal-seeker")
+          .toString()
+          .replace(/[^a-z0-9]+/gi, "_")
+          .replace(/^_+|_+$/g, "")
+          .toLowerCase() || "legal-seeker";
+
+      doc.save(`Legal_Seeker_Audit_Trail_${safeName}_${reportNumber}.pdf`);
     } catch (error) {
-      console.error('Failed to export audit trail PDF:', error);
-      alert('Failed to export audit trail PDF. Please try again.');
+      console.error("Failed to export audit trail PDF:", error);
+      alert("Failed to export audit trail PDF. Please try again.");
     }
   };
 
-  // Handle PDF export for recent activity (placeholder)
+  // Handle PDF export for recent activity (admin-style layout)
   const handleExportActivity = async () => {
     try {
-      // TODO: Implement PDF export functionality
-      alert('PDF export functionality will be implemented soon');
+      if (!recentActivity || recentActivity.length === 0) {
+        alert("No recent activity entries to export.");
+        return;
+      }
+
+      const doc = new jsPDF("landscape");
+
+      doc.setProperties({
+        title: "Legal Seeker Activity Report",
+        subject: `Activity report for ${
+          userData.full_name || userData.email || "User"
+        }`,
+        author: "AI.ttorney Admin Panel",
+        creator: "AI.ttorney Admin Panel",
+      });
+
+      const reportNumber = Date.now().toString().slice(-6);
+      const generatedBy = currentAdmin
+        ? `${
+            currentAdmin.full_name ||
+            currentAdmin.name ||
+            currentAdmin.email ||
+            "Admin"
+          } (${currentAdmin.role || "admin"})`
+        : null;
+
+      await addPDFHeader(
+        doc,
+        "LEGAL SEEKER ACTIVITY REPORT",
+        reportNumber,
+        generatedBy
+      );
+
+      const fullName = userData.full_name || "Unknown";
+      const email = userData.email || "Unknown";
+
+      let yPos = addAdminInfo(
+        doc,
+        fullName,
+        email,
+        recentActivity.length,
+        48,
+        "LEGAL SEEKER INFORMATION"
+      );
+
+      const tableHeaders = ["Action", "Date", "Details"];
+
+      const tableData = recentActivity.map((activity) => {
+        const dateStr = activity.created_at
+          ? new Date(activity.created_at).toLocaleString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "-";
+
+        const rawDetails = activity.details || "-";
+        const trimmedDetails =
+          rawDetails.length > 80
+            ? rawDetails.substring(0, 80) + "..."
+            : rawDetails;
+
+        return [activity.action || "Unknown Action", dateStr, trimmedDetails];
+      });
+
+      autoTable(doc, {
+        head: [tableHeaders],
+        body: tableData,
+        startY: yPos,
+        styles: {
+          fontSize: 7,
+          cellPadding: 2,
+          lineColor: [0, 0, 0],
+          lineWidth: 0.3,
+          textColor: [0, 0, 0],
+          fontStyle: "normal",
+          overflow: "linebreak",
+        },
+        headStyles: {
+          fillColor: [255, 255, 255],
+          textColor: [0, 0, 0],
+          fontStyle: "bold",
+          fontSize: 7,
+          halign: "left",
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245],
+        },
+        columnStyles: {
+          0: { cellWidth: 85, halign: "left" }, // Action
+          1: { cellWidth: 60, halign: "left" }, // Date
+          2: { cellWidth: 112, halign: "left" }, // Details
+        },
+        margin: { left: 20, right: 20 },
+        tableWidth: 257,
+        theme: "grid",
+      });
+
+      addPDFFooter(doc);
+
+      const safeName =
+        (fullName || email || "legal-seeker")
+          .toString()
+          .replace(/[^a-z0-9]+/gi, "_")
+          .replace(/^_+|_+$/g, "")
+          .toLowerCase() || "legal-seeker";
+
+      doc.save(`Legal_Seeker_Activity_Report_${safeName}_${reportNumber}.pdf`);
     } catch (error) {
-      console.error('Failed to export activity PDF:', error);
-      alert('Failed to export activity PDF. Please try again.');
+      console.error("Failed to export activity PDF:", error);
+      alert("Failed to export activity PDF. Please try again.");
     }
   };
 
@@ -254,7 +518,7 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
       pending_lawyer: pendingLawyer,
       reject_count: rejectCount,
       last_rejected_at: lastRejectedAt,
-      is_blocked_from_applying: isBlockedFromApplying
+      is_blocked_from_applying: isBlockedFromApplying,
     } = userData;
 
     return {
@@ -270,15 +534,29 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
       pendingLawyer,
       rejectCount,
       lastRejectedAt,
-      isBlockedFromApplying
+      isBlockedFromApplying,
     };
   }, [userData]);
 
-  if (!user && !loading) return <Modal open={open} onClose={() => {}} title="Legal Seeker Details" showCloseButton={false} />;
-  
+  if (!user && !loading)
+    return (
+      <Modal
+        open={open}
+        onClose={() => {}}
+        title="Legal Seeker Details"
+        showCloseButton={false}
+      />
+    );
+
   if (loading) {
     return (
-      <Modal open={open} onClose={() => {}} title="Legal Seeker Details" width="max-w-4xl" showCloseButton={false}>
+      <Modal
+        open={open}
+        onClose={() => {}}
+        title="Legal Seeker Details"
+        width="max-w-4xl"
+        showCloseButton={false}
+      >
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#023D7B] mx-auto mb-4"></div>
@@ -288,7 +566,7 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
       </Modal>
     );
   }
-  
+
   // Extract values from memoized data
   const {
     id,
@@ -303,101 +581,138 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
     pendingLawyer,
     rejectCount,
     lastRejectedAt,
-    isBlockedFromApplying
+    isBlockedFromApplying,
   } = extractedData;
 
   // Format date for display
   const formatDate = (dateString, includeTime = true) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
-    const options = { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric'
+    const options = {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     };
-    
+
     if (includeTime) {
-      options.hour = '2-digit';
-      options.minute = '2-digit';
+      options.hour = "2-digit";
+      options.minute = "2-digit";
     }
-    
-    return date.toLocaleDateString('en-US', options);
+
+    return date.toLocaleDateString("en-US", options);
   };
 
   return (
-    <Modal 
-      open={open} 
-      onClose={() => {}} 
-      title="Legal Seeker Details" 
+    <Modal
+      open={open}
+      onClose={() => {}}
+      title="Legal Seeker Details"
       width="max-w-4xl"
       showCloseButton={false}
     >
       <div className="space-y-4">
         {/* Account Information */}
         <div>
-          <h3 className="text-sm font-medium text-gray-900 mb-3">Account Information</h3>
+          <h3 className="text-sm font-medium text-gray-900 mb-3">
+            Account Information
+          </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <div className="text-[9px] text-gray-500">Full Name</div>
-              <div className="text-xs font-medium text-gray-900">{fullName || '-'}</div>
+              <div className="text-xs font-medium text-gray-900">
+                {fullName || "-"}
+              </div>
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Email</div>
-              <div className="text-xs font-medium text-gray-900">{email || '-'}</div>
+              <div className="text-xs font-medium text-gray-900">
+                {email || "-"}
+              </div>
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Username</div>
-              <div className="text-xs font-medium text-gray-900">{username || '-'}</div>
+              <div className="text-xs font-medium text-gray-900">
+                {username || "-"}
+              </div>
             </div>
             <div>
-              <div className="text-[9px] text-gray-500">Verification Status</div>
+              <div className="text-[9px] text-gray-500">
+                Verification Status
+              </div>
               <div className="flex items-center gap-2">
                 <VerificationBadge isVerified={isVerified} />
               </div>
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Created At</div>
-              <div className="text-xs text-gray-700">{formatDate(createdAt)}</div>
+              <div className="text-xs text-gray-700">
+                {formatDate(createdAt)}
+              </div>
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Last Edited At</div>
               <div className="text-xs text-gray-700">
-                {updatedAt ? formatDate(updatedAt) : 
-                 createdAt ? formatDate(createdAt) : 'Never'}
+                {updatedAt
+                  ? formatDate(updatedAt)
+                  : createdAt
+                  ? formatDate(createdAt)
+                  : "Never"}
               </div>
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Birthdate</div>
-              <div className="text-xs text-gray-700">{formatDate(birthdate, false)}</div>
+              <div className="text-xs text-gray-700">
+                {formatDate(birthdate, false)}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Lawyer Application Status */}
         <div className="border-t border-gray-200 pt-4">
-          <h3 className="text-sm font-medium text-gray-900 mb-3">Lawyer Application Status</h3>
+          <h3 className="text-sm font-medium text-gray-900 mb-3">
+            Lawyer Application Status
+          </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <div className="text-[9px] text-gray-500">Pending Lawyer Application</div>
+              <div className="text-[9px] text-gray-500">
+                Pending Lawyer Application
+              </div>
               <div className="flex items-center gap-2">
-                <BooleanBadge value={pendingLawyer} trueLabel="Pending" falseLabel="None" grayForFalse={true} />
+                <BooleanBadge
+                  value={pendingLawyer}
+                  trueLabel="Pending"
+                  falseLabel="None"
+                  grayForFalse={true}
+                />
               </div>
             </div>
             <div>
-              <div className="text-[9px] text-gray-500">Blocked from Applying</div>
+              <div className="text-[9px] text-gray-500">
+                Blocked from Applying
+              </div>
               <div className="flex items-center gap-2">
-                <BooleanBadge value={isBlockedFromApplying} trueLabel="Blocked" falseLabel="Allowed" invertColors={true} />
+                <BooleanBadge
+                  value={isBlockedFromApplying}
+                  trueLabel="Blocked"
+                  falseLabel="Allowed"
+                  invertColors={true}
+                />
               </div>
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Rejection Count</div>
               <div className="text-xs font-medium text-gray-900">
-                {rejectCount !== null && rejectCount !== undefined ? rejectCount : 0}
+                {rejectCount !== null && rejectCount !== undefined
+                  ? rejectCount
+                  : 0}
               </div>
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Last Rejected At</div>
-              <div className="text-xs text-gray-700">{formatDate(lastRejectedAt)}</div>
+              <div className="text-xs text-gray-700">
+                {formatDate(lastRejectedAt)}
+              </div>
             </div>
           </div>
         </div>
@@ -405,14 +720,17 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
         {/* Legal Seeker History & Audit Trail Section */}
         <div className="border-t border-gray-200 pt-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
             {/* Recent Activity Column */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <Activity className="h-3 w-3 text-gray-600" />
-                  <h4 className="text-xs font-medium text-gray-900">Recent Activity</h4>
-                  <span className="text-[10px] text-gray-500">({recentActivity.length} entries)</span>
+                  <h4 className="text-xs font-medium text-gray-900">
+                    Recent Activity
+                  </h4>
+                  <span className="text-[10px] text-gray-500">
+                    ({recentActivity.length} entries)
+                  </span>
                 </div>
                 <Tooltip content="Download as PDF">
                   <button
@@ -457,8 +775,11 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
                               {formatDate(activity.created_at)}
                             </td>
                             <td className="px-2 py-1.5 max-w-32">
-                              <div className="text-[9px] text-gray-700 truncate" title={activity.details || '-'}>
-                                {activity.details || '-'}
+                              <div
+                                className="text-[9px] text-gray-700 truncate"
+                                title={activity.details || "-"}
+                              >
+                                {activity.details || "-"}
                               </div>
                             </td>
                             <td className="px-2 py-1.5 text-right">
@@ -480,7 +801,9 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
               ) : (
                 <div className="text-center py-6">
                   <Activity className="h-6 w-6 text-gray-400 mx-auto mb-1" />
-                  <p className="text-[10px] text-gray-500">No recent activity found</p>
+                  <p className="text-[10px] text-gray-500">
+                    No recent activity found
+                  </p>
                 </div>
               )}
             </div>
@@ -490,16 +813,26 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <History className="h-3 w-3 text-gray-600" />
-                  <h4 className="text-xs font-medium text-gray-900">Audit Trail</h4>
-                  <span className="text-[10px] text-gray-500">({auditTrail.length} entries)</span>
+                  <h4 className="text-xs font-medium text-gray-900">
+                    Audit Trail
+                  </h4>
+                  <span className="text-[10px] text-gray-500">
+                    ({auditTrail.length} entries)
+                  </span>
                 </div>
                 <Tooltip content="Download as PDF">
                   <button
                     onClick={handleExportAuditTrail}
-                    disabled={auditLoading || !auditTrail || auditTrail.length === 0}
+                    disabled={
+                      auditLoading || !auditTrail || auditTrail.length === 0
+                    }
                     className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {auditLoading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                    {auditLoading ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Download size={14} />
+                    )}
                   </button>
                 </Tooltip>
               </div>
@@ -507,13 +840,17 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
               {auditLoading ? (
                 <div className="text-center py-6">
                   <Loader2 className="h-6 w-6 text-gray-400 mx-auto mb-1 animate-spin" />
-                  <p className="text-[10px] text-gray-500">Loading audit trail...</p>
+                  <p className="text-[10px] text-gray-500">
+                    Loading audit trail...
+                  </p>
                 </div>
               ) : auditError ? (
                 <div className="text-center py-6">
                   <AlertCircle className="h-6 w-6 text-red-400 mx-auto mb-1" />
-                  <p className="text-[10px] text-red-500 mb-2">Failed to load audit trail</p>
-                  <button 
+                  <p className="text-[10px] text-red-500 mb-2">
+                    Failed to load audit trail
+                  </p>
+                  <button
                     onClick={loadAuditLogs}
                     className="text-[9px] text-blue-600 hover:text-blue-800 underline"
                   >
@@ -548,9 +885,11 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
                             <td className="px-2 py-1.5 whitespace-nowrap">
                               <div className="text-[9px]">
                                 <div className="font-medium text-gray-900">
-                                  {log.admin || 'Unknown Admin'}
+                                  {log.admin || "Unknown Admin"}
                                 </div>
-                                <div className="text-gray-500 capitalize">{log.role || 'User'}</div>
+                                <div className="text-gray-500 capitalize">
+                                  {log.role || "User"}
+                                </div>
                               </div>
                             </td>
                             <td className="px-2 py-1.5 whitespace-nowrap text-[9px] text-gray-500">
@@ -565,7 +904,9 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
               ) : (
                 <div className="text-center py-6">
                   <History className="h-6 w-6 text-gray-400 mx-auto mb-1" />
-                  <p className="text-[10px] text-gray-500">No audit trail found</p>
+                  <p className="text-[10px] text-gray-500">
+                    No audit trail found
+                  </p>
                 </div>
               )}
             </div>
@@ -620,7 +961,8 @@ const ViewLegalSeekerModal = ({ open, onClose, user, loading = false }) => {
                   Details
                 </label>
                 <div className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
-                  {selectedActivity.details || 'No additional details available'}
+                  {selectedActivity.details ||
+                    "No additional details available"}
                 </div>
               </div>
 
