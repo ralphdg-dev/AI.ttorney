@@ -1,19 +1,26 @@
-const express = require('express');
-const { supabaseAdmin } = require('../config/supabase');
-const { authenticateAdmin } = require('../middleware/auth');
+const express = require("express");
+const { supabaseAdmin } = require("../config/supabase");
+const { authenticateAdmin } = require("../middleware/auth");
 
 const router = express.Router();
 
 // Get all legal seekers (registered users who are not admins/lawyers)
-router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
+router.get("/legal-seekers", authenticateAdmin, async (req, res) => {
   try {
-    const { page = 1, limit = 50, search = '', status = 'all', archived = 'active' } = req.query;
+    const {
+      page = 1,
+      limit = 50,
+      search = "",
+      status = "all",
+      archived = "active",
+    } = req.query;
     const offset = (page - 1) * limit;
 
     // Build the query - show ALL legal seekers (exclude only verified lawyers, admins, and superadmins)
     let query = supabaseAdmin
-      .from('users')
-      .select(`
+      .from("users")
+      .select(
+        `
         id,
         full_name,
         email,
@@ -35,52 +42,55 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
         banned_at,
         banned_reason,
         account_status
-      `)
-      .not('role', 'in', '("verified_lawyer","admin","superadmin")') // Exclude only verified lawyers and admins
-      .order('created_at', { ascending: false });
+      `
+      )
+      .not("role", "in", '("verified_lawyer","admin","superadmin")') // Exclude only verified lawyers and admins
+      .order("created_at", { ascending: false });
 
     // Add search filter if provided
     if (search) {
       const trimmedSearch = search.trim();
-      query = query.or(`full_name.ilike.%${trimmedSearch}%,email.ilike.%${trimmedSearch}%,username.ilike.%${trimmedSearch}%`);
+      query = query.or(
+        `full_name.ilike.%${trimmedSearch}%,email.ilike.%${trimmedSearch}%,username.ilike.%${trimmedSearch}%`
+      );
     }
 
     // Add status filter
-    if (status !== 'all') {
-      if (status === 'verified') {
-        query = query.eq('is_verified', true);
-      } else if (status === 'unverified') {
-        query = query.eq('is_verified', false);
-      } else if (status === 'pending_lawyer') {
-        query = query.eq('pending_lawyer', true);
-      } else if (status === 'no status') {
+    if (status !== "all") {
+      if (status === "verified") {
+        query = query.eq("is_verified", true);
+      } else if (status === "unverified") {
+        query = query.eq("is_verified", false);
+      } else if (status === "pending_lawyer") {
+        query = query.eq("pending_lawyer", true);
+      } else if (status === "no status") {
         query = query
-          .eq('is_verified', false)
-          .eq('pending_lawyer', false)
-          .eq('account_status', 'active')
-          .is('banned_at', null)
-          .is('role', 'neq', 'guest') // Exclude deactivated/guest users
-          .or('suspension_end.is.null,suspension_end.lt.now()');
+          .eq("is_verified", false)
+          .eq("pending_lawyer", false)
+          .eq("account_status", "active")
+          .is("banned_at", null)
+          .is("role", "neq", "guest") // Exclude deactivated/guest users
+          .or("suspension_end.is.null,suspension_end.lt.now()");
       }
     }
 
     // Add archived filter (handle null values - null means active/not archived)
-    if (archived === 'active') {
+    if (archived === "active") {
       // For pending lawyer filter, don't restrict account_status since they might have different statuses
-      if (status === 'pending_lawyer') {
+      if (status === "pending_lawyer") {
         query = query
-          .or('archived.is.null,archived.eq.false')
-          .is('banned_at', null)
-          .neq('role', 'guest');
+          .or("archived.is.null,archived.eq.false")
+          .is("banned_at", null)
+          .neq("role", "guest");
       } else {
         query = query
-          .or('archived.is.null,archived.eq.false')
-          .is('banned_at', null)
-          .neq('role', 'guest')
-          .eq('account_status', 'active');
+          .or("archived.is.null,archived.eq.false")
+          .is("banned_at", null)
+          .neq("role", "guest")
+          .eq("account_status", "active");
       }
-    } else if (archived === 'archived') {
-      query = query.eq('archived', true);
+    } else if (archived === "archived") {
+      query = query.eq("archived", true);
     }
     // If archived === 'all', don't add any filter
 
@@ -90,24 +100,24 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
     const { data: users, error } = await query;
 
     if (error) {
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Failed to fetch legal seekers' 
+      return res.status(500).json({
+        success: false,
+        error: "Failed to fetch legal seekers",
       });
     }
 
     // Transform data for frontend
-    const transformedUsers = users.map(user => ({
+    const transformedUsers = users.map((user) => ({
       id: user.id,
-      full_name: user.full_name || 'N/A',
+      full_name: user.full_name || "N/A",
       email: user.email,
-      username: user.username || 'N/A',
-      birthdate: user.birthdate || 'N/A',
+      username: user.username || "N/A",
+      birthdate: user.birthdate || "N/A",
       registration_date: user.created_at,
-      verification_status: user.is_verified ? 'Verified' : 'Unverified',
-      has_lawyer_application: user.pending_lawyer ? 'Yes' : 'No',
+      verification_status: user.is_verified ? "Verified" : "Unverified",
+      has_lawyer_application: user.pending_lawyer ? "Yes" : "No",
       role: user.role,
-      archived: user.archived === true || user.archived === 'true',
+      archived: user.archived === true || user.archived === "true",
       is_verified: user.is_verified, // Include raw boolean for frontend logic
       // Include moderation fields
       strike_count: user.strike_count || 0,
@@ -117,54 +127,56 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
       last_violation_at: user.last_violation_at,
       banned_at: user.banned_at,
       banned_reason: user.banned_reason,
-      account_status: user.account_status || 'active'
+      account_status: user.account_status || "active",
     }));
 
     // Get total count for pagination with same filters
     let countQuery = supabaseAdmin
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .not('role', 'in', '("verified_lawyer","admin","superadmin")');
+      .from("users")
+      .select("*", { count: "exact", head: true })
+      .not("role", "in", '("verified_lawyer","admin","superadmin")');
 
     // Apply same filters as main query
     if (search) {
-      countQuery = countQuery.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,username.ilike.%${search}%`);
+      countQuery = countQuery.or(
+        `full_name.ilike.%${search}%,email.ilike.%${search}%,username.ilike.%${search}%`
+      );
     }
 
-    if (status !== 'all') {
-      if (status === 'verified') {
-        countQuery = countQuery.eq('is_verified', true);
-      } else if (status === 'unverified') {
-        countQuery = countQuery.eq('is_verified', false);
-      } else if (status === 'pending_lawyer') {
-        countQuery = countQuery.eq('pending_lawyer', true);
-      } else if (status === 'no status') {
+    if (status !== "all") {
+      if (status === "verified") {
+        countQuery = countQuery.eq("is_verified", true);
+      } else if (status === "unverified") {
+        countQuery = countQuery.eq("is_verified", false);
+      } else if (status === "pending_lawyer") {
+        countQuery = countQuery.eq("pending_lawyer", true);
+      } else if (status === "no status") {
         countQuery = countQuery
-          .eq('is_verified', false)
-          .eq('pending_lawyer', false)
-          .eq('account_status', 'active')
-          .is('banned_at', null)
-          .is('role', 'neq', 'guest') // Exclude deactivated/guest users
-          .or('suspension_end.is.null,suspension_end.lt.now()');
+          .eq("is_verified", false)
+          .eq("pending_lawyer", false)
+          .eq("account_status", "active")
+          .is("banned_at", null)
+          .is("role", "neq", "guest") // Exclude deactivated/guest users
+          .or("suspension_end.is.null,suspension_end.lt.now()");
       }
     }
 
-    if (archived === 'active') {
+    if (archived === "active") {
       // For pending lawyer filter, don't restrict account_status since they might have different statuses
-      if (status === 'pending_lawyer') {
+      if (status === "pending_lawyer") {
         countQuery = countQuery
-          .or('archived.is.null,archived.eq.false')
-          .is('banned_at', null)
-          .neq('role', 'guest');
+          .or("archived.is.null,archived.eq.false")
+          .is("banned_at", null)
+          .neq("role", "guest");
       } else {
         countQuery = countQuery
-          .or('archived.is.null,archived.eq.false')
-          .is('banned_at', null)
-          .neq('role', 'guest')
-          .eq('account_status', 'active');
+          .or("archived.is.null,archived.eq.false")
+          .is("banned_at", null)
+          .neq("role", "guest")
+          .eq("account_status", "active");
       }
-    } else if (archived === 'archived') {
-      countQuery = countQuery.eq('archived', true);
+    } else if (archived === "archived") {
+      countQuery = countQuery.eq("archived", true);
     }
 
     const { count: totalCount } = await countQuery;
@@ -176,235 +188,257 @@ router.get('/legal-seekers', authenticateAdmin, async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total: totalCount,
-        pages: Math.ceil(totalCount / limit)
-      }
+        pages: Math.ceil(totalCount / limit),
+      },
     });
-
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
     });
   }
 });
 
 // Get legal seekers statistics (must come before /:id route)
-router.get('/legal-seekers/stats/overview', authenticateAdmin, async (req, res) => {
-  try {
-    // Get total counts
-    const { count: totalUsers } = await supabaseAdmin
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .in('role', ['guest', 'registered_user']);
+router.get(
+  "/legal-seekers/stats/overview",
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      // Get total counts
+      const { count: totalUsers } = await supabaseAdmin
+        .from("users")
+        .select("*", { count: "exact", head: true })
+        .in("role", ["guest", "registered_user"]);
 
-    const { count: verifiedUsers } = await supabaseAdmin
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .in('role', ['guest', 'registered_user'])
-      .eq('is_verified', true);
+      const { count: verifiedUsers } = await supabaseAdmin
+        .from("users")
+        .select("*", { count: "exact", head: true })
+        .in("role", ["guest", "registered_user"])
+        .eq("is_verified", true);
 
-    const { count: pendingLawyers } = await supabaseAdmin
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .in('role', ['guest', 'registered_user'])
-      .eq('pending_lawyer', true);
+      const { count: pendingLawyers } = await supabaseAdmin
+        .from("users")
+        .select("*", { count: "exact", head: true })
+        .in("role", ["guest", "registered_user"])
+        .eq("pending_lawyer", true);
 
-    const { count: newThisMonth } = await supabaseAdmin
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .in('role', ['guest', 'registered_user'])
-      .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+      const { count: newThisMonth } = await supabaseAdmin
+        .from("users")
+        .select("*", { count: "exact", head: true })
+        .in("role", ["guest", "registered_user"])
+        .gte(
+          "created_at",
+          new Date(
+            new Date().getFullYear(),
+            new Date().getMonth(),
+            1
+          ).toISOString()
+        );
 
-    res.json({
-      success: true,
-      data: {
-        total_users: totalUsers || 0,
-        verified_users: verifiedUsers || 0,
-        unverified_users: (totalUsers || 0) - (verifiedUsers || 0),
-        pending_lawyers: pendingLawyers || 0,
-        new_this_month: newThisMonth || 0
-      }
-    });
-
-  } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
-    });
+      res.json({
+        success: true,
+        data: {
+          total_users: totalUsers || 0,
+          verified_users: verifiedUsers || 0,
+          unverified_users: (totalUsers || 0) - (verifiedUsers || 0),
+          pending_lawyers: pendingLawyers || 0,
+          new_this_month: newThisMonth || 0,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      });
+    }
   }
-});
+);
 
 // Get single legal seeker details
-router.get('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
+router.get("/legal-seekers/:id", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
     const { data: user, error } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', id)
+      .from("users")
+      .select("*")
+      .eq("id", id)
       .single();
 
     if (error || !user) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Legal seeker not found' 
+      return res.status(404).json({
+        success: false,
+        error: "Legal seeker not found",
       });
     }
 
     // Check if user is actually a legal seeker (not verified lawyer/admin/superadmin)
-    if (['verified_lawyer', 'admin', 'superadmin'].includes(user.role)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'User is not a legal seeker' 
+    if (["verified_lawyer", "admin", "superadmin"].includes(user.role)) {
+      return res.status(400).json({
+        success: false,
+        error: "User is not a legal seeker",
       });
     }
 
     res.json({
       success: true,
-      data: user
+      data: user,
     });
-
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
     });
   }
 });
 
 // Update legal seeker status (verify/unverify)
-router.patch('/legal-seekers/:id/status', authenticateAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { is_verified } = req.body;
+router.patch(
+  "/legal-seekers/:id/status",
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { is_verified } = req.body;
 
-    if (typeof is_verified !== 'boolean') {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'is_verified must be a boolean value' 
+      if (typeof is_verified !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          error: "is_verified must be a boolean value",
+        });
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from("users")
+        .update({
+          is_verified,
+          // updated_at handled by database with Asia/Manila timezone
+        })
+        .eq("id", id)
+        .not("role", "in", '("verified_lawyer","admin","superadmin")') // Only allow updates to legal seekers
+        .select()
+        .single();
+
+      if (error || !data) {
+        return res.status(404).json({
+          success: false,
+          error: "Legal seeker not found or update failed",
+        });
+      }
+
+      res.json({
+        success: true,
+        message: `User ${is_verified ? "verified" : "unverified"} successfully`,
+        data: data,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
       });
     }
-
-    const { data, error } = await supabaseAdmin
-      .from('users')
-      .update({ 
-        is_verified
-        // updated_at handled by database with Asia/Manila timezone
-      })
-      .eq('id', id)
-      .not('role', 'in', '("verified_lawyer","admin","superadmin")') // Only allow updates to legal seekers
-      .select()
-      .single();
-
-    if (error || !data) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Legal seeker not found or update failed' 
-      });
-    }
-
-    res.json({
-      success: true,
-      message: `User ${is_verified ? 'verified' : 'unverified'} successfully`,
-      data: data
-    });
-
-  } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
-    });
   }
-});
+);
 
 // Delete legal seeker (soft delete by setting role to 'guest')
-router.delete('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
+router.delete("/legal-seekers/:id", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
     // First check if user exists and is a legal seeker
     const { data: existingUser, error: checkError } = await supabaseAdmin
-      .from('users')
-      .select('role')
-      .eq('id', id)
+      .from("users")
+      .select("role")
+      .eq("id", id)
       .single();
 
     if (checkError || !existingUser) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Legal seeker not found' 
+      return res.status(404).json({
+        success: false,
+        error: "Legal seeker not found",
       });
     }
 
-    if (['verified_lawyer', 'admin', 'superadmin'].includes(existingUser.role)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Cannot delete non-legal seeker accounts' 
+    if (
+      ["verified_lawyer", "admin", "superadmin"].includes(existingUser.role)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: "Cannot delete non-legal seeker accounts",
       });
     }
 
     // Soft delete by setting role to 'guest' and clearing verification
     const { data, error } = await supabaseAdmin
-      .from('users')
-      .update({ 
-        role: 'guest',
-        is_verified: false
+      .from("users")
+      .update({
+        role: "guest",
+        is_verified: false,
         // updated_at handled by database with Asia/Manila timezone
       })
-      .eq('id', id)
+      .eq("id", id)
       .select()
       .single();
 
     if (error) {
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Failed to delete legal seeker' 
+      return res.status(500).json({
+        success: false,
+        error: "Failed to delete legal seeker",
       });
     }
 
     res.json({
       success: true,
-      message: 'Legal seeker account deactivated successfully'
+      message: "Legal seeker account deactivated successfully",
     });
-
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
     });
   }
 });
 
-
 // Get all verified lawyers
-router.get('/lawyers', authenticateAdmin, async (req, res) => {
+router.get("/lawyers", authenticateAdmin, async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '' } = req.query;
+    const { page = 1, limit = 10, search = "" } = req.query;
     const offset = (page - 1) * limit;
-
 
     // First, let's try a simpler query to get verified lawyers with lawyer_info
     let query = supabaseAdmin
-      .from('users')
-      .select(`
+      .from("users")
+      .select(
+        `
         id,
         full_name,
         email,
         username,
         created_at,
         is_verified,
+        role,
+        strike_count,
+        suspension_count,
+        suspension_end,
+        last_violation_at,
+        banned_at,
+        banned_reason,
+        account_status,
         lawyer_info (
           accepting_consultations
         )
-      `)
-      .eq('role', 'verified_lawyer') // Only verified lawyers
-      .order('created_at', { ascending: false });
+      `
+      )
+      .eq("role", "verified_lawyer") // Only verified lawyers
+      .order("created_at", { ascending: false });
 
     // Add search filter if provided
     if (search) {
       const trimmedSearch = search.trim();
-      query = query.or(`full_name.ilike.%${trimmedSearch}%,email.ilike.%${trimmedSearch}%,username.ilike.%${trimmedSearch}%`);
+      query = query.or(
+        `full_name.ilike.%${trimmedSearch}%,email.ilike.%${trimmedSearch}%,username.ilike.%${trimmedSearch}%`
+      );
     }
 
     // Add pagination
@@ -413,71 +447,83 @@ router.get('/lawyers', authenticateAdmin, async (req, res) => {
     const { data: lawyers, error } = await query;
 
     if (error) {
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Failed to fetch lawyers: ' + error.message 
+      return res.status(500).json({
+        success: false,
+        error: "Failed to fetch lawyers: " + error.message,
       });
     }
 
     // Now try to get lawyer applications for these users
     let transformedLawyers = [];
-    
+
     if (lawyers && lawyers.length > 0) {
-      const userIds = lawyers.map(lawyer => lawyer.id);
-      
+      const userIds = lawyers.map((lawyer) => lawyer.id);
+
       // Get lawyer applications separately - fetch latest version for each user
       const { data: applications, error: appError } = await supabaseAdmin
-        .from('lawyer_applications')
-        .select('user_id, roll_number, roll_signing_date, status, version, is_latest')
-        .in('user_id', userIds)
-        .eq('status', 'accepted')
-        .order('version', { ascending: false }); // Get highest version first
+        .from("lawyer_applications")
+        .select(
+          "user_id, roll_number, roll_signing_date, status, version, is_latest"
+        )
+        .in("user_id", userIds)
+        .eq("status", "accepted")
+        .order("version", { ascending: false }); // Get highest version first
 
       if (appError) {
         // Continue without applications data
       }
 
-
       // Process applications to get latest version for each user
       const latestApplications = {};
       if (applications) {
-        applications.forEach(app => {
+        applications.forEach((app) => {
           const userId = app.user_id;
-          if (!latestApplications[userId] || 
-              app.is_latest === true || 
-              (app.version > (latestApplications[userId].version || 0))) {
+          if (
+            !latestApplications[userId] ||
+            app.is_latest === true ||
+            app.version > (latestApplications[userId].version || 0)
+          ) {
             latestApplications[userId] = app;
           }
         });
       }
 
       // Transform data for frontend
-      transformedLawyers = lawyers.map(lawyer => {
+      transformedLawyers = lawyers.map((lawyer) => {
         const application = latestApplications[lawyer.id];
         // Check accepting_consultations from lawyer_info table
         const lawyerInfo = lawyer.lawyer_info?.[0]; // lawyer_info is an array from the join
-        const acceptingConsultations = lawyerInfo?.accepting_consultations === true;
-        
+        const acceptingConsultations =
+          lawyerInfo?.accepting_consultations === true;
+
         return {
           id: lawyer.id,
-          full_name: lawyer.full_name || 'N/A',
+          full_name: lawyer.full_name || "N/A",
           email: lawyer.email,
-          username: lawyer.username || 'N/A',
+          username: lawyer.username || "N/A",
+          role: lawyer.role || "verified_lawyer",
           accepting_consultations: acceptingConsultations,
-          roll_number: application?.roll_number || 'N/A',
+          roll_number: application?.roll_number || "N/A",
           roll_sign_date: application?.roll_signing_date || lawyer.created_at,
-          status: 'Verified',
-          registration_date: lawyer.created_at
+          status: "Verified",
+          registration_date: lawyer.created_at,
+          // Moderation fields to align with legal seekers and sanctions UI
+          strike_count: lawyer.strike_count || 0,
+          suspension_count: lawyer.suspension_count || 0,
+          suspension_end: lawyer.suspension_end,
+          last_violation_at: lawyer.last_violation_at,
+          banned_at: lawyer.banned_at,
+          banned_reason: lawyer.banned_reason,
+          account_status: lawyer.account_status || "active",
         };
       });
     }
 
     // Get total count for pagination
     const { count: totalCount } = await supabaseAdmin
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'verified_lawyer');
-
+      .from("users")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "verified_lawyer");
 
     res.json({
       success: true,
@@ -486,175 +532,179 @@ router.get('/lawyers', authenticateAdmin, async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total: totalCount || 0,
-        pages: Math.ceil((totalCount || 0) / limit)
-      }
+        pages: Math.ceil((totalCount || 0) / limit),
+      },
     });
-
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error: ' + error.message 
+    res.status(500).json({
+      success: false,
+      error: "Internal server error: " + error.message,
     });
   }
 });
 
 // Get single lawyer details
-router.get('/lawyers/:id', authenticateAdmin, async (req, res) => {
+router.get("/lawyers/:id", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
     const { data: lawyer, error } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .eq('role', 'verified_lawyer')
+      .from("users")
+      .select("*")
+      .eq("id", id)
+      .eq("role", "verified_lawyer")
       .single();
 
     if (error || !lawyer) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Lawyer not found' 
+      return res.status(404).json({
+        success: false,
+        error: "Lawyer not found",
       });
     }
 
     res.json({
       success: true,
-      data: lawyer
+      data: lawyer,
     });
-
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
     });
   }
 });
 
 // Update lawyer status (suspend/unsuspend)
-router.patch('/lawyers/:id/status', authenticateAdmin, async (req, res) => {
+router.patch("/lawyers/:id/status", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { is_verified } = req.body;
 
-    if (typeof is_verified !== 'boolean') {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'is_verified must be a boolean value' 
+    if (typeof is_verified !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        error: "is_verified must be a boolean value",
       });
     }
 
     const { data, error } = await supabaseAdmin
-      .from('users')
-      .update({ 
-        is_verified
+      .from("users")
+      .update({
+        is_verified,
         // updated_at handled by database with Asia/Manila timezone
       })
-      .eq('id', id)
-      .eq('role', 'verified_lawyer')
+      .eq("id", id)
+      .eq("role", "verified_lawyer")
       .select()
       .single();
 
     if (error || !data) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Lawyer not found or update failed' 
+      return res.status(404).json({
+        success: false,
+        error: "Lawyer not found or update failed",
       });
     }
 
     res.json({
       success: true,
-      message: `Lawyer ${is_verified ? 'verified' : 'suspended'} successfully`,
-      data: data
+      message: `Lawyer ${is_verified ? "verified" : "suspended"} successfully`,
+      data: data,
     });
-
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
     });
   }
 });
 
 // Archive/Unarchive legal seeker
-router.patch('/legal-seekers/:id/archive', authenticateAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { archived } = req.body;
+router.patch(
+  "/legal-seekers/:id/archive",
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { archived } = req.body;
 
-    // Validate input
-    if (typeof archived !== 'boolean') {
-      return res.status(400).json({
+      // Validate input
+      if (typeof archived !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          error: "Archived field must be a boolean",
+        });
+      }
+
+      // Update the user's archived status (only for legal seekers)
+      const { data, error } = await supabaseAdmin
+        .from("users")
+        .update({
+          archived,
+          // updated_at handled by database with Asia/Manila timezone
+        })
+        .eq("id", id)
+        .not("role", "in", '("verified_lawyer","admin","superadmin")') // Only allow archiving legal seekers
+        .select()
+        .single();
+
+      if (error) {
+        return res.status(500).json({
+          success: false,
+          error: "Failed to update archive status",
+        });
+      }
+
+      if (!data) {
+        return res.status(404).json({
+          success: false,
+          error: "User not found",
+        });
+      }
+
+      res.json({
+        success: true,
+        message: `User ${archived ? "archived" : "unarchived"} successfully`,
+        data: data,
+      });
+    } catch (error) {
+      res.status(500).json({
         success: false,
-        error: 'Archived field must be a boolean'
+        error: "Internal server error",
       });
     }
-
-    // Update the user's archived status (only for legal seekers)
-    const { data, error } = await supabaseAdmin
-      .from('users')
-      .update({ 
-        archived
-        // updated_at handled by database with Asia/Manila timezone
-      })
-      .eq('id', id)
-      .not('role', 'in', '("verified_lawyer","admin","superadmin")') // Only allow archiving legal seekers
-      .select()
-      .single();
-
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to update archive status'
-      });
-    }
-
-    if (!data) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: `User ${archived ? 'archived' : 'unarchived'} successfully`,
-      data: data
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
   }
-});
+);
 
 // Get legal seeker audit logs (actions performed ON this legal seeker)
-router.get('/legal-seekers/:id/audit-logs', authenticateAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { page = 1, limit = 50 } = req.query;
-    const offset = (page - 1) * limit;
+router.get(
+  "/legal-seekers/:id/audit-logs",
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { page = 1, limit = 50 } = req.query;
+      const offset = (page - 1) * limit;
 
-    // First verify the legal seeker exists
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('id, email, full_name')
-      .eq('id', id)
-      .single();
+      // First verify the legal seeker exists
+      const { data: user, error: userError } = await supabaseAdmin
+        .from("users")
+        .select("id, email, full_name")
+        .eq("id", id)
+        .single();
 
-    if (userError || !user) {
-      return res.status(404).json({
-        success: false,
-        error: 'Legal seeker not found'
-      });
-    }
+      if (userError || !user) {
+        return res.status(404).json({
+          success: false,
+          error: "Legal seeker not found",
+        });
+      }
 
-    // Get audit logs for this legal seeker - look for user-related actions
-    // This will include user creation, updates, verification changes, etc.
-    const { data: auditLogs, error: auditError } = await supabaseAdmin
-      .from('admin_audit_logs')
-      .select(`
+      // Get audit logs for this legal seeker - look for user-related actions
+      // This will include user creation, updates, verification changes, etc.
+      const { data: auditLogs, error: auditError } = await supabaseAdmin
+        .from("admin_audit_logs")
+        .select(
+          `
         id,
         action,
         target_table,
@@ -664,165 +714,177 @@ router.get('/legal-seekers/:id/audit-logs', authenticateAdmin, async (req, res) 
         target_id,
         metadata,
         created_at
-      `)
-      .eq('target_id', id)
-      .eq('target_table', 'users')
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      `
+        )
+        .eq("target_id", id)
+        .eq("target_table", "users")
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
 
-    if (auditError) {
-      // If table doesn't exist, create mock data based on user info
-      if (auditError.code === '42P01' || auditError.message.includes('relation') || auditError.message.includes('does not exist')) {
-        const mockAuditLogs = [
-          {
-            id: 1,
-            action: 'User account created',
-            target_table: 'users',
-            actor_id: null,
-            actor_name: 'System',
-            role: 'system',
-            target_id: user.id,
-            metadata: {
-              action_type: 'create',
-              target_email: user.email,
-              target_user: {
-                email: user.email,
-                full_name: user.full_name
-              }
+      if (auditError) {
+        // If table doesn't exist, create mock data based on user info
+        if (
+          auditError.code === "42P01" ||
+          auditError.message.includes("relation") ||
+          auditError.message.includes("does not exist")
+        ) {
+          const mockAuditLogs = [
+            {
+              id: 1,
+              action: "User account created",
+              target_table: "users",
+              actor_id: null,
+              actor_name: "System",
+              role: "system",
+              target_id: user.id,
+              metadata: {
+                action_type: "create",
+                target_email: user.email,
+                target_user: {
+                  email: user.email,
+                  full_name: user.full_name,
+                },
+              },
+              created_at: new Date().toISOString(),
             },
-            created_at: new Date().toISOString()
-          }
-        ];
+          ];
 
-        // Get total count (mock)
-        const totalCount = mockAuditLogs.length;
+          // Get total count (mock)
+          const totalCount = mockAuditLogs.length;
 
-        return res.json({
-          success: true,
-          data: mockAuditLogs,
-          pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total: totalCount,
-            pages: Math.ceil(totalCount / limit)
-          }
+          return res.json({
+            success: true,
+            data: mockAuditLogs,
+            pagination: {
+              page: parseInt(page),
+              limit: parseInt(limit),
+              total: totalCount,
+              pages: Math.ceil(totalCount / limit),
+            },
+          });
+        }
+
+        return res.status(500).json({
+          success: false,
+          error: "Failed to fetch audit logs: " + auditError.message,
         });
       }
-      
-      return res.status(500).json({
+
+      // Get total count for pagination
+      const { count: totalCount } = await supabaseAdmin
+        .from("admin_audit_logs")
+        .select("*", { count: "exact", head: true })
+        .eq("target_id", id)
+        .eq("target_table", "users");
+
+      res.json({
+        success: true,
+        data: auditLogs || [],
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: totalCount || 0,
+          pages: Math.ceil((totalCount || 0) / limit),
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
         success: false,
-        error: 'Failed to fetch audit logs: ' + auditError.message
+        error: "Internal server error",
       });
     }
-
-    // Get total count for pagination
-    const { count: totalCount } = await supabaseAdmin
-      .from('admin_audit_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('target_id', id)
-      .eq('target_table', 'users');
-
-    res.json({
-      success: true,
-      data: auditLogs || [],
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: totalCount || 0,
-        pages: Math.ceil((totalCount || 0) / limit)
-      }
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
   }
-});
+);
 
 // Create legal seeker audit log entry
-router.post('/legal-seekers/:id/audit-logs', authenticateAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { action, details, metadata } = req.body;
+router.post(
+  "/legal-seekers/:id/audit-logs",
+  authenticateAdmin,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { action, details, metadata } = req.body;
 
-    if (!action) {
-      return res.status(400).json({
-        success: false,
-        error: 'Action is required'
-      });
-    }
-
-    // Verify the legal seeker exists
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('id', id)
-      .single();
-
-    if (userError || !user) {
-      return res.status(404).json({
-        success: false,
-        error: 'Legal seeker not found'
-      });
-    }
-
-    // Create audit log entry with CORRECT DATETIME
-    const auditData = {
-      action: action,
-      target_table: 'users',
-      actor_id: req.admin.id,
-      actor_name: req.admin.full_name || req.admin.email,
-      role: req.admin.role,
-      target_id: id,
-      metadata: metadata || {},
-      created_at: new Date().toISOString() // ENSURE CORRECT DATETIME
-    };
-
-    const { data: auditLog, error: auditError } = await supabaseAdmin
-      .from('admin_audit_logs')
-      .insert(auditData)
-      .select()
-      .single();
-
-    if (auditError) {
-      // If table doesn't exist, just return success with mock data
-      if (auditError.code === '42P01' || auditError.message.includes('relation') || auditError.message.includes('does not exist')) {
-        return res.json({
-          success: true,
-          message: 'Audit log recorded (table not found - using fallback)',
-          data: {
-            action,
-            user_id: id,
-            actor_name: req.admin.full_name || req.admin.email,
-            created_at: new Date().toISOString()
-          }
+      if (!action) {
+        return res.status(400).json({
+          success: false,
+          error: "Action is required",
         });
       }
-      
-      return res.status(500).json({
+
+      // Verify the legal seeker exists
+      const { data: user, error: userError } = await supabaseAdmin
+        .from("users")
+        .select("id")
+        .eq("id", id)
+        .single();
+
+      if (userError || !user) {
+        return res.status(404).json({
+          success: false,
+          error: "Legal seeker not found",
+        });
+      }
+
+      // Create audit log entry with CORRECT DATETIME
+      const auditData = {
+        action: action,
+        target_table: "users",
+        actor_id: req.admin.id,
+        actor_name: req.admin.full_name || req.admin.email,
+        role: req.admin.role,
+        target_id: id,
+        metadata: metadata || {},
+        created_at: new Date().toISOString(), // ENSURE CORRECT DATETIME
+      };
+
+      const { data: auditLog, error: auditError } = await supabaseAdmin
+        .from("admin_audit_logs")
+        .insert(auditData)
+        .select()
+        .single();
+
+      if (auditError) {
+        // If table doesn't exist, just return success with mock data
+        if (
+          auditError.code === "42P01" ||
+          auditError.message.includes("relation") ||
+          auditError.message.includes("does not exist")
+        ) {
+          return res.json({
+            success: true,
+            message: "Audit log recorded (table not found - using fallback)",
+            data: {
+              action,
+              user_id: id,
+              actor_name: req.admin.full_name || req.admin.email,
+              created_at: new Date().toISOString(),
+            },
+          });
+        }
+
+        return res.status(500).json({
+          success: false,
+          error: "Failed to create audit log: " + auditError.message,
+        });
+      }
+
+      res.status(201).json({
+        success: true,
+        message: "Audit log created successfully",
+        data: auditLog ? auditLog : {},
+      });
+    } catch (error) {
+      res.status(500).json({
         success: false,
-        error: 'Failed to create audit log: ' + auditError.message
+        error: "Internal server error",
       });
     }
-
-    res.status(201).json({
-      success: true,
-      message: 'Audit log created successfully',
-      data: auditLog ? auditLog : {}
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
   }
-});
+);
 
 // Update legal seeker status (PATCH endpoint for editing)
-router.patch('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
+router.patch("/legal-seekers/:id", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { is_verified } = req.body;
@@ -831,81 +893,83 @@ router.patch('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
     if (is_verified === undefined || is_verified === null) {
       return res.status(400).json({
         success: false,
-        error: 'is_verified status is required'
+        error: "is_verified status is required",
       });
     }
 
     // Validate is_verified is boolean
-    if (typeof is_verified !== 'boolean') {
+    if (typeof is_verified !== "boolean") {
       return res.status(400).json({
         success: false,
-        error: 'is_verified must be a boolean value'
+        error: "is_verified must be a boolean value",
       });
     }
 
     // Get current user data for comparison and audit logging
     const { data: currentUser, error: fetchError } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', id)
+      .from("users")
+      .select("*")
+      .eq("id", id)
       .single();
 
     if (fetchError || !currentUser) {
       return res.status(404).json({
         success: false,
-        error: 'Legal seeker not found'
+        error: "Legal seeker not found",
       });
     }
 
     // Update user with new verification status and updated_at timestamp
     const { data: updatedUser, error: updateError } = await supabaseAdmin
-      .from('users')
+      .from("users")
       .update({
-        is_verified: is_verified
+        is_verified: is_verified,
         // updated_at handled by database with Asia/Manila timezone
       })
-      .eq('id', id)
+      .eq("id", id)
       .select()
       .single();
 
     if (updateError) {
       return res.status(500).json({
         success: false,
-        error: 'Failed to update legal seeker: ' + updateError.message
+        error: "Failed to update legal seeker: " + updateError.message,
       });
     }
 
     // Create audit log entry with CORRECT DATETIME
     try {
       const auditData = {
-        action: `Legal seeker verification status updated from "${currentUser.is_verified ? 'verified' : 'unverified'}" to "${is_verified ? 'verified' : 'unverified'}"`,
-        target_table: 'users',
+        action: `Legal seeker verification status updated from "${
+          currentUser.is_verified ? "verified" : "unverified"
+        }" to "${is_verified ? "verified" : "unverified"}"`,
+        target_table: "users",
         actor_id: req.admin.id,
         actor_name: req.admin.full_name || req.admin.email,
         role: req.admin.role,
         target_id: id,
         created_at: new Date().toISOString(),
         metadata: {
-          action_type: 'update',
-          field_changed: 'is_verified',
+          action_type: "update",
+          field_changed: "is_verified",
           old_value: currentUser.is_verified,
           new_value: is_verified,
           target_user: {
             id: currentUser.id,
             email: currentUser.email,
-            full_name: currentUser.full_name
+            full_name: currentUser.full_name,
           },
           updated_by: {
             id: req.admin.id,
             email: req.admin.email,
             full_name: req.admin.full_name,
-            role: req.admin.role
-          }
-        }
+            role: req.admin.role,
+          },
+        },
       };
 
       const { error: auditError } = await supabaseAdmin
-        .from('admin_audit_logs')
+        .from("admin_audit_logs")
         .insert(auditData);
 
       if (auditError) {
@@ -917,7 +981,7 @@ router.patch('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Legal seeker updated successfully',
+      message: "Legal seeker updated successfully",
       data: {
         id: updatedUser.id,
         email: updatedUser.email,
@@ -932,259 +996,279 @@ router.patch('/legal-seekers/:id', authenticateAdmin, async (req, res) => {
         reject_count: updatedUser.reject_count,
         last_rejected_at: updatedUser.last_rejected_at,
         is_blocked_from_applying: updatedUser.is_blocked_from_applying,
-        archived: updatedUser.archived
-      }
+        archived: updatedUser.archived,
+      },
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: 'Internal server error'
+      error: "Internal server error",
     });
   }
 });
 
 // Add strike to user
-router.patch('/legal-seekers/:id/strikes', authenticateAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { action, reason } = req.body; // action: 'add' | 'remove'
-    const adminId = req.admin?.id;
-
-    if (!action || !['add', 'remove'].includes(action)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid action. Must be add or remove'
-      });
-    }
-
-    // Get current user data
-    const { data: currentUser, error: fetchError } = await supabaseAdmin
-      .from('users')
-      .select('id, full_name, email, strike_count, reject_count, suspension_count')
-      .eq('id', id)
-      .single();
-
-    if (fetchError || !currentUser) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    // Calculate new strike count
-    const currentStrikes = currentUser.strike_count || 0;
-    const newStrikeCount = action === 'add' 
-      ? currentStrikes + 1 
-      : Math.max(0, currentStrikes - 1);
-
-    // Check if user reaches 3 strikes (suspension threshold)
-    let updateData = {
-      strike_count: newStrikeCount,
-      last_violation_at: action === 'add' ? new Date().toISOString() : currentUser.last_violation_at
-    };
-
-    // If adding strikes and reaching 3 strikes = trigger suspension
-    if (action === 'add' && newStrikeCount >= 3) {
-      const newSuspensionCount = (currentUser.suspension_count || 0) + 1;
-      const suspensionEnd = new Date();
-      suspensionEnd.setDate(suspensionEnd.getDate() + 7); // 7 days suspension
-      
-      updateData = {
-        strike_count: 0, // Reset strikes to 0 after suspension
-        suspension_count: newSuspensionCount,
-        suspension_end: suspensionEnd.toISOString(),
-        account_status: 'suspended',
-        last_violation_at: new Date().toISOString()
-      };
-    }
-    // If removing strikes, just update the count (don't affect suspensions)
-    else if (action === 'remove') {
-      updateData.strike_count = newStrikeCount;
-    }
-
-    // Update user
-    const { data: updatedUser, error: updateError } = await supabaseAdmin
-      .from('users')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (updateError) {
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to update user strikes'
-      });
-    }
-
-    // Log the action
+router.patch(
+  "/legal-seekers/:id/strikes",
+  authenticateAdmin,
+  async (req, res) => {
     try {
-      await supabaseAdmin.from('admin_audit_logs').insert({
-        admin_id: adminId,
-        action: `user_strike_${action}`,
-        target_type: 'user',
-        target_id: id,
-        details: { 
-          reason, 
-          previous_strikes: currentStrikes,
-          new_strikes: updateData.strike_count,
-          suspension_triggered: action === 'add' && newStrikeCount >= 3,
-          suspension_count: updateData.suspension_count || currentUser.suspension_count
-        }
-      });
-    } catch (auditError) {
-      // Failed to log strike action
-    }
+      const { id } = req.params;
+      const { action, reason } = req.body; // action: 'add' | 'remove'
+      const adminId = req.admin?.id;
 
-    res.json({
-      success: true,
-      message: `Strike ${action}ed successfully`,
-      data: {
-        ...updatedUser,
-        total_strikes: updatedUser.strike_count || 0
+      if (!action || !["add", "remove"].includes(action)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid action. Must be add or remove",
+        });
       }
-    });
 
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
+      // Get current user data
+      const { data: currentUser, error: fetchError } = await supabaseAdmin
+        .from("users")
+        .select(
+          "id, full_name, email, strike_count, reject_count, suspension_count"
+        )
+        .eq("id", id)
+        .single();
+
+      if (fetchError || !currentUser) {
+        return res.status(404).json({
+          success: false,
+          error: "User not found",
+        });
+      }
+
+      // Calculate new strike count
+      const currentStrikes = currentUser.strike_count || 0;
+      const newStrikeCount =
+        action === "add" ? currentStrikes + 1 : Math.max(0, currentStrikes - 1);
+
+      // Check if user reaches 3 strikes (suspension threshold)
+      let updateData = {
+        strike_count: newStrikeCount,
+        last_violation_at:
+          action === "add"
+            ? new Date().toISOString()
+            : currentUser.last_violation_at,
+      };
+
+      // If adding strikes and reaching 3 strikes = trigger suspension
+      if (action === "add" && newStrikeCount >= 3) {
+        const newSuspensionCount = (currentUser.suspension_count || 0) + 1;
+        const suspensionEnd = new Date();
+        suspensionEnd.setDate(suspensionEnd.getDate() + 7); // 7 days suspension
+
+        updateData = {
+          strike_count: 0, // Reset strikes to 0 after suspension
+          suspension_count: newSuspensionCount,
+          suspension_end: suspensionEnd.toISOString(),
+          account_status: "suspended",
+          last_violation_at: new Date().toISOString(),
+        };
+      }
+      // If removing strikes, just update the count (don't affect suspensions)
+      else if (action === "remove") {
+        updateData.strike_count = newStrikeCount;
+      }
+
+      // Update user
+      const { data: updatedUser, error: updateError } = await supabaseAdmin
+        .from("users")
+        .update(updateData)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (updateError) {
+        return res.status(500).json({
+          success: false,
+          error: "Failed to update user strikes",
+        });
+      }
+
+      // Log the action
+      try {
+        await supabaseAdmin.from("admin_audit_logs").insert({
+          admin_id: adminId,
+          action: `user_strike_${action}`,
+          target_type: "user",
+          target_id: id,
+          details: {
+            reason,
+            previous_strikes: currentStrikes,
+            new_strikes: updateData.strike_count,
+            suspension_triggered: action === "add" && newStrikeCount >= 3,
+            suspension_count:
+              updateData.suspension_count || currentUser.suspension_count,
+          },
+        });
+      } catch (auditError) {
+        // Failed to log strike action
+      }
+
+      res.json({
+        success: true,
+        message: `Strike ${action}ed successfully`,
+        data: {
+          ...updatedUser,
+          total_strikes: updatedUser.strike_count || 0,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      });
+    }
   }
-});
+);
 
 // Ban/Restrict user
-router.patch('/legal-seekers/:id/moderation', authenticateAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { action, reason, duration } = req.body; // action: 'ban' | 'restrict' | 'unban'
-    const adminId = req.admin?.id;
-
-    if (!action || !['ban', 'restrict', 'unban'].includes(action)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid action. Must be ban, restrict, or unban'
-      });
-    }
-
-    // Calculate end date for temporary actions
-    let endDate = null;
-    if (duration && duration !== 'permanent' && action !== 'unban') {
-      const now = new Date();
-      const [amount, unit] = duration.split('_');
-      const duration_num = parseInt(amount);
-
-      switch (unit) {
-        case 'day':
-        case 'days':
-          endDate = new Date(now.getTime() + duration_num * 24 * 60 * 60 * 1000);
-          break;
-        case 'week':
-        case 'weeks':
-          endDate = new Date(now.getTime() + duration_num * 7 * 24 * 60 * 60 * 1000);
-          break;
-        case 'month':
-        case 'months':
-          endDate = new Date(now.setMonth(now.getMonth() + duration_num));
-          break;
-        case 'year':
-          endDate = new Date(now.setFullYear(now.getFullYear() + duration_num));
-          break;
-      }
-    }
-
-    // Update user status
-    let updateData = {};
-    if (action === 'ban') {
-      updateData = {
-        account_status: 'banned',
-        banned_at: new Date().toISOString(),
-        banned_reason: reason,
-        suspension_end: endDate?.toISOString() || null
-      };
-    } else if (action === 'restrict') {
-      // Since your schema doesn't have restriction, we'll use suspension instead
-      updateData = {
-        account_status: 'suspended',
-        suspension_end: endDate?.toISOString() || null,
-        last_violation_at: new Date().toISOString()
-      };
-    } else if (action === 'unban') {
-      updateData = {
-        account_status: 'active',
-        banned_at: null,
-        banned_reason: null,
-        suspension_end: null
-      };
-    }
-
-    const { data: updatedUser, error: updateError } = await supabaseAdmin
-      .from('users')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (updateError) {
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to update user status'
-      });
-    }
-
-    // Log the action
+router.patch(
+  "/legal-seekers/:id/moderation",
+  authenticateAdmin,
+  async (req, res) => {
     try {
-      await supabaseAdmin.from('admin_audit_logs').insert({
-        admin_id: adminId,
-        action: `user_${action}`,
-        target_type: 'user',
-        target_id: id,
-        details: { 
-          reason, 
-          duration,
-          end_date: endDate?.toISOString()
+      const { id } = req.params;
+      const { action, reason, duration } = req.body; // action: 'ban' | 'restrict' | 'unban'
+      const adminId = req.admin?.id;
+
+      if (!action || !["ban", "restrict", "unban"].includes(action)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid action. Must be ban, restrict, or unban",
+        });
+      }
+
+      // Calculate end date for temporary actions
+      let endDate = null;
+      if (duration && duration !== "permanent" && action !== "unban") {
+        const now = new Date();
+        const [amount, unit] = duration.split("_");
+        const duration_num = parseInt(amount);
+
+        switch (unit) {
+          case "day":
+          case "days":
+            endDate = new Date(
+              now.getTime() + duration_num * 24 * 60 * 60 * 1000
+            );
+            break;
+          case "week":
+          case "weeks":
+            endDate = new Date(
+              now.getTime() + duration_num * 7 * 24 * 60 * 60 * 1000
+            );
+            break;
+          case "month":
+          case "months":
+            endDate = new Date(now.setMonth(now.getMonth() + duration_num));
+            break;
+          case "year":
+            endDate = new Date(
+              now.setFullYear(now.getFullYear() + duration_num)
+            );
+            break;
         }
+      }
+
+      // Update user status
+      let updateData = {};
+      if (action === "ban") {
+        updateData = {
+          account_status: "banned",
+          banned_at: new Date().toISOString(),
+          banned_reason: reason,
+          suspension_end: endDate?.toISOString() || null,
+        };
+      } else if (action === "restrict") {
+        // Since your schema doesn't have restriction, we'll use suspension instead
+        updateData = {
+          account_status: "suspended",
+          suspension_end: endDate?.toISOString() || null,
+          last_violation_at: new Date().toISOString(),
+        };
+      } else if (action === "unban") {
+        updateData = {
+          account_status: "active",
+          banned_at: null,
+          banned_reason: null,
+          suspension_end: null,
+        };
+      }
+
+      const { data: updatedUser, error: updateError } = await supabaseAdmin
+        .from("users")
+        .update(updateData)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (updateError) {
+        return res.status(500).json({
+          success: false,
+          error: "Failed to update user status",
+        });
+      }
+
+      // Log the action
+      try {
+        await supabaseAdmin.from("admin_audit_logs").insert({
+          admin_id: adminId,
+          action: `user_${action}`,
+          target_type: "user",
+          target_id: id,
+          details: {
+            reason,
+            duration,
+            end_date: endDate?.toISOString(),
+          },
+        });
+      } catch (auditError) {
+        // Failed to log moderation action
+      }
+
+      res.json({
+        success: true,
+        message: `User ${action}ed successfully`,
+        data: updatedUser,
       });
-    } catch (auditError) {
-      // Failed to log moderation action
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      });
     }
-
-    res.json({
-      success: true,
-      message: `User ${action}ed successfully`,
-      data: updatedUser
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
   }
-});
+);
 
 // Get consultation bans
-router.get('/consultation-bans', authenticateAdmin, async (req, res) => {
+router.get("/consultation-bans", authenticateAdmin, async (req, res) => {
   try {
-    const { page = 1, limit = 50, search = '' } = req.query;
+    const { page = 1, limit = 50, search = "" } = req.query;
     const offset = (page - 1) * limit;
 
     // Get users with consultation ban information
     let query = supabaseAdmin
-      .from('users')
-      .select(`
+      .from("users")
+      .select(
+        `
         id,
         full_name,
         email,
         consultation_ban_end,
         created_at
-      `)
-      .order('consultation_ban_end', { ascending: false, nullsLast: true });
+      `
+      )
+      .order("consultation_ban_end", { ascending: false, nullsLast: true });
 
     // Add search filter if provided
     if (search) {
-      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,id.eq.${search}`);
+      query = query.or(
+        `full_name.ilike.%${search}%,email.ilike.%${search}%,id.eq.${search}`
+      );
     }
 
     // Apply pagination
@@ -1195,18 +1279,22 @@ router.get('/consultation-bans', authenticateAdmin, async (req, res) => {
     if (usersError) {
       return res.status(500).json({
         success: false,
-        error: 'Failed to fetch users'
+        error: "Failed to fetch users",
       });
     }
 
     // Get consultation cancellation counts for each user
-    const userIds = users.map(user => user.id);
-    const { data: cancellations, error: cancellationsError } = await supabaseAdmin
-      .from('consultation_requests')
-      .select('user_id')
-      .eq('status', 'cancelled')
-      .in('user_id', userIds)
-      .gte('updated_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()); // Last 30 days
+    const userIds = users.map((user) => user.id);
+    const { data: cancellations, error: cancellationsError } =
+      await supabaseAdmin
+        .from("consultation_requests")
+        .select("user_id")
+        .eq("status", "cancelled")
+        .in("user_id", userIds)
+        .gte(
+          "updated_at",
+          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+        ); // Last 30 days
 
     if (cancellationsError) {
       // Error fetching cancellations
@@ -1215,43 +1303,48 @@ router.get('/consultation-bans', authenticateAdmin, async (req, res) => {
     // Count cancellations per user
     const cancellationCounts = {};
     if (cancellations) {
-      cancellations.forEach(c => {
-        cancellationCounts[c.user_id] = (cancellationCounts[c.user_id] || 0) + 1;
+      cancellations.forEach((c) => {
+        cancellationCounts[c.user_id] =
+          (cancellationCounts[c.user_id] || 0) + 1;
       });
     }
 
     // Add cancellation counts to users
-    const usersWithCounts = users.map(user => ({
+    const usersWithCounts = users.map((user) => ({
       ...user,
-      recent_cancellations: cancellationCounts[user.id] || 0
+      recent_cancellations: cancellationCounts[user.id] || 0,
     }));
 
     // Get statistics
     const now = new Date().toISOString();
-    
+
     const { data: statsData, error: statsError } = await supabaseAdmin
-      .from('users')
-      .select('consultation_ban_end')
-      .not('consultation_ban_end', 'is', null);
+      .from("users")
+      .select("consultation_ban_end")
+      .not("consultation_ban_end", "is", null);
 
     let stats = {
       totalBanned: 0,
       activeBans: 0,
       expiredBans: 0,
-      totalCancellations: 0
+      totalCancellations: 0,
     };
 
     if (statsData && !statsError) {
       stats.totalBanned = statsData.length;
-      stats.activeBans = statsData.filter(u => u.consultation_ban_end > now).length;
-      stats.expiredBans = statsData.filter(u => u.consultation_ban_end <= now).length;
+      stats.activeBans = statsData.filter(
+        (u) => u.consultation_ban_end > now
+      ).length;
+      stats.expiredBans = statsData.filter(
+        (u) => u.consultation_ban_end <= now
+      ).length;
     }
 
     // Get total cancellations count
     const { count: totalCancellations } = await supabaseAdmin
-      .from('consultation_requests')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'cancelled');
+      .from("consultation_requests")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "cancelled");
 
     stats.totalCancellations = totalCancellations || 0;
 
@@ -1262,100 +1355,102 @@ router.get('/consultation-bans', authenticateAdmin, async (req, res) => {
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: users.length
-      }
+        total: users.length,
+      },
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch consultation bans'
+      error: "Failed to fetch consultation bans",
     });
   }
 });
 
 // Lift consultation ban
-router.post('/consultation-bans/:userId/lift', authenticateAdmin, async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { reason, admin_id } = req.body;
-    const adminId = req.user?.id || admin_id;
-
-    if (!reason || !reason.trim()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Reason is required'
-      });
-    }
-
-    // Get user info first
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('id, full_name, consultation_ban_end')
-      .eq('id', userId)
-      .single();
-
-    if (userError || !user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    if (!user.consultation_ban_end) {
-      return res.status(400).json({
-        success: false,
-        error: 'User is not currently banned from consultations'
-      });
-    }
-
-    // Lift the ban
-    const { error: updateError } = await supabaseAdmin
-      .from('users')
-      .update({ consultation_ban_end: null })
-      .eq('id', userId);
-
-    if (updateError) {
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to lift consultation ban'
-      });
-    }
-
-    // Log the action
+router.post(
+  "/consultation-bans/:userId/lift",
+  authenticateAdmin,
+  async (req, res) => {
     try {
-      await supabaseAdmin.from('admin_audit_logs').insert({
-        admin_id: adminId,
-        action: 'consultation_ban_lifted',
-        target_type: 'user',
-        target_id: userId,
-        details: { 
-          reason: reason.trim(),
-          previous_ban_end: user.consultation_ban_end,
-          user_name: user.full_name
-        }
-      });
-    } catch (auditError) {
-      // Failed to log ban lift action
-    }
+      const { userId } = req.params;
+      const { reason, admin_id } = req.body;
+      const adminId = req.user?.id || admin_id;
 
-    res.json({
-      success: true,
-      message: `Consultation ban lifted for ${user.full_name}`,
-      data: {
-        user_id: userId,
-        user_name: user.full_name,
-        action: 'ban_lifted',
-        reason: reason.trim()
+      if (!reason || !reason.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: "Reason is required",
+        });
       }
-    });
 
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
+      // Get user info first
+      const { data: user, error: userError } = await supabaseAdmin
+        .from("users")
+        .select("id, full_name, consultation_ban_end")
+        .eq("id", userId)
+        .single();
+
+      if (userError || !user) {
+        return res.status(404).json({
+          success: false,
+          error: "User not found",
+        });
+      }
+
+      if (!user.consultation_ban_end) {
+        return res.status(400).json({
+          success: false,
+          error: "User is not currently banned from consultations",
+        });
+      }
+
+      // Lift the ban
+      const { error: updateError } = await supabaseAdmin
+        .from("users")
+        .update({ consultation_ban_end: null })
+        .eq("id", userId);
+
+      if (updateError) {
+        return res.status(500).json({
+          success: false,
+          error: "Failed to lift consultation ban",
+        });
+      }
+
+      // Log the action
+      try {
+        await supabaseAdmin.from("admin_audit_logs").insert({
+          admin_id: adminId,
+          action: "consultation_ban_lifted",
+          target_type: "user",
+          target_id: userId,
+          details: {
+            reason: reason.trim(),
+            previous_ban_end: user.consultation_ban_end,
+            user_name: user.full_name,
+          },
+        });
+      } catch (auditError) {
+        // Failed to log ban lift action
+      }
+
+      res.json({
+        success: true,
+        message: `Consultation ban lifted for ${user.full_name}`,
+        data: {
+          user_id: userId,
+          user_name: user.full_name,
+          action: "ban_lifted",
+          reason: reason.trim(),
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+      });
+    }
   }
-});
+);
 
 module.exports = router;
