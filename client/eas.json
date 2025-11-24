@@ -1,7 +1,8 @@
 {
   "cli": {
     "version": ">= 13.2.1",
-    "appVersionSource": "remote"
+    "appVersionSource": "remote",
+    "defaultBuildProfile": "preview"
   },
   "build": {
     "development": {
@@ -15,7 +16,6 @@
       }
     },
     "preview": {
-      "developmentClient": true,
       "distribution": "internal",
       "android": {
         "buildType": "apk"
