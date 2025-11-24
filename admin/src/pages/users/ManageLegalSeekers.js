@@ -1,47 +1,64 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
-import { Users, Eye, Pencil, Archive, ArchiveRestore, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Loader2, XCircle, RefreshCw, MoreVertical, CheckCircle, XCircle as XCircleIcon } from 'lucide-react';
-import Tooltip from '../../components/ui/Tooltip';
-import ListToolbar from '../../components/ui/ListToolbar';
-import ConfirmationModal from '../../components/ui/ConfirmationModal';
-import ViewLegalSeekerModal from '../../components/users/ViewLegalSeekerModal';
-import EditLegalSeekerModal from '../../components/users/EditLegalSeekerModal';
-import DataTable from '../../components/ui/DataTable';
-import Pagination from '../../components/ui/Pagination';
-import { useToast } from '../../components/ui/Toast';
-import usersService from '../../services/usersService';
-import legalSeekerService from '../../services/legalSeekerService';
+import React from "react";
+import ReactDOM from "react-dom";
+import {
+  Users,
+  Eye,
+  Pencil,
+  Archive,
+  ArchiveRestore,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  XCircle,
+  RefreshCw,
+  MoreVertical,
+} from "lucide-react";
+import Tooltip from "../../components/ui/Tooltip";
+import ListToolbar from "../../components/ui/ListToolbar";
+import ConfirmationModal from "../../components/ui/ConfirmationModal";
+import ViewLegalSeekerModal from "../../components/users/ViewLegalSeekerModal";
+import EditLegalSeekerModal from "../../components/users/EditLegalSeekerModal";
+import DataTable from "../../components/ui/DataTable";
+import Pagination from "../../components/ui/Pagination";
+import { useToast } from "../../components/ui/Toast";
+import usersService from "../../services/usersService";
+import legalSeekerService from "../../services/legalSeekerService";
 
 const StatusBadge = ({ status }) => {
   const getStatusStyles = (status) => {
     switch (status?.toLowerCase()) {
-      case 'verified':
-        return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-      case 'unverified':
-        return 'bg-red-50 text-red-700 border border-red-200';
-      case 'active':
-        return 'bg-green-50 text-green-700 border border-green-200';
-      case 'inactive':
-        return 'bg-gray-50 text-gray-700 border border-gray-200';
-      case 'suspended':
-        return 'bg-red-50 text-red-700 border border-red-200';
+      case "verified":
+        return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+      case "unverified":
+        return "bg-red-50 text-red-700 border border-red-200";
+      case "active":
+        return "bg-green-50 text-green-700 border border-green-200";
+      case "inactive":
+        return "bg-gray-50 text-gray-700 border border-gray-200";
+      case "suspended":
+        return "bg-red-50 text-red-700 border border-red-200";
       default:
-        return 'bg-gray-50 text-gray-700 border border-gray-200';
+        return "bg-gray-50 text-gray-700 border border-gray-200";
     }
   };
 
-  const displayStatus = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown';
+  const displayStatus = status
+    ? status.charAt(0).toUpperCase() + status.slice(1)
+    : "Unknown";
   const styles = getStatusStyles(status);
 
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}
+    >
       {displayStatus}
     </span>
   );
 };
 
 const LawyerApplicationBadge = ({ hasApplication }) => {
-  if (hasApplication === 'Yes') {
+  if (hasApplication === "Yes") {
     return (
       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
         Yes
@@ -57,11 +74,11 @@ const LawyerApplicationBadge = ({ hasApplication }) => {
 
 const ManageLegalSeekers = () => {
   const { showSuccess, showError, showWarning, ToastContainer } = useToast();
-  const [query, setQuery] = React.useState('');
-  const [debouncedQuery, setDebouncedQuery] = React.useState('');
-  const [combinedFilter, setCombinedFilter] = React.useState('Active');
-  const [status, setStatus] = React.useState('All');
-  const [sortBy, setSortBy] = React.useState('Newest');
+  const [query, setQuery] = React.useState("");
+  const [debouncedQuery, setDebouncedQuery] = React.useState("");
+  const [combinedFilter, setCombinedFilter] = React.useState("Active");
+  const [status, setStatus] = React.useState("All");
+  const [sortBy, setSortBy] = React.useState("Newest");
   const [data, setData] = React.useState([]);
   const [allData, setAllData] = React.useState([]); // Store all data for client-side filtering
   const [loading, setLoading] = React.useState(true);
@@ -70,12 +87,11 @@ const ManageLegalSeekers = () => {
     page: 1,
     limit: 10,
     total: 0,
-    pages: 0
+    pages: 0,
   });
-  const [actionLoading, setActionLoading] = React.useState({});
   const [sortConfig, setSortConfig] = React.useState({
     key: null,
-    direction: 'asc'
+    direction: "asc",
   });
   const [viewOpen, setViewOpen] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
@@ -83,11 +99,11 @@ const ManageLegalSeekers = () => {
   const [loadingDetails, setLoadingDetails] = React.useState(false);
   const [confirmationModal, setConfirmationModal] = React.useState({
     open: false,
-    type: '',
+    type: "",
     userId: null,
-    userName: '',
+    userName: "",
     loading: false,
-    changes: null // For tracking edit changes
+    changes: null, // For tracking edit changes
   });
 
   // Kebab dropdown state (like ManageAdmins)
@@ -115,15 +131,15 @@ const ManageLegalSeekers = () => {
     const handleClickOutside = (event) => {
       if (
         openDropdown &&
-        !event.target.closest('.dropdown-container') &&
-        !event.target.closest('.dropdown-portal')
+        !event.target.closest(".dropdown-container") &&
+        !event.target.closest(".dropdown-portal")
       ) {
         setOpenDropdown(null);
         setDropdownPosition({});
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [openDropdown]);
 
   // Recompute position on scroll/resize
@@ -136,13 +152,13 @@ const ManageLegalSeekers = () => {
       setDropdownPosition({ right, bottom });
     };
     updatePosition();
-    window.addEventListener('scroll', updatePosition, true);
-    window.addEventListener('resize', updatePosition);
-    document.addEventListener('scroll', updatePosition, true);
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    document.addEventListener("scroll", updatePosition, true);
     return () => {
-      window.removeEventListener('scroll', updatePosition, true);
-      window.removeEventListener('resize', updatePosition);
-      document.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+      document.removeEventListener("scroll", updatePosition, true);
     };
   }, [openDropdown, dropdownAnchor]);
 
@@ -160,28 +176,34 @@ const ManageLegalSeekers = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Parse combined filter to extract status and archived parameters
-      let status = 'all';
-      let archived = 'active';
-      
-      if (combinedFilter === 'Active') {
-        status = 'all';
-        archived = 'active';
-      } else if (combinedFilter === 'Archived') {
-        status = 'all';
-        archived = 'archived';
-      } else if (combinedFilter === 'All') {
-        status = 'all';
-        archived = 'all';
-      } else if (combinedFilter.includes('Active -')) {
+      let status = "all";
+      let archived = "active";
+
+      if (combinedFilter === "Active") {
+        status = "all";
+        archived = "active";
+      } else if (combinedFilter === "Archived") {
+        status = "all";
+        archived = "archived";
+      } else if (combinedFilter === "All") {
+        status = "all";
+        archived = "all";
+      } else if (combinedFilter.includes("Active -")) {
         // Handle "Active - Verified", "Active - Unverified", etc.
-        status = combinedFilter.replace('Active - ', '').toLowerCase().replace(' ', '_');
-        archived = 'active';
-      } else if (combinedFilter.includes('Archived -')) {
+        status = combinedFilter
+          .replace("Active - ", "")
+          .toLowerCase()
+          .replace(" ", "_");
+        archived = "active";
+      } else if (combinedFilter.includes("Archived -")) {
         // Handle "Archived - Verified", "Archived - Unverified", etc.
-        status = combinedFilter.replace('Archived - ', '').toLowerCase().replace(' ', '_');
-        archived = 'archived';
+        status = combinedFilter
+          .replace("Archived - ", "")
+          .toLowerCase()
+          .replace(" ", "_");
+        archived = "archived";
       }
 
       const params = {
@@ -189,15 +211,19 @@ const ManageLegalSeekers = () => {
         limit: 100, // Load more data for better client-side filtering
         search: debouncedQuery,
         status,
-        archived
+        archived,
       };
-      
+
       const response = await usersService.getLegalSeekers(params);
       setAllData(response.data);
-      setPagination(prev => ({ ...prev, total: response.pagination.total, pages: Math.ceil(response.pagination.total / 10) }));
+      setPagination((prev) => ({
+        ...prev,
+        total: response.pagination.total,
+        pages: Math.ceil(response.pagination.total / 10),
+      }));
     } catch (err) {
       setError(err.message);
-      console.error('Failed to load legal seekers:', err);
+      console.error("Failed to load legal seekers:", err);
     } finally {
       setLoading(false);
     }
@@ -208,33 +234,17 @@ const ManageLegalSeekers = () => {
     loadData();
   }, [loadData]);
 
-  // Handle status toggle
-  const handleStatusToggle = async (userId, currentStatus) => {
-    try {
-      setActionLoading(prev => ({ ...prev, [userId]: true }));
-      const newStatus = !currentStatus;
-      await usersService.updateLegalSeekerStatus(userId, newStatus);
-      await loadData(); // Reload data
-    } catch (err) {
-      console.error('Failed to update status:', err);
-      alert('Failed to update user status: ' + err.message);
-    } finally {
-      setActionLoading(prev => ({ ...prev, [userId]: false }));
-    }
-  };
-
   // Handle view user details
   const handleView = async (user) => {
     try {
       setLoadingDetails(true);
       setViewOpen(true);
-      
-      
+
       // Fetch complete user details from the API
       const userDetails = await usersService.getLegalSeeker(user.id);
       setSelectedUser(userDetails);
     } catch (error) {
-      console.error('Failed to fetch user details:', error);
+      console.error("Failed to fetch user details:", error);
       // Fallback to using row data if API call fails
       setSelectedUser(user);
     } finally {
@@ -251,26 +261,26 @@ const ManageLegalSeekers = () => {
   // Handle edit save with change comparison
   const handleEditSave = (updatedUser, originalUser) => {
     const changes = {};
-    
+
     if (originalUser && updatedUser) {
       // Check for verification status changes
       if (originalUser.is_verified !== updatedUser.is_verified) {
-        changes['Email Verified'] = {
-          from: originalUser.is_verified ? 'Verified' : 'Unverified',
-          to: updatedUser.is_verified ? 'Verified' : 'Unverified'
+        changes["Email Verified"] = {
+          from: originalUser.is_verified ? "Verified" : "Unverified",
+          to: updatedUser.is_verified ? "Verified" : "Unverified",
         };
       }
     }
-    
+
     // Show confirmation modal with changes
     if (Object.keys(changes).length > 0) {
       setConfirmationModal({
         open: true,
-        type: 'edit',
+        type: "edit",
         userId: updatedUser.id,
-        userName: updatedUser.full_name || 'Unknown',
+        userName: updatedUser.full_name || "Unknown",
         loading: false,
-        changes: changes
+        changes: changes,
       });
     }
   };
@@ -278,48 +288,53 @@ const ManageLegalSeekers = () => {
   // Handle archive button click
   const handleArchive = (user) => {
     const isCurrentlyArchived = user.archived === true;
-    const modalType = isCurrentlyArchived ? 'unarchive' : 'archive';
-    
+    const modalType = isCurrentlyArchived ? "unarchive" : "archive";
+
     setConfirmationModal({
       open: true,
       type: modalType,
       userId: user.id,
-      userName: user.full_name || 'Unknown',
-      loading: false
+      userName: user.full_name || "Unknown",
+      loading: false,
     });
   };
 
   // Helper function to get modal content based on type
   const getModalContent = () => {
     const { type, userName, changes } = confirmationModal;
-    
+
     switch (type) {
-      case 'archive':
+      case "archive":
         return {
-          title: 'Archive User',
+          title: "Archive User",
           message: `Are you sure you want to archive ${userName}? Archived users will be hidden from the main list but can be accessed through the "Archived" filter.`,
-          confirmText: 'Archive User',
+          confirmText: "Archive User",
           showFeedbackInput: false,
-          onConfirm: confirmArchive
+          onConfirm: confirmArchive,
         };
-      case 'unarchive':
+      case "unarchive":
         return {
-          title: 'Unarchive User',
+          title: "Unarchive User",
           message: `Are you sure you want to unarchive ${userName}? They will be restored to the active users list.`,
-          confirmText: 'Unarchive User',
+          confirmText: "Unarchive User",
           showFeedbackInput: false,
-          onConfirm: confirmArchive
+          onConfirm: confirmArchive,
         };
-      case 'edit':
-        const changesList = changes ? Object.entries(changes).map(([field, change]) => 
-          `• ${field}: "${change.from}" → "${change.to}"`
-        ).join('\n') : '';
+      case "edit":
+        const changesList = changes
+          ? Object.entries(changes)
+              .map(
+                ([field, change]) =>
+                  `• ${field}: "${change.from}" → "${change.to}"`
+              )
+              .join("\n")
+          : "";
         return {
-          title: 'Confirm User Changes',
+          title: "Confirm User Changes",
           message: `Are you sure you want to save these changes to ${userName}?\n\nChanges:\n${changesList}`,
-          confirmText: 'Save Changes',
+          confirmText: "Save Changes",
           showFeedbackInput: false,
-          onConfirm: confirmEdit
+          onConfirm: confirmEdit,
         };
       default:
         return {};
@@ -327,77 +342,102 @@ const ManageLegalSeekers = () => {
   };
 
   const closeModal = () => {
-    setConfirmationModal({ open: false, type: '', userId: null, userName: '', loading: false, changes: null });
+    setConfirmationModal({
+      open: false,
+      type: "",
+      userId: null,
+      userName: "",
+      loading: false,
+      changes: null,
+    });
   };
 
   // Handle archive/unarchive user
   const confirmArchive = async () => {
     const { userId, userName, type } = confirmationModal;
-    const isArchiving = type === 'archive';
-    
+    const isArchiving = type === "archive";
+
     try {
-      setConfirmationModal(prev => ({ ...prev, loading: true }));
-      
+      setConfirmationModal((prev) => ({ ...prev, loading: true }));
+
       await usersService.archiveLegalSeeker(userId, isArchiving);
       await loadData(); // Reload data
-      setConfirmationModal({ open: false, type: '', userId: null, userName: '', loading: false, changes: null });
-      
+      setConfirmationModal({
+        open: false,
+        type: "",
+        userId: null,
+        userName: "",
+        loading: false,
+        changes: null,
+      });
     } catch (err) {
-      console.error(`Failed to ${isArchiving ? 'archive' : 'unarchive'} user:`, err);
-      alert(`Failed to ${isArchiving ? 'archive' : 'unarchive'} user: ` + err.message);
-      setConfirmationModal(prev => ({ ...prev, loading: false }));
+      console.error(
+        `Failed to ${isArchiving ? "archive" : "unarchive"} user:`,
+        err
+      );
+      alert(
+        `Failed to ${isArchiving ? "archive" : "unarchive"} user: ` +
+          err.message
+      );
+      setConfirmationModal((prev) => ({ ...prev, loading: false }));
     }
   };
 
   // Handle edit confirmation
   const confirmEdit = async () => {
     const { userId, userName, changes } = confirmationModal;
-    
+
     try {
-      setConfirmationModal(prev => ({ ...prev, loading: true }));
-      
+      setConfirmationModal((prev) => ({ ...prev, loading: true }));
+
       // Prepare update data based on changes
       const updateData = {};
-      
-      if (changes['Email Verified']) {
-        updateData.is_verified = changes['Email Verified'].to === 'Verified';
+
+      if (changes["Email Verified"]) {
+        updateData.is_verified = changes["Email Verified"].to === "Verified";
       }
-      
+
       // Make the API call
       await legalSeekerService.updateLegalSeeker(userId, updateData);
-      
+
       setEditOpen(false); // Close edit modal
       await loadData(); // Reload data
-      setConfirmationModal({ open: false, type: '', userId: null, userName: '', loading: false, changes: null });
-      
+      setConfirmationModal({
+        open: false,
+        type: "",
+        userId: null,
+        userName: "",
+        loading: false,
+        changes: null,
+      });
     } catch (err) {
-      console.error('Failed to edit user:', err);
-      alert('Failed to edit user: ' + err.message);
-      setConfirmationModal(prev => ({ ...prev, loading: false }));
+      console.error("Failed to edit user:", err);
+      alert("Failed to edit user: " + err.message);
+      setConfirmationModal((prev) => ({ ...prev, loading: false }));
     }
   };
 
   // Handle column sorting
   const handleSort = (columnKey) => {
-    let direction = 'asc';
-    if (sortConfig.key === columnKey && sortConfig.direction === 'asc') {
-      direction = 'desc';
+    let direction = "asc";
+    if (sortConfig.key === columnKey && sortConfig.direction === "asc") {
+      direction = "desc";
     }
     setSortConfig({ key: columnKey, direction });
     // Clear the dropdown sort when using column sort
-    setSortBy('Newest');
+    setSortBy("Newest");
   };
 
   // Handle dropdown sort change
   const handleSortByChange = (newSortBy) => {
     setSortBy(newSortBy);
     // Clear column sort when using dropdown sort
-    setSortConfig({ key: null, direction: 'asc' });
+    setSortConfig({ key: null, direction: "asc" });
   };
 
   // Handle pagination
   const handlePageChange = (newPage) => {
-    setPagination(prev => ({ ...prev, page: newPage }));
+    setPagination((prev) => ({ ...prev, page: newPage }));
   };
 
   const handlePrevPage = () => {
@@ -419,11 +459,11 @@ const ManageLegalSeekers = () => {
     // Apply client-side search filter for immediate feedback
     if (query.trim()) {
       const searchTerm = query.toLowerCase().trim();
-      filteredArray = filteredArray.filter(item => {
+      filteredArray = filteredArray.filter((item) => {
         return (
-          (item.full_name || '').toLowerCase().includes(searchTerm) ||
-          (item.email || '').toLowerCase().includes(searchTerm) ||
-          (item.username || '').toLowerCase().includes(searchTerm)
+          (item.full_name || "").toLowerCase().includes(searchTerm) ||
+          (item.email || "").toLowerCase().includes(searchTerm) ||
+          (item.username || "").toLowerCase().includes(searchTerm)
         );
       });
     }
@@ -439,57 +479,75 @@ const ManageLegalSeekers = () => {
         if (aValue === null || aValue === undefined) return 1;
         if (bValue === null || bValue === undefined) return -1;
 
-        if (sortConfig.key === 'registration_date') {
+        if (sortConfig.key === "registration_date") {
           comparison = new Date(aValue) - new Date(bValue);
-        } else if (typeof aValue === 'string') {
+        } else if (typeof aValue === "string") {
           comparison = aValue.localeCompare(bValue);
         } else {
           comparison = aValue - bValue;
         }
 
-        return sortConfig.direction === 'desc' ? -comparison : comparison;
+        return sortConfig.direction === "desc" ? -comparison : comparison;
       });
     }
     // Apply dropdown sorting if no column sort is active
-    else if (sortBy !== 'Newest') {
+    else if (sortBy !== "Newest") {
       filteredArray = filteredArray.sort((a, b) => {
         switch (sortBy) {
-          case 'Oldest':
-            return new Date(a.registration_date) - new Date(b.registration_date);
-          case 'Name A-Z':
-            return (a.full_name || '').localeCompare(b.full_name || '');
-          case 'Name Z-A':
-            return (b.full_name || '').localeCompare(a.full_name || '');
-          case 'Email A-Z':
-            return (a.email || '').localeCompare(b.email || '');
-          case 'Email Z-A':
-            return (b.email || '').localeCompare(a.email || '');
-          case 'Username A-Z':
-            return (a.username || '').localeCompare(b.username || '');
-          case 'Username Z-A':
-            return (b.username || '').localeCompare(a.username || '');
-          case 'Birthdate Oldest':
-            return new Date(a.birthdate || '1900-01-01') - new Date(b.birthdate || '1900-01-01');
-          case 'Birthdate Newest':
-            return new Date(b.birthdate || '1900-01-01') - new Date(a.birthdate || '1900-01-01');
-          case 'Status A-Z':
-            return (a.account_status || '').localeCompare(b.account_status || '');
-          case 'Status Z-A':
-            return (b.account_status || '').localeCompare(a.account_status || '');
-          case 'Lawyer App Yes First':
-            return (b.has_lawyer_application || '').localeCompare(a.has_lawyer_application || '');
-          case 'Lawyer App No First':
-            return (a.has_lawyer_application || '').localeCompare(b.has_lawyer_application || '');
-          case 'Newest':
+          case "Oldest":
+            return (
+              new Date(a.registration_date) - new Date(b.registration_date)
+            );
+          case "Name A-Z":
+            return (a.full_name || "").localeCompare(b.full_name || "");
+          case "Name Z-A":
+            return (b.full_name || "").localeCompare(a.full_name || "");
+          case "Email A-Z":
+            return (a.email || "").localeCompare(b.email || "");
+          case "Email Z-A":
+            return (b.email || "").localeCompare(a.email || "");
+          case "Username A-Z":
+            return (a.username || "").localeCompare(b.username || "");
+          case "Username Z-A":
+            return (b.username || "").localeCompare(a.username || "");
+          case "Birthdate Oldest":
+            return (
+              new Date(a.birthdate || "1900-01-01") -
+              new Date(b.birthdate || "1900-01-01")
+            );
+          case "Birthdate Newest":
+            return (
+              new Date(b.birthdate || "1900-01-01") -
+              new Date(a.birthdate || "1900-01-01")
+            );
+          case "Status A-Z":
+            return (a.account_status || "").localeCompare(
+              b.account_status || ""
+            );
+          case "Status Z-A":
+            return (b.account_status || "").localeCompare(
+              a.account_status || ""
+            );
+          case "Lawyer App Yes First":
+            return (b.has_lawyer_application || "").localeCompare(
+              a.has_lawyer_application || ""
+            );
+          case "Lawyer App No First":
+            return (a.has_lawyer_application || "").localeCompare(
+              b.has_lawyer_application || ""
+            );
+          case "Newest":
           default:
-            return new Date(b.registration_date) - new Date(a.registration_date);
+            return (
+              new Date(b.registration_date) - new Date(a.registration_date)
+            );
         }
       });
     }
     // Default sort by newest registration date
     else {
-      filteredArray = filteredArray.sort((a, b) => 
-        new Date(b.registration_date) - new Date(a.registration_date)
+      filteredArray = filteredArray.sort(
+        (a, b) => new Date(b.registration_date) - new Date(a.registration_date)
       );
     }
 
@@ -507,85 +565,25 @@ const ManageLegalSeekers = () => {
   React.useEffect(() => {
     const totalFiltered = filteredAndSortedData.length;
     const totalPages = Math.ceil(totalFiltered / 10);
-    setPagination(prev => ({ 
-      ...prev, 
-      total: totalFiltered, 
+    setPagination((prev) => ({
+      ...prev,
+      total: totalFiltered,
       pages: totalPages,
-      page: prev.page > totalPages && totalPages > 0 ? 1 : prev.page
+      page: prev.page > totalPages && totalPages > 0 ? 1 : prev.page,
     }));
   }, [filteredAndSortedData]);
 
   const columns = [
-    { 
-      key: 'full_name', 
+    {
+      key: "full_name",
       header: (
         <button
           className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
-          onClick={() => handleSort('full_name')}
+          onClick={() => handleSort("full_name")}
         >
           <span>Full Name</span>
-          {sortConfig.key === 'full_name' ? (
-            sortConfig.direction === 'asc' ? (
-              <ChevronUp size={14} className="text-blue-600" />
-            ) : (
-              <ChevronDown size={14} className="text-blue-600" />
-            )
-          ) : (
-            <div className="w-3.5 h-3.5" />
-          )}
-        </button>
-      )
-    },
-    { 
-      key: 'email', 
-      header: (
-        <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
-          onClick={() => handleSort('email')}
-        >
-          <span>Email</span>
-          {sortConfig.key === 'email' ? (
-            sortConfig.direction === 'asc' ? (
-              <ChevronUp size={14} className="text-blue-600" />
-            ) : (
-              <ChevronDown size={14} className="text-blue-600" />
-            )
-          ) : (
-            <div className="w-3.5 h-3.5" />
-          )}
-        </button>
-      )
-    },
-    { 
-      key: 'username', 
-      header: (
-        <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
-          onClick={() => handleSort('username')}
-        >
-          <span>Username</span>
-          {sortConfig.key === 'username' ? (
-            sortConfig.direction === 'asc' ? (
-              <ChevronUp size={14} className="text-blue-600" />
-            ) : (
-              <ChevronDown size={14} className="text-blue-600" />
-            )
-          ) : (
-            <div className="w-3.5 h-3.5" />
-          )}
-        </button>
-      )
-    },
-    { 
-      key: 'birthdate', 
-      header: (
-        <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
-          onClick={() => handleSort('birthdate')}
-        >
-          <span>Birthdate</span>
-          {sortConfig.key === 'birthdate' ? (
-            sortConfig.direction === 'asc' ? (
+          {sortConfig.key === "full_name" ? (
+            sortConfig.direction === "asc" ? (
               <ChevronUp size={14} className="text-blue-600" />
             ) : (
               <ChevronDown size={14} className="text-blue-600" />
@@ -595,59 +593,119 @@ const ManageLegalSeekers = () => {
           )}
         </button>
       ),
-      render: (row) => {
-        if (!row.birthdate) return 'N/A';
-        const date = new Date(row.birthdate);
-        if (isNaN(date.getTime())) return 'Invalid Date';
-        return new Intl.DateTimeFormat('en-US', {
-          month: 'short',
-          day: 'numeric', 
-          year: 'numeric',
-          timeZone: 'Asia/Manila'
-        }).format(date);
-      }
-    },
-    { 
-      key: 'registration_date', 
-      header: (
-        <button
-          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
-          onClick={() => handleSort('registration_date')}
-        >
-          <span>Registration Date</span>
-          {sortConfig.key === 'registration_date' ? (
-            sortConfig.direction === 'asc' ? (
-              <ChevronUp size={14} className="text-blue-600" />
-            ) : (
-              <ChevronDown size={14} className="text-blue-600" />
-            )
-          ) : (
-            <div className="w-3.5 h-3.5" />
-          )}
-        </button>
-      ),
-      render: (row) => {
-        if (!row.registration_date) return 'N/A';
-        const date = new Date(row.registration_date);
-        if (isNaN(date.getTime())) return 'Invalid Date';
-        return new Intl.DateTimeFormat('en-US', {
-          month: 'short',
-          day: 'numeric', 
-          year: 'numeric',
-          timeZone: 'Asia/Manila'
-        }).format(date);
-      }
     },
     {
-      key: 'account_status',
+      key: "email",
       header: (
         <button
           className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
-          onClick={() => handleSort('account_status')}
+          onClick={() => handleSort("email")}
+        >
+          <span>Email</span>
+          {sortConfig.key === "email" ? (
+            sortConfig.direction === "asc" ? (
+              <ChevronUp size={14} className="text-blue-600" />
+            ) : (
+              <ChevronDown size={14} className="text-blue-600" />
+            )
+          ) : (
+            <div className="w-3.5 h-3.5" />
+          )}
+        </button>
+      ),
+    },
+    {
+      key: "username",
+      header: (
+        <button
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
+          onClick={() => handleSort("username")}
+        >
+          <span>Username</span>
+          {sortConfig.key === "username" ? (
+            sortConfig.direction === "asc" ? (
+              <ChevronUp size={14} className="text-blue-600" />
+            ) : (
+              <ChevronDown size={14} className="text-blue-600" />
+            )
+          ) : (
+            <div className="w-3.5 h-3.5" />
+          )}
+        </button>
+      ),
+    },
+    {
+      key: "birthdate",
+      header: (
+        <button
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
+          onClick={() => handleSort("birthdate")}
+        >
+          <span>Birthdate</span>
+          {sortConfig.key === "birthdate" ? (
+            sortConfig.direction === "asc" ? (
+              <ChevronUp size={14} className="text-blue-600" />
+            ) : (
+              <ChevronDown size={14} className="text-blue-600" />
+            )
+          ) : (
+            <div className="w-3.5 h-3.5" />
+          )}
+        </button>
+      ),
+      render: (row) => {
+        if (!row.birthdate) return "N/A";
+        const date = new Date(row.birthdate);
+        if (isNaN(date.getTime())) return "Invalid Date";
+        return new Intl.DateTimeFormat("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          timeZone: "Asia/Manila",
+        }).format(date);
+      },
+    },
+    {
+      key: "registration_date",
+      header: (
+        <button
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
+          onClick={() => handleSort("registration_date")}
+        >
+          <span>Registration Date</span>
+          {sortConfig.key === "registration_date" ? (
+            sortConfig.direction === "asc" ? (
+              <ChevronUp size={14} className="text-blue-600" />
+            ) : (
+              <ChevronDown size={14} className="text-blue-600" />
+            )
+          ) : (
+            <div className="w-3.5 h-3.5" />
+          )}
+        </button>
+      ),
+      render: (row) => {
+        if (!row.registration_date) return "N/A";
+        const date = new Date(row.registration_date);
+        if (isNaN(date.getTime())) return "Invalid Date";
+        return new Intl.DateTimeFormat("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          timeZone: "Asia/Manila",
+        }).format(date);
+      },
+    },
+    {
+      key: "account_status",
+      header: (
+        <button
+          className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
+          onClick={() => handleSort("account_status")}
         >
           <span>Account Status</span>
-          {sortConfig.key === 'account_status' ? (
-            sortConfig.direction === 'asc' ? (
+          {sortConfig.key === "account_status" ? (
+            sortConfig.direction === "asc" ? (
               <ChevronUp size={14} className="text-blue-600" />
             ) : (
               <ChevronDown size={14} className="text-blue-600" />
@@ -660,15 +718,15 @@ const ManageLegalSeekers = () => {
       render: (row) => <StatusBadge status={row.account_status} />,
     },
     {
-      key: 'has_lawyer_application',
+      key: "has_lawyer_application",
       header: (
         <button
           className="flex items-center space-x-1 text-left font-medium text-gray-500 hover:text-gray-500"
-          onClick={() => handleSort('has_lawyer_application')}
+          onClick={() => handleSort("has_lawyer_application")}
         >
           <span>Lawyer Application</span>
-          {sortConfig.key === 'has_lawyer_application' ? (
-            sortConfig.direction === 'asc' ? (
+          {sortConfig.key === "has_lawyer_application" ? (
+            sortConfig.direction === "asc" ? (
               <ChevronUp size={14} className="text-blue-600" />
             ) : (
               <ChevronDown size={14} className="text-blue-600" />
@@ -678,12 +736,14 @@ const ManageLegalSeekers = () => {
           )}
         </button>
       ),
-      render: (row) => <LawyerApplicationBadge hasApplication={row.has_lawyer_application} />,
+      render: (row) => (
+        <LawyerApplicationBadge hasApplication={row.has_lawyer_application} />
+      ),
     },
     {
-      key: 'actions',
-      header: 'Actions',
-      align: 'right',
+      key: "actions",
+      header: "Actions",
+      align: "right",
       render: (row) => {
         const isArchived = row.archived === true;
         return (
@@ -691,80 +751,80 @@ const ManageLegalSeekers = () => {
             <div className="relative dropdown-container">
               <button
                 onClick={(e) => handleDropdownToggle(row.id, e)}
-                className={`flex items-center justify-center w-8 h-8 text-gray-600 hover:text-gray-900 rounded-full transition-all duration-200 ${openDropdown === row.id ? 'bg-gray-200' : 'hover:bg-gray-100'}`}
+                className={`flex items-center justify-center w-8 h-8 text-gray-600 hover:text-gray-900 rounded-full transition-all duration-200 ${
+                  openDropdown === row.id ? "bg-gray-200" : "hover:bg-gray-100"
+                }`}
                 aria-label="Actions"
               >
                 <MoreVertical className="w-4 h-4" />
               </button>
 
-              {openDropdown === row.id && ReactDOM.createPortal(
-                <>
-                  <div
-                    className="fixed inset-0 z-[9998]"
-                    onClick={() => { setOpenDropdown(null); setDropdownPosition({}); }}
-                  />
-                  <div
-                    className="fixed w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] dropdown-portal"
-                    style={{ right: dropdownPosition.right ?? 20, bottom: dropdownPosition.bottom ?? 20 }}
-                  >
-                    <div className="py-2">
-                      <button
-                        onClick={() => { handleView(row); setOpenDropdown(null); setDropdownPosition({}); }}
-                        className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-center">
-                          <Eye className="w-4 h-4 mr-3 text-gray-500" />
-                          <span>View</span>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => { handleStatusToggle(row.id, row.is_verified); setOpenDropdown(null); setDropdownPosition({}); }}
-                        className={`flex items-center justify-between w-full px-3 py-2 text-sm transition-colors ${
-                          row.is_verified 
-                            ? 'text-red-600 hover:bg-red-50' 
-                            : 'text-green-600 hover:bg-green-50'
-                        }`}
-                        disabled={actionLoading[row.id]}
-                      >
-                        <div className="flex items-center">
-                          {row.is_verified ? (
-                            <XCircleIcon className="w-4 h-4 mr-3 text-red-500" />
-                          ) : (
-                            <CheckCircle className="w-4 h-4 mr-3 text-green-500" />
-                          )}
-                          <span>{row.is_verified ? 'Unverify' : 'Verify'}</span>
-                        </div>
-                        {actionLoading[row.id] && (
-                          <Loader2 size={14} className="animate-spin text-gray-400" />
+              {openDropdown === row.id &&
+                ReactDOM.createPortal(
+                  <>
+                    <div
+                      className="fixed inset-0 z-[9998]"
+                      onClick={() => {
+                        setOpenDropdown(null);
+                        setDropdownPosition({});
+                      }}
+                    />
+                    <div
+                      className="fixed w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] dropdown-portal"
+                      style={{
+                        right: dropdownPosition.right ?? 20,
+                        bottom: dropdownPosition.bottom ?? 20,
+                      }}
+                    >
+                      <div className="py-2">
+                        <button
+                          onClick={() => {
+                            handleView(row);
+                            setOpenDropdown(null);
+                            setDropdownPosition({});
+                          }}
+                          className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center">
+                            <Eye className="w-4 h-4 mr-3 text-gray-500" />
+                            <span>View</span>
+                          </div>
+                        </button>
+                        <div className="border-t border-gray-200 my-1"></div>
+                        {!isArchived ? (
+                          <button
+                            onClick={() => {
+                              handleArchive(row);
+                              setOpenDropdown(null);
+                              setDropdownPosition({});
+                            }}
+                            className="flex items-center justify-between w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <Archive className="w-4 h-4 mr-3 text-red-500" />
+                              <span>Archive</span>
+                            </div>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              handleArchive(row);
+                              setOpenDropdown(null);
+                              setDropdownPosition({});
+                            }}
+                            className="flex items-center justify-between w-full px-3 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <RefreshCw className="w-4 h-4 mr-3 text-green-600" />
+                              <span>Unarchive</span>
+                            </div>
+                          </button>
                         )}
-                      </button>
-                      <div className="border-t border-gray-200 my-1"></div>
-                      {!isArchived ? (
-                        <button
-                          onClick={() => { handleArchive(row); setOpenDropdown(null); setDropdownPosition({}); }}
-                          className="flex items-center justify-between w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                        >
-                          <div className="flex items-center">
-                            <Archive className="w-4 h-4 mr-3 text-red-500" />
-                            <span>Archive</span>
-                          </div>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => { handleArchive(row); setOpenDropdown(null); setDropdownPosition({}); }}
-                          className="flex items-center justify-between w-full px-3 py-2 text-sm text-green-700 hover:bg-green-50 transition-colors"
-                        >
-                          <div className="flex items-center">
-                            <RefreshCw className="w-4 h-4 mr-3 text-green-600" />
-                            <span>Unarchive</span>
-                          </div>
-                        </button>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                </>,
-                document.body
-              )}
+                  </>,
+                  document.body
+                )}
             </div>
           </div>
         );
@@ -779,9 +839,11 @@ const ManageLegalSeekers = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <XCircle className="h-8 w-8 text-red-600 mx-auto mb-4" />
-          <p className="text-sm text-red-600 mb-2">Failed to load legal seekers</p>
+          <p className="text-sm text-red-600 mb-2">
+            Failed to load legal seekers
+          </p>
           <p className="text-xs text-gray-500 mb-4">{error}</p>
-          <button 
+          <button
             onClick={loadData}
             className="bg-[#023D7B] text-white text-xs px-3 py-1.5 rounded-md hover:bg-[#013462]"
           >
@@ -802,7 +864,9 @@ const ManageLegalSeekers = () => {
             <Users size={14} />
           </div>
           <div className="flex flex-col justify-center">
-            <h2 className="text-[12px] font-semibold text-gray-900">Manage Legal Seekers</h2>
+            <h2 className="text-[12px] font-semibold text-gray-900">
+              Manage Legal Seekers
+            </h2>
             <p className="text-[10px] text-gray-500 mt-0.5">
               Search, filter and manage legal seeker accounts.
             </p>
@@ -820,39 +884,39 @@ const ManageLegalSeekers = () => {
             value: combinedFilter,
             onChange: setCombinedFilter,
             options: [
-              'Active',
-              'Archived', 
-              'All',
-              'Active - No Status',
-              'Active - Verified',
-              'Active - Unverified',
-              'Active - Pending Lawyer',
-              'Archived - Verified',
-              'Archived - Unverified',
-              'Archived - Pending Lawyer'
+              "Active",
+              "Archived",
+              "All",
+              "Active - No Status",
+              "Active - Verified",
+              "Active - Unverified",
+              "Active - Pending Lawyer",
+              "Archived - Verified",
+              "Archived - Unverified",
+              "Archived - Pending Lawyer",
             ],
-            label: 'Filter by status',
+            label: "Filter by status",
           }}
           sort={{
             value: sortBy,
             onChange: handleSortByChange,
             options: [
-              'Newest', 
-              'Oldest', 
-              'Name A-Z', 
-              'Name Z-A',
-              'Email A-Z',
-              'Email Z-A',
-              'Username A-Z',
-              'Username Z-A',
-              'Birthdate Oldest',
-              'Birthdate Newest',
-              'Status A-Z',
-              'Status Z-A',
-              'Lawyer App Yes First',
-              'Lawyer App No First'
+              "Newest",
+              "Oldest",
+              "Name A-Z",
+              "Name Z-A",
+              "Email A-Z",
+              "Email Z-A",
+              "Username A-Z",
+              "Username Z-A",
+              "Birthdate Oldest",
+              "Birthdate Newest",
+              "Status A-Z",
+              "Status Z-A",
+              "Lawyer App Yes First",
+              "Lawyer App No First",
             ],
-            label: 'Sort by',
+            label: "Sort by",
           }}
         />
       </div>
@@ -872,7 +936,9 @@ const ManageLegalSeekers = () => {
         <div className="mt-4 flex items-center justify-between">
           {/* Pagination Info */}
           <div className="text-xs text-gray-500">
-            Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} legal seekers
+            Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+            {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
+            {pagination.total} legal seekers
           </div>
 
           {/* Pagination Buttons */}
@@ -907,8 +973,8 @@ const ManageLegalSeekers = () => {
                     onClick={() => handlePageChange(pageNum)}
                     className={`px-3 py-1.5 text-xs border rounded-md ${
                       pagination.page === pageNum
-                        ? 'bg-[#023D7B] text-white border-[#023D7B]'
-                        : 'border-gray-300 hover:bg-gray-50'
+                        ? "bg-[#023D7B] text-white border-[#023D7B]"
+                        : "border-gray-300 hover:bg-gray-50"
                     }`}
                   >
                     {pageNum}
