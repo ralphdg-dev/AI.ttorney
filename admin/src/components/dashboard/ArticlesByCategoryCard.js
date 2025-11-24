@@ -16,7 +16,7 @@ const ArticlesByCategoryCard = () => {
   useEffect(() => {
     const fetchArticles = async () => {
       try {
-        const response = await fetch("http://localhost:5001/api/stats/articles-by-category");
+        const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api'}/stats/articles-by-category`);
         const result = await response.json();
 
         // Capitalize first letter of each category

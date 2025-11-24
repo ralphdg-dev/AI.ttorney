@@ -98,6 +98,11 @@ export default function VerifyOTP() {
   };
 
   const handleVerifyOTP = async () => {
+    if (canResend) {
+      setError("This code has expired. Please request a new verification code.");
+      return;
+    }
+
     const otpString = otp.join("");
 
     if (otpString.length !== 6) {
@@ -389,7 +394,7 @@ export default function VerifyOTP() {
         <PrimaryButton
           title={isLoading ? "Verifying..." : "Verify"}
           onPress={handleVerifyOTP}
-          disabled={isLoading || !isOtpComplete || isLockedOut}
+          disabled={isLoading || !isOtpComplete || isLockedOut || canResend}
           loading={isLoading}
         />
 

@@ -51,7 +51,7 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setGuestSession(null);
       console.log('🗑️ Guest session cleared');
     } catch (error) {
-      console.error('❌ Error clearing guest session:', error);
+      console.warn('❌ Error clearing guest session:', error);
     }
   }, []);
 
@@ -82,7 +82,7 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             return;
           }
         } catch (parseError) {
-          console.error('❌ Corrupted session data, clearing and creating new session:', parseError);
+          console.warn('❌ Corrupted session data, clearing and creating new session:', parseError);
           await AsyncStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
         }
       }
@@ -110,7 +110,7 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Let index.tsx handle the routing to guest-onboarding
       console.log('🧭 GuestContext: Guest session created, letting index.tsx handle routing');
     } catch (error) {
-      console.error('❌ [PROD] Guest session start failed:', {
+      console.warn('❌ [PROD] Guest session start failed:', {
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString(),
         action: 'startGuestSession'
@@ -156,7 +156,7 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Validate session before incrementing (security check)
     if (!validateGuestSession(guestSession)) {
-      console.error('❌ Invalid guest session, cannot increment');
+      console.warn('❌ Invalid guest session, cannot increment');
       await clearGuestSession();
       return false;
     }
@@ -190,7 +190,7 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       return true;
     } catch (error) {
-      console.error('❌ [PROD] Failed to increment guest prompt count:', {
+      console.warn('❌ [PROD] Failed to increment guest prompt count:', {
         error: error instanceof Error ? error.message : 'Unknown error',
         sessionId: guestSession.id,
         currentCount: guestSession.promptCount,

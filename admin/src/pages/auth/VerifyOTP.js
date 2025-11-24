@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Lock, AlertCircle, Loader2, Mail, ArrowLeft } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api';
 
 const VerifyOTP = () => {
   const navigate = useNavigate();

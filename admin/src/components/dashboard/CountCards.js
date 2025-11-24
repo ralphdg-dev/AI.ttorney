@@ -63,7 +63,7 @@ const CountCards = () => {
   // Helper for fetching and setting data
   const fetchData = async (endpoint, setter, keyName) => {
     try {
-      const res = await fetch(`http://localhost:5001/api/stats/${endpoint}`);
+      const res = await fetch(`${process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api'}/stats/${endpoint}`);
       const data = await res.json();
 
       // Extract correct key dynamically

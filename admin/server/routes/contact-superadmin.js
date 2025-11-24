@@ -1,44 +1,34 @@
-const express = require('express');
-const nodemailer = require('nodemailer');
+const express = require("express");
+const fetch = require("node-fetch");
 const router = express.Router();
 
 // Rate limiting for contact form
-const contactLimiter = require('express-rate-limit')({
+const contactLimiter = require("express-rate-limit")({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // Limit to 5 requests per window
-  message: { error: 'Too many contact requests, please try again later.' },
+  message: { error: "Too many contact requests, please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => process.env.NODE_ENV === 'development' // Skip in development
+  skip: (req) => process.env.NODE_ENV === "development", // Skip in development
 });
 
 // Create email transporter
 const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_SERVER,
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-      user: process.env.SMTP_USERNAME,
-      pass: process.env.SMTP_PASSWORD,
-    },
-    tls: {
-      rejectUnauthorized: false // Allow self-signed certificates in development
-    }
-  });
+  // Deprecated: email is now sent via Resend HTTP API instead of direct SMTP.
+  return null;
 };
 
 // HTML email template
 const getContactEmailTemplate = (name, email, subject, message) => {
-  const timestamp = new Date().toLocaleString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    timeZone: 'Asia/Manila'
+  const timestamp = new Date().toLocaleString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: "Asia/Manila",
   });
 
   return `
@@ -84,7 +74,7 @@ const getContactEmailTemplate = (name, email, subject, message) => {
                 <div style="margin-bottom: 25px;">
                     <h3 style="color: #023D7B; margin: 0 0 10px 0; font-size: 16px; font-weight: 600;">Message</h3>
                     <div style="color: #333; padding: 20px; background-color: #f8fafc; border-radius: 6px; font-size: 14px; line-height: 1.8;">
-                        ${message.replace(/\n/g, '<br>')}
+                        ${message.replace(/\n/g, "<br>")}
                     </div>
                 </div>
                 
@@ -102,7 +92,11 @@ const getContactEmailTemplate = (name, email, subject, message) => {
                     This is an automated message from the <strong>AI.ttorney Admin Panel</strong>
                 </p>
                 <p style="margin: 8px 0 0 0; color: #9ca3af; font-size: 11px;">
-                    IP Address: ${process.env.NODE_ENV === 'development' ? 'Development Mode' : 'Logged for security'}
+                    IP Address: ${
+                      process.env.NODE_ENV === "development"
+                        ? "Development Mode"
+                        : "Logged for security"
+                    }
                 </p>
             </div>
         </div>
@@ -185,7 +179,7 @@ const getConfirmationEmailTemplate = (name, subject) => {
 };
 
 // POST /api/contact-superadmin
-router.post('/', contactLimiter, async (req, res) => {
+router.post("/", contactLimiter, async (req, res) => {
   try {
     const { name, email, subject, message } = req.body;
 
@@ -193,7 +187,7 @@ router.post('/', contactLimiter, async (req, res) => {
     if (!name || !email || !subject || !message) {
       return res.status(400).json({
         success: false,
-        error: 'All fields are required'
+        error: "All fields are required",
       });
     }
 
@@ -202,70 +196,107 @@ router.post('/', contactLimiter, async (req, res) => {
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        error: 'Please enter a valid email address'
+        error: "Please enter a valid email address",
       });
     }
 
-    // Check SMTP configuration
-    if (!process.env.SMTP_USERNAME || !process.env.SMTP_PASSWORD) {
+    // Check email configuration (Resend)
+    const resendApiKey = process.env.RESEND_API_KEY;
+    const fromEmail =
+      process.env.FROM_EMAIL ||
+      process.env.SMTP_USERNAME ||
+      "noreply@ai.ttorney.com";
+    const fromName = process.env.FROM_NAME || "AI.ttorney Admin";
+    const superadminEmail =
+      process.env.SUPERADMIN_EMAIL || "aittorney.otp@gmail.com";
+
+    if (!resendApiKey) {
       return res.status(500).json({
         success: false,
-        error: 'Email service not configured'
+        error: "Email service not configured",
       });
     }
 
-    // Create transporter
-    const transporter = createTransporter();
-
-    // Verify transporter connection
-    try {
-      await transporter.verify();
-    } catch (verifyError) {
-      return res.status(500).json({
-        success: false,
-        error: 'Email service connection failed'
-      });
-    }
-
-    // Prepare email
+    // Prepare email to superadmin
     const emailHtml = getContactEmailTemplate(name, email, subject, message);
-    const mailOptions = {
-      from: `"${process.env.FROM_NAME || 'AI.ttorney Admin'}" <${process.env.FROM_EMAIL || process.env.SMTP_USERNAME}>`,
-      to: 'aittorney.otp@gmail.com',
-      replyTo: email,
+    const superadminPayload = {
+      from: `"${fromName}" <${fromEmail}>`,
+      to: [superadminEmail],
       subject: `[Admin Contact] ${subject}`,
-      html: emailHtml
+      html: emailHtml,
+      reply_to: email,
     };
 
-    // Send email to superadmin
-    const info = await transporter.sendMail(mailOptions);
-    
-    
-    // Send confirmation email to sender
+    // Send email to superadmin via Resend
+    const superadminResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(superadminPayload),
+    });
+
+    if (!superadminResponse.ok) {
+      const text = await superadminResponse.text().catch(() => "");
+      console.error(
+        "❌ Resend superadmin contact email failed:",
+        superadminResponse.status,
+        text
+      );
+      return res.status(500).json({
+        success: false,
+        error: "Failed to send message. Please try again.",
+      });
+    }
+
+    // Send confirmation email to sender (best-effort)
     try {
       const confirmationHtml = getConfirmationEmailTemplate(name, subject);
-      const confirmationMailOptions = {
-        from: `"${process.env.FROM_NAME || 'AI.ttorney Admin'}" <${process.env.FROM_EMAIL || process.env.SMTP_USERNAME}>`,
-        to: email,
-        subject: 'Your message has been received - AI.ttorney Admin',
-        html: confirmationHtml
+      const confirmationPayload = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: [email],
+        subject: "Your message has been received - AI.ttorney Admin",
+        html: confirmationHtml,
       };
 
-      const confirmationInfo = await transporter.sendMail(confirmationMailOptions);
+      const confirmationResponse = await fetch(
+        "https://api.resend.com/emails",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(confirmationPayload),
+        }
+      );
+
+      if (!confirmationResponse.ok) {
+        const text = await confirmationResponse.text().catch(() => "");
+        console.error(
+          "❌ Resend confirmation email failed:",
+          confirmationResponse.status,
+          text
+        );
+      }
     } catch (confirmationError) {
       // Don't fail the main request if confirmation fails
+      console.error(
+        "❌ Confirmation email error (Resend):",
+        confirmationError.message
+      );
     }
 
     res.json({
       success: true,
-      message: 'Your message has been sent to the superadmin successfully. A confirmation email has been sent to your inbox.',
-      messageId: info.messageId
+      message:
+        "Your message has been sent to the superadmin successfully. A confirmation email has been sent to your inbox.",
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: 'Failed to send message. Please try again.'
+      error: "Failed to send message. Please try again.",
     });
   }
 });

@@ -151,7 +151,7 @@ const ViewTermModal = ({ open, onClose, term }) => {
       setAuditError(null);
 
       const response = await fetch(
-        `http://localhost:5001/api/glossary-terms/${term.id}/audit-logs`,
+        `${process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api'}/glossary-terms/${term.id}/audit-logs`,
         {
           headers: getAuthHeaders(),
         }

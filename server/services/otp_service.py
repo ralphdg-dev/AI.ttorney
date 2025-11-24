@@ -164,8 +164,8 @@ class OTPService:
         return f"otp:{otp_type}:{normalized_email}"
     
     # OTP Configuration Constants
-    OTP_TTL_SECONDS = 600  # 10 minutes for all OTP types
-    OTP_TTL_MINUTES = 10
+    OTP_TTL_SECONDS = 120  # 2 minutes for all OTP types
+    OTP_TTL_MINUTES = 2
     
     # OTP Type Configuration
     OTP_TYPES = {
@@ -451,7 +451,7 @@ class OTPService:
                     <h1 style="color: #1e3a8a; font-size: 32px; margin: 0; letter-spacing: 8px;">{otp_code}</h1>
                 </div>
                 
-                <p>This code will expire in <strong>10 minutes</strong>.</p>
+                <p>This code will expire in <strong>2 minutes</strong>.</p>
                 <p>If you didn't create an account with AI.ttorney, please ignore this email.</p>
                 
                 <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
@@ -483,7 +483,7 @@ class OTPService:
                     <h1 style="color: #1e3a8a; font-size: 32px; margin: 0; letter-spacing: 8px;">{otp_code}</h1>
                 </div>
                 
-                <p>This code will expire in <strong>10 minutes</strong>.</p>
+                <p>This code will expire in <strong>2 minutes</strong>.</p>
                 <p>If you didn't request a password reset, please ignore this email and your password will remain unchanged.</p>
                 
                 <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
@@ -515,7 +515,7 @@ class OTPService:
                     <h1 style="color: #1e3a8a; font-size: 32px; margin: 0; letter-spacing: 8px;">{otp_code}</h1>
                 </div>
                 
-                <p>This code will expire in <strong>10 minutes</strong>.</p>
+                <p>This code will expire in <strong>2 minutes</strong>.</p>
                 <p>If you didn't request this email change, please ignore this email and contact our support team immediately.</p>
                 
                 <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">

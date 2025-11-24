@@ -17,7 +17,7 @@ const TermsByCategoryCard = () => {
     const fetchTerms = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5001/api/stats/terms-by-category"
+          `${process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api'}/stats/terms-by-category`
         );
         const result = await response.json();
 

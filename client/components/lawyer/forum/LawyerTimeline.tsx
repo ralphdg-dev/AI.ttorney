@@ -222,7 +222,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
       if (!response.ok) {
         const errorText = await response.text();
         if (response.status === 403) {
-          if (__DEV__) console.error('LawyerTimeline: Authentication failed - 403 Forbidden. Check if user is properly authenticated.');
+          if (__DEV__) console.warn('LawyerTimeline: Authentication failed - 403 Forbidden. Check if user is properly authenticated.');
           setPosts([]);
           setError('Authentication required. Please log in again.');
           return;
@@ -285,7 +285,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
           return loadPosts(force, retryCount + 1);
         }
       } else {
-        if (__DEV__) console.error('LawyerTimeline load error:', errorMessage);
+        if (__DEV__) console.warn('LawyerTimeline load error:', errorMessage);
 
         if (isComponentMounted.current) {
           setError(errorMessage);

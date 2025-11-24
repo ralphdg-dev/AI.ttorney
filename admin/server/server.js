@@ -49,9 +49,28 @@ const authLimiter = rateLimit({
   skip: (req) => process.env.NODE_ENV === 'development' // Skip rate limiting in development
 });
 
-// CORS configuration - Simplified for development
+// CORS configuration
+const allowedOrigins = process.env.FRONTEND_URL 
+  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+  : [];
+
 app.use(cors({
-  origin: true, // Allow all origins in development
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // In development, allow all origins
+    if (process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
+    // In production, check against allowed origins
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
@@ -170,8 +189,9 @@ process.on('SIGINT', () => {
 
 // Start server
 app.listen(PORT, () => {
+  const baseUrl = process.env.API_BASE_URL || `http://localhost:${PORT}`;
   console.log(`🚀 Admin API Server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔐 Auth endpoint: http://localhost:${PORT}/api/auth`);
+  console.log(`📊 Health check: ${baseUrl}/health`);
+  console.log(`🔐 Auth endpoint: ${baseUrl}/api/auth`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });

@@ -44,7 +44,7 @@ const AddTermModal = ({ open, onClose, onSave }) => {
   }, [open]);
 
   const translateText = async (text, targetLang) => {
-    const res = await fetch('http://localhost:5001/api/translate', {
+    const res = await fetch(`${process.env.REACT_APP_API_URL || 'https://ai-ttorney-admin-server.onrender.com/api'}/translate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, targetLang }),
