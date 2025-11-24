@@ -112,6 +112,11 @@ function AppContent() {
 export default function RootLayout() {
   const { isReady } = useRobustFonts();
 
+  React.useEffect(() => {
+    // Log successful initialization
+    console.log('✅ [_layout.tsx] RootLayout mounted, fonts ready:', isReady);
+  }, [isReady]);
+
   // Wait for fonts to load or timeout before rendering
   if (!isReady) {
     return null;
