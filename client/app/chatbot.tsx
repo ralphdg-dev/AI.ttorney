@@ -174,6 +174,36 @@ const streamChatResponse = (params: StreamChatResponseParams): Promise<void> => 
         return;
       }
       
+      // Handle JSON response (non-streaming mode)
+      if (xhr.status === 200 && xhr.responseText && !xhr.responseText.includes('data: ')) {
+        try {
+          const jsonResponse = JSON.parse(xhr.responseText);
+          console.log('📦 Received JSON response:', jsonResponse);
+          
+          // Handle metadata
+          if (jsonResponse.type === 'metadata' || jsonResponse.language) {
+            onMetadata(jsonResponse);
+          }
+          
+          // Handle sources
+          if (jsonResponse.sources) {
+            onSources(jsonResponse.sources);
+          }
+          
+          // Handle content
+          if (jsonResponse.content) {
+            onContent(jsonResponse.content);
+          }
+          
+          // Mark as complete
+          if (jsonResponse.done) {
+            onComplete();
+          }
+        } catch (e) {
+          console.error('❌ Error parsing JSON response:', e);
+        }
+      }
+      
       onComplete();
       onFinish();
       resolve();
