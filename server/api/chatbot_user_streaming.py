@@ -760,8 +760,6 @@ async def ask_legal_question(
             
             context, sources, rag_metadata = retrieve_relevant_context_with_web_search(
                 question=search_query,
-                qdrant_client=qdrant_client,
-                openai_client=openai_client,
                 collection_name=COLLECTION_NAME,
                 embedding_model=EMBEDDING_MODEL,
                 top_k=TOP_K_RESULTS,
