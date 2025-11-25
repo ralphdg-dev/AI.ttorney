@@ -901,6 +901,7 @@ async def ask_legal_question(
         try:
             # Collect the full response from the stream
             full_response = {}
+            accumulated_content = ""
             async for chunk in generate_stream():
                 # Parse SSE format chunks - format_sse adds "data: " prefix
                 if chunk.startswith("data: "):
@@ -908,8 +909,18 @@ async def ask_legal_question(
                         # Remove "data: " prefix and parse JSON
                         json_data = chunk[6:].strip()  # Remove prefix and whitespace
                         data = json.loads(json_data)
-                        full_response.update(data)
+                        
+                        # Accumulate content instead of overwriting
+                        if data.get("content") and data["content"] != ".":
+                            accumulated_content += data["content"]
+                        
+                        # Update other fields normally
+                        for key, value in data.items():
+                            if key != "content":
+                                full_response[key] = value
+                        
                         if data.get("done"):
+                            full_response["content"] = accumulated_content
                             break
                     except json.JSONDecodeError:
                         continue
