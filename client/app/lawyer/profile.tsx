@@ -830,11 +830,11 @@ const LawyerProfilePage: React.FC = () => {
 
               <View
                 style={[
-                  tw`self-start px-2 py-1 rounded-md`,
+                  tw`self-start px-3 py-1.5 rounded-md flex-shrink-0`,
                   { backgroundColor: "#ECFDF5" },
                 ]}
               >
-                <Text style={tw`text-xs font-semibold text-green-700`}>
+                <Text style={tw`text-xs font-semibold text-green-700 leading-tight`}>
                   {profileData.verificationStatus}
                 </Text>
               </View>

@@ -150,8 +150,10 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
 
   const getCardPosition = (): ViewStyle => {
     const step = tutorialSteps[currentStep];
+    console.log(`🎯 Getting card position for step: ${step.id}, spotlight:`, spotlightPosition);
+    
     if (step.skipSpotlight) {
-      return {
+      const position = {
         position: 'absolute' as const,
         top: 100,
         left: 20,
@@ -159,6 +161,8 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
         width: screenWidth - 40,
         height: Math.min(screenHeight * 0.25, 200), // Responsive height
       };
+      console.log(`🎯 Skip spotlight position:`, position);
+      return position;
     }
 
     const spotlight = spotlightPosition;
@@ -180,13 +184,16 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
       cardY = spotlight.y + spotlight.height + 20;
     }
 
-    return {
+    const position = {
       position: 'absolute' as const,
       left: cardX,
       top: cardY,
       width: cardWidth,
       height: cardHeight,
     };
+    
+    console.log(`🎯 Calculated card position:`, position);
+    return position;
   };
 
   const renderSpotlightMask = () => {
@@ -271,6 +278,7 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
         const ref = stepRefs[targetId];
         if (ref?.current) {
           ref.current.measure((fx: any, fy: any, width: any, height: any, px: any, py: any) => {
+            console.log(`🎯 Measured ${targetId}:`, { x: px, y: py, width, height });
             setSpotlightPosition({
               x: px,
               y: py,
@@ -279,22 +287,35 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
             });
           });
         } else {
-          // Fallback: try to find element by its testID or position
-          // For now, use default positions for known elements
-          const defaultPositions: { [key: string]: any } = {
-            'chatbot-button': { x: screenWidth / 2 - 60, y: screenHeight - 140, width: 120, height: 60 },
-            'glossary-button': { x: screenWidth / 2 - 180, y: screenHeight - 140, width: 120, height: 60 },
+          console.log(`🎯 Ref not found for ${targetId}, using fallback position`);
+          // Simplified fallback positions that are more reliable
+          const fallbackPositions: { [key: string]: any } = {
+            'chatbot-button': { x: screenWidth / 2 - 60, y: screenHeight - 180, width: 120, height: 60 },
+            'glossary-button': { x: screenWidth / 2 - 180, y: screenHeight - 180, width: 120, height: 60 },
+            'menu-button': { x: 20, y: 60, width: 40, height: 40 },
             'bottom-navbar': { x: 0, y: screenHeight - 100, width: screenWidth, height: 100 },
           };
 
-          if (defaultPositions[targetId]) {
-            setSpotlightPosition(defaultPositions[targetId]);
+          if (fallbackPositions[targetId]) {
+            console.log(`🎯 Using fallback for ${targetId}:`, fallbackPositions[targetId]);
+            setSpotlightPosition(fallbackPositions[targetId]);
+          } else {
+            console.log(`🎯 No fallback position for ${targetId}, using center`);
+            // Center of screen as last resort
+            setSpotlightPosition({
+              x: screenWidth / 2 - 50,
+              y: screenHeight / 2 - 50,
+              width: 100,
+              height: 100,
+            });
           }
         }
       };
 
       animateStepChange();
-      measureTargetElement();
+      
+      // Add a small delay to ensure UI is rendered before measuring
+      setTimeout(measureTargetElement, 100);
     }
   }, [visible, currentStep, stepRefs, animateStepChange, screenWidth, screenHeight, tutorialSteps]);
 

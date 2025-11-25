@@ -77,20 +77,20 @@ class PromotionalContentValidator:
         self.url_patterns = [
                            
             r'https?://[^\s]+',
-            r'www\.[^\s]+',
+            # Only match www. when followed by actual domain-like patterns
+            r'www\.[a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}(?:/[^\s]*)?',
             r'ftp://[^\s]+',
             
-                                        
-            r'\b\w+\.(com|net|org|ph|gov|edu|co|io|app|dev|tech|law|legal|biz|info|online|site|xyz|me|us|uk|ca|au|tv|cc|ly|gl|be|it|de|fr|jp|cn|in|br|mx|es|ru|kr|sg|my|th|vn|id|tw|hk|nz|za|ae|sa|eg|ng|ke|gh|tz|ug|zm|zw|mw|bw|sz|ls|na|ao|mz|mg|mu|sc|re|yt|km|dj|so|et|er|sd|ss|ly|tn|dz|ma|eh|mr|ml|bf|ne|td|cf|cm|gq|ga|cg|cd|ao|zm|na|bw|sz|ls|za|mg|mu|sc|re|yt|km|dj|so|et|er|sd|ss)\b',
+            # Removed generic domain pattern to prevent false positives
+            # AI analysis will catch contextual URLs intelligently
             
                             
             r'\b(bit\.ly|tinyurl\.com|goo\.gl|t\.co|ow\.ly|buff\.ly|adf\.ly|is\.gd|cli\.gs|short\.link|tiny\.cc|rb\.gy|cutt\.ly|shorturl\.at)/[^\s]+',
             
-                                        
-            r'\b\w+\s*[\.\[\(]\s*(dot|\.)\s*[\.\]\)]\s*\w+',                                
-            r'\b\w+\s+dot\s+\w+',                     
-            r'\b\w+\s*\[\s*\.\s*\]\s*\w+',                   
-            r'\b\w+\s*\(\s*\.\s*\)\s*\w+',                   
+            # Fixed: More specific obfuscation patterns to avoid false positives
+            r'\b[a-zA-Z0-9]+\s*\[\s*at\s*\]\s*[a-zA-Z0-9]+\s*\[\s*dot\s*\]\s*[a-zA-Z]{2,}\b',                                
+            r'\b[a-zA-Z0-9]+\s*\(\s*at\s*\)\s*[a-zA-Z0-9]+\s*\(\s*dot\s*\)\s*[a-zA-Z]{2,}\b',                     
+            r'\b[a-zA-Z0-9]+\s+at\s+[a-zA-Z0-9]+\s+dot\s+[a-zA-Z]{2,}\b',                   
         ]
         
                                         

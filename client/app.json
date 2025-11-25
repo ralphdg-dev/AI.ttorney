@@ -10,10 +10,7 @@
     "newArchEnabled": true,
     "owner": "j24angeles",
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
+      "icon": "./assets/images/icon.png",
       "softwareKeyboardLayoutMode": "pan"
     },
     "web": {

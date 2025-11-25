@@ -13,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLawyerDashboard } from '../../hooks/useLawyerDashboard';
 import { getClientName } from '../../utils/consultationStyles';
 import { QUICK_STATS_CONFIG, DASHBOARD_CONSTANTS } from '../../constants/dashboardConfig';
+import { getContentBottomPadding } from '../../constants/LayoutConstants';
 import RegisteredOnboardingOverlay from '../../components/onboarding/RegisteredOnboardingOverlay';
 import { AuthGuard } from '../../components/AuthGuard';
 
@@ -124,7 +125,10 @@ const LawyerDashboard: React.FC = () => {
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}
           scrollEventThrottle={16}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 56 + (insets.bottom || 0) + 20 }}
+          contentContainerStyle={{ 
+            paddingHorizontal: 20, 
+            paddingBottom: getContentBottomPadding(insets.bottom || 0, 20)
+          }}
         >
           {/* Welcome Section - Presentational Component */}
           <DashboardWelcome date={currentDate} lawyerName={lawyerName} />

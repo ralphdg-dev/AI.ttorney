@@ -5,7 +5,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Image,
   TextInput,
   Modal,
   Alert,
@@ -300,6 +299,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   };
 
   const addTimeSlot = (day: string, time: string) => {
+    // Close dropdown first for immediate feedback
+    setShowTimeDropdown((prev) => ({
+      ...prev,
+      [day]: false,
+    }));
+
     setDayTimeSlots((prev) => {
       const existingTimes = prev[day] || [];
       if (existingTimes.includes(time)) {
@@ -311,11 +316,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         [day]: [...existingTimes, time].sort(),
       };
     });
-
-    setShowTimeDropdown((prev) => ({
-      ...prev,
-      [day]: false,
-    }));
   };
 
   const removeTimeSlot = (day: string, timeToRemove: string) => {
@@ -739,7 +739,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                       value={searchQuery}
                     />
                   </View>
-                  <ScrollView style={tw`max-h-48`}>
+                  <ScrollView 
+                    style={tw`max-h-48`}
+                    nestedScrollEnabled={true}
+                    showsVerticalScrollIndicator={true}
+                    scrollEventThrottle={16}
+                  >
                     {filteredSpecializations.map((specialization) => (
                       <TouchableOpacity
                         key={specialization}
@@ -896,7 +901,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                         <View
                           style={tw`mt-1 border border-gray-300 rounded-lg bg-white max-h-40`}
                         >
-                          <ScrollView style={tw`max-h-40`}>
+                          <ScrollView 
+                            style={tw`max-h-40`}
+                            nestedScrollEnabled={true}
+                            showsVerticalScrollIndicator={true}
+                            scrollEventThrottle={16}
+                          >
                             {TIME_OPTIONS.map((timeOption) => (
                               <TouchableOpacity
                                 key={timeOption.value}
