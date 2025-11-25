@@ -34,8 +34,8 @@ export class NetworkConfig {
     // Development: Auto-detect from Expo's development server
     const detectedIP = this.detectIPFromExpo();
     
-    // Web development: Force port 8000 to avoid confusion
-    if (Platform.OS === 'web') {
+    // Web development: Force port 8000 to avoid confusion (DEV ONLY)
+    if (Platform.OS === 'web' && __DEV__) {
       console.log('🌐 Web development detected, forcing port 8000');
       return `http://localhost:8000`;
     }
