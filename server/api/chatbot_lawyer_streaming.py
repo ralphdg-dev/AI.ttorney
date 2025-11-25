@@ -654,16 +654,38 @@ Note: No specific context was retrieved from the vector database. Proceed with t
             yield format_sse({'error': str(e), 'done': True})
     
                                                    
-    return StreamingResponse(
-        generate_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",                           
-            "Access-Control-Allow-Origin": "*",                
-        }
-    )
+    if stream:
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",                           
+                "Access-Control-Allow-Origin": "*",                
+            }
+        )
+    else:
+        # Return JSON response for backward compatibility
+        try:
+            # Collect the full response from the stream
+            full_response = {}
+            async for chunk in generate_stream():
+                # Parse SSE format chunks
+                if chunk.startswith("data: "):
+                    try:
+                        data = json.loads(chunk[6:])  # Remove "data: " prefix
+                        full_response.update(data)
+                        if data.get("done"):
+                            break
+                    except json.JSONDecodeError:
+                        continue
+            
+            # Return the complete response as JSON
+            return full_response
+        except Exception as e:
+            logger.error(f"JSON response generation error: {e}")
+            return {"error": str(e), "answer": "Sorry, I encountered an error processing your request."}
 
 
 @router.get("/stream/health")

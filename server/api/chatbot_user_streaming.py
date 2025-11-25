@@ -67,7 +67,8 @@ router = APIRouter(prefix="/api/chatbot/user", tags=["User Chatbot"])
 async def ask_legal_question(
     request: ChatRequest,
     chat_service: ChatHistoryService = Depends(get_chat_history_service),
-    current_user: Optional[dict] = Depends(get_optional_current_user)
+    current_user: Optional[dict] = Depends(get_optional_current_user),
+    stream: bool = False
 ):
     """
     User chatbot endpoint with Server-Sent Events (SSE) streaming.
@@ -894,11 +895,33 @@ async def ask_legal_question(
             logger.error(f"Streaming error: {e}")
             yield format_sse({'error': str(e), 'done': True})
     
-    return StreamingResponse(
-        generate_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive"
-        }
-    )
+    if stream:
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive"
+            }
+        )
+    else:
+        # Return JSON response for backward compatibility
+        try:
+            # Collect the full response from the stream
+            full_response = {}
+            async for chunk in generate_stream():
+                # Parse SSE format chunks
+                if chunk.startswith("data: "):
+                    try:
+                        data = json.loads(chunk[6:])  # Remove "data: " prefix
+                        full_response.update(data)
+                        if data.get("done"):
+                            break
+                    except json.JSONDecodeError:
+                        continue
+            
+            # Return the complete response as JSON
+            return full_response
+        except Exception as e:
+            logger.error(f"JSON response generation error: {e}")
+            return {"error": str(e), "answer": "Sorry, I encountered an error processing your request."}
