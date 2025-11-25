@@ -1,6 +1,6 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated, Platform, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
 import { LAYOUT } from '../../constants/LayoutConstants';
@@ -39,6 +39,7 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
   },
   ref
 ) => {
+  const insets = useSafeAreaInsets();
   const [isOpen, setIsOpen] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -322,9 +323,10 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
       {/* Sidebar */}
       <Animated.View
         style={[
-          tw`absolute top-0 bottom-0`,
+          tw`absolute top-0`,
           {
             right: 0,
+            bottom: insets.bottom,
             width: SIDEBAR_WIDTH,
             backgroundColor: Colors.background.primary,
             transform: [{ translateX: slideAnim }],
@@ -332,7 +334,7 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
           },
         ]}
       >
-        <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+        <View style={{ flex: 1, paddingTop: insets.top }}>
           {/* Header */}
           <View
             style={[
@@ -481,7 +483,7 @@ const ChatHistorySidebar = forwardRef<ChatHistorySidebarRef, ChatHistorySidebarP
             </View>
           )}
         </ScrollView>
-        </SafeAreaView>
+        </View>
       </Animated.View>
 
       {/* Delete Confirmation Modal */}

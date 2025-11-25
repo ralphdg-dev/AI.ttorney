@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, usePathname } from "expo-router";
 import { Text as GSText } from "@/components/ui/text";
 import { Button, ButtonText } from "@/components/ui/button/";
@@ -24,6 +24,7 @@ import { useGuest } from "../../contexts/GuestContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { NetworkConfig } from "@/utils/networkConfig";
 import { safeGoBack } from "@/utils/navigationHelper";
+import { getContentBottomPadding } from '../../constants/LayoutConstants';
 
 interface GlossaryTerm {
   id: number;
@@ -38,6 +39,7 @@ interface GlossaryTerm {
 }
 
 export default function TermDetailScreen() {
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const pathname = usePathname();
@@ -211,7 +213,7 @@ export default function TermDetailScreen() {
       <Animated.ScrollView
         className="flex-1 bg-gray-50"
         contentContainerStyle={{ 
-          paddingBottom: 100,
+          paddingBottom: getContentBottomPadding(insets.bottom, 20),
           paddingHorizontal: 16,
           paddingTop: 16
         }}

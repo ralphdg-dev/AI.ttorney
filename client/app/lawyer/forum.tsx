@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Timeline from '../../components/home/Timeline';
 import { LawyerNavbar } from '../../components/lawyer/shared';
@@ -10,6 +10,7 @@ import Colors from '../../constants/Colors';
 import { AuthGuard } from '../../components/AuthGuard';
 
 const LawyerForum: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
 
   const handleNotificationPress = useCallback(() => {

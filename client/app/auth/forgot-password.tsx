@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Alert, Platform, TextInput, TouchableOpacity, View, Text, ScrollView, KeyboardAvoidingView, StatusBar, Image } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useToast, Toast, ToastTitle, ToastDescription } from "../../components/ui/toast";
+import { useToast } from "@/components/ui/toast";
+import { createSafeAreaToastRenderer } from "@/components/ui/SafeAreaToast";
 import { useRouter, usePathname } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
@@ -102,11 +103,12 @@ export default function ForgotPassword() {
         toast.show({
           placement: 'top',
           duration: 4000,
-          render: ({ id }) => (
-            <Toast nativeID={id} action="error" variant="solid">
-              <ToastTitle>Email Not Found</ToastTitle>
-              <ToastDescription>No account found with this email address. Please check your email or sign up for a new account.</ToastDescription>
-            </Toast>
+          render: createSafeAreaToastRenderer(
+            'top',
+            'error',
+            'solid',
+            'Email Not Found',
+            'No account found with this email address. Please check your email or sign up for a new account.'
           ),
         });
         setError('No account found with this email address. Please check your email or sign up for a new account.');
@@ -123,11 +125,12 @@ export default function ForgotPassword() {
         toast.show({
           placement: 'top',
           duration: 3000,
-          render: ({ id }) => (
-            <Toast nativeID={id} action="success" variant="solid">
-              <ToastTitle>Reset Code Sent</ToastTitle>
-              <ToastDescription>A password reset code has been sent to your email address.</ToastDescription>
-            </Toast>
+          render: createSafeAreaToastRenderer(
+            'top',
+            'success',
+            'solid',
+            'Reset Code Sent',
+            'A password reset code has been sent to your email address.'
           ),
         });
         setCurrentStep('otp');
@@ -244,11 +247,12 @@ export default function ForgotPassword() {
         toast.show({
           placement: 'top',
           duration: 4000,
-          render: ({ id }) => (
-            <Toast nativeID={id} action="error" variant="solid">
-              <ToastTitle>Email Not Found</ToastTitle>
-              <ToastDescription>No account found with this email address. Please check your email or sign up for a new account.</ToastDescription>
-            </Toast>
+          render: createSafeAreaToastRenderer(
+            'top',
+            'error',
+            'solid',
+            'Email Not Found',
+            'No account found with this email address. Please check your email or sign up for a new account.'
           ),
         });
         setCanResend(true);
@@ -275,11 +279,12 @@ export default function ForgotPassword() {
       toast.show({
         placement: 'top',
         duration: 3000,
-        render: ({ id }) => (
-          <Toast nativeID={id} action="success" variant="solid">
-            <ToastTitle>Code Resent</ToastTitle>
-            <ToastDescription>A new verification code has been sent to your email.</ToastDescription>
-          </Toast>
+        render: createSafeAreaToastRenderer(
+          'top',
+          'success',
+          'solid',
+          'Code Resent',
+          'A new verification code has been sent to your email.'
         ),
       });
       
@@ -337,11 +342,12 @@ export default function ForgotPassword() {
           toast.show({
             placement: 'top',
             duration: 3000,
-            render: ({ id }) => (
-              <Toast nativeID={id} action="error" variant="solid">
-                <ToastTitle>Password not changed</ToastTitle>
-                <ToastDescription>New password can't be the same as your current one.</ToastDescription>
-              </Toast>
+            render: createSafeAreaToastRenderer(
+              'top',
+              'error',
+              'solid',
+              'Password not changed',
+              'New password can\'t be the same as your current one.'
             ),
           });
         } else {
@@ -352,11 +358,12 @@ export default function ForgotPassword() {
         toast.show({
           placement: 'top',
           duration: 3000,
-          render: ({ id }) => (
-            <Toast nativeID={id} action="success" variant="solid">
-              <ToastTitle>Password Reset Successful</ToastTitle>
-              <ToastDescription>Your password has been updated. Please login with your new password.</ToastDescription>
-            </Toast>
+          render: createSafeAreaToastRenderer(
+            'top',
+            'success',
+            'solid',
+            'Password Reset Successful',
+            'Your password has been updated. Please login with your new password.'
           ),
         });
         

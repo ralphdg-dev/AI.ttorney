@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, Animated, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { User, Bookmark, MoreHorizontal, Flag, Send } from 'lucide-react-native';
 import ReportModal from '../../common/ReportModal';
@@ -23,6 +23,7 @@ import { showStrikeAddedToast, showSuspendedToast, showBannedToast, showAccessDe
 import { validatePostContent } from '../../../utils/contentValidation';
 import { VerifiedLawyerBadge } from '../../common/VerifiedLawyerBadge';
 import { getCategoryColors, getCategoryDisplayText } from '@/utils/categoryUtils';
+import { getSafeBottomPosition } from '../../../constants/LayoutConstants';
 
 
 interface PostData {
@@ -76,6 +77,7 @@ interface Reply {
 
 
 const ViewPost: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { postId, from, query } = useLocalSearchParams<{ postId?: string; from?: string; query?: string }>();
   const { user: currentUser, session } = useAuth();
@@ -893,10 +895,10 @@ const ViewPost: React.FC = () => {
             </View>
 
             {/* Replies Section Skeleton */}
-            <View style={tw`mt-6 pt-6 border-t border-gray-100`}>
+            <View style={tw`pt-6 mt-6 border-t border-gray-100`}>
               <SkeletonLoader width={100} height={18} borderRadius={4} style={tw`mb-4`} />
               {[1, 2].map((index) => (
-                <View key={index} style={tw`flex-row items-start mb-4 pl-4 border-l-2 border-gray-100`}>
+                <View key={index} style={tw`flex-row items-start pl-4 mb-4 border-l-2 border-gray-100`}>
                   <SkeletonLoader width={40} height={40} borderRadius={20} style={tw`mr-3`} />
                   <View style={tw`flex-1`}>
                     <SkeletonLoader width={100} height={14} borderRadius={4} style={tw`mb-2`} />
@@ -984,7 +986,7 @@ const ViewPost: React.FC = () => {
                 }
               </Text>
             </TouchableOpacity>
-            <View style={tw`h-px bg-gray-200 mx-2`} />
+            <View style={tw`h-px mx-2 bg-gray-200`} />
             <TouchableOpacity
               style={tw`flex-row items-center px-4 py-3`}
               onPress={handleReportPress}
@@ -1003,8 +1005,8 @@ const ViewPost: React.FC = () => {
       >
         
         {!post && !loading && !postReady && error && (
-          <View style={tw`px-5 py-6 items-center`}>
-            <Text style={tw`text-gray-500 text-center mb-4`}>{error}</Text>
+          <View style={tw`items-center px-5 py-6`}>
+            <Text style={tw`mb-4 text-center text-gray-500`}>{error}</Text>
             <TouchableOpacity
               onPress={() => {
                 setError(null);
@@ -1012,10 +1014,10 @@ const ViewPost: React.FC = () => {
                 // Trigger reload by updating a dependency
                 setPost(null);
               }}
-              style={tw`bg-blue-500 px-4 py-2 rounded-lg`}
+              style={tw`px-4 py-2 bg-blue-500 rounded-lg`}
               accessibilityLabel="Try loading the post again"
             >
-              <Text style={tw`text-white font-medium`}>Try Again</Text>
+              <Text style={tw`font-medium text-white`}>Try Again</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1023,18 +1025,18 @@ const ViewPost: React.FC = () => {
           <View style={tw`px-5 py-6`}>
             <View style={tw`flex-row items-start mb-4`}>
                 {isAnonymous || isDeactivated ? (
-                  <View style={tw`w-12 h-12 rounded-full border border-gray-200 items-center justify-center mr-3`}>
+                  <View style={tw`items-center justify-center w-12 h-12 mr-3 border border-gray-200 rounded-full`}>
                     <User size={20} color="#6B7280" />
                   </View>
                 ) : displayUser.avatar && !displayUser.avatar.includes('flaticon') && !imageLoadError ? (
                   <Image 
                     source={{ uri: displayUser.avatar }} 
-                    style={tw`w-12 h-12 rounded-full mr-3`}
+                    style={tw`w-12 h-12 mr-3 rounded-full`}
                     onError={() => setImageLoadError(true)}
                   />
                 ) : (
-                  <View style={[tw`w-12 h-12 rounded-full items-center justify-center mr-3`, { backgroundColor: Colors.primary.blue }]}>
-                    <Text style={tw`text-white font-semibold text-base`}>
+                  <View style={[tw`items-center justify-center w-12 h-12 mr-3 rounded-full`, { backgroundColor: Colors.primary.blue }]}>
+                    <Text style={tw`text-base font-semibold text-white`}>
                       {getInitials(displayUser.name)}
                     </Text>
                   </View>
@@ -1044,7 +1046,7 @@ const ViewPost: React.FC = () => {
                   <View style={tw`flex-1 mr-3`}>
                     {/* [Full Name] [lawyer badge] */}
                     <View style={{flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap'}}>
-                      <Text style={tw`text-base font-semibold text-gray-900 mr-2`}>
+                      <Text style={tw`mr-2 text-base font-semibold text-gray-900`}>
                         {isDeactivated ? 'Deactivated Account' : displayUser.name}
                       </Text>
                       {!isAnonymous && !isDeactivated && displayUser.isLawyer && (
@@ -1055,14 +1057,14 @@ const ViewPost: React.FC = () => {
                     {/* [username] [law category] - side by side */}
                     <View style={tw`flex-row items-center mt-1`}>
                       {!isAnonymous && !isDeactivated && (
-                        <Text style={tw`text-sm text-gray-500 mr-2`}>
+                        <Text style={tw`mr-2 text-sm text-gray-500`}>
                           @{post.user?.username || 'user'}
                         </Text>
                       )}
                       
                       {post.domain && (
                         <View style={[
-                          tw`px-3 py-1 rounded-full border`,
+                          tw`px-3 py-1 border rounded-full`,
                           { 
                             backgroundColor: categoryColors.bg,
                             borderColor: categoryColors.border
@@ -1084,36 +1086,36 @@ const ViewPost: React.FC = () => {
               </View>
             </View>
 
-            <Text style={tw`text-gray-800 text-base leading-6 mb-4`}>
+            <Text style={tw`mb-4 text-base leading-6 text-gray-800`}>
               {showFullContent ? displayContent : contentPreview}
             </Text>
             {shouldShowReadMore && (
               <TouchableOpacity onPress={() => setShowFullContent(!showFullContent)}>
-                <Text style={[tw`font-medium mb-2`, { color: Colors.primary.blue }]}>
+                <Text style={[tw`mb-2 font-medium`, { color: Colors.primary.blue }]}>
                   {showFullContent ? 'Show less' : 'Read more'}
                 </Text>
               </TouchableOpacity>
             )}
             
             {/* [timestamp] - at the bottom of post content */}
-            <Text style={tw`text-xs text-gray-500 mb-2`}>
+            <Text style={tw`mb-2 text-xs text-gray-500`}>
               {displayTimestamp}
             </Text>
 
             {/* Replies Section */}
-            <View style={tw`mt-6 pt-6 border-t border-gray-100 bg-white`}>
-              <Text style={tw`text-lg font-bold text-gray-900 mb-4`}>
+            <View style={tw`pt-6 mt-6 bg-white border-t border-gray-100`}>
+              <Text style={tw`mb-4 text-lg font-bold text-gray-900`}>
                 Replies ({[...replies, ...optimisticReplies].length})
               </Text>
               
               {repliesLoading ? (
                 // Skeleton loaders for replies
                 [1, 2, 3].map((index) => (
-                  <View key={index} style={tw`flex-row items-start mb-4 pl-4`}>
-                    <View style={tw`w-10 h-10 rounded-full border border-gray-200 mr-3`} />
+                  <View key={index} style={tw`flex-row items-start pl-4 mb-4`}>
+                    <View style={tw`w-10 h-10 mr-3 border border-gray-200 rounded-full`} />
                     <View style={tw`flex-1`}>
-                        <View style={tw`h-4 border border-gray-200 rounded w-3/4 mb-2`} />
-                        <View style={tw`h-4 border border-gray-200 rounded w-1/2`} />
+                        <View style={tw`w-3/4 h-4 mb-2 border border-gray-200 rounded`} />
+                        <View style={tw`w-1/2 h-4 border border-gray-200 rounded`} />
                       </View>
                   </View>
                 ))
@@ -1142,23 +1144,23 @@ const ViewPost: React.FC = () => {
                   const replyTimestamp = formatTimestamp(reply.created_at);
                   
                   const replyComponent = (
-                    <View key={reply.id} style={tw`mb-6 pl-4 bg-white`}>
+                    <View key={reply.id} style={tw`pl-4 mb-6 bg-white`}>
                       <View style={tw`flex-row items-start mb-2`}>
                         {isReplyAnonymous || isReplyDeactivated ? (
-                          <View style={tw`w-10 h-10 rounded-full bg-gray-100 border border-gray-200 items-center justify-center mr-3`}>
+                          <View style={tw`items-center justify-center w-10 h-10 mr-3 bg-gray-100 border border-gray-200 rounded-full`}>
                             <User size={16} color="#6B7280" />
                           </View>
                         ) : replyUser.avatar && !replyUser.avatar.includes('flaticon') && !replyImageErrors.has(reply.id) ? (
                           <Image 
                             source={{ uri: replyUser.avatar }} 
-                            style={tw`w-10 h-10 rounded-full mr-3`}
+                            style={tw`w-10 h-10 mr-3 rounded-full`}
                             onError={() => {
                               setReplyImageErrors(prev => new Set(prev).add(reply.id));
                             }}
                           />
                         ) : (
-                          <View style={[tw`w-10 h-10 rounded-full items-center justify-center mr-3`, { backgroundColor: Colors.primary.blue }]}>
-                            <Text style={tw`text-white font-semibold text-sm`}>
+                          <View style={[tw`items-center justify-center w-10 h-10 mr-3 rounded-full`, { backgroundColor: Colors.primary.blue }]}>
+                            <Text style={tw`text-sm font-semibold text-white`}>
                               {getInitials(replyUser.name)}
                             </Text>
                           </View>
@@ -1168,7 +1170,7 @@ const ViewPost: React.FC = () => {
                           <View style={tw`mb-2`}>
                             <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
                               <View style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
-                                <Text style={tw`text-base font-semibold text-gray-900 mr-2`}>
+                                <Text style={tw`mr-2 text-base font-semibold text-gray-900`}>
                                   {isReplyDeactivated ? 'Deactivated Account' : replyUser.name}
                                 </Text>
                                 {!isReplyAnonymous && !isReplyDeactivated && replyUser.isLawyer && (
@@ -1187,17 +1189,17 @@ const ViewPost: React.FC = () => {
                             
                             {/* [username] - law category not available in comments */}
                             {!isReplyAnonymous && !isReplyDeactivated && (
-                              <Text style={tw`text-sm text-gray-500 mt-1`}>
+                              <Text style={tw`mt-1 text-sm text-gray-500`}>
                                 @{replyUser.name?.toLowerCase().replace(/\s+/g, '') || 'user'}
                               </Text>
                             )}
                           </View>
                           
                           {/* [post content] */}
-                          <Text style={tw`text-gray-900 mb-2`}>{reply.body}</Text>
+                          <Text style={tw`mb-2 text-gray-900`}>{reply.body}</Text>
                           
                           {/* [timestamp] */}
-                          <Text style={tw`text-xs text-gray-500 mb-1`}>
+                          <Text style={tw`mb-1 text-xs text-gray-500`}>
                             {replyTimestamp}
                           </Text>
                         </View>
@@ -1205,7 +1207,7 @@ const ViewPost: React.FC = () => {
                       
                       {/* Reply Menu Dropdown */}
                       {replyMenuOpen === reply.id && !reply.isOptimistic && (
-                        <View style={tw`absolute top-8 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-32`}>
+                        <View style={tw`absolute right-0 z-10 w-32 bg-white border border-gray-200 rounded-lg shadow-lg top-8`}>
                           <TouchableOpacity
                             onPress={() => handleReportReplyPress(reply.id)}
                             style={tw`flex-row items-center px-3 py-2`}
@@ -1233,8 +1235,8 @@ const ViewPost: React.FC = () => {
                   return replyComponent;
                 }) : (
                   // No replies message
-                  <View style={tw`py-4 items-center bg-white`}>
-                    <Text style={tw`text-gray-500 text-center italic`}>No replies yet</Text>
+                  <View style={tw`items-center py-4 bg-white`}>
+                    <Text style={tw`italic text-center text-gray-500`}>No replies yet</Text>
                   </View>
                 );
                 })()
@@ -1246,10 +1248,10 @@ const ViewPost: React.FC = () => {
 
       {/* Reply Input - Only visible for lawyers */}
       {isLawyer && post && (
-        <View style={tw`absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3`}>
+        <View style={[tw`absolute left-0 right-0 px-4 py-3 bg-white border-t border-gray-200`, { bottom: getSafeBottomPosition(insets.bottom) }]}>
           <View style={tw`flex-row items-center`}>
             <TextInput
-              style={tw`flex-1 border border-gray-300 rounded-full px-4 py-2 mr-3 text-base`}
+              style={tw`flex-1 px-4 py-2 mr-3 text-base border border-gray-300 rounded-full`}
               placeholder="Write a reply..."
               value={replyText}
               onChangeText={setReplyText}
@@ -1259,7 +1261,7 @@ const ViewPost: React.FC = () => {
               onPress={handleSendReply}
               disabled={!replyText.trim() || isReplying}
               style={[
-                tw`w-10 h-10 rounded-full items-center justify-center`,
+                tw`items-center justify-center w-10 h-10 rounded-full`,
                 {
                   backgroundColor: replyText.trim() && !isReplying ? Colors.primary.blue : '#D1D5DB'
                 }

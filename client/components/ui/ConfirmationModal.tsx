@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody, ModalFooter } from './modal';
 import { VStack } from './vstack';
 import { HStack } from './hstack';
@@ -33,6 +34,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   type = 'warning',
   isLoading = false
 }) => {
+  const insets = useSafeAreaInsets();
   const getModalConfig = () => {
     switch (type) {
       case 'danger':
@@ -98,7 +100,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           </Text>
         </ModalBody>
         
-        <ModalFooter className="p-4 pt-1">
+        <ModalFooter className="p-4 pt-1" style={{ paddingBottom: Math.max(16, insets.bottom + 8) }}>
           <HStack className="gap-2 w-full">
             <Button 
               variant="outline" 

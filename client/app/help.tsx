@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,12 @@ import {
   KeyboardAvoidingView,
   Animated,
   Modal,
-  Alert,
   Dimensions,
   StatusBar,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from "axios";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 import { NetworkConfig } from "../utils/networkConfig";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../constants/Colors";
@@ -29,7 +27,7 @@ import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 const { width, height } = Dimensions.get("window");
 
 const SkeletonLoader = () => {
-  const animatedValue = new Animated.Value(0);
+  const animatedValue = useMemo(() => new Animated.Value(0), []);
 
   useEffect(() => {
     Animated.loop(
@@ -46,7 +44,7 @@ const SkeletonLoader = () => {
         }),
       ])
     ).start();
-  }, []);
+  }, [animatedValue]);
 
   const opacity = animatedValue.interpolate({
     inputRange: [0, 1],
@@ -78,6 +76,7 @@ const SkeletonLoader = () => {
 };
 
 export default function HelpAndSupport() {
+  const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
   const [errors, setErrors] = useState({
     name: "",
@@ -98,23 +97,31 @@ export default function HelpAndSupport() {
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0));
 
   useEffect(() => {
     if (showEmailForm) {
-      Animated.timing(fadeAnim, {
+      Animated.timing(fadeAnim.current, {
         toValue: 1,
         duration: 300,
         useNativeDriver: true,
       }).start();
     } else {
-      Animated.timing(fadeAnim, {
+      Animated.timing(fadeAnim.current, {
         toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }).start();
     }
   }, [showEmailForm]);
+
+  useEffect(() => {
+    Animated.timing(fadeAnim.current, {
+      toValue: showEmailSentModal ? 1 : 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [showEmailSentModal]);
 
   const faqs = [
     {
@@ -216,7 +223,7 @@ export default function HelpAndSupport() {
   const handleEmailSupport = () => setShowEmailForm(true);
 
   const handleCloseEmailForm = () => {
-    Animated.timing(fadeAnim, {
+    Animated.timing(fadeAnim.current, {
       toValue: 0,
       duration: 250,
       useNativeDriver: true,
@@ -330,7 +337,7 @@ export default function HelpAndSupport() {
       >
         <ScrollView
           style={tw`flex-1`}
-          contentContainerStyle={tw`pb-12`}
+          contentContainerStyle={[tw`px-6`, { paddingBottom: 56 + (insets.bottom || 0) + 20 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -518,7 +525,7 @@ export default function HelpAndSupport() {
         <Animated.View
           style={[
             tw`flex-1 bg-black bg-opacity-50 justify-center items-center`,
-            { opacity: fadeAnim, zIndex: 10, elevation: 10 },
+            { opacity: fadeAnim.current, zIndex: 10, elevation: 10 },
           ]}
         >
           <KeyboardAvoidingView

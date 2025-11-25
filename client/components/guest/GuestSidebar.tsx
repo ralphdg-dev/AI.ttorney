@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Dimensions, Easing } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { 
   Shield,
@@ -39,6 +39,7 @@ interface MenuItem {
  * Includes: Help, About, Privacy, Terms, Exit Guest Mode
  */
 export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) => {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [slideAnim] = useState(() => new Animated.Value(-SIDEBAR_WIDTH));
   const [overlayAnim] = useState(() => new Animated.Value(0));
@@ -190,13 +191,15 @@ export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) =
           styles.sidebar,
           {
             transform: [{ translateX: slideAnim }],
+            paddingTop: insets.top,
+            bottom: insets.bottom,
           },
         ]}
         accessible={true}
         accessibilityRole="menu"
         accessibilityLabel="Guest navigation sidebar"
       >
-        <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+        <View style={{ flex: 1 }}>
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.userInfo}>
@@ -250,7 +253,7 @@ export const GuestSidebar: React.FC<GuestSidebarProps> = ({ isOpen, onClose }) =
             <Text style={styles.footerText}>Ai.ttorney</Text>
             <Text style={styles.footerSubtext}>Justice at Your Fingertips</Text>
           </View>
-        </SafeAreaView>
+        </View>
       </Animated.View>
     </View>
   );

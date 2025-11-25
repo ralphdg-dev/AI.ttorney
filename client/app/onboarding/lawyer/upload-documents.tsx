@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StatusBar, ScrollView, View, Text, TextInput, TouchableOpacity, Image, Alert, Modal, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,9 +11,11 @@ import { lawyerApplicationService } from '../../../services/lawyerApplicationSer
 import { useAuth } from '../../../contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../../constants/Colors';
+import { getContentBottomPadding } from '../../../constants/LayoutConstants';
 
 export default function LawyerReg() {
-  const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [rollNumber, setRollNumber] = useState('');
@@ -27,7 +29,6 @@ export default function LawyerReg() {
   const [showUploadOptions, setShowUploadOptions] = useState(false);
   const [ibpCard, setIbpCard] = useState<any | null>(null);
   const [ibpCardPath, setIbpCardPath] = useState<string>('');
-  const [isUploading, setIsUploading] = useState(false);
   const isComplete = Boolean(firstName.trim() && lastName.trim() && rollNumber.trim() && rollSignDate && ibpCard);
   const today = new Date();
 
@@ -256,7 +257,7 @@ export default function LawyerReg() {
       {/* Main Content */}
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 140 }}
+        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: getContentBottomPadding(insets.bottom, 20) }}
         keyboardShouldPersistTaps="handled"
       >
         {/* Logo */}

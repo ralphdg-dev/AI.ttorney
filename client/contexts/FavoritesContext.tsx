@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { NetworkConfig } from '@/utils/networkConfig';
-import { useToast, Toast, ToastTitle } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/toast';
+import { createSafeAreaToastRenderer } from '@/components/ui/SafeAreaToast';
 
 const API_BASE_URL = NetworkConfig.getApiUrl();
 
@@ -50,11 +51,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
         toast.show({
           placement: 'top',
           duration: 2000,
-          render: ({ id }) => (
-            <Toast nativeID={id} action="muted" variant="outline">
-              <ToastTitle>Login required</ToastTitle>
-            </Toast>
-          ),
+          render: createSafeAreaToastRenderer('top', 'muted', 'outline', 'Login required'),
         });
         return;
       }
@@ -86,11 +83,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
           toast.show({
             placement: 'top',
             duration: 2000,
-            render: ({ id }) => (
-              <Toast nativeID={id} action="error" variant="outline">
-                <ToastTitle>Failed to remove</ToastTitle>
-              </Toast>
-            ),
+            render: createSafeAreaToastRenderer('top', 'error', 'outline', 'Failed to remove'),
           });
         }
       } else {
@@ -112,11 +105,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
           toast.show({
             placement: 'top',
             duration: 2000,
-            render: ({ id }) => (
-              <Toast nativeID={id} action="error" variant="outline">
-                <ToastTitle>Failed to add</ToastTitle>
-              </Toast>
-            ),
+            render: createSafeAreaToastRenderer('top', 'error', 'outline', 'Failed to add'),
           });
         }
       }

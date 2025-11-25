@@ -3,7 +3,8 @@ import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, clearAuthStorage } from '../config/supabase';
 import { router, useSegments } from 'expo-router';
 import { getRoleBasedRedirect } from '../config/routes';
-import { useToast, Toast, ToastTitle, ToastDescription } from '../components/ui/toast';
+import { useToast } from '@/components/ui/toast';
+import { createSafeAreaToastRenderer } from '@/components/ui/SafeAreaToast';
 import { NetworkConfig } from '../utils/networkConfig';
 
 // Role hierarchy based on backend schema
@@ -160,16 +161,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Auth timeout');
       toast.show({
         placement: 'top',
-        render: ({ id }) => {
-          return (
-            <Toast nativeID={id} action="warning" variant="solid">
-              <ToastTitle>Authentication Timeout</ToastTitle>
-              <ToastDescription>
-                Sign in is taking longer than expected. Please check your connection and try again.
-              </ToastDescription>
-            </Toast>
-          );
-        },
+        render: createSafeAreaToastRenderer(
+          'top', 
+          'warning', 
+          'solid', 
+          'Authentication Timeout',
+          'Sign in is taking longer than expected. Please check your connection and try again.'
+        ),
       });
       setIsLoading(false);
     }, 15000);

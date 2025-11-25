@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, ScrollView, TouchableOpacity, StatusBar } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,6 +48,7 @@ const cardShadowStyle = createShadowStyle({
 });
 
 export default function SettingsScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -170,7 +171,7 @@ export default function SettingsScreen() {
 
       <ScrollView
         style={tw`flex-1`}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 56 + (insets.bottom || 0) + 20 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Section */}

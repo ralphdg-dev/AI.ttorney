@@ -7,7 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../config/supabase';
@@ -19,8 +19,10 @@ import {
   CalendarCheck,
   ArrowRight,
 } from 'lucide-react-native';
+import { getContentBottomPadding } from '../../constants/LayoutConstants';
 
 export default function RegisteredOnboardingTutorial() {
+  const insets = useSafeAreaInsets();
   const { user, session, setUser } = useAuth();
   const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -130,7 +132,7 @@ export default function RegisteredOnboardingTutorial() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={[styles.scrollView, { paddingBottom: getContentBottomPadding(insets.bottom, 20) }]} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>

@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, ScrollView, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'tailwind-react-native-classnames';
 import { useRouter, usePathname } from 'expo-router';
 import Header from '@/components/Header';
@@ -32,6 +32,7 @@ const Section: React.FC<{ title: string; children: React.ReactNode; icon?: strin
 );
 
 export default function AboutScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
   const { user, isAuthenticated } = useAuth();
@@ -55,7 +56,7 @@ export default function AboutScreen() {
 
       <ScrollView
         style={tw`flex-1`}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 56 + (insets.bottom || 0) + 20 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Title */}

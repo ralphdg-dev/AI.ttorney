@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, memo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar } from "react-native";
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import tw from 'tailwind-react-native-classnames';
 import Colors from '../../constants/Colors';
@@ -19,6 +19,7 @@ import { AuthGuard } from '../../components/AuthGuard';
 const LawyerDashboard: React.FC = () => {
   const router = useRouter();
   const { session, user } = useAuth();
+  const insets = useSafeAreaInsets();
   
   // Custom hook handles all data fetching logic
   const { loading, stats, recentConsultations, acceptedConsultations } = useLawyerDashboard(
@@ -119,10 +120,11 @@ const LawyerDashboard: React.FC = () => {
           />
         
         <ScrollView 
-          style={tw`flex-1 pb-24`} 
+          style={tw`flex-1`} 
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}
           scrollEventThrottle={16}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 56 + (insets.bottom || 0) + 20 }}
         >
           {/* Welcome Section - Presentational Component */}
           <DashboardWelcome date={currentDate} lawyerName={lawyerName} />

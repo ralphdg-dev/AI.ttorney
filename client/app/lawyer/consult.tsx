@@ -7,7 +7,7 @@ import {
   Alert,
   StatusBar,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from "expo-router";
 import {
   MessageCircle,
@@ -27,7 +27,8 @@ import tw from "tailwind-react-native-classnames";
 import Colors from "../../constants/Colors";
 import { NetworkConfig } from "../../utils/networkConfig";
 import { formatConsultationTime } from "../../utils/consultationUtils";
-import { useToast, Toast, ToastTitle, ToastDescription } from "../../components/ui/toast";
+import { useToast } from "@/components/ui/toast";
+import { createSafeAreaToastRenderer } from "@/components/ui/SafeAreaToast";
 
 interface ConsultationRequest {
   id: string;
@@ -50,6 +51,7 @@ interface ConsultationRequest {
 }
 
 const LawyerConsultPage: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, session } = useAuth();
   const toast = useToast();
@@ -300,13 +302,12 @@ const LawyerConsultPage: React.FC = () => {
         toast.show({
           placement: 'top',
           duration: 3000,
-          render: ({ id }) => (
-            <Toast nativeID={id} action="success" variant="solid">
-              <ToastTitle>Success!</ToastTitle>
-              <ToastDescription>
-                Consultation {confirmationModal.actionType}ed successfully
-              </ToastDescription>
-            </Toast>
+          render: createSafeAreaToastRenderer(
+            'top',
+            'success',
+            'solid',
+            'Success!',
+            `Consultation ${confirmationModal.actionType}ed successfully`
           ),
         });
       } else {
@@ -314,13 +315,12 @@ const LawyerConsultPage: React.FC = () => {
         toast.show({
           placement: 'top',
           duration: 4000,
-          render: ({ id }) => (
-            <Toast nativeID={id} action="error" variant="solid">
-              <ToastTitle>Error</ToastTitle>
-              <ToastDescription>
-                Failed to {confirmationModal.actionType} consultation
-              </ToastDescription>
-            </Toast>
+          render: createSafeAreaToastRenderer(
+            'top',
+            'error',
+            'solid',
+            'Error',
+            `Failed to ${confirmationModal.actionType} consultation`
           ),
         });
       }
@@ -331,13 +331,12 @@ const LawyerConsultPage: React.FC = () => {
       toast.show({
         placement: 'top',
         duration: 4000,
-        render: ({ id }) => (
-          <Toast nativeID={id} action="error" variant="solid">
-            <ToastTitle>Error</ToastTitle>
-            <ToastDescription>
-              Failed to {confirmationModal.actionType} consultation. Please try again.
-            </ToastDescription>
-          </Toast>
+        render: createSafeAreaToastRenderer(
+          'top',
+          'error',
+          'solid',
+          'Error',
+          `Failed to ${confirmationModal.actionType} consultation. Please try again.`
         ),
       });
     } finally {
@@ -382,7 +381,7 @@ const LawyerConsultPage: React.FC = () => {
 
       <ScrollView
         style={tw`flex-1`}
-        contentContainerStyle={tw`pb-24`}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 56 + (insets.bottom || 0) + 20 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Enhanced Stats Grid */}

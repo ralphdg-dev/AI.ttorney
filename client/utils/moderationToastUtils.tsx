@@ -1,13 +1,11 @@
 /**
  * Utility functions for displaying moderation-related toast notifications
- * Eliminates code duplication across components
+ * 
  * @module moderationToastUtils
  */
 
 import React from 'react';
-import { View } from 'react-native';
-import { Toast, ToastTitle, ToastDescription } from '@/components/ui/toast';
-
+import { createSafeAreaToastRenderer } from '@/components/ui/SafeAreaToast';
 type ToastAction = 'error' | 'warning' | 'success' | 'info' | 'muted';
 
 interface ToastInstance {
@@ -36,14 +34,7 @@ export const showModerationToast = (
   toast.show({
     placement: 'top',
     duration,
-    render: ({ id }) => {
-      return (
-        <Toast nativeID={id} action={action} variant="solid">
-          <ToastTitle>{title}</ToastTitle>
-          <ToastDescription>{description}</ToastDescription>
-        </Toast>
-      );
-    },
+    render: createSafeAreaToastRenderer('top', action, 'solid', title, description),
   });
 };
 
@@ -139,19 +130,6 @@ export const showContentValidationToast = (
   toast.show({
     placement: 'bottom',
     duration,
-    render: ({ id }) => {
-      return (
-        <View style={{ marginBottom: 80 }}>
-          <Toast 
-            nativeID={id} 
-            action={action} 
-            variant="solid"
-          >
-            <ToastTitle>{title}</ToastTitle>
-            <ToastDescription>{description}</ToastDescription>
-          </Toast>
-        </View>
-      );
-    },
+    render: createSafeAreaToastRenderer('bottom', action, 'solid', title, description),
   });
 };

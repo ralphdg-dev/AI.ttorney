@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, Image, KeyboardAvoidingView, Platform, ActivityIndicator, Dimensions, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import tw from 'tailwind-react-native-classnames';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../lib/api-client';
-import { useToast, Toast, ToastTitle, ToastDescription } from '../../components/ui/toast';
-import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from "@/components/ui/toast";
+import { createSafeAreaToastRenderer } from "@/components/ui/SafeAreaToast";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../constants/Colors';
 import TermsOfServiceModal from '../../components/common/TermsOfServiceModal';
+import { getContentBottomPadding, getSafeBottomPosition } from '../../constants/LayoutConstants';
 
 export default function UserRegistration() {
+  const insets = useSafeAreaInsets();
   const toast = useToast();
-  const { signUp } = useAuth();
   
   // Screen dimensions for responsive design
   const { width: screenWidth } = Dimensions.get('window');
@@ -93,13 +93,6 @@ export default function UserRegistration() {
     }
   };
 
-  // Calculate minimum allowed birthdate (18 years ago)
-  const getMinimumBirthdate = () => {
-    const today = new Date();
-    const minDate = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
-    return minDate;
-  };
-
   // Validation functions
   const validateEmail = async (emailValue: string) => {
     // Clear any existing timeout
@@ -138,11 +131,12 @@ export default function UserRegistration() {
             setEmailStatus('taken');
             toast.show({
               placement: "top",
-              render: ({ id }) => (
-                <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-                  <ToastTitle size="md">Email Already Exists</ToastTitle>
-                  <ToastDescription size="sm">This email is already registered. Please use a different email or sign in instead.</ToastDescription>
-                </Toast>
+              render: createSafeAreaToastRenderer(
+                'top',
+                'error',
+                'solid',
+                'Email Already Exists',
+                'This email is already registered. Please use a different email or sign in instead.'
               ),
             });
           } else {
@@ -203,11 +197,12 @@ export default function UserRegistration() {
             setUsernameStatus('taken');
             toast.show({
               placement: "top",
-              render: ({ id }) => (
-                <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-                  <ToastTitle size="md">Username Taken</ToastTitle>
-                  <ToastDescription size="sm">This username is already taken. Please choose a different username.</ToastDescription>
-                </Toast>
+              render: createSafeAreaToastRenderer(
+                'top',
+                'error',
+                'solid',
+                'Username Taken',
+                'This username is already taken. Please choose a different username.'
               ),
             });
           } else {
@@ -318,7 +313,7 @@ export default function UserRegistration() {
           className="flex-1"
           contentContainerStyle={{ 
             paddingHorizontal: horizontalPadding, 
-            paddingBottom: 32, 
+            paddingBottom: getContentBottomPadding(insets.bottom, 20), 
             flexGrow: 1, 
             alignItems: isDesktop || isTablet ? 'center' : 'stretch' 
           }}
@@ -605,11 +600,12 @@ export default function UserRegistration() {
             if (!isComplete) {
               toast.show({
                 placement: "top",
-                render: ({ id }) => (
-                  <Toast nativeID={id} action="warning" variant="solid" className="mt-12">
-                    <ToastTitle size="md">Form Incomplete</ToastTitle>
-                    <ToastDescription size="sm">Please fill in all required fields and fix any validation errors.</ToastDescription>
-                  </Toast>
+                render: createSafeAreaToastRenderer(
+                  'top',
+                  'warning',
+                  'solid',
+                  'Form Incomplete',
+                  'Please fill in all required fields and fix any validation errors.'
                 ),
               });
               return;
@@ -618,11 +614,12 @@ export default function UserRegistration() {
             if (validationLoading.email || validationLoading.username) {
               toast.show({
                 placement: "top",
-                render: ({ id }) => (
-                  <Toast nativeID={id} action="info" variant="solid" className="mt-12">
-                    <ToastTitle size="md">Validating...</ToastTitle>
-                    <ToastDescription size="sm">Please wait while we validate your information.</ToastDescription>
-                  </Toast>
+                render: createSafeAreaToastRenderer(
+                  'top',
+                  'info',
+                  'solid',
+                  'Validating...',
+                  'Please wait while we validate your information.'
                 ),
               });
               return;
@@ -643,11 +640,12 @@ export default function UserRegistration() {
               if (!signUpResult.success) {
                 toast.show({
                   placement: "top",
-                  render: ({ id }) => (
-                    <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-                      <ToastTitle size="md">Registration Failed</ToastTitle>
-                      <ToastDescription size="sm">{signUpResult.error || 'Failed to create account'}</ToastDescription>
-                    </Toast>
+                  render: createSafeAreaToastRenderer(
+                    'top',
+                    'error',
+                    'solid',
+                    'Registration Failed',
+                    signUpResult.error || 'Failed to create account'
                   ),
                 });
                 setLoading(false);
@@ -666,11 +664,12 @@ export default function UserRegistration() {
               if (otpResult.error) {
                 toast.show({
                   placement: "top",
-                  render: ({ id }) => (
-                    <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-                      <ToastTitle size="md">Verification Email Failed</ToastTitle>
-                      <ToastDescription size="sm">{otpResult.error}</ToastDescription>
-                    </Toast>
+                  render: createSafeAreaToastRenderer(
+                    'top',
+                    'error',
+                    'solid',
+                    'Verification Email Failed',
+                    otpResult.error
                   ),
                 });
                 setLoading(false);
@@ -680,11 +679,12 @@ export default function UserRegistration() {
               // Show success toast
               toast.show({
                 placement: "top",
-                render: ({ id }) => (
-                  <Toast nativeID={id} action="success" variant="solid" className="mt-12">
-                    <ToastTitle size="md">Account Created!</ToastTitle>
-                    <ToastDescription size="sm">Please check your email for the verification code.</ToastDescription>
-                  </Toast>
+                render: createSafeAreaToastRenderer(
+                  'top',
+                  'success',
+                  'solid',
+                  'Account Created!',
+                  'Please check your email for the verification code.'
                 ),
               });
               
@@ -696,11 +696,12 @@ export default function UserRegistration() {
               console.error('Registration error:', error);
               toast.show({
                 placement: "top",
-                render: ({ id }) => (
-                  <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-                    <ToastTitle size="md">Connection Error</ToastTitle>
-                    <ToastDescription size="sm">Please check your internet connection and try again.</ToastDescription>
-                  </Toast>
+                render: createSafeAreaToastRenderer(
+                  'top',
+                  'error',
+                  'solid',
+                  'Connection Error',
+                  'Please check your internet connection and try again.'
                 ),
               });
             } finally {
@@ -737,6 +738,7 @@ export default function UserRegistration() {
         >
           <TouchableOpacity 
             className={`bg-white rounded-t-2xl max-h-4/5 ${isDesktop ? 'px-15' : isTablet ? 'px-10' : 'px-6'} pt-6`}
+            style={{ paddingBottom: getSafeBottomPosition(insets.bottom, 20) }}
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
           >

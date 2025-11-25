@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PrimaryButton from './PrimaryButton';
+import { getSafeBottomPosition } from '../../constants/LayoutConstants';
 
 interface StickyFooterButtonProps {
   title: string;
@@ -15,8 +17,10 @@ export default function StickyFooterButton({
   disabled = false,
   bottomOffset = 0,
 }: StickyFooterButtonProps) {
+  const insets = useSafeAreaInsets();
+  
   return (
-    <View style={[styles.container, { bottom: bottomOffset, pointerEvents: 'box-none' }]}>
+    <View style={[styles.container, { bottom: getSafeBottomPosition(insets.bottom, bottomOffset), pointerEvents: 'box-none' }]}>
       <View style={styles.divider} />
       <View style={styles.innerPad}>
         <PrimaryButton title={title} onPress={onPress} disabled={disabled} />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
 
 import { View, FlatList, RefreshControl, TouchableOpacity, Animated, StyleSheet, ListRenderItem } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NetworkConfig } from '../../utils/networkConfig';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Plus } from 'lucide-react-native';
@@ -52,10 +53,12 @@ interface TimelineProps {
 }
 
 export interface TimelineHandle {
-  scrollToTop: () => void;
+  context?: 'user' | 'lawyer';
 }
 
 const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }, ref) => {
+
+  const insets = useSafeAreaInsets();
 
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
@@ -766,7 +769,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
           ref={listRef}
           {...listProps}
           style={styles.timeline}
-          contentContainerStyle={allPosts.length === 0 ? styles.emptyContent : styles.timelineContent}
+          contentContainerStyle={allPosts.length === 0 ? styles.emptyContent : [styles.timelineContent, { paddingBottom: 56 + (insets.bottom || 0) + 20 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={refreshControl}
           ListHeaderComponent={null}
@@ -812,7 +815,7 @@ const styles = StyleSheet.create({
   },
   timelineContent: {
     paddingTop: 10,
-    paddingBottom: 100, // Account for bottom navigation
+    // Dynamic bottom padding handled inline
   },
   emptyContent: {
     flexGrow: 1,

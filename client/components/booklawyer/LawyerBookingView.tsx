@@ -15,7 +15,8 @@ import { Box } from "@/components/ui/box";
 import { Text } from "@/components/ui/text";
 import { ScrollView } from "@/components/ui/scroll-view";
 import { Pressable } from "@/components/ui/pressable";
-import { useToast, Toast, ToastTitle, ToastDescription } from '@/components/ui/toast';
+import { useToast } from "@/components/ui/toast";
+import { createSafeAreaToastRenderer } from "@/components/ui/SafeAreaToast";
 import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/modal';
 import { Heading } from '@/components/ui/heading';
 import { Icon } from '@/components/ui/icon';
@@ -288,13 +289,12 @@ export default function LawyerBookingView() {
       toast.show({
         placement: 'top',
         duration: 4000,
-        render: ({ id }) => (
-          <Toast nativeID={id} action="warning" variant="solid">
-            <ToastTitle>Date Not Available</ToastTitle>
-            <ToastDescription>
-              Same-day consultations are not available. Please select a future date.
-            </ToastDescription>
-          </Toast>
+        render: createSafeAreaToastRenderer(
+          'top',
+          'warning',
+          'solid',
+          'Date Not Available',
+          'Same-day consultations are not available. Please select a future date.'
         ),
       });
     }
@@ -688,13 +688,12 @@ export default function LawyerBookingView() {
       toast.show({
         placement: 'top',
         duration: 4000,
-        render: ({ id }) => (
-          <Toast nativeID={id} action="success" variant="solid">
-            <ToastTitle>Request Sent!</ToastTitle>
-            <ToastDescription>
-              Your consultation request has been submitted. The lawyer will review it shortly.
-            </ToastDescription>
-          </Toast>
+        render: createSafeAreaToastRenderer(
+          'top',
+          'success',
+          'solid',
+          'Request Sent!',
+          'Your consultation request has been submitted. The lawyer will review it shortly.'
         ),
       });
       
@@ -709,13 +708,12 @@ export default function LawyerBookingView() {
       toast.show({
         placement: 'top',
         duration: 5000,
-        render: ({ id }) => (
-          <Toast nativeID={id} action="error" variant="solid">
-            <ToastTitle>Request Failed</ToastTitle>
-            <ToastDescription>
-              {error.message || 'Failed to submit consultation request. Please try again.'}
-            </ToastDescription>
-          </Toast>
+        render: createSafeAreaToastRenderer(
+          'top',
+          'error',
+          'solid',
+          'Request Failed',
+          error.message || 'Failed to submit consultation request. Please try again.'
         ),
       });
     } finally {

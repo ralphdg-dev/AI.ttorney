@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { View, StatusBar, Text, ScrollView, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../../../components/Header';
 import StickyFooterButton from '../../../components/ui/StickyFooterButton';
 import { router } from 'expo-router';
 import Colors from '../../../constants/Colors';
 import { lawyerApplicationService } from '../../../services/lawyerApplicationService';
+import { getContentBottomPadding } from '../../../constants/LayoutConstants';
 
 export default function LawyerTerms() {
+  const insets = useSafeAreaInsets();
   const [enabled, setEnabled] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(5);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -125,7 +127,7 @@ export default function LawyerTerms() {
       />
 
       {/* Terms content */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 100 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: getContentBottomPadding(insets.bottom, 20) }}>
         <Text style={{ fontSize: 22, fontWeight: '700', color: '#111827', marginBottom: 8 }}>
           Terms of Use for Lawyer Users
         </Text>
@@ -135,7 +137,7 @@ export default function LawyerTerms() {
         {/* Introduction */}
         <View style={{ marginBottom: 16 }}>
           <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20, marginBottom: 8 }}>
-            Welcome to Ai.ttorney ("we," "our," or "us"). These Terms of Use ("Terms") govern your access to and use of the Ai.ttorney platform as a Lawyer User. By registering or using the platform, you agree to comply with these Terms and applicable laws, including the Code of Professional Responsibility and Accountability (CPRA) of the Integrated Bar of the Philippines (IBP).
+            Welcome to Ai.ttorney (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). These Terms of Use (&quot;Terms&quot;) govern your access to and use of the Ai.ttorney platform as a Lawyer User. By registering or using the platform, you agree to comply with these Terms and applicable laws, including the Code of Professional Responsibility and Accountability (CPRA) of the Integrated Bar of the Philippines (IBP).
           </Text>
           <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20 }}>
             If you do not agree, please do not use Ai.ttorney.
@@ -146,7 +148,7 @@ export default function LawyerTerms() {
         <View style={{ marginBottom: 16 }}>
           <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 6 }}>1. Purpose of the Platform</Text>
           <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20, marginBottom: 8 }}>
-            Ai.ttorney is a legal literacy and access-to-justice platform that connects verified legal professionals ("Lawyer Users") with individuals seeking general legal assistance ("Legal Seekers").
+            Ai.ttorney is a legal literacy and access-to-justice platform that connects verified legal professionals (&quot;Lawyer Users&quot;) with individuals seeking general legal assistance (&quot;Legal Seekers&quot;).
           </Text>
           <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20, marginBottom: 4 }}>
             The Platform allows lawyers to:
@@ -218,8 +220,8 @@ export default function LawyerTerms() {
             You must:
           </Text>
           <View style={{ paddingLeft: 12 }}>
-            <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20 }}>• Respect the privacy and confidentiality of any Legal Seeker data shared through Ai.ttorney</Text>
-            <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20 }}>• Avoid requesting or collecting unnecessary personal or case details beyond what's required for scheduling</Text>
+            <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20 }}>• Respect the privacy and confidentiality of any Legal Seeker data shared through &quot;Ai.ttorney&quot;</Text>
+            <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20 }}>• Avoid requesting or collecting unnecessary personal or case details beyond what&apos;s required for scheduling</Text>
             <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20 }}>• Handle any received information responsibly and in accordance with the Data Privacy Act of 2012 (RA 10173)</Text>
           </View>
         </View>
@@ -229,8 +231,8 @@ export default function LawyerTerms() {
           <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 6 }}>6. Liability Disclaimer</Text>
           <View style={{ paddingLeft: 12 }}>
             <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20 }}>• Ai.ttorney is not responsible for any interaction, communication, or outcome arising from consultations</Text>
-            <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20 }}>• Ai.ttorney does not verify, endorse, or monitor the legal advice or assistance given by Lawyer Users</Text>
-            <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20 }}>• You acknowledge that any professional relationship that may form after a consultation occurs outside Ai.ttorney's scope and responsibility</Text>
+            <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20 }}>• &quot;Ai.ttorney&quot; does not verify, endorse, or monitor the legal advice or assistance given by Lawyer Users</Text>
+            <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20 }}>• You acknowledge that any professional relationship that may form after a consultation occurs outside Ai.ttorney&apos;s scope and responsibility</Text>
             <Text style={{ fontSize: 14, color: '#4b5563', lineHeight: 20 }}>• Ai.ttorney shall not be liable for any claims, losses, damages, or disputes between Lawyer Users and Legal Seekers</Text>
           </View>
         </View>

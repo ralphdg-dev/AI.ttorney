@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, KeyboardAvoidingView, Platform, StatusBar } from "react-native";
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from "expo-router";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../constants/Colors";
@@ -9,8 +9,10 @@ import logo from "../assets/images/logo.png";
 import { useToast, Toast, ToastTitle, ToastDescription } from "../components/ui/toast";
 import { useAuth } from "../contexts/AuthContext";
 import { useGuest } from "../contexts/GuestContext";
+import { getContentBottomPadding } from "../constants/LayoutConstants";
 
 export default function Login() {
+  const insets = useSafeAreaInsets();
   const toast = useToast();
   const { signIn, isAuthenticated } = useAuth();
   const { startGuestSession, isStartingSession, setShowTutorial } = useGuest();
@@ -169,7 +171,7 @@ export default function Login() {
         >
           <ScrollView
             style={tw`flex-1`}
-            contentContainerStyle={tw`flex-grow`}
+            contentContainerStyle={[tw`flex-grow`, { paddingBottom: getContentBottomPadding(insets.bottom, 20) }]}
             keyboardShouldPersistTaps="handled"
           >
 

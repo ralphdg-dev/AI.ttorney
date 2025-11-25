@@ -10,6 +10,18 @@ import { Platform } from 'react-native';
  */
 
 /**
+ * Get safe bottom position for fixed/absolute positioned components
+ * FAANG-standard utility for bottom positioning with safe area support
+ * 
+ * @param safeAreaBottom - Safe area bottom inset from useSafeAreaInsets()
+ * @param additionalOffset - Additional offset if needed (default: 0)
+ * @returns Safe bottom position value
+ */
+export const getSafeBottomPosition = (safeAreaBottom: number, additionalOffset: number = 0): number => {
+  return (safeAreaBottom || 0) + additionalOffset;
+};
+
+/**
  * Core layout dimensions (in dp/pt)
  * Based on Material Design 3 and iOS HIG standards
  */

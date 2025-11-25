@@ -1,24 +1,23 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, StatusBar, Image } from 'react-native';
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Save,
   X,
   User,
   Camera,
-  Image as ImageIcon,
 } from "lucide-react-native";
 import * as ImagePicker from 'expo-image-picker';
 import Navbar from "../../components/Navbar";
 import Colors from "../../constants/Colors";
 import { useAuth } from "../../contexts/AuthContext";
-import AuthGuard from "../../components/AuthGuard";
+import { AuthGuard } from "../../components/AuthGuard";
 import tw from "tailwind-react-native-classnames";
 import { supabase } from "../../config/supabase";
 import { useRouter, usePathname } from "expo-router";
-import { useToast, Toast, ToastTitle, ToastDescription } from "../../components/ui/toast";
-import { Avatar, AvatarImage, AvatarFallbackText } from "../../components/ui/avatar";
-import { VStack } from "../../components/ui/vstack";
+import { useToast } from "@/components/ui/toast";
+import { createSafeAreaToastRenderer } from "@/components/ui/SafeAreaToast";
+import { Avatar, AvatarFallbackText } from "../../components/ui/avatar";
 import { createShadowStyle } from "../../utils/shadowUtils";
 import { NetworkConfig } from "../../utils/networkConfig";
 import { safeGoBack } from '../../utils/navigationHelper';
@@ -106,7 +105,8 @@ const makeApiRequest = async ({ method, endpoint, body, timeout = DEFAULT_TIMEOU
   }
 };
 
-export default function EditProfilePage() {
+export default function EditProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { user, isAuthenticated, refreshUserData } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -289,7 +289,7 @@ export default function EditProfilePage() {
       const arrayBuffer = await response.arrayBuffer();
       
       // Upload to Supabase storage using ArrayBuffer
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('user-profile-pics')
         .upload(fileName, arrayBuffer, {
           contentType: `image/${fileExtension}`,
@@ -534,13 +534,12 @@ export default function EditProfilePage() {
       toast.show({
         placement: "top",
         duration: 3000,
-        render: ({ id }) => (
-          <Toast nativeID={`toast-${id}`} action="success" variant="solid">
-            <VStack space="xs">
-              <ToastTitle>OTP Sent!</ToastTitle>
-              <ToastDescription>Check your email for the verification code.</ToastDescription>
-            </VStack>
-          </Toast>
+        render: createSafeAreaToastRenderer(
+          'top',
+          'success',
+          'solid',
+          'OTP Sent!',
+          'Check your email for the verification code.'
         ),
       });
     } catch (error: any) {
@@ -585,13 +584,12 @@ export default function EditProfilePage() {
       toast.show({
         placement: "top",
         duration: 2000,
-        render: ({ id }) => (
-          <Toast nativeID={`toast-${id}`} action="success" variant="solid">
-            <VStack space="xs">
-              <ToastTitle>Email Verified!</ToastTitle>
-              <ToastDescription>You can now save your changes.</ToastDescription>
-            </VStack>
-          </Toast>
+        render: createSafeAreaToastRenderer(
+          'top',
+          'success',
+          'solid',
+          'Email Verified!',
+          'You can now save your changes.'
         ),
       });
     } catch (error: any) {
@@ -662,7 +660,7 @@ export default function EditProfilePage() {
         if (uploadedUrl) {
           profilePhotoUrl = uploadedUrl;
         }
-      } catch (error) {
+      } catch {
         Alert.alert('Error', 'Failed to upload profile photo. Please try again.');
         setIsSaving(false);
         return;
@@ -704,7 +702,7 @@ export default function EditProfilePage() {
         throw new Error(errorData.detail || 'Failed to update profile');
       }
 
-      const responseData = await response.json();
+      await response.json();
 
       // Refresh the user profile to get updated data
       if (refreshUserData) {
@@ -714,13 +712,12 @@ export default function EditProfilePage() {
       toast.show({
         placement: "top",
         duration: 3000,
-        render: ({ id }) => (
-          <Toast nativeID={`toast-${id}`} action="success" variant="solid">
-            <VStack space="xs">
-              <ToastTitle>Profile Updated!</ToastTitle>
-              <ToastDescription>Your changes have been saved successfully.</ToastDescription>
-            </VStack>
-          </Toast>
+        render: createSafeAreaToastRenderer(
+          'top',
+          'success',
+          'solid',
+          'Profile Updated!',
+          'Your changes have been saved successfully.'
         ),
       });
 
@@ -796,7 +793,7 @@ export default function EditProfilePage() {
       <ScrollView
         style={tw`flex-1`}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={tw`pb-28`}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 56 + (insets.bottom || 0) + 20 }}
       >
         {/* Profile Photo Section */}
         <View style={[tw`bg-white mx-4 mt-4 p-6 rounded-lg`, cardStyle]}>

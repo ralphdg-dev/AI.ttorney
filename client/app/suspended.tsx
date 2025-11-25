@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { AlertTriangle, LogOut, Hourglass, Info, EyeOff, ShieldAlert, MessageSquare, CheckCircle, XCircle, Clock } from 'lucide-react-native';
 import { NetworkConfig } from '../utils/networkConfig';
 import { appealService, Appeal } from '../services/appealService';
+import { getSafeBottomPosition } from '../constants/LayoutConstants';
 
 interface SuspensionInfo {
   suspension_count: number;
@@ -407,7 +408,7 @@ export default function SuspendedScreen() {
           onRequestClose={() => setShowAppealModal(false)}
         >
           <View className="flex-1 justify-end bg-black/50">
-            <View className="bg-white rounded-t-2xl p-5">
+            <View className="bg-white rounded-t-2xl p-5" style={{ paddingBottom: getSafeBottomPosition(insets.bottom, 20) }}>
               <Text className="text-base font-bold text-gray-900 mb-4">Submit an Appeal</Text>
 
               <View className="mb-4">

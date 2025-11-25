@@ -9,7 +9,7 @@ import {
   Alert,
   StatusBar,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
 import {
   Settings,
@@ -29,7 +29,7 @@ import Colors from "../../constants/Colors";
 import { useAuth } from "../../contexts/AuthContext";
 import { AuthGuard } from "../../components/AuthGuard";
 import tw from "tailwind-react-native-classnames";
-import { useLawyerProfile, TimeSlot } from "../../services/lawyerProfileServices";
+import { TimeSlot } from "../../services/lawyerProfileServices";
 import { supabase } from "../../config/supabase";
 import { useRouter } from "expo-router";
 
@@ -81,6 +81,7 @@ for (let h = 0; h < 24; h++) {
 }
 
 const LawyerProfilePage: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, signOut, refreshUserData } = useAuth();
   
@@ -119,7 +120,7 @@ const LawyerProfilePage: React.FC = () => {
     }
   );
 
-  const { saveProfile } = useLawyerProfile();
+  // const { saveProfile } = useLawyerProfile(); // TODO: Implement save functionality
 
   const [availabilitySlots, setAvailabilitySlots] = useState<TimeSlot[]>([
     {
@@ -800,7 +801,7 @@ const LawyerProfilePage: React.FC = () => {
       <ScrollView
         style={tw`flex-1`}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={tw`pb-24`}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 56 + (insets.bottom || 0) + 20 }}
       >
         <View style={tw`p-4 bg-white border-b border-gray-200`}>
           <View style={tw`flex-row items-center`}>

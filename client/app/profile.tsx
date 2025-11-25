@@ -6,7 +6,7 @@ import {
   ScrollView,
   StatusBar,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Settings,
   Edit,
@@ -77,6 +77,7 @@ export default function UserProfilePage() {
   const { user, signOut, refreshUserData } = useAuth();
   const router = useRouter();
   const hasRefreshed = useRef(false);
+  const insets = useSafeAreaInsets();
 
   // Background refresh once on mount
   useEffect(() => {
@@ -123,7 +124,7 @@ export default function UserProfilePage() {
       <ScrollView 
         style={[tw`flex-1`, { backgroundColor: Colors.background.secondary }]} 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={tw`pb-20`}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 56 + (insets.bottom || 0) + 20 }}
       >
         {/* Profile Header */}
         <View style={[tw`bg-white px-6 py-8`, cardStyle]}>

@@ -9,6 +9,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getContentBottomPadding } from '../constants/LayoutConstants';
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
 import { HStack } from "@/components/ui/hstack";
@@ -26,7 +27,6 @@ import { SidebarWrapper, useSidebar } from "@/components/AppSidebar";
 import { useLegalArticles } from "@/hooks/useLegalArticles";
 import {
   CacheService,
-  generateGlossaryCacheKey,
 } from "@/services/cacheService";
 import { NetworkConfig } from "@/utils/networkConfig";
 import { useGuest } from "../contexts/GuestContext";
@@ -73,7 +73,7 @@ export default function GlossaryScreen() {
     searchArticles 
   } = useLegalArticles();
   const [displayArticles, setDisplayArticles] = useState<ArticleItem[]>([]);
-  const [isSearchingArticles, setIsSearchingArticles] = useState<boolean>(false);
+  const [isSearchingArticles] = useState<boolean>(false);
   const { isBookmarked, toggleBookmark } = useBookmarks();
   
   // Animation and layout
@@ -640,10 +640,10 @@ export default function GlossaryScreen() {
           ListFooterComponent={renderPaginationControls}
           ListEmptyComponent={renderEmptyState}
           contentContainerStyle={{
-            paddingHorizontal: horizontalPadding,
-            paddingBottom: isDesktop ? 120 : isTablet ? 110 : 100,
-            paddingTop: isDesktop ? 8 : isTablet ? 6 : 4,
-            flexGrow: 1,
+              paddingHorizontal: horizontalPadding,
+              paddingBottom: getContentBottomPadding(insets.bottom, 20),
+              paddingTop: isDesktop ? 8 : isTablet ? 6 : 4,
+              flexGrow: 1,
           }}
           columnWrapperStyle={
             numColumns > 1

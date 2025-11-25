@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { View, FlatList, useWindowDimensions, TouchableOpacity, StatusBar } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
@@ -9,7 +9,7 @@ import { Text as GSText } from "@/components/ui/text";
 import { Ionicons } from "@expo/vector-icons";
 import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 import Colors from "@/constants/Colors";
-import { LAYOUT } from "@/constants/LayoutConstants";
+import { getContentBottomPadding } from "@/constants/LayoutConstants";
 import CategoryScroller from "@/components/glossary/CategoryScroller";
 import Navbar from "@/components/Navbar";
 import { GuestNavbar, GuestSidebar } from "@/components/guest";
@@ -21,9 +21,11 @@ import { useGuest } from "../contexts/GuestContext";
 import { useBookmarks } from "@/contexts/BookmarksContext";
 
 export default function GuidesScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isGuestMode } = useGuest();
-  const { openSidebar } = useSidebar();
+  const sidebar = useSidebar();
+  const { openSidebar } = sidebar || {};
   const { articles: legalArticles, loading, error, refetch, getArticlesByCategory, searchArticles } = useLegalArticles();
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -35,13 +37,11 @@ export default function GuidesScreen() {
   const { width } = useWindowDimensions();
   
   const ARTICLES_PER_PAGE = 8;
-  const cardGap = LAYOUT.SPACING.md; // 16
   
-  // FAANG approach: Always 1 column on mobile for better UX
-  const numColumns = 1;
+  // Responsive design
+  const numColumns = width > 768 ? 2 : 1;
   
   const [displayArticles, setDisplayArticles] = useState<ArticleItem[]>([]);
-  const previousSearchRef = useRef<string>("");
 
   useEffect(() => {
     if (activeCategory === "all" && !searchQuery.trim()) {
@@ -114,7 +114,7 @@ export default function GuidesScreen() {
     if (isGuestMode) {
       setIsGuestSidebarOpen(true);
     } else {
-      openSidebar();
+      openSidebar?.();
     }
   }, [isGuestMode, openSidebar]);
 
@@ -303,7 +303,7 @@ const renderPagination = () => {
               ListFooterComponent={renderPagination}
               contentContainerStyle={{
                 paddingHorizontal: 12,
-                paddingBottom: 100,  
+                paddingBottom: getContentBottomPadding(insets.bottom, 20),
                 flexGrow: 1 
               }}
               columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}

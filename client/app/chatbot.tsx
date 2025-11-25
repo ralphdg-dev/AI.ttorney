@@ -19,7 +19,7 @@ import {
   Animated,
   StatusBar,
   } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../constants/Colors";
@@ -38,7 +38,7 @@ import { Send } from "lucide-react-native";
 import { MarkdownText } from "../components/chatbot/MarkdownText";
 import { ModerationWarningBanner } from "../components/moderation/ModerationWarningBanner";
 import { NetworkConfig } from "../utils/networkConfig";
-import { LAYOUT } from "../constants/LayoutConstants";
+import { LAYOUT, getSafeBottomPosition } from "../constants/LayoutConstants";
 import { addGuestDataToRequest, logGuestRequest } from "../utils/guestRequestHelper";
 import GuestOnboardingTutorial from "../components/guest/GuestOnboardingTutorial";
 
@@ -336,6 +336,7 @@ interface Message {
 }
 
 export default function ChatbotScreen() {
+  const insets = useSafeAreaInsets();
   const { user, session, isLawyer } = useAuth();
   const { isGuestMode, hasReachedLimit, incrementPromptCount, startGuestSession, updateGuestSessionId, guestSession, isLoading: isGuestLoading, showTutorial, setShowTutorial } = useGuest();
   const guestChat = useGuestChat(); // Always call hooks unconditionally
@@ -1798,11 +1799,12 @@ export default function ChatbotScreen() {
             inputContainerHeight.current = height;
           }}
           style={[
-            tw`px-4 pt-3 pb-4 border-t border-b`,
+            tw`px-4 pt-3 border-t border-b`,
             {
               borderTopColor: Colors.border.light,
               borderBottomColor: Colors.border.light,
               backgroundColor: '#FFFFFF',
+              paddingBottom: getSafeBottomPosition(insets.bottom, 16),
             },
           ]}
         >

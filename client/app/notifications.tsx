@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { View, FlatList, Pressable, StatusBar, ActivityIndicator } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from "tailwind-react-native-classnames";
 import Header from "@/components/Header";
 import { Box } from "@/components/ui/box";
@@ -25,6 +25,7 @@ export default function NotificationsScreen() {
   const [selectedViolation, setSelectedViolation] = useState<any>(null);
   const [showViolationModal, setShowViolationModal] = useState(false);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   React.useEffect(() => {
     if (!hasFetched.current) {
@@ -245,7 +246,7 @@ export default function NotificationsScreen() {
           data={filteredNotifications}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 80 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 56 + (insets.bottom || 0) + 20 }}
           style={{ zIndex: 0, elevation: 0 }}
           showsVerticalScrollIndicator={false}
         />

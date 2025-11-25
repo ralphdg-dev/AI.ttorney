@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { View, RefreshControl, ScrollView, Animated, StatusBar, Alert, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import tw from "tailwind-react-native-classnames";
 import Header from "../components/Header";
@@ -25,6 +25,7 @@ import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 import ConsultationFilterModal from "../components/sidebar/consultations/ConsultationFilterModal";
 
 export default function ConsultationsScreen() {
+  const insets = useSafeAreaInsets();
   const [consultations, setConsultations] = useState<ConsultationWithLawyer[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -366,7 +367,7 @@ export default function ConsultationsScreen() {
         
         <ScrollView
           style={tw`flex-1`}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 96, paddingTop: 0, flexGrow: 0 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 56 + (insets.bottom || 0) + 20, paddingTop: 0, flexGrow: 0 }}
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}
           refreshControl={

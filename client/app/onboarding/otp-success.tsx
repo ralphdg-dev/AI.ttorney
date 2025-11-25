@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Box } from "../../components/ui/box";
 import { VStack } from "../../components/ui/vstack";
 import { Text } from "../../components/ui/text";
 import { StatusBar } from "../../components/ui/status-bar";
-import { Image } from "../../components/ui/image";
 import Colors from "../../constants/Colors";
 // import successIcon from "../../assets/images/registration/success.png";
 
@@ -23,8 +23,9 @@ export default function OtpSuccess() {
   }, []);
 
   return (
-    <Box className="flex-1 bg-white">
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }} edges={['top', 'left', 'right']}>
+      <Box className="flex-1 bg-white">
+        <StatusBar barStyle="dark-content" backgroundColor="white" />
       
       <VStack className="flex-1 justify-center items-center px-6">
         {/* Success Icon - Using emoji instead */}
@@ -60,5 +61,6 @@ export default function OtpSuccess() {
         </VStack>
       </VStack>
     </Box>
+    </SafeAreaView>
   );
 }

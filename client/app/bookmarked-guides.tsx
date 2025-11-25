@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { View, FlatList, useWindowDimensions, StatusBar } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from "tailwind-react-native-classnames";
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
@@ -24,6 +24,7 @@ import { Filter, SortAsc } from "lucide-react-native";
 const API_BASE_URL = NetworkConfig.getApiUrl();
 
 export default function BookmarkedGuidesScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session } = useAuth();
   const { bookmarkedGuideIds } = useBookmarks();
@@ -201,7 +202,7 @@ export default function BookmarkedGuidesScreen() {
               </GSText>
             </View>
           }
-          contentContainerStyle={{ paddingBottom: 80, paddingHorizontal: 20, flexGrow: 1 }}
+          contentContainerStyle={{ paddingBottom: 56 + (insets.bottom || 0) + 20, paddingHorizontal: 20, flexGrow: 1 }}
           columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
           renderItem={({ item }) => (
             <ArticleCard

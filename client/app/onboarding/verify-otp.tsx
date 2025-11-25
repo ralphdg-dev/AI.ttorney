@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Alert, Platform, TextInput, TouchableOpacity } from "react-native";
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Box } from "../../components/ui/box";
@@ -13,12 +13,14 @@ import { StatusBar } from "../../components/ui/status-bar";
 import { Image } from "../../components/ui/image";
 import PrimaryButton from "../../components/ui/PrimaryButton";
 import Header from "../../components/Header";
+import { getContentBottomPadding } from "../../constants/LayoutConstants";
 import Colors from "../../constants/Colors";
 import { apiClient } from "../../lib/api-client";
 import { useAuth } from "../../contexts/AuthContext";
 import otpsent from "../../assets/images/otpsent.png";
 
 export default function VerifyOTP() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const email = typeof params.email === 'string' ? params.email : "user@example.com";
   const { signIn, refreshUserData } = useAuth();
@@ -315,7 +317,7 @@ export default function VerifyOTP() {
       
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: getContentBottomPadding(insets.bottom, 20) }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >

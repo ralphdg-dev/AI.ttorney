@@ -374,7 +374,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           {
             transform: [{ translateX: slideAnim }],
             paddingTop: insets.top,
-            paddingBottom: insets.bottom,
+            bottom: insets.bottom,
           },
         ]}
         accessible={true}
