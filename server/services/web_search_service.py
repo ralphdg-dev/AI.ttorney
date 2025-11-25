@@ -52,17 +52,25 @@ def extract_legal_keywords(query: str) -> List[str]:
     legal_terms_map = {
                           
         'kasambahay': ['kasambahay', 'domestic worker', 'household worker'],
+        'yaya': ['yaya', 'nanny', 'caregiver', 'domestic worker'],
+        'katulong': ['katulong', 'helper', 'domestic worker', 'household help'],
+        'driver': ['driver', 'chauffeur', 'personal driver'],
         'trabaho': ['employment', 'work', 'labor'],
         'amo': ['employer', 'boss'],
-        'sweldo': ['salary', 'wage', 'compensation'],
+        'sweldo': ['salary', 'wage', 'compensation', 'income'],
+        'suweldo': ['salary', 'wage', 'compensation', 'pay'],
         'tanggal': ['termination', 'dismissal', 'fired'],
         'resign': ['resignation', 'quit'],
+        'pwesto': ['position', 'job', 'employment'],
         
                     
         'asawa': ['spouse', 'husband', 'wife', 'marriage'],
         'diborsyo': ['divorce', 'annulment', 'separation'],
         'anak': ['child', 'children', 'custody'],
         'mana': ['inheritance', 'estate', 'heir'],
+        'pagmamana': ['inheritance', 'estate', 'succession'],
+        'magulang': ['parent', 'mother', 'father', 'guardian'],
+        'kapatid': ['sibling', 'brother', 'sister'],
         
                       
         'kaso': ['case', 'lawsuit', 'complaint'],
@@ -70,18 +78,116 @@ def extract_legal_keywords(query: str) -> List[str]:
         'krimen': ['crime', 'criminal', 'offense'],
         'pulis': ['police', 'law enforcement'],
         'huli': ['arrest', 'detained'],
+        'akusasyon': ['accusation', 'charge', 'complaint'],
+        'bisyo': ['vice', 'addiction', 'substance abuse'],
         
                         
         'lupa': ['land', 'property', 'real estate'],
         'bahay': ['house', 'home', 'residence'],
         'utang': ['debt', 'loan', 'obligation'],
+        'utangan': ['debt', 'loan', 'credit'],
         'kontrata': ['contract', 'agreement'],
+        'kasunduan': ['contract', 'agreement', 'covenant'],
+        'pabahay': ['rental', 'lease', 'housing'],
+        'upahan': ['rent', 'lease', 'rental'],
         
                                 
         'karapatan': ['rights', 'legal rights'],
         'proteksyon': ['protection', 'safeguards'],
         'abuso': ['abuse', 'violation', 'mistreatment'],
         'diskriminasyon': ['discrimination'],
+        'panloloko': ['fraud', 'deception', 'scam'],
+        'paninindak': ['harassment', 'intimidation', 'threat'],
+        'pang-aabuso': ['abuse', 'mistreatment', 'violence'],
+        'hustisya': ['justice', 'fairness', 'legal remedy'],
+        'katarungan': ['justice', 'fairness', 'equity'],
+        
+        'separasyon': ['separation', 'legal separation'],
+        'paghihiwalay': ['separation', 'breakup', 'legal separation'],
+        'bata': ['child', 'minor', 'underage'],
+        'binata': ['minor', 'underage', 'juvenile'],
+        'dalaga': ['minor', 'underage', 'juvenile'],
+        'pamilya': ['family', 'household', 'relatives'],
+        'pamangkin': ['nephew', 'niece', 'cousin'],
+        'tito': ['uncle', 'relative', 'family'],
+        'tita': ['aunt', 'relative', 'family'],
+        'ninong': ['godfather', 'sponsor', 'guardian'],
+        'ninang': ['godmother', 'sponsor', 'guardian'],
+        
+        # More common everyday terms
+
+        'sahod': ['salary', 'wage', 'pay', 'compensation'],
+        'benta': ['sale', 'sell', 'transaction'],
+        'bili': ['buy', 'purchase', 'acquire'],
+        'upahin': ['rent', 'lease', 'hire'],
+        'hiram': ['borrow', 'loan', 'rent'],
+        'pautang': ['lend', 'loan', 'credit'],
+        'bayad': ['payment', 'pay', 'settlement'],
+        'bayaran': ['payment', 'fee', 'charge'],
+        'sisingilin': ['collect', 'demand payment', 'bill'],
+        'singil': ['bill', 'invoice', 'charge'],
+        
+        'away': ['fight', 'conflict', 'dispute'],
+        'gulo': ['trouble', 'conflict', 'disorder'],
+        'tanong': ['question', 'inquiry', 'interrogation'],
+        'sagot': ['answer', 'response', 'defense'],
+        ' reklamo': ['complaint', 'grievance', 'protest'],
+        'sumbong': ['report', 'complaint', 'inform'],
+        'demanda': ['lawsuit', 'case', 'legal action'],
+        'kaso': ['case', 'lawsuit', 'legal matter'],
+        
+        'pekeng': ['fake', 'fraudulent', 'counterfeit'],
+        'mandaraya': ['cheat', 'deceive', 'defraud'],
+        'panloloko': ['deception', 'fraud', 'scam'],
+        'nangongotong': ['extortion', 'blackmail', 'coercion'],
+        'snatcher': ['theft', 'robbery', 'snatching'],
+        'holdap': ['robbery', 'holdup', 'armed robbery'],
+        'nakaw': ['theft', 'stealing', 'larceny'],
+        
+        'sira': ['damage', 'broken', 'destroyed'],
+        'masira': ['damage', 'destroy', 'break'],
+        'gastos': ['expenses', 'costs', 'damages'],
+        'kabayaran': ['payment', 'compensation', 'reimbursement'],
+        'bawi': ['recover', 'get back', 'refund'],
+        'babalik': ['return', 'give back', 'restore'],
+        
+        'ligal': ['legal', 'lawful', 'legitimate'],
+        'ilegal': ['illegal', 'unlawful', 'prohibited'],
+        'batas': ['law', 'statute', 'regulation'],
+        'korte': ['court', 'judiciary', 'legal system'],
+        'hukom': ['judge', 'justice', 'magistrate'],
+        'abogado': ['lawyer', 'attorney', 'counsel'],
+        'fiscal': ['prosecutor', 'public attorney'],
+        
+        'saksi': ['witness', 'testimony', 'evidence'],
+        'patunay': ['proof', 'evidence', 'documentation'],
+        'kasulatan': ['document', 'paperwork', 'written proof'],
+        'pirma': ['signature', 'sign', 'written agreement'],
+        'kontrata': ['contract', 'agreement', 'written deal'],
+        
+        'babaeng buntis': ['pregnant woman', 'maternity', 'pregnancy rights'],
+        'buntis': ['pregnant', 'maternity', 'expecting'],
+        'nanay': ['mother', 'mom', 'parent'],
+        'tatay': ['father', 'dad', 'parent'],
+        'kuya': ['older brother', 'male relative'],
+        'ate': ['older sister', 'female relative'],
+        
+        'kapitbahay': ['neighbor', 'community', 'neighborhood'],
+        'barkada': ['friends', 'peer group', 'companions'],
+        'kaibigan': ['friend', 'companion', 'associate'],
+        'kalaban': ['enemy', 'opponent', 'adversary'],
+        'rival': ['rival', 'competitor', 'opponent'],
+        
+        'sakit': ['illness', 'disease', 'medical condition'],
+        'pilay': ['injured', 'disabled', 'physically impaired'],
+        'pilipit': ['broken', 'damaged', 'injured'],
+        'masaktan': ['hurt', 'injure', 'harm'],
+        'victim': ['victim', 'injured party', 'aggrieved'],
+        
+        'trabahante': ['worker', 'employee', 'laborer'],
+        'empleado': ['employee', 'worker', 'staff'],
+        'negosyante': ['businessman', 'entrepreneur', 'owner'],
+        'negosyo': ['business', 'enterprise', 'commercial activity'],
     }
     
                                        
