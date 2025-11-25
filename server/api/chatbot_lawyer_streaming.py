@@ -6,7 +6,6 @@ import time
 import logging
 from datetime import datetime
 
-                                              
 from utils.sse_formatter import format_sse
 
                                                          

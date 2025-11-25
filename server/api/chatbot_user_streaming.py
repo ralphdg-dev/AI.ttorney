@@ -4,6 +4,7 @@ from typing import Optional, AsyncGenerator
 import json
 import time
 import logging
+from utils.sse_formatter import format_sse
 
                                                                        
 from api.chatbot_user import (
