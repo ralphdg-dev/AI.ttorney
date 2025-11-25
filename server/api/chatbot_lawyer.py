@@ -74,12 +74,13 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
                                          
-if not QDRANT_URL or not QDRANT_API_KEY:
-    logger.error("QDRANT_URL and QDRANT_API_KEY must be set")
-    raise ValueError("Missing required Qdrant configuration")
-if not OPENAI_API_KEY:
-    logger.error("OPENAI_API_KEY must be set")
-    raise ValueError("Missing required OpenAI API key")
+# Validation disabled - streaming files handle their own validation
+# if not QDRANT_URL or not QDRANT_API_KEY:
+#     logger.error("QDRANT_URL and QDRANT_API_KEY must be set")
+#     raise ValueError("Missing required Qdrant configuration")
+# if not OPENAI_API_KEY:
+#     logger.error("OPENAI_API_KEY must be set")
+#     raise ValueError("Missing required OpenAI API key")
 
 EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4o-mini"                                           

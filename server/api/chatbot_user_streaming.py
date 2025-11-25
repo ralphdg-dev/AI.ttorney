@@ -5,25 +5,10 @@ import json
 import time
 import logging
 
-# Initialize clients directly to avoid importing from crashing old file
+# Initialize clients using cached singletons (validation handled in client_cache.py)
 from utils.sse_formatter import format_sse
 from services.client_cache import get_qdrant_client, get_openai_client
-import os
 
-# Initialize clients directly to avoid importing from crashing old file
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-QDRANT_URL = os.getenv("QDRANT_URL")
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
-
-# Validate environment variables
-if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY environment variable is required")
-if not QDRANT_URL:
-    raise ValueError("QDRANT_URL environment variable is required")
-if not QDRANT_API_KEY:
-    raise ValueError("QDRANT_API_KEY environment variable is required")
-
-# Initialize clients
 openai_client = get_openai_client()
 qdrant_client = get_qdrant_client()
 
