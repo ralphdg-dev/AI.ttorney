@@ -177,32 +177,12 @@ const ManageLegalSeekers = () => {
       setLoading(true);
       setError(null);
 
-      // Parse combined filter to extract status and archived parameters
+      // Parse combined filter to extract archived parameter
+      // We only support two high-level filters: Active and Archived
       let status = "all";
       let archived = "active";
 
-      if (combinedFilter === "Active") {
-        status = "all";
-        archived = "active";
-      } else if (combinedFilter === "Archived") {
-        status = "all";
-        archived = "archived";
-      } else if (combinedFilter === "All") {
-        status = "all";
-        archived = "all";
-      } else if (combinedFilter.includes("Active -")) {
-        // Handle "Active - Verified", "Active - Unverified", etc.
-        status = combinedFilter
-          .replace("Active - ", "")
-          .toLowerCase()
-          .replace(" ", "_");
-        archived = "active";
-      } else if (combinedFilter.includes("Archived -")) {
-        // Handle "Archived - Verified", "Archived - Unverified", etc.
-        status = combinedFilter
-          .replace("Archived - ", "")
-          .toLowerCase()
-          .replace(" ", "_");
+      if (combinedFilter === "Archived") {
         archived = "archived";
       }
 
@@ -883,18 +863,7 @@ const ManageLegalSeekers = () => {
           filter={{
             value: combinedFilter,
             onChange: setCombinedFilter,
-            options: [
-              "Active",
-              "Archived",
-              "All",
-              "Active - No Status",
-              "Active - Verified",
-              "Active - Unverified",
-              "Active - Pending Lawyer",
-              "Archived - Verified",
-              "Archived - Unverified",
-              "Archived - Pending Lawyer",
-            ],
+            options: ["Active", "Archived"],
             label: "Filter by status",
           }}
           sort={{
