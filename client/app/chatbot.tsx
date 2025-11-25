@@ -12,12 +12,13 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView,
   Platform,
   Linking,
   Image,
   Animated,
   StatusBar,
+  useWindowDimensions,
+  Keyboard,
   } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
@@ -29,6 +30,7 @@ import Navbar from "../components/Navbar";
 import { GuestNavbar, GuestSidebar, GuestRateLimitBanner } from "../components/guest";
 import { LawyerNavbar } from "../components/lawyer/shared";
 import { useAuth } from "../contexts/AuthContext";
+import { LAYOUT, getResponsiveValue } from '../constants/LayoutConstants';
 import { useGuest } from "../contexts/GuestContext";
 import { useGuestChat } from "../contexts/GuestChatContext";
 import { useModerationStatus } from "../contexts/ModerationContext";
@@ -38,7 +40,6 @@ import { Send } from "lucide-react-native";
 import { MarkdownText } from "../components/chatbot/MarkdownText";
 import { ModerationWarningBanner } from "../components/moderation/ModerationWarningBanner";
 import { NetworkConfig } from "../utils/networkConfig";
-import { LAYOUT, getSafeBottomPosition } from "../constants/LayoutConstants";
 import { addGuestDataToRequest, logGuestRequest } from "../utils/guestRequestHelper";
 import GuestOnboardingTutorial from "../components/guest/GuestOnboardingTutorial";
 
@@ -337,7 +338,38 @@ interface Message {
 
 export default function ChatbotScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions(); // Get screen width for responsive sizing
   const { user, session, isLawyer } = useAuth();
+  
+  // Responsive sizing variables
+  const navbarHeight = getResponsiveValue(width, LAYOUT.NAVBAR_HEIGHT, LAYOUT.NAVBAR_HEIGHT, LAYOUT.NAVBAR_HEIGHT * 1.2);
+  const inputHeight = getResponsiveValue(width, 48, 52, 56);
+  const horizontalPadding = getResponsiveValue(width, LAYOUT.SPACING.md, LAYOUT.SPACING.lg, LAYOUT.SPACING.xl);
+  const fontSize = getResponsiveValue(width, 16, 16, 18);
+  
+  // Keyboard awareness for Android
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener('keyboardWillShow', (event) => {
+      if (Platform.OS === 'android') {
+        console.log('🔹 Keyboard will show:', event.endCoordinates.height);
+        setKeyboardHeight(event.endCoordinates.height);
+      }
+    });
+    
+    const keyboardWillHideListener = Keyboard.addListener('keyboardWillHide', () => {
+      if (Platform.OS === 'android') {
+        console.log('🔹 Keyboard will hide');
+        setKeyboardHeight(0);
+      }
+    });
+    
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, []);
   const { isGuestMode, hasReachedLimit, incrementPromptCount, startGuestSession, updateGuestSessionId, guestSession, isLoading: isGuestLoading, showTutorial, setShowTutorial } = useGuest();
   const guestChat = useGuestChat(); // Always call hooks unconditionally
   const { moderationStatus, refreshStatus } = useModerationStatus();
@@ -456,15 +488,6 @@ export default function ChatbotScreen() {
   const shouldAutoScroll = useRef<boolean>(true); // Track if we should auto-scroll (user hasn't scrolled up)
   const scrollAnimationFrame = useRef<number | null>(null); // Animation frame for smooth scrolling
   const inputContainerHeight = useRef<number>(0); // Measured height of input container
-  
-  // Calculate bottom padding for keyboard avoidance
-  const getBottomPadding = useCallback(() => {
-    const inputHeight = inputContainerHeight.current || 80;
-    const navbarHeight = 60;
-    const safeAreaBottom = insets.bottom || 0;
-    const spacing = 20;
-    return inputHeight + navbarHeight + safeAreaBottom + spacing;
-  }, [insets.bottom]);
   
   
   // Dynamic greeting that changes per session
@@ -1516,7 +1539,7 @@ export default function ChatbotScreen() {
         tw`flex-1`,
         { backgroundColor: Colors.background.primary },
       ]}
-      edges={['top', 'left', 'right']}
+      edges={['top', 'left', 'right', 'bottom']}
     >
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
@@ -1575,7 +1598,7 @@ export default function ChatbotScreen() {
           ) : (
             // Show greeting screen only for new conversations
             <ScrollView
-              contentContainerStyle={tw`items-center px-6 pt-12 pb-48`}
+              contentContainerStyle={[tw`items-center px-6 pt-12`, { paddingBottom: navbarHeight + insets.bottom }]}
               showsVerticalScrollIndicator={false}
               style={tw`flex-1`}
             >
@@ -1689,10 +1712,7 @@ export default function ChatbotScreen() {
             extraData={messages} // Critical: Force re-render when messages array changes
             contentContainerStyle={[
               tw`pt-2`,
-              { 
-                // Dynamic padding for keyboard avoidance - matches input container height
-                paddingBottom: getBottomPadding()
-              }
+              { paddingBottom: navbarHeight + insets.bottom } // Account for responsive navbar height + safe area
             ]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -1793,15 +1813,16 @@ export default function ChatbotScreen() {
         )}
       </View>
 
-      {/* Composer - Now properly positioned for keyboard avoidance */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-        style={{
-          backgroundColor: '#FFFFFF',
-          zIndex: LAYOUT.Z_INDEX.fixed,
-        }}
-      >
+      {/* Composer - Positioned absolutely above navbar, moves up with keyboard */}
+      <View style={{
+        position: 'absolute',
+        bottom: (Platform.OS === 'android' ? keyboardHeight : 0) + navbarHeight + (insets.bottom || 0), // Dynamic positioning with keyboard
+        left: 0,
+        right: 0,
+        backgroundColor: '#FFFFFF',
+        zIndex: 100, // Ensure it renders on top of all content
+        elevation: 10, // Android elevation for proper layering
+      }}>
         <View
           onLayout={(event) => {
             // Measure actual input container height for accurate padding
@@ -1809,12 +1830,13 @@ export default function ChatbotScreen() {
             inputContainerHeight.current = height;
           }}
           style={[
-            tw`px-4 pt-3 border-t border-b`,
+            tw`justify-center border-t border-b`, // Only vertical centering, preserve horizontal layout
             {
               borderTopColor: Colors.border.light,
               borderBottomColor: Colors.border.light,
               backgroundColor: '#FFFFFF',
-              paddingBottom: getSafeBottomPosition(insets.bottom, 16),
+              paddingHorizontal: horizontalPadding,
+              paddingVertical: 12, // Equal padding top and bottom for centering
             },
           ]}
         >
@@ -1823,12 +1845,12 @@ export default function ChatbotScreen() {
               <View
                 ref={chatbotRef}
                 style={[
-                  tw`px-5 rounded-full`,
+                  tw`px-4 rounded-full`, // Added more padding
                   {
                     backgroundColor: isGenerating ? "#F3F4F6" : Colors.background.secondary,
                     borderWidth: 1,
                     borderColor: isGenerating ? "#E5E7EB" : Colors.border.light,
-                    height: 52,
+                    height: inputHeight, // Use responsive height
                     ...(Platform.OS === "web"
                       ? { 
                           boxShadow: isGenerating 
@@ -1852,14 +1874,16 @@ export default function ChatbotScreen() {
                   placeholder="Ask your legal question..."
                   placeholderTextColor="#9CA3AF"
                   style={[
-                    tw`flex-1 text-base`,
+                    tw`flex-1`,
                     {
                       color: Colors.text.primary,
+                      fontSize: fontSize, // Use responsive font size
                       outlineStyle: "none",
                       paddingVertical: 0,
-                      height: 50,
-                      fontSize: 16,
-                      lineHeight: 20,
+                      paddingHorizontal: 0, // Remove horizontal padding to align with container padding
+                      lineHeight: fontSize + 4, // Proper line height for readability
+                      textAlignVertical: 'center', // Ensure text is vertically centered
+                      textAlign: 'left', // Left-align text for better readability
                     },
                   ]}
                   maxLength={1000}
@@ -1908,15 +1932,33 @@ export default function ChatbotScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
       {/* Conditionally render navbar based on user role and guest mode */}
-      {isGuestMode ? (
-        <GuestNavbar activeTab="ask" glossaryRef={glossaryRef} navbarRef={navbarRef} />
-      ) : user?.role === "verified_lawyer" ? (
-        <LawyerNavbar activeTab="chatbot" />
-      ) : (
-        <Navbar activeTab="ask" />
-      )}
+      {(() => {
+        console.log('🔍 Navbar Debug:', {
+          isGuestMode,
+          userRole: user?.role,
+          userId: user?.id,
+          shouldShowGuestNavbar: isGuestMode,
+          shouldShowLawyerNavbar: user?.role === "verified_lawyer",
+          shouldShowRegularNavbar: !isGuestMode && user?.role !== "verified_lawyer"
+        });
+        
+        const navbarComponent = isGuestMode ? (
+          <GuestNavbar activeTab="ask" glossaryRef={glossaryRef} navbarRef={navbarRef} />
+        ) : user?.role === "verified_lawyer" ? (
+          <LawyerNavbar activeTab="chatbot" />
+        ) : (
+          <Navbar activeTab="ask" />
+        );
+        
+        // Temporarily wrap navbar with bright background to verify visibility
+        return (
+          <View style={{ backgroundColor: '#ff0000', minHeight: 56 }}>
+            {navbarComponent}
+          </View>
+        );
+      })()}
       {!isGuestMode && <SidebarWrapper />}
       
       {/* Tutorial Overlay */}

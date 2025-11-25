@@ -6,7 +6,8 @@ import tw from "tailwind-react-native-classnames";
 import Colors from "../constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import logo from "../assets/images/logo.png";
-import { useToast, Toast, ToastTitle, ToastDescription } from "../components/ui/toast";
+import { useToast } from "../components/ui/toast";
+import { createSafeAreaToastRenderer } from "../components/ui/SafeAreaToast";
 import { useAuth } from "../contexts/AuthContext";
 import { useGuest } from "../contexts/GuestContext";
 import { getContentBottomPadding } from "../constants/LayoutConstants";
@@ -106,11 +107,12 @@ export default function Login() {
       if (result.success) {
         toast.show({
           placement: "top",
-          render: ({ id }) => (
-            <Toast nativeID={id} action="success" variant="solid" className="mt-12">
-              <ToastTitle size="md">Welcome back!</ToastTitle>
-              <ToastDescription size="sm">Redirecting...</ToastDescription>
-            </Toast>
+          render: createSafeAreaToastRenderer(
+            'top',
+            'success',
+            'solid',
+            'Welcome back!',
+            'Redirecting...'
           ),
         });
       } else {
@@ -125,21 +127,23 @@ export default function Login() {
           lastDeniedAtRef.current = now;
           toast.show({
             placement: "top",
-            render: ({ id }) => (
-              <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-                <ToastTitle size="md">Access denied</ToastTitle>
-              </Toast>
+            render: createSafeAreaToastRenderer(
+              'top',
+              'error',
+              'solid',
+              'Access denied'
             ),
           });
           setTimeout(() => { deniedToastInProgressRef.current = false; }, 2000);
         } else {
           toast.show({
             placement: "top",
-            render: ({ id }) => (
-              <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-                <ToastTitle size="md">Login Failed</ToastTitle>
-                <ToastDescription size="sm">{result.error || "Invalid email or password"}</ToastDescription>
-              </Toast>
+            render: createSafeAreaToastRenderer(
+              'top',
+              'error',
+              'solid',
+              'Login Failed',
+              result.error || "Invalid email or password"
             ),
           });
         }
@@ -148,11 +152,12 @@ export default function Login() {
       console.error('Login error:', error);
       toast.show({
         placement: "top",
-        render: ({ id }) => (
-          <Toast nativeID={id} action="error" variant="solid" className="mt-12">
-            <ToastTitle size="md">Connection Error</ToastTitle>
-            <ToastDescription size="sm">Please check your internet connection</ToastDescription>
-          </Toast>
+        render: createSafeAreaToastRenderer(
+          'top',
+          'error',
+          'solid',
+          'Connection Error',
+          'Please check your internet connection'
         ),
       });
     } finally {

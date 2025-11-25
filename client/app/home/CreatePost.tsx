@@ -46,7 +46,7 @@ const CreatePost: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <KeyboardAvoidingView 
         style={{ flex: 1 }}

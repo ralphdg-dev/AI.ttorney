@@ -8,8 +8,9 @@ import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
 import { Input, InputField } from "@/components/ui/input";
-import { AlertCircle, CheckCircle, Eye, EyeOff, Lock } from "lucide-react-native";
-import { useToast, Toast, ToastTitle, ToastDescription } from "@/components/ui/toast";
+import { AlertCircle, Eye, EyeOff, Lock } from "lucide-react-native";
+import { useToast } from "@/components/ui/toast";
+import { createSafeAreaToastRenderer } from "@/components/ui/SafeAreaToast";
 import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
@@ -99,16 +100,12 @@ export default function ChangePasswordScreen() {
       // Show success toast
       toast.show({
         placement: "top",
-        render: ({ id }) => (
-          <Toast nativeID={`toast-${id}`} action="success" variant="solid">
-            <HStack space="md" className="items-center">
-              <CheckCircle size={20} color={Colors.status.success} />
-              <VStack space="xs">
-                <ToastTitle>Password Changed!</ToastTitle>
-                <ToastDescription>Your password has been updated successfully.</ToastDescription>
-              </VStack>
-            </HStack>
-          </Toast>
+        render: createSafeAreaToastRenderer(
+          'top',
+          'success',
+          'solid',
+          'Password Changed!',
+          'Your password has been updated successfully.'
         ),
       });
       
@@ -134,16 +131,12 @@ export default function ChangePasswordScreen() {
       // Show error toast
       toast.show({
         placement: "top",
-        render: ({ id }) => (
-          <Toast nativeID={`toast-${id}`} action="error" variant="solid">
-            <HStack space="md" className="items-center">
-              <AlertCircle size={20} color={Colors.status.error} />
-              <VStack space="xs">
-                <ToastTitle>Password Change Failed</ToastTitle>
-                <ToastDescription>{error.message || "Please try again."}</ToastDescription>
-              </VStack>
-            </HStack>
-          </Toast>
+        render: createSafeAreaToastRenderer(
+          'top',
+          'error',
+          'solid',
+          'Password Change Failed',
+          error.message || "Please try again."
         ),
       });
     } finally {

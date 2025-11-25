@@ -100,10 +100,7 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab, glossaryRef, navba
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    position: 'relative', // Changed from absolute
     backgroundColor: '#FFFFFF',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E5E7EB',

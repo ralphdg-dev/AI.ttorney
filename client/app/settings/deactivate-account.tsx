@@ -11,7 +11,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useRouter, usePathname } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserX, AlertTriangle, ArrowLeft } from 'lucide-react-native';
-import { Toast, ToastTitle, ToastDescription, useToast } from '../../components/ui/toast';
+import { useToast } from '../../components/ui/toast';
+import { createSafeAreaToastRenderer } from '../../components/ui/SafeAreaToast';
 import { NetworkConfig } from '../../utils/networkConfig';
 import Colors from '../../constants/Colors';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
@@ -44,12 +45,13 @@ const DeactivateAccountScreen: React.FC = () => {
         toast.show({
           placement: "top",
           duration: 3000,
-          render: ({ id }) => (
-            <Toast nativeID={id} action="success" variant="solid">
-              <ToastTitle>Success</ToastTitle>
-              <ToastDescription>Account deactivated successfully</ToastDescription>
-            </Toast>
-          )
+          render: createSafeAreaToastRenderer(
+            'top',
+            'success',
+            'solid',
+            'Success',
+            'Account deactivated successfully'
+          ),
         });
         await refreshUserData();
         setTimeout(() => router.replace('/deactivated'), 1500);
@@ -57,12 +59,13 @@ const DeactivateAccountScreen: React.FC = () => {
         toast.show({
           placement: "top",
           duration: 3000,
-          render: ({ id }) => (
-            <Toast nativeID={id} action="error" variant="solid">
-              <ToastTitle>Error</ToastTitle>
-              <ToastDescription>{data.detail || "Failed to deactivate account"}</ToastDescription>
-            </Toast>
-          )
+          render: createSafeAreaToastRenderer(
+            'top',
+            'error',
+            'solid',
+            'Error',
+            data.detail || "Failed to deactivate account"
+          ),
         });
       }
     } catch (error) {
@@ -70,12 +73,13 @@ const DeactivateAccountScreen: React.FC = () => {
       toast.show({
         placement: "top",
         duration: 3000,
-        render: ({ id }) => (
-          <Toast nativeID={id} action="error" variant="solid">
-            <ToastTitle>Error</ToastTitle>
-            <ToastDescription>An unexpected error occurred. Please try again.</ToastDescription>
-          </Toast>
-        )
+        render: createSafeAreaToastRenderer(
+          'top',
+          'error',
+          'solid',
+          'Error',
+          'An unexpected error occurred. Please try again.'
+        ),
       });
     } finally {
       setIsDeactivating(false);
@@ -88,12 +92,13 @@ const DeactivateAccountScreen: React.FC = () => {
       toast.show({
         placement: "top",
         duration: 3000,
-        render: ({ id }) => (
-          <Toast nativeID={id} action="error" variant="solid">
-            <ToastTitle>Error</ToastTitle>
-            <ToastDescription>Please enter your email</ToastDescription>
-          </Toast>
-        )
+        render: createSafeAreaToastRenderer(
+          'top',
+          'error',
+          'solid',
+          'Error',
+          'Please enter your email'
+        ),
       });
       return;
     }
@@ -122,12 +127,13 @@ const DeactivateAccountScreen: React.FC = () => {
         toast.show({
           placement: "top",
           duration: 3000,
-          render: ({ id }) => (
-            <Toast nativeID={id} action="error" variant="solid">
-              <ToastTitle>Error</ToastTitle>
-              <ToastDescription>{data.detail || "Email does not match your account"}</ToastDescription>
-            </Toast>
-          )
+          render: createSafeAreaToastRenderer(
+            'top',
+            'error',
+            'solid',
+            'Error',
+            data.detail || "Email does not match your account"
+          ),
         });
         setIsDeactivating(false);
       }
@@ -136,23 +142,25 @@ const DeactivateAccountScreen: React.FC = () => {
         toast.show({
           placement: "top",
           duration: 3000,
-          render: ({ id }) => (
-            <Toast nativeID={id} action="error" variant="solid">
-              <ToastTitle>Error</ToastTitle>
-              <ToastDescription>Request timed out. Please check your connection and try again.</ToastDescription>
-            </Toast>
-          )
+          render: createSafeAreaToastRenderer(
+            'top',
+            'error',
+            'solid',
+            'Error',
+            'Request timed out. Please check your connection and try again.'
+          ),
         });
       } else {
         toast.show({
           placement: "top",
           duration: 3000,
-          render: ({ id }) => (
-            <Toast nativeID={id} action="error" variant="solid">
-              <ToastTitle>Error</ToastTitle>
-              <ToastDescription>{error instanceof Error ? error.message : "An unexpected error occurred. Please try again."}</ToastDescription>
-            </Toast>
-          )
+          render: createSafeAreaToastRenderer(
+            'top',
+            'error',
+            'solid',
+            'Error',
+            error instanceof Error ? error.message : "An unexpected error occurred. Please try again."
+          ),
         });
       }
       setIsDeactivating(false);

@@ -213,28 +213,20 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
       is_anonymous: isAnonymous,
     };
 
-    // Add optimistic post and navigate back immediately
+    // Add optimistic post but don't navigate back yet
     const optimisticId = addOptimisticPost(payload);
-    router.back();
-
+    
     try {
-      const headers = getAuthHeaders();
-      const apiUrl = await NetworkConfig.getBestApiUrl();
-
-      // Create abort controller for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-
-      console.log(`[CreatePost:${userType}] Creating post at ${apiUrl}/api/forum/posts`);
-
-      const response = await fetch(`${apiUrl}/api/forum/posts`, {
+      const response = await fetch(`${NetworkConfig.getBestApiUrl()}/api/forum/posts`, {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
         body: JSON.stringify(payload),
-        signal: controller.signal,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT),
       });
 
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -271,6 +263,8 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
         } else {
           confirmOptimisticPost(optimisticId);
         }
+        // Navigate back after successful post confirmation
+        router.back();
       }, OPTIMISTIC_CONFIRM_DELAY);
 
     } catch (e: any) {

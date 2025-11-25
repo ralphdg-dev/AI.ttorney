@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, StatusBar } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Timeline from '../../components/home/Timeline';
 import { LawyerNavbar } from '../../components/lawyer/shared';
@@ -10,7 +10,6 @@ import Colors from '../../constants/Colors';
 import { AuthGuard } from '../../components/AuthGuard';
 
 const LawyerForum: React.FC = () => {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
 
   const handleNotificationPress = useCallback(() => {
@@ -19,7 +18,7 @@ const LawyerForum: React.FC = () => {
 
   return (
     <AuthGuard>
-      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right', 'bottom']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header 
             variant="home"
