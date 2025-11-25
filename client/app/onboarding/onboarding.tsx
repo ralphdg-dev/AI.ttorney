@@ -1,5 +1,5 @@
 import { View, Animated } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import tw from 'tailwind-react-native-classnames';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
@@ -17,6 +17,7 @@ import Colors from '../../constants/Colors';
 
 export default function Onboarding() {
   const { user, isAuthenticated } = useAuth();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     // If user is already authenticated, redirect them to their appropriate dashboard
@@ -46,7 +47,7 @@ export default function Onboarding() {
   const handleGestureStateChange = (event: any) => onHandlerStateChange(event, proceedToRegistration);
 
   return (
-    <SafeAreaView style={tw`flex-1`} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={tw`flex-1`} edges={['top', 'left', 'right', 'bottom']}>
       <GestureHandlerRootView style={tw`flex-1`}>
         <PanGestureHandler
           onGestureEvent={onGestureEvent}
@@ -93,7 +94,7 @@ export default function Onboarding() {
             </Animated.View>
 
             {/* Bottom Section */}
-            <View style={tw`px-6 pb-12 mt-8 relative`}>
+            <View style={[tw`px-6 relative`, { paddingBottom: Math.max(insets.bottom + 24, 48) }]}>
               {/* Progress Dots */}
               <ProgressDots progressAnims={progressAnims} />
 

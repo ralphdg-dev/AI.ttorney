@@ -160,7 +160,7 @@ const DeactivateAccountScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar backgroundColor={Colors.background.primary} />
       
             

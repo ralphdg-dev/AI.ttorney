@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Alert, Platform, TextInput, TouchableOpacity, View, Text, ScrollView, KeyboardAvoidingView, StatusBar, Image } from "react-native";
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from "@/components/ui/toast";
 import { createSafeAreaToastRenderer } from "@/components/ui/SafeAreaToast";
 import { useRouter, usePathname } from "expo-router";
@@ -18,6 +18,7 @@ type Step = 'email' | 'otp' | 'reset';
 export default function ForgotPassword() {
   const router = useRouter();
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
   const [currentStep, setCurrentStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
@@ -622,7 +623,7 @@ export default function ForgotPassword() {
     const buttonProps = getButtonProps();
 
     return (
-      <View style={tw`relative px-6 pb-12 mt-8`}>
+      <View style={[tw`relative px-6 mt-8`, { paddingBottom: Math.max(insets.bottom + 24, 48) }]}>
         <PrimaryButton
           title={buttonProps.title}
           onPress={buttonProps.onPress}
@@ -665,7 +666,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
       <View style={tw`flex-1 bg-white`}>

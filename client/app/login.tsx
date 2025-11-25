@@ -161,7 +161,7 @@ export default function Login() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
       <View style={tw`flex-1 bg-white`}>
@@ -311,7 +311,7 @@ export default function Login() {
       </View>
 
       {/* Bottom Section */}
-      <View style={tw`items-center px-6 pb-8`}>
+      <View style={[tw`items-center px-6 mt-8`, { paddingBottom: Math.max(insets.bottom + 24, 48) }]}>
         <Text style={[tw`text-center`, { color: Colors.text.sub }]}>
           Don&apos;t have an account?{" "}
           <Text

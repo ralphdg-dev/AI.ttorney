@@ -313,7 +313,7 @@ export default function HelpAndSupport() {
   const handleCallSupport = () => Linking.openURL("tel:+123456789");
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header
         title="Help & Support"

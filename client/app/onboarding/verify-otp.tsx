@@ -301,7 +301,7 @@ export default function VerifyOTP() {
   const isOtpComplete = otp.every((digit) => digit !== "");
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right', 'bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1 bg-white"
@@ -398,7 +398,7 @@ export default function VerifyOTP() {
       </ScrollView>
 
       {/* Bottom Section - Match onboarding pattern */}
-      <Box className="relative px-6 pb-12 mt-8">
+      <Box className="relative px-6 mt-8" style={{ paddingBottom: Math.max(insets.bottom + 24, 48) }}>
         <PrimaryButton
           title={isLoading ? "Verifying..." : "Verify"}
           onPress={handleVerifyOTP}

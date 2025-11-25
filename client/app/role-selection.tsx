@@ -373,7 +373,7 @@ export default function RoleSelection() {
   );
 
   return (
-    <SafeAreaView style={tw`flex-1`} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={tw`flex-1`} edges={['top', 'left', 'right', 'bottom']}>
       <View style={tw`flex-1 bg-white`}>
         {/* Responsive, scrollable content */}
         <KeyboardAvoidingView

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'tailwind-react-native-classnames';
 import { router } from 'expo-router';
 import Header from '../../../components/Header';
@@ -12,6 +12,8 @@ import Colors from '../../../constants/Colors';
 
 
 export default function LawyerStartingPage() {
+  const insets = useSafeAreaInsets();
+  
   const handleBack = () => {
     // @ts-ignore: canGoBack may not exist on some expo-router versions
     if (typeof (router as any).canGoBack === 'function' && (router as any).canGoBack()) {
@@ -25,7 +27,7 @@ export default function LawyerStartingPage() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
       <Header 
@@ -34,7 +36,7 @@ export default function LawyerStartingPage() {
         backgroundColor={Colors.background.primary}
       />
       
-      <View style={tw`flex-1 px-6 pb-32`}>
+      <View style={[tw`flex-1 px-6`, { paddingBottom: Math.max(insets.bottom + 24, 48) }]}>
         {/* Heading */}
         <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#0f172a', marginTop: 32 }}>
           Let&apos;s get started
