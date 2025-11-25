@@ -390,7 +390,8 @@ export const validateRouteOnServer = async (
   userToken: string
 ): Promise<{ valid: boolean; redirectTo?: string; error?: string }> => {
   try {
-    const response = await fetch('/api/validate-route', {
+    const validateUrl = `${process.env.EXPO_PUBLIC_API_URL || 'https://aittorney-staging.up.railway.app'}/api/validate-route`;
+    const response = await fetch(validateUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -463,11 +464,18 @@ export const logRouteAccess = (
   };
 
   if (process.env.NODE_ENV === 'production') {
-    fetch('/api/audit/route-access', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(logData)
-    }).catch(error => console.error('Failed to log route access:', error));
+    try {
+      // Use full API URL to avoid Invalid URL error
+      const auditUrl = `${process.env.EXPO_PUBLIC_API_URL || 'https://aittorney-staging.up.railway.app'}/api/audit/route-access`;
+      fetch(auditUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logData)
+      }).catch(error => console.error('Failed to log route access:', error));
+    } catch (error) {
+      console.error('Audit service error:', error);
+      // Don't crash the app if audit fails
+    }
   }
 };
 

@@ -29,9 +29,11 @@ export const RouteErrorBoundary: React.FC<RouteErrorBoundaryProps> = ({ children
 
     // Send route error to monitoring service
     if (process.env.NODE_ENV === 'production') {
-      fetch('/api/errors/route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      try {
+        const errorUrl = `${process.env.EXPO_PUBLIC_API_URL || 'https://aittorney-staging.up.railway.app'}/api/errors/route`;
+        fetch(errorUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           route: currentPath,
           error: error.message,
@@ -46,6 +48,9 @@ export const RouteErrorBoundary: React.FC<RouteErrorBoundaryProps> = ({ children
           }
         })
       }).catch(logError => console.error('Failed to log route error:', logError));
+      } catch (error) {
+        console.error('Route error logging failed:', error);
+      }
     }
   };
 

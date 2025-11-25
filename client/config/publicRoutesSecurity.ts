@@ -293,11 +293,16 @@ export const logSecurityEvent = (event: {
   
   // Send to server for production monitoring
   if (process.env.NODE_ENV === 'production') {
-    fetch('/api/security/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(logEntry),
+    try {
+      const securityUrl = `${process.env.EXPO_PUBLIC_API_URL || 'https://aittorney-staging.up.railway.app'}/api/security/log`;
+      fetch(securityUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logEntry),
     }).catch(error => console.error('Failed to log security event:', error));
+    } catch (error) {
+      console.error('Security logging failed:', error);
+    }
   }
 };
 

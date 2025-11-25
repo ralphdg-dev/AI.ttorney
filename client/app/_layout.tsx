@@ -64,7 +64,7 @@ function AppContent() {
                 <BookmarksProvider>
                   <PostBookmarksProvider>
                     <ConsultationsProvider>
-                      {/* <ErrorBoundary fallbackRoute="/login"> */}
+                      <ErrorBoundary fallbackRoute="/login">
                         <ForumCacheProvider>
                           <SidebarProvider>
                             <AuthGuard>
@@ -150,7 +150,7 @@ function AppContent() {
                             </AuthGuard>
                           </SidebarProvider>
                         </ForumCacheProvider>
-                      {/* </ErrorBoundary> */}
+                      </ErrorBoundary>
                     </ConsultationsProvider>
                   </PostBookmarksProvider>
                 </BookmarksProvider>
