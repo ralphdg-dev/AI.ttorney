@@ -1,11 +1,12 @@
-from fastapi import APIRouter, HTTPException, Depends, status
-from pydantic import BaseModel, EmailStr, validator
-from typing import Optional, Dict, Any
-from middleware.auth import get_current_user
-from services.supabase_service import SupabaseService
-from services.otp_service import OTPService
-import logging
+from fastapi import APIRouter, HTTPException, status, Depends
+from pydantic import BaseModel, validator, EmailStr
+from typing import Dict, Any, Optional, Union
 from datetime import datetime
+from config.dependencies import get_current_user
+from services.supabase_service import SupabaseService
+import logging
+import re
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -40,15 +41,16 @@ class UpdateUserProfileRequest(BaseModel):
     def validate_username(cls, v):
         if not v or not v.strip():
             raise ValueError('Username is required')
-        if len(v.strip()) < 3:
+        if len(v) < 3:
             raise ValueError('Username must be at least 3 characters long')
+        if not re.match(r'^[a-zA-Z0-9_]+$', v):
+            raise ValueError('Username can only contain letters, numbers, and underscores')
         return v.strip()
     
     @validator('birthdate')
     def validate_birthdate(cls, v):
         if v:
             try:
-                                      
                 datetime.fromisoformat(v.replace('Z', '+00:00'))
                 return v
             except ValueError:
@@ -175,13 +177,11 @@ async def update_user_profile(
                 detail=f"Failed to update profile: {result['error']}"
             )
         
-                                                                  
+        # Update email in Supabase Auth if it changed
         if profile_data.email != profile["email"]:
             auth_result = await supabase_service.update_user_email(user_id, profile_data.email)
             if not auth_result["success"]:
                 logger.warning(f"Failed to update email in auth: {auth_result['error']}")
-                                                                        
-                                                                              
         
         return {
             "success": True,

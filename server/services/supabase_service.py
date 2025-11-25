@@ -30,6 +30,11 @@ class SupabaseService:
     def _get_headers(self, use_service_key: bool = False) -> Dict[str, str]:
         """Get request headers"""
         key = self.service_key if use_service_key and self.service_key else self.anon_key
+        
+        # Debug logging to verify service key usage
+        if use_service_key:
+            logger.info(f"🔑 Using service role key: {key[:20]}..." if key else "❌ Service key is None!")
+        
         return {
             "apikey": key,
             "Authorization": f"Bearer {key}",
@@ -250,26 +255,76 @@ class SupabaseService:
                     query_params.append(f"{key}=eq.{value}")
                 query_string = "&".join(query_params)
                 
-                logger.info(f" Updating user profile with where: {where_clause}")
-                logger.debug(f" Update data: {update_data}")
+                logger.info(f"🔧 Updating user profile with where: {where_clause}")
+                logger.debug(f"🔧 Update data: {update_data}")
+                
+                # Verify service key is available
+                if not self.service_key:
+                    logger.error("❌ SERVICE ROLE KEY IS NOT SET - This will cause RLS failures!")
+                    return {"success": False, "error": "Service role key not configured"}
+                
+                headers = self._get_headers(use_service_key=True)
+                logger.info(f"🔑 Using service role key for profile update: {headers['Authorization'][:30]}...")
                 
                 response = await client.patch(
                     f"{self.rest_url}/users?{query_string}",
                     json=update_data,
-                    headers=self._get_headers(use_service_key=True)
+                    headers=headers
                 )
                 
                 logger.info(f"📡 Update response status: {response.status_code}")
                 
                 if response.status_code in [200, 204]:
-                    logger.info(f" User profile updated successfully")
+                    logger.info(f"✅ User profile updated successfully")
                     return {"success": True, "message": "User profile updated"}
                 else:
                     error_data = response.json() if response.content else {}
+                    logger.error(f"❌ Profile update failed: {response.status_code} - {error_data}")
                     return {"success": False, "error": error_data}
                     
         except Exception as e:
-            logger.error(f"Update user profile error: {str(e)}")
+            logger.error(f"❌ Update user profile error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    async def update_lawyer_info(self, update_data: Dict[str, Any], where_clause: Dict[str, Any]) -> Dict[str, Any]:
+        """Update lawyer info in lawyer_info table"""
+        try:
+            async with httpx.AsyncClient() as client:
+                                                         
+                query_params = []
+                for key, value in where_clause.items():
+                    query_params.append(f"{key}=eq.{value}")
+                query_string = "&".join(query_params)
+                
+                logger.info(f"👨‍⚖️ Updating lawyer_info with where: {where_clause}")
+                logger.debug(f"👨‍⚖️ Update data: {update_data}")
+                
+                # Verify service key is available
+                if not self.service_key:
+                    logger.error("❌ SERVICE ROLE KEY IS NOT SET - This will cause RLS failures!")
+                    return {"success": False, "error": "Service role key not configured"}
+                
+                headers = self._get_headers(use_service_key=True)
+                logger.info(f"🔑 Using service role key for lawyer_info update: {headers['Authorization'][:30]}...")
+                
+                response = await client.patch(
+                    f"{self.rest_url}/lawyer_info?{query_string}",
+                    json=update_data,
+                    headers=headers
+                )
+                
+                logger.info(f"📡 Lawyer info update response status: {response.status_code}")
+                
+                if response.status_code in [200, 204]:
+                    logger.info(f"✅ Lawyer info updated successfully")
+                    return {"success": True, "message": "Lawyer info updated"}
+                else:
+                    error_data = response.json() if response.content else {}
+                    logger.error(f"❌ Lawyer info update failed: {response.status_code} - {error_data}")
+                    return {"success": False, "error": error_data}
+                    
+        except Exception as e:
+            logger.error(f"❌ Update lawyer info error: {str(e)}")
             return {"success": False, "error": str(e)}
     
     async def check_user_exists(self, field: str, value: str) -> Dict[str, Any]:
@@ -295,10 +350,8 @@ class SupabaseService:
                     logger.error(f"Check public.users error: {public_response.status_code} - {public_response.text}")
                     return {"success": False, "error": f"Database query failed: {public_response.status_code}"}
                 
-                                                               
                 auth_exists = False
                 if field == "email":
-                                                                                     
                     auth_response = await client.get(
                         f"{self.auth_url}/admin/users",
                         headers=self._get_headers(use_service_key=True)
@@ -306,18 +359,14 @@ class SupabaseService:
                     
                     if auth_response.status_code == 200:
                         auth_data = auth_response.json()
-                                                                                                                 
                         all_users = auth_data.get("users", [])
                         matching_users = [user for user in all_users if user.get("email") == value]
                         auth_exists = len(matching_users) > 0
                         logger.info(f"Auth users check: found {len(matching_users)} records for email={value}")
-                                                                         
-                        auth_data = {"users": matching_users}
                     else:
                         logger.error(f"Check auth.users error: {auth_response.status_code} - {auth_response.text}")
                         return {"success": False, "error": f"Auth query failed: {auth_response.status_code}"}
                 
-                                                      
                 exists = public_exists or auth_exists
                 
                 logger.info(f"Final result: exists={exists}, public_exists={public_exists}, auth_exists={auth_exists}")
@@ -325,14 +374,10 @@ class SupabaseService:
                 return {
                     "success": True,
                     "exists": exists,
-                    "found_in_public": public_exists,
-                    "found_in_auth": auth_exists,
-                    "data": {
-                        "public": public_data,
-                        "auth": auth_data.get("users", [])
-                    }
+                    "public_data": public_data,
+                    "auth_data": auth_data
                 }
-                    
+                
         except Exception as e:
             logger.error(f"Check user exists error: {str(e)}")
             return {"success": False, "error": str(e)}
@@ -560,6 +605,28 @@ class SupabaseService:
                     
         except Exception as e:
             logger.error(f"Create report error: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def update_user_password(self, user_id: str, new_password: str) -> Dict[str, Any]:
+        """Update user password using Supabase admin API"""
+        try:
+            # Use service role key for admin operations
+            async with httpx.AsyncClient() as client:
+                response = await client.put(
+                    f"{self.auth_url}/admin/users/{user_id}",
+                    headers=self._get_headers(use_service_key=True),
+                    json={"password": new_password}
+                )
+                
+                if response.status_code == 200:
+                    return {"success": True}
+                else:
+                    error_data = response.json() if response.content else {}
+                    logger.error(f"Update password failed: {response.status_code}, {error_data}")
+                    return {"success": False, "error": error_data.get("message", "Failed to update password")}
+                    
+        except Exception as e:
+            logger.error(f"Update password error: {str(e)}")
             return {"success": False, "error": str(e)}
 
     async def check_user_reported_post(self, user_id: str, post_id: str) -> Dict[str, Any]:

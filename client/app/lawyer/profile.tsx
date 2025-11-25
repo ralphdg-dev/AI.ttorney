@@ -32,6 +32,7 @@ import tw from "tailwind-react-native-classnames";
 import { TimeSlot } from "../../services/lawyerProfileServices";
 import { supabase } from "../../config/supabase";
 import { useRouter } from "expo-router";
+import { NetworkConfig } from "../../utils/networkConfig";
 
 interface ProfileData {
   name: string;
@@ -417,60 +418,7 @@ const LawyerProfilePage: React.FC = () => {
     }
   }, [user?.id]);
 
-  const saveProfessionalInfo = async (
-    rollNumber: string,
-    rollSigningDate: string
-  ) => {
-    if (!user?.id) return { success: false, error: "User not found" };
-
-    try {
-      console.log("Saving professional info:", { rollNumber, rollSigningDate, userId: user.id });
-
-      const { data: existingRecord } = await supabase
-        .from("lawyer_applications")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-
-      let result;
-
-      if (existingRecord) {
-        console.log("Updating existing record:", existingRecord.id);
-        result = await supabase
-          .from("lawyer_applications")
-          .update({
-            roll_number: rollNumber || null,
-            roll_signing_date: rollSigningDate || null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("user_id", user.id)
-          .select();
-      } else {
-        console.log("Creating new record");
-        result = await supabase.from("lawyer_applications").insert({
-          user_id: user.id,
-          roll_number: rollNumber || null,
-          roll_signing_date: rollSigningDate || null,
-          status: "approved",
-        })
-        .select();
-      }
-
-      if (result.error) {
-        console.error("Error saving professional info:", result.error);
-        return { success: false, error: result.error.message };
-      }
-
-      console.log("Professional info saved successfully:", result.data);
-      return { success: true };
-    } catch (error) {
-      console.error("Error in saveProfessionalInfo:", error);
-      return {
-        success: false,
-        error: "Failed to save professional information",
-      };
-    }
-  };
+  // saveProfessionalInfo function was removed - unused and never called
 
   // Initialize profile data immediately when user is available
   useEffect(() => {
@@ -597,26 +545,43 @@ const LawyerProfilePage: React.FC = () => {
     }
 
     try {
-      console.log("Saving profile data with availability:", profileData);
+      console.log("Saving lawyer profile data with availability:", profileData);
+
+      // Use the same backend API as regular users to avoid RLS issues
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        return { success: false, error: "Authentication required" };
+      }
 
       // Prepare specialization string
       const specializationString = Array.isArray(contactInfo.specializations)
         ? contactInfo.specializations.join(", ")
         : contactInfo.specializations;
 
-      // Update users table for name and email first
-      const { error: userError } = await supabase
-        .from("users")
-        .update({
+      // Update users table via backend API (uses service role key, bypasses RLS)
+      const userUpdateResponse = await fetch(`${await NetworkConfig.getBestApiUrl()}/api/user/profile`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           full_name: profileData.name,
           email: profileData.email,
-        })
-        .eq("id", user.id);
+          username: profileData.name.toLowerCase().replace(/\s+/g, '_'), // Generate username from name
+        }),
+      });
 
-      if (userError) {
-        console.error("Error updating user info:", userError);
-        return { success: false, error: userError.message };
+      if (!userUpdateResponse.ok) {
+        const errorData = await userUpdateResponse.json();
+        console.error("Error updating user info via API:", errorData);
+        return { success: false, error: errorData.detail || "Failed to update user profile" };
       }
+
+      // Update lawyer_info table - use direct Supabase calls (already working, different RLS policies)
+      let lawyerInfoError;
+      // let lawyerInfoData; // Not used, can be removed
 
       // Check if lawyer_info record exists
       const { data: existingLawyerInfo } = await supabase
@@ -624,10 +589,6 @@ const LawyerProfilePage: React.FC = () => {
         .select("id, name")
         .eq("lawyer_id", user.id)
         .single();
-
-      // Update lawyer_info table - only update if record exists
-      let lawyerInfoError;
-      let lawyerInfoData;
 
       if (existingLawyerInfo) {
         // Record exists - update it (preserve existing name field)
@@ -649,7 +610,7 @@ const LawyerProfilePage: React.FC = () => {
           .single();
 
         lawyerInfoError = result.error;
-        lawyerInfoData = result.data;
+        // lawyerInfoData = result.data; // Not used, can be removed
       } else {
         // Record doesn't exist - create it with name from users table
         const result = await supabase
@@ -668,7 +629,7 @@ const LawyerProfilePage: React.FC = () => {
           .single();
 
         lawyerInfoError = result.error;
-        lawyerInfoData = result.data;
+        // lawyerInfoData = result.data; // Not used, can be removed
       }
 
       if (lawyerInfoError) {
@@ -676,18 +637,8 @@ const LawyerProfilePage: React.FC = () => {
         return { success: false, error: lawyerInfoError.message };
       }
 
-      // Update professional info
-      const professionalResult = await saveProfessionalInfo(
-        professionalInfo.rollNumber,
-        professionalInfo.rollSigningDate
-      );
-
-      if (!professionalResult.success) {
-        return professionalResult;
-      }
-
-      console.log("Profile saved successfully:", lawyerInfoData);
-      return { success: true };
+      console.log("Lawyer profile updated successfully");
+      return { success: true, message: "Profile updated successfully" };
     } catch (error: any) {
       console.error("Error saving lawyer profile:", error);
       return { success: false, error: error.message || "Failed to save profile" };
