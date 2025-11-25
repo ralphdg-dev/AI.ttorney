@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { router } from 'expo-router';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   GUEST_PROMPT_LIMIT,
@@ -41,7 +41,7 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoading, setIsLoading] = useState(true);
   const [isStartingSession, setIsStartingSession] = useState(false); // Prevent race conditions
   const [, forceUpdate] = useState(0); // Force re-render trigger
-  const [showTutorial, setShowTutorial] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(Platform.OS === 'android'); // Show by default on Android to avoid race condition
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Define clearGuestSession first (no dependencies)
@@ -141,9 +141,31 @@ export const GuestProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     console.log('🔄 Guest session updated with new ID:', sessionId);
   }, [guestSession, startGuestSession]);
 
-  // Initialize without auto-loading guest sessions
+  // Initialize and check tutorial completion status
   useEffect(() => {
-    setIsLoading(false);
+    const checkTutorialCompletion = async () => {
+      try {
+        const tutorialCompleted = await AsyncStorage.getItem('@guest_onboarding_completed');
+        console.log('🎯 Tutorial completion check:', { tutorialCompleted, platform: Platform.OS });
+        
+        if (tutorialCompleted) {
+          // Tutorial was completed, hide it
+          setShowTutorial(false);
+          console.log('🎯 Tutorial was completed, hiding it');
+        } else {
+          // Tutorial not completed, show it
+          setShowTutorial(true);
+          console.log('🎯 Tutorial not completed, showing it');
+        }
+      } catch (error) {
+        console.warn('❌ Error checking tutorial completion:', error);
+        // Keep default state (true on Android, false on web)
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkTutorialCompletion();
   }, []);
 
   // Define incrementPromptCount (depends on guestSession and startGuestSession)

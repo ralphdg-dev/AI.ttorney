@@ -1,20 +1,18 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   Modal,
   Animated,
   TouchableOpacity,
+  Platform,
+  type ViewStyle,
+  useWindowDimensions,
 } from 'react-native';
-import type { ViewStyle } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Rect, Defs, Mask } from 'react-native-svg';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 interface TutorialStep {
   id: string;
@@ -26,12 +24,6 @@ interface TutorialStep {
   skipSpotlight?: boolean;
 }
 
-interface ArrowPosition extends ViewStyle {
-  arrowDirection?: 'up' | 'down';
-  position: 'absolute';
-  left: number;
-  top: number;
-}
 
 interface GuestOnboardingTutorialProps {
   visible: boolean;
@@ -44,6 +36,8 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
   onComplete,
   stepRefs = {},
 }) => {
+  // Debug: Log visibility state on Android
+  console.log('🎯 GuestOnboardingTutorial render:', { visible, platform: Platform.OS });
   const [currentStep, setCurrentStep] = useState(0);
   const [spotlightPosition, setSpotlightPosition] = useState({
     x: 0,
@@ -52,13 +46,11 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
     height: 100,
   });
   const [isAnimating, setIsAnimating] = useState(false);
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
   const TUTORIAL_STORAGE_KEY = '@guest_onboarding_completed';
 
-  const tutorialSteps: TutorialStep[] = [
+  const tutorialSteps: TutorialStep[] = useMemo(() => [
     {
       id: 'chatbot',
       title: 'Ask legal questions anytime',
@@ -89,7 +81,7 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
       description: 'You can now use all the features. Sign up to save your information and get personalized recommendations.',
       skipSpotlight: true,
     },
-  ];
+  ], []);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -129,7 +121,7 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
     ]).start(() => {
       setIsAnimating(false);
     });
-  }, [fadeAnim, scaleAnim, progressDotAnims, currentStep]);
+  }, [fadeAnim, scaleAnim, progressDotAnims, currentStep, tutorialSteps]);
 
   const handleNext = () => {
     if (isAnimating) return;
@@ -146,10 +138,7 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
     }
   };
 
-  const handleSkip = () => {
-    handleComplete();
-  };
-
+  
   const handleComplete = async () => {
     try {
       await AsyncStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
@@ -197,54 +186,6 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
       top: cardY,
       width: cardWidth,
       height: cardHeight,
-    };
-  };
-
-  const getArrowPosition = (): ArrowPosition | undefined => {
-    const step = tutorialSteps[currentStep];
-    if (step.skipSpotlight) return undefined;
-
-    const spotlight = spotlightPosition;
-    const cardWidth = Math.min(screenWidth * 0.7, 320); // Match getCardPosition
-    const cardHeight = Math.min(screenHeight * 0.25, 200); // Match getCardPosition
-    const pointerWidth = 20; // Smaller pointer width
-    const pointerHeight = 16; // Smaller pointer height
-    const cardOffset = 20; // Same as used in getCardPosition
-    
-    // Calculate card position (same logic as getCardPosition)
-    let cardX = spotlight.x + spotlight.width / 2 - cardWidth / 2;
-    let cardY = spotlight.y - cardHeight - cardOffset;
-    
-    // Ensure card stays within screen bounds
-    if (cardX < 20) cardX = 20;
-    if (cardX + cardWidth > screenWidth - 20) cardX = screenWidth - cardWidth - 20;
-    
-    if (cardY < 20) {
-      // Not enough space above, position below
-      cardY = spotlight.y + spotlight.height + cardOffset;
-    }
-    
-    // Calculate pointer position to point from card to spotlight
-    let pointerX, pointerY: number;
-    let arrowDirection: 'up' | 'down';
-    
-    if (cardY < spotlight.y) {
-      // Card is above spotlight - pointer points down (attached to bottom of card)
-      pointerX = spotlight.x + spotlight.width / 2 - pointerWidth / 2;
-      pointerY = cardY + cardHeight - 1; // Position at bottom edge of card
-      arrowDirection = 'down';
-    } else {
-      // Card is below spotlight - pointer points up (attached to top of card)
-      pointerX = spotlight.x + spotlight.width / 2 - pointerWidth / 2;
-      pointerY = cardY - pointerHeight + 1; // Position at top edge of card
-      arrowDirection = 'up';
-    }
-
-    return {
-      position: 'absolute' as const,
-      left: pointerX,
-      top: pointerY,
-      arrowDirection,
     };
   };
 
@@ -355,7 +296,7 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
       animateStepChange();
       measureTargetElement();
     }
-  }, [visible, currentStep, stepRefs, animateStepChange, screenWidth, screenHeight]);
+  }, [visible, currentStep, stepRefs, animateStepChange, screenWidth, screenHeight, tutorialSteps]);
 
   if (!visible) return null;
 
@@ -382,6 +323,7 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
         >
           <View style={styles.tutorialCard}>
             <View style={styles.cardContent}>
+              <Text style={styles.cardTitle}>{step.title}</Text>
               <Text style={styles.cardDescription}>{step.description}</Text>
             </View>
 
