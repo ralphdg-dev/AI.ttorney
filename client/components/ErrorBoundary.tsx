@@ -35,6 +35,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     console.error('ErrorInfo:', errorInfo);
     console.error('Component Stack:', errorInfo.componentStack);
     console.error('Timestamp:', new Date().toISOString());
+    console.error('Current Route:', typeof window !== 'undefined' ? window.location.pathname : 'Unknown');
+    console.error('Platform:', Platform.OS);
+    console.error('Retry Count:', this.state.retryCount);
     
     // Call custom error handler if provided
     if (this.props.onError) {
