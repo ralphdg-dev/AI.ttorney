@@ -22,7 +22,15 @@ GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
 WEB_SEARCH_CONFIDENCE_THRESHOLD = 0.8                                            
 MAX_WEB_RESULTS = 5                                  
 CACHE_TTL_SECONDS = 3600                            
-MAX_SNIPPET_LENGTH = 300                                  
+MAX_SNIPPET_LENGTH = 300
+
+# TRUSTED DOMAIN WHITELIST - ONLY these domains are allowed
+TRUSTED_DOMAINS = {
+    'officialgazette.gov.ph',
+    'lawphil.net',
+    'sc.judiciary.gov.ph',
+    'elibrary.judiciary.gov.ph'
+}                                  
 
                                          
 search_cache = TTLCache(maxsize=100, ttl=CACHE_TTL_SECONDS)
@@ -238,16 +246,25 @@ class WebSearchService:
             results = []
             if "items" in data:
                 for item in data["items"]:
+                    url = item.get("link", "")
+                    
+                    # STRICT DOMAIN FILTERING - Only allow trusted domains
+                    if not self._is_trusted_domain(url):
+                        logger.debug(f"   ❌ Blocked untrusted domain: {self._extract_domain(url)}")
+                        continue
+                    
                     result = {
                         "title": item.get("title", ""),
                         "snippet": item.get("snippet", ""),
-                        "url": item.get("link", ""),
-                        "source": self._extract_domain(item.get("link", "")),
+                        "url": url,
+                        "source": self._extract_domain(url),
                         "timestamp": datetime.now().isoformat()
                     }
                     results.append(result)
                 
-                logger.info(f" Found {len(results)} web search results")
+                logger.info(f"✅ Found {len(results)} trusted web search results")
+                if len(results) == 0:
+                    logger.warning("⚠️  All results filtered out - no trusted domains found")
             else:
                 logger.warning("No web search results found")
             
@@ -275,6 +292,29 @@ class WebSearchService:
             return domain
         except:
             return "Unknown"
+    
+    def _is_trusted_domain(self, url: str) -> bool:
+        """
+        Check if URL is from trusted domain
+        
+        Args:
+            url: URL to check
+            
+        Returns:
+            bool: True if domain is in trusted whitelist
+        """
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            domain = parsed.netloc
+            
+            # Remove www. prefix for consistent matching
+            if domain.startswith('www.'):
+                domain = domain[4:]
+                
+            return domain in TRUSTED_DOMAINS
+        except:
+            return False
     
     def format_web_context(self, search_results: List[Dict]) -> Tuple[str, List[Dict]]:
         """
