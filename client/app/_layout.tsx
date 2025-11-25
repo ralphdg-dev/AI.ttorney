@@ -64,10 +64,10 @@ function AppContent() {
                 <BookmarksProvider>
                   <PostBookmarksProvider>
                     <ConsultationsProvider>
-                      <ForumCacheProvider>
+                      {/* <ErrorBoundary fallbackRoute="/login"> */}
+                        <ForumCacheProvider>
                           <SidebarProvider>
                             <AuthGuard>
-                              <ErrorBoundary fallbackRoute="/login">
                               <Stack screenOptions={{ 
                                 headerShown: false,
                                 animation: 'none'
@@ -147,10 +147,10 @@ function AppContent() {
                                 {/* Apply Lawyer Route */}
                                 <Stack.Screen name="apply-lawyer" options={{ headerShown: false }} />
                               </Stack>
-                              </ErrorBoundary>
                             </AuthGuard>
                           </SidebarProvider>
                         </ForumCacheProvider>
+                      {/* </ErrorBoundary> */}
                     </ConsultationsProvider>
                   </PostBookmarksProvider>
                 </BookmarksProvider>
