@@ -406,7 +406,7 @@ router.get("/lawyers", authenticateAdmin, async (req, res) => {
     const { page = 1, limit = 10, search = "" } = req.query;
     const offset = (page - 1) * limit;
 
-    // First, let's try a simpler query to get verified lawyers with lawyer_info
+    // Base query to get verified lawyers from users table
     let query = supabaseAdmin
       .from("users")
       .select(
@@ -424,10 +424,7 @@ router.get("/lawyers", authenticateAdmin, async (req, res) => {
         last_violation_at,
         banned_at,
         banned_reason,
-        account_status,
-        lawyer_info (
-          accepting_consultations
-        )
+        account_status
       `
       )
       .eq("role", "verified_lawyer") // Only verified lawyers
@@ -453,13 +450,13 @@ router.get("/lawyers", authenticateAdmin, async (req, res) => {
       });
     }
 
-    // Now try to get lawyer applications for these users
+    // Now get lawyer applications and consultation settings for these users
     let transformedLawyers = [];
 
     if (lawyers && lawyers.length > 0) {
       const userIds = lawyers.map((lawyer) => lawyer.id);
 
-      // Get lawyer applications separately - fetch latest version for each user
+      // Get latest accepted lawyer applications (roll info)
       const { data: applications, error: appError } = await supabaseAdmin
         .from("lawyer_applications")
         .select(
@@ -473,7 +470,17 @@ router.get("/lawyers", authenticateAdmin, async (req, res) => {
         // Continue without applications data
       }
 
-      // Process applications to get latest version for each user
+      // Get consultation settings from lawyer_info table (same source as mobile app)
+      const { data: lawyerInfos, error: infoError } = await supabaseAdmin
+        .from("lawyer_info")
+        .select("lawyer_id, accepting_consultations")
+        .in("lawyer_id", userIds);
+
+      if (infoError) {
+        // Continue without consultation data
+      }
+
+      // Map latest application per user
       const latestApplications = {};
       if (applications) {
         applications.forEach((app) => {
@@ -488,13 +495,21 @@ router.get("/lawyers", authenticateAdmin, async (req, res) => {
         });
       }
 
+      // Map lawyer_info by lawyer_id
+      const lawyerInfoMap = {};
+      if (lawyerInfos) {
+        lawyerInfos.forEach((info) => {
+          if (info.lawyer_id) {
+            lawyerInfoMap[info.lawyer_id] = info;
+          }
+        });
+      }
+
       // Transform data for frontend
       transformedLawyers = lawyers.map((lawyer) => {
         const application = latestApplications[lawyer.id];
-        // Check accepting_consultations from lawyer_info table
-        const lawyerInfo = lawyer.lawyer_info?.[0]; // lawyer_info is an array from the join
-        const acceptingConsultations =
-          lawyerInfo?.accepting_consultations === true;
+        const info = lawyerInfoMap[lawyer.id];
+        const acceptingConsultations = !!info?.accepting_consultations;
 
         return {
           id: lawyer.id,

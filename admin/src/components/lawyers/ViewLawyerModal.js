@@ -1,35 +1,50 @@
-import React from 'react';
-import Modal from '../ui/Modal';
-import { User, Mail, Calendar, FileText, Shield, Clock, CheckCircle, XCircle } from 'lucide-react';
+import React from "react";
+import Modal from "../ui/Modal";
+import {
+  User,
+  Mail,
+  FileText,
+  Shield,
+  Clock,
+  Calendar,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 
 const StatusBadge = ({ status }) => {
   const getStyles = (status) => {
     switch (status?.toLowerCase()) {
-      case 'active':
-        return 'bg-green-100 text-green-800 border border-green-200';
-      case 'suspended':
-        return 'bg-red-100 text-red-800 border border-red-200';
-      case 'inactive':
-        return 'bg-gray-100 text-gray-800 border border-gray-200';
+      case "active":
+        return "bg-green-100 text-green-800 border border-green-200";
+      case "suspended":
+        return "bg-red-100 text-red-800 border border-red-200";
+      case "inactive":
+        return "bg-gray-100 text-gray-800 border border-gray-200";
       default:
-        return 'bg-green-100 text-green-800 border border-green-200';
+        return "bg-green-100 text-green-800 border border-green-200";
     }
   };
 
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${getStyles(status)}`}>
-      {status || 'Active'}
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${getStyles(
+        status
+      )}`}
+    >
+      {status || "Active"}
     </span>
   );
 };
 
 const ConsultationBadge = ({ accepting }) => {
-  const styles = accepting 
-    ? 'bg-green-50 text-green-700 border border-green-200' 
-    : 'bg-gray-50 text-gray-700 border border-gray-200';
+  const styles = accepting
+    ? "bg-green-50 text-green-700 border border-green-200"
+    : "bg-gray-50 text-gray-700 border border-gray-200";
 
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}>
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${styles}`}
+    >
       {accepting ? (
         <>
           <CheckCircle size={12} className="mr-1" />
@@ -51,39 +66,49 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
 
   // Format date for display
   const formatDate = (dateString, includeTime = true) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Invalid Date';
-    
-    const options = { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric',
-      timeZone: 'Asia/Manila'
-    };
-    
-    if (includeTime) {
-      options.hour = '2-digit';
-      options.minute = '2-digit';
-    }
-    
-    return date.toLocaleDateString('en-US', options);
-  };
+    if (isNaN(date.getTime())) return "Invalid Date";
 
+    const options = {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "Asia/Manila",
+    };
+
+    if (includeTime) {
+      options.hour = "2-digit";
+      options.minute = "2-digit";
+    }
+
+    return date.toLocaleDateString("en-US", options);
+  };
 
   if (!lawyerData && !loading) {
     return (
-      <Modal open={open} onClose={() => {}} title="View Lawyer Details" showCloseButton={false}>
+      <Modal
+        open={open}
+        onClose={() => {}}
+        title="View Lawyer Details"
+        showCloseButton={false}
+      >
         <div className="text-center py-8">
           <p className="text-gray-500">No lawyer data available</p>
         </div>
       </Modal>
     );
   }
-  
+
   if (loading) {
     return (
-      <Modal open={open} onClose={() => {}} title="View Lawyer Details" width="max-w-4xl" showCloseButton={false}>
+      <Modal
+        open={open}
+        onClose={() => {}}
+        title="View Lawyer Details"
+        width="max-w-4xl"
+        showCloseButton={false}
+      >
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#023D7B] mx-auto mb-4"></div>
@@ -95,9 +120,9 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
   }
 
   return (
-    <Modal 
-      open={open} 
-      onClose={() => {}} 
+    <Modal
+      open={open}
+      onClose={() => {}}
       title="Lawyer Details"
       width="max-w-4xl"
       showCloseButton={false}
@@ -106,8 +131,12 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
         {/* Header with Status */}
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-sm font-medium text-gray-900">{lawyerData.full_name || 'Unknown Lawyer'}</h3>
-            <p className="text-[11px] text-gray-500 mt-0.5">{lawyerData.email || 'No email provided'}</p>
+            <h3 className="text-sm font-medium text-gray-900">
+              {lawyerData.full_name || "Unknown Lawyer"}
+            </h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              {lawyerData.email || "No email provided"}
+            </p>
           </div>
         </div>
 
@@ -120,29 +149,42 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <div className="text-[9px] text-gray-500">Full Name</div>
-              <div className="text-xs font-medium text-gray-900">{lawyerData.full_name || '-'}</div>
+              <div className="text-xs font-medium text-gray-900">
+                {lawyerData.full_name || "-"}
+              </div>
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Username</div>
-              <div className="text-xs font-medium text-gray-900">{lawyerData.username || '-'}</div>
+              <div className="text-xs font-medium text-gray-900">
+                {lawyerData.username || "-"}
+              </div>
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Email</div>
-              <div className="text-xs font-medium text-gray-900">{lawyerData.email || '-'}</div>
+              <div className="text-xs font-medium text-gray-900">
+                {lawyerData.email || "-"}
+              </div>
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Phone Number</div>
-              <div className="text-xs font-medium text-gray-900">{lawyerData.phone_number || 'Not provided'}</div>
+              <div className="text-xs font-medium text-gray-900">
+                {lawyerData.phone_number || "Not provided"}
+              </div>
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Registration Date</div>
-              <div className="text-xs text-gray-700">{formatDate(lawyerData.registration_date)}</div>
+              <div className="text-xs text-gray-700">
+                {formatDate(lawyerData.registration_date)}
+              </div>
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Last Updated</div>
               <div className="text-xs text-gray-700">
-                {lawyerData.updated_at ? formatDate(lawyerData.updated_at) : 
-                 lawyerData.registration_date ? formatDate(lawyerData.registration_date) : 'Never'}
+                {lawyerData.updated_at
+                  ? formatDate(lawyerData.updated_at)
+                  : lawyerData.registration_date
+                  ? formatDate(lawyerData.registration_date)
+                  : "Never"}
               </div>
             </div>
           </div>
@@ -157,26 +199,24 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <div className="text-[9px] text-gray-500">Roll Number</div>
-              <div className="text-xs font-medium text-gray-900">{lawyerData.roll_number || 'Not provided'}</div>
-            </div>
-            <div>
-              <div className="text-[9px] text-gray-500">Roll Sign Date</div>
-              <div className="text-xs text-gray-700">{formatDate(lawyerData.roll_sign_date, false)}</div>
-            </div>
-            <div>
-              <div className="text-[9px] text-gray-500">Years of Experience</div>
-              <div className="text-xs text-gray-700">
-                {lawyerData.years_of_experience ? `${lawyerData.years_of_experience} years` : 'Not specified'}
+              <div className="text-xs font-medium text-gray-900">
+                {lawyerData.roll_number || "Not provided"}
               </div>
             </div>
             <div>
-              <div className="text-[9px] text-gray-500">Verification Status</div>
+              <div className="text-[9px] text-gray-500">Roll Sign Date</div>
               <div className="text-xs text-gray-700">
-                {lawyerData.is_verified ? (
-                  <span className="text-green-600 font-medium">✓ Verified</span>
-                ) : (
-                  <span className="text-red-600 font-medium">✗ Not Verified</span>
-                )}
+                {formatDate(lawyerData.roll_sign_date, false)}
+              </div>
+            </div>
+            <div>
+              <div className="text-[9px] text-gray-500">
+                Years of Experience
+              </div>
+              <div className="text-xs text-gray-700">
+                {lawyerData.years_of_experience
+                  ? `${lawyerData.years_of_experience} years`
+                  : "Not specified"}
               </div>
             </div>
           </div>
@@ -190,9 +230,13 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
           </h4>
           <div className="grid grid-cols-1 gap-3">
             <div>
-              <div className="text-[9px] text-gray-500">Accepting Consultations</div>
+              <div className="text-[9px] text-gray-500">
+                Accepting Consultations
+              </div>
               <div className="text-xs text-gray-700 mt-1">
-                <ConsultationBadge accepting={lawyerData.accepting_consultations} />
+                <ConsultationBadge
+                  accepting={lawyerData.accepting_consultations}
+                />
               </div>
             </div>
           </div>
@@ -206,10 +250,11 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
               Specializations
             </h4>
             <div>
-              {Array.isArray(lawyerData.specializations) && lawyerData.specializations.length > 0 ? (
+              {Array.isArray(lawyerData.specializations) &&
+              lawyerData.specializations.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {lawyerData.specializations.map((spec, index) => (
-                    <span 
+                    <span
                       key={index}
                       className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 border border-blue-200"
                     >
@@ -218,7 +263,9 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-gray-500">No specializations listed</p>
+                <p className="text-xs text-gray-500">
+                  No specializations listed
+                </p>
               )}
             </div>
           </div>
@@ -254,11 +301,17 @@ const ViewLawyerModal = ({ open, onClose, lawyer, loading = false }) => {
             </div>
             <div>
               <div className="text-[9px] text-gray-500">Total Forum Posts</div>
-              <div className="text-xs font-medium text-gray-900">{lawyerData.post_count || 0}</div>
+              <div className="text-xs font-medium text-gray-900">
+                {lawyerData.post_count || 0}
+              </div>
             </div>
             <div>
-              <div className="text-[9px] text-gray-500">Total Consultations</div>
-              <div className="text-xs font-medium text-gray-900">{lawyerData.consultation_count || 0}</div>
+              <div className="text-[9px] text-gray-500">
+                Total Consultations
+              </div>
+              <div className="text-xs font-medium text-gray-900">
+                {lawyerData.consultation_count || 0}
+              </div>
             </div>
           </div>
         </div>
