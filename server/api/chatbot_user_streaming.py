@@ -901,7 +901,10 @@ async def ask_legal_question(
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
-                "Connection": "keep-alive"
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization"
             }
         )
     else:
@@ -910,16 +913,18 @@ async def ask_legal_question(
             # Collect the full response from the stream
             full_response = {}
             async for chunk in generate_stream():
-                # Parse SSE format chunks
+                # Parse SSE format chunks - format_sse adds "data: " prefix
                 if chunk.startswith("data: "):
                     try:
-                        data = json.loads(chunk[6:])  # Remove "data: " prefix
+                        # Remove "data: " prefix and parse JSON
+                        json_data = chunk[6:].strip()  # Remove prefix and whitespace
+                        data = json.loads(json_data)
                         full_response.update(data)
                         if data.get("done"):
                             break
                     except json.JSONDecodeError:
                         continue
-            
+
             # Return the complete response as JSON
             return full_response
         except Exception as e:

@@ -224,9 +224,7 @@ from api.chatbot_lawyer_streaming import router as lawyer_chatbot_streaming_rout
 from api.chatbot_user import router as user_chatbot_router
 from api.chatbot_lawyer import router as lawyer_chatbot_router
 app.include_router(user_chatbot_streaming_router)                              
-app.include_router(lawyer_chatbot_streaming_router)                              
-app.include_router(user_chatbot_router)                   
-app.include_router(lawyer_chatbot_router)                   
+app.include_router(lawyer_chatbot_streaming_router)                   
 
                                         
 from routes.chat_history import router as chat_history_router

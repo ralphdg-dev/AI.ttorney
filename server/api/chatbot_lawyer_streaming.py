@@ -661,8 +661,10 @@ Note: No specific context was retrieved from the vector database. Proceed with t
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",                           
-                "Access-Control-Allow-Origin": "*",                
+                "X-Accel-Buffering": "no",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization"
             }
         )
     else:
@@ -671,10 +673,12 @@ Note: No specific context was retrieved from the vector database. Proceed with t
             # Collect the full response from the stream
             full_response = {}
             async for chunk in generate_stream():
-                # Parse SSE format chunks
+                # Parse SSE format chunks - format_sse adds "data: " prefix
                 if chunk.startswith("data: "):
                     try:
-                        data = json.loads(chunk[6:])  # Remove "data: " prefix
+                        # Remove "data: " prefix and parse JSON
+                        json_data = chunk[6:].strip()  # Remove prefix and whitespace
+                        data = json.loads(json_data)
                         full_response.update(data)
                         if data.get("done"):
                             break
