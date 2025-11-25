@@ -4,6 +4,8 @@ from typing import Optional, AsyncGenerator, Dict, List
 import json
 import time
 import logging
+
+logger = logging.getLogger(__name__)
 from datetime import datetime
 
 from utils.sse_formatter import format_sse

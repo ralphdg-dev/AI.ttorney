@@ -221,8 +221,6 @@ app.include_router(forum_search_router)
                                                                      
 from api.chatbot_user_streaming import router as user_chatbot_streaming_router
 from api.chatbot_lawyer_streaming import router as lawyer_chatbot_streaming_router
-from api.chatbot_user import router as user_chatbot_router
-from api.chatbot_lawyer import router as lawyer_chatbot_router
 app.include_router(user_chatbot_streaming_router)                              
 app.include_router(lawyer_chatbot_streaming_router)                   
 
