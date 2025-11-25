@@ -19,7 +19,7 @@ import {
   Animated,
   StatusBar,
   } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../constants/Colors";
@@ -38,7 +38,7 @@ import { Send } from "lucide-react-native";
 import { MarkdownText } from "../components/chatbot/MarkdownText";
 import { ModerationWarningBanner } from "../components/moderation/ModerationWarningBanner";
 import { NetworkConfig } from "../utils/networkConfig";
-import { LAYOUT, getTotalUIHeight } from "../constants/LayoutConstants";
+import { LAYOUT } from "../constants/LayoutConstants";
 import { addGuestDataToRequest, logGuestRequest } from "../utils/guestRequestHelper";
 import GuestOnboardingTutorial from "../components/guest/GuestOnboardingTutorial";
 
@@ -340,7 +340,6 @@ export default function ChatbotScreen() {
   const { isGuestMode, hasReachedLimit, incrementPromptCount, startGuestSession, updateGuestSessionId, guestSession, isLoading: isGuestLoading, showTutorial, setShowTutorial } = useGuest();
   const guestChat = useGuestChat(); // Always call hooks unconditionally
   const { moderationStatus, refreshStatus } = useModerationStatus();
-  const insets = useSafeAreaInsets();
   const [showLimitBanner, setShowLimitBanner] = useState(true);
   const [isGuestSidebarOpen, setIsGuestSidebarOpen] = useState(false);
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
@@ -456,18 +455,8 @@ export default function ChatbotScreen() {
   const shouldAutoScroll = useRef<boolean>(true); // Track if we should auto-scroll (user hasn't scrolled up)
   const scrollAnimationFrame = useRef<number | null>(null); // Animation frame for smooth scrolling
   const inputContainerHeight = useRef<number>(0); // Measured height of input container
-  const navbarHeight = useRef<number>(60); // Navbar height (fixed)
   
-  // Calculate bottom padding based on actual measured UI elements
-  // This is more accurate than percentage-based guessing
-  const getBottomPadding = useCallback(() => {
-    // Real measurements: navbar + input container + comfortable spacing
-    const totalUIHeight = navbarHeight.current + inputContainerHeight.current;
-    const breathingRoom = 20; // Small fixed spacing for comfort
-    
-    return totalUIHeight + breathingRoom;
-  }, []);
-
+  
   // Dynamic greeting that changes per session
   const greeting = useMemo(() => {
     const guestGreetings = [
@@ -1691,9 +1680,8 @@ export default function ChatbotScreen() {
             contentContainerStyle={[
               tw`pt-2`,
               { 
-                // Padding based on actual measured UI elements (navbar + input)
-                // More accurate than percentage-based calculations
-                paddingBottom: getBottomPadding()
+                // Reduced padding since input is now in flex layout with keyboard avoidance
+                paddingBottom: 100 // Fixed padding for keyboard space
               }
             ]}
             showsVerticalScrollIndicator={false}
@@ -1794,17 +1782,13 @@ export default function ChatbotScreen() {
         )}
       </View>
 
-      {/* Composer - Fixed at bottom */}
+      {/* Composer - Now properly positioned for keyboard avoidance */}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
         style={{
-          position: 'absolute',
-          bottom: getTotalUIHeight(insets.bottom),
-          left: 0,
-          right: 0,
-          zIndex: LAYOUT.Z_INDEX.fixed,
           backgroundColor: '#FFFFFF',
+          zIndex: LAYOUT.Z_INDEX.fixed,
         }}
       >
         <View

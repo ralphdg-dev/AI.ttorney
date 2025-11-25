@@ -263,10 +263,8 @@ const styles = StyleSheet.create({
     color: '#DC2626',
   },
   bottomBannerContainer: {
-    position: 'absolute',
-    bottom: 80,
-    left: 0,
-    right: 0,
+    marginHorizontal: 16,
+    marginBottom: 16,
     zIndex: 10,
   },
 });

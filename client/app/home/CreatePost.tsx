@@ -6,7 +6,6 @@ import { ArrowLeft } from 'lucide-react-native';
 import CategoryScroller from '@/components/glossary/CategoryScroller';
 import Colors from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
-import ToggleSwitch from '@/components/ui/ToggleSwitch';
 import CustomToggle from '@/components/common/CustomToggle';
 import Navbar from '@/components/Navbar';
 import { ModerationWarningBanner } from '@/components/moderation/ModerationWarningBanner';
@@ -255,10 +254,8 @@ const styles = StyleSheet.create({
     color: '#DC2626',
   },
   bottomBannerContainer: {
-    position: 'absolute',
-    bottom: 80,
-    left: 0,
-    right: 0,
+    marginHorizontal: 16,
+    marginBottom: 16,
     zIndex: 10,
   },
 });
