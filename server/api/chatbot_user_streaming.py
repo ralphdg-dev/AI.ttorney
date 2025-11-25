@@ -4,27 +4,40 @@ from typing import Optional, AsyncGenerator
 import json
 import time
 import logging
-from utils.sse_formatter import format_sse
 
-                                                                       
+# Initialize clients directly to avoid importing from crashing old file
+from utils.sse_formatter import format_sse
+from services.client_cache import get_qdrant_client, get_openai_client
+import os
+
+# Initialize clients directly to avoid importing from crashing old file
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+
+# Validate environment variables
+if not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY environment variable is required")
+if not QDRANT_URL:
+    raise ValueError("QDRANT_URL environment variable is required")
+if not QDRANT_API_KEY:
+    raise ValueError("QDRANT_API_KEY environment variable is required")
+
+# Initialize clients
+openai_client = get_openai_client()
+qdrant_client = get_qdrant_client()
+
 from api.chatbot_user import (
-            
     ChatRequest,
-    
-              
     get_optional_current_user,
     get_chat_history_service,
     ChatHistoryService,
-    
-                        
     is_simple_greeting,
     is_conversation_context_question,
     is_app_information_question,
     is_translation_request,
     is_legal_category_request,
     get_legal_category_response,
-    
-                   
     CHAT_MODEL,
     TOP_K_RESULTS,
     STREAMING_TIMEOUT_SECONDS,
@@ -32,9 +45,6 @@ from api.chatbot_user import (
     STREAMING_MAX_INTERVAL_MS,
     ENGLISH_SYSTEM_PROMPT,
     TAGALOG_SYSTEM_PROMPT,
-    openai_client,
-    
-                       
     detect_language,
     is_legal_question,
     generate_ai_response,
@@ -43,8 +53,6 @@ from api.chatbot_user import (
     save_chat_interaction,
     is_professional_advice_roleplay_request,
     build_professional_referral_response,
-    
-                
     get_moderation_service,
     get_violation_tracking_service,
     ViolationType

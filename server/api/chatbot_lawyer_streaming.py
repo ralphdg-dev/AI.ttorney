@@ -9,26 +9,37 @@ logger = logging.getLogger(__name__)
 from datetime import datetime
 
 from utils.sse_formatter import format_sse
+from services.client_cache import get_qdrant_client, get_openai_client
+import os
 
-                                                         
+# Initialize clients directly to avoid importing from crashing old file
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+
+# Validate environment variables
+if not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY environment variable is required")
+if not QDRANT_URL:
+    raise ValueError("QDRANT_URL environment variable is required")
+if not QDRANT_API_KEY:
+    raise ValueError("QDRANT_API_KEY environment variable is required")
+
+# Initialize clients
+openai_client = get_openai_client()
+qdrant_client = get_qdrant_client()
+
+# Import only what we need from the old file (avoiding client imports)
 from api.chatbot_lawyer import (
-            
     ChatRequest,
-    
-              
     get_optional_current_user,
     get_chat_history_service,
     ChatHistoryService,
-    
-                   
     CHAT_MODEL,
     TOP_K_RESULTS,
-    openai_client,
     guardrails_instance,
     LAWYER_SYSTEM_PROMPT_ENGLISH,
     LAWYER_SYSTEM_PROMPT_TAGALOG,
-    
-                          
     detect_prohibited_input,
     is_gibberish_input,
     detect_language,
@@ -37,16 +48,10 @@ from api.chatbot_lawyer import (
     is_out_of_scope_topic,
     is_legal_question,
     is_complex_query,
-    
-                       
     generate_ai_response,
     save_chat_interaction,
-                                       
     is_professional_advice_roleplay_request,
-    build_professional_referral_response,
-    
-             
-    logger
+    build_professional_referral_response
 )
 
                                                   
