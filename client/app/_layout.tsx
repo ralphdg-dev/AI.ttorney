@@ -64,7 +64,7 @@ function AppContent() {
                 <BookmarksProvider>
                   <PostBookmarksProvider>
                     <ConsultationsProvider>
-                      <ErrorBoundary fallbackRoute="/home">
+                      <ErrorBoundary fallbackRoute="/login">
                         <ForumCacheProvider>
                           <SidebarProvider>
                             <AuthGuard>

@@ -90,6 +90,7 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
         setPosts([]);
       }
     } catch (error) {
+      console.warn('Failed to load posts:', error);
       setPosts([]);
     } finally {
       setRefreshing(false);
@@ -118,12 +119,12 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
 
   const handleCommentPress = (postId: string) => {
     console.log(`Comment pressed for post ${postId}`);
-    // TODO: Navigate to comments screen
+    // TODO: Navigate to comments screen (KNOWN ISSUE - Low priority for production)
   };
 
   const handleReportPress = (postId: string) => {
     console.log(`Report pressed for post ${postId}`);
-    // TODO: Show report modal
+    // TODO: Show report modal (KNOWN ISSUE - Low priority for production)
   };
 
   const handlePostPress = (postId: string) => {

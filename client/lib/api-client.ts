@@ -77,11 +77,13 @@ class ApiClient {
 
       if (!response.ok) {
         const errorMessage = (data && (data.detail || data.message)) || text || `Request failed (${response.status})`;
-        console.log('🔍 DEBUG: API Error Response');
-        console.log('🔍 DEBUG: Response status:', response.status);
-        console.log('🔍 DEBUG: Response data:', data);
-        console.log('🔍 DEBUG: Response text:', text);
-        console.log('🔍 DEBUG: Error message:', errorMessage);
+        if (__DEV__) {
+          console.log('🔍 DEBUG: API Error Response');
+          console.log('🔍 DEBUG: Response status:', response.status);
+          console.log('🔍 DEBUG: Response data:', data);
+          console.log('🔍 DEBUG: Response text:', text);
+          console.log('🔍 DEBUG: Error message:', errorMessage);
+        }
         const errorResponse: ApiResponse = {
           success: false,
           error: errorMessage,
@@ -107,9 +109,11 @@ class ApiClient {
       if (data && typeof data === 'object' && typeof (data as any).message === 'string') {
         successResponse.message = (data as any).message;
       }
-      console.log('🔍 DEBUG: API Success Response');
-      console.log('🔍 DEBUG: Response data:', data);
-      console.log('🔍 DEBUG: Success response:', successResponse);
+      if (__DEV__) {
+        console.log('🔍 DEBUG: API Success Response');
+        console.log('🔍 DEBUG: Response data:', data);
+        console.log('🔍 DEBUG: Success response:', successResponse);
+      }
       return successResponse;
     } catch (error) {
       const isNetworkError = error instanceof Error && (

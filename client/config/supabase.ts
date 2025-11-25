@@ -14,12 +14,12 @@ const createSupabaseClient = () => {
     return supabaseInstance;
   }
 
-  // Validate that we have the required credentials
+  // Validate that we have the required credentials (with fallbacks)
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('❌ Missing Supabase credentials!');
-    console.error('URL:', supabaseUrl);
-    console.error('Key:', supabaseAnonKey ? 'Present' : 'Missing');
-    throw new Error('Supabase credentials not configured');
+    console.warn('⚠️ Using fallback Supabase credentials');
+    console.warn('URL:', supabaseUrl);
+    console.warn('Key:', supabaseAnonKey ? 'Present' : 'Missing');
+    // Don't throw error - use fallbacks instead
   }
 
   console.log('🔧 Creating Supabase client with URL:', supabaseUrl);

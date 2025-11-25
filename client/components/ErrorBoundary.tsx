@@ -7,6 +7,7 @@ interface ErrorBoundaryState {
   hasError: boolean;
   error?: Error;
   errorInfo?: React.ErrorInfo;
+  retryCount: number;
 }
 
 interface ErrorBoundaryProps {
@@ -18,18 +19,22 @@ interface ErrorBoundaryProps {
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, retryCount: 0 };
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
+    return { hasError: true, error, retryCount: 0 };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ error, errorInfo });
     
-    // Log error to console for development
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    // Enhanced error logging for debugging
+    console.error('🚨 ERROR BOUNDARY CAUGHT ERROR:');
+    console.error('Error:', error);
+    console.error('ErrorInfo:', errorInfo);
+    console.error('Component Stack:', errorInfo.componentStack);
+    console.error('Timestamp:', new Date().toISOString());
     
     // Call custom error handler if provided
     if (this.props.onError) {
@@ -65,7 +70,24 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   };
 
   private handleRetry = () => {
-    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+    const MAX_RETRIES = 3;
+    if (this.state.retryCount >= MAX_RETRIES) {
+      console.warn('🚨 Maximum retry attempts reached, redirecting to safe route');
+      this.setState({ hasError: false, error: undefined, errorInfo: undefined, retryCount: 0 });
+      try {
+        router.replace('/login' as any);
+      } catch (navError) {
+        console.error('Navigation to login failed:', navError);
+      }
+      return;
+    }
+    
+    this.setState(prevState => ({ 
+      hasError: false, 
+      error: undefined, 
+      errorInfo: undefined,
+      retryCount: prevState.retryCount + 1
+    }));
   };
 
   render() {

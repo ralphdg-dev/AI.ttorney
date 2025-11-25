@@ -304,7 +304,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (suspensionStatus && suspensionStatus.isSuspended) {
           setIsLoading(false);
           clearTimeout(timeoutId);
-          router.replace('/suspended' as any);
+          try {
+            router.replace('/suspended' as any);
+          } catch (routerError) {
+            console.warn('Router not ready during suspension redirect:', routerError);
+          }
           return;
         }
         
@@ -319,14 +323,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log(`🚀 Navigating to: ${redirectPath} (accepted lawyer)`);
           setIsLoading(false);
           clearTimeout(timeoutId);
-          router.replace(redirectPath as any);
+          try {
+            router.replace(redirectPath as any);
+          } catch (routerError) {
+            console.warn('Router not ready during lawyer redirect:', routerError);
+          }
         } else {
           // For pending/rejected lawyers or regular users, use normal role-based redirect
           const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
           console.log(`🚀 Navigating to: ${redirectPath} (role: ${profile.role})`);
           setIsLoading(false);
           clearTimeout(timeoutId);
-          router.replace(redirectPath as any);
+          try {
+            router.replace(redirectPath as any);
+          } catch (routerError) {
+            console.warn('Router not ready during role redirect:', routerError);
+          }
         }
       } else {
         // Token refresh - just update state, don't navigate
@@ -340,7 +352,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
       clearTimeout(timeoutId);
     }
-  }, [checkLawyerApplicationStatus, checkSuspensionStatus, getCurrentRoute]);
+  }, [checkLawyerApplicationStatus, checkSuspensionStatus, getCurrentRoute, toast]);
 
   useEffect(() => {
     // Initialize auth state and listen for auth changes
