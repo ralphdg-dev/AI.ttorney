@@ -53,6 +53,7 @@ interface TimelineProps {
 }
 
 export interface TimelineHandle {
+  scrollToTop: () => void;
   context?: 'user' | 'lawyer';
 }
 
@@ -761,7 +762,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
 
       {/* Show skeleton loading for initial load */}
       {initialLoading && allPosts.length === 0 ? (
-        <View style={styles.skeletonContainer}>
+        <View style={[styles.skeletonContainer, { paddingBottom: Math.max(32, insets.bottom + 16) }]}>
           <SkeletonList itemCount={8} itemHeight={200} spacing={12} />
         </View>
       ) : (
@@ -789,7 +790,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
 
       {/* Floating Create Post Button */}
       <TouchableOpacity 
-        style={styles.createPostButton} 
+        style={[styles.createPostButton, { bottom: 90 + (insets.bottom || 0) }]} 
         onPress={handleCreatePost} 
         activeOpacity={0.7}
         accessible={true}
@@ -848,7 +849,7 @@ const styles = StyleSheet.create({
   },
   createPostButton: {
     position: 'absolute',
-    bottom: 90, // Positioned above bottom navigation
+    bottom: 90, // Will be adjusted dynamically with safe area insets
     right: 20,
     width: 60, // Slightly larger for better touch target
     height: 60,

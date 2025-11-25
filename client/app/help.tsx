@@ -21,8 +21,10 @@ import tw from "tailwind-react-native-classnames";
 import Colors from "../constants/Colors";
 import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
+import { GuestNavbar } from "@/components/guest";
 import { SidebarWrapper } from "@/components/AppSidebar";
 import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
+import { useGuest } from "../contexts/GuestContext";
 
 const { width, height } = Dimensions.get("window");
 
@@ -77,6 +79,7 @@ const SkeletonLoader = () => {
 
 export default function HelpAndSupport() {
   const insets = useSafeAreaInsets();
+  const { isGuestMode } = useGuest();
   const [search, setSearch] = useState("");
   const [errors, setErrors] = useState({
     name: "",
@@ -90,7 +93,6 @@ export default function HelpAndSupport() {
   const [isLoading, setIsLoading] = useState(true);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [visibleFaqCount, setVisibleFaqCount] = useState(5);
 
   const [emailName, setEmailName] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
@@ -209,10 +211,8 @@ export default function HelpAndSupport() {
   const filteredFaqs = faqs.filter((item) =>
     item.question.toLowerCase().includes(search.toLowerCase())
   );
-  const displayedFaqs = filteredFaqs.slice(0, visibleFaqCount);
 
   useEffect(() => {
-    setVisibleFaqCount(5);
     setExpandedIndex(null);
   }, [search]);
 
@@ -337,7 +337,7 @@ export default function HelpAndSupport() {
       >
         <ScrollView
           style={tw`flex-1`}
-          contentContainerStyle={[tw`px-6`, { paddingBottom: 56 + (insets.bottom || 0) + 20 }]}
+          contentContainerStyle={[tw`px-6`, { paddingBottom: Math.max(56, insets.bottom + 36) }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -356,8 +356,8 @@ export default function HelpAndSupport() {
                 >
                   Frequently Asked Questions
                 </Text>
-                {displayedFaqs.length > 0 ? (
-                  displayedFaqs.map((item, index) => (
+                {filteredFaqs.length > 0 ? (
+                  filteredFaqs.map((item, index) => (
                     <View
                       key={`${item.question}-${index}`}
                       style={[
@@ -414,16 +414,6 @@ export default function HelpAndSupport() {
                   </View>
                 )}
 
-                {filteredFaqs.length > visibleFaqCount && (
-                  <View style={tw`items-center mt-1`}>
-                    <TouchableOpacity
-                      onPress={() => setVisibleFaqCount((c) => Math.min(c + 5, filteredFaqs.length))}
-                      style={[tw`px-4 py-2 rounded-lg`, { backgroundColor: Colors.primary.blue }]}
-                    >
-                      <Text style={tw`text-white font-semibold`}>See more</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
               </View>
 
               {/* Contact Section */}
@@ -512,7 +502,11 @@ export default function HelpAndSupport() {
       </KeyboardAvoidingView>
 
       {/* Bottom Navigation */}
-      <Navbar />
+      {isGuestMode ? (
+        <GuestNavbar activeTab="learn" />
+      ) : (
+        <Navbar />
+      )}
       <SidebarWrapper />
 
       {/* EMAIL FORM MODAL */}

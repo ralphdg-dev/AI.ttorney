@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StatusBar, FlatList } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ActivityIndicator, StatusBar, FlatList } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Search } from 'lucide-react-native';
+import { Search } from 'lucide-react-native';
 import Colors from '../constants/Colors';
 import { NetworkConfig } from '../utils/networkConfig';
 import Post from '../components/home/Post';
@@ -16,8 +16,9 @@ const SearchScreen: React.FC = () => {
   const { query: initialQueryParam } = useLocalSearchParams<{ query?: string }>();
   const { session } = useAuth();
   const { prefetchPost } = useForumCache();
+  const insets = useSafeAreaInsets();
 
-  const [query, setQuery] = useState<string>(typeof initialQueryParam === 'string' ? initialQueryParam : '');
+  const [query] = useState<string>(typeof initialQueryParam === 'string' ? initialQueryParam : '');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -60,7 +61,7 @@ const SearchScreen: React.FC = () => {
   }, []);
 
   // Auth headers helper (exact copy from Timeline)
-  const getAuthHeaders = async (): Promise<HeadersInit> => {
+  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
     try {
       // First try to get token from AuthContext session
       if (session?.access_token) {
@@ -85,7 +86,7 @@ const SearchScreen: React.FC = () => {
       if (__DEV__) console.error('Search auth error:', error);
       return { 'Content-Type': 'application/json' };
     }
-  };
+  }, [session]);
 
   // Fetch API (debounced)
   useEffect(() => {
@@ -138,15 +139,15 @@ const SearchScreen: React.FC = () => {
               
               setSearchResults(filteredPosts);
             } else {
-              const errorText = await res.text();
+              await res.text();
               setError(`API Error: ${res.status} ${res.statusText}`);
               setSearchResults([]);
             }
-          } catch (fetchError) {
+          } catch {
             setError('Network error occurred');
             setSearchResults([]);
           }
-        } catch (e: any) {
+        } catch {
           setError('Failed to fetch search results');
           setSearchResults([]);
         } finally {
@@ -158,7 +159,7 @@ const SearchScreen: React.FC = () => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query]);
+  }, [query, getAuthHeaders]);
 
   const EmptyState = (
     <View className="flex-1 justify-center items-center px-8 py-12">
@@ -188,7 +189,7 @@ const SearchScreen: React.FC = () => {
         {query && (
           <View className="bg-white border-b border-gray-200 px-4 py-3">
             <Text className="text-lg font-semibold text-gray-900">Search Results</Text>
-            <Text className="text-sm text-gray-500 mt-1">Results for "{query}"</Text>
+            <Text className="text-sm text-gray-500 mt-1">Results for &quot;{query}&quot;</Text>
           </View>
         )}
 
@@ -255,7 +256,7 @@ const SearchScreen: React.FC = () => {
                 );
               }}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingTop: 16, paddingBottom: 32 }}
+              contentContainerStyle={{ paddingTop: 16, paddingBottom: Math.max(32, insets.bottom + 16) }}
             />
           </View>
         ) : null}

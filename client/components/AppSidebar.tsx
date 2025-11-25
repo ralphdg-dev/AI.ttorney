@@ -503,7 +503,7 @@ export const SidebarWrapper: React.FC<{
         router.push("/onboarding/lawyer/verification-instructions");
         break;
       case "profile":
-        console.log("Profile page not implemented yet");
+        router.push("/profile");
         break;
       default:
         console.log(`Route ${route} not implemented yet`);

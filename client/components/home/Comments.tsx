@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, TextInput, FlatList, ListRenderItem } from 'react-native';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { View, Text, TextInput, FlatList, ListRenderItem, KeyboardAvoidingView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Send, User } from 'lucide-react-native';
 import Colors from '../../constants/Colors';
 import { useAuth } from '../../contexts/AuthContext';
@@ -43,8 +44,19 @@ const Comments: React.FC<CommentsProps> = React.memo(({
   onRefresh,
 }) => {
   const { user: currentUser } = useAuth();
+  const insets = useSafeAreaInsets();
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const inputContainerHeight = useRef<number>(0);
+
+  // Calculate bottom padding for keyboard avoidance
+  const getBottomPadding = useCallback(() => {
+    const inputHeight = inputContainerHeight.current || 80;
+    const navbarHeight = 60;
+    const safeAreaBottom = insets.bottom || 0;
+    const spacing = 20;
+    return inputHeight + navbarHeight + safeAreaBottom + spacing;
+  }, [insets.bottom]);
 
 
   const isCommentDisabled = useMemo(() => {
@@ -132,69 +144,86 @@ const Comments: React.FC<CommentsProps> = React.memo(({
 
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+    >
       <Text style={styles.title}>Comments ({comments.length})</Text>
 
-
-      {/* Comment Input */}
-      {currentUser && (
-        <FadeInView delay={0}>
-          <Card variant="outlined" padding="medium" style={styles.inputCard}>
-            <TextInput
-              style={styles.commentInput}
-              placeholder="Write a comment..."
-              placeholderTextColor={Colors.text.tertiary}
-              value={newComment}
-              onChangeText={setNewComment}
-              multiline
-              maxLength={500}
-              textAlignVertical="top"
-            />
-            <View style={styles.inputActions}>
-              <Text style={[
-                styles.characterCount,
-                newComment.length > 500 && styles.characterCountExceeded
-              ]}>
-                {newComment.length}/500
-              </Text>
-              <Button
-                title="Post"
-                variant="primary"
-                size="small"
-                disabled={isCommentDisabled}
-                loading={isSubmitting}
-                onPress={handleSubmitComment}
-                icon={<Send size={14} color={Colors.text.white} />}
-                iconPosition="right"
-              />
-            </View>
-          </Card>
-        </FadeInView>
-      )}
-
-
       {/* Comments List */}
-      {comments.length > 0 ? (
-        <FlatList
-          {...optimizedListProps}
-          style={styles.commentsList}
-          contentContainerStyle={styles.commentsListContent}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={false} // Disable scroll since it's inside a ScrollView
-          windowSize={8}
-          initialNumToRender={5}
-          maxToRenderPerBatch={3}
-        />
-      ) : (
-        <FadeInView delay={200}>
-          <Card variant="flat" padding="large" style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              No comments yet. Be the first to share your thoughts!
+      <FlatList
+        {...optimizedListProps}
+        style={styles.commentsList}
+        contentContainerStyle={[styles.commentsListContent, { paddingBottom: getBottomPadding() }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 10
+        }}
+        windowSize={8}
+        initialNumToRender={5}
+        maxToRenderPerBatch={3}
+        ListEmptyComponent={
+          <FadeInView delay={200}>
+            <Card variant="flat" padding="large" style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                No comments yet. Be the first to share your thoughts!
+              </Text>
+            </Card>
+          </FadeInView>
+        }
+      />
+
+      {/* Comment Input - Fixed at bottom */}
+      {currentUser && (
+        <View
+          onLayout={(event) => {
+            const { height } = event.nativeEvent.layout;
+            inputContainerHeight.current = height;
+          }}
+          style={[
+            styles.inputCard,
+            {
+              paddingBottom: 16 + (insets.bottom || 0),
+              backgroundColor: '#FFFFFF',
+              borderTopWidth: 1,
+              borderTopColor: Colors.border.light,
+            }
+          ]}
+        >
+          <TextInput
+            style={styles.commentInput}
+            placeholder="Write a comment..."
+            placeholderTextColor={Colors.text.tertiary}
+            value={newComment}
+            onChangeText={setNewComment}
+            multiline
+            maxLength={500}
+            textAlignVertical="top"
+          />
+          <View style={styles.inputActions}>
+            <Text style={[
+              styles.characterCount,
+              newComment.length > 500 && styles.characterCountExceeded
+            ]}>
+              {newComment.length}/500
             </Text>
-          </Card>
-        </FadeInView>
+            <Button
+              title="Post"
+              variant="primary"
+              size="small"
+              disabled={isCommentDisabled}
+              loading={isSubmitting}
+              onPress={handleSubmitComment}
+              icon={<Send size={14} color={Colors.text.white} />}
+              iconPosition="right"
+            />
+          </View>
+        </View>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 });
 

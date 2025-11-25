@@ -457,6 +457,15 @@ export default function ChatbotScreen() {
   const scrollAnimationFrame = useRef<number | null>(null); // Animation frame for smooth scrolling
   const inputContainerHeight = useRef<number>(0); // Measured height of input container
   
+  // Calculate bottom padding for keyboard avoidance
+  const getBottomPadding = useCallback(() => {
+    const inputHeight = inputContainerHeight.current || 80;
+    const navbarHeight = 60;
+    const safeAreaBottom = insets.bottom || 0;
+    const spacing = 20;
+    return inputHeight + navbarHeight + safeAreaBottom + spacing;
+  }, [insets.bottom]);
+  
   
   // Dynamic greeting that changes per session
   const greeting = useMemo(() => {
@@ -1681,11 +1690,16 @@ export default function ChatbotScreen() {
             contentContainerStyle={[
               tw`pt-2`,
               { 
-                // Reduced padding since input is now in flex layout with keyboard avoidance
-                paddingBottom: 100 // Fixed padding for keyboard space
+                // Dynamic padding for keyboard avoidance - matches input container height
+                paddingBottom: getBottomPadding()
               }
             ]}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            maintainVisibleContentPosition={{
+              minIndexForVisible: 0,
+              autoscrollToTopThreshold: 10
+            }}
             onLayout={() => {
               // Initial scroll when conversation loads - scroll to absolute bottom
               if (messages.length > 0 && !isTyping) {
@@ -1712,10 +1726,6 @@ export default function ChatbotScreen() {
                 // Using scrollToOffset with large value ensures we reach absolute bottom
                 smoothScrollToBottom();
               }
-            }}
-            maintainVisibleContentPosition={{
-              minIndexForVisible: 0,
-              autoscrollToTopThreshold: 10,
             }}
             onScroll={(event) => {
               // Detect if user manually scrolled up

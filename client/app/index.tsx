@@ -1,5 +1,6 @@
 import { Redirect } from "expo-router";
 import { useMemo, useEffect, useState } from "react";
+import { View, Text, Image, StyleSheet } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { useGuest } from "../contexts/GuestContext";
 import { getRoleBasedRedirect } from "../config/routes";
@@ -53,5 +54,46 @@ export default function SplashScreen() {
     return "/login";
   }, [initialAuthCheck, isLoading, isAuthenticated, isGuestMode, user, hasSeenOnboarding, forceRender]);
 
-  return redirectPath ? <Redirect href={redirectPath as any} /> : null;
+  // Show splash screen while loading
+  if (redirectPath === null) {
+    return (
+      <View style={styles.container}>
+        <Image 
+          source={require("../assets/images/splash-icon.png")} 
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <Text style={styles.title}>AI.ttorney</Text>
+        <Text style={styles.subtitle}>Your Legal Assistant</Text>
+      </View>
+    );
+  }
+
+  return <Redirect href={redirectPath as any} />;
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  logo: {
+    width: 200,
+    height: 200,
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#1e40af',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 40,
+  },
+});
