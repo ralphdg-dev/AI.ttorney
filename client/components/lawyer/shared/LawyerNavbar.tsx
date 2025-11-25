@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
 import { 
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react-native';
 import Colors from '../../../constants/Colors';
 import { GlobalStyles } from '../../../constants/GlobalStyles';
+import { LAYOUT } from '../../../constants/LayoutConstants';
 
 interface LawyerNavbarProps {
   activeTab?: 'home' | 'forum' | 'consult' | 'chatbot' | 'profile' | null;
@@ -153,31 +154,47 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E5E7EB',
-    boxShadow: '0 -2px 3px rgba(0, 0, 0, 0.1)',
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.08)',
+      },
+    }),
   },
   navbar: {
     flexDirection: 'row',
-    height: 60,
+    height: LAYOUT.NAVBAR_HEIGHT,
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 8,
+    paddingHorizontal: LAYOUT.SPACING.xs,
+    paddingVertical: LAYOUT.SPACING.xs,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 16,
-    marginHorizontal: 3,
+    minHeight: LAYOUT.MIN_TOUCH_TARGET,
+    paddingVertical: LAYOUT.SPACING.xs - 2,
+    paddingHorizontal: LAYOUT.SPACING.xs,
+    borderRadius: LAYOUT.RADIUS.md,
+    marginHorizontal: LAYOUT.SPACING.xxs,
   },
   tabLabel: {
     fontSize: 10,
-    marginTop: 4,
+    marginTop: 2,
     textAlign: 'center',
+    fontWeight: '500',
+    letterSpacing: Platform.select({ ios: -0.1, default: 0 }),
     ...GlobalStyles.text,
   },
   activeLabel: {
@@ -187,6 +204,7 @@ const styles = StyleSheet.create({
   inactiveLabel: {
     color: Colors.primary.blue,
     opacity: 0.6,
+    ...GlobalStyles.text,
   },
 });
 
