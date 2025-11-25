@@ -9,14 +9,8 @@ logger = logging.getLogger(__name__)
 from datetime import datetime
 
 from utils.sse_formatter import format_sse
-from services.client_cache import get_qdrant_client, get_openai_client
-import os
 
-# Initialize clients using cached singletons (validation handled in client_cache.py)
-openai_client = get_openai_client()
-qdrant_client = get_qdrant_client()
-
-# Import only what we need from the old file (avoiding client imports)
+# Import everything from the old file including pre-initialized clients
 from api.chatbot_lawyer import (
     ChatRequest,
     get_optional_current_user,
@@ -24,6 +18,8 @@ from api.chatbot_lawyer import (
     ChatHistoryService,
     CHAT_MODEL,
     TOP_K_RESULTS,
+    openai_client,
+    qdrant_client,
     guardrails_instance,
     LAWYER_SYSTEM_PROMPT_ENGLISH,
     LAWYER_SYSTEM_PROMPT_TAGALOG,

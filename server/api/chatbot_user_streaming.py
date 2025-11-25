@@ -5,18 +5,16 @@ import json
 import time
 import logging
 
-# Initialize clients using cached singletons (validation handled in client_cache.py)
 from utils.sse_formatter import format_sse
-from services.client_cache import get_qdrant_client, get_openai_client
 
-openai_client = get_openai_client()
-qdrant_client = get_qdrant_client()
-
+# Import everything from the old file including pre-initialized clients
 from api.chatbot_user import (
     ChatRequest,
     get_optional_current_user,
     get_chat_history_service,
     ChatHistoryService,
+    openai_client,
+    qdrant_client,
     is_simple_greeting,
     is_conversation_context_question,
     is_app_information_question,
