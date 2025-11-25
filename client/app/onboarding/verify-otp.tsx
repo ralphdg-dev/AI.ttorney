@@ -21,7 +21,7 @@ import otpsent from "../../assets/images/otpsent.png";
 export default function VerifyOTP() {
   const params = useLocalSearchParams();
   const email = typeof params.email === 'string' ? params.email : "user@example.com";
-  const { signIn } = useAuth();
+  const { signIn, refreshUserData } = useAuth();
 
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
@@ -191,6 +191,12 @@ export default function VerifyOTP() {
             
             if (signInResult.success) {
               console.log('✅ Automatic sign-in successful after OTP verification');
+              
+              // CRITICAL: Refetch user profile to get updated is_verified status
+              console.log('🔄 Refetching user profile to get updated is_verified status...');
+              const refreshedProfile = await refreshUserData();
+              console.log('📊 Refreshed profile data:', refreshedProfile);
+              
               // Clean up the temporary password
               await AsyncStorage.removeItem('temp_registration_password');
               console.log('🧹 Removed temp_registration_password from storage');
