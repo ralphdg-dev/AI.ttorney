@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import { View, FlatList, RefreshControl, TouchableOpacity, Animated, StyleSheet } from 'react-native';
+import { View, FlatList, RefreshControl, TouchableOpacity, Animated, StyleSheet, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Post from '../../home/Post';
@@ -12,6 +13,7 @@ import { shouldUseNativeDriver } from '../../../utils/animations';
 import { NetworkConfig } from '../../../utils/networkConfig';
 import { useList } from '@/hooks/useOptimizedList';
 import { SkeletonList } from '@/components/ui/SkeletonLoader';
+import { getResponsiveValue } from '@/constants/LayoutConstants';
 
 
 type ForumPostWithUser = {
@@ -29,6 +31,7 @@ type ForumPostWithUser = {
   content: string;
   comments: number;
   isOptimistic?: boolean;
+  isLoading?: boolean; // For loading state
   animatedOpacity?: Animated.Value;
   isNewlyLoaded?: boolean;
   loadedIndex?: number;
@@ -45,6 +48,14 @@ const LawyerTimeline: React.FC = React.memo(() => {
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
   const { getCachedPosts, setCachedPosts, isCacheValid, updatePostBookmark, setLastFetchTime, prefetchPost, setCachedPost } = useForumCache();
+  
+  // Responsive sizing for create post button
+  const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const buttonSize = getResponsiveValue(screenWidth, 50, 56, 60);
+  const iconSize = getResponsiveValue(screenWidth, 22, 24, 26);
+  const bottomOffset = getResponsiveValue(screenWidth, 66, 70, 74); // NAVBAR_HEIGHT (56) + breathing room (10-18)
+  const rightOffset = getResponsiveValue(screenWidth, 16, 20, 24);
 
   const [posts, setPosts] = useState<ForumPostWithUser[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -431,6 +442,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
       content: postData.body,
       comments: 0,
       isOptimistic: true,
+      isLoading: true, // Add loading state for consistent UX
       animatedOpacity,
       body: postData.body,
       domain: postData.category || 'others',
@@ -454,25 +466,32 @@ const LawyerTimeline: React.FC = React.memo(() => {
   // Function to confirm optimistic post (make it fully opaque and keep it seamless)
   const confirmOptimisticPost = useCallback((optimisticId: string, realPost?: ForumPostWithUser) => {
     setOptimisticPosts(prev => {
-      const post = prev.find(p => p.id === optimisticId);
-      if (post?.animatedOpacity) {
-        // Animate to full opacity to show success
-        Animated.timing(post.animatedOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: shouldUseNativeDriver('opacity'),
-        }).start();
-        
-        // Keep optimistic post visible and let duplicate detection handle seamless transition
-        // The post will automatically be filtered out when the real post appears
-        // Only remove it after a reasonable time to ensure the real post has loaded
-        setTimeout(() => {
-          if (isComponentMounted.current) {
-            setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+      const updatedPosts = prev.map(post => {
+        if (post.id === optimisticId) {
+          // Remove loading state and animate to full opacity
+          const updatedPost = { ...post, isLoading: false };
+          if (post.animatedOpacity) {
+            Animated.timing(post.animatedOpacity, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: shouldUseNativeDriver('opacity'),
+            }).start();
           }
-        }, 3000); // Extended delay - duplicate detection prevents visual duplicates
-      }
-      return prev;
+          return updatedPost;
+        }
+        return post;
+      });
+      
+      // Keep optimistic post visible and let duplicate detection handle seamless transition
+      // The post will automatically be filtered out when the real post appears
+      // Only remove it after a reasonable time to ensure the real post has loaded
+      setTimeout(() => {
+        if (isComponentMounted.current) {
+          setOptimisticPosts(current => current.filter(p => p.id !== optimisticId));
+        }
+      }, 3000); // Extended delay - duplicate detection prevents visual duplicates
+      
+      return updatedPosts;
     });
     
     // Refresh posts to get the real post
@@ -638,14 +657,15 @@ const LawyerTimeline: React.FC = React.memo(() => {
         style={[
           {
             position: 'absolute',
-            bottom: 80,
-            right: 20,
+            bottom: bottomOffset + (insets.bottom || 0),
+            right: rightOffset,
             backgroundColor: Colors.primary.blue,
-            width: 56,
-            height: 56,
-            borderRadius: 28,
+            width: buttonSize,
+            height: buttonSize,
+            borderRadius: buttonSize / 2,
             justifyContent: 'center',
             alignItems: 'center',
+            zIndex: 1000, // Ensure it appears above other elements
             ...createShadowStyle({
               shadowColor: Colors.primary.blue,
               shadowOffset: { width: 0, height: 4 },
@@ -657,8 +677,12 @@ const LawyerTimeline: React.FC = React.memo(() => {
         ]} 
         onPress={handleCreatePost} 
         activeOpacity={0.8}
+        accessible={true}
+        accessibilityLabel="Create new post"
+        accessibilityRole="button"
+        accessibilityHint="Tap to create a new forum post"
       >
-        <Plus size={24} color="#FFFFFF" />
+        <Plus size={iconSize} color="#FFFFFF" strokeWidth={2.5} />
       </TouchableOpacity>
     </View>
   );

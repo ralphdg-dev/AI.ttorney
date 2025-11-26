@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
 import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
 import { getCategoryColors, getCategoryDisplayText } from '@/utils/categoryUtils';
 import ReportModal from '../common/ReportModal';
@@ -435,12 +435,7 @@ const Post: React.FC<PostProps> = React.memo(({
         {/* Post Content */}
         <View style={styles.contentContainer}>
           <Text style={styles.content}>{content}</Text>
-          {isLoading && (
-            <View style={styles.loadingIndicator}>
-              <ActivityIndicator size="small" color={Colors.primary.blue} />
-              <Text style={styles.loadingText}>Publishing...</Text>
-            </View>
-          )}
+          {/* Removed publishing indicator - just use opacity */}
         </View>
 
 
@@ -528,8 +523,7 @@ const styles = StyleSheet.create({
   },
   loadingPost: {
     opacity: 0.7,
-    borderColor: Colors.primary.blue,
-    borderWidth: 1,
+    // Removed blue border - just use opacity
   },
   userRow: {
     flexDirection: 'row',
@@ -554,10 +548,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
-    flex: 1, // Allow proper text truncation
+    flexShrink: 1, // Allow shrinking but don't expand unnecessarily
   },
   verifiedBadgeContainer: {
-    marginLeft: 8,
+    marginLeft: 4, // Reduced from 8 to 4 for closer spacing
   },
   categoryRow: {
     flexDirection: 'row',
@@ -569,7 +563,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0F1419',
     marginRight: 8, // Will be overridden by responsive value
-    flex: 1, // Allow text to take available space and truncate
+    flexShrink: 1, // Allow text to shrink when needed but don't expand unnecessarily
   },
   userMetaRow: {
     flexDirection: 'row',
@@ -610,22 +604,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: '#0F1419',
   },
-  loadingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 16,
-    alignSelf: 'flex-start',
-  },
-  loadingText: {
-    fontSize: 12,
-    color: Colors.primary.blue,
-    marginLeft: 6,
-    fontWeight: '500',
-  },
+  // Removed loadingIndicator and loadingText styles - no longer needed
   moreMenu: {
     position: 'absolute',
     top: 40,

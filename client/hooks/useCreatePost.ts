@@ -213,8 +213,11 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
       is_anonymous: isAnonymous,
     };
 
-    // Add optimistic post but don't navigate back yet
+    // Add optimistic post and navigate back immediately for better UX
     const optimisticId = addOptimisticPost(payload);
+    
+    // Navigate back immediately to show optimistic post in timeline
+    router.back();
     
     try {
       const apiUrl = await NetworkConfig.getBestApiUrl();
@@ -264,8 +267,7 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
         } else {
           confirmOptimisticPost(optimisticId);
         }
-        // Navigate back after successful post confirmation
-        router.back();
+        // No need to navigate back - already navigated
       }, OPTIMISTIC_CONFIRM_DELAY);
 
     } catch (e: any) {

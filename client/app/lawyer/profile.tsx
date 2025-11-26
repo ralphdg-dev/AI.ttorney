@@ -10,6 +10,8 @@ import {
   StatusBar,
   useWindowDimensions,
 } from "react-native";
+import { useToast } from "@/components/ui/toast";
+import { createSafeAreaToastRenderer } from "@/components/ui/SafeAreaToast";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
 import {
@@ -87,6 +89,7 @@ const LawyerProfilePage: React.FC = () => {
   const router = useRouter();
   const { user, signOut, refreshUserData } = useAuth();
   const { width: screenWidth } = useWindowDimensions();
+  const toast = useToast();
   
   // Responsive sizing based on screen width and avatar size
   const avatarSize = screenWidth < 375 ? 72 : screenWidth < 768 ? 76 : 80;
@@ -257,13 +260,60 @@ const LawyerProfilePage: React.FC = () => {
     }
 
     const newStatus = !isAcceptingConsultations;
+    
+    // Only validate when trying to turn ON accepting consultations
+    if (newStatus) {
+      const validationErrors: string[] = [];
+
+      // Check required fields
+      if (!lawyerContactInfo.phone_number?.trim()) {
+        validationErrors.push("• Phone number is required");
+      }
+      if (!lawyerContactInfo.location?.trim()) {
+        validationErrors.push("• Location/address is required");
+      }
+      if (!lawyerContactInfo.bio?.trim()) {
+        validationErrors.push("• Professional bio is required");
+      }
+      if (!lawyerContactInfo.specializations?.trim()) {
+        validationErrors.push("• Legal specializations are required");
+      }
+
+      // Check availability
+      const { selectedDays, dayTimeSlots } = parseAvailabilityData();
+      if (selectedDays.length === 0) {
+        validationErrors.push("• Available days must be selected");
+      } else {
+        const daysWithoutTimes = selectedDays.filter(day => 
+          !dayTimeSlots[day] || dayTimeSlots[day].length === 0
+        );
+        if (daysWithoutTimes.length > 0) {
+          validationErrors.push(`• Time slots must be set for: ${daysWithoutTimes.join(", ")}`);
+        }
+      }
+
+      // Show validation errors if any
+      if (validationErrors.length > 0) {
+        toast.show({
+          placement: "top",
+          duration: 4000,
+          render: createSafeAreaToastRenderer(
+            'top',
+            'error',
+            'solid',
+            'Profile Incomplete',
+            'Complete your profile first'
+          ),
+        });
+        return;
+      }
+    }
+
     const previousStatus = isAcceptingConsultations;
 
     try {
       // Optimistic UI update
       setIsAcceptingConsultations(newStatus);
-
-      console.log(`🔄 Updating consultation status to ${newStatus} for lawyer ${user.id}`);
 
       // First try to update existing record
       const { data, error } = await supabase
@@ -302,26 +352,34 @@ const LawyerProfilePage: React.FC = () => {
         }
 
         if (insertData && insertData.accepting_consultations === newStatus) {
-          console.log("✅ Lawyer record created and consultation status set");
-          Alert.alert(
-            "Success",
-            newStatus
-              ? "You are now accepting consultations."
-              : "You are no longer accepting consultations."
-          );
+          toast.show({
+            placement: "top",
+            duration: 3000,
+            render: createSafeAreaToastRenderer(
+              'top',
+              'success',
+              'solid',
+              'Success',
+              newStatus ? "Now accepting consultations" : "No longer accepting consultations"
+            ),
+          });
         } else {
           throw new Error("Failed to verify new record creation");
         }
       } else {
         // Verify the update was successful
         if (data.accepting_consultations === newStatus) {
-          console.log("✅ Consultation status updated successfully");
-          Alert.alert(
-            "Success",
-            newStatus
-              ? "You are now accepting consultations."
-              : "You are no longer accepting consultations."
-          );
+          toast.show({
+            placement: "top",
+            duration: 3000,
+            render: createSafeAreaToastRenderer(
+              'top',
+              'success',
+              'solid',
+              'Success',
+              newStatus ? "Now accepting consultations" : "No longer accepting consultations"
+            ),
+          });
         } else {
           console.error("❌ Status update verification failed:", { data, expected: newStatus });
           throw new Error("Status update verification failed - data mismatch");
@@ -348,7 +406,17 @@ const LawyerProfilePage: React.FC = () => {
         errorMessage = error.message;
       }
 
-      Alert.alert("Error", errorMessage);
+      toast.show({
+        placement: "top",
+        duration: 4000,
+        render: createSafeAreaToastRenderer(
+          'top',
+          'error',
+          'solid',
+          'Error',
+          errorMessage
+        ),
+      });
     }
   };
 

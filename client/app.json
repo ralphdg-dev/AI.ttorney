@@ -11,7 +11,7 @@
     "owner": "j24angeles",
     "android": {
       "icon": "./assets/images/icon.png",
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "bundler": "metro",

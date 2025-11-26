@@ -65,7 +65,8 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   // Responsive sizing for plus button
   const buttonSize = getResponsiveValue(screenWidth, 50, 56, 60);
   const iconSize = getResponsiveValue(screenWidth, 22, 24, 26);
-  const bottomOffset = getResponsiveValue(screenWidth, 70, 75, 80);
+  // Updated to properly account for navbar height + safe area + breathing room
+  const bottomOffset = getResponsiveValue(screenWidth, 66, 70, 74); // NAVBAR_HEIGHT (56) + breathing room (10-18)
   const rightOffset = getResponsiveValue(screenWidth, 16, 20, 24);
 
   const router = useRouter();
@@ -634,6 +635,12 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         confirmOptimisticPost,
         removeOptimisticPost,
       };
+    } else if (context === 'lawyer') {
+      (global as any).forumActions = {
+        addOptimisticPost,
+        confirmOptimisticPost,
+        removeOptimisticPost,
+      };
     }
   }, [addOptimisticPost, confirmOptimisticPost, removeOptimisticPost, context]);
 
@@ -730,6 +737,12 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   React.useEffect(() => {
     if (context === 'user') {
       (global as any).userForumActions = {
+        addOptimisticPost,
+        confirmOptimisticPost,
+        removeOptimisticPost,
+      };
+    } else if (context === 'lawyer') {
+      (global as any).forumActions = {
         addOptimisticPost,
         confirmOptimisticPost,
         removeOptimisticPost,
