@@ -4,9 +4,7 @@ import { Plus } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Post from '../../home/Post';
 import Colors from '../../../constants/Colors';
-import { Database } from '../../../types/database.types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import ForumLoadingAnimation from '../../ui/ForumLoadingAnimation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useForumCache } from '@/contexts/ForumCacheContext';
 import { createShadowStyle } from '../../../utils/shadowUtils';
@@ -14,18 +12,14 @@ import { shouldUseNativeDriver } from '../../../utils/animations';
 import { NetworkConfig } from '../../../utils/networkConfig';
 import { useList } from '@/hooks/useOptimizedList';
 import { SkeletonList } from '@/components/ui/SkeletonLoader';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { Text } from '@/components/ui/text';
 
-type ForumPost = Database['public']['Tables']['forum_posts']['Row'];
-type User = Database['public']['Tables']['users']['Row'];
 
 type ForumPostWithUser = {
   id: string;
   user: {
     name: string;
     username: string;
-    avatar?: string;
+    avatar: string;
     isLawyer?: boolean;
     lawyerBadge?: string;
     account_status?: string;
@@ -62,8 +56,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
   // Refs for optimization
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isComponentMounted = useRef(true);
-  const loadingMoreRef = useRef(false);
-  const refreshingRef = useRef(false);
+    const refreshingRef = useRef(false);
   const listRef = useRef<FlatList>(null);
 
   // Optimized auth headers helper with minimal logging
@@ -614,9 +607,6 @@ const LawyerTimeline: React.FC = React.memo(() => {
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
-      {/* Forum Loading Animation */}
-      <ForumLoadingAnimation visible={initialLoading} />
-
       {/* Show skeleton loading for initial load */}
       {initialLoading && allPosts.length === 0 ? (
         <View style={styles.skeletonContainer}>

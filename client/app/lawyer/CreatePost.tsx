@@ -15,7 +15,7 @@ import { validatePostContent } from '@/utils/contentValidation';
 import { showContentValidationToast } from '@/utils/moderationToastUtils';
 
 // Constants
-const MAX_CONTENT_LENGTH = 500;
+const MAX_CONTENT_LENGTH = 5000;
 
 const LawyerCreatePost: React.FC = () => {
   const router = useRouter();

@@ -137,7 +137,7 @@ async def _get_cached_reply_counts(post_ids: list) -> dict:
 
 class CreatePostRequest(BaseModel):
     body: str = Field(..., min_length=1, max_length=5000)
-    category: Optional[str] = Field(None, description="Optional category e.g. family, work, civil, criminal, consumer")
+    category: str = Field(..., description="Category e.g. family, work, civil, criminal, consumer")
     is_anonymous: Optional[bool] = False
 
 
@@ -254,7 +254,7 @@ async def create_post(
         post_row: Dict[str, Any] = {
             "user_id": user_id,
             "body": body.body.strip(),
-            "category": (body.category or None),
+            "category": body.category,
             "is_anonymous": bool(body.is_anonymous),
             "is_flagged": False,
         }

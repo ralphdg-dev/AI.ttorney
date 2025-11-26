@@ -53,6 +53,7 @@ router = APIRouter(prefix="/api/chatbot/lawyer", tags=["Legal Practice & Researc
 @router.post("/ask")
 async def ask_legal_question(
     request: ChatRequest,
+    stream: bool = True,
     chat_service: ChatHistoryService = Depends(get_chat_history_service),
     current_user: Optional[dict] = Depends(get_optional_current_user)
 ):
