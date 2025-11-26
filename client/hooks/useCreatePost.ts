@@ -217,7 +217,8 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
     const optimisticId = addOptimisticPost(payload);
     
     try {
-      const response = await fetch(`${NetworkConfig.getBestApiUrl()}/api/forum/posts`, {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/forum/posts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

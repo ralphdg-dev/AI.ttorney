@@ -90,8 +90,9 @@ const LawyerProfilePage: React.FC = () => {
   
   // Responsive sizing based on screen width and avatar size
   const avatarSize = screenWidth < 375 ? 72 : screenWidth < 768 ? 76 : 80;
-  const badgeSize = Math.round(avatarSize * 0.3); // 30% of avatar size
-  const iconSize = Math.round(badgeSize * 0.5); // 50% of badge size
+  const badgeSize = Math.round(avatarSize * 0.28); // 28% of avatar size for better fit
+  const iconSize = Math.round(badgeSize * 0.6); // 60% of badge size for better visibility
+  const badgeOffset = Math.round(badgeSize * 0.1); // 10% offset for positioning
   
   // Helper function to get initials from name
   const getInitials = (name: string) => {
@@ -260,7 +261,6 @@ const LawyerProfilePage: React.FC = () => {
         .update({ accepting_consultations: newStatus })
         .eq("lawyer_id", user.id)
         .select()
-        .limit(1)
         .maybeSingle();
 
       if (error) {
@@ -351,7 +351,6 @@ const LawyerProfilePage: React.FC = () => {
           "phone_number, location, bio, specialization, days, hours_available, accepting_consultations"
         )
         .eq("lawyer_id", user.id)
-        .limit(1)
         .maybeSingle();
 
       if (error) {
@@ -597,7 +596,6 @@ const LawyerProfilePage: React.FC = () => {
         .from("lawyer_info")
         .select("id, name")
         .eq("lawyer_id", user.id)
-        .limit(1)
         .maybeSingle();
 
       if (existingLawyerInfo) {
@@ -617,7 +615,6 @@ const LawyerProfilePage: React.FC = () => {
           .update(updateData)
           .eq("lawyer_id", user.id)
           .select()
-          .limit(1)
           .maybeSingle();
 
         lawyerInfoError = result.error;
@@ -637,7 +634,6 @@ const LawyerProfilePage: React.FC = () => {
             hours_available: profileData.hours_available || {},
           })
           .select()
-          .limit(1)
           .maybeSingle();
 
         lawyerInfoError = result.error;
@@ -787,11 +783,13 @@ const LawyerProfilePage: React.FC = () => {
               )}
               <View
                 style={[
-                  tw`absolute flex items-center justify-center border-2 border-white rounded-full -bottom-1 -right-1`,
+                  tw`absolute flex items-center justify-center border-2 border-white rounded-full`,
                   { 
                     backgroundColor: "#ECFDF5",
                     width: badgeSize,
                     height: badgeSize,
+                    bottom: -badgeOffset,
+                    right: -badgeOffset,
                   },
                 ]}
               >

@@ -17,7 +17,7 @@ import {
   Image,
   Animated,
   StatusBar,
-  KeyboardAvoidingView,
+  Keyboard,
   } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
@@ -463,7 +463,6 @@ export default function ChatbotScreen() {
   const lastContentHeight = useRef<number>(0); // Track content height for smooth scrolling
   const shouldAutoScroll = useRef<boolean>(true); // Track if we should auto-scroll (user hasn't scrolled up)
   const scrollAnimationFrame = useRef<number | null>(null); // Animation frame for smooth scrolling
-  const inputContainerHeight = useRef<number>(0); // Measured height of input container
   
   
   // Dynamic greeting that changes per session
@@ -1509,6 +1508,49 @@ export default function ChatbotScreen() {
     );
   };
 
+  // State for keyboard height with animated value for smooth transitions
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const animatedKeyboardHeight = useRef(new Animated.Value(0)).current;
+  
+  // Listen to keyboard events for proper mobile behavior
+  useEffect(() => {
+    // Use platform-specific listeners for better performance
+    const showListener = Platform.OS === 'ios' 
+      ? 'keyboardWillShow' 
+      : 'keyboardDidShow';
+    const hideListener = Platform.OS === 'ios' 
+      ? 'keyboardWillHide' 
+      : 'keyboardDidHide';
+    
+    const keyboardShowListener = Keyboard.addListener(showListener, (event) => {
+      const newHeight = event.endCoordinates.height;
+      setKeyboardHeight(newHeight);
+      
+      // Animate the height change for smooth transition (250ms like WhatsApp/Messenger)
+      Animated.timing(animatedKeyboardHeight, {
+        toValue: newHeight,
+        duration: 250,
+        useNativeDriver: false, // Height animation requires non-native driver
+      }).start();
+    });
+    
+    const keyboardHideListener = Keyboard.addListener(hideListener, () => {
+      setKeyboardHeight(0);
+      
+      // Animate back to 0
+      Animated.timing(animatedKeyboardHeight, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: false,
+      }).start();
+    });
+    
+    return () => {
+      keyboardShowListener.remove();
+      keyboardHideListener.remove();
+    };
+  }, [animatedKeyboardHeight]);
+
   return (
     <SafeAreaView
       style={[
@@ -1569,8 +1611,15 @@ export default function ChatbotScreen() {
         />
       )}
 
-      {/* Messages list or centered placeholder */}
-      <View style={tw`flex-1`}>
+      {/* Messages list or centered placeholder - Dynamic padding for input + navbar + keyboard */}
+      <View style={[
+        tw`flex-1`,
+        {
+          paddingBottom: keyboardHeight > 0 
+            ? keyboardHeight + navbarHeight + inputHeight + 24 // keyboard + input + navbar + spacing
+            : navbarHeight + inputHeight + 24 // just input + navbar + spacing
+        }
+      ]}>
         {messages.length === 0 ? (
           isLoadingConversation ? (
             // Show blank screen when loading a conversation from history
@@ -1578,7 +1627,7 @@ export default function ChatbotScreen() {
           ) : (
             // Show greeting screen only for new conversations
             <ScrollView
-              contentContainerStyle={[tw`items-center justify-center px-6 pt-12`, { paddingBottom: navbarHeight + insets.bottom }]}
+              contentContainerStyle={[tw`items-center justify-center px-6 pt-12`, { paddingBottom: 0 }]}
               showsVerticalScrollIndicator={false}
               style={tw`flex-1`}
             >
@@ -1692,7 +1741,7 @@ export default function ChatbotScreen() {
             extraData={messages} // Critical: Force re-render when messages array changes
             contentContainerStyle={[
               tw`pt-2`,
-              { paddingBottom: navbarHeight + insets.bottom } // Account for responsive navbar height + safe area
+              { paddingBottom: 0 } // Padding handled by parent container
             ]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -1793,33 +1842,24 @@ export default function ChatbotScreen() {
         )}
       </View>
 
-      {/* Input Field and Navbar - Wrapped in KeyboardAvoidingView */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
-        style={{ backgroundColor: '#FFFFFF' }}
+      {/* Input Field - Absolutely positioned at bottom */}
+      <View
+        style={[
+          tw`absolute left-0 right-0 justify-center border-t border-b`,
+          {
+            bottom: keyboardHeight > 0 ? keyboardHeight : navbarHeight,
+            borderTopColor: Colors.border.light,
+            borderBottomColor: Colors.border.light,
+            backgroundColor: '#FFFFFF',
+            paddingHorizontal: horizontalPadding,
+            paddingVertical: 12,
+            // Add safe area padding for iOS
+            paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 12) : 12,
+            // Smooth transition when keyboard appears/disappears
+            transform: [{ translateY: 0 }],
+          },
+        ]}
       >
-        {/* Composer - Fixed at bottom above navbar */}
-        <View
-          onLayout={(event) => {
-            // Measure actual input container height for accurate padding
-            const { height } = event.nativeEvent.layout;
-            inputContainerHeight.current = height;
-          }}
-          style={[
-            tw`justify-center border-t border-b`,
-            {
-              borderTopColor: Colors.border.light,
-              borderBottomColor: Colors.border.light,
-              backgroundColor: '#FFFFFF',
-              paddingHorizontal: horizontalPadding,
-              paddingVertical: 12,
-              // Prevent sidebar overlap
-              marginRight: (!isGuestMode && isSidebarOpen) ? 280 : 0,
-              transitionDuration: '200ms',
-            },
-          ]}
-        >
           <View style={tw`flex-row items-center`}>
             <View style={tw`flex-1 mr-3`}>
               <View
@@ -1911,9 +1951,18 @@ export default function ChatbotScreen() {
               <Send size={20} color={!input.trim() || isGenerating ? "#9CA3AF" : "#fff"} />
             </TouchableOpacity>
           </View>
-        </View>
-        
-        {/* Navbar - Always render, never conditional on loading states */}
+      </View>
+      
+      {/* Navbar - Absolutely positioned at bottom */}
+      <View
+        style={[
+          tw`absolute left-0 right-0`,
+          {
+            bottom: 0,
+            paddingBottom: Platform.OS === 'ios' ? insets.bottom : 0,
+          }
+        ]}
+      >
         {isGuestMode ? (
           <GuestNavbar activeTab="ask" glossaryRef={glossaryRef} navbarRef={navbarRef} />
         ) : user?.role === "verified_lawyer" ? (
@@ -1921,7 +1970,7 @@ export default function ChatbotScreen() {
         ) : (
           <Navbar activeTab="ask" />
         )}
-      </KeyboardAvoidingView>
+      </View>
       
       {!isGuestMode && <SidebarWrapper />}
       

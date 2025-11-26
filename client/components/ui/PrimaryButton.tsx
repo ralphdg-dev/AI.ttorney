@@ -1,4 +1,4 @@
-import { TouchableOpacity, Text, Dimensions } from "react-native";
+import { TouchableOpacity, Text } from "react-native";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../../constants/Colors";
 
@@ -8,8 +8,6 @@ interface PrimaryButtonProps {
   disabled?: boolean;
   loading?: boolean;
 }
-
-const { width } = Dimensions.get("window");
 
 export default function PrimaryButton({ 
   title, 
@@ -33,7 +31,7 @@ export default function PrimaryButton({
     >
       <Text
         style={[
-          tw`text-white font-semibold text-lg`,
+          tw`text-white font-semibold text-lg text-center`,
           {
             color: disabled ? "#9CA3AF" : "white",
           },

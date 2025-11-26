@@ -522,88 +522,93 @@ export default function HelpAndSupport() {
             { opacity: fadeAnim.current, zIndex: 10, elevation: 10 },
           ]}
         >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={[
-              tw`bg-white rounded-2xl p-6`,
-              {
-                width: Math.min(width * 0.9, 600),
-                maxHeight: height * 0.85,
-              },
-            ]}
-          >
-            <View style={tw`flex-row items-center justify-between mb-4`}>
-              <Text
-                style={[tw`text-xl font-bold`, { color: Colors.text.head }]}
-              >
-                Contact Support
-              </Text>
-              <TouchableOpacity onPress={handleCloseEmailForm}>
-                <Ionicons name="close" size={28} color={Colors.text.head} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Input
-                label="Your Name"
-                value={emailName}
-                setValue={setEmailName}
-                error={errors.name}
-              />
-              <Input
-                label="Your Email"
-                value={emailAddress}
-                setValue={setEmailAddress}
-                keyboardType="email-address"
-                error={errors.email}
-              />
-              <Input
-                label="Subject"
-                value={emailSubject}
-                setValue={setEmailSubject}
-                error={errors.subject}
-              />
-              <Input
-                label="Message"
-                value={emailMessage}
-                setValue={setEmailMessage}
-                multiline
-                numberOfLines={5}
-                error={errors.message}
-              />
-
-              <View style={tw`flex-row justify-between mt-4 mb-2`}>
-                <TouchableOpacity
-                  style={[
-                    tw`flex-1 py-3 rounded-xl mr-2 border`,
-                    { borderColor: Colors.primary.blue },
-                  ]}
-                  onPress={handleCloseEmailForm}
+          <SafeAreaView style={{ maxWidth: Math.min(width * 0.9, 600) }}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={[
+                tw`bg-white rounded-2xl p-6`,
+                {
+                  width: Math.min(width * 0.9, 600),
+                  maxHeight: height * 0.85,
+                },
+              ]}
+            >
+              <View style={tw`flex-row items-center justify-between mb-4`}>
+                <Text
+                  style={[tw`text-xl font-bold`, { color: Colors.text.head }]}
                 >
-                  <Text
-                    style={[
-                      tw`text-center font-semibold`,
-                      { color: Colors.primary.blue },
-                    ]}
-                  >
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    tw`flex-1 py-3 rounded-xl ml-2`,
-                    { backgroundColor: Colors.primary.blue },
-                  ]}
-                  onPress={handleConfirmSend}
-                >
-                  <Text style={tw`text-center text-white font-semibold`}>
-                    Send Email
-                  </Text>
+                  Contact Support
+                </Text>
+                <TouchableOpacity onPress={handleCloseEmailForm}>
+                  <Ionicons name="close" size={28} color={Colors.text.head} />
                 </TouchableOpacity>
               </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
+
+              <ScrollView 
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) }}
+              >
+                <Input
+                  label="Your Name"
+                  value={emailName}
+                  setValue={setEmailName}
+                  error={errors.name}
+                />
+                <Input
+                  label="Your Email"
+                  value={emailAddress}
+                  setValue={setEmailAddress}
+                  keyboardType="email-address"
+                  error={errors.email}
+                />
+                <Input
+                  label="Subject"
+                  value={emailSubject}
+                  setValue={setEmailSubject}
+                  error={errors.subject}
+                />
+                <Input
+                  label="Message"
+                  value={emailMessage}
+                  setValue={setEmailMessage}
+                  multiline
+                  numberOfLines={5}
+                  error={errors.message}
+                />
+
+                <View style={tw`flex-row justify-between mt-4 mb-2`}>
+                  <TouchableOpacity
+                    style={[
+                      tw`flex-1 py-3 rounded-xl mr-2 border`,
+                      { borderColor: Colors.primary.blue },
+                    ]}
+                    onPress={handleCloseEmailForm}
+                  >
+                    <Text
+                      style={[
+                        tw`text-center font-semibold`,
+                        { color: Colors.primary.blue },
+                      ]}
+                    >
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      tw`flex-1 py-3 rounded-xl ml-2`,
+                      { backgroundColor: Colors.primary.blue },
+                    ]}
+                    onPress={handleConfirmSend}
+                  >
+                    <Text style={tw`text-center text-white font-semibold`}>
+                      Send Email
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </SafeAreaView>
         </Animated.View>
       </Modal>
 
