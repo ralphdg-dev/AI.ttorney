@@ -424,6 +424,7 @@ const Post: React.FC<PostProps> = React.memo(({
                     fontSize: responsive.categoryFontSize,
                   }]}
                   allowFontScaling={false}
+                  adjustsFontSizeToFit={false}
                 >
                   {displayText}
                 </Text>
@@ -595,17 +596,20 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   categoryBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    paddingRight: 12,
     borderRadius: 8,
     borderWidth: 1,
     alignSelf: 'flex-start',
     maxWidth: '100%',
+    overflow: 'visible',
   },
   categoryText: {
     fontSize: 10,
     fontWeight: '600',
     lineHeight: 14,
+    letterSpacing: 0.5,
     includeFontPadding: false,
     textTransform: 'uppercase',
   },

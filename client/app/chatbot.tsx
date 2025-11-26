@@ -16,6 +16,7 @@ import {
   Linking,
   Image,
   Animated,
+  Easing,
   StatusBar,
   Keyboard,
   KeyboardAvoidingView,
@@ -346,6 +347,16 @@ export default function ChatbotScreen() {
   const horizontalPadding = LAYOUT.SPACING.md; // Fixed 16px padding for consistency
   const fontSize = 16;
   
+  // Enhanced keyboard visibility tracking with smooth animations
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const keyboardAnimatedValue = useRef(new Animated.Value(0)).current;
+  // No interpolation - direct value for INSTANT response
+  const inputTranslateY = keyboardAnimatedValue.interpolate({
+    inputRange: [0, 0.01, 1],
+    outputRange: [0, -15, -15], // Jump immediately to position
+    extrapolate: 'clamp'
+  });
+  
   const { isGuestMode, hasReachedLimit, incrementPromptCount, startGuestSession, updateGuestSessionId, guestSession, isLoading: isGuestLoading, showTutorial, setShowTutorial } = useGuest();
   const guestChat = useGuestChat(); // Always call hooks unconditionally
   const { moderationStatus, refreshStatus } = useModerationStatus();
@@ -357,6 +368,7 @@ export default function ChatbotScreen() {
   const messages = localMessages; // Same state for everyone
   
   // Refs for tutorial targets
+  const inputRef = useRef<TextInput | null>(null);
   const chatbotRef = useRef<View | null>(null);
   const glossaryRef = useRef<View | null>(null);
   const navbarRef = useRef<View | null>(null);
@@ -373,6 +385,66 @@ export default function ChatbotScreen() {
     setShowTutorial(false);
     // Tutorial is complete, user stays on chatbot
   };
+  
+  // Enhanced keyboard visibility tracking with ultra-smooth animations
+  useEffect(() => {
+    // Listen for keyboard WILL show (earliest possible event)
+    const keyboardWillShowListener = Keyboard.addListener(
+      'keyboardWillShow',
+      (e) => {
+        console.log('⌨️ Keyboard will show');
+        // Update state immediately
+        setIsKeyboardVisible(true);
+        
+        // INSTANT ANIMATION - SUPER FAST
+        // Skip animation and set value directly for immediate response
+        keyboardAnimatedValue.setValue(1);
+      }
+    );
+    
+    // Also listen for did show to ensure animation completes
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        console.log('⌨️ Keyboard did show');
+        setIsKeyboardVisible(true);
+        
+        // INSTANT RESPONSE - NO DELAY
+        // Ensure value is set to exactly 1
+        keyboardAnimatedValue.setValue(1);
+      }
+    );
+    
+    // Listen for keyboard WILL hide
+    const keyboardWillHideListener = Keyboard.addListener(
+      'keyboardWillHide',
+      () => {
+        console.log('⌨️ Keyboard will hide');
+        
+        // INSTANT HIDE - SUPER FAST
+        // Skip animation for immediate response
+        keyboardAnimatedValue.setValue(0);
+        setIsKeyboardVisible(false);
+      }
+    );
+    
+    // Also listen for did hide as backup
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        console.log('⌨️ Keyboard did hide');
+        setIsKeyboardVisible(false);
+        keyboardAnimatedValue.setValue(0);
+      }
+    );
+    
+    return () => {
+      keyboardWillShowListener?.remove();
+      keyboardDidShowListener.remove();
+      keyboardWillHideListener?.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
   
     
   // Sync localMessages to GuestChatContext for guest persistence (optimized)
@@ -1571,11 +1643,12 @@ export default function ChatbotScreen() {
         />
       )}
 
-      {/* KeyboardAvoidingView for proper Android keyboard handling */}
+      {/* KeyboardAvoidingView with immediate response */}
       <KeyboardAvoidingView
         style={tw`flex-1`}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={0}
+        enabled={true}
       >
         {/* Messages list or centered placeholder */}
         <View style={tw`flex-1`}>
@@ -1586,8 +1659,15 @@ export default function ChatbotScreen() {
           ) : (
             // Show greeting screen only for new conversations
             <ScrollView
-              contentContainerStyle={[tw`items-center justify-center px-6 pt-12`, { paddingBottom: 0 }]}
+              contentContainerStyle={[
+                tw`items-center justify-center px-6 pt-12`, 
+                { 
+                  paddingBottom: 0 // KeyboardAvoidingView handles this now
+                }
+              ]}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
               style={tw`flex-1`}
             >
               {/* Logo */}
@@ -1700,10 +1780,14 @@ export default function ChatbotScreen() {
             extraData={messages} // Critical: Force re-render when messages array changes
             contentContainerStyle={[
               tw`pt-2`,
-              { paddingBottom: navbarHeight + 16 } // Add padding for navbar
+              { 
+                paddingBottom: navbarHeight + 16 // KeyboardAvoidingView handles keyboard padding
+              }
             ]}
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
+            removeClippedSubviews={false}
             maintainVisibleContentPosition={{
               minIndexForVisible: 0,
               autoscrollToTopThreshold: 10
@@ -1801,18 +1885,24 @@ export default function ChatbotScreen() {
         )}
         </View>
 
-        {/* Input Field - Fixed at bottom of KeyboardAvoidingView */}
-        <View
+        {/* Input Field - Sits directly on keyboard with no gap */}
+        <Animated.View
           style={[
             tw`justify-center border-t`,
             {
               borderTopColor: Colors.border.light,
               backgroundColor: '#FFFFFF',
               paddingHorizontal: horizontalPadding,
-              paddingVertical: 12,
-              // Add safe area padding for iOS
-              paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 12) : 12,
+              paddingVertical: Platform.OS === 'android' ? 4 : 12,
+              paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 12) : 2,
+              // Apply smooth animation transform
+              transform: [{ translateY: inputTranslateY }],
             },
+            // Simple bottom margin when keyboard is hidden
+            {
+              position: 'relative',
+              marginBottom: Platform.OS === 'android' ? 16 : 0
+            }
           ]}
         >
           <View style={tw`flex-row items-center`}>
@@ -1844,6 +1934,7 @@ export default function ChatbotScreen() {
                 ]}
               >
                 <TextInput
+                  ref={inputRef}
                   value={input}
                   onChangeText={setInput}
                   placeholder="Ask your legal question..."
@@ -1865,6 +1956,17 @@ export default function ChatbotScreen() {
                   onSubmitEditing={sendMessage}
                   returnKeyType="send"
                   editable={!isGenerating}
+                  // Enhanced keyboard handling props
+                  blurOnSubmit={false}
+                  keyboardType="default"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  autoCorrect={false}
+                  onFocus={() => {
+                    // INSTANT RESPONSE - Force keyboard visibility and animation
+                    setIsKeyboardVisible(true);
+                    keyboardAnimatedValue.setValue(1);
+                  }}
                 />
               </View>
             </View>
@@ -1906,7 +2008,7 @@ export default function ChatbotScreen() {
               <Send size={20} color={!input.trim() || isGenerating ? "#9CA3AF" : "#fff"} />
             </TouchableOpacity>
           </View>
-      </View>
+        </Animated.View>
       </KeyboardAvoidingView>
       
       {/* Navbar - Fixed at bottom */}

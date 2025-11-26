@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, Animated, StatusBar, useWindowDimensions, Keyboard, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -103,25 +103,96 @@ const ViewPost: React.FC = () => {
   
   const responsive = usePostResponsive();
   
-  // Keyboard awareness for dynamic ScrollView padding
+  // Enhanced keyboard handling with animation for reply input
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const keyboardAnimatedValue = useRef(new Animated.Value(0)).current;
   
+  // We don't need interpolation anymore since we're using absolute positioning
+  
+  // Function to reset input position
+  const resetInputPosition = useCallback(() => {
+    // Reset all state and animation values
+    setIsKeyboardVisible(false);
+    setKeyboardHeight(0);
+    keyboardAnimatedValue.setValue(0);
+    
+    // Force layout update to ensure input is at bottom
+    requestAnimationFrame(() => {
+      keyboardAnimatedValue.setValue(0);
+    });
+  }, []);
+
+  // Reset input position when component unmounts
   useEffect(() => {
-    const keyboardWillShowListener = Keyboard.addListener('keyboardWillShow', (event) => {
-      console.log('🔹 Keyboard will show:', event.endCoordinates.height);
-      setKeyboardHeight(event.endCoordinates.height);
-    });
-    
-    const keyboardWillHideListener = Keyboard.addListener('keyboardWillHide', () => {
-      console.log('🔹 Keyboard will hide');
-      setKeyboardHeight(0);
-    });
-    
     return () => {
-      keyboardWillShowListener.remove();
-      keyboardWillHideListener.remove();
+      // Ensure input position is reset when leaving the screen
+      resetInputPosition();
     };
   }, []);
+
+  useEffect(() => {
+    // Listen for keyboard WILL show (earliest possible event)
+    const keyboardWillShowListener = Keyboard.addListener(
+      'keyboardWillShow',
+      (e) => {
+        console.log('🕹 Keyboard will show:', e.endCoordinates.height);
+        // Update state immediately
+        setIsKeyboardVisible(true);
+        setKeyboardHeight(e.endCoordinates.height);
+        
+        // INSTANT ANIMATION - SUPER FAST
+        keyboardAnimatedValue.setValue(1);
+        
+        // Force immediate layout update
+        requestAnimationFrame(() => {
+          // Double-check that animation value is set
+          keyboardAnimatedValue.setValue(1);
+        });
+      }
+    );
+    
+    // Also listen for did show as backup
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      (e) => {
+        console.log('🕹 Keyboard did show');
+        setIsKeyboardVisible(true);
+        setKeyboardHeight(e.endCoordinates.height);
+        keyboardAnimatedValue.setValue(1);
+      }
+    );
+    
+    // Listen for keyboard WILL hide
+    const keyboardWillHideListener = Keyboard.addListener(
+      'keyboardWillHide',
+      () => {
+        console.log('🕹 Keyboard will hide');
+        // INSTANT HIDE - SUPER FAST
+        resetInputPosition();
+      }
+    );
+    
+    // Also listen for did hide as backup
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        console.log('🕹 Keyboard did hide');
+        resetInputPosition();
+      }
+    );
+    
+    // Listen for blur events on the TextInput
+    const blurSubscription = Keyboard.addListener('keyboardDidHide', resetInputPosition);
+    
+    return () => {
+      keyboardWillShowListener?.remove();
+      keyboardDidShowListener.remove();
+      keyboardWillHideListener?.remove();
+      keyboardDidHideListener.remove();
+      blurSubscription.remove();
+    };
+  }, [resetInputPosition]);
   
   const [showFullContent, setShowFullContent] = useState(false);
   const [post, setPost] = useState<PostData | null>(null);
@@ -1035,11 +1106,8 @@ const ViewPost: React.FC = () => {
         </>
       )}
 
-      <KeyboardAvoidingView 
-        style={tw`flex-1 bg-white`}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
+      {/* Use KeyboardAvoidingView for iOS, regular View for Android */}
+      <View style={tw`flex-1 bg-white`}>
         <ScrollView 
           style={tw`flex-1`}
           contentContainerStyle={{ 
@@ -1047,6 +1115,8 @@ const ViewPost: React.FC = () => {
             paddingBottom: isLawyer ? responsive.replyInputHeight + LAYOUT.SPACING.sm * 2 + getSafeBottomPosition(insets.bottom) + keyboardHeight : 20 
           }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="none"
         >
         
         {!post && !loading && !postReady && error && (
@@ -1297,14 +1367,61 @@ const ViewPost: React.FC = () => {
 
         {/* Reply Input - Only visible for lawyers */}
         {isLawyer && post && (
-          <View style={[tw`bg-white border-t border-gray-200`, { paddingHorizontal: responsive.horizontalPadding, paddingVertical: LAYOUT.SPACING.sm, paddingBottom: getSafeBottomPosition(insets.bottom) }]}>
+          <Animated.View 
+            style={[
+              tw`bg-white border-t border-gray-200`, 
+              { 
+                paddingHorizontal: responsive.horizontalPadding, 
+                paddingVertical: LAYOUT.SPACING.sm, 
+                paddingBottom: getSafeBottomPosition(insets.bottom) + 16, // Added extra 16px padding at bottom
+                position: 'absolute', // Always use absolute positioning
+                bottom: 0, // Anchor to bottom of screen
+                left: 0,
+                right: 0,
+                zIndex: 999, // Ensure it stays on top
+              },
+              // When keyboard is visible, position above keyboard with extra space
+              isKeyboardVisible && {
+                bottom: keyboardHeight, // Position directly above keyboard
+                paddingBottom: getSafeBottomPosition(insets.bottom) + 8, // Slightly less padding when keyboard is visible
+              }
+            ]}
+          >
           <View style={tw`flex-row items-center`}>
             <TextInput
-              style={[tw`flex-1 mr-3 text-base border border-gray-300 rounded-full`, { paddingHorizontal: LAYOUT.SPACING.md, height: responsive.replyInputHeight }]}
+              style={[
+                tw`flex-1 mr-3 text-base border border-gray-300 rounded-full`, 
+                { 
+                  paddingHorizontal: LAYOUT.SPACING.md, 
+                  height: responsive.replyInputHeight + 4, // Slightly taller input field
+                  paddingVertical: 8, // Add vertical padding inside input
+                }
+              ]}
               placeholder="Write a reply..."
               value={replyText}
               onChangeText={setReplyText}
               multiline={false}
+              // Enhanced keyboard handling props
+              blurOnSubmit={false}
+              keyboardType="default"
+              autoCapitalize="none"
+              spellCheck={false}
+              autoCorrect={false}
+              onFocus={() => {
+                // INSTANT RESPONSE - Force keyboard visibility and animation
+                setIsKeyboardVisible(true);
+                setKeyboardHeight(300); // Use default height until actual height is known
+                keyboardAnimatedValue.setValue(1);
+                
+                // Force immediate layout update
+                requestAnimationFrame(() => {
+                  keyboardAnimatedValue.setValue(1);
+                });
+              }}
+              onBlur={() => {
+                // Ensure input resets when focus is lost
+                resetInputPosition();
+              }}
             />
             <TouchableOpacity
               onPress={handleSendReply}
@@ -1312,8 +1429,8 @@ const ViewPost: React.FC = () => {
               style={[
                 tw`items-center justify-center rounded-full`,
                 { 
-                  width: responsive.replyInputHeight, 
-                  height: responsive.replyInputHeight,
+                  width: responsive.replyInputHeight + 4, // Match input height
+                  height: responsive.replyInputHeight + 4, // Match input height
                   backgroundColor: replyText.trim() && !isReplying ? Colors.primary.blue : '#D1D5DB'
                 }
               ]}
@@ -1321,9 +1438,9 @@ const ViewPost: React.FC = () => {
               <Send size={18} color="white" />
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
       )}
-      </KeyboardAvoidingView>
+      </View>
 
       {/* Report Post Modal */}
       <ReportModal
