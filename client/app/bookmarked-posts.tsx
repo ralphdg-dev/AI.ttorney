@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, FlatList, RefreshControl, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Bookmark, Filter, SortAsc } from 'lucide-react-native';
 import UnifiedSearchBar from '@/components/common/UnifiedSearchBar';
@@ -143,7 +143,6 @@ const styles = StyleSheet.create({
 });
 
 export default function BookmarkedPostsScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
   const { loadBookmarks: refreshBookmarkContext } = usePostBookmarks();
@@ -369,9 +368,15 @@ export default function BookmarkedPostsScreen() {
         <Header title="Bookmarked Posts" showMenu={true} />
 
       {loading ? (
-        <PostSkeletonList count={3} />
+        <View style={{ flex: 1 }}>
+          {renderSearchBar()}
+          <PostSkeletonList count={3} />
+        </View>
       ) : posts.length === 0 ? (
-        renderEmptyState()
+        <>
+          {renderSearchBar()}
+          {renderEmptyState()}
+        </>
       ) : (
         <>
           {renderSearchBar()}
@@ -396,7 +401,7 @@ export default function BookmarkedPostsScreen() {
               keyExtractor={keyExtractor}
               renderItem={renderItem}
               ListHeaderComponent={renderHeader}
-              contentContainerStyle={{ paddingBottom: 56 + (insets.bottom || 0) + 20 }}
+              contentContainerStyle={{ paddingBottom: 36 }}
               showsVerticalScrollIndicator={false}
               onScroll={() => setOpenMenuPostId(null)}
               scrollEventThrottle={16}
