@@ -60,8 +60,21 @@ const LawyerCreatePost: React.FC = () => {
       return;
     }
     
-    // Lawyers always post non-anonymously
-    await createPost(content, categoryId, false);
+    // Clear form immediately for better UX
+    const originalContent = content;
+    const originalCategory = categoryId;
+    
+    setContent('');
+    setCategoryId('');
+    
+    try {
+      // Lawyers always post non-anonymously
+      await createPost(originalContent, originalCategory, false);
+    } catch (error) {
+      // If post fails, restore form data
+      setContent(originalContent);
+      setCategoryId(originalCategory);
+    }
   };
 
   return (
@@ -84,7 +97,7 @@ const LawyerCreatePost: React.FC = () => {
               disabled={isPostDisabled}
             >
               <Text style={styles.postButtonText}>
-                {isPosting ? 'Posting...' : 'Post'}
+                {isPosting ? 'Publishing...' : 'Post'}
               </Text>
             </TouchableOpacity>
           </View>

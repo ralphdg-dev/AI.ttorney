@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   },
   createPostButton: {
     position: 'absolute',
-    bottom: 80,
+    bottom: 70, // Updated to account for navbar height + breathing room
     right: 20,
     backgroundColor: Colors.primary.blue,
     width: 56,
@@ -201,6 +201,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     boxShadow: `0 4px 8px ${Colors.primary.blue}30`,
     elevation: 8,
+    zIndex: 1000, // Ensure it appears above other elements
   },
 });
 

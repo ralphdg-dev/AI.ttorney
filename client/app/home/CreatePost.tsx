@@ -42,7 +42,24 @@ const CreatePost: React.FC = () => {
 
   const handlePostSubmit = async () => {
     if (isPostDisabled) return;
-    await createPost(content, categoryId, isAnonymous);
+    
+    // Clear form immediately for better UX
+    const originalContent = content;
+    const originalCategory = categoryId;
+    const originalAnonymous = isAnonymous;
+    
+    setContent('');
+    setCategoryId('');
+    setIsAnonymous(false);
+    
+    try {
+      await createPost(originalContent, originalCategory, originalAnonymous);
+    } catch (error) {
+      // If post fails, restore form data
+      setContent(originalContent);
+      setCategoryId(originalCategory);
+      setIsAnonymous(originalAnonymous);
+    }
   };
 
   return (
@@ -65,7 +82,7 @@ const CreatePost: React.FC = () => {
               disabled={isPostDisabled}
             >
               <Text style={styles.postButtonText}>
-                {isPosting ? 'Posting...' : 'Post'}
+                {isPosting ? 'Publishing...' : 'Post'}
               </Text>
             </TouchableOpacity>
           </View>
