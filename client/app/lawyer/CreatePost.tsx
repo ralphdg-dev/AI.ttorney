@@ -6,7 +6,6 @@ import { Shield, ArrowLeft } from 'lucide-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CategoryScroller from '@/components/glossary/CategoryScroller';
 import Colors from '../../constants/Colors';
-import { LawyerNavbar } from '../../components/lawyer/shared';
 import { ModerationWarningBanner } from '@/components/moderation/ModerationWarningBanner';
 import { useCreatePost } from '@/hooks/useCreatePost';
 import { useModerationStatus } from '@/contexts/ModerationContext';
@@ -84,7 +83,7 @@ const LawyerCreatePost: React.FC = () => {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}>
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -158,8 +157,6 @@ const LawyerCreatePost: React.FC = () => {
           />
         </View>
       )}
-      
-      <LawyerNavbar activeTab="forum" />
     </SafeAreaView>
   );
 };

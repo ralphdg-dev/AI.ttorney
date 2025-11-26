@@ -7,7 +7,6 @@ import CategoryScroller from '@/components/glossary/CategoryScroller';
 import Colors from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import CustomToggle from '@/components/common/CustomToggle';
-import Navbar from '@/components/Navbar';
 import { ModerationWarningBanner } from '@/components/moderation/ModerationWarningBanner';
 import { useCreatePost } from '@/hooks/useCreatePost';
 import { useModerationStatus } from '@/contexts/ModerationContext';
@@ -63,13 +62,13 @@ const CreatePost: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={{ flex: 1, paddingBottom: 56 }}>
+        <View style={{ flex: 1, paddingBottom: 16 }}>
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -138,7 +137,6 @@ const CreatePost: React.FC = () => {
         </View>
       )}
       
-      <Navbar activeTab="home" />
     </SafeAreaView>
   );
 };

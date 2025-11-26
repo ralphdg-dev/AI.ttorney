@@ -65,8 +65,8 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   // Responsive sizing for plus button
   const buttonSize = getResponsiveValue(screenWidth, 50, 56, 60);
   const iconSize = getResponsiveValue(screenWidth, 22, 24, 26);
-  // Updated to properly account for navbar height + safe area + breathing room
-  const bottomOffset = getResponsiveValue(screenWidth, 66, 70, 74); // NAVBAR_HEIGHT (56) + breathing room (10-18)
+  // Updated to sit deep into the navbar area (safe area adds final clearance)
+  const bottomOffset = getResponsiveValue(screenWidth, -32, -30, -28); // Strong negative offsets pull button well below timeline edge
   const rightOffset = getResponsiveValue(screenWidth, 16, 20, 24);
 
   const router = useRouter();
@@ -875,7 +875,7 @@ const styles = StyleSheet.create({
   },
   createPostButton: {
     position: 'absolute',
-    bottom: 70, // Will be adjusted dynamically with safe area insets
+    bottom: 62, // Very close to navbar - will be adjusted dynamically with safe area insets
     right: 16, // Reduced from 20 for better balance
     width: 56, // Slightly smaller for better proportions
     height: 56,

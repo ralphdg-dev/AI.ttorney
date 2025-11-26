@@ -50,7 +50,18 @@ export const getCategoryDisplayText = (category: string | undefined | null): str
   if (!category) return 'Others';
   
   const normalized = normalizeCategory(category);
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  
+  // Return proper display names that won't be truncated
+  const displayNames: Record<CategoryType, string> = {
+    family: 'Family',
+    labor: 'Labor',
+    civil: 'Civil',
+    criminal: 'Criminal',
+    consumer: 'Consumer',
+    others: 'Others'
+  };
+  
+  return displayNames[normalized];
 };
 
 /**

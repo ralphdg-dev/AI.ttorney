@@ -54,7 +54,7 @@ const LawyerTimeline: React.FC = React.memo(() => {
   const { width: screenWidth } = useWindowDimensions();
   const buttonSize = getResponsiveValue(screenWidth, 50, 56, 60);
   const iconSize = getResponsiveValue(screenWidth, 22, 24, 26);
-  const bottomOffset = getResponsiveValue(screenWidth, 66, 70, 74); // NAVBAR_HEIGHT (56) + breathing room (10-18)
+  const bottomOffset = getResponsiveValue(screenWidth, -12, -10, -8); // Negative offsets pull button closer to navbar
   const rightOffset = getResponsiveValue(screenWidth, 16, 20, 24);
 
   const [posts, setPosts] = useState<ForumPostWithUser[]>([]);

@@ -410,13 +410,21 @@ const Post: React.FC<PostProps> = React.memo(({
             </View>
             
             {/* Category Badge Row */}
-            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: responsive.verticalSpacing}}>
+            <View style={[styles.categoryRow, { marginBottom: responsive.verticalSpacing }]}>
               {/* Category Badge */}
-              <View style={[styles.categoryBadge, { 
-                backgroundColor: categoryColors.bg,
-                borderColor: categoryColors.border 
-              }]}>
-                <Text style={[styles.categoryText, { color: categoryColors.text, fontSize: responsive.categoryFontSize }]}>
+              <View
+                style={[styles.categoryBadge, {
+                  backgroundColor: categoryColors.bg,
+                  borderColor: categoryColors.border,
+                }]}
+              >
+                <Text
+                  style={[styles.categoryText, {
+                    color: categoryColors.text,
+                    fontSize: responsive.categoryFontSize,
+                  }]}
+                  allowFontScaling={false}
+                >
                   {displayText}
                 </Text>
               </View>
@@ -555,7 +563,8 @@ const styles = StyleSheet.create({
   },
   categoryRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
     marginBottom: 6,
   },
   userName: {
@@ -586,14 +595,18 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   categoryBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 8,
     borderWidth: 1,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
   categoryText: {
     fontSize: 10,
     fontWeight: '600',
+    lineHeight: 14,
+    includeFontPadding: false,
     textTransform: 'uppercase',
   },
   contentContainer: {
