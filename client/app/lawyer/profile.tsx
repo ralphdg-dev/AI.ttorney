@@ -8,6 +8,7 @@ import {
   Image,
   Alert,
   StatusBar,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import ConfirmationModal from "../../components/ui/ConfirmationModal";
@@ -85,6 +86,12 @@ const LawyerProfilePage: React.FC = () => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, signOut, refreshUserData } = useAuth();
+  const { width: screenWidth } = useWindowDimensions();
+  
+  // Responsive sizing based on screen width and avatar size
+  const avatarSize = screenWidth < 375 ? 72 : screenWidth < 768 ? 76 : 80;
+  const badgeSize = Math.round(avatarSize * 0.3); // 30% of avatar size
+  const iconSize = Math.round(badgeSize * 0.5); // 50% of badge size
   
   // Helper function to get initials from name
   const getInitials = (name: string) => {
@@ -253,7 +260,8 @@ const LawyerProfilePage: React.FC = () => {
         .update({ accepting_consultations: newStatus })
         .eq("lawyer_id", user.id)
         .select()
-        .single();
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
         throw new Error(error.message);
@@ -343,7 +351,8 @@ const LawyerProfilePage: React.FC = () => {
           "phone_number, location, bio, specialization, days, hours_available, accepting_consultations"
         )
         .eq("lawyer_id", user.id)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
         if (error.code === "PGRST116") {
@@ -588,7 +597,8 @@ const LawyerProfilePage: React.FC = () => {
         .from("lawyer_info")
         .select("id, name")
         .eq("lawyer_id", user.id)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
       if (existingLawyerInfo) {
         // Record exists - update it (preserve existing name field)
@@ -607,7 +617,8 @@ const LawyerProfilePage: React.FC = () => {
           .update(updateData)
           .eq("lawyer_id", user.id)
           .select()
-          .single();
+          .limit(1)
+          .maybeSingle();
 
         lawyerInfoError = result.error;
         // lawyerInfoData = result.data; // Not used, can be removed
@@ -626,7 +637,8 @@ const LawyerProfilePage: React.FC = () => {
             hours_available: profileData.hours_available || {},
           })
           .select()
-          .single();
+          .limit(1)
+          .maybeSingle();
 
         lawyerInfoError = result.error;
         // lawyerInfoData = result.data; // Not used, can be removed
@@ -746,7 +758,7 @@ const LawyerProfilePage: React.FC = () => {
 
   return (
     <AuthGuard>
-      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header title="Profile" showMenu={true} />
       <ScrollView
@@ -760,22 +772,30 @@ const LawyerProfilePage: React.FC = () => {
               {profileData.avatar && !profileData.avatar.includes('unsplash') ? (
                 <Image
                   source={{ uri: profileData.avatar }}
-                  style={tw`w-20 h-20 rounded-full`}
+                  style={[tw`rounded-full`, { width: avatarSize, height: avatarSize }]}
                 />
               ) : (
-                <View style={[tw`items-center justify-center w-20 h-20 rounded-full`, { backgroundColor: Colors.primary.blue }]}>
-                  <Text style={tw`text-2xl font-bold text-white`}>
+                <View style={[tw`items-center justify-center rounded-full`, { 
+                  width: avatarSize, 
+                  height: avatarSize,
+                  backgroundColor: Colors.primary.blue 
+                }]}>
+                  <Text style={[tw`font-bold text-white`, { fontSize: avatarSize * 0.4 }]}>
                     {getInitials(profileData.name || 'User')}
                   </Text>
                 </View>
               )}
               <View
                 style={[
-                  tw`absolute flex items-center justify-center w-6 h-6 border-2 border-white rounded-full -bottom-1 -right-1`,
-                  { backgroundColor: "#ECFDF5" },
+                  tw`absolute flex items-center justify-center border-2 border-white rounded-full -bottom-1 -right-1`,
+                  { 
+                    backgroundColor: "#ECFDF5",
+                    width: badgeSize,
+                    height: badgeSize,
+                  },
                 ]}
               >
-                <Shield size={14} color="#059669" fill="#059669" stroke="none" strokeWidth={0} />
+                <Shield size={iconSize} color="#059669" fill="#059669" stroke="none" strokeWidth={0} />
               </View>
             </View>
 
@@ -834,7 +854,7 @@ const LawyerProfilePage: React.FC = () => {
                   { backgroundColor: "#ECFDF5" },
                 ]}
               >
-                <Text style={tw`text-xs font-semibold text-green-700 leading-tight`}>
+                <Text style={tw`text-xs font-semibold leading-tight text-green-700`}>
                   {profileData.verificationStatus}
                 </Text>
               </View>

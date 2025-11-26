@@ -18,7 +18,7 @@ const LawyerForum: React.FC = () => {
 
   return (
     <AuthGuard>
-      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header 
             variant="home"

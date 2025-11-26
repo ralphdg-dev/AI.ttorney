@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -59,16 +59,10 @@ const LawyerConsultPage: React.FC = () => {
     "all" | "pending" | "accepted" | "completed"
   >("all");
   const [allConsultations, setAllConsultations] = useState<ConsultationRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    total_requests: 0,
-    pending_requests: 0,
-    accepted_requests: 0,
-    completed_requests: 0,
-    rejected_requests: 0,
-    today_sessions: 0,
-  });
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [loading, setLoading] = useState(false); // Start as false for instant UI
+  const cacheRef = useRef<{ data: ConsultationRequest[], timestamp: number } | null>(null);
+  const currentTime = useMemo(() => new Date(), []);
+  const isInitialMount = useRef(true);
   const [confirmationModal, setConfirmationModal] = useState<{
     isOpen: boolean;
     actionType: "accept" | "complete" | "reject" | null;
@@ -76,46 +70,55 @@ const LawyerConsultPage: React.FC = () => {
     clientName: string | null;
   }>({ isOpen: false, actionType: null, requestId: null, clientName: null });
 
-  // Calculate accurate stats from consultation requests
-  const calculateStats = (requests: ConsultationRequest[]) => {
+  // Memoized stats calculation - only recalculate when consultations change
+  const stats = useMemo(() => {
     const now = new Date();
-    const today = now.toISOString().split("T")[0]; // Get today's date in YYYY-MM-DD format
+    const today = now.toISOString().split("T")[0];
 
-    const total_requests = requests.length;
-    const pending_requests = requests.filter(
-      (req) => req.status === "pending"
-    ).length;
-    const accepted_requests = requests.filter(
-      (req) => req.status === "accepted"
-    ).length;
-    const completed_requests = requests.filter(
-      (req) => req.status === "completed"
-    ).length;
-    const rejected_requests = requests.filter(
-      (req) => req.status === "rejected"
-    ).length;
-
-    // Calculate today's sessions (accepted requests with today's consultation date)
-    const today_sessions = requests.filter(
-      (req) => req.status === "accepted" && req.consultation_date === today
-    ).length;
+    let total = 0, pending = 0, accepted = 0, completed = 0, rejected = 0, todaySessions = 0;
+    
+    // Single pass through array for better performance
+    for (const req of allConsultations) {
+      total++;
+      switch (req.status) {
+        case "pending": pending++; break;
+        case "accepted": 
+          accepted++;
+          if (req.consultation_date === today) todaySessions++;
+          break;
+        case "completed": completed++; break;
+        case "rejected": rejected++; break;
+      }
+    }
 
     return {
-      total_requests,
-      pending_requests,
-      accepted_requests,
-      completed_requests,
-      rejected_requests,
-      today_sessions,
+      total_requests: total,
+      pending_requests: pending,
+      accepted_requests: accepted,
+      completed_requests: completed,
+      rejected_requests: rejected,
+      today_sessions: todaySessions,
     };
-  };
+  }, [allConsultations]);
 
-  // Single API call - fetch all consultations once, filter client-side
-  const fetchConsultationRequests = async () => {
+  // Optimized fetch with instant cache-first loading
+  const fetchConsultationRequests = useCallback(async () => {
     if (!user?.id) return;
 
-    try {
+    // Show cached data immediately if available (instant load)
+    if (cacheRef.current) {
+      const cacheAge = Date.now() - cacheRef.current.timestamp;
+      if (cacheAge < 5 * 60 * 1000) {
+        setAllConsultations(cacheRef.current.data);
+        isInitialMount.current = false;
+        // Still fetch fresh data in background
+      }
+    } else if (isInitialMount.current) {
+      // Only show loading skeleton on true first load (no cache)
       setLoading(true);
+    }
+
+    try {
       const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await fetch(
         `${apiUrl}/api/consult-actions/my-consultations`,
@@ -130,16 +133,21 @@ const LawyerConsultPage: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setAllConsultations(data);
-        setStats(calculateStats(data));
+        cacheRef.current = { data, timestamp: Date.now() };
+        isInitialMount.current = false;
       } else {
-        Alert.alert("Error", "Failed to load consultation requests");
+        if (isInitialMount.current) {
+          Alert.alert("Error", "Failed to load consultation requests");
+        }
       }
     } catch {
-      Alert.alert("Error", "Failed to load consultations. Please check your connection.");
+      if (isInitialMount.current) {
+        Alert.alert("Error", "Failed to load consultations. Please check your connection.");
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, session?.access_token]);
 
   useEffect(() => {
     if (user?.id && session?.access_token) {
@@ -191,13 +199,7 @@ const LawyerConsultPage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 30000); // Update every 30 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+  // Removed unnecessary time interval - currentTime is now memoized
 
   // Modified formatTimeAgo to accept current time as parameter
   const formatTimeAgo = (timestamp: string, currentTime: Date = new Date()) => {
@@ -360,12 +362,12 @@ const LawyerConsultPage: React.FC = () => {
 
   if (loading && consultationRequests.length === 0) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header
           title="Consultations"
         />
-        <View style={tw`flex-1 px-5 pt-6`}>
+        <View style={tw`flex-1 px-4 pt-6`}>
           <ConsultationListSkeleton count={5} />
         </View>
         <LawyerNavbar activeTab="consult" />
@@ -375,7 +377,7 @@ const LawyerConsultPage: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header
         title="Consultations"
@@ -383,16 +385,16 @@ const LawyerConsultPage: React.FC = () => {
 
       <ScrollView
         style={tw`flex-1`}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 56 + (insets.bottom || 0) + 20 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 56 + (insets.bottom || 0) + 16 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Enhanced Stats Grid */}
         <View style={tw`px-4 pt-6 pb-2`}>
-          <Text style={tw`text-xl font-bold text-gray-900 mb-4`}>Overview</Text>
+          <Text style={tw`mb-4 text-xl font-bold text-gray-900`}>Overview</Text>
           <View style={tw`flex-row flex-wrap -mr-3`}>
             <View
               style={[
-                tw`bg-white rounded-xl p-4 flex-1 border border-gray-100 mr-3 mb-3`,
+                tw`flex-1 p-4 mb-3 mr-3 bg-white border border-gray-100 rounded-xl`,
                 {
                   minWidth: 144,
                   boxShadow:
@@ -417,7 +419,7 @@ const LawyerConsultPage: React.FC = () => {
 
             <View
               style={[
-                tw`bg-white rounded-xl p-4 flex-1 border border-gray-100 mr-3 mb-3`,
+                tw`flex-1 p-4 mb-3 mr-3 bg-white border border-gray-100 rounded-xl`,
                 {
                   minWidth: 144,
                   boxShadow:
@@ -441,10 +443,10 @@ const LawyerConsultPage: React.FC = () => {
             </View>
           </View>
 
-          <View style={tw`flex-row flex-wrap -mr-3 mt-3`}>
+          <View style={tw`flex-row flex-wrap mt-3 -mr-3`}>
             <View
               style={[
-                tw`bg-white rounded-xl p-4 flex-1 border border-gray-100 mr-3`,
+                tw`flex-1 p-4 mr-3 bg-white border border-gray-100 rounded-xl`,
                 {
                   minWidth: 144,
                   boxShadow:
@@ -469,7 +471,7 @@ const LawyerConsultPage: React.FC = () => {
 
             <View
               style={[
-                tw`bg-white rounded-xl p-4 flex-1 border border-gray-100 mr-3`,
+                tw`flex-1 p-4 mr-3 bg-white border border-gray-100 rounded-xl`,
                 {
                   minWidth: 144,
                   boxShadow:
@@ -507,7 +509,7 @@ const LawyerConsultPage: React.FC = () => {
                   <TouchableOpacity
                     key={filterOption}
                     style={[
-                      tw`px-5 py-3 rounded-full border mr-3`,
+                      tw`px-5 py-3 mr-3 border rounded-full`,
                       {
                         boxShadow:
                           "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
@@ -565,12 +567,12 @@ const LawyerConsultPage: React.FC = () => {
 
           {consultationRequests.length === 0 ? (
             <View
-              style={tw`bg-white rounded-2xl p-8 items-center justify-center border border-gray-100`}
+              style={tw`items-center justify-center p-8 bg-white border border-gray-100 rounded-2xl`}
             >
-              <Text style={tw`text-lg font-semibold text-gray-500 mb-2`}>
+              <Text style={tw`mb-2 text-lg font-semibold text-gray-500`}>
                 No consultation requests found
               </Text>
-              <Text style={tw`text-sm text-gray-400 text-center`}>
+              <Text style={tw`text-sm text-center text-gray-400`}>
                 {filter === "all"
                   ? "You don't have any consultation requests yet."
                   : `You don't have any ${filter} consultation requests.`}
@@ -586,7 +588,7 @@ const LawyerConsultPage: React.FC = () => {
                 <View
                   key={request.id}
                   style={[
-                    tw`bg-white rounded-xl p-4 mb-3 border`,
+                    tw`p-4 mb-3 bg-white border rounded-xl`,
                     {
                       borderColor: '#E5E7EB',
                       shadowColor: '#000',
@@ -602,9 +604,9 @@ const LawyerConsultPage: React.FC = () => {
                     <View style={tw`flex-row items-center flex-1 mr-3`}>
                       <View style={tw`relative`}>
                         <View
-                          style={tw`w-12 h-12 rounded-full bg-gray-200 items-center justify-center`}
+                          style={tw`items-center justify-center w-12 h-12 bg-gray-200 rounded-full`}
                         >
-                          <Text style={tw`text-gray-600 font-semibold`}>
+                          <Text style={tw`font-semibold text-gray-600`}>
                             {request.client_name
                               .split(" ")
                               .map((n) => n[0])
@@ -615,23 +617,23 @@ const LawyerConsultPage: React.FC = () => {
                         {request.status === "pending" && (
                           <View
                             style={[
-                              tw`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white`,
+                              tw`absolute w-4 h-4 border-2 border-white rounded-full -top-1 -right-1`,
                               { backgroundColor: "#F97316" },
                             ]}
                           />
                         )}
                       </View>
 
-                      <View style={tw`ml-3 flex-1`}>
+                      <View style={tw`flex-1 ml-3`}>
                         <View style={tw`flex-row items-center mb-1`}>
                           <Text
-                            style={tw`text-base font-semibold text-gray-900 mr-2`}
+                            style={tw`mr-2 text-base font-semibold text-gray-900`}
                           >
                             {request.client_name}
                           </Text>
                         </View>
                         <Text
-                          style={tw`text-sm text-gray-600 font-medium`}
+                          style={tw`text-sm font-medium text-gray-600`}
                           accessibilityLabel={`Consultation request from ${request.client_name}`}
                         >
                           Consultation Request
@@ -660,7 +662,7 @@ const LawyerConsultPage: React.FC = () => {
 
                   {/* Message */}
                   <Text
-                    style={tw`text-sm text-gray-700 leading-5 mb-4`}
+                    style={tw`mb-4 text-sm leading-5 text-gray-700`}
                     numberOfLines={2}
                     accessibilityLabel={`Message: ${request.message}`}
                   >
@@ -669,12 +671,12 @@ const LawyerConsultPage: React.FC = () => {
 
                   {/* Enhanced Footer */}
                   <View style={tw`flex-row items-center justify-between mb-3`}>
-                    <View style={tw`flex-row items-center flex-wrap`}>
+                    <View style={tw`flex-row flex-wrap items-center`}>
                       {/* Consultation Mode */}
                       {request.consultation_mode && (
                         <View
                           style={[
-                            tw`flex-row items-center px-3 py-1 rounded-full border mr-2 mb-2`,
+                            tw`flex-row items-center px-3 py-1 mb-2 mr-2 border rounded-full`,
                             {
                               backgroundColor: modeStyle.bg,
                               borderColor: modeStyle.border,
@@ -684,7 +686,7 @@ const LawyerConsultPage: React.FC = () => {
                           <ModeIcon size={12} color={modeStyle.text} />
                           <Text
                             style={[
-                              tw`text-xs font-medium ml-1 capitalize`,
+                              tw`ml-1 text-xs font-medium capitalize`,
                               { color: modeStyle.text },
                             ]}
                           >
@@ -698,7 +700,7 @@ const LawyerConsultPage: React.FC = () => {
                     <View style={tw`items-end flex-shrink-0`}>
                       <View style={tw`flex-row items-center mb-1`}>
                         <Clock size={12} color="#6B7280" />
-                        <Text style={tw`text-gray-500 text-xs ml-1`}>
+                        <Text style={tw`ml-1 text-xs text-gray-500`}>
                           {formatTimeAgo(request.created_at, currentTime)}
                         </Text>
                       </View>
@@ -715,9 +717,9 @@ const LawyerConsultPage: React.FC = () => {
 
                   {/* Preferred Date and Time */}
                   {(request.consultation_date || request.consultation_time) && (
-                    <View style={tw`bg-gray-50 rounded-lg p-3 mb-3`}>
+                    <View style={tw`p-3 mb-3 rounded-lg bg-gray-50`}>
                       <Text
-                        style={tw`text-xs font-semibold text-gray-600 mb-2`}
+                        style={tw`mb-2 text-xs font-semibold text-gray-600`}
                       >
                         Client&apos;s Preferred Schedule:
                       </Text>
@@ -726,7 +728,7 @@ const LawyerConsultPage: React.FC = () => {
                           <View style={tw`flex-row items-center`}>
                             <Calendar size={14} color="#6B7280" />
                             <Text
-                              style={tw`text-sm text-gray-700 ml-2 font-medium`}
+                              style={tw`ml-2 text-sm font-medium text-gray-700`}
                             >
                               {new Date(
                                 request.consultation_date
@@ -742,7 +744,7 @@ const LawyerConsultPage: React.FC = () => {
                           <View style={tw`flex-row items-center`}>
                             <Clock size={14} color="#6B7280" />
                             <Text
-                              style={tw`text-sm text-gray-700 ml-2 font-medium`}
+                              style={tw`ml-2 text-sm font-medium text-gray-700`}
                             >
                               {formatConsultationTime(request.consultation_time)}
                             </Text>
@@ -757,7 +759,7 @@ const LawyerConsultPage: React.FC = () => {
                     <View style={tw`flex-row gap-2`}>
                       <TouchableOpacity
                         style={[
-                          tw`flex-1 py-3 rounded-xl mr-3`,
+                          tw`flex-1 py-3 mr-3 rounded-xl`,
                           {
                             backgroundColor: "#EF4444",
                             boxShadow:
@@ -776,7 +778,7 @@ const LawyerConsultPage: React.FC = () => {
                         activeOpacity={0.85}
                       >
                         <Text
-                          style={tw`text-white text-center font-semibold text-sm`}
+                          style={tw`text-sm font-semibold text-center text-white`}
                         >
                           Decline
                         </Text>
@@ -802,7 +804,7 @@ const LawyerConsultPage: React.FC = () => {
                         activeOpacity={0.85}
                       >
                         <Text
-                          style={tw`text-white text-center font-semibold text-sm`}
+                          style={tw`text-sm font-semibold text-center text-white`}
                         >
                           Accept
                         </Text>
@@ -813,7 +815,7 @@ const LawyerConsultPage: React.FC = () => {
                   {request.status === "accepted" && (
                     <TouchableOpacity
                       style={[
-                        tw`bg-green-600 py-3 rounded-xl mt-2`,
+                        tw`py-3 mt-2 bg-green-600 rounded-xl`,
                         {
                           boxShadow:
                             "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
@@ -831,7 +833,7 @@ const LawyerConsultPage: React.FC = () => {
                       activeOpacity={0.85}
                     >
                       <Text
-                        style={tw`text-white text-center font-semibold text-sm`}
+                        style={tw`text-sm font-semibold text-center text-white`}
                       >
                         Mark Session Completed
                       </Text>
@@ -840,14 +842,14 @@ const LawyerConsultPage: React.FC = () => {
 
                   {/* View Details Button */}
                   <TouchableOpacity
-                    style={tw`bg-gray-100 py-3 rounded-xl mt-3 border border-gray-200`}
+                    style={tw`py-3 mt-3 bg-gray-100 border border-gray-200 rounded-xl`}
                     onPress={() => handleRequestPress(request.id)}
                     accessibilityLabel={`View consultation details for ${request.client_name}`}
                     accessibilityRole="button"
                     activeOpacity={0.7}
                   >
                     <Text
-                      style={tw`text-gray-700 text-center font-semibold text-sm`}
+                      style={tw`text-sm font-semibold text-center text-gray-700`}
                     >
                       View Details
                     </Text>

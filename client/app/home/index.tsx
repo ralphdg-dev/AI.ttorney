@@ -21,7 +21,7 @@ const HomePage: React.FC = () => {
 
   return (
     <AuthGuard>
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header 
             variant="home"

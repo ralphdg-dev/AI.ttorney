@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
 
-import { View, FlatList, RefreshControl, TouchableOpacity, Animated, StyleSheet, ListRenderItem } from 'react-native';
+import { View, FlatList, RefreshControl, TouchableOpacity, Animated, StyleSheet, ListRenderItem, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NetworkConfig } from '../../utils/networkConfig';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -59,6 +59,12 @@ export interface TimelineHandle {
 const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }, ref) => {
 
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+
+  // Responsive sizing for plus button
+  const buttonSize = screenWidth < 375 ? 50 : screenWidth < 768 ? 56 : 60;
+  const iconSize = screenWidth < 375 ? 22 : screenWidth < 768 ? 24 : 26;
+  const bottomOffset = screenWidth < 375 ? 70 : screenWidth < 768 ? 75 : 80;
 
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
@@ -786,7 +792,15 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
 
       {/* Floating Create Post Button */}
       <TouchableOpacity 
-        style={[styles.createPostButton, { bottom: 90 + (insets.bottom || 0) }]} 
+        style={[
+          styles.createPostButton, 
+          { 
+            bottom: bottomOffset + (insets.bottom || 0),
+            width: buttonSize,
+            height: buttonSize,
+            borderRadius: buttonSize / 2,
+          }
+        ]} 
         onPress={handleCreatePost} 
         activeOpacity={0.7}
         accessible={true}
@@ -795,7 +809,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         accessibilityHint="Tap to create a new forum post"
         testID="create-post-button"
       >
-        <Plus size={26} color="#FFFFFF" strokeWidth={2.5} />
+        <Plus size={iconSize} color="#FFFFFF" strokeWidth={2.5} />
       </TouchableOpacity>
     </View>
   );

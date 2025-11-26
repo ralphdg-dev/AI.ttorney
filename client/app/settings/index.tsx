@@ -8,7 +8,6 @@ import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Box } from "@/components/ui/box";
 import { Text as GSText } from "@/components/ui/text";
-import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarImage, AvatarFallbackText } from "@/components/ui/avatar";
 import CustomToggle from "@/components/common/CustomToggle";
 import Header from "@/components/Header";
@@ -159,7 +158,7 @@ export default function SettingsScreen() {
 
   return (
     <AuthGuard>
-      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
       {/* Header with menu button */}

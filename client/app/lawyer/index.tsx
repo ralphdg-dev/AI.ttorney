@@ -90,7 +90,7 @@ const LawyerDashboard: React.FC = () => {
   if (loading) {
     return (
       <AuthGuard>
-        <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top']}>
           <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
           <Header 
             variant="home"
@@ -111,7 +111,7 @@ const LawyerDashboard: React.FC = () => {
 
   return (
     <AuthGuard>
-      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <Header 
             variant="home"
@@ -126,15 +126,15 @@ const LawyerDashboard: React.FC = () => {
           removeClippedSubviews={true}
           scrollEventThrottle={16}
           contentContainerStyle={{ 
-            paddingHorizontal: 20, 
-            paddingBottom: getContentBottomPadding(insets.bottom || 0, 20)
+            paddingHorizontal: 16, 
+            paddingBottom: getContentBottomPadding(insets.bottom || 0, 16)
           }}
         >
-          {/* Welcome Section - Presentational Component */}
+          {/* Welcome Section */}
           <DashboardWelcome date={currentDate} lawyerName={lawyerName} />
           
-          {/* Quick Stats - Configuration-driven rendering */}
-          <View style={tw`px-6 mb-6`}>
+          {/* Quick Stats */}
+          <View style={tw`mb-4`}>
             <View style={tw`flex-row -mx-2`}>
               {QUICK_STATS_CONFIG.map((config, index) => (
                 <QuickStatsCard
@@ -147,8 +147,8 @@ const LawyerDashboard: React.FC = () => {
             </View>
           </View>
 
-          {/* Consultation Calendar - Memoized data */}
-          <View style={tw`mx-6 mb-6`}>
+          {/* Consultation Calendar */}
+          <View style={tw`mb-4`}>
             <ConsultationCalendar 
               consultations={calendarConsultations}
               onDatePress={handleDatePress}
@@ -157,7 +157,7 @@ const LawyerDashboard: React.FC = () => {
           </View>
 
           {/* Recent Consultations */}
-          <View style={tw`p-4 mx-6 mb-6 bg-white border border-gray-200 rounded-2xl`}>
+          <View style={tw`p-4 mb-4 bg-white border border-gray-200 rounded-2xl`}>
             <View style={tw`flex-row items-center justify-between mb-6`}>
               <View style={{ flex: 1, marginRight: 8 }}>
                 <Text style={tw`text-lg font-bold text-gray-900`} numberOfLines={1}>Recent Activity</Text>

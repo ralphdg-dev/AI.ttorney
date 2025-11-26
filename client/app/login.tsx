@@ -165,7 +165,7 @@ export default function Login() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
       <View style={tw`flex-1 bg-white`}>
