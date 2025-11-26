@@ -630,17 +630,23 @@ const LawyerProfilePage: React.FC = () => {
         : contactInfo.specializations;
 
       // Update users table via backend API (uses service role key, bypasses RLS)
+      const userUpdateBody = {
+        full_name: profileData.name,
+        email: profileData.email,
+        username: profileData.name.toLowerCase().replace(/\s+/g, '_'), // Generate username from name
+      };
+      
+      console.log("🔍 DEBUG: Sending to /api/user/profile:", userUpdateBody);
+      console.log("🔍 DEBUG: Profile data received:", profileData);
+      console.log("🔍 DEBUG: Contact info received:", contactInfo);
+      
       const userUpdateResponse = await fetch(`${await NetworkConfig.getBestApiUrl()}/api/user/profile`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          full_name: profileData.name,
-          email: profileData.email,
-          username: profileData.name.toLowerCase().replace(/\s+/g, '_'), // Generate username from name
-        }),
+        body: JSON.stringify(userUpdateBody),
       });
 
       if (!userUpdateResponse.ok) {
@@ -649,7 +655,7 @@ const LawyerProfilePage: React.FC = () => {
         return { success: false, error: errorData.detail || "Failed to update user profile" };
       }
 
-      // Update lawyer_info table - use direct Supabase calls (already working, different RLS policies)
+      // Update lawyer_info table - ALL lawyer data goes here including hours_available
       let lawyerInfoError;
       // let lawyerInfoData; // Not used, can be removed
 

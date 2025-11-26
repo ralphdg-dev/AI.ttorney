@@ -21,6 +21,7 @@ import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody, ModalFooter
 import { Heading } from '@/components/ui/heading';
 import { Icon } from '@/components/ui/icon';
 import { Button, ButtonText } from '@/components/ui/button/';
+import TimeUtils from '../../utils/timeUtils';
 
 interface TimeSlot {
   id: string;
@@ -115,26 +116,6 @@ export default function LawyerBookingView() {
 
   const isMediumScreen = width >= 375 && width < 768;
 
-  const parseHoursAvailable = (hoursData: any): DayAvailability[] | Record<string, string[]> => {
-    if (!hoursData) return [];
-
-    // If already JSONB object, return as-is
-    if (typeof hoursData === 'object' && !Array.isArray(hoursData)) {
-      return hoursData;
-    }
-
-    // Legacy array format
-    if (Array.isArray(hoursData) && hoursData.length === 0) return [];
-
-    return hoursData.map((daySchedule: string) => {
-      const [day, timesStr] = daySchedule.split("=");
-      const times = timesStr
-        ? timesStr.split(",").map((t: string) => t.trim())
-        : [];
-      return { day: day.trim(), times };
-    });
-  };
-
   // Check if lawyer is available on a specific date
   const isLawyerAvailableOnDate = (date: Date): boolean => {
     if (!lawyerData || !lawyerData.hours_available) return false;
@@ -172,19 +153,11 @@ export default function LawyerBookingView() {
     // Handle JSONB format: {"Monday": ["09:00", "11:00"]}
     if (typeof lawyerData.hours_available === 'object' && !Array.isArray(lawyerData.hours_available)) {
       const times = lawyerData.hours_available[selectedDayName] || [];
-      return times.map((time, index) => {
-        // Convert 24h to 12h format for display
-        const [hour, minute] = time.split(':');
-        const hourNum = parseInt(hour);
-        const ampm = hourNum >= 12 ? 'PM' : 'AM';
-        const displayHour = hourNum === 0 ? 12 : hourNum > 12 ? hourNum - 12 : hourNum;
-        
-        return {
-          id: time, // Store "09:00" format (24-hour) for API
-          time: `${displayHour}:${minute} ${ampm}`, // Display "9:00 AM" format
-          available: true,
-        };
-      });
+      return times.map((time, index) => ({
+        id: time, // Store "09:00" format (24-hour) for API
+        time: TimeUtils.convertTo12h(time), // Display "9:00 AM" format
+        available: true,
+      }));
     }
 
     // Legacy format: DayAvailability[]
@@ -419,8 +392,8 @@ export default function LawyerBookingView() {
         : ["General Law"];
 
       const hours_available = params.lawyerhours_available
-        ? JSON.parse(params.lawyerhours_available as string)
-        : [];
+        ? TimeUtils.parseHoursAvailable(JSON.parse(params.lawyerhours_available as string))
+        : {};
 
       const lawyerInfo: LawyerData = {
         id: params.id as string, // lawyer_info.id (primary key)
@@ -429,7 +402,7 @@ export default function LawyerBookingView() {
         specialization: specialization,
         hours: params.lawyerHours as string,
         days: params.lawyerDays as string,
-        hours_available: parseHoursAvailable(hours_available),
+        hours_available: hours_available,
         bio: params.lawyerBio as string,
       };
 

@@ -21,6 +21,7 @@ import {
 import tw from "tailwind-react-native-classnames";
 import Colors from "../../../constants/Colors";
 import { TimeSlot } from "../../../services/lawyerProfileServices";
+import TimeUtils from "../../../utils/timeUtils";
 import { Avatar, AvatarImage, AvatarFallbackText } from "../../../components/ui/avatar";
 
 interface ProfileData {
@@ -164,14 +165,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         // Handle JSONB format
         if (typeof profileData.hours_available === 'object') {
           Object.entries(profileData.hours_available).forEach(([day, times]) => {
-            hoursData[day] = times.map(time => {
-              // Convert 24h to 12h format for display
-              const [hour, minute] = time.split(':');
-              const hourNum = parseInt(hour);
-              const ampm = hourNum >= 12 ? 'PM' : 'AM';
-              const displayHour = hourNum === 0 ? 12 : hourNum > 12 ? hourNum - 12 : hourNum;
-              return `${displayHour}:${minute} ${ampm}`;
-            });
+            if (DAYS_OF_WEEK.includes(day)) {
+              // Convert 24h to 12h format for display using centralized utility
+              hoursData[day] = times.map(time => TimeUtils.convertTo12h(time));
+            }
           });
           setDayTimeSlots(hoursData);
           return;

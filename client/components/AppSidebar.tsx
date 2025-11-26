@@ -503,12 +503,17 @@ export const SidebarWrapper: React.FC<{
         router.push("/onboarding/lawyer/verification-instructions");
         break;
       case "profile":
-        router.push("/profile");
+        // Route lawyers to lawyer profile, regular users to regular profile
+        if (user?.role === 'verified_lawyer') {
+          router.push("/lawyer/profile");
+        } else {
+          router.push("/profile");
+        }
         break;
       default:
         console.log(`Route ${route} not implemented yet`);
     }
-  }, [router]);
+  }, [router, user?.role]);
 
   // Memoize user info to prevent object recreation on every render
   const actualUserInfo = React.useMemo(() => ({

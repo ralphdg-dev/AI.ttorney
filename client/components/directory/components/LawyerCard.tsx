@@ -7,6 +7,7 @@ import { Box } from "@/components/ui/box";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../../../constants/Colors";
 import { shadowPresets } from "../../../utils/shadowUtils";
+import TimeUtils from "../../../utils/timeUtils";
 
 interface Lawyer {
   id: string;
@@ -47,14 +48,7 @@ export default function LawyerCard({
     // Handle JSONB format: {"Monday": ["09:00", "11:00"]}
     if (typeof lawyer.hours_available === 'object' && !Array.isArray(lawyer.hours_available)) {
       const times = lawyer.hours_available[today] || [];
-      return times.map(time => {
-        // Convert 24h to 12h format for display
-        const [hour, minute] = time.split(':');
-        const hourNum = parseInt(hour);
-        const ampm = hourNum >= 12 ? 'PM' : 'AM';
-        const displayHour = hourNum === 0 ? 12 : hourNum > 12 ? hourNum - 12 : hourNum;
-        return `${displayHour}:${minute} ${ampm}`;
-      });
+      return times.map(time => TimeUtils.convertTo12h(time));
     }
 
     // Legacy format: ["Monday= 9:00 AM, 11:00 AM"]
@@ -110,12 +104,12 @@ export default function LawyerCard({
 
   return (
     <Box
-      className="mb-3 bg-white rounded-lg border border-gray-200 overflow-hidden"
+      className="mb-3 overflow-hidden bg-white border border-gray-200 rounded-lg"
       style={shadowPresets.light}
     >
       {/* Header Section */}
       <Box className="p-4 pb-3">
-        <HStack className="justify-between items-start mb-3">
+        <HStack className="items-start justify-between mb-3">
           {/* Left Section - Name & Specialization */}
           <VStack className="flex-1 pr-2">
             {/* Lawyer Name */}
@@ -128,7 +122,7 @@ export default function LawyerCard({
 
             {/* Specialization */}
             <Pressable onPress={handleSpecializationPress}>
-              <HStack className="items-center flex-wrap">
+              <HStack className="flex-wrap items-center">
                 <Box className="bg-gray-100 px-2 py-0.5 rounded-full mr-1 mb-1">
                   <Text
                     className="text-xs font-medium"
@@ -158,7 +152,7 @@ export default function LawyerCard({
           {/* Right Section - Location Badge */}
           <VStack className="items-end">
             <Box
-              className="px-2 py-1 rounded-full flex-row items-center"
+              className="flex-row items-center px-2 py-1 rounded-full"
               style={{
                 backgroundColor: "#F9FAFB",
                 borderWidth: 1,
@@ -187,9 +181,9 @@ export default function LawyerCard({
 
         {/* All Specializations Dropdown */}
         {showAllSpecialization && (
-          <Box className="p-4 mb-3 bg-white rounded-lg border border-gray-200" style={{ elevation: 0.5 }}>
+          <Box className="p-4 mb-3 bg-white border border-gray-200 rounded-lg" style={{ elevation: 0.5 }}>
             <Text
-              className="text-sm font-semibold mb-2"
+              className="mb-2 text-sm font-semibold"
               style={{ color: Colors.text.head }}
             >
               All Specializations
@@ -212,7 +206,7 @@ export default function LawyerCard({
       </Box>
 
       {/* Divider */}
-      <Box className="h-px bg-gray-100 mx-3" />
+      <Box className="h-px mx-3 bg-gray-100" />
 
       {/* Schedule Section */}
       <Box className="p-4 pt-2">
@@ -302,7 +296,7 @@ export default function LawyerCard({
                 color={Colors.text.sub}
               />
               <Text
-                className="text-xs ml-1 font-medium"
+                className="ml-1 text-xs font-medium"
                 style={{ color: Colors.text.sub }}
               >
                 {hasAvailableHours
@@ -326,7 +320,7 @@ export default function LawyerCard({
           disabled={!isBookable || checkingRequest}
         >
           <Text
-            className="font-semibold text-sm"
+            className="text-sm font-semibold"
             style={{
               color: isBookable ? "white" : "#6B7280",
             }}
