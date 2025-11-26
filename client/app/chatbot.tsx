@@ -18,6 +18,7 @@ import {
   Animated,
   StatusBar,
   Keyboard,
+  KeyboardAvoidingView,
   } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
@@ -1508,48 +1509,7 @@ export default function ChatbotScreen() {
     );
   };
 
-  // State for keyboard height with animated value for smooth transitions
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const animatedKeyboardHeight = useRef(new Animated.Value(0)).current;
-  
-  // Listen to keyboard events for proper mobile behavior
-  useEffect(() => {
-    // Use platform-specific listeners for better performance
-    const showListener = Platform.OS === 'ios' 
-      ? 'keyboardWillShow' 
-      : 'keyboardDidShow';
-    const hideListener = Platform.OS === 'ios' 
-      ? 'keyboardWillHide' 
-      : 'keyboardDidHide';
-    
-    const keyboardShowListener = Keyboard.addListener(showListener, (event) => {
-      const newHeight = event.endCoordinates.height;
-      setKeyboardHeight(newHeight);
-      
-      // Animate the height change for smooth transition (250ms like WhatsApp/Messenger)
-      Animated.timing(animatedKeyboardHeight, {
-        toValue: newHeight,
-        duration: 250,
-        useNativeDriver: false, // Height animation requires non-native driver
-      }).start();
-    });
-    
-    const keyboardHideListener = Keyboard.addListener(hideListener, () => {
-      setKeyboardHeight(0);
-      
-      // Animate back to 0
-      Animated.timing(animatedKeyboardHeight, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: false,
-      }).start();
-    });
-    
-    return () => {
-      keyboardShowListener.remove();
-      keyboardHideListener.remove();
-    };
-  }, [animatedKeyboardHeight]);
+  // KeyboardAvoidingView handles keyboard behavior automatically
 
   return (
     <SafeAreaView
@@ -1611,15 +1571,14 @@ export default function ChatbotScreen() {
         />
       )}
 
-      {/* Messages list or centered placeholder - Dynamic padding for input + navbar + keyboard */}
-      <View style={[
-        tw`flex-1`,
-        {
-          paddingBottom: keyboardHeight > 0 
-            ? keyboardHeight + navbarHeight + inputHeight + 24 // keyboard + input + navbar + spacing
-            : navbarHeight + inputHeight + 24 // just input + navbar + spacing
-        }
-      ]}>
+      {/* KeyboardAvoidingView for proper Android keyboard handling */}
+      <KeyboardAvoidingView
+        style={tw`flex-1`}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        {/* Messages list or centered placeholder */}
+        <View style={tw`flex-1`}>
         {messages.length === 0 ? (
           isLoadingConversation ? (
             // Show blank screen when loading a conversation from history
@@ -1741,7 +1700,7 @@ export default function ChatbotScreen() {
             extraData={messages} // Critical: Force re-render when messages array changes
             contentContainerStyle={[
               tw`pt-2`,
-              { paddingBottom: 0 } // Padding handled by parent container
+              { paddingBottom: navbarHeight + 16 } // Add padding for navbar
             ]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -1840,26 +1799,22 @@ export default function ChatbotScreen() {
             }
           />
         )}
-      </View>
+        </View>
 
-      {/* Input Field - Absolutely positioned at bottom */}
-      <View
-        style={[
-          tw`absolute left-0 right-0 justify-center border-t border-b`,
-          {
-            bottom: keyboardHeight > 0 ? keyboardHeight : navbarHeight,
-            borderTopColor: Colors.border.light,
-            borderBottomColor: Colors.border.light,
-            backgroundColor: '#FFFFFF',
-            paddingHorizontal: horizontalPadding,
-            paddingVertical: 12,
-            // Add safe area padding for iOS
-            paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 12) : 12,
-            // Smooth transition when keyboard appears/disappears
-            transform: [{ translateY: 0 }],
-          },
-        ]}
-      >
+        {/* Input Field - Fixed at bottom of KeyboardAvoidingView */}
+        <View
+          style={[
+            tw`justify-center border-t`,
+            {
+              borderTopColor: Colors.border.light,
+              backgroundColor: '#FFFFFF',
+              paddingHorizontal: horizontalPadding,
+              paddingVertical: 12,
+              // Add safe area padding for iOS
+              paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 12) : 12,
+            },
+          ]}
+        >
           <View style={tw`flex-row items-center`}>
             <View style={tw`flex-1 mr-3`}>
               <View
@@ -1952,16 +1907,13 @@ export default function ChatbotScreen() {
             </TouchableOpacity>
           </View>
       </View>
+      </KeyboardAvoidingView>
       
-      {/* Navbar - Absolutely positioned at bottom */}
+      {/* Navbar - Fixed at bottom */}
       <View
-        style={[
-          tw`absolute left-0 right-0`,
-          {
-            bottom: 0,
-            paddingBottom: Platform.OS === 'ios' ? insets.bottom : 0,
-          }
-        ]}
+        style={{
+          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 0,
+        }}
       >
         {isGuestMode ? (
           <GuestNavbar activeTab="ask" glossaryRef={glossaryRef} navbarRef={navbarRef} />

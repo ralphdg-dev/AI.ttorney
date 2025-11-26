@@ -36,8 +36,6 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
   onComplete,
   stepRefs = {},
 }) => {
-  // Debug: Log visibility state on Android
-  console.log('🎯 GuestOnboardingTutorial render:', { visible, platform: Platform.OS });
   const [currentStep, setCurrentStep] = useState(0);
   const [spotlightPosition, setSpotlightPosition] = useState({
     x: 0,
@@ -82,6 +80,15 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
       skipSpotlight: true,
     },
   ], []);
+
+  // Debug: Log visibility state on Android
+  console.log('🎯 GuestOnboardingTutorial render:', { 
+    visible, 
+    platform: Platform.OS, 
+    currentStep, 
+    stepTitle: tutorialSteps[currentStep]?.title,
+    stepDescription: tutorialSteps[currentStep]?.description 
+  });
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -200,6 +207,13 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
     const step = tutorialSteps[currentStep];
     if (step.skipSpotlight) {
       // Just dim the entire screen for final step
+      return (
+        <View style={styles.fullDimOverlay} />
+      );
+    }
+
+    // Android fallback: Use simple overlay instead of complex SVG masking
+    if (Platform.OS === 'android') {
       return (
         <View style={styles.fullDimOverlay} />
       );
@@ -327,6 +341,8 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
       animationType="fade"
       visible={visible}
       statusBarTranslucent={true}
+      supportedOrientations={['portrait']}
+      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
     >
       <View style={StyleSheet.absoluteFill}>
         {/* Dimmed overlay with spotlight cutout */}
@@ -346,6 +362,12 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
             <View style={styles.cardContent}>
               <Text style={styles.cardTitle}>{step.title}</Text>
               <Text style={styles.cardDescription}>{step.description}</Text>
+              {/* Android debugging - temporary */}
+              {Platform.OS === 'android' && __DEV__ && (
+                <Text style={{ color: 'red', fontSize: 10 }}>
+                  Android Debug: Step {currentStep + 1}
+                </Text>
+              )}
             </View>
 
             {/* Bottom controls row */}
@@ -418,9 +440,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
-    elevation: 12,
+    elevation: Platform.OS === 'android' ? 20 : 12, // Higher elevation on Android
     borderWidth: 0.5,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+    // Android-specific fixes
+    ...(Platform.OS === 'android' && {
+      // Ensure background is solid on Android
+      backgroundColor: '#1F2937',
+      // Add minimum dimensions
+      minHeight: 120,
+      minWidth: 200,
+    }),
   },
   skipButton: {
     position: 'absolute',
@@ -452,19 +482,29 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: Platform.OS === 'android' ? 'bold' : '700',
     color: '#FFFFFF',
     marginBottom: 8,
-    lineHeight: 22,
+    lineHeight: Platform.OS === 'android' ? 24 : 22,
     textAlign: 'center',
+    // Android-specific fixes
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
   cardDescription: {
     fontSize: 14,
-    fontWeight: '400',
+    fontWeight: Platform.OS === 'android' ? 'normal' : '400',
     color: '#FFFFFF',
-    lineHeight: 20,
+    lineHeight: Platform.OS === 'android' ? 22 : 20,
     textAlign: 'center',
     marginBottom: 12,
+    // Android-specific fixes
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
   backButton: {
     backgroundColor: '#374151',
@@ -489,7 +529,12 @@ const styles = StyleSheet.create({
   nextButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: Platform.OS === 'android' ? 'bold' : '600',
+    // Android-specific fixes
+    ...(Platform.OS === 'android' && {
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    }),
   },
   speechBubblePointer: {
     position: 'absolute',
