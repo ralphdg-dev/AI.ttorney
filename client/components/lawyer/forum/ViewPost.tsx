@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, Animated, StatusBar, useWindowDimensions, Keyboard, Platform } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, Animated, StatusBar, useWindowDimensions, Keyboard, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { User, Bookmark, MoreHorizontal, Flag, Send } from 'lucide-react-native';
@@ -88,28 +88,33 @@ const ViewPost: React.FC = () => {
   // Responsive dimensions
   const { width } = useWindowDimensions();
   
-  // Responsive sizing values
-  const horizontalPadding = LAYOUT.SPACING.md; // Fixed 16px padding for consistency
-  const avatarSize = getResponsiveValue(width, 40, 48, 56); // Small: 40px, Tablet: 48px, Desktop: 56px
-  const dropdownWidth = getResponsiveValue(width, 160, 192, 224); // Responsive dropdown width
-  const replyInputHeight = getResponsiveValue(width, 40, 44, 48); // Responsive input height
+  // Custom hook for responsive values
+  const usePostResponsive = useCallback(() => {
+    return {
+      horizontalPadding: LAYOUT.SPACING.md,
+      avatarSize: getResponsiveValue(width, 40, 48, 56),
+      dropdownWidth: getResponsiveValue(width, 160, 192, 224),
+      replyInputHeight: getResponsiveValue(width, 40, 44, 48),
+      nameFontSize: getResponsiveValue(width, 14, 16, 18),
+      usernameFontSize: getResponsiveValue(width, 12, 14, 15),
+      verticalSpacing: getResponsiveValue(width, 6, 8, 12),
+    };
+  }, [width]);
   
-  // Keyboard awareness for Android
+  const responsive = usePostResponsive();
+  
+  // Keyboard awareness for dynamic ScrollView padding
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   
   useEffect(() => {
     const keyboardWillShowListener = Keyboard.addListener('keyboardWillShow', (event) => {
-      if (Platform.OS === 'android') {
-        console.log('🔹 Comment keyboard will show:', event.endCoordinates.height);
-        setKeyboardHeight(event.endCoordinates.height);
-      }
+      console.log('🔹 Keyboard will show:', event.endCoordinates.height);
+      setKeyboardHeight(event.endCoordinates.height);
     });
     
     const keyboardWillHideListener = Keyboard.addListener('keyboardWillHide', () => {
-      if (Platform.OS === 'android') {
-        console.log('🔹 Comment keyboard will hide');
-        setKeyboardHeight(0);
-      }
+      console.log('🔹 Keyboard will hide');
+      setKeyboardHeight(0);
     });
     
     return () => {
@@ -899,10 +904,9 @@ const ViewPost: React.FC = () => {
           <View style={{ height: 60 }} />
           
           {/* Skeleton Content */}
-          <View style={{ paddingHorizontal: horizontalPadding, paddingVertical: LAYOUT.SPACING.lg, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-            {/* User Info Skeleton */}
-            <View style={tw`flex-row items-start mb-4`}>
-              <SkeletonLoader width={avatarSize} height={avatarSize} borderRadius={avatarSize/2} style={tw`mr-4`} />
+          <View style={{ paddingHorizontal: responsive.horizontalPadding, paddingVertical: LAYOUT.SPACING.lg, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+            <View style={tw`flex-row items-center py-4`}>
+              <SkeletonLoader width={responsive.avatarSize} height={responsive.avatarSize} borderRadius={responsive.avatarSize/2} style={tw`mr-4`} />
               <View style={tw`flex-1`}>
                 <View style={tw`flex-row items-center justify-between mb-1`}>
                   <SkeletonLoader width={120} height={16} borderRadius={4} style={tw`mb-2`} />
@@ -1000,7 +1004,7 @@ const ViewPost: React.FC = () => {
               elevation: 3,
             }),
             zIndex: 1000,
-            width: dropdownWidth
+            width: responsive.dropdownWidth
           }}>
             <TouchableOpacity
               style={tw`flex-row items-center px-4 py-3`}
@@ -1031,11 +1035,19 @@ const ViewPost: React.FC = () => {
         </>
       )}
 
-      <ScrollView 
+      <KeyboardAvoidingView 
         style={tw`flex-1 bg-white`}
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: isLawyer ? 80 : 20 }}
-        showsVerticalScrollIndicator={false}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
+        <ScrollView 
+          style={tw`flex-1`}
+          contentContainerStyle={{ 
+            flexGrow: 1, 
+            paddingBottom: isLawyer ? responsive.replyInputHeight + LAYOUT.SPACING.sm * 2 + getSafeBottomPosition(insets.bottom) + keyboardHeight : 20 
+          }}
+          showsVerticalScrollIndicator={false}
+        >
         
         {!post && !loading && !postReady && error && (
           <View style={tw`items-center px-5 py-6`}>
@@ -1055,67 +1067,73 @@ const ViewPost: React.FC = () => {
           </View>
         )}
         {post && (
-          <View style={{ paddingHorizontal: horizontalPadding, paddingVertical: LAYOUT.SPACING.lg }}>
+          <View style={{ paddingHorizontal: responsive.horizontalPadding, paddingVertical: LAYOUT.SPACING.lg }}>
             <View style={tw`flex-row items-start mb-4`}>
                 {isAnonymous || isDeactivated ? (
-                  <View style={{ alignItems: 'center', justifyContent: 'center', width: avatarSize, height: avatarSize, marginRight: LAYOUT.SPACING.sm, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: avatarSize/2 }}>
-                    <User size={avatarSize * 0.5} color="#6B7280" />
+                  <View style={{ alignItems: 'center', justifyContent: 'center', width: responsive.avatarSize, height: responsive.avatarSize, marginRight: LAYOUT.SPACING.sm, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: responsive.avatarSize/2 }}>
+                    <User size={responsive.avatarSize * 0.5} color="#6B7280" />
                   </View>
                 ) : displayUser.avatar && !displayUser.avatar.includes('flaticon') && !imageLoadError ? (
                   <Image 
                     source={{ uri: displayUser.avatar }} 
-                    style={{ width: avatarSize, height: avatarSize, marginRight: LAYOUT.SPACING.sm, borderRadius: avatarSize/2 }}
+                    style={{ width: responsive.avatarSize, height: responsive.avatarSize, marginRight: LAYOUT.SPACING.sm, borderRadius: responsive.avatarSize/2 }}
                     onError={() => setImageLoadError(true)}
                   />
                 ) : (
-                  <View style={{ alignItems: 'center', justifyContent: 'center', width: avatarSize, height: avatarSize, marginRight: LAYOUT.SPACING.sm, borderRadius: avatarSize/2, backgroundColor: Colors.primary.blue }}>
+                  <View style={{ alignItems: 'center', justifyContent: 'center', width: responsive.avatarSize, height: responsive.avatarSize, marginRight: LAYOUT.SPACING.sm, borderRadius: responsive.avatarSize/2, backgroundColor: Colors.primary.blue }}>
                     <Text style={tw`text-base font-semibold text-white`}>
                       {getInitials(displayUser.name)}
                     </Text>
                   </View>
                 )}
               <View style={tw`flex-1`}>
-                <View style={tw`flex-row items-start justify-between mb-1`}>
-                  <View style={tw`flex-1 mr-3`}>
-                    {/* [Full Name] [lawyer badge] */}
-                    <View style={{flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap'}}>
-                      <Text style={tw`mr-2 text-base font-semibold text-gray-900`} numberOfLines={1}>
-                        {isDeactivated ? 'Deactivated Account' : displayUser.name}
-                      </Text>
-                      {!isAnonymous && !isDeactivated && displayUser.isLawyer && (
-                        <VerifiedLawyerBadge size="sm" />
-                      )}
+                {/* User Name and Badge Row */}
+                <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: responsive.verticalSpacing}}>
+                  <Text style={{fontSize: responsive.nameFontSize, fontWeight: '600', color: '#0F1419', marginRight: 8}} numberOfLines={1}>
+                    {isDeactivated ? 'Deactivated Account' : displayUser.name}
+                  </Text>
+                  {!isAnonymous && !isDeactivated && displayUser.isLawyer && (
+                    <View style={{ marginLeft: 8 }}>
+                      <VerifiedLawyerBadge size="sm" />
                     </View>
-                    
-                    {/* [username] [law category] - side by side */}
-                    <View style={tw`flex-row items-center mt-1`}>
-                      {!isAnonymous && !isDeactivated && (
-                        <Text style={tw`mr-2 text-sm text-gray-500`} numberOfLines={1}>
-                          @{post.user?.username || 'user'}
-                        </Text>
-                      )}
-                      
-                      {post.domain && (
-                        <View style={[
-                          tw`px-3 py-1 border rounded-full`,
-                          { 
-                            backgroundColor: categoryColors.bg,
-                            borderColor: categoryColors.border
-                          }
-                        ]}>
-                          <Text style={[
-                            tw`text-xs font-semibold`, 
-                            { color: categoryColors.text, textTransform: 'uppercase' }
-                          ]}>
-                            {getCategoryDisplayText(post?.domain)}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
+                  )}
                 </View>
                 
-                {/* [timestamp] - moved to bottom */}
+                {/* Username Row */}
+                <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: responsive.verticalSpacing}}>
+                  {!isAnonymous && !isDeactivated && (
+                    <Text style={{fontSize: responsive.usernameFontSize, color: '#536471'}} numberOfLines={1}>
+                      @{post.user?.username || 'user'}
+                    </Text>
+                  )}
+                </View>
+                
+                {/* Category Badge Row */}
+                <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: responsive.verticalSpacing}}>
+                  {post.domain && (
+                    <View style={[
+                      {
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        backgroundColor: categoryColors.bg,
+                        borderColor: categoryColors.border
+                      }
+                    ]}>
+                      <Text style={[
+                        {
+                          fontSize: 10,
+                          fontWeight: '600',
+                          color: categoryColors.text,
+                          textTransform: 'uppercase'
+                        }
+                      ]}>
+                        {getCategoryDisplayText(post?.domain)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
 
@@ -1145,7 +1163,7 @@ const ViewPost: React.FC = () => {
                 // Skeleton loaders for replies
                 [1, 2, 3].map((index) => (
                   <View key={index} style={tw`flex-row items-start pl-4 mb-4`}>
-                    <View style={{ width: avatarSize * 0.8, height: avatarSize * 0.8, marginRight: LAYOUT.SPACING.sm, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: (avatarSize * 0.8) / 2 }} />
+                    <View style={{ width: responsive.avatarSize * 0.8, height: responsive.avatarSize * 0.8, marginRight: LAYOUT.SPACING.sm, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: (responsive.avatarSize * 0.8) / 2 }} />
                     <View style={tw`flex-1`}>
                         <View style={tw`w-3/4 h-4 mb-2 border border-gray-200 rounded`} />
                         <View style={tw`w-1/2 h-4 border border-gray-200 rounded`} />
@@ -1186,11 +1204,11 @@ const ViewPost: React.FC = () => {
                         ) : replyUser.avatar && !replyUser.avatar.includes('flaticon') ? (
                           <Image 
                             source={{ uri: replyUser.avatar }} 
-                            style={{ width: avatarSize * 0.8, height: avatarSize * 0.8, marginRight: LAYOUT.SPACING.sm, borderRadius: (avatarSize * 0.8) / 2 }}
+                            style={{ width: responsive.avatarSize * 0.8, height: responsive.avatarSize * 0.8, marginRight: LAYOUT.SPACING.sm, borderRadius: (responsive.avatarSize * 0.8) / 2 }}
                             onError={() => console.log('Failed to load reply avatar')}
                           />
                         ) : (
-                          <View style={{ alignItems: 'center', justifyContent: 'center', width: avatarSize * 0.8, height: avatarSize * 0.8, marginRight: LAYOUT.SPACING.sm, borderRadius: (avatarSize * 0.8) / 2, backgroundColor: Colors.primary.blue }}>
+                          <View style={{ alignItems: 'center', justifyContent: 'center', width: responsive.avatarSize * 0.8, height: responsive.avatarSize * 0.8, marginRight: LAYOUT.SPACING.sm, borderRadius: (responsive.avatarSize * 0.8) / 2, backgroundColor: Colors.primary.blue }}>
                             <Text style={tw`text-sm font-semibold text-white`}>
                               {getInitials(replyUser.name)}
                             </Text>
@@ -1275,14 +1293,14 @@ const ViewPost: React.FC = () => {
             </View>
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
 
-      {/* Reply Input - Only visible for lawyers */}
-      {isLawyer && post && (
-        <View style={[tw`absolute left-0 right-0 bg-white border-t border-gray-200`, { bottom: (Platform.OS === 'android' ? keyboardHeight : 0) + getSafeBottomPosition(insets.bottom), paddingHorizontal: horizontalPadding, paddingVertical: LAYOUT.SPACING.sm }]}>
+        {/* Reply Input - Only visible for lawyers */}
+        {isLawyer && post && (
+          <View style={[tw`bg-white border-t border-gray-200`, { paddingHorizontal: responsive.horizontalPadding, paddingVertical: LAYOUT.SPACING.sm, paddingBottom: getSafeBottomPosition(insets.bottom) }]}>
           <View style={tw`flex-row items-center`}>
             <TextInput
-              style={[tw`flex-1 mr-3 text-base border border-gray-300 rounded-full`, { paddingHorizontal: LAYOUT.SPACING.md, height: replyInputHeight }]}
+              style={[tw`flex-1 mr-3 text-base border border-gray-300 rounded-full`, { paddingHorizontal: LAYOUT.SPACING.md, height: responsive.replyInputHeight }]}
               placeholder="Write a reply..."
               value={replyText}
               onChangeText={setReplyText}
@@ -1294,8 +1312,8 @@ const ViewPost: React.FC = () => {
               style={[
                 tw`items-center justify-center rounded-full`,
                 { 
-                  width: replyInputHeight, 
-                  height: replyInputHeight,
+                  width: responsive.replyInputHeight, 
+                  height: responsive.replyInputHeight,
                   backgroundColor: replyText.trim() && !isReplying ? Colors.primary.blue : '#D1D5DB'
                 }
               ]}
@@ -1305,6 +1323,7 @@ const ViewPost: React.FC = () => {
           </View>
         </View>
       )}
+      </KeyboardAvoidingView>
 
       {/* Report Post Modal */}
       <ReportModal

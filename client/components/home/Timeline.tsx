@@ -13,6 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useList } from '@/hooks/useOptimizedList';
 import { SkeletonList } from '@/components/ui/SkeletonLoader';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { getResponsiveValue } from '@/constants/LayoutConstants';
 import { Text } from '@/components/ui/text';
 
 interface PostData {
@@ -62,9 +63,10 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   const { width: screenWidth } = useWindowDimensions();
 
   // Responsive sizing for plus button
-  const buttonSize = screenWidth < 375 ? 50 : screenWidth < 768 ? 56 : 60;
-  const iconSize = screenWidth < 375 ? 22 : screenWidth < 768 ? 24 : 26;
-  const bottomOffset = screenWidth < 375 ? 70 : screenWidth < 768 ? 75 : 80;
+  const buttonSize = getResponsiveValue(screenWidth, 50, 56, 60);
+  const iconSize = getResponsiveValue(screenWidth, 22, 24, 26);
+  const bottomOffset = getResponsiveValue(screenWidth, 70, 75, 80);
+  const rightOffset = getResponsiveValue(screenWidth, 16, 20, 24);
 
   const router = useRouter();
   const { session, isAuthenticated, user: currentUser } = useAuth();
@@ -796,6 +798,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
           styles.createPostButton, 
           { 
             bottom: bottomOffset + (insets.bottom || 0),
+            right: rightOffset,
             width: buttonSize,
             height: buttonSize,
             borderRadius: buttonSize / 2,
@@ -859,23 +862,23 @@ const styles = StyleSheet.create({
   },
   createPostButton: {
     position: 'absolute',
-    bottom: 90, // Will be adjusted dynamically with safe area insets
-    right: 20,
-    width: 60, // Slightly larger for better touch target
-    height: 60,
-    borderRadius: 30,
+    bottom: 70, // Will be adjusted dynamically with safe area insets
+    right: 16, // Reduced from 20 for better balance
+    width: 56, // Slightly smaller for better proportions
+    height: 56,
+    borderRadius: 28,
     backgroundColor: Colors.primary.blue,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 12, // Higher elevation for better visibility
+    elevation: 8, // Reduced elevation for less prominent shadow
     shadowColor: Colors.primary.blue,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 }, // Reduced shadow height
+    shadowOpacity: 0.25, // Reduced shadow opacity
+    shadowRadius: 6, // Reduced shadow radius for softer shadow
     zIndex: 1000, // Explicit z-index for iOS
     // Add subtle border for definition
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   loadingContainer: {
     paddingVertical: 20,

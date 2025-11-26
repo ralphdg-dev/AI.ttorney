@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -16,6 +17,8 @@ import {
   User
 } from 'lucide-react-native';
 import { useGuest } from '../contexts/GuestContext';
+import { LAYOUT, getResponsiveValue } from '../constants/LayoutConstants';
+import Colors from '../constants/Colors';
 
 
 export default function GuestOnboardingScreen() {
@@ -24,6 +27,7 @@ export default function GuestOnboardingScreen() {
   const { startGuestSession, setShowTutorial } = useGuest();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = Dimensions.get('window');
   
   const features = [
     {
@@ -77,34 +81,53 @@ export default function GuestOnboardingScreen() {
         <View style={styles.header}>
           <View style={styles.logoContainer}>
             <View style={styles.logo}>
-              <Scale size={32} color="#023D7B" strokeWidth={2.5} />
+              <Scale 
+                size={getResponsiveValue(width, 28, 32, 36)} 
+                color={Colors.primary.blue} 
+                strokeWidth={2.5} 
+              />
             </View>
-            <Text style={styles.appName}>AI.ttorney</Text>
+            <Text style={[styles.appName, { fontSize: getResponsiveValue(width, 24, 28, 32) }]}>
+              AI.ttorney
+            </Text>
           </View>
-          <Text style={styles.subtitle}>Your Legal Assistant</Text>
+          <Text style={[styles.subtitle, { fontSize: getResponsiveValue(width, 14, 16, 18) }]}>
+            Your Legal Assistant
+          </Text>
         </View>
 
         {/* Welcome Message */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeTitle}>Welcome, Guest!</Text>
-          <Text style={styles.welcomeDescription}>
+          <Text style={[styles.welcomeTitle, { fontSize: getResponsiveValue(width, 20, 24, 28) }]}>
+            Welcome, Guest!
+          </Text>
+          <Text style={[styles.welcomeDescription, { fontSize: getResponsiveValue(width, 14, 16, 18) }]}>
             Explore our legal assistance tools and get started with understanding your legal questions.
           </Text>
         </View>
 
         {/* Features */}
         <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>What&apos;s Available</Text>
+          <Text style={[styles.sectionTitle, { fontSize: getResponsiveValue(width, 18, 20, 22) }]}>
+            What&apos;s Available
+          </Text>
           {features.map((feature, index) => {
             const IconComponent = feature.icon;
             return (
               <View key={feature.id} style={[styles.featureCard, { backgroundColor: feature.color }]}>
                 <View style={styles.featureIcon}>
-                  <IconComponent size={24} color="#FFFFFF" />
+                  <IconComponent 
+                    size={getResponsiveValue(width, 20, 24, 28)} 
+                    color="#FFFFFF" 
+                  />
                 </View>
                 <View style={styles.featureContent}>
-                  <Text style={styles.featureTitle}>{feature.title}</Text>
-                  <Text style={styles.featureDescription}>{feature.description}</Text>
+                  <Text style={[styles.featureTitle, { fontSize: getResponsiveValue(width, 16, 18, 20) }]}>
+                    {feature.title}
+                  </Text>
+                  <Text style={[styles.featureDescription, { fontSize: getResponsiveValue(width, 12, 14, 16) }]}>
+                    {feature.description}
+                  </Text>
                 </View>
               </View>
             );
@@ -114,8 +137,10 @@ export default function GuestOnboardingScreen() {
         {/* Pro Tip */}
         <View style={styles.tipSection}>
           <View style={styles.tipCard}>
-            <Text style={styles.tipTitle}>💡 Pro Tip</Text>
-            <Text style={styles.tipText}>
+            <Text style={[styles.tipTitle, { fontSize: getResponsiveValue(width, 14, 16, 18) }]}>
+              💡 Pro Tip
+            </Text>
+            <Text style={[styles.tipText, { fontSize: getResponsiveValue(width, 12, 14, 16) }]}>
               Sign up for a free account to save your conversation history, bookmark favorite terms, and get personalized recommendations.
             </Text>
           </View>
@@ -128,8 +153,13 @@ export default function GuestOnboardingScreen() {
             onPress={handleStartExploring}
             activeOpacity={0.8}
           >
-            <Text style={styles.primaryButtonText}>Start Exploring</Text>
-            <ArrowRight size={20} color="#FFFFFF" />
+            <Text style={[styles.primaryButtonText, { fontSize: getResponsiveValue(width, 14, 16, 18) }]}>
+              Start Exploring
+            </Text>
+            <ArrowRight 
+              size={getResponsiveValue(width, 16, 20, 24)} 
+              color="#FFFFFF" 
+            />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -137,8 +167,13 @@ export default function GuestOnboardingScreen() {
             onPress={handleSignIn}
             activeOpacity={0.8}
           >
-            <User size={18} color="#023D7B" />
-            <Text style={styles.secondaryButtonText}>Sign In</Text>
+            <User 
+              size={getResponsiveValue(width, 16, 18, 20)} 
+              color={Colors.primary.blue} 
+            />
+            <Text style={[styles.secondaryButtonText, { fontSize: getResponsiveValue(width, 14, 16, 18) }]}>
+              Sign In
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -152,71 +187,71 @@ export default function GuestOnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.background.primary,
   },
   scrollView: {
     flex: 1,
   },
   header: {
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 32,
+    paddingHorizontal: LAYOUT.SPACING.lg,
+    paddingTop: LAYOUT.SPACING.lg,
+    paddingBottom: LAYOUT.SPACING.xl,
   },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: LAYOUT.SPACING.sm,
   },
   logo: {
-    width: 56,
-    height: 56,
-    backgroundColor: '#F0F7FF',
-    borderRadius: 16,
+    width: getResponsiveValue(Dimensions.get('window').width, 48, 56, 64),
+    height: getResponsiveValue(Dimensions.get('window').width, 48, 56, 64),
+    backgroundColor: Colors.background.secondary,
+    borderRadius: LAYOUT.RADIUS.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: LAYOUT.SPACING.md,
   },
   appName: {
-    fontSize: 28,
     fontWeight: '800',
-    color: '#023D7B',
+    color: Colors.primary.blue,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
+    color: Colors.text.sub,
     fontWeight: '500',
+    textAlign: 'center',
   },
   welcomeSection: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
+    paddingHorizontal: LAYOUT.SPACING.lg,
+    marginBottom: LAYOUT.SPACING.xl,
   },
   welcomeTitle: {
-    fontSize: 24,
     fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 8,
+    color: Colors.text.head,
+    marginBottom: LAYOUT.SPACING.sm,
+    textAlign: 'center',
   },
   welcomeDescription: {
-    fontSize: 16,
-    color: '#6B7280',
-    lineHeight: 24,
+    color: Colors.text.sub,
+    lineHeight: getResponsiveValue(Dimensions.get('window').width, 20, 24, 28),
+    textAlign: 'center',
   },
   featuresSection: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
+    paddingHorizontal: LAYOUT.SPACING.lg,
+    marginBottom: LAYOUT.SPACING.xl,
   },
   sectionTitle: {
-    fontSize: 20,
     fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 16,
+    color: Colors.text.head,
+    marginBottom: LAYOUT.SPACING.md,
+    textAlign: 'center',
   },
   featureCard: {
     flexDirection: 'row',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: LAYOUT.RADIUS.lg,
+    padding: LAYOUT.SPACING.lg,
+    marginBottom: LAYOUT.SPACING.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -224,64 +259,65 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   featureIcon: {
-    width: 48,
-    height: 48,
+    width: getResponsiveValue(Dimensions.get('window').width, 40, 48, 56),
+    height: getResponsiveValue(Dimensions.get('window').width, 40, 48, 56),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
+    borderRadius: LAYOUT.RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: LAYOUT.SPACING.md,
   },
   featureContent: {
     flex: 1,
+    justifyContent: 'center',
   },
   featureTitle: {
-    fontSize: 18,
     fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: LAYOUT.SPACING.xs,
+    textAlign: 'left',
   },
   featureDescription: {
-    fontSize: 14,
     color: '#E5E7EB',
-    lineHeight: 20,
+    lineHeight: getResponsiveValue(Dimensions.get('window').width, 18, 20, 22),
+    textAlign: 'left',
   },
   tipSection: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
+    paddingHorizontal: LAYOUT.SPACING.lg,
+    marginBottom: LAYOUT.SPACING.xl,
   },
   tipCard: {
     backgroundColor: '#FEF3C7',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: LAYOUT.RADIUS.md,
+    padding: LAYOUT.SPACING.md,
     borderLeftWidth: 4,
     borderLeftColor: '#F59E0B',
   },
   tipTitle: {
-    fontSize: 16,
     fontWeight: '700',
     color: '#92400E',
-    marginBottom: 4,
+    marginBottom: LAYOUT.SPACING.xs,
+    textAlign: 'left',
   },
   tipText: {
-    fontSize: 14,
     color: '#78350F',
-    lineHeight: 20,
+    lineHeight: getResponsiveValue(Dimensions.get('window').width, 18, 20, 22),
+    textAlign: 'left',
   },
   actionsSection: {
-    paddingHorizontal: 24,
-    marginBottom: 24,
+    paddingHorizontal: LAYOUT.SPACING.lg,
+    marginBottom: LAYOUT.SPACING.lg,
   },
   primaryButton: {
     flexDirection: 'row',
-    backgroundColor: '#023D7B',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    backgroundColor: Colors.primary.blue,
+    borderRadius: LAYOUT.RADIUS.md,
+    paddingVertical: LAYOUT.SPACING.md,
+    paddingHorizontal: LAYOUT.SPACING.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
-    shadowColor: '#023D7B',
+    marginBottom: LAYOUT.SPACING.md,
+    shadowColor: Colors.primary.blue,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -289,25 +325,25 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
     fontWeight: '700',
-    marginRight: 8,
+    marginRight: LAYOUT.SPACING.sm,
+    textAlign: 'center',
   },
   secondaryButton: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    borderRadius: LAYOUT.RADIUS.md,
+    paddingVertical: LAYOUT.SPACING.md,
+    paddingHorizontal: LAYOUT.SPACING.lg,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#023D7B',
+    borderColor: Colors.primary.blue,
   },
   secondaryButtonText: {
-    color: '#023D7B',
-    fontSize: 16,
+    color: Colors.primary.blue,
     fontWeight: '600',
-    marginLeft: 8,
+    marginLeft: LAYOUT.SPACING.sm,
+    textAlign: 'center',
   },
 });

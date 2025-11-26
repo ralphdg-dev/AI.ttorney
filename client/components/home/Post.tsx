@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { Bookmark, MoreHorizontal, User, MessageCircle, Flag, ChevronRight } from 'lucide-react-native';
 import { getCategoryColors, getCategoryDisplayText } from '@/utils/categoryUtils';
 import ReportModal from '../common/ReportModal';
@@ -8,6 +8,7 @@ import Colors from '@/constants/Colors';
 import { BookmarkService } from '../../services/bookmarkService';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePostBookmarks } from '../../contexts/PostBookmarksContext';
+import { getResponsiveValue } from '@/constants/LayoutConstants';
 import FadeInView from '../ui/FadeInView';
  
 import { VerifiedLawyerBadge } from '../common/VerifiedLawyerBadge';
@@ -70,9 +71,18 @@ const Post: React.FC<PostProps> = React.memo(({
 }) => {
   const { user: currentUser, session } = useAuth();
   const { loadBookmarks: refreshBookmarkContext } = usePostBookmarks();
+  const { width } = useWindowDimensions();
   const [isBookmarked, setIsBookmarked] = useState(propIsBookmarked || false);
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
+  
+  // Responsive values for Post component
+  const responsive = React.useMemo(() => ({
+    usernameFontSize: getResponsiveValue(width, 12, 13, 14),
+    timestampFontSize: getResponsiveValue(width, 11, 12, 13),
+    categoryFontSize: getResponsiveValue(width, 9, 10, 11),
+    verticalSpacing: getResponsiveValue(width, 4, 6, 8),
+  }), [width]);
   const [displayTime, setDisplayTime] = useState(() => {
     // Initialize with formatted time
     const dateToFormat = created_at || timestamp;
@@ -336,40 +346,42 @@ const Post: React.FC<PostProps> = React.memo(({
           )}
           
           <View style={styles.userInfo}>
-            {/* User Name and Category Row */}
+            {/* User Name Row */}
             <View style={styles.userNameRow}>
               <Text style={styles.userName}>
                 {isDeactivated ? 'Deactivated Account' : (user.name || 'User')}
               </Text>
 
-
               {/* Verified Lawyer Badge (unified across app) */}
               {!isAnonymous && !isDeactivated && user?.isLawyer && (
-                <View style={{ marginRight: 6 }}>
+                <View style={styles.verifiedBadgeContainer}>
                   <VerifiedLawyerBadge size="sm" />
                 </View>
               )}
-              
+            </View>
+            
+            {/* Username and Timestamp Row */}
+            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: responsive.verticalSpacing}}>
+              {!isAnonymous && !isDeactivated && (
+                <>
+                  <Text style={[styles.userHandle, { fontSize: responsive.usernameFontSize }]}>@{user.username || 'user'}</Text>
+                  <Text style={[styles.metaSeparator, { fontSize: responsive.timestampFontSize }]}> • </Text>
+                </>
+              )}
+              <Text style={[styles.timestamp, { fontSize: responsive.timestampFontSize }]}>{displayTime}</Text>
+            </View>
+            
+            {/* Category Badge Row */}
+            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: responsive.verticalSpacing}}>
               {/* Category Badge */}
               <View style={[styles.categoryBadge, { 
                 backgroundColor: categoryColors.bg,
                 borderColor: categoryColors.border 
               }]}>
-                <Text style={[styles.categoryText, { color: categoryColors.text }]}>
+                <Text style={[styles.categoryText, { color: categoryColors.text, fontSize: responsive.categoryFontSize }]}>
                   {displayText}
                 </Text>
               </View>
-            </View>
-            
-            {/* User Handle and Timestamp Row */}
-            <View style={styles.userMetaRow}>
-              {!isAnonymous && !isDeactivated && (
-                <>
-                  <Text style={styles.userHandle}>@{user.username || 'user'}</Text>
-                  <Text style={styles.metaSeparator}> • </Text>
-                </>
-              )}
-              <Text style={styles.timestamp}>{displayTime}</Text>
             </View>
           </View>
           
@@ -503,7 +515,15 @@ const styles = StyleSheet.create({
   userNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: 6,
+  },
+  verifiedBadgeContainer: {
+    marginLeft: 8,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
   },
   userName: {
     fontSize: 14,
@@ -516,15 +536,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   userHandle: {
-    fontSize: 12,
+    fontSize: 12, // Will be overridden by responsive value
     color: '#536471',
   },
   metaSeparator: {
-    fontSize: 12,
+    fontSize: 12, // Will be overridden by responsive value
     color: '#536471',
   },
   timestamp: {
-    fontSize: 12,
+    fontSize: 12, // Will be overridden by responsive value
     color: '#536471',
   },
   moreButton: {

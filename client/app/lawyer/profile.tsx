@@ -250,43 +250,105 @@ const LawyerProfilePage: React.FC = () => {
       return;
     }
 
+    // Validate user role before proceeding
+    if (user.role !== "verified_lawyer") {
+      Alert.alert("Error", "Only verified lawyers can update consultation status");
+      return;
+    }
+
     const newStatus = !isAcceptingConsultations;
     const previousStatus = isAcceptingConsultations;
 
     try {
+      // Optimistic UI update
       setIsAcceptingConsultations(newStatus);
 
+      console.log(`🔄 Updating consultation status to ${newStatus} for lawyer ${user.id}`);
+
+      // First try to update existing record
       const { data, error } = await supabase
         .from("lawyer_info")
-        .update({ accepting_consultations: newStatus })
+        .update({ 
+          accepting_consultations: newStatus,
+          updated_at: new Date().toISOString()
+        })
         .eq("lawyer_id", user.id)
-        .select()
+        .select("accepting_consultations")
         .maybeSingle();
 
       if (error) {
-        throw new Error(error.message);
+        console.error("❌ Supabase error:", error);
+        throw new Error(`Database error: ${error.message}`);
       }
 
-      if (data && data.accepting_consultations === newStatus) {
-        Alert.alert(
-          "Success",
-          newStatus
-            ? "You are now accepting consultations."
-            : "You are no longer accepting consultations."
-        );
+      // If no record exists, create one
+      if (!data) {
+        console.log("📝 No lawyer_info record found, creating new record");
+        
+        const { data: insertData, error: insertError } = await supabase
+          .from("lawyer_info")
+          .insert({ 
+            lawyer_id: user.id,
+            accepting_consultations: newStatus,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select("accepting_consultations")
+          .single();
+
+        if (insertError) {
+          console.error("❌ Insert error:", insertError);
+          throw new Error(`Failed to create lawyer record: ${insertError.message}`);
+        }
+
+        if (insertData && insertData.accepting_consultations === newStatus) {
+          console.log("✅ Lawyer record created and consultation status set");
+          Alert.alert(
+            "Success",
+            newStatus
+              ? "You are now accepting consultations."
+              : "You are no longer accepting consultations."
+          );
+        } else {
+          throw new Error("Failed to verify new record creation");
+        }
       } else {
-        throw new Error("Status update verification failed");
+        // Verify the update was successful
+        if (data.accepting_consultations === newStatus) {
+          console.log("✅ Consultation status updated successfully");
+          Alert.alert(
+            "Success",
+            newStatus
+              ? "You are now accepting consultations."
+              : "You are no longer accepting consultations."
+          );
+        } else {
+          console.error("❌ Status update verification failed:", { data, expected: newStatus });
+          throw new Error("Status update verification failed - data mismatch");
+        }
       }
     } catch (error: any) {
-      console.error("Error updating consultation status:", error);
+      console.error("❌ Error updating consultation status:", error);
 
+      // Revert optimistic update
       setIsAcceptingConsultations(previousStatus);
 
-      Alert.alert(
-        "Error",
-        error.message ||
-          "Failed to update consultation status. Please try again."
-      );
+      // Provide specific error messages
+      let errorMessage = "Failed to update consultation status. Please try again.";
+      
+      if (error.message?.includes("406") || error.message?.includes("Not Acceptable")) {
+        errorMessage = "Permission denied. Please check your account status and try again.";
+      } else if (error.message?.includes("auth")) {
+        errorMessage = "Authentication error. Please log out and log back in.";
+      } else if (error.message?.includes("Database error")) {
+        errorMessage = "Database error. Please contact support if this persists.";
+      } else if (error.message?.includes("Failed to create lawyer record")) {
+        errorMessage = "Account setup incomplete. Please complete your profile first.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      Alert.alert("Error", errorMessage);
     }
   };
 
@@ -852,7 +914,7 @@ const LawyerProfilePage: React.FC = () => {
                   { backgroundColor: "#ECFDF5" },
                 ]}
               >
-                <Text style={tw`text-xs font-semibold leading-tight text-green-700`}>
+                <Text style={tw`text-xs font-semibold text-green-700`}>
                   {profileData.verificationStatus}
                 </Text>
               </View>
