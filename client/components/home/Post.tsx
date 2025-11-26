@@ -78,11 +78,42 @@ const Post: React.FC<PostProps> = React.memo(({
   
   // Responsive values for Post component
   const responsive = React.useMemo(() => ({
-    usernameFontSize: getResponsiveValue(width, 12, 13, 14),
-    timestampFontSize: getResponsiveValue(width, 11, 12, 13),
+    userNameFontSize: getResponsiveValue(width, 12, 13, 14), // Responsive user name
+    usernameFontSize: getResponsiveValue(width, 11, 12, 13), // Handle (@username)
+    timestampFontSize: getResponsiveValue(width, 10, 11, 12),
     categoryFontSize: getResponsiveValue(width, 9, 10, 11),
     verticalSpacing: getResponsiveValue(width, 4, 6, 8),
+    nameMarginRight: getResponsiveValue(width, 4, 6, 8), // Responsive margin
+    useCompactName: width < 380, // Use compact name format on very small screens
   }), [width]);
+
+  // Determine if the user account is deactivated (moved up for getDisplayName)
+  const isDeactivated = user.account_status === 'deactivated';
+
+  // Helper function to format name for small screens
+  const getDisplayName = useCallback((fullName: string) => {
+    if (!responsive.useCompactName || isDeactivated) {
+      return isDeactivated ? 'Deactivated Account' : (fullName || 'User');
+    }
+    
+    if (!fullName || typeof fullName !== 'string') {
+      return 'User';
+    }
+    
+    const nameParts = fullName.trim().split(' ').filter(part => part.length > 0);
+    
+    if (nameParts.length === 1) {
+      // Single name, just return as is
+      return nameParts[0];
+    } else if (nameParts.length >= 2) {
+      // First name + first letter of surname + dot
+      const firstName = nameParts[0];
+      const surnameInitial = nameParts[nameParts.length - 1][0].toUpperCase(); // Last name's first letter
+      return `${firstName} ${surnameInitial}.`;
+    }
+    
+    return fullName;
+  }, [responsive.useCompactName, isDeactivated]);
   const [displayTime, setDisplayTime] = useState(() => {
     // Initialize with formatted time
     const dateToFormat = created_at || timestamp;
@@ -313,9 +344,6 @@ const Post: React.FC<PostProps> = React.memo(({
 
   // Determine if the user is anonymous
   const isAnonymous = (user.username || '').toLowerCase() === 'anonymous' || (user.name || '').toLowerCase().includes('anonymous');
-  
-  // Determine if the user account is deactivated
-  const isDeactivated = user.account_status === 'deactivated';
 
 
   return (
@@ -348,8 +376,18 @@ const Post: React.FC<PostProps> = React.memo(({
           <View style={styles.userInfo}>
             {/* User Name Row */}
             <View style={styles.userNameRow}>
-              <Text style={styles.userName}>
-                {isDeactivated ? 'Deactivated Account' : (user.name || 'User')}
+              <Text 
+                style={[
+                  styles.userName, 
+                  { 
+                    fontSize: responsive.userNameFontSize,
+                    marginRight: responsive.nameMarginRight,
+                  }
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {getDisplayName(user.name)}
               </Text>
 
               {/* Verified Lawyer Badge (unified across app) */}
@@ -516,6 +554,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
+    flex: 1, // Allow proper text truncation
   },
   verifiedBadgeContainer: {
     marginLeft: 8,
@@ -526,10 +565,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   userName: {
-    fontSize: 14,
+    fontSize: 14, // Will be overridden by responsive value
     fontWeight: '600',
     color: '#0F1419',
-    marginRight: 8,
+    marginRight: 8, // Will be overridden by responsive value
+    flex: 1, // Allow text to take available space and truncate
   },
   userMetaRow: {
     flexDirection: 'row',
