@@ -903,7 +903,7 @@ const LawyerProfilePage: React.FC = () => {
       >
         <View style={tw`p-4 bg-white border-b border-gray-200`}>
           <View style={tw`flex-row items-center`}>
-            <View style={tw`relative mr-4`}>
+            <View style={[tw`relative mr-4`, { overflow: 'visible' }]}>
               {profileData.avatar && !profileData.avatar.includes('unsplash') ? (
                 <Image
                   source={{ uri: profileData.avatar }}
