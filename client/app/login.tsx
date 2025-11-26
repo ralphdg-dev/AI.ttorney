@@ -10,7 +10,6 @@ import { useToast } from "../components/ui/toast";
 import { createSafeAreaToastRenderer } from "../components/ui/SafeAreaToast";
 import { useAuth } from "../contexts/AuthContext";
 import { useGuest } from "../contexts/GuestContext";
-import { getContentBottomPadding } from "../constants/LayoutConstants";
 
 export default function Login() {
   const insets = useSafeAreaInsets();
@@ -176,7 +175,7 @@ export default function Login() {
         >
           <ScrollView
             style={tw`flex-1`}
-            contentContainerStyle={[tw`flex-grow`, { paddingBottom: getContentBottomPadding(insets.bottom, 20) }]}
+            contentContainerStyle={[tw`flex-grow`]}
             keyboardShouldPersistTaps="handled"
           >
 
@@ -315,8 +314,8 @@ export default function Login() {
         </View>
       </View>
 
-      {/* Bottom Section */}
-      <View style={[tw`items-center px-6 mt-8`, { paddingBottom: Math.max(insets.bottom + 24, 48) }]}>
+      {/* Bottom Section - Fixed at bottom */}
+      <View style={[tw`items-center px-6`, { paddingBottom: Math.max(insets.bottom + 24, 48) }]}>
         <Text style={[tw`text-center`, { color: Colors.text.sub }]}>
           Don&apos;t have an account?{" "}
           <Text
@@ -327,7 +326,7 @@ export default function Login() {
           </Text>
         </Text>
       </View>
-          </ScrollView>
+    </ScrollView>
         </KeyboardAvoidingView>
       </View>
     </SafeAreaView>

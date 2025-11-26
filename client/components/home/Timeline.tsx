@@ -10,7 +10,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useForumCache } from '../../contexts/ForumCacheContext';
 import Colors from '../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import ForumLoadingAnimation from '../ui/ForumLoadingAnimation';
 import { useList } from '@/hooks/useOptimizedList';
 import { SkeletonList } from '@/components/ui/SkeletonLoader';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -757,9 +756,6 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
 
   return (
     <View style={styles.container}>
-      {/* Forum Loading Animation */}
-      <ForumLoadingAnimation visible={initialLoading} />
-
       {/* Show skeleton loading for initial load */}
       {initialLoading && allPosts.length === 0 ? (
         <View style={[styles.skeletonContainer, { paddingBottom: Math.max(32, insets.bottom + 16) }]}>
@@ -808,7 +804,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF', // White background for post content area
   },
   timeline: {
     flex: 1,

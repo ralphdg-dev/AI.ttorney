@@ -89,7 +89,7 @@ const ViewPost: React.FC = () => {
   const { width } = useWindowDimensions();
   
   // Responsive sizing values
-  const horizontalPadding = getResponsiveValue(width, LAYOUT.SPACING.md, LAYOUT.SPACING.lg, LAYOUT.SPACING.xl);
+  const horizontalPadding = LAYOUT.SPACING.md; // Fixed 16px padding for consistency
   const avatarSize = getResponsiveValue(width, 40, 48, 56); // Small: 40px, Tablet: 48px, Desktop: 56px
   const dropdownWidth = getResponsiveValue(width, 160, 192, 224); // Responsive dropdown width
   const replyInputHeight = getResponsiveValue(width, 40, 44, 48); // Responsive input height

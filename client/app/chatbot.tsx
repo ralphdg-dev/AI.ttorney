@@ -17,7 +17,6 @@ import {
   Image,
   Animated,
   StatusBar,
-  useWindowDimensions,
   Keyboard,
   } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -30,7 +29,7 @@ import Navbar from "../components/Navbar";
 import { GuestNavbar, GuestSidebar, GuestRateLimitBanner } from "../components/guest";
 import { LawyerNavbar } from "../components/lawyer/shared";
 import { useAuth } from "../contexts/AuthContext";
-import { LAYOUT, getResponsiveValue } from '../constants/LayoutConstants';
+import { LAYOUT } from '../constants/LayoutConstants';
 import { useGuest } from "../contexts/GuestContext";
 import { useGuestChat } from "../contexts/GuestChatContext";
 import { useModerationStatus } from "../contexts/ModerationContext";
@@ -338,14 +337,13 @@ interface Message {
 
 export default function ChatbotScreen() {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions(); // Get screen width for responsive sizing
   const { user, session, isLawyer } = useAuth();
   
   // Responsive sizing variables
-  const navbarHeight = getResponsiveValue(width, LAYOUT.NAVBAR_HEIGHT, LAYOUT.NAVBAR_HEIGHT, LAYOUT.NAVBAR_HEIGHT * 1.2);
-  const inputHeight = getResponsiveValue(width, 48, 52, 56);
-  const horizontalPadding = getResponsiveValue(width, LAYOUT.SPACING.md, LAYOUT.SPACING.lg, LAYOUT.SPACING.xl);
-  const fontSize = getResponsiveValue(width, 16, 16, 18);
+  const navbarHeight = LAYOUT.NAVBAR_HEIGHT;
+  const inputHeight = 48;
+  const horizontalPadding = LAYOUT.SPACING.md; // Fixed 16px padding for consistency
+  const fontSize = 16;
   
   // Keyboard awareness for Android
   const [keyboardHeight, setKeyboardHeight] = useState(0);

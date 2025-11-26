@@ -368,6 +368,8 @@ const LawyerConsultPage: React.FC = () => {
         <View style={tw`flex-1 px-5 pt-6`}>
           <ConsultationListSkeleton count={5} />
         </View>
+        <LawyerNavbar activeTab="consult" />
+        <SidebarWrapper />
       </SafeAreaView>
     );
   }
