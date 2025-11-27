@@ -841,7 +841,11 @@ async def ask_legal_question(
                 yield format_sse({'content': token_buffer})
             
                                                                         
-            legal_disclaimer = get_legal_disclaimer(language, request.question, full_answer)
+            # Determine user type for appropriate disclaimer
+            # Guest session has guest_session_id but no user_id
+            is_guest_session = request.guest_session_id and not effective_user_id
+            user_type = "guest" if is_guest_session else "registered"
+            legal_disclaimer = get_legal_disclaimer(language, request.question, full_answer, user_type=user_type)
             if legal_disclaimer:
                 yield format_sse({'type': 'disclaimer', 'disclaimer': legal_disclaimer})
             

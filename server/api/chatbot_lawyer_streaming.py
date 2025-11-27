@@ -602,7 +602,7 @@ Note: No specific context was retrieved from the vector database. Proceed with t
                     logger.warning(f"Guardrails output validation error: {e}")
             
             # ALWAYS send legal disclaimer before completion
-            disclaimer = get_legal_disclaimer(language)
+            disclaimer = get_legal_disclaimer(language, user_type="lawyer")
             yield format_sse({'type': 'disclaimer', 'disclaimer': disclaimer})
             
                                     

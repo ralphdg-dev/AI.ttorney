@@ -968,7 +968,9 @@ export default function ChatbotScreen() {
         // Initialize streaming state - same for guests and authenticated users
         setMessages((prev) => [...prev, streamingMsg]);
         
-        isStreamingRef.current = true; // Mark as streaming
+        // Don't mark as streaming yet - wait for actual content to arrive
+        // This allows the typing indicator to show until first content arrives
+        isStreamingRef.current = false;
 
         // Create abort controller for timeout
         const controller = new AbortController();
@@ -1020,6 +1022,11 @@ export default function ChatbotScreen() {
                   msg.id === streamingMsgId ? { ...msg, text: answer } : msg
                 )
               );
+              
+              // Set streaming flag to true when content starts coming in
+              if (!isStreamingRef.current && content.trim().length > 0) {
+                isStreamingRef.current = true;
+              }
             },
             onSources: (receivedSources: any[]) => {
               sources = receivedSources;
@@ -1093,6 +1100,7 @@ export default function ChatbotScreen() {
             },
             onError: () => {
               setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
+              isStreamingRef.current = false; // Reset streaming state on error
             },
             onFinish: () => {
               clearTimeout(timeoutId);
@@ -1108,6 +1116,7 @@ export default function ChatbotScreen() {
           setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
           setIsTyping(false); // Reset typing state
           setIsGenerating(false); // Reset generating state
+          isStreamingRef.current = false; // Reset streaming state
           abortControllerRef.current = null; // Clear abort controller
           throw streamError;
         }
@@ -1803,8 +1812,8 @@ export default function ChatbotScreen() {
             style={[tw`flex-1`, { opacity: isScrolledToBottom ? 1 : 0 }]}
             ListFooterComponent={
               <>
-                {/* Typing indicator - only show when actively typing */}
-                {isTyping && (
+                {/* Typing indicator - only show when actively typing and not streaming content */}
+                {isTyping && !isStreamingRef.current && (
         <View style={tw`px-4 py-1.5`}>
           <View style={tw`flex-row items-start`}>
             <View style={tw`mr-2.5`}>

@@ -256,6 +256,8 @@ async def verify_token(current_user: Dict[str, Any] = Depends(get_current_user))
 async def send_otp(http_request: Request, request: SendOTPRequest):
     """Send OTP for email verification or password reset"""
     try:
+        logger.info(f"📧 OTP Request - Type: {request.otp_type}, Email: {request.email}")
+        
         if request.otp_type == "email_verification":
             result = await otp_service.send_verification_otp(request.email, request.user_name)
         elif request.otp_type == "password_reset":
@@ -282,12 +284,16 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
                 detail="Invalid OTP type"
             )
         
+        logger.info(f"📧 OTP Service Result - Success: {result.get('success')}, Error: {result.get('error')}")
+        
         if not result["success"]:
+            logger.error(f"❌ OTP sending failed: {result['error']}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=result["error"]
             )
         
+        logger.info(f"✅ OTP sent successfully to {request.email}")
         return OTPResponse(
             success=True,
             message=result["message"],
@@ -297,10 +303,13 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Send OTP error: {str(e)}")
+        logger.error(f"❌ Send OTP error: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send OTP"
+            detail=f"Failed to send OTP: {str(e)}"
         )
 
 

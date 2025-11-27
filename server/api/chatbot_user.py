@@ -2106,7 +2106,7 @@ def requires_legal_disclaimer(question: str, answer: str) -> bool:
     return False
 
 
-def get_legal_disclaimer(language: str, question: str = "", answer: str = "") -> str:
+def get_legal_disclaimer(language: str, question: str = "", answer: str = "", user_type: str = "registered") -> str:
     """
     Get legal disclaimer in appropriate language with in-app legal help link.
     ALWAYS returns disclaimer to ensure users understand this is legal awareness, not advice.
@@ -2115,6 +2115,7 @@ def get_legal_disclaimer(language: str, question: str = "", answer: str = "") ->
         language: Detected language (english, tagalog, taglish)
         question: User's question (optional, for context)
         answer: Generated answer (optional, for context)
+        user_type: Type of user (guest, registered, lawyer)
     
     Returns:
         str: Legal disclaimer (always returned for every message)
@@ -2122,11 +2123,27 @@ def get_legal_disclaimer(language: str, question: str = "", answer: str = "") ->
     # ALWAYS show disclaimer - this is legal awareness, not legal advice
     # AI.ttorney is not liable for any decisions made based on this information
     
-    disclaimers = {
-        "english": "⚖️ **Legal Disclaimer**: This is for legal awareness only, not legal advice. AI.ttorney is not liable for any actions or decisions made based on this information. For your specific situation, consult with a licensed Philippine lawyer through our [Legal Help directory](/directory?tab=lawyers).",
-        "tagalog": "⚖️ **Paalala**: Ito ay para sa legal awareness lamang, hindi legal advice. Ang AI.ttorney ay walang pananagutan sa anumang aksyon o desisyon base sa impormasyong ito. Para sa iyong partikular na sitwasyon, kumonsulta sa lisensyadong abogado sa aming [Legal Help directory](/directory?tab=lawyers).",
-        "taglish": "⚖️ **Disclaimer**: Ito ay for legal awareness lang, hindi legal advice. AI.ttorney is not liable para sa any actions o decisions based sa information na ito. Para sa iyong specific situation, mag-consult with a licensed Philippine lawyer sa aming [Legal Help directory](/directory?tab=lawyers)."
-    }
+    # Guest disclaimers - simple prompt to sign in
+    if user_type == "guest":
+        disclaimers = {
+            "english": "⚖️ **Legal Disclaimer**: This is for legal awareness only, not legal advice. [Sign in](/login) or create an account for full access.",
+            "tagalog": "⚖️ **Paalala**: Ito ay para sa legal awareness lamang, hindi legal advice. [Mag-sign in](/login) o gumawa ng account para sa full access.",
+            "taglish": "⚖️ **Disclaimer**: Ito ay for legal awareness lang, hindi legal advice. [Sign in](/login) o gumawa ng account for full access."
+        }
+    # Lawyer disclaimers - emphasize professional responsibility
+    elif user_type == "lawyer":
+        disclaimers = {
+            "english": "⚖️ **Professional Responsibility**: As a legal professional, you are responsible for verifying information and using this knowledge ethically in accordance with your professional duties and the Code of Professional Responsibility.",
+            "tagalog": "⚖️ **Propesyonal na Responsibilidad**: Bilang legal professional, ikaw ay responsable sa pag-verify ng impormasyon at paggamit nito nang etikal alinsunod sa iyong propesyonal na tungkulin at Code of Professional Responsibility.",
+            "taglish": "⚖️ **Professional Responsibility**: As legal professional, ikaw ay responsible sa pag-verify ng information at paggamit nito ethically according sa iyong professional duties at Code of Professional Responsibility."
+        }
+    # Registered user disclaimers - standard disclaimer with Legal Help link
+    else:
+        disclaimers = {
+            "english": "⚖️ **Legal Disclaimer**: This is for legal awareness only, not legal advice. AI.ttorney is not liable for any actions or decisions made based on this information. For your specific situation, consult with a licensed Philippine lawyer through our [Legal Help directory](/directory?tab=lawyers).",
+            "tagalog": "⚖️ **Paalala**: Ito ay para sa legal awareness lamang, hindi legal advice. Ang AI.ttorney ay walang pananagutan sa anumang aksyon o desisyon base sa impormasyong ito. Para sa iyong partikular na sitwasyon, kumonsulta sa lisensyadong abogado sa aming [Legal Help directory](/directory?tab=lawyers).",
+            "taglish": "⚖️ **Disclaimer**: Ito ay for legal awareness lang, hindi legal advice. AI.ttorney is not liable para sa any actions o decisions based sa information na ito. Para sa iyong specific situation, mag-consult with a licensed Philippine lawyer sa aming [Legal Help directory](/directory?tab=lawyers)."
+        }
     return disclaimers.get(language, disclaimers["english"])
 
 
@@ -2431,6 +2448,12 @@ async def ask_legal_question(
                                                                                        
     effective_user_id = authenticated_user_id or request.user_id
     print(f" Effective user ID for chat history: {effective_user_id}")
+    
+                                                                   
+    # Determine user type: guest session has guest_session_id but no user_id
+    is_guest_session = request.guest_session_id and not effective_user_id
+    user_type = "guest" if is_guest_session else "registered"
+    print(f" User type for disclaimer: {user_type} (guest_session_id: {request.guest_session_id}, effective_user_id: {effective_user_id})")
     
                                                                                   
                                                              
@@ -2938,7 +2961,7 @@ async def ask_legal_question(
             return create_chat_response(
                 answer=referral_response,
                 simplified_summary="Referral to Legal Help for professional consultation",
-                legal_disclaimer=get_legal_disclaimer(language),
+                legal_disclaimer=get_legal_disclaimer(language, user_type=user_type),
                 fallback_suggestions=get_fallback_suggestions(language, is_complex=True),
                 follow_up_questions=referral_followups,
                 session_id=session_id,
@@ -2963,7 +2986,7 @@ async def ask_legal_question(
             return create_chat_response(
                 answer=personal_advice_response,
                 simplified_summary="Personal advice question - requires lawyer consultation",
-                legal_disclaimer=get_legal_disclaimer(language),
+                legal_disclaimer=get_legal_disclaimer(language, user_type=user_type),
                 fallback_suggestions=get_fallback_suggestions(language, is_complex=True)
             )
         
@@ -3380,7 +3403,7 @@ async def ask_legal_question(
             return create_chat_response(
                 answer=no_context_message,
                 simplified_summary="No relevant legal information found in database",
-                legal_disclaimer=get_legal_disclaimer(language),
+                legal_disclaimer=get_legal_disclaimer(language, user_type=user_type),
                 fallback_suggestions=get_fallback_suggestions(language, is_complex=True)
             )
         
@@ -3485,7 +3508,7 @@ async def ask_legal_question(
                 print(f"  Failed to generate security report: {e}")
         
                                                          
-        legal_disclaimer = get_legal_disclaimer(language, request.question, answer)
+        legal_disclaimer = get_legal_disclaimer(language, request.question, answer, user_type=user_type)
         
                                                                                 
         fallback_suggestions = get_fallback_suggestions(language, is_complex=True) if (is_complex or confidence == "low") else None
