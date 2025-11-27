@@ -21,6 +21,7 @@ import tw from "tailwind-react-native-classnames";
 import Colors from "../constants/Colors";
 import Header from "@/components/Header";
 import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
+import { SidebarWrapper } from "@/components/AppSidebar";
 import { useGuest } from "../contexts/GuestContext";
 
 const { width, height } = Dimensions.get("window");
@@ -706,6 +707,7 @@ export default function HelpAndSupport() {
           </View>
         </View>
       </Modal>
+      {!isGuestMode && <SidebarWrapper />}
     </SafeAreaView>
   );
 }
