@@ -325,6 +325,28 @@ interface SourceCitation {
   relevance_score: number;
 }
 
+/**
+ * Convert domain names to friendly source names
+ */
+const getFriendlySourceName = (domainOrLaw: string): string => {
+  const domainMapping: { [key: string]: string } = {
+    'officialgazette.gov.ph': 'Official Gazette',
+    'lawphil.net': 'LawPhil',
+    'sc.judiciary.gov.ph': 'Supreme Court of the Philippines',
+    'elibrary.judiciary.gov.ph': 'Supreme Court E-Library'
+  };
+  
+  // Check if the input contains any of our mapped domains
+  for (const [domain, friendlyName] of Object.entries(domainMapping)) {
+    if (domainOrLaw.toLowerCase().includes(domain)) {
+      return friendlyName;
+    }
+  }
+  
+  // Return original if no mapping found
+  return domainOrLaw;
+};
+
 interface FallbackSuggestion {
   action: string;
   description: string;
@@ -1474,7 +1496,7 @@ export default function ChatbotScreen() {
                         { color: Colors.text.primary },
                       ]}
                     >
-                      {source.law.toUpperCase()}
+                      {getFriendlySourceName(source.law).toUpperCase()}
                     </Text>
                     <Text
                       style={[
