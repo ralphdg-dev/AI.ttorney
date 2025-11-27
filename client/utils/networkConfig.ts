@@ -14,8 +14,8 @@ import Constants from 'expo-constants';
 export class NetworkConfig {
   private static cachedApiUrl: string | null = null;
   private static lastHealthCheck: number = 0;
-  private static readonly HEALTH_CHECK_INTERVAL = 60000; // 1 minute
-  private static readonly CONNECTION_TIMEOUT = 3000; // 3 seconds
+  private static readonly HEALTH_CHECK_INTERVAL = 300000; // 5 minutes - increased for better performance
+  private static readonly CONNECTION_TIMEOUT = 2000; // 2 seconds - reduced for faster failure detection
   private static readonly DEFAULT_PORT = '8000';
   private static readonly PRODUCTION_API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://aittorney-staging.up.railway.app';
   
@@ -178,44 +178,51 @@ export class NetworkConfig {
   static async getBestApiUrl(): Promise<string> {
     const now = Date.now();
     
-    // Return cached URL if recent health check passed
+    // Fast path: Return cached URL if recent health check passed
     if (this.cachedApiUrl && (now - this.lastHealthCheck) < this.HEALTH_CHECK_INTERVAL) {
       return this.cachedApiUrl;
     }
 
     const primaryUrl = this.getApiUrl();
     
-    // Skip health check in development for faster, more reliable connections
-    if (__DEV__) {
+    // Performance optimization: Skip health check in most cases
+    // This significantly improves API call speed
+    if (__DEV__ || !this.cachedApiUrl) {
+      // First-time initialization or development mode
       this.cachedApiUrl = primaryUrl;
       this.lastHealthCheck = now;
       return primaryUrl;
     }
     
-    // Production: Verify connectivity before returning
-    if (__DEV__) {
-      console.log(`🔍 Verifying API connection: ${primaryUrl}`);
-    }
+    // Production: Only verify connectivity periodically in background
+    // This allows immediate API access while health check runs in parallel
+    this.lastHealthCheck = now; // Update timestamp immediately
     
-    const isHealthy = await this.healthCheck(primaryUrl);
+    // Run health check in background without blocking API access
+    this.backgroundHealthCheck(primaryUrl);
     
-    if (isHealthy) {
-      if (__DEV__) {
-        console.log(`✅ API server connected: ${primaryUrl}`);
+    // Return best known URL immediately without waiting
+    return this.cachedApiUrl || primaryUrl;
+  }
+  
+  /**
+   * Perform health check in background without blocking API access
+   * This significantly improves performance while maintaining reliability
+   */
+  private static async backgroundHealthCheck(url: string): Promise<void> {
+    try {
+      const isHealthy = await this.healthCheck(url);
+      
+      if (isHealthy) {
+        this.cachedApiUrl = url;
+      } else {
+        // Only clear cache if health check explicitly fails
+        this.cachedApiUrl = null;
       }
-      this.cachedApiUrl = primaryUrl;
-      this.lastHealthCheck = now;
-      return primaryUrl;
+    } catch (error) {
+      // Silently handle errors in background check
+      // Keep using the current URL until next check
     }
-
-    // Connection failed - clear cache and return URL anyway
-    // Let the actual API call handle the error with proper user feedback
-    if (__DEV__) {
-      console.warn(`⚠️ API health check failed, attempting connection anyway`);
-    }
-    
-    this.cachedApiUrl = null;
-    return primaryUrl;
   }
 
   /**
