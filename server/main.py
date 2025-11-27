@@ -171,24 +171,22 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Production-grade error handling"""
-    logger.error(f"💥 Global exception: {str(exc)}", exc_info=True)
+    logger.error(f"💥 Global exception handler caught error")
+    logger.error(f"💥 Request: {request.method} {request.url.path}")
+    logger.error(f"💥 Exception type: {type(exc).__name__}")
+    logger.error(f"💥 Exception message: {str(exc)}")
+    logger.error(f"💥 Full traceback:", exc_info=True)
     
-    if os.getenv("NODE_ENV") == "production":
-        # Don't expose internal errors in production
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "Internal server error"}
-        )
-    else:
-        # Show full error in development
-        return JSONResponse(
-            status_code=500,
-            content={
-                "detail": "Internal server error",
-                "error": str(exc),
-                "type": type(exc).__name__
-            }
-        )
+    # Always show detailed errors for debugging - even in production for now
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "error": str(exc),
+            "type": type(exc).__name__,
+            "path": request.url.path
+        }
+    )
 
 app.include_router(auth_router)
 app.include_router(legalTerms)
