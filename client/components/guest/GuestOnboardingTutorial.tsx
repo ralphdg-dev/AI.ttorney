@@ -7,9 +7,11 @@ import {
   Animated,
   TouchableOpacity,
   Platform,
+  Easing,
   type ViewStyle,
   useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Rect, Defs, Mask } from 'react-native-svg';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
@@ -24,7 +26,6 @@ interface TutorialStep {
   skipSpotlight?: boolean;
 }
 
-
 interface GuestOnboardingTutorialProps {
   visible: boolean;
   onComplete: () => void;
@@ -36,16 +37,7 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
   onComplete,
   stepRefs = {},
 }) => {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [spotlightPosition, setSpotlightPosition] = useState({
-    x: 0,
-    y: 0,
-    width: 100,
-    height: 100,
-  });
-  const [isAnimating, setIsAnimating] = useState(false);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-
   const TUTORIAL_STORAGE_KEY = '@guest_onboarding_completed';
 
   const tutorialSteps: TutorialStep[] = useMemo(() => [
@@ -81,158 +73,207 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
     },
   ], []);
 
-  // Debug: Log visibility state on Android
-  console.log('🎯 GuestOnboardingTutorial render:', { 
-    visible, 
-    platform: Platform.OS, 
-    currentStep, 
-    stepTitle: tutorialSteps[currentStep]?.title,
-    stepDescription: tutorialSteps[currentStep]?.description 
-  });
+  const [currentStep, setCurrentStep] = useState(0);
+  const [spotlightPositions, setSpotlightPositions] = useState<{[key: string]: {x: number, y: number, width: number, height: number}}>({});
+
+  const currentSpotlight = useMemo(() => {
+    const step = tutorialSteps[currentStep];
+    if (!step || step.skipSpotlight) return null;
+    return spotlightPositions[step.targetId || ''] || {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+  }, [currentStep, tutorialSteps, spotlightPositions]);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const progressDotAnims = useRef(
     tutorialSteps.map(() => new Animated.Value(8))
   ).current;
+  const overlayOpacity = useRef(new Animated.Value(1)).current;
 
-  const animateStepChange = useCallback(() => {
-    setIsAnimating(true);
-    
-    // Reset animations
-    fadeAnim.setValue(0);
-    scaleAnim.setValue(0.9);
-    
-    // Animate progress dots
+  // No animation configs needed - we're setting values directly
+
+  useEffect(() => {
+    if (visible && stepRefs) {
+      const positions: {[key: string]: any} = {};
+      const fallbackPositions: { [key: string]: any } = {
+        'chatbot-button': { x: screenWidth / 2 - 60, y: screenHeight - 180, width: 120, height: 60 },
+        'glossary-button': { x: screenWidth / 2 - 180, y: screenHeight - 180, width: 120, height: 60 },
+        'menu-button': { x: 20, y: 60, width: 40, height: 40 },
+        'bottom-navbar': { x: 0, y: screenHeight - 100, width: screenWidth, height: 100 },
+      };
+
+      setSpotlightPositions(fallbackPositions);
+
+      const measureAll = () => {
+        tutorialSteps.forEach(step => {
+          if (step.skipSpotlight || !step.targetId) return;
+
+          const ref = stepRefs[step.targetId];
+          if (ref?.current) {
+            ref.current.measure((fx: any, fy: any, width: any, height: any, px: any, py: any) => {
+              positions[step.targetId!] = { x: px, y: py, width, height };
+            });
+          }
+        });
+
+        setSpotlightPositions(prev => ({...prev, ...positions}));
+      };
+
+      measureAll();
+
+      requestAnimationFrame(measureAll);
+    }
+  }, [visible, stepRefs, tutorialSteps, screenWidth, screenHeight]);
+
+  // Update progress dots instantly when step changes
+  const updateProgressDots = useCallback(() => {
     tutorialSteps.forEach((_, index) => {
       const targetWidth = index === currentStep ? 24 : 8;
-      Animated.timing(progressDotAnims[index], {
-        toValue: targetWidth,
-        duration: 300,
-        useNativeDriver: false,
-      }).start();
+      progressDotAnims[index].setValue(targetWidth); 
     });
-    
-    // Animate in
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setIsAnimating(false);
-    });
-  }, [fadeAnim, scaleAnim, progressDotAnims, currentStep, tutorialSteps]);
-
+  }, [progressDotAnims, currentStep, tutorialSteps]);
+  
+  // Auto-update dots when step changes
+  useEffect(() => {
+    updateProgressDots();
+  }, [currentStep, updateProgressDots]);
+  
+  // Ultra-instant transition with zero wait time and no blinking
   const handleNext = () => {
-    if (isAnimating) return;
     if (currentStep < tutorialSteps.length - 1) {
-      setCurrentStep(currentStep + 1);
+      // CRITICAL: Keep overlay at exact same opacity during transition
+      // This prevents any blinking effect
+      
+      // Prepare next step immediately
+      const nextStepIndex = currentStep + 1;
+      
+      // CRITICAL: Update step IMMEDIATELY with no animation
+      setCurrentStep(nextStepIndex);
+      
+      // CRITICAL: No opacity changes to overlay during transition
+      // Set final values directly without animation
+      fadeAnim.setValue(1);
+      scaleAnim.setValue(1);
     } else {
       handleComplete();
     }
   };
 
+  // Ultra-instant previous step with zero wait time and no blinking
   const handlePrevious = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
+    if (currentStep === 0) return;
+
+    // CRITICAL: Keep overlay at exact same opacity during transition
+    // This prevents any blinking effect
+    
+    // Prepare previous step immediately
+    const prevStepIndex = currentStep - 1;
+    
+    // CRITICAL: Update step IMMEDIATELY with no animation
+    setCurrentStep(prevStepIndex);
+    
+    // CRITICAL: No opacity changes to overlay during transition
+    // Set final values directly without animation
+    fadeAnim.setValue(1);
+    scaleAnim.setValue(1);
   };
 
-  
   const handleComplete = async () => {
     try {
       await AsyncStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
     } catch (error) {
-      console.warn('Failed to save tutorial completion:', error);
+      // Error silently handled
     }
     onComplete();
   };
 
-  const getCardPosition = (): ViewStyle => {
+  const getCardPosition = useCallback((): ViewStyle => {
     const step = tutorialSteps[currentStep];
-    console.log(`🎯 Getting card position for step: ${step.id}, spotlight:`, spotlightPosition);
     
     if (step.skipSpotlight) {
-      const position = {
+      return {
         position: 'absolute' as const,
-        top: 100,
+        top: screenHeight * 0.15,
         left: 20,
         right: 20,
-        width: screenWidth - 40,
-        height: Math.min(screenHeight * 0.25, 200), // Responsive height
+        maxWidth: screenWidth - 40,
       };
-      console.log(`🎯 Skip spotlight position:`, position);
-      return position;
     }
 
-    const spotlight = spotlightPosition;
-    const cardWidth = Math.min(screenWidth * 0.7, 320); // Responsive width, max 320px
-    const cardHeight = Math.min(screenHeight * 0.25, 200); // Responsive height, max 200px
-    const cardMargin = 20;
+    // Use pre-measured spotlight position
+    const spotlight = currentSpotlight || { x: 0, y: 0, width: 100, height: 100 };
+    const cardWidth = Math.min(screenWidth * 0.85, 360); // Wider for Android, up to 85% of screen
+    const cardMargin = 16;
+    const estimatedCardHeight = 180; // Estimated card height
+    const spacingFromSpotlight = 85; // Extra spacing to prevent overlap
 
     let cardX = spotlight.x + spotlight.width / 2 - cardWidth / 2;
-    let cardY = spotlight.y - cardHeight - 20; // Much closer to spotlight
+    let cardY;
 
-    // Ensure card stays within screen bounds
+    // Ensure card stays within screen bounds horizontally
     if (cardX < cardMargin) cardX = cardMargin;
     if (cardX + cardWidth > screenWidth - cardMargin) {
       cardX = screenWidth - cardWidth - cardMargin;
     }
 
-    if (cardY < cardMargin) {
-      // Not enough space above, position below
-      cardY = spotlight.y + spotlight.height + 20;
+    // Try to position above spotlight first
+    const spaceAbove = spotlight.y - cardMargin;
+    const spaceBelow = screenHeight - (spotlight.y + spotlight.height) - cardMargin;
+    
+    if (spaceAbove >= estimatedCardHeight + spacingFromSpotlight) {
+      // Enough space above - position above spotlight
+      cardY = spotlight.y - estimatedCardHeight - spacingFromSpotlight;
+    } else if (spaceBelow >= estimatedCardHeight + spacingFromSpotlight) {
+      // Not enough space above, position below spotlight
+      cardY = spotlight.y + spotlight.height + spacingFromSpotlight;
+    } else {
+      // Not enough space above or below, position at top with margin
+      cardY = cardMargin;
     }
 
     const position = {
       position: 'absolute' as const,
       left: cardX,
       top: cardY,
-      width: cardWidth,
-      height: cardHeight,
+      maxWidth: cardWidth,
     };
     
-    console.log(`🎯 Calculated card position:`, position);
     return position;
-  };
+  }, [currentStep, tutorialSteps, currentSpotlight, screenWidth, screenHeight]);
 
   const renderSpotlightMask = () => {
     const step = tutorialSteps[currentStep];
     if (step.skipSpotlight) {
-      // Just dim the entire screen for final step
+      // Just dim the entire screen for final step - single overlay that extends beyond screen
       return (
-        <View style={styles.fullDimOverlay} />
+        <View style={[
+          StyleSheet.absoluteFill, 
+          { 
+            backgroundColor: Platform.OS === 'android' ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.7)',
+            bottom: -100, // Extend below to cover navbar
+          }
+        ]} />
       );
     }
 
-    // Android fallback: Use simple overlay instead of complex SVG masking
-    if (Platform.OS === 'android') {
-      return (
-        <View style={styles.fullDimOverlay} />
-      );
-    }
+    // Use pre-measured spotlight position
+    const spotlight = currentSpotlight || { x: 0, y: 0, width: 100, height: 100 };
+    const padding = 12;
 
-    const spotlight = spotlightPosition;
-    const padding = 12; // Reduced padding for smaller cutout
-
-    // Get exact corner radius based on component type - using exact styling
     const getCornerRadius = () => {
       switch (step.targetId) {
         case 'chatbot-button':
-          return (spotlight.height + padding * 2) / 2; // Adjusted for increased width
+          return (spotlight.height + padding * 2) / 2;
         case 'glossary-button':
         case 'forum-button':
         case 'guides-button':
-          return 12; // TouchableOpacity buttons with increased padding
+          return 12;
         case 'bottom-navbar':
-          return 0; // Navbar usually has square corners
+          return 0;
         default:
           return 12;
       }
@@ -240,19 +281,21 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
 
     const cornerRadius = getCornerRadius();
 
+    // Single SVG overlay with spotlight cutout - no double overlays
+    // Use extra height to ensure full coverage including navbar
+    const overlayHeight = screenHeight + 100; // Extra 100px to cover bottom navbar
+    
     return (
-      <Svg style={StyleSheet.absoluteFill} width={screenWidth} height={screenHeight}>
+      <Svg style={StyleSheet.absoluteFill} width={screenWidth} height={overlayHeight}>
         <Defs>
-          <Mask id="spotlight-mask" x="0" y="0" width={screenWidth} height={screenHeight}>
-            {/* Full screen white rectangle (visible area - shows dimmed overlay) */}
+          <Mask id="spotlight-mask">
             <Rect 
               x="0" 
               y="0" 
               width={screenWidth} 
-              height={screenHeight} 
+              height={overlayHeight} 
               fill="white" 
             />
-            {/* Exact component shape cutout (invisible area - hides overlay, reveals feature) */}
             <Rect 
               x={spotlight.x - padding} 
               y={spotlight.y - padding} 
@@ -264,13 +307,12 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
             />
           </Mask>
         </Defs>
-        {/* Dimmed overlay with exact component cutout */}
         <Rect 
           x="0" 
           y="0" 
           width={screenWidth} 
-          height={screenHeight} 
-          fill="rgba(0, 0, 0, 0.7)" 
+          height={overlayHeight} 
+          fill={Platform.OS === 'android' ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.7)'} 
           mask="url(#spotlight-mask)" 
         />
       </Svg>
@@ -279,95 +321,59 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
 
   const step = tutorialSteps[currentStep];
 
+  // Initialize all values immediately when component mounts
   useEffect(() => {
-    if (visible) {
-      const measureTargetElement = () => {
-        const step = tutorialSteps[currentStep];
-        if (step.skipSpotlight) return;
-
-        const targetId = step.targetId;
-        if (!targetId) return;
-
-        // Try to get ref from stepRefs first, then fallback to global measurement
-        const ref = stepRefs[targetId];
-        if (ref?.current) {
-          ref.current.measure((fx: any, fy: any, width: any, height: any, px: any, py: any) => {
-            console.log(`🎯 Measured ${targetId}:`, { x: px, y: py, width, height });
-            setSpotlightPosition({
-              x: px,
-              y: py,
-              width,
-              height,
-            });
-          });
-        } else {
-          console.log(`🎯 Ref not found for ${targetId}, using fallback position`);
-          // Simplified fallback positions that are more reliable
-          const fallbackPositions: { [key: string]: any } = {
-            'chatbot-button': { x: screenWidth / 2 - 60, y: screenHeight - 180, width: 120, height: 60 },
-            'glossary-button': { x: screenWidth / 2 - 180, y: screenHeight - 180, width: 120, height: 60 },
-            'menu-button': { x: 20, y: 60, width: 40, height: 40 },
-            'bottom-navbar': { x: 0, y: screenHeight - 100, width: screenWidth, height: 100 },
-          };
-
-          if (fallbackPositions[targetId]) {
-            console.log(`🎯 Using fallback for ${targetId}:`, fallbackPositions[targetId]);
-            setSpotlightPosition(fallbackPositions[targetId]);
-          } else {
-            console.log(`🎯 No fallback position for ${targetId}, using center`);
-            // Center of screen as last resort
-            setSpotlightPosition({
-              x: screenWidth / 2 - 50,
-              y: screenHeight / 2 - 50,
-              width: 100,
-              height: 100,
-            });
-          }
-        }
-      };
-
-      animateStepChange();
-      
-      // Add a small delay to ensure UI is rendered before measuring
-      setTimeout(measureTargetElement, 100);
-    }
-  }, [visible, currentStep, stepRefs, animateStepChange, screenWidth, screenHeight, tutorialSteps]);
+    // Set all values to final state immediately - no animations
+    fadeAnim.setValue(1);
+    scaleAnim.setValue(1);
+    overlayOpacity.setValue(1);
+    
+    // Pre-update progress dots
+    tutorialSteps.forEach((_, index) => {
+      const targetWidth = index === currentStep ? 24 : 8;
+      progressDotAnims[index].setValue(targetWidth);
+    });
+    
+    // CRITICAL: Never change overlay opacity during transitions
+    return () => {
+      // Ensure clean values on unmount
+      fadeAnim.setValue(1);
+      scaleAnim.setValue(1);
+      overlayOpacity.setValue(1);
+    };
+  }, [fadeAnim, scaleAnim, overlayOpacity, progressDotAnims, tutorialSteps, currentStep]);
 
   if (!visible) return null;
 
   return (
     <Modal
       transparent={true}
-      animationType="fade"
+      animationType="none"
       visible={visible}
       statusBarTranslucent={true}
       supportedOrientations={['portrait']}
       presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
+      hardwareAccelerated={true}
     >
-      <View style={StyleSheet.absoluteFill}>
-        {/* Dimmed overlay with spotlight cutout */}
+      <View style={[StyleSheet.absoluteFill, { flex: 1 }]}>
+        {/* Single overlay with spotlight cutout - no animation wrapper to prevent blinking */}
         {renderSpotlightMask()}
 
-        {/* Tutorial card with speech bubble */}
+        {/* Tutorial card - Always visible to prevent blinking */}
         <Animated.View
           style={[
             getCardPosition(),
             {
               opacity: fadeAnim,
               transform: [{ scale: scaleAnim }],
+              backfaceVisibility: 'hidden', // Prevent flicker
             },
           ]}
         >
           <View style={styles.tutorialCard}>
             <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>{step.title}</Text>
-              <Text style={styles.cardDescription}>{step.description}</Text>
-              {/* Android debugging - temporary */}
-              {Platform.OS === 'android' && __DEV__ && (
-                <Text style={{ color: 'red', fontSize: 10 }}>
-                  Android Debug: Step {currentStep + 1}
-                </Text>
-              )}
+              <Text style={styles.cardTitle}>{step?.title}</Text>
+              <Text style={styles.cardDescription}>{step?.description}</Text>
             </View>
 
             {/* Bottom controls row */}
@@ -379,7 +385,7 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
                   onPress={handlePrevious}
                   activeOpacity={0.8}
                 >
-                  <ChevronLeft size={16} color="#FFFFFF" />
+                  <ChevronLeft size={16} color={Platform.OS === 'android' ? '#FFFFFF' : '#FFFFFF'} />
                 </TouchableOpacity>
               )}
 
@@ -391,7 +397,9 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
                     style={[
                       styles.dot,
                       {
-                        backgroundColor: index <= currentStep ? '#4B5563' : 'rgba(75, 85, 99, 0.3)',
+                        backgroundColor: index <= currentStep 
+                          ? (Platform.OS === 'android' ? '#FFFFFF' : '#4B5563') 
+                          : (Platform.OS === 'android' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(75, 85, 99, 0.3)'),
                         width: progressDotAnims[index], // Animated width
                       }
                     ]}
@@ -408,7 +416,7 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
                 {currentStep === tutorialSteps.length - 1 ? (
                   <Text style={styles.nextButtonText}>Get Started</Text>
                 ) : (
-                  <ChevronRight size={16} color="#FFFFFF" />
+                  <ChevronRight size={16} color={Platform.OS === 'android' ? '#1E40AF' : '#FFFFFF'} />
                 )}
               </TouchableOpacity>
             </View>
@@ -420,37 +428,20 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
 };
 
 const styles = StyleSheet.create({
-  dimmedArea: {
-    position: 'absolute',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-  },
-  fullDimOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-  },
   tutorialCard: {
-    backgroundColor: '#1F2937',
+    backgroundColor: Platform.OS === 'android' ? '#1E40AF' : '#1F2937', // Blue on Android for better visibility
     borderRadius: 16,
-    padding: 16,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
-    elevation: Platform.OS === 'android' ? 20 : 12, // Higher elevation on Android
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    // Android-specific fixes
-    ...(Platform.OS === 'android' && {
-      // Ensure background is solid on Android
-      backgroundColor: '#1F2937',
-      // Add minimum dimensions
-      minHeight: 120,
-      minWidth: 200,
-    }),
+    elevation: Platform.OS === 'android' ? 24 : 12,
+    borderWidth: Platform.OS === 'android' ? 2 : 0.5,
+    borderColor: Platform.OS === 'android' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+    // Dynamic sizing - no fixed height
+    minWidth: 200,
+    maxWidth: '100%',
   },
   skipButton: {
     position: 'absolute',
@@ -459,15 +450,16 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   cardContent: {
-    flex: 1,
-    justifyContent: 'center',
+    paddingBottom: 8,
   },
   bottomControls: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: Platform.OS === 'android' ? 1 : 0,
+    borderTopColor: Platform.OS === 'android' ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
   },
   progressDots: {
     flexDirection: 'row',
@@ -481,55 +473,59 @@ const styles = StyleSheet.create({
     marginHorizontal: 3,
   },
   cardTitle: {
-    fontSize: 16,
-    fontWeight: Platform.OS === 'android' ? 'bold' : '700',
+    fontSize: Platform.OS === 'android' ? 17 : 16,
+    fontWeight: 'bold',
     color: '#FFFFFF',
     marginBottom: 8,
     lineHeight: Platform.OS === 'android' ? 24 : 22,
     textAlign: 'center',
+    flexWrap: 'wrap',
     // Android-specific fixes
     ...(Platform.OS === 'android' && {
       includeFontPadding: false,
       textAlignVertical: 'center',
+      letterSpacing: 0.2,
     }),
   },
   cardDescription: {
-    fontSize: 14,
-    fontWeight: Platform.OS === 'android' ? 'normal' : '400',
+    fontSize: Platform.OS === 'android' ? 14 : 14,
+    fontWeight: '400',
     color: '#FFFFFF',
-    lineHeight: Platform.OS === 'android' ? 22 : 20,
+    lineHeight: Platform.OS === 'android' ? 21 : 20,
     textAlign: 'center',
     marginBottom: 12,
+    flexWrap: 'wrap',
     // Android-specific fixes
     ...(Platform.OS === 'android' && {
       includeFontPadding: false,
       textAlignVertical: 'center',
+      letterSpacing: 0.1,
     }),
   },
   backButton: {
-    backgroundColor: '#374151',
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    backgroundColor: Platform.OS === 'android' ? 'rgba(255, 255, 255, 0.2)' : '#374151',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 36,
-    minHeight: 36,
+    minWidth: 40,
+    minHeight: 40,
   },
   nextButton: {
-    backgroundColor: '#374151',
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    backgroundColor: Platform.OS === 'android' ? '#FFFFFF' : '#374151',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 36,
-    minHeight: 36,
+    minWidth: 40,
+    minHeight: 40,
   },
   nextButtonText: {
-    color: '#FFFFFF',
+    color: Platform.OS === 'android' ? '#1E40AF' : '#FFFFFF',
     fontSize: 14,
-    fontWeight: Platform.OS === 'android' ? 'bold' : '600',
+    fontWeight: 'bold',
     // Android-specific fixes
     ...(Platform.OS === 'android' && {
       includeFontPadding: false,

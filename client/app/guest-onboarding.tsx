@@ -75,7 +75,7 @@ export default function GuestOnboardingScreen() {
 
   
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
@@ -180,7 +180,7 @@ export default function GuestOnboardingScreen() {
         {/* Bottom spacing */}
         <View style={{ height: 40 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

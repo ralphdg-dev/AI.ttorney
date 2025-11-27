@@ -1516,12 +1516,16 @@ export default function ChatbotScreen() {
   // KeyboardAvoidingView handles keyboard behavior automatically
 
   return (
-    <SafeAreaView
+    <View
       style={[
         tw`flex-1`,
-        { backgroundColor: Colors.background.primary },
+        { 
+          backgroundColor: Colors.background.primary,
+          paddingTop: insets.top,
+          paddingLeft: insets.left,
+          paddingRight: insets.right
+        },
       ]}
-      edges={['top', 'left', 'right']}
     >
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
@@ -1953,6 +1957,6 @@ export default function ChatbotScreen() {
           stepRefs={stepRefs}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
