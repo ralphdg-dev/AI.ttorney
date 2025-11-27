@@ -121,7 +121,7 @@ export default function GuidesScreen() {
 
   const renderListHeader = () => (
     <View>
-      <HStack className="items-center mb-4">
+      <HStack className="items-center mb-2">
         <Ionicons name="pricetags" size={16} color={Colors.text.sub} />
         <GSText size="sm" bold className="ml-2" style={{ color: Colors.text.sub }}>
           Choose Category
@@ -297,7 +297,7 @@ const renderPagination = useCallback(() => {
             placeholder="Search articles"
             loading={loading}
             showFilterIcon={false}
-            containerClassName="pt-6 pb-4"
+            containerClassName="pt-4 pb-2"
           />
         </View>
 
