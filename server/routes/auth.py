@@ -261,37 +261,37 @@ async def verify_token(current_user: Dict[str, Any] = Depends(get_current_user))
                
 @router.post("/send-otp", response_model=OTPResponse)
 @rate_limit_auth("10/minute")  # Increased for mobile network variability
-async def send_otp(http_request: Request, request: SendOTPRequest):
+async def send_otp(otp_request: SendOTPRequest):
     """Send OTP for email verification or password reset"""
     logger.info("="*80)
     logger.info("📨 SEND OTP ENDPOINT CALLED")
     logger.info("="*80)
     try:
-        logger.info(f"📧 OTP Request - Type: {request.otp_type}, Email: {request.email}")
-        logger.info(f"📧 OTP Request user_name: '{request.user_name}'")
-        logger.info(f"📧 Request object type: {type(request)}")
-        logger.info(f"📧 Request dict: {request.dict()}")
+        logger.info(f"📧 OTP Request - Type: {otp_request.otp_type}, Email: {otp_request.email}")
+        logger.info(f"📧 OTP Request user_name: '{otp_request.user_name}'")
+        logger.info(f"📧 Request object type: {type(otp_request)}")
+        logger.info(f"📧 Request dict: {otp_request.dict()}")
         
         # Validate user_name parameter for email verification
-        if request.otp_type == "email_verification" and not request.user_name:
-            logger.warning(f"⚠️ Missing user_name for email verification OTP: {request.email}")
+        if otp_request.otp_type == "email_verification" and not otp_request.user_name:
+            logger.warning(f"⚠️ Missing user_name for email verification OTP: {otp_request.email}")
             # Use a default name rather than failing
             user_name = "User"
         else:
-            user_name = request.user_name or "User"
+            user_name = otp_request.user_name or "User"
         
-        logger.info(f"🔍 DEBUG: Using user_name: '{user_name}' for email: {request.email}")
+        logger.info(f"🔍 DEBUG: Using user_name: '{user_name}' for email: {otp_request.email}")
         
-        if request.otp_type == "email_verification":
+        if otp_request.otp_type == "email_verification":
             # For email verification, always attempt to send OTP
-            logger.info(f"📤 Sending verification OTP to {request.email} with user_name: {user_name}")
-            result = await otp_service.send_verification_otp(request.email, user_name)
+            logger.info(f"📤 Sending verification OTP to {otp_request.email} with user_name: {user_name}")
+            result = await otp_service.send_verification_otp(otp_request.email, user_name)
             logger.info(f"✅ Verification OTP result: {result}")
-        elif request.otp_type == "password_reset":
+        elif otp_request.otp_type == "password_reset":
             # For password reset, check if user exists first
             supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
-            user_check = supabase.table('users').select('id, full_name').eq('email', request.email).execute()
-            logger.info(f"Password reset OTP request for email: {request.email}")
+            user_check = supabase.table('users').select('id, full_name').eq('email', otp_request.email).execute()
+            logger.info(f"Password reset OTP request for email: {otp_request.email}")
             logger.info(f"User check result: {user_check.data}")
             
             if not user_check.data or len(user_check.data) == 0:
@@ -305,7 +305,7 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
             
             # Use provided name or fall back to database name or default
             user_name = user_check.data[0].get('full_name', user_name)
-            result = await otp_service.send_password_reset_otp(request.email, user_name)
+            result = await otp_service.send_password_reset_otp(otp_request.email, user_name)
             logger.info(f"🔍 DEBUG: Password reset OTP result: {result}")
         else:
             raise HTTPException(
@@ -344,7 +344,7 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
                 detail=error_message
             )
         
-        logger.info(f"✅ OTP sent successfully to {request.email}")
+        logger.info(f"✅ OTP sent successfully to {otp_request.email}")
         logger.info("="*80)
         logger.info("🔧 CONSTRUCTING RESPONSE")
         logger.info("="*80)
@@ -394,7 +394,7 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
         logger.error(f"❌ Error type: {type(e).__name__}")
         import traceback
         logger.error(f"❌ Full traceback:\n{traceback.format_exc()}")
-        logger.error(f"❌ Request details - Email: {request.email}, Type: {request.otp_type}, User: {request.user_name}")
+        logger.error(f"❌ Request details - Email: {otp_request.email}, Type: {otp_request.otp_type}, User: {otp_request.user_name}")
         
         # Return detailed error for debugging
         error_detail = f"Failed to process OTP request: {type(e).__name__}: {str(e)}"
