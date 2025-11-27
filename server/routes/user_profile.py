@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, validator, EmailStr
 from typing import Dict, Any, Optional, Union
 from datetime import datetime
-from config.dependencies import get_current_user
+from middleware.auth import get_current_user
 from services.supabase_service import SupabaseService
 import logging
 import re
