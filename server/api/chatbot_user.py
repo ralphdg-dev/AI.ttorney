@@ -2123,12 +2123,15 @@ def get_legal_disclaimer(language: str, question: str = "", answer: str = "", us
     # ALWAYS show disclaimer - this is legal awareness, not legal advice
     # AI.ttorney is not liable for any decisions made based on this information
     
+    # DEBUG: Log what user_type we're generating disclaimer for
+    print(f"🔍 DISCLAIMER DEBUG: Generating disclaimer for user_type='{user_type}', language='{language}'")
+    
     # Guest disclaimers - simple prompt to sign in
     if user_type == "guest":
         disclaimers = {
-            "english": "⚖️ **Legal Disclaimer**: This is for legal awareness only, not legal advice. [Sign in](/login) or create an account for full access.",
-            "tagalog": "⚖️ **Paalala**: Ito ay para sa legal awareness lamang, hindi legal advice. [Mag-sign in](/login) o gumawa ng account para sa full access.",
-            "taglish": "⚖️ **Disclaimer**: Ito ay for legal awareness lang, hindi legal advice. [Sign in](/login) o gumawa ng account for full access."
+            "english": "⚖️ **Legal Disclaimer**: This is for legal awareness only, not legal advice. For specific legal situations, consult with a licensed lawyer.",
+            "tagalog": "⚖️ **Paalala**: Ito ay para sa legal awareness lamang, hindi legal advice. Para sa partikular na legal na sitwasyon, kumonsulta sa lisensyadong abogado.",
+            "taglish": "⚖️ **Disclaimer**: Ito ay for legal awareness lang, hindi legal advice. Para sa specific legal situations, mag-consult with a licensed lawyer."
         }
     # Lawyer disclaimers - emphasize professional responsibility
     elif user_type == "lawyer":
@@ -2137,14 +2140,17 @@ def get_legal_disclaimer(language: str, question: str = "", answer: str = "", us
             "tagalog": "⚖️ **Propesyonal na Responsibilidad**: Bilang legal professional, ikaw ay responsable sa pag-verify ng impormasyon at paggamit nito nang etikal alinsunod sa iyong propesyonal na tungkulin at Code of Professional Responsibility.",
             "taglish": "⚖️ **Professional Responsibility**: As legal professional, ikaw ay responsible sa pag-verify ng information at paggamit nito ethically according sa iyong professional duties at Code of Professional Responsibility."
         }
-    # Registered user disclaimers - standard disclaimer with Legal Help link
+    # Registered user disclaimers - standard disclaimer (no links)
     else:
         disclaimers = {
-            "english": "⚖️ **Legal Disclaimer**: This is for legal awareness only, not legal advice. AI.ttorney is not liable for any actions or decisions made based on this information. For your specific situation, consult with a licensed Philippine lawyer through our [Legal Help directory](/directory?tab=lawyers).",
-            "tagalog": "⚖️ **Paalala**: Ito ay para sa legal awareness lamang, hindi legal advice. Ang AI.ttorney ay walang pananagutan sa anumang aksyon o desisyon base sa impormasyong ito. Para sa iyong partikular na sitwasyon, kumonsulta sa lisensyadong abogado sa aming [Legal Help directory](/directory?tab=lawyers).",
-            "taglish": "⚖️ **Disclaimer**: Ito ay for legal awareness lang, hindi legal advice. AI.ttorney is not liable para sa any actions o decisions based sa information na ito. Para sa iyong specific situation, mag-consult with a licensed Philippine lawyer sa aming [Legal Help directory](/directory?tab=lawyers)."
+            "english": "⚖️ **Legal Disclaimer**: This is for legal awareness only, not legal advice. AI.ttorney is not liable for any actions or decisions made based on this information. For your specific situation, consult with a licensed Philippine lawyer through our Legal Help directory.",
+            "tagalog": "⚖️ **Paalala**: Ito ay para sa legal awareness lamang, hindi legal advice. Ang AI.ttorney ay walang pananagutan sa anumang aksyon o desisyon base sa impormasyong ito. Para sa iyong partikular na sitwasyon, kumonsulta sa lisensyadong abogado sa aming Legal Help directory.",
+            "taglish": "⚖️ **Disclaimer**: Ito ay for legal awareness lang, hindi legal advice. AI.ttorney is not liable para sa any actions o decisions based sa information na ito. Para sa iyong specific situation, mag-consult with a licensed Philippine lawyer sa aming Legal Help directory."
         }
-    return disclaimers.get(language, disclaimers["english"])
+    
+    disclaimer_text = disclaimers.get(language, disclaimers["english"])
+    print(f"🔍 DISCLAIMER DEBUG: Returning disclaimer: {disclaimer_text[:100]}...")
+    return disclaimer_text
 
 
 def create_chat_response(
