@@ -16,7 +16,6 @@ import {
   Linking,
   Image,
   Animated,
-  Easing,
   StatusBar,
   KeyboardAvoidingView,
   } from "react-native";
@@ -346,15 +345,7 @@ export default function ChatbotScreen() {
   const horizontalPadding = LAYOUT.SPACING.md; // Fixed 16px padding for consistency
   const fontSize = 16;
   
-  // Enhanced keyboard visibility tracking with smooth animations
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const keyboardAnimatedValue = useRef(new Animated.Value(0)).current;
-  // No interpolation - direct value for INSTANT response
-  const inputTranslateY = keyboardAnimatedValue.interpolate({
-    inputRange: [0, 0.01, 1],
-    outputRange: [0, -15, -15], // Jump immediately to position
-    extrapolate: 'clamp'
-  });
+  // KeyboardAvoidingView handles all keyboard management automatically
   
   const { isGuestMode, hasReachedLimit, incrementPromptCount, startGuestSession, updateGuestSessionId, guestSession, isLoading: isGuestLoading, showTutorial, setShowTutorial } = useGuest();
   const guestChat = useGuestChat(); // Always call hooks unconditionally
@@ -385,65 +376,7 @@ export default function ChatbotScreen() {
     // Tutorial is complete, user stays on chatbot
   };
   
-  // Enhanced keyboard visibility tracking with ultra-smooth animations
-  useEffect(() => {
-    // Listen for keyboard WILL show (earliest possible event)
-    const keyboardWillShowListener = Keyboard.addListener(
-      'keyboardWillShow',
-      (e) => {
-        console.log('⌨️ Keyboard will show');
-        // Update state immediately
-        setIsKeyboardVisible(true);
-        
-        // INSTANT ANIMATION - SUPER FAST
-        // Skip animation and set value directly for immediate response
-        keyboardAnimatedValue.setValue(1);
-      }
-    );
-    
-    // Also listen for did show to ensure animation completes
-    const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
-      () => {
-        console.log('⌨️ Keyboard did show');
-        setIsKeyboardVisible(true);
-        
-        // INSTANT RESPONSE - NO DELAY
-        // Ensure value is set to exactly 1
-        keyboardAnimatedValue.setValue(1);
-      }
-    );
-    
-    // Listen for keyboard WILL hide
-    const keyboardWillHideListener = Keyboard.addListener(
-      'keyboardWillHide',
-      () => {
-        console.log('⌨️ Keyboard will hide');
-        
-        // INSTANT HIDE - SUPER FAST
-        // Skip animation for immediate response
-        keyboardAnimatedValue.setValue(0);
-        setIsKeyboardVisible(false);
-      }
-    );
-    
-    // Also listen for did hide as backup
-    const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => {
-        console.log('⌨️ Keyboard did hide');
-        setIsKeyboardVisible(false);
-        keyboardAnimatedValue.setValue(0);
-      }
-    );
-    
-    return () => {
-      keyboardWillShowListener?.remove();
-      keyboardDidShowListener.remove();
-      keyboardWillHideListener?.remove();
-      keyboardDidHideListener.remove();
-    };
-  }, []);
+  // KeyboardAvoidingView handles keyboard events automatically - no manual listeners needed
   
     
   // Sync localMessages to GuestChatContext for guest persistence (optimized)
@@ -1885,7 +1818,7 @@ export default function ChatbotScreen() {
         </View>
 
         {/* Input Field - Sits directly on keyboard with no gap */}
-        <Animated.View
+        <View
           style={[
             tw`justify-center border-t`,
             {
@@ -1894,11 +1827,6 @@ export default function ChatbotScreen() {
               paddingHorizontal: horizontalPadding,
               paddingVertical: Platform.OS === 'android' ? 4 : 12,
               paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 12) : 2,
-              // Apply smooth animation transform
-              transform: [{ translateY: inputTranslateY }],
-            },
-            // Simple bottom margin when keyboard is hidden
-            {
               position: 'relative',
               marginBottom: Platform.OS === 'android' ? 16 : 0
             }
@@ -1955,17 +1883,7 @@ export default function ChatbotScreen() {
                   onSubmitEditing={sendMessage}
                   returnKeyType="send"
                   editable={!isGenerating}
-                  // Enhanced keyboard handling props
                   blurOnSubmit={false}
-                  keyboardType="default"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  autoCorrect={false}
-                  onFocus={() => {
-                    // INSTANT RESPONSE - Force keyboard visibility and animation
-                    setIsKeyboardVisible(true);
-                    keyboardAnimatedValue.setValue(1);
-                  }}
                 />
               </View>
             </View>
@@ -2007,7 +1925,7 @@ export default function ChatbotScreen() {
               <Send size={20} color={!input.trim() || isGenerating ? "#9CA3AF" : "#fff"} />
             </TouchableOpacity>
           </View>
-        </Animated.View>
+        </View>
       </KeyboardAvoidingView>
       
       {/* Navbar - Fixed at bottom */}

@@ -132,6 +132,11 @@ const ViewPost: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Only add keyboard listeners on native platforms (iOS/Android), not web
+    if (Platform.OS === 'web') {
+      return;
+    }
+    
     // Listen for keyboard WILL show (earliest possible event)
     const keyboardWillShowListener = Keyboard.addListener(
       'keyboardWillShow',
