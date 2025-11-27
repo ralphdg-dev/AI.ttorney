@@ -21,8 +21,6 @@ import { NetworkConfig } from '@/utils/networkConfig';
 import { useAuth } from "../contexts/AuthContext";
 import { AuthGuard } from "../components/AuthGuard";
 
-const API_BASE_URL = NetworkConfig.getApiUrl();
-
 export default function FavoritesScreen() {
   const router = useRouter();
   const { loadFavorites } = useFavorites();
@@ -44,8 +42,9 @@ export default function FavoritesScreen() {
 
     try {
       setLoading(true);
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       
-      const response = await fetch(`${API_BASE_URL}/api/user/favorites/terms`, {
+      const response = await fetch(`${apiUrl}/api/user/favorites/terms`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
         },

@@ -84,32 +84,7 @@ export const useLegalArticles = () => {
     }
   };
 
-  const searchArticlesFromServer = async (query: string, category?: string) => {
-    try {
-      const searchParams = new URLSearchParams();
-      searchParams.append('q', query);
-      if (category) searchParams.append('category', category);
-      
-      const apiUrl = await NetworkConfig.getBestApiUrl();
-      const response = await fetch(`${apiUrl}/api/legal/search?${searchParams.toString()}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error('Search API request failed');
-      }
-      
-      return result.data || [];
-    } catch (err) {
-      console.error('Error searching from server API:', err);
-      throw err;
-    }
-  };
-
+  
   const fetchArticles = useCallback(async (retryCount = 0) => {
     const maxRetries = 3;
     

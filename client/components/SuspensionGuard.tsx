@@ -49,7 +49,7 @@ export const SuspensionGuard: React.FC<{ children: React.ReactNode }> = ({ child
           if (normalizePath(pathname || '/') !== '/suspended') {
             router.replace('/suspended');
           }
-        } else if (suspensionStatus && suspensionStatus.needsLiftedAcknowledgment) {
+        } else if (suspensionStatus && !suspensionStatus.isSuspended) {
           console.log('✅ User suspension lifted, redirecting to suspension-lifted screen');
           if (normalizePath(pathname || '/') !== '/suspension-lifted') {
             router.replace('/suspension-lifted');

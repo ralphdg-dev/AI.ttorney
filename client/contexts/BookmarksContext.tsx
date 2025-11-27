@@ -4,8 +4,6 @@ import { createSafeAreaToastRenderer } from '@/components/ui/SafeAreaToast';
 import { NetworkConfig } from '@/utils/networkConfig';
 import { useAuth } from './AuthContext';
 
-const API_BASE_URL = NetworkConfig.getApiUrl();
-
 interface BookmarksContextType {
   bookmarkedGuideIds: Set<string>;
   toggleBookmark: (guideId: string, guideTitle?: string) => Promise<void>;
@@ -31,7 +29,8 @@ export const BookmarksProvider: React.FC<BookmarksProviderProps> = ({ children }
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/user/favorites/guides`, {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/user/favorites/guides`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
 
@@ -70,8 +69,9 @@ export const BookmarksProvider: React.FC<BookmarksProviderProps> = ({ children }
       }
       
       // API call
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       if (isCurrentlyBookmarked) {
-        const response = await fetch(`${API_BASE_URL}/api/user/favorites/guides/${guideId}`, {
+        const response = await fetch(`${apiUrl}/api/user/favorites/guides/${guideId}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${session.access_token}` },
         });
@@ -85,7 +85,7 @@ export const BookmarksProvider: React.FC<BookmarksProviderProps> = ({ children }
           });
         }
       } else {
-        const response = await fetch(`${API_BASE_URL}/api/user/favorites/guides`, {
+        const response = await fetch(`${apiUrl}/api/user/favorites/guides`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,

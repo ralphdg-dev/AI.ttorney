@@ -46,7 +46,7 @@ class AppealService {
   ): Promise<Appeal> {
     const apiUrl = await NetworkConfig.getBestApiUrl();
     
-    const response = await fetch(`${apiUrl}/api/appeals`, {
+    const response = await fetch(`${apiUrl}/api/user/suspensions/appeal`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -71,7 +71,7 @@ class AppealService {
   async getMyAppeals(accessToken: string): Promise<AppealsListResponse> {
     const apiUrl = await NetworkConfig.getBestApiUrl();
     
-    const response = await fetch(`${apiUrl}/api/appeals/my`, {
+    const response = await fetch(`${apiUrl}/api/user/suspensions/appeals`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`
       }
@@ -81,26 +81,29 @@ class AppealService {
       throw new Error('Failed to fetch appeals');
     }
 
-    return response.json();
+    const data = await response.json();
+    
+    // Backend returns array directly, wrap it in expected format
+    return {
+      success: true,
+      data: Array.isArray(data) ? data : [],
+      total: Array.isArray(data) ? data.length : 0
+    };
   }
 
   /**
    * Get details of a specific appeal
    */
   async getAppeal(appealId: string, accessToken: string): Promise<Appeal> {
-    const apiUrl = await NetworkConfig.getBestApiUrl();
+    // Get all appeals and find the specific one (backend doesn't have single appeal endpoint)
+    const appeals = await this.getMyAppeals(accessToken);
+    const appeal = appeals.data.find(a => a.id === appealId);
     
-    const response = await fetch(`${apiUrl}/api/appeals/${appealId}`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch appeal');
+    if (!appeal) {
+      throw new Error('Appeal not found');
     }
 
-    return response.json();
+    return appeal;
   }
 
   /**

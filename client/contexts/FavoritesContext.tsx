@@ -4,8 +4,6 @@ import { NetworkConfig } from '@/utils/networkConfig';
 import { useToast } from '@/components/ui/toast';
 import { createSafeAreaToastRenderer } from '@/components/ui/SafeAreaToast';
 
-const API_BASE_URL = NetworkConfig.getApiUrl();
-
 export interface FavoritesContextType {
   favoriteTermIds: Set<string>;
   toggleFavorite: (termId: string, termTitle?: string) => Promise<void>;
@@ -31,7 +29,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/user/favorites/terms`, {
+      const apiUrl = await NetworkConfig.getBestApiUrl();
+      const response = await fetch(`${apiUrl}/api/user/favorites/terms`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
 
@@ -70,8 +69,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
       }
       
       // API call
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       if (isCurrentlyFavorite) {
-        const response = await fetch(`${API_BASE_URL}/api/user/favorites/terms/${termId}`, {
+        const response = await fetch(`${apiUrl}/api/user/favorites/terms/${termId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -87,7 +87,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
           });
         }
       } else {
-        const response = await fetch(`${API_BASE_URL}/api/user/favorites/terms`, {
+        const response = await fetch(`${apiUrl}/api/user/favorites/terms`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,

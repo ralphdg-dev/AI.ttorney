@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StatusBar, ScrollView, View, Text, TextInput, TouchableOpacity, Image, Alert, Modal, Platform } from 'react-native';
+import { StatusBar, ScrollView, View, Text, TextInput, TouchableOpacity, Image, Alert, Modal, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
@@ -15,7 +15,7 @@ import { getContentBottomPadding } from '../../../constants/LayoutConstants';
 
 export default function LawyerReg() {
   const insets = useSafeAreaInsets();
-  const { } = useAuth();
+  useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [rollNumber, setRollNumber] = useState('');
@@ -27,6 +27,7 @@ export default function LawyerReg() {
   const [showMonthSelect, setShowMonthSelect] = useState(false);
   const [showYearSelect, setShowYearSelect] = useState(false);
   const [showUploadOptions, setShowUploadOptions] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [ibpCard, setIbpCard] = useState<any | null>(null);
   const [ibpCardPath, setIbpCardPath] = useState<string>('');
   const isComplete = Boolean(firstName.trim() && lastName.trim() && rollNumber.trim() && rollSignDate && ibpCard);
@@ -608,39 +609,56 @@ export default function LawyerReg() {
         {!ibpCard && (
           <TouchableOpacity
             onPress={() => {
+              if (isUploading) return; // Prevent multiple uploads
               if (Platform.OS === 'web') {
                 handleBrowseFiles();
               } else {
                 setShowUploadOptions(true);
               }
             }}
-            activeOpacity={0.85}
+            disabled={isUploading}
+            activeOpacity={isUploading ? 1 : 0.85}
             style={{
               width: '100%',
               minHeight: 90,
               borderWidth: 1.5,
-              borderColor: '#D1D5DB',
+              borderColor: isUploading ? '#fbbf24' : '#D1D5DB',
               borderRadius: 10,
-              backgroundColor: '#F8FAFC',
+              backgroundColor: isUploading ? '#fef3c7' : '#F8FAFC',
               justifyContent: 'center',
               marginTop: 8,
               borderStyle: 'dashed',
               padding: 12,
+              opacity: isUploading ? 0.7 : 1,
             }}
           >
-            {/* Header Row */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-              <MaterialIcons name="cloud-upload" size={22} color="#6b7280" />
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#6b7280', marginLeft: 8 }}>
-                Upload a file
-              </Text>
-            </View>
+            {isUploading ? (
+              <View style={{ alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="#f59e0b" />
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#92400e', marginTop: 8 }}>
+                  Uploading...
+                </Text>
+                <Text style={{ fontSize: 13, color: '#92400e', marginTop: 4 }}>
+                  Please wait while we upload your file
+                </Text>
+              </View>
+            ) : (
+              <>
+                {/* Header Row */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                  <MaterialIcons name="cloud-upload" size={22} color="#6b7280" />
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#6b7280', marginLeft: 8 }}>
+                    Upload a file
+                  </Text>
+                </View>
 
-            {/* Details */}
-            <Text style={{ fontSize: 13, color: '#6b7280', marginBottom: 2 }}>
-              Formats: JPG, JPEG, PNG
-            </Text>
-            <Text style={{ fontSize: 13, color: '#6b7280' }}>Max size: 5MB</Text>
+                {/* Details */}
+                <Text style={{ fontSize: 13, color: '#6b7280', marginBottom: 2 }}>
+                  Formats: JPG, JPEG, PNG
+                </Text>
+                <Text style={{ fontSize: 13, color: '#6b7280' }}>Max size: 5MB</Text>
+              </>
+            )}
           </TouchableOpacity>
         )}
 

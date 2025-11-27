@@ -21,8 +21,6 @@ import Button from "@/components/ui/Button";
 import { ArticleCardSkeletonList } from "@/components/guides/ArticleCardSkeleton";
 import { Filter, SortAsc } from "lucide-react-native";
 
-const API_BASE_URL = NetworkConfig.getApiUrl();
-
 export default function BookmarkedGuidesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -56,8 +54,9 @@ export default function BookmarkedGuidesScreen() {
 
       try {
         setLoading(true);
+        const apiUrl = await NetworkConfig.getBestApiUrl();
         
-        const response = await fetch(`${API_BASE_URL}/api/legal/articles`);
+        const response = await fetch(`${apiUrl}/api/legal/articles`);
 
         if (response.ok) {
           const data = await response.json();

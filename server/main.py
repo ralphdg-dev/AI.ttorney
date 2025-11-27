@@ -255,6 +255,14 @@ app.include_router(user_favorites_router)
 from routes.notifications import router as notifications_router
 app.include_router(notifications_router)
 
+# Legal articles routes
+from routes.legalGuides import router as legal_guides_router
+app.include_router(legal_guides_router)  # Already has /api/legal prefix
+
+# Report resolution routes
+from routes.report_resolution import router as report_resolution_router
+app.include_router(report_resolution_router, prefix="/api")
+
 @app.get("/")
 @limiter.limit("60/minute")
 async def root(request: Request):

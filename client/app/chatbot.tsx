@@ -20,7 +20,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import tw from "tailwind-react-native-classnames";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../constants/Colors";

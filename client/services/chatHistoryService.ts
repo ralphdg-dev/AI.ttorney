@@ -35,7 +35,6 @@ export interface Conversation {
 
 const CURRENT_CONVERSATION_KEY = '@current_conversation_id';
 const ACTIVE_CONVERSATIONS_KEY = '@active_conversations';
-const CONVERSATIONS_CACHE_KEY = '@conversations_cache';
 const CACHE_DURATION = 30000; // 30 seconds cache
 
 /**

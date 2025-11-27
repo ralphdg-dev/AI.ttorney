@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, Animated, StatusBar, useWindowDimensions, Keyboard, Platform, KeyboardAvoidingView } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, Image, TextInput, Animated, StatusBar, useWindowDimensions, Keyboard, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { User, Bookmark, MoreHorizontal, Flag, Send } from 'lucide-react-native';
@@ -121,7 +121,7 @@ const ViewPost: React.FC = () => {
     requestAnimationFrame(() => {
       keyboardAnimatedValue.setValue(0);
     });
-  }, []);
+  }, [keyboardAnimatedValue]);
 
   // Reset input position when component unmounts
   useEffect(() => {
@@ -129,7 +129,7 @@ const ViewPost: React.FC = () => {
       // Ensure input position is reset when leaving the screen
       resetInputPosition();
     };
-  }, []);
+  }, [resetInputPosition]);
 
   useEffect(() => {
     // Only add keyboard listeners on native platforms (iOS/Android), not web
@@ -197,7 +197,7 @@ const ViewPost: React.FC = () => {
       keyboardDidHideListener.remove();
       blurSubscription.remove();
     };
-  }, [resetInputPosition]);
+  }, [resetInputPosition, keyboardAnimatedValue]);
   
   const [showFullContent, setShowFullContent] = useState(false);
   const [post, setPost] = useState<PostData | null>(null);
