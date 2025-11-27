@@ -184,9 +184,11 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
 
   const handleComplete = async () => {
     try {
+      // Save tutorial completion status to AsyncStorage
       await AsyncStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
+      console.log('✅ Tutorial completion saved to AsyncStorage');
     } catch (error) {
-      // Error silently handled
+      console.error('❌ Error saving tutorial completion:', error);
     }
     onComplete();
   };
@@ -322,17 +324,38 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
   const step = tutorialSteps[currentStep];
 
   // Initialize all values immediately when component mounts
+  // Check if tutorial has been completed before showing
   useEffect(() => {
-    // Set all values to final state immediately - no animations
-    fadeAnim.setValue(1);
-    scaleAnim.setValue(1);
-    overlayOpacity.setValue(1);
+    const checkTutorialStatus = async () => {
+      try {
+        // Check if tutorial has been completed
+        const tutorialCompleted = await AsyncStorage.getItem(TUTORIAL_STORAGE_KEY);
+        
+        if (tutorialCompleted === 'true') {
+          console.log('🔍 Tutorial already completed, closing tutorial');
+          // If tutorial was completed before, don't show it
+          onComplete();
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking tutorial status:', error);
+      }
+      
+      // If we get here, tutorial hasn't been completed, initialize animations
+      fadeAnim.setValue(1);
+      scaleAnim.setValue(1);
+      overlayOpacity.setValue(1);
+      
+      // Pre-update progress dots
+      tutorialSteps.forEach((_, index) => {
+        const targetWidth = index === currentStep ? 24 : 8;
+        progressDotAnims[index].setValue(targetWidth);
+      });
+    };
     
-    // Pre-update progress dots
-    tutorialSteps.forEach((_, index) => {
-      const targetWidth = index === currentStep ? 24 : 8;
-      progressDotAnims[index].setValue(targetWidth);
-    });
+    if (visible) {
+      checkTutorialStatus();
+    }
     
     // CRITICAL: Never change overlay opacity during transitions
     return () => {
@@ -341,7 +364,7 @@ const GuestOnboardingTutorial: React.FC<GuestOnboardingTutorialProps> = ({
       scaleAnim.setValue(1);
       overlayOpacity.setValue(1);
     };
-  }, [fadeAnim, scaleAnim, overlayOpacity, progressDotAnims, tutorialSteps, currentStep]);
+  }, [visible, fadeAnim, scaleAnim, overlayOpacity, progressDotAnims, tutorialSteps, currentStep, onComplete]);
 
   if (!visible) return null;
 

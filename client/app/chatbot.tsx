@@ -6,6 +6,8 @@ import React, {
   useMemo,
 } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -380,26 +382,49 @@ export default function ChatbotScreen() {
     'bottom-navbar': navbarRef,
   };
   
-  const handleTutorialComplete = () => {
+  const handleTutorialComplete = async () => {
+    try {
+      // Save tutorial completion status to AsyncStorage
+      await AsyncStorage.setItem('@guest_onboarding_completed', 'true');
+      console.log('✅ Tutorial completion saved to AsyncStorage');
+    } catch (error) {
+      console.error('❌ Error saving tutorial completion:', error);
+    }
     setShowTutorial(false);
     // Tutorial is complete, user stays on chatbot
   };
   
   // Show tutorial when guest user first enters chatbot page
   const hasShownTutorialRef = useRef(false);
-  
+
   useFocusEffect(
     useCallback(() => {
-      // Only show tutorial once for guest users when they first enter the page
-      if (isGuestMode && !hasShownTutorialRef.current) {
-        // Small delay to ensure page is fully rendered before showing tutorial
-        const timer = setTimeout(() => {
-          setShowTutorial(true);
-          hasShownTutorialRef.current = true;
-        }, 500);
-        
-        return () => clearTimeout(timer);
-      }
+      // Check if tutorial has been shown before using AsyncStorage
+      const checkTutorialStatus = async () => {
+        try {
+          // Only proceed if in guest mode
+          if (!isGuestMode) return;
+          
+          // Check AsyncStorage for tutorial completion
+          const tutorialCompleted = await AsyncStorage.getItem('@guest_onboarding_completed');
+          console.log('🔍 Tutorial status check:', { tutorialCompleted });
+          
+          // Only show tutorial if it hasn't been completed and hasn't been shown in this session
+          if (!tutorialCompleted && !hasShownTutorialRef.current) {
+            // Small delay to ensure page is fully rendered before showing tutorial
+            const timer = setTimeout(() => {
+              setShowTutorial(true);
+              hasShownTutorialRef.current = true;
+            }, 500);
+            
+            return () => clearTimeout(timer);
+          }
+        } catch (error) {
+          console.error('Error checking tutorial status:', error);
+        }
+      };
+      
+      checkTutorialStatus();
     }, [isGuestMode, setShowTutorial])
   );
   

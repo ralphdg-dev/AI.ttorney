@@ -151,12 +151,12 @@ export const getTotalUIHeight = (safeAreaBottom: number): number =>
  * Includes breathing room for better UX
  * 
  * @param safeAreaBottom - Bottom safe area inset from useSafeAreaInsets()
- * @param breathingRoom - Additional spacing (default: 20dp)
+ * @param breathingRoom - Additional spacing (default: 10dp, reduced from 20dp)
  * @returns Total padding in dp/pt
  */
 export const getContentBottomPadding = (
   safeAreaBottom: number, 
-  breathingRoom: number = 20
+  breathingRoom: number = 10 // Reduced default from 20 to 10
 ): number => 
   LAYOUT.NAVBAR_HEIGHT + safeAreaBottom + breathingRoom;
 

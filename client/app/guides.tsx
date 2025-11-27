@@ -131,8 +131,47 @@ export default function GuidesScreen() {
     </View>
   );
 
-const renderPagination = () => {
-  const getVisiblePages = () => {
+// Memoized pagination components for better performance
+const PageNumber = React.memo(({ page, isActive, onPress }: { page: number, isActive: boolean, onPress: () => void }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    style={tw`w-8 h-8 mx-1 rounded-lg justify-center items-center border ${isActive ? "border-blue-500" : "border-gray-300"}`}
+  >
+    <GSText
+      style={{
+        fontSize: 12,
+        fontWeight: isActive ? "700" : "400",
+        color: isActive ? "#1E40AF" : "#374151",
+      }}
+    >
+      {page}
+    </GSText>
+  </TouchableOpacity>
+));
+
+const Ellipsis = React.memo(({ index }: { index: number }) => (
+  <View key={`ellipsis-${index}`} style={tw`items-center justify-center w-8 h-8 mx-1`}>
+    <GSText style={{ fontSize: 12 }} className="text-gray-500">...</GSText>
+  </View>
+));
+
+const PaginationButton = React.memo(({ direction, disabled, onPress }: { direction: "back" | "forward", disabled: boolean, onPress: () => void }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    disabled={disabled}
+    style={tw`w-8 h-8 mx-1 rounded-full justify-center items-center ${disabled ? "opacity-50" : "border border-gray-300"}`}
+  >
+    <Ionicons
+      name={direction === "back" ? "chevron-back" : "chevron-forward"}
+      size={16}
+      color={disabled ? "#9CA3AF" : Colors.primary.blue}
+    />
+  </TouchableOpacity>
+));
+
+const renderPagination = useCallback(() => {
+  // Memoize the visible pages calculation
+  const visiblePages = useMemo(() => {
     if (totalPages <= 5) {
       return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
@@ -161,99 +200,83 @@ const renderPagination = () => {
       "...",
       totalPages,
     ];
-  };
+  }, [currentPage, totalPages]);
 
-  const handlePageChange = (page: number): void => {
+  // Optimized page change handlers with direct function references
+  const handlePrevPage = useCallback(() => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      });
+    }
+  }, [currentPage]);
+
+  const handleNextPage = useCallback(() => {
+    if (currentPage < totalPages) {
+      setCurrentPage(prev => prev + 1);
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      });
+    }
+  }, [currentPage, totalPages]);
+
+  const handlePageSelect = useCallback((page: number) => {
     setCurrentPage(page);
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-  };
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+    });
+  }, []);
+
+  // Don't render pagination if not needed
+  if (totalPages <= 1) return null;
 
   return (
-    <View style={tw`py-6 bg-gray-50`}>
-      <View style={tw`flex-col items-center`}>
-        {/* Pagination buttons */}
-        {totalPages > 1 && (
-          <View style={tw`flex-row items-center justify-center`}>
-            {/* Prev button */}
-            <TouchableOpacity
-              onPress={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              style={tw`w-10 h-10 mx-1 rounded-full justify-center items-center ${
-                currentPage === 1
-                  ? "bg-gray-200 opacity-50"
-                  : "bg-white border border-gray-300"
-              }`}
-            >
-              <Ionicons
-                name="chevron-back"
-                size={18}
-                color={currentPage === 1 ? "#9CA3AF" : Colors.primary.blue}
+    <View style={tw`pt-2 pb-0`}>
+      <View style={tw`items-center`}>
+        {/* Single row pagination with all elements in one line */}
+        <View style={tw`flex-row items-center justify-center`}>
+          {/* Prev button */}
+          <PaginationButton 
+            direction="back" 
+            disabled={currentPage === 1} 
+            onPress={handlePrevPage} 
+          />
+
+          {/* Page numbers */}
+          {visiblePages.map((page, index) =>
+            page === "..." ? (
+              <Ellipsis key={`ellipsis-${index}`} index={index} />
+            ) : (
+              <PageNumber 
+                key={`page-${page}`}
+                page={page as number} 
+                isActive={currentPage === page} 
+                onPress={() => handlePageSelect(page as number)} 
               />
-            </TouchableOpacity>
+            )
+          )}
 
-            {/* Page numbers */}
-            {getVisiblePages().map((page, index) =>
-              page === "..." ? (
-                <View
-                  key={`ellipsis-${index}`}
-                  style={tw`items-center justify-center w-10 h-10 mx-1`}
-                >
-                  <GSText className="text-gray-500">...</GSText>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  key={page}
-                  onPress={() => handlePageChange(page as number)}
-                  style={tw`w-10 h-10 mx-1 rounded-lg justify-center items-center border ${
-                    currentPage === page
-                      ? "bg-gray-200 border-gray-300"
-                      : "bg-white border-gray-300"
-                  }`}
-                >
-                  <GSText
-                    className={
-                      currentPage === page
-                        ? "text-gray-700 font-bold"
-                        : "text-gray-700"
-                    }
-                  >
-                    {page}
-                  </GSText>
-                </TouchableOpacity>
-              )
-            )}
+          {/* Next button */}
+          <PaginationButton 
+            direction="forward" 
+            disabled={currentPage === totalPages} 
+            onPress={handleNextPage} 
+          />
+        </View>
 
-            {/* Next button */}
-            <TouchableOpacity
-              onPress={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              style={tw`w-10 h-10 mx-1 rounded-full justify-center items-center ${
-                currentPage === totalPages
-                  ? "bg-gray-200 opacity-50"
-                  : "bg-white border border-gray-300"
-              }`}
-            >
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={currentPage === totalPages ? "#9CA3AF" : Colors.primary.blue}
-              />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Counter */}
+        {/* Counter - reduced margin top */}
         <GSText
           size="sm"
-          className="mt-4 text-center text-gray-700"
-          style={{ fontSize: 14 }}
+          className="mt-1 text-center text-gray-500"
+          style={{ fontSize: 12 }}
         >
-  Showing {Math.min(endIndex, totalArticles)} of {totalArticles} results
+          Showing {Math.min(endIndex, totalArticles)} of {totalArticles} results
         </GSText>
       </View>
     </View>
   );
-};
+}, [currentPage, totalPages, totalArticles, endIndex]);
 
   
 
@@ -303,7 +326,7 @@ const renderPagination = () => {
               ListFooterComponent={renderPagination}
               contentContainerStyle={{
                 paddingHorizontal: 12,
-                paddingBottom: getContentBottomPadding(insets.bottom, 20),
+                paddingBottom: getContentBottomPadding(insets.bottom, 8), // Reduced from 20 to 8
                 flexGrow: 1 
               }}
               columnWrapperStyle={numColumns > 1 ? { justifyContent: "space-between" } : undefined}
