@@ -196,17 +196,18 @@ export default function TermDetailScreen() {
         showBackButton={true}
         onBackPress={handleBack}
         rightComponent={
-          <TouchableOpacity
-            onPress={handleToggleFavorite}
-            className="p-2"
-            disabled={isGuestMode}
-          >
-            <Star
-              size={20}
-              color={isTermFavorite ? Colors.status.warning : Colors.text.sub}
-              fill={isTermFavorite ? Colors.status.warning : "none"}
-            />
-          </TouchableOpacity>
+          !isGuestMode && (
+            <TouchableOpacity
+              onPress={handleToggleFavorite}
+              className="p-2"
+            >
+              <Star
+                size={20}
+                color={isTermFavorite ? Colors.status.warning : Colors.text.sub}
+                fill={isTermFavorite ? Colors.status.warning : "none"}
+              />
+            </TouchableOpacity>
+          )
         }
       />
       {/* Content */}

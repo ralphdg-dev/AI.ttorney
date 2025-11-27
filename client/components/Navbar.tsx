@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
@@ -28,6 +28,9 @@ const Navbar: React.FC<NavbarProps> = ({
   const { user } = useAuth();
   const { width } = useWindowDimensions();
   
+  // Navigation guard to prevent spam clicking
+  const isNavigatingRef = useRef(false);
+  
   // Dynamic sizing based on screen width
   const isSmallScreen = width < 375;
   const iconSize = isSmallScreen ? 20 : 22;
@@ -35,7 +38,11 @@ const Navbar: React.FC<NavbarProps> = ({
 
   // Auto-detect active tab based on current route if not provided
   const getActiveTab = () => {
-    if (activeTab !== undefined) return activeTab;
+    if (activeTab) return activeTab;
+    
+    // Don't highlight any tab for certain routes
+    if (pathname.includes('/article')) return null;
+    if (pathname.includes('/bookmarked')) return null;
     
     // Check sidebar routes first - these should NOT highlight any navbar tab
     if (pathname.includes('/consultations')) return null;
@@ -43,8 +50,6 @@ const Navbar: React.FC<NavbarProps> = ({
     if (pathname.includes('/help')) return null;
     if (pathname.includes('/favorite-terms')) return null;
     if (pathname.includes('/notifications')) return null;
-    if (pathname.includes('/article')) return null;
-    if (pathname.includes('/bookmarked')) return null;
     
     // Check main navbar routes
     if (pathname === '/' || pathname === '/home') return 'home';
@@ -60,11 +65,25 @@ const Navbar: React.FC<NavbarProps> = ({
   const currentActiveTab = getActiveTab();
 
   const handleTabPress = (tabId: string) => {
-    // Call custom onTabPress if provided
+    // Use custom handler if provided
     if (onTabPress) {
       onTabPress(tabId);
       return;
     }
+
+    // Prevent spam clicking - ignore if already navigating
+    if (isNavigatingRef.current) {
+      console.log(`[Navbar] Navigation already in progress, ignoring ${tabId} click`);
+      return;
+    }
+
+    // Prevent navigation to the same tab
+    if (currentActiveTab === tabId) {
+      console.log(`[Navbar] Already on ${tabId} tab, ignoring navigation`);
+      return;
+    }
+
+    isNavigatingRef.current = true;
 
     // Default navigation behavior
     console.log(`[Navbar] Navigating to tab: ${tabId}`);
@@ -90,6 +109,11 @@ const Navbar: React.FC<NavbarProps> = ({
       default:
         console.log(`Unknown tab: ${tabId}`);
     }
+
+    // Reset navigation guard after a delay to allow next navigation
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 500);
   };
 
   const tabs = [

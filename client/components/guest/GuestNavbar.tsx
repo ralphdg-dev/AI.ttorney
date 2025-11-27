@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
@@ -19,6 +19,9 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab, glossaryRef, navba
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
+  
+  // Navigation guard to prevent spam clicking
+  const isNavigatingRef = useRef(false);
 
   // Auto-detect active tab based on current route if not provided
   const getActiveTab = () => {
@@ -34,6 +37,20 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab, glossaryRef, navba
   const currentActiveTab = getActiveTab();
 
   const handleTabPress = (tabId: string) => {
+    // Prevent spam clicking - ignore if already navigating
+    if (isNavigatingRef.current) {
+      console.log(`[GuestNavbar] Navigation already in progress, ignoring ${tabId} click`);
+      return;
+    }
+
+    // Prevent navigation to the same tab
+    if (currentActiveTab === tabId) {
+      console.log(`[GuestNavbar] Already on ${tabId} tab, ignoring navigation`);
+      return;
+    }
+
+    isNavigatingRef.current = true;
+    
     switch (tabId) {
       case 'learn':
         router.push('/glossary');
@@ -44,6 +61,11 @@ const GuestNavbar: React.FC<GuestNavbarProps> = ({ activeTab, glossaryRef, navba
       default:
         console.log(`Unknown tab: ${tabId}`);
     }
+
+    // Reset navigation guard after a delay to allow next navigation
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 500);
   };
 
   const tabs = [

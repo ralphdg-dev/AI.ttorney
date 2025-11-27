@@ -488,7 +488,7 @@ const Post: React.FC<PostProps> = React.memo(({
               <Text style={styles.actionCount}>{comments}</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.viewMoreButton}>
+          <TouchableOpacity style={styles.viewMoreButton} onPress={handlePostPress}>
             <ChevronRight size={18} color="#536471" />
           </TouchableOpacity>
         </View>

@@ -1029,12 +1029,17 @@ const ViewPost: React.FC = () => {
         title="Post"
         showBackButton={true}
         onBackPress={() => {
+          console.log('[ViewPost] Back button pressed, from:', from, 'query:', query);
+          
+          // Special case: if coming from search with query, preserve search state
           if (from === 'search' && query) {
+            console.log('[ViewPost] Redirecting to search with query:', query);
             router.push(`/search?query=${encodeURIComponent(query)}` as any);
           } else {
-            // Role-based redirect: lawyers to /lawyer/forum, users to /home
-            const redirectPath = currentUser?.role === 'verified_lawyer' ? '/lawyer/forum' : '/home';
-            router.push(redirectPath as any);
+            // Default: use router.back() to return to previous page (timeline)
+            // This handles all cases: timeline, home, lawyer forum, etc.
+            console.log('[ViewPost] Using router.back() to return to previous page');
+            router.back();
           }
         }}
         rightComponent={

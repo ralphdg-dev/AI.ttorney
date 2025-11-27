@@ -476,14 +476,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let errorMessage = 'Invalid email or password';
         if (error.message.includes('Invalid login credentials')) {
           errorMessage = 'Invalid email or password';
-        } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Please verify your email address';
         } else if (error.message.includes('network')) {
           errorMessage = 'Network error. Please check your connection';
+        } else if (error.message.includes('Email not confirmed')) {
+          // Bypass Supabase email confirmation check - we use custom OTP verification
+          // Allow login to proceed and let server handle verification redirect
+          console.log('📧 Supabase email not confirmed, but allowing login for custom verification');
+          // Don't return error, proceed with login flow
+        } else {
+          errorMessage = error.message;
+          setIsLoading(false);
+          return { success: false, error: errorMessage };
         }
         
-        setIsLoading(false);
-        return { success: false, error: errorMessage };
+        // Only return error if it's not the email confirmation case
+        if (!error.message.includes('Email not confirmed')) {
+          setIsLoading(false);
+          return { success: false, error: errorMessage };
+        }
       }
 
       if (data.session && data.user) {

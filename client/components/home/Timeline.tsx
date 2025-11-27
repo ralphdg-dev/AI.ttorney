@@ -91,6 +91,8 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   const refreshingRef = useRef(false);
   const hasMoreRef = useRef(true);
   const listRef = useRef<FlatList>(null);
+  // Add scroll position tracking
+  const scrollPositionRef = useRef(0);
 
   useImperativeHandle(ref, () => ({
     scrollToTop: () => {
@@ -370,6 +372,17 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   const hasFocusedOnce = useRef(false);
   useFocusEffect(
     useCallback(() => {
+      // Restore scroll position after a short delay to ensure render is complete
+      const savedPosition = scrollPositionRef.current;
+      if (savedPosition > 0 && listRef.current) {
+        if (__DEV__) console.log(`Timeline: Restoring scroll position: ${savedPosition}`);
+        setTimeout(() => {
+          if (listRef.current && isComponentMounted.current) {
+            listRef.current.scrollToOffset({ offset: savedPosition, animated: false });
+          }
+        }, 100);
+      }
+      
       // Only refresh on focus if cache is invalid AND we've already loaded once
       // This prevents overwriting paginated posts with cached first page
       if (!hasFocusedOnce.current) {
@@ -471,6 +484,13 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   }, []);
 
   const handlePostPress = useCallback((postId: string) => {
+    // Save current scroll position before navigation
+    if (listRef.current) {
+      const scrollPosition = (listRef.current as any)._scrollMetrics?.offset || 0;
+      scrollPositionRef.current = scrollPosition;
+      if (__DEV__) console.log(`Timeline: Saving scroll position: ${scrollPosition}`);
+    }
+    
     // Prefetch the post before navigation for instant loading
     prefetchPost(postId);
 
@@ -509,7 +529,6 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         if (__DEV__) console.log('Timeline: No more posts to load');
         return;
       }
-
 
       if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage, hasMore: hasMoreRef.current });
       loadPosts(false); // Don't force refresh
@@ -787,12 +806,17 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
           ref={listRef}
           {...listProps}
           style={styles.timeline}
+          onScroll={(event) => {
+            // Track scroll position as user scrolls
+            scrollPositionRef.current = event.nativeEvent.contentOffset.y;
+            // Close any open menus when scrolling
+            setOpenMenuPostId(null);
+          }}
           contentContainerStyle={allPosts.length === 0 ? styles.emptyContent : [styles.timelineContent, { paddingBottom: 56 + (insets.bottom || 0) + 20 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={refreshControl}
           ListHeaderComponent={null}
           ListFooterComponent={renderFooter}
-          onScroll={() => setOpenMenuPostId(null)}
           scrollEventThrottle={400}
           onEndReached={allPosts.length > 0 ? handleLoadMore : undefined}
           onEndReachedThreshold={0.3}
