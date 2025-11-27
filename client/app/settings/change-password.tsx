@@ -12,7 +12,6 @@ import { AlertCircle, Eye, EyeOff, Lock } from "lucide-react-native";
 import { useToast } from "@/components/ui/toast";
 import { createSafeAreaToastRenderer } from "@/components/ui/SafeAreaToast";
 import Header from "@/components/Header";
-import Navbar from "@/components/Navbar";
 import Colors from "@/constants/Colors";
 import { supabase } from "@/config/supabase";
 import { createShadowStyle } from "@/utils/shadowUtils";
@@ -97,6 +96,18 @@ export default function ChangePasswordScreen() {
         throw new Error(errorData.detail || 'Failed to change password');
       }
 
+      const responseData = await response.json();
+      
+      // Debug logging to identify the issue
+      console.log('🔍 Change password response:', responseData);
+      console.log('🔍 Response success field:', responseData.success);
+      console.log('🔍 Response status:', response.status);
+      
+      if (!responseData.success) {
+        console.log('❌ Change password failed - responseData.success is false');
+        throw new Error(responseData.detail || 'Failed to change password');
+      }
+
       // Show success toast
       toast.show({
         placement: "top",
@@ -177,7 +188,7 @@ export default function ChangePasswordScreen() {
       >
         {/* Header Card */}
         <View 
-          style={[tw`bg-white rounded-2xl p-6 mb-6`, createShadowStyle({
+          style={[tw`p-6 mb-6 bg-white rounded-2xl`, createShadowStyle({
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.1,
@@ -187,7 +198,7 @@ export default function ChangePasswordScreen() {
         >
           <HStack className="items-center mb-4">
             <View 
-              style={[tw`w-12 h-12 rounded-xl items-center justify-center mr-4`, { backgroundColor: Colors.primary.blue + '20' }]}
+              style={[tw`items-center justify-center w-12 h-12 mr-4 rounded-xl`, { backgroundColor: Colors.primary.blue + '20' }]}
             >
               <Lock size={24} color={Colors.primary.blue} />
             </View>
@@ -204,7 +215,7 @@ export default function ChangePasswordScreen() {
         
         {/* Form Card */}
         <View 
-          style={[tw`bg-white rounded-2xl p-6 mb-6`, createShadowStyle({
+          style={[tw`p-6 mb-6 bg-white rounded-2xl`, createShadowStyle({
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.1,
@@ -396,7 +407,7 @@ export default function ChangePasswordScreen() {
             onPress={handleCancel}
             disabled={loading}
             style={[
-              tw`flex-1 py-3 px-4 rounded-lg border flex-row items-center justify-center`,
+              tw`flex-row items-center justify-center flex-1 px-4 py-3 border rounded-lg`,
               {
                 borderColor: Colors.border.light,
                 backgroundColor: Colors.background.primary,
@@ -415,7 +426,7 @@ export default function ChangePasswordScreen() {
             onPress={handleResetPassword}
             disabled={loading}
             style={[
-              tw`flex-1 py-3 px-4 rounded-lg flex-row items-center justify-center`,
+              tw`flex-row items-center justify-center flex-1 px-4 py-3 rounded-lg`,
               {
                 backgroundColor: loading ? Colors.secondary.lightGray : Colors.primary.blue,
                 opacity: loading ? 0.8 : 1,
@@ -438,8 +449,6 @@ export default function ChangePasswordScreen() {
           </TouchableOpacity>
         </HStack>
       </ScrollView>
-      
-      <Navbar />
     </SafeAreaView>
   );
 }

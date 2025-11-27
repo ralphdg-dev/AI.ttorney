@@ -12,7 +12,18 @@
     "android": {
       "icon": "./assets/images/icon.png",
       "softwareKeyboardLayoutMode": "resize",
-      "windowSoftInputMode": "adjustResize"
+      "windowSoftInputMode": "adjustResize",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "AI.ttorney needs access to your camera to take profile photos.",
+        "NSPhotoLibraryUsageDescription": "AI.ttorney needs access to your photo library to select profile photos."
+      }
     },
     "web": {
       "bundler": "metro",
@@ -30,7 +41,8 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-image-picker"
     ],
     "experiments": {
       "typedRoutes": true
