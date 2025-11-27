@@ -132,12 +132,12 @@ def get_otp_store():
 
 class OTPService:
     def __init__(self):
-                            
-        self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+        # Use consistent environment variable names
+        self.smtp_server = os.getenv("SMTP_HOST", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        self.smtp_username = os.getenv("SMTP_USERNAME")
+        self.smtp_username = os.getenv("SMTP_USER")
         self.smtp_password = os.getenv("SMTP_PASSWORD")
-        self.from_email = os.getenv("FROM_EMAIL", "noreply@ai.ttorney.com")
+        self.from_email = os.getenv("EMAIL_FROM", "noreply@ai.ttorney.com")
         self.from_name = os.getenv("FROM_NAME", "AI.ttorney")
         
                                                                  
