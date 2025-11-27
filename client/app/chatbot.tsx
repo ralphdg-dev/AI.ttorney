@@ -57,6 +57,7 @@ interface StreamChatResponseParams {
   onContent: (content: string) => void;
   onSources: (sources: any[]) => void;
   onMetadata: (metadata: any) => void;
+  onDisclaimer?: (disclaimer: string) => void;
   onViolation?: (violation: any) => void;
   onComplete: () => void;
   onError: () => void;
@@ -71,6 +72,7 @@ const streamChatResponse = (params: StreamChatResponseParams): Promise<void> => 
     onContent,
     onSources,
     onMetadata,
+    onDisclaimer,
     onViolation,
     onComplete,
     onError,
@@ -90,7 +92,7 @@ const streamChatResponse = (params: StreamChatResponseParams): Promise<void> => 
     
     let buffer = '';
     let lastUpdateTime = 0;
-    const UPDATE_INTERVAL = 50; // Smooth 20fps updates
+    const UPDATE_INTERVAL = 8; // Ultra-smooth 120fps updates for maximum responsiveness
     
     // Handle streaming data
     xhr.onprogress = () => {
@@ -119,6 +121,11 @@ const streamChatResponse = (params: StreamChatResponseParams): Promise<void> => 
             } else if (data.type === 'metadata') {
               onMetadata(data);
               console.log('📋 Metadata:', { language: data.language });
+            } else if (data.type === 'disclaimer') {
+              if (onDisclaimer && data.disclaimer) {
+                onDisclaimer(data.disclaimer);
+                console.log('⚖️ Legal disclaimer received');
+              }
             } else if (data.type === 'violation') {
               if (onViolation) {
                 onViolation(data.violation);
@@ -421,7 +428,8 @@ export default function ChatbotScreen() {
     msgId: string,
     text: string,
     sources: any[],
-    language: string
+    language: string,
+    disclaimer?: string
   ) => {
     try {
       // Unified approach: use localMessages for everyone
@@ -434,7 +442,8 @@ export default function ChatbotScreen() {
               ...newMessages[msgIndex], 
               text,
               sources,
-              language
+              language,
+              legal_disclaimer: disclaimer
             };
           } else {
             console.warn(`⚠️ Message ${msgId} not found for sources update`);
@@ -996,6 +1005,10 @@ export default function ChatbotScreen() {
             onSources: (receivedSources: any[]) => {
               sources = receivedSources;
             },
+            onDisclaimer: (disclaimer: string) => {
+              legal_disclaimer = disclaimer;
+              console.log('⚖️ Disclaimer captured:', disclaimer.substring(0, 50) + '...');
+            },
             onMetadata: (metadata: any) => {
               language = metadata.language;
               returnedSessionId = metadata.session_id;
@@ -1041,7 +1054,7 @@ export default function ChatbotScreen() {
               
               // Only update with sources if this wasn't a violation
               if (!isViolation) {
-                updateMessageWithSources(streamingMsgId, answer, sources, language);
+                updateMessageWithSources(streamingMsgId, answer, sources, language, legal_disclaimer);
                 
                 // OpenAI/Anthropic pattern: Increment count ONLY after successful response
                 // Server already incremented, we just update client to match

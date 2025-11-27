@@ -24,10 +24,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-                                                            
-STREAMING_TOKEN_BATCH_SIZE = 3                                               
-STREAMING_MAX_INTERVAL_MS = 80                                     
-STREAMING_TIMEOUT_SECONDS = 60.0  # Optimized for mobile networks                                         
+# Ultra-aggressive streaming settings for maximum speed
+STREAMING_TOKEN_BATCH_SIZE = 1  # Send every single token immediately for fastest response
+STREAMING_MAX_INTERVAL_MS = 5  # Ultra-fast 5ms interval for near-instant delivery
+STREAMING_TIMEOUT_SECONDS = 90.0  # Increased timeout for complex queries while maintaining speed                                         
 
                                                  
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -95,8 +95,8 @@ if not OPENAI_API_KEY:
 
 EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4o-mini"                                           
-TOP_K_RESULTS = 3                                                             
-MIN_CONFIDENCE_SCORE = 0.3                                              
+TOP_K_RESULTS = 2  # Reduced for faster retrieval - quality over quantity
+MIN_CONFIDENCE_SCORE = 0.4  # Higher threshold for better quality, faster results                                              
 
                                                
 PROHIBITED_PATTERNS = [
@@ -2109,7 +2109,7 @@ def requires_legal_disclaimer(question: str, answer: str) -> bool:
 def get_legal_disclaimer(language: str, question: str = "", answer: str = "") -> str:
     """
     Get legal disclaimer in appropriate language with in-app legal help link.
-    Only returns disclaimer if the question/answer is actually legal-related.
+    ALWAYS returns disclaimer to ensure users understand this is legal awareness, not advice.
     
     Args:
         language: Detected language (english, tagalog, taglish)
@@ -2117,16 +2117,15 @@ def get_legal_disclaimer(language: str, question: str = "", answer: str = "") ->
         answer: Generated answer (optional, for context)
     
     Returns:
-        str: Legal disclaimer if needed, empty string otherwise
+        str: Legal disclaimer (always returned for every message)
     """
-                                            
-    if question and answer and not requires_legal_disclaimer(question, answer):
-        return ""                                       
+    # ALWAYS show disclaimer - this is legal awareness, not legal advice
+    # AI.ttorney is not liable for any decisions made based on this information
     
     disclaimers = {
-        "english": "⚖ Important: This is general legal information only, not legal advice. For your specific situation, you can consult with a licensed Philippine lawyer through our [Legal Help directory](/directory?tab=lawyers) section.",
-        "tagalog": "⚖ Mahalaga: Ito ay pangkalahatang impormasyon lamang, hindi legal advice. Para sa iyong partikular na sitwasyon, maaari kang kumonsulta sa lisensyadong abogado sa aming [Legal Help directory](/directory?tab=lawyers) section.",
-        "taglish": "⚖ Important: Ito ay general legal information lang, hindi legal advice. Para sa iyong specific situation, you can consult with a licensed Philippine lawyer sa aming [Legal Help directory](/directory?tab=lawyers) section."
+        "english": "⚖️ **Legal Disclaimer**: This is for legal awareness only, not legal advice. AI.ttorney is not liable for any actions or decisions made based on this information. For your specific situation, consult with a licensed Philippine lawyer through our [Legal Help directory](/directory?tab=lawyers).",
+        "tagalog": "⚖️ **Paalala**: Ito ay para sa legal awareness lamang, hindi legal advice. Ang AI.ttorney ay walang pananagutan sa anumang aksyon o desisyon base sa impormasyong ito. Para sa iyong partikular na sitwasyon, kumonsulta sa lisensyadong abogado sa aming [Legal Help directory](/directory?tab=lawyers).",
+        "taglish": "⚖️ **Disclaimer**: Ito ay for legal awareness lang, hindi legal advice. AI.ttorney is not liable para sa any actions o decisions based sa information na ito. Para sa iyong specific situation, mag-consult with a licensed Philippine lawyer sa aming [Legal Help directory](/directory?tab=lawyers)."
     }
     return disclaimers.get(language, disclaimers["english"])
 

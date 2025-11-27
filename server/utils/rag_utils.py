@@ -145,33 +145,60 @@ def retrieve_relevant_context_with_web_search(
             metadata["web_results"] = len(web_results)
             
             if web_results:
-                                                                      
-                for i, result in enumerate(web_results, 1):
-                                                                             
+                # Filter and validate web results for quality
+                valid_results = []
+                for result in web_results:
+                    content = result.get('scraped_content', result.get('snippet', ''))
+                    url = result.get('url', '')
+                    title = result.get('title', '')
+                    
+                    # Skip if no content
+                    if not content or len(content.strip()) < 50:
+                        logger.debug(f"   ❌ Skipping result with insufficient content: {title[:50]}")
+                        continue
+                    
+                    # Skip generic homepage results (no specific article path)
+                    if url.count('/') <= 3 and not any(keyword in url.lower() for keyword in ['article', 'law', 'republic-act', 'executive-order', 'small-claims', 'rules', 'issuance']):
+                        logger.debug(f"   ❌ Skipping generic homepage: {url}")
+                        continue
+                    
+                    # Skip results with generic/vague titles
+                    generic_phrases = [
+                        'has the exclusive power to',
+                        'official website',
+                        'welcome to',
+                        'home page',
+                        'about us'
+                    ]
+                    if any(phrase in title.lower() for phrase in generic_phrases):
+                        logger.debug(f"   ❌ Skipping generic title: {title[:50]}")
+                        continue
+                    
+                    valid_results.append(result)
+                
+                # Process only valid, high-quality results
+                for i, result in enumerate(valid_results, 1):
                     content = result.get('scraped_content', result.get('snippet', ''))
                     
-                    if content:
-                                                                        
-                        context_entry = f"""[Web Source {i}: {result.get('title', 'Untitled')}]
+                    context_entry = f"""[Web Source {i}: {result.get('title', 'Untitled')}]
 [URL: {result.get('url', '')}]
 {content}
 """
-                        web_context_parts.append(context_entry)
-                        
-                                                
-                        web_sources.append({
-                            "source": "Web Search",
-                            "law": result.get("source", "Web"),
-                            "article_number": f"Web Result {i}",
-                            "article_title": result.get("title", ""),
-                            "text_preview": content[:200] + "..." if len(content) > 200 else content,
-                            "source_url": result.get("url", ""),
-                            "relevance_score": 0.0,
-                            "search_timestamp": result.get("timestamp", ""),
-                            "source_type": "web_scraped"
-                        })
+                    web_context_parts.append(context_entry)
+                    
+                    web_sources.append({
+                        "source": "Web Search",
+                        "law": result.get("source", "Web"),
+                        "article_number": f"Web Result {i}",
+                        "article_title": result.get("title", ""),
+                        "text_preview": content[:200] + "..." if len(content) > 200 else content,
+                        "source_url": result.get("url", ""),
+                        "relevance_score": 0.0,
+                        "search_timestamp": result.get("timestamp", ""),
+                        "source_type": "web_scraped"
+                    })
                 
-                logger.info(f" Added {len(web_results)} web search results with scraped content to context")
+                logger.info(f"✅ Added {len(valid_results)} high-quality web results (filtered from {len(web_results)} total)")
             else:
                 logger.warning("  Web search returned no results")
     

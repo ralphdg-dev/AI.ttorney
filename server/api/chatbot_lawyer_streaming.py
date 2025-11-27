@@ -37,6 +37,9 @@ from api.chatbot_lawyer import (
     build_professional_referral_response
 )
 
+# Import disclaimer function from user chatbot (shared utility)
+from api.chatbot_user import get_legal_disclaimer
+
                                                   
 from services.content_moderation_service import get_moderation_service
 from services.violation_tracking_service import get_violation_tracking_service
@@ -566,12 +569,12 @@ Note: No specific context was retrieved from the vector database. Proceed with t
                 model=CHAT_MODEL,
                 messages=messages,
                 max_tokens=request.max_tokens,
-                temperature=0.2,                                           
-                top_p=0.9,
+                temperature=0.1,  # Ultra-low for fastest responses
+                top_p=0.7,  # Focused sampling for speed
                 presence_penalty=0.1,
                 frequency_penalty=0.1,
                 stream=True,                     
-                timeout=60.0                                           
+                timeout=90.0  # Increased timeout for complex legal analysis
             )
             
                                           
@@ -597,6 +600,10 @@ Note: No specific context was retrieved from the vector database. Proceed with t
                         yield format_sse({'warning': 'Response may not meet all safety standards'})
                 except Exception as e:
                     logger.warning(f"Guardrails output validation error: {e}")
+            
+            # ALWAYS send legal disclaimer before completion
+            disclaimer = get_legal_disclaimer(language)
+            yield format_sse({'type': 'disclaimer', 'disclaimer': disclaimer})
             
                                     
             total_time = time.time() - perf_start

@@ -59,7 +59,7 @@ async def ask_legal_question(
     request: ChatRequest,
     chat_service: ChatHistoryService = Depends(get_chat_history_service),
     current_user: Optional[dict] = Depends(get_optional_current_user),
-    stream: bool = False
+    stream: bool = True
 ):
     """
     User chatbot endpoint with Server-Sent Events (SSE) streaming.
@@ -806,7 +806,8 @@ async def ask_legal_question(
                 model=CHAT_MODEL,
                 messages=messages,
                 max_tokens=request.max_tokens,
-                temperature=0.5,
+                temperature=0.1,  # Ultra-low for fastest, most deterministic responses
+                top_p=0.7,  # Focused sampling for speed
                 stream=True,                     
                 timeout=STREAMING_TIMEOUT_SECONDS
             )
