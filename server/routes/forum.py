@@ -466,6 +466,8 @@ async def create_test_reply(current_user: Dict[str, Any] = Depends(get_current_u
 
 @router.get("/posts/recent", response_model=ListPostsResponse)
 async def list_recent_posts(
+    page: int = 1,
+    limit: int = 15,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """BEST APPROACH: Minimal queries with smart global caching and pagination support."""
@@ -473,7 +475,8 @@ async def list_recent_posts(
         user_id = current_user["user"]["id"]
         
                                                                  
-        cache_key = "global_posts_all"
+        # Page-specific cache key for pagination
+        cache_key = f"global_posts_page_{page}_limit_{limit}"
         current_time = time.time()
         
                                         
@@ -495,8 +498,11 @@ async def list_recent_posts(
             supabase = SupabaseService()
             async with httpx.AsyncClient(timeout=15.0) as client:
                                                                                  
+                # Calculate offset for pagination
+                offset = (page - 1) * limit
+                
                 posts_response = await client.get(
-                    f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&order=created_at.desc&is_flagged=eq.false&limit=100",
+                    f"{supabase.rest_url}/forum_posts?select=*,users(id,username,full_name,role,profile_photo,photo_url,account_status)&order=created_at.desc&is_flagged=eq.false&limit={limit}&offset={offset}",
                     headers=supabase._get_headers(use_service_key=True)
                 )
 

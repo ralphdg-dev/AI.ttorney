@@ -394,8 +394,8 @@ class ApiClient {
     });
   }
 
-  async getRecentForumPosts(): Promise<ApiResponse> {
-    return this.request('/api/forum/posts/recent');
+  async getRecentForumPosts(page: number = 1, limit: number = 15): Promise<ApiResponse> {
+    return this.request(`/api/forum/posts/recent?page=${page}&limit=${limit}`);
   }
 
   async getForumPostById(postId: string): Promise<ApiResponse> {

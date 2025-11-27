@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, FlatList, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Text } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Post from './home/Post';
@@ -27,8 +27,13 @@ interface TimelineProps {
 
 const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
   const router = useRouter();
-  const [posts, setPosts] = useState<PostData[]>([]);
+  const [posts, setPosts] = useState<PostData[]>([]); // All displayed posts
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  
+  const POSTS_PER_PAGE = 15; // Industry standard batch size
 
   const formatTimeAgo = (isoDate?: string): string => {
     if (!isoDate) return '';
@@ -76,27 +81,73 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     };
   };
 
+  // Load first page of posts from API (server-side pagination)
   const loadPosts = useCallback(async () => {
     setRefreshing(true);
     try {
-      const res = await apiClient.getRecentForumPosts();
+      console.log('📡 Loading page 1 from API...');
+      const res = await apiClient.getRecentForumPosts(1, POSTS_PER_PAGE);
       
+      let mappedPosts: PostData[] = [];
       if (res.success && Array.isArray((res.data as any)?.data)) {
         const rows = (res.data as any).data as any[];
-        setPosts(rows.map(mapApiToPost));
+        mappedPosts = rows.map(mapApiToPost);
       } else if (res.success && Array.isArray(res.data)) {
-        setPosts((res.data as any[]).map(mapApiToPost));
-      } else {
-        setPosts([]);
+        mappedPosts = (res.data as any[]).map(mapApiToPost);
       }
+      
+      console.log(`✅ Loaded ${mappedPosts.length} posts from API`);
+      setPosts(mappedPosts);
+      setCurrentPage(1);
+      // If we got less than POSTS_PER_PAGE, there are no more posts
+      setHasMore(mappedPosts.length === POSTS_PER_PAGE);
     } catch (error) {
       console.warn('Failed to load posts:', error);
       setPosts([]);
+      setHasMore(false);
     } finally {
       setRefreshing(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  // Load more posts when scrolling (TRUE server-side pagination)
+  const loadMorePosts = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    
+    setLoadingMore(true);
+    
+    try {
+      const nextPage = currentPage + 1;
+      console.log(`📡 Loading page ${nextPage} from API...`);
+      
+      const res = await apiClient.getRecentForumPosts(nextPage, POSTS_PER_PAGE);
+      
+      let newPosts: PostData[] = [];
+      if (res.success && Array.isArray((res.data as any)?.data)) {
+        const rows = (res.data as any).data as any[];
+        newPosts = rows.map(mapApiToPost);
+      } else if (res.success && Array.isArray(res.data)) {
+        newPosts = (res.data as any[]).map(mapApiToPost);
+      }
+      
+      console.log(`✅ Loaded ${newPosts.length} more posts from API`);
+      
+      if (newPosts.length > 0) {
+        setPosts(prev => [...prev, ...newPosts]);
+        setCurrentPage(nextPage);
+        // If we got less than POSTS_PER_PAGE, there are no more posts
+        setHasMore(newPosts.length === POSTS_PER_PAGE);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.warn('Failed to load more posts:', error);
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [currentPage, hasMore, loadingMore]);
 
   useEffect(() => {
     loadPosts();
@@ -139,33 +190,67 @@ const Timeline: React.FC<TimelineProps> = ({ context = 'user' }) => {
     router.push(route as any);
   };
 
+  // Render footer with loading indicator
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={Colors.primary.blue} />
+        <Text style={styles.loadingText}>Loading more posts...</Text>
+      </View>
+    );
+  };
+  
+  // Render empty state
+  const renderEmpty = () => {
+    if (refreshing) return null;
+    
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyText}>No posts yet</Text>
+      </View>
+    );
+  };
+  
+  // Render individual post item
+  const renderPost = ({ item }: { item: PostData }) => (
+    <Post
+      id={item.id}
+      user={item.user}
+      timestamp={item.timestamp}
+      category={item.category}
+      content={item.content}
+      comments={item.comments}
+      onCommentPress={() => handleCommentPress(item.id)}
+      onReportPress={() => handleReportPress(item.id)}
+      onPostPress={() => handlePostPress(item.id)}
+    />
+  );
+
   return (
     <View style={styles.container}>
-      {/* Timeline */}
-      <ScrollView 
+      {/* Timeline with Infinite Scroll */}
+      <FlatList
+        data={posts}
+        renderItem={renderPost}
+        keyExtractor={(item) => item.id}
         style={styles.timeline}
         contentContainerStyle={styles.timelineContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={loadPosts} />
         }
-      >
-        {posts.map((post) => (
-          <Post
-            key={post.id}
-            id={post.id}
-            user={post.user}
-            timestamp={post.timestamp}
-            category={post.category}
-            content={post.content}
-            comments={post.comments}
-            onCommentPress={() => handleCommentPress(post.id)}
-            onReportPress={() => handleReportPress(post.id)}
-            onPostPress={() => handlePostPress(post.id)}
-          />
-        ))}
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+        onEndReached={loadMorePosts}
+        onEndReachedThreshold={0.5} // Trigger when 50% from bottom (industry standard)
+        ListFooterComponent={renderFooter}
+        ListEmptyComponent={renderEmpty}
+        removeClippedSubviews={true} // Optimize memory usage
+        maxToRenderPerBatch={10} // Render optimization
+        updateCellsBatchingPeriod={50} // Smooth scrolling
+        windowSize={10} // Number of items to keep in memory
+        initialNumToRender={15} // Initial render count
+      />
 
       {/* Floating Create Post Button */}
       <TouchableOpacity style={styles.createPostButton} onPress={handleCreatePost} activeOpacity={0.8}>
@@ -185,9 +270,26 @@ const styles = StyleSheet.create({
   },
   timelineContent: {
     paddingVertical: 10, // Add some vertical padding
+    paddingBottom: 100, // Add bottom padding for floating button
   },
-  bottomSpacer: {
-    height: 100, // Add a spacer at the bottom
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  emptyState: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#9CA3AF',
   },
   createPostButton: {
     position: 'absolute',
