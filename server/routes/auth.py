@@ -274,10 +274,13 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
         else:
             user_name = request.user_name or "User"
         
+        logger.info(f"🔍 DEBUG: Using user_name: '{user_name}' for email: {request.email}")
+        
         if request.otp_type == "email_verification":
             # For email verification, always attempt to send OTP
             logger.info(f"Sending verification OTP to {request.email} with user_name: {user_name}")
             result = await otp_service.send_verification_otp(request.email, user_name)
+            logger.info(f"🔍 DEBUG: Verification OTP result: {result}")
         elif request.otp_type == "password_reset":
             # For password reset, check if user exists first
             supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
@@ -296,19 +299,20 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
             # Use provided name or fall back to database name or default
             user_name = user_check.data[0].get('full_name', user_name)
             result = await otp_service.send_password_reset_otp(request.email, user_name)
+            logger.info(f"🔍 DEBUG: Password reset OTP result: {result}")
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid OTP type"
             )
         
-        logger.info(f"📧 OTP Service Result - Success: {result.get('success')}, Error: {result.get('error')}")
+        logger.info(f"📧 OTP Service Result - Success: {result.get('success', False)}, Error: {result.get('error', 'None')}")
         
-        if not result["success"]:
-            logger.error(f"❌ OTP sending failed: {result['error']}")
+        if not result.get("success", False):
+            logger.error(f"❌ OTP sending failed: {result.get('error', 'Unknown error')}")
             # Return a more user-friendly error message
             error_message = "Failed to send verification code. Please try again."
-            if "SMTP" in result.get('error', ''):
+            if result.get('error', '') and "SMTP" in result.get('error', ''):
                 error_message = "Email service temporarily unavailable. Please try again later."
             
             raise HTTPException(
@@ -317,19 +321,43 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
             )
         
         logger.info(f"✅ OTP sent successfully to {request.email}")
-        return OTPResponse(
-            success=True,
-            message=result["message"],
-            expires_in_minutes=result.get("expires_in_minutes")
-        )
+        
+        # Safely construct the response with defaults if fields are missing
+        try:
+            message = result.get("message", "Verification code sent successfully")
+            expires_in_minutes = result.get("expires_in_minutes", 2)
+            
+            logger.info(f"🔍 DEBUG: Constructing OTPResponse with message: '{message}' and expires_in_minutes: {expires_in_minutes}")
+            
+            response = OTPResponse(
+                success=True,
+                message=message,
+                expires_in_minutes=expires_in_minutes
+            )
+            
+            logger.info(f"🔍 DEBUG: Successfully created OTPResponse: {response}")
+            return response
+            
+        except Exception as response_error:
+            logger.error(f"❌ Error constructing OTP response: {str(response_error)}")
+            logger.error(f"❌ Response construction error type: {type(response_error).__name__}")
+            import traceback
+            logger.error(f"❌ Response construction traceback: {traceback.format_exc()}")
+            
+            # Fallback to a minimal valid response
+            return OTPResponse(
+                success=True,
+                message="Verification code sent successfully",
+                expires_in_minutes=2
+            )
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Send OTP error: {str(e)}")
-        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"❌ Error type: {type(e).__name__}")
         import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
         
         # Return a more user-friendly error message
         error_message = "Failed to process your request. Please try again later."

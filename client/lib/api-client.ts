@@ -68,11 +68,23 @@ class ApiClient {
       let data: any = null;
       let text: string | null = null;
       try {
-        data = await response.json();
-      } catch {
-        try {
-          text = await response.text();
-        } catch {}
+        // First try to get the response as text
+        text = await response.text();
+        
+        // Then try to parse it as JSON if it's not empty
+        if (text && text.trim()) {
+          try {
+            data = JSON.parse(text);
+          } catch (jsonError) {
+            console.log('🔍 DEBUG: Response text:', text);
+            console.log('🔍 DEBUG: JSON parse error:', jsonError);
+            // Keep text as is if JSON parsing fails
+          }
+        } else {
+          console.log('🔍 DEBUG: Response text: null');
+        }
+      } catch (responseError) {
+        console.log('🔍 DEBUG: Error reading response:', responseError);
       }
 
       if (!response.ok) {
@@ -314,10 +326,27 @@ class ApiClient {
     if (data.user_name) {
       payload.user_name = data.user_name;
     }
-    return this.request('/auth/send-otp', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
+    try {
+      console.log('🔗 Base URL:', await this.getBaseUrl());
+      const response = await this.request('/auth/send-otp', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      
+      // If the email was sent but we got an error response, log it but don't fail the request
+      if (response.error) {
+        console.log('🔍 DEBUG: API Error Response', response.error);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('🚨 Send OTP error:', error);
+      // Return a structured error response
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to send OTP'
+      };
+    }
   }
 
   async verifyOTP(data: {
