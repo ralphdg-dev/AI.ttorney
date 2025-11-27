@@ -220,12 +220,16 @@ async def forgot_password(http_request: Request, request: Dict[str, str] = Body(
             "message": "If the email exists, a reset code has been sent."
         }
     except Exception as e:
-        logger.error(f"Forgot password error: {str(e)}")
-                                                    
-        return {
-            "success": True,
-            "message": "If the email exists, a reset code has been sent."
-        }
+        logger.error(f"❌ FORGOT PASSWORD ERROR: {str(e)}")
+        logger.error(f"❌ ERROR TYPE: {type(e).__name__}")
+        import traceback
+        logger.error(f"❌ FULL TRACEBACK:\n{traceback.format_exc()}")
+        
+        # Re-raise to see the actual error in Railway logs
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process password reset: {str(e)}"
+        )
 
 @router.post("/reset-password-old")
 async def reset_password(reset_data: PasswordReset):
