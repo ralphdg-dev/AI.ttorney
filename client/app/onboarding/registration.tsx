@@ -658,8 +658,9 @@ export default function UserRegistration() {
               // Step 2: Send OTP for email verification
               const otpResult = await apiClient.sendOTP({
                 email,
-                otp_type: 'email_verification'
-              } as any);
+                otp_type: 'email_verification',
+                user_name: `${firstName} ${lastName}` // Add user_name parameter
+              });
               
               if (otpResult.error) {
                 toast.show({
