@@ -49,7 +49,7 @@ async def get_favorite_terms(current_user: dict = Depends(get_current_user)):
                     "select": "id,glossary_id,favorited_at,glossary_terms!glossary_id(id,term_en,term_fil,definition_en,definition_fil,category)",
                     "order": "favorited_at.desc"
                 },
-                headers=supabase_service._get_headers()
+                headers=supabase_service._get_headers(use_service_key=True)
             )
             
             if response.status_code != 200:
@@ -102,7 +102,7 @@ async def add_favorite_term(
                     "glossary_id": f"eq.{request.glossary_id}",
                     "select": "id"
                 },
-                headers=supabase_service._get_headers()
+                headers=supabase_service._get_headers(use_service_key=True)
             )
             
             if check_response.status_code == 200:
@@ -118,7 +118,7 @@ async def add_favorite_term(
                     "user_id": user_id,
                     "glossary_id": request.glossary_id
                 },
-                headers={**supabase_service._get_headers(), "Prefer": "return=representation"}
+                headers={**supabase_service._get_headers(use_service_key=True), "Prefer": "return=representation"}
             )
             
             if insert_response.status_code == 201:
@@ -152,7 +152,7 @@ async def remove_favorite_term(term_id: str, current_user: dict = Depends(get_cu
                     "user_id": f"eq.{user_id}",
                     "glossary_id": f"eq.{term_id}"
                 },
-                headers=supabase_service._get_headers()
+                headers=supabase_service._get_headers(use_service_key=True)
             )
             
             if response.status_code == 204:
@@ -189,7 +189,7 @@ async def check_favorite_term(
                     "glossary_id": f"eq.{glossary_id}",
                     "select": "id"
                 },
-                headers=supabase_service._get_headers()
+                headers=supabase_service._get_headers(use_service_key=True)
             )
             
             if response.status_code == 200:
@@ -226,7 +226,7 @@ async def get_bookmarked_guides(current_user: dict = Depends(get_current_user)):
                     "select": "*",
                     "order": "bookmarked_at.desc"
                 },
-                headers=supabase_service._get_headers()
+                headers=supabase_service._get_headers(use_service_key=True)
             )
             
             if response.status_code == 200:
@@ -265,7 +265,7 @@ async def add_bookmarked_guide(
                     "article_id": f"eq.{request.article_id}",
                     "select": "id"
                 },
-                headers=supabase_service._get_headers()
+                headers=supabase_service._get_headers(use_service_key=True)
             )
             
             if check_response.status_code == 200:
@@ -281,7 +281,7 @@ async def add_bookmarked_guide(
                     "user_id": user_id,
                     "article_id": request.article_id
                 },
-                headers={**supabase_service._get_headers(), "Prefer": "return=representation"}
+                headers={**supabase_service._get_headers(use_service_key=True), "Prefer": "return=representation"}
             )
             
             if insert_response.status_code == 201:
@@ -318,7 +318,7 @@ async def remove_bookmarked_guide(
                     "user_id": f"eq.{user_id}",
                     "article_id": f"eq.{article_id}"
                 },
-                headers=supabase_service._get_headers()
+                headers=supabase_service._get_headers(use_service_key=True)
             )
             
             if response.status_code == 204:
@@ -355,7 +355,7 @@ async def check_bookmarked_guide(
                     "article_id": f"eq.{article_id}",
                     "select": "id"
                 },
-                headers=supabase_service._get_headers()
+                headers=supabase_service._get_headers(use_service_key=True)
             )
             
             if response.status_code == 200:
