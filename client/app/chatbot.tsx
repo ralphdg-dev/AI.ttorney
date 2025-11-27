@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -382,6 +383,24 @@ export default function ChatbotScreen() {
     setShowTutorial(false);
     // Tutorial is complete, user stays on chatbot
   };
+  
+  // Show tutorial when guest user first enters chatbot page
+  const hasShownTutorialRef = useRef(false);
+  
+  useFocusEffect(
+    useCallback(() => {
+      // Only show tutorial once for guest users when they first enter the page
+      if (isGuestMode && !hasShownTutorialRef.current) {
+        // Small delay to ensure page is fully rendered before showing tutorial
+        const timer = setTimeout(() => {
+          setShowTutorial(true);
+          hasShownTutorialRef.current = true;
+        }, 500);
+        
+        return () => clearTimeout(timer);
+      }
+    }, [isGuestMode, setShowTutorial])
+  );
   
   // KeyboardAvoidingView handles keyboard events automatically - no manual listeners needed
   

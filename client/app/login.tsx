@@ -15,13 +15,13 @@ export default function Login() {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { signIn, isAuthenticated } = useAuth();
-  const { startGuestSession, isStartingSession, setShowTutorial } = useGuest();
+  const { startGuestSession, isStartingSession } = useGuest();
 
   // Debug wrapper for guest session start
   const handleContinueAsGuest = async () => {
     try {
       await startGuestSession();
-      setShowTutorial(true);
+      // Don't set tutorial here - let chatbot page handle it after navigation
       router.push('/chatbot');
     } catch (error) {
       console.error('Failed to start guest session:', error);
