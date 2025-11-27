@@ -39,7 +39,7 @@ export interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isGuestMode: boolean;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string; data?: any }>;
   signOut: () => Promise<void>;
   setUser: (user: User | null) => void;
   refreshUserData: () => Promise<User | null>;
@@ -350,9 +350,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.warn('Router not ready during lawyer redirect:', routerError);
           }
         } else {
-          // For pending/rejected lawyers or regular users, use normal role-based redirect
-          const redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
-          console.log(`🚀 Navigating to: ${redirectPath} (role: ${profile.role})`);
+          // For unverified users (guest role + is_verified=false), redirect to OTP verification
+          // For others, use normal role-based redirect
+          let redirectPath: string;
+          if (profile.role === 'guest' && !profile.is_verified) {
+            // Pass email as parameter for OTP verification
+            const email = profile.email || '';
+            redirectPath = `/onboarding/verify-otp?email=${encodeURIComponent(email)}`;
+            console.log(`🚀 Navigating to: ${redirectPath} (unverified user - needs OTP verification)`);
+          } else {
+            redirectPath = getRoleBasedRedirect(profile.role, profile.is_verified, false);
+            console.log(`🚀 Navigating to: ${redirectPath} (role: ${profile.role}, verified: ${profile.is_verified})`);
+          }
+          
           setIsLoading(false);
           clearTimeout(timeoutId);
           try {
@@ -476,8 +486,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: errorMessage };
       }
 
-      if (data.session) {
-        return { success: true };
+      if (data.session && data.user) {
+        // Fetch profile to check verification status
+        try {
+          const { data: profileData } = await supabase
+            .from('users')
+            .select('is_verified, role, full_name, email')
+            .eq('id', data.user.id)
+            .single();
+          
+          const requiresVerification = profileData?.role === 'guest' && !profileData?.is_verified;
+          let otpSent = false;
+          
+          // Send OTP for unverified users
+          if (requiresVerification && profileData?.email) {
+            try {
+              const API_URL = await NetworkConfig.getBestApiUrl();
+              const otpResponse = await fetch(`${API_URL}/auth/send-otp`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  email: profileData.email,
+                  otp_type: 'email_verification',
+                  user_name: profileData.full_name || 'User'
+                }),
+              });
+              
+              if (otpResponse.ok) {
+                otpSent = true;
+                console.log('✅ Verification OTP sent to unverified user');
+              } else {
+                console.warn('⚠️ Failed to send verification OTP');
+              }
+            } catch (otpError) {
+              console.warn('⚠️ Error sending verification OTP:', otpError);
+            }
+          }
+          
+          // Return success with verification status
+          return { 
+            success: true, 
+            data: {
+              requires_verification: requiresVerification,
+              otp_sent: otpSent,
+              is_verified: profileData?.is_verified || false
+            }
+          };
+        } catch (profileError) {
+          console.warn('Could not fetch profile during sign-in:', profileError);
+          return { success: true };
+        }
       }
 
       setIsLoading(false);

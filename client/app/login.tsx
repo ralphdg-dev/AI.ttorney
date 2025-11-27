@@ -104,21 +104,38 @@ export default function Login() {
       const result = await signIn(email.toLowerCase().trim(), password);
 
       if (result.success) {
-        toast.show({
-          placement: "top",
-          render: createSafeAreaToastRenderer(
-            'top',
-            'success',
-            'solid',
-            'Welcome back!',
-            'Redirecting...'
-          ),
-        });
+        // Check if user needs email verification
+        const requiresVerification = result.data?.requires_verification || false;
+        const otpSent = result.data?.otp_sent || false;
         
-        // Explicit navigation as fallback to ensure routing works
-        setTimeout(() => {
-          router.replace('/home');
-        }, 2500);
+        if (requiresVerification && otpSent) {
+          // Show message for unverified users
+          toast.show({
+            placement: "top",
+            render: createSafeAreaToastRenderer(
+              'top',
+              'info',
+              'solid',
+              'Verification Required',
+              'We sent a verification code to your email. Redirecting to verification...'
+            ),
+          });
+        } else {
+          // Regular login success
+          toast.show({
+            placement: "top",
+            render: createSafeAreaToastRenderer(
+              'top',
+              'success',
+              'solid',
+              'Welcome back!',
+              'Redirecting...'
+            ),
+          });
+        }
+        
+        // AuthContext will handle the redirect based on verification status
+        // No need for explicit navigation here
       } else {
         // Show error toast (debounced for Access denied)
         const now = Date.now();

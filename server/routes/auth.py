@@ -54,33 +54,16 @@ async def sign_in(request: Request, credentials: UserSignIn):
     result = await auth_service.sign_in(credentials)
     
     if not result["success"]:
-                                        
-        if result.get("error") == "account_not_verified":
-                                                         
-            if result.get("requires_verification") and result.get("email"):
-                                                       
-                supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
-                user_check = supabase.table('users').select('full_name').eq('email', result["email"]).execute()
-                user_name = user_check.data[0].get('full_name', 'User') if user_check.data else 'User'
-                logger.info(f" Email verification OTP for email: {result['email']}, fetched user_name: '{user_name}'")
-                
-                otp_result = await otp_service.send_verification_otp(result["email"], user_name)
-                return {
-                    "success": False,
-                    "error": "account_not_verified",
-                    "message": result["message"],
-                    "requires_verification": True,
-                    "email": result["email"],
-                    "otp_sent": otp_result["success"],
-                    "otp_message": otp_result.get("message", "OTP sent to your email")
-                }
-            
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=result["error"]
         )
     
-    return {
+    # If user is not verified, automatically send OTP for verification
+    profile = result.get("profile", {})
+    is_verified = profile.get("is_verified", False)
+    
+    response_data = {
         "success": True,
         "message": "Sign in successful",
         "user": result["user"],
@@ -89,6 +72,27 @@ async def sign_in(request: Request, credentials: UserSignIn):
         "profile": result["profile"],
         "redirect_path": result.get("redirect_path", "/home")
     }
+    
+    # Send OTP to unverified users automatically
+    if not is_verified:
+        try:
+            supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+            user_check = supabase.table('users').select('full_name').eq('email', credentials.email).execute()
+            user_name = user_check.data[0].get('full_name', 'User') if user_check.data else 'User'
+            logger.info(f"📧 Sending verification OTP for unverified user: {credentials.email}")
+            
+            otp_result = await otp_service.send_verification_otp(credentials.email, user_name)
+            response_data["otp_sent"] = otp_result["success"]
+            response_data["requires_verification"] = True
+            if otp_result["success"]:
+                logger.info(f"✅ Verification OTP sent to {credentials.email}")
+            else:
+                logger.error(f"❌ Failed to send OTP: {otp_result.get('error', 'Unknown error')}")
+        except Exception as otp_error:
+            logger.error(f"❌ Error sending verification OTP: {str(otp_error)}")
+            response_data["otp_sent"] = False
+    
+    return response_data
 
 @router.post("/signout")
 async def sign_out(request: Request):

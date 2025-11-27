@@ -176,35 +176,25 @@ class AuthService:
             
             profile = profile_response["data"]
             
-                                                     
+            # Get role and verification status from profile
             user_role = profile.get("role", "guest")
             is_verified = profile.get("is_verified", False)
             
-                           
-            logger.info(f" Login attempt - Role: {user_role}, Verified: {is_verified}, Email: {credentials.email}")
-            logger.info(f" Full profile data: {profile}")
+            # Debug logging
+            logger.info(f"🔐 Login attempt - Role: {user_role}, Verified: {is_verified}, Email: {credentials.email}")
+            logger.info(f"📋 Full profile data: {profile}")
             
-                                                                                        
+            # Role-based redirect path determination
+            # If user is not verified (guest role + is_verified=False), redirect to OTP verification
             if user_role == "guest" and not is_verified:
-                return {
-                    "success": False,
-                    "error": "account_not_verified",
-                    "message": "Your account is not verified. Please check your email for the verification code.",
-                    "requires_verification": True,
-                    "email": credentials.email
-                }
-            
-                                                              
-            if user_role == "guest" and is_verified:
+                redirect_path = "/onboarding/verify-otp"
+            elif user_role == "guest" and is_verified:
                 redirect_path = "/role-selection"
-                                                                    
             elif user_role == "registered_user":
                 redirect_path = "/home"
-                                                                                                    
             elif user_role == "verified_lawyer":
                 redirect_path = "/lawyer"
             else:
-                                                                    
                 redirect_path = self._get_redirect_path_for_role(user_role)
             
             logger.info(f"Redirect path determined: {redirect_path}")
