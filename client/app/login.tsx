@@ -114,6 +114,11 @@ export default function Login() {
             'Redirecting...'
           ),
         });
+        
+        // Explicit navigation as fallback to ensure routing works
+        setTimeout(() => {
+          router.replace('/home');
+        }, 2500);
       } else {
         // Show error toast (debounced for Access denied)
         const now = Date.now();

@@ -733,7 +733,13 @@ export default function EditProfileScreen() {
 
       const responseData = await response.json();
       
+      // Debug logging to identify the issue
+      console.log('🔍 Profile update response:', responseData);
+      console.log('🔍 Response success field:', responseData.success);
+      console.log('🔍 Response status:', response.status);
+      
       if (!responseData.success) {
+        console.log('❌ Profile update failed - responseData.success is false');
         throw new Error(responseData.detail || 'Failed to update profile');
       }
 

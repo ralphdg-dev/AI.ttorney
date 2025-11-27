@@ -265,15 +265,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (profile && shouldNavigate) {
         const currentRoute = getCurrentRoute();
         
-        // Skip redirects if user is already on a valid page (chatbot, guides, etc.)
-        const validPages = ['/chatbot', '/guides', '/glossary', '/article', '/help', '/about', '/settings'];
+        // Skip redirects if user is already on a valid page (chatbot, guides, etc.) or in onboarding flow
+        const validPages = ['/chatbot', '/guides', '/glossary', '/article', '/help', '/about', '/settings', '/onboarding'];
         const isValidPage = validPages.some(page => currentRoute.includes(page));
         
-        if (isValidPage && currentRoute !== '/login' && currentRoute !== '/') {
-          console.log('🔐 User is on a valid page, skipping redirect:', currentRoute);
+        // Only skip redirects for token refreshes (shouldNavigate=false) or when already on valid pages
+        if (isValidPage && currentRoute !== '/login' && currentRoute !== '/' && !shouldNavigate) {
+          console.log('🔐 User is on a valid page and this is a token refresh, skipping redirect:', currentRoute);
+          console.log('   shouldNavigate:', shouldNavigate);
+          console.log('   isValidPage:', isValidPage);
           setIsLoading(false);
           clearTimeout(timeoutId);
           return;
+        }
+        
+        // Log routing decisions for debugging
+        if (shouldNavigate) {
+          console.log('🚀 AuthContext routing decision - shouldNavigate:', shouldNavigate);
+          console.log('   Current route:', currentRoute);
+          console.log('   User role:', profile?.role);
+          console.log('   Is verified:', profile?.is_verified);
         }
         
         // ALWAYS check if user is deactivated - this takes priority over everything
