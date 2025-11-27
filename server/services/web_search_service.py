@@ -19,8 +19,8 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")                           
 
                
-WEB_SEARCH_CONFIDENCE_THRESHOLD = 0.1  # Very low threshold to prioritize web search (90% web, 10% local)
-MAX_WEB_RESULTS = 8  # Increased to get more comprehensive web results
+WEB_SEARCH_CONFIDENCE_THRESHOLD = 0.8                                            
+MAX_WEB_RESULTS = 5                                  
 CACHE_TTL_SECONDS = 3600                            
 MAX_SNIPPET_LENGTH = 300
 
@@ -262,29 +262,24 @@ class WebSearchService:
         """
         Determine if web search should be triggered based on Qdrant results
         
-        Strategy: Prioritize web search (90%) over local database (10%)
-        Web search triggers almost always to get the most recent and comprehensive information
-        
         Args:
             qdrant_score: Highest relevance score from Qdrant
             num_results: Number of results returned by Qdrant
         
         Returns:
-            bool: True if web search should be triggered (almost always)
+            bool: True if web search should be triggered
         """
-        # Always trigger web search for no results
+                                
+                                       
+                                               
         if num_results == 0:
             logger.info(" Triggering web search: No Qdrant results")
             return True
         
-        # Trigger web search for low confidence (threshold is very low at 0.1)
-        # This means web search triggers for ~90% of queries
         if qdrant_score < WEB_SEARCH_CONFIDENCE_THRESHOLD:
-            logger.info(f" Triggering web search: Prioritizing web results (score: {qdrant_score:.3f} < {WEB_SEARCH_CONFIDENCE_THRESHOLD})")
+            logger.info(f" Triggering web search: Low confidence score ({qdrant_score:.3f} < {WEB_SEARCH_CONFIDENCE_THRESHOLD})")
             return True
         
-        # Only skip web search if Qdrant has very high confidence (>0.9)
-        logger.info(f" Using Qdrant only: High confidence score ({qdrant_score:.3f})")
         return False
     
     def search(self, query: str, num_results: int = MAX_WEB_RESULTS) -> List[Dict]:

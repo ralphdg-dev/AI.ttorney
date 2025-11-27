@@ -214,19 +214,12 @@ def retrieve_relevant_context_with_web_search(
                                                                      
     if qdrant_context_parts and web_context_parts:
         combined_context = (
-            "=== PRIMARY SOURCES: WEB SEARCH (90% Priority - Most Recent & Authoritative) ===\n\n" +
+            "=== PRIMARY SOURCES: WEB SEARCH (Most Recent & Comprehensive) ===\n\n" +
             "\n\n".join(web_context_parts) +
-            "\n\n=== SUPPLEMENTARY SOURCES: LOCAL DATABASE (10% Priority - Additional Reference) ===\n\n" +
+            "\n\n=== SUPPLEMENTARY SOURCES: LEGAL DATABASE (Additional Context) ===\n\n" +
             "\n\n".join(qdrant_context_parts)
         )
-    elif web_context_parts:
-        # Web-only results
-        combined_context = (
-            "=== WEB SEARCH RESULTS (Authoritative & Up-to-Date) ===\n\n" +
-            "\n\n".join(web_context_parts)
-        )
     else:
-        # Qdrant-only results (fallback)
         combined_context = "\n\n".join(all_context_parts)
     
     logger.info(
