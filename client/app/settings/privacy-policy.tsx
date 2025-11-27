@@ -10,8 +10,6 @@ import { Text as GSText } from '@/components/ui/text';
 import Colors from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { safeGoBack } from '@/utils/navigationHelper';
-import Navbar from "@/components/Navbar";
-import { GuestNavbar } from "@/components/guest";
 
 // Reusable BulletPoint component
 const BulletPoint: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -315,11 +313,6 @@ export default function PrivacyPolicyScreen() {
           </VStack>
         </VStack>
       </ScrollView>
-      {isGuestMode ? (
-        <GuestNavbar activeTab="learn" />
-      ) : (
-        <Navbar activeTab="profile" />
-      )}
     </Box>
     </SafeAreaView>
   );

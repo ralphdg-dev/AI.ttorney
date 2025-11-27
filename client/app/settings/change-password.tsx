@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, Alert, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, Alert, StatusBar, ScrollView, ActivityIndicator, Text as RNText } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from "tailwind-react-native-classnames";
 import { useRouter, usePathname } from "expo-router";
@@ -8,10 +8,9 @@ import { VStack } from "@/components/ui/vstack";
 import { HStack } from "@/components/ui/hstack";
 import { Text as GSText } from "@/components/ui/text";
 import { Input, InputField } from "@/components/ui/input";
-import { AlertCircle, Eye, EyeOff, Lock } from "lucide-react-native";
+import { AlertCircle, Eye, EyeOff, Lock, ArrowLeft } from "lucide-react-native";
 import { useToast } from "@/components/ui/toast";
 import { createSafeAreaToastRenderer } from "@/components/ui/SafeAreaToast";
-import Header from "@/components/Header";
 import Colors from "@/constants/Colors";
 import { supabase } from "@/config/supabase";
 import { createShadowStyle } from "@/utils/shadowUtils";
@@ -168,18 +167,22 @@ export default function ChangePasswordScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       
-      {/* Header with back button */}
-      <Header 
-        title="Change Password" 
-        showBackButton={true}
-        showMenu={false}
-        onBackPress={() => safeGoBack(router, {
-          isGuestMode: false,
-          isAuthenticated,
-          userRole: user?.role,
-          currentPath: pathname,
-        })}
-      />
+      {/* Simple back button instead of full header */}
+      <View style={[tw`flex-row items-center px-4 py-3`, { backgroundColor: Colors.background.primary }]}>
+        <TouchableOpacity
+          onPress={() => safeGoBack(router, {
+            isGuestMode: false,
+            isAuthenticated,
+            userRole: user?.role,
+            currentPath: pathname,
+          })}
+          style={tw`p-2 rounded-full`}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <ArrowLeft size={24} color={Colors.primary.blue} />
+        </TouchableOpacity>
+        <RNText style={[tw`text-lg font-semibold ml-2`, { color: Colors.text.primary }]}>Change Password</RNText>
+      </View>
 
       <ScrollView
         style={tw`flex-1`}

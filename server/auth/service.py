@@ -292,49 +292,82 @@ class AuthService:
     async def mark_user_verified(self, email: str) -> Dict[str, Any]:
         """Mark user as verified and confirm email in Supabase Auth"""
         try:
-            logger.info(f" Marking user as verified: {email}")
+            logger.info(f"🔍 Marking user as verified: {email}")
             
-                                                        
+            # Step 1: Get user profile to check current verification status
             profile_response = await self.supabase.get_user_profile_by_email(email)
             if not profile_response["success"] or not profile_response["data"]:
+                logger.error(f"❌ User profile not found for email: {email}")
                 return {"success": False, "error": "User profile not found"}
             
             current_profile = profile_response["data"]
             user_id = current_profile.get("id")
-            logger.info(f" Current profile before update: role={current_profile.get('role')}, is_verified={current_profile.get('is_verified')}")
             
-                                                             
+            # Check if user is already verified
+            if current_profile.get("is_verified"):
+                logger.info(f"✅ User already verified: {email}")
+                return {"success": True, "message": "User already verified"}
+                
+            logger.info(f"📊 Current profile before update: role={current_profile.get('role')}, is_verified={current_profile.get('is_verified')}")
+            
+            # Step 2: Update user profile in database
             profile_update_response = await self.supabase.update_user_profile(
                 {
-                    "is_verified": True
-                                                                
+                    "is_verified": True,
+                    # Set role to registered_user if it's currently guest
+                    "role": "registered_user" if current_profile.get("role") == "guest" else current_profile.get("role")
                 },
                 {"email": email}
             )
             
             if not profile_update_response["success"]:
+                logger.error(f"❌ Failed to update user profile: {profile_update_response['error']}")
                 return profile_update_response
             
-                                                                                         
+            # Step 3: Confirm email in Supabase Auth
             if user_id:
-                auth_confirm_response = await self.supabase.confirm_user_email(user_id)
-                if not auth_confirm_response["success"]:
-                    logger.warning(f"Failed to confirm email in Supabase Auth: {auth_confirm_response['error']}")
-                                                                              
-                else:
-                    logger.info(f" Email confirmed in Supabase Auth for user: {user_id}")
+                try:
+                    auth_confirm_response = await self.supabase.confirm_user_email(user_id)
+                    if not auth_confirm_response["success"]:
+                        logger.warning(f"⚠️ Failed to confirm email in Supabase Auth: {auth_confirm_response['error']}")
+                        # Continue anyway - the profile update is more important
+                    else:
+                        logger.info(f"✅ Email confirmed in Supabase Auth for user: {user_id}")
+                except Exception as confirm_error:
+                    logger.warning(f"⚠️ Error confirming email in Supabase Auth: {str(confirm_error)}")
+                    # Continue anyway - the profile update is more important
             
-            logger.info(f" Profile update response: {profile_update_response}")
+            logger.info(f"📊 Profile update response: {profile_update_response}")
             
-                                      
-            verify_response = await self.supabase.get_user_profile_by_email(email)
-            if verify_response["success"] and verify_response["data"]:
-                updated_profile = verify_response["data"]
-                logger.info(f" Profile after update: role={updated_profile.get('role')}, is_verified={updated_profile.get('is_verified')}")
+            # Step 4: Verify the update was successful
+            try:
+                verify_response = await self.supabase.get_user_profile_by_email(email)
+                if verify_response["success"] and verify_response["data"]:
+                    updated_profile = verify_response["data"]
+                    logger.info(f"📊 Profile after update: role={updated_profile.get('role')}, is_verified={updated_profile.get('is_verified')}")
+                    
+                    # Double-check verification status
+                    if not updated_profile.get("is_verified"):
+                        logger.warning(f"⚠️ Verification flag not set after update for user: {email}")
+                        # Try one more time with direct SQL update
+                        try:
+                            direct_update = await self.supabase.execute_sql(
+                                "UPDATE users SET is_verified = true WHERE email = :email",
+                                {"email": email}
+                            )
+                            logger.info(f"🔧 Direct SQL update attempted: {direct_update}")
+                        except Exception as sql_error:
+                            logger.error(f"❌ Direct SQL update failed: {str(sql_error)}")
+            except Exception as verify_error:
+                logger.warning(f"⚠️ Error verifying profile update: {str(verify_error)}")
             
-            return profile_update_response
+            logger.info(f"✅ User verification process completed for: {email}")
+            return {"success": True, "message": "User verified successfully"}
         except Exception as e:
-            logger.error(f"Mark user verified error: {str(e)}")
+            logger.error(f"❌ Mark user verified error: {str(e)}")
+            logger.error(f"❌ Error type: {type(e).__name__}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
             return {"success": False, "error": str(e)}
     
     async def update_user_role(self, email: str, role_selection: str) -> Dict[str, Any]:
