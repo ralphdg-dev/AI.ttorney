@@ -259,16 +259,17 @@ async def verify_token(current_user: Dict[str, Any] = Depends(get_current_user))
     }
 
                
-@router.post("/send-otp", response_model=OTPResponse)
+@router.post("/send-otp")
 @rate_limit_auth("10/minute")  # Increased for mobile network variability
 async def send_otp(http_request: Request, request: SendOTPRequest):
     """Send OTP for email verification or password reset"""
     try:
         logger.info(f"📧 OTP Request - Type: {request.otp_type}, Email: {request.email}")
+        logger.info(f"📧 OTP Request user_name: '{request.user_name}'")
         
         # Validate user_name parameter for email verification
         if request.otp_type == "email_verification" and not request.user_name:
-            logger.warning(f"Missing user_name for email verification OTP: {request.email}")
+            logger.warning(f"⚠️ Missing user_name for email verification OTP: {request.email}")
             # Use a default name rather than failing
             user_name = "User"
         else:
@@ -278,9 +279,9 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
         
         if request.otp_type == "email_verification":
             # For email verification, always attempt to send OTP
-            logger.info(f"Sending verification OTP to {request.email} with user_name: {user_name}")
+            logger.info(f"📤 Sending verification OTP to {request.email} with user_name: {user_name}")
             result = await otp_service.send_verification_otp(request.email, user_name)
-            logger.info(f"🔍 DEBUG: Verification OTP result: {result}")
+            logger.info(f"✅ Verification OTP result: {result}")
         elif request.otp_type == "password_reset":
             # For password reset, check if user exists first
             supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
@@ -306,7 +307,8 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
                 detail="Invalid OTP type"
             )
         
-        logger.info(f"📧 OTP Service Result - Success: {result.get('success', False)}, Error: {result.get('error', 'None')}")
+        logger.info(f"� OTP Service Result - Success: {result.get('success', False)}, Message: {result.get('message', 'N/A')}, Error: {result.get('error', 'None')}")
+        logger.info(f"📊 Result type: {type(result)}, Keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
         
         if not result.get("success", False):
             logger.error(f"❌ OTP sending failed: {result.get('error', 'Unknown error')}")
@@ -327,44 +329,53 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
             message = result.get("message", "Verification code sent successfully")
             expires_in_minutes = result.get("expires_in_minutes", 2)
             
-            logger.info(f"🔍 DEBUG: Constructing OTPResponse with message: '{message}' and expires_in_minutes: {expires_in_minutes}")
+            # Ensure expires_in_minutes is an integer
+            if expires_in_minutes is not None:
+                expires_in_minutes = int(expires_in_minutes)
             
-            response = OTPResponse(
-                success=True,
-                message=message,
-                expires_in_minutes=expires_in_minutes
-            )
+            logger.info(f"� Constructing response - message: '{message}', expires_in_minutes: {expires_in_minutes} (type: {type(expires_in_minutes)})")
             
-            logger.info(f"🔍 DEBUG: Successfully created OTPResponse: {response}")
-            return response
+            # Return as dict to avoid Pydantic serialization issues
+            response_dict = {
+                "success": True,
+                "message": str(message),
+                "expires_in_minutes": expires_in_minutes
+            }
+            
+            logger.info(f"✅ Response constructed successfully: {response_dict}")
+            return response_dict
             
         except Exception as response_error:
             logger.error(f"❌ Error constructing OTP response: {str(response_error)}")
             logger.error(f"❌ Response construction error type: {type(response_error).__name__}")
             import traceback
             logger.error(f"❌ Response construction traceback: {traceback.format_exc()}")
+            logger.error(f"❌ Result that caused error: {result}")
             
-            # Fallback to a minimal valid response
-            return OTPResponse(
-                success=True,
-                message="Verification code sent successfully",
-                expires_in_minutes=2
-            )
+            # Fallback to a minimal valid response as dict
+            return {
+                "success": True,
+                "message": "Verification code sent successfully",
+                "expires_in_minutes": 2
+            }
         
-    except HTTPException:
+    except HTTPException as http_exc:
+        logger.error(f"🔴 HTTPException in send_otp: {http_exc.detail}")
         raise
     except Exception as e:
-        logger.error(f"❌ Send OTP error: {str(e)}")
+        logger.error(f"❌❌❌ CRITICAL: Unexpected error in send_otp")
+        logger.error(f"❌ Error message: {str(e)}")
         logger.error(f"❌ Error type: {type(e).__name__}")
         import traceback
-        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        logger.error(f"❌ Full traceback:\n{traceback.format_exc()}")
+        logger.error(f"❌ Request details - Email: {request.email}, Type: {request.otp_type}, User: {request.user_name}")
         
-        # Return a more user-friendly error message
-        error_message = "Failed to process your request. Please try again later."
+        # Return detailed error for debugging
+        error_detail = f"Failed to process OTP request: {type(e).__name__}: {str(e)}"
         
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=error_message
+            detail=error_detail
         )
 
 
