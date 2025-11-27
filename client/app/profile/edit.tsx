@@ -298,6 +298,8 @@ export default function EditProfileScreen() {
 
       if (uploadError) {
         console.error('Supabase upload error:', uploadError);
+        console.error('Full error details:', JSON.stringify(uploadError, null, 2));
+        Alert.alert('Upload Error', `Failed to upload: ${uploadError.message}`);
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
@@ -595,26 +597,58 @@ export default function EditProfileScreen() {
     } catch (error: any) {
       console.error("Verify OTP error:", error);
       setOtpError(error.message || "Invalid OTP code");
-    } finally {
-      setOtpLoading(false);
     }
   };
 
-  const validateForm = () => {
+  const validateForm = (): boolean => {
     if (!editFormData.full_name.trim()) {
-      Alert.alert("Error", "Full name is required");
+      Alert.alert('Error', 'Full name is required');
+      return false;
+    }
+
+    if (!editFormData.username.trim()) {
+      Alert.alert('Error', 'Username is required');
+      return false;
+    }
+
+    if (editFormData.username.length < 3) {
+      Alert.alert('Error', 'Username must be at least 3 characters long');
+      return false;
+    }
+
+    // Backend regex validation: ^[a-zA-Z0-9_]+$
+    const usernameRegex = /^[a-zA-Z0-9_]+$/;
+    if (!usernameRegex.test(editFormData.username)) {
+      Alert.alert('Error', 'Username can only contain letters, numbers, and underscores');
       return false;
     }
 
     if (!editFormData.email.trim()) {
-      Alert.alert("Error", "Email is required");
+      Alert.alert('Error', 'Email is required');
       return false;
     }
 
+    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(editFormData.email)) {
-      Alert.alert("Error", "Please enter a valid email address");
+      Alert.alert('Error', 'Please enter a valid email address');
       return false;
+    }
+
+    if (editFormData.birthdate) {
+      // Validate ISO date format (YYYY-MM-DD)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(editFormData.birthdate)) {
+        Alert.alert('Error', 'Birthdate must be in YYYY-MM-DD format');
+        return false;
+      }
+      
+      // Check if it's a valid date
+      const date = new Date(editFormData.birthdate);
+      if (isNaN(date.getTime())) {
+        Alert.alert('Error', 'Please enter a valid birthdate');
+        return false;
+      }
     }
 
     return true;
@@ -697,12 +731,11 @@ export default function EditProfileScreen() {
         body: updatedData
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to update profile');
+      const responseData = await response.json();
+      
+      if (!responseData.success) {
+        throw new Error(responseData.detail || 'Failed to update profile');
       }
-
-      await response.json();
 
       // Refresh the user profile to get updated data
       if (refreshUserData) {
@@ -724,9 +757,6 @@ export default function EditProfileScreen() {
       setEmailVerified(false);
       setNewEmail("");
 
-      // Refresh context in background
-      await refreshUserData();
-
       setTimeout(() => {
         safeGoBack(router, {
           isGuestMode: false,
@@ -747,7 +777,7 @@ export default function EditProfileScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[tw`flex-1 justify-center items-center`, { backgroundColor: Colors.background.primary }]}>
+      <SafeAreaView style={[tw`items-center justify-center flex-1`, { backgroundColor: Colors.background.primary }]}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
         <ActivityIndicator size="large" color={Colors.primary.blue} />
         <Text style={[tw`mt-4 text-base`, { color: Colors.text.secondary }]}>Loading profile...</Text>
@@ -760,7 +790,7 @@ export default function EditProfileScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       {/* Back Button Header */}
-      <View style={[tw`bg-white p-4 flex-row items-center justify-between`, { borderBottomColor: Colors.border.light, borderBottomWidth: 1 }]}>
+      <View style={[tw`flex-row items-center justify-between p-4 bg-white`, { borderBottomColor: Colors.border.light, borderBottomWidth: 1 }]}>
         <TouchableOpacity
           style={[tw`p-2 rounded-lg`, { backgroundColor: Colors.background.tertiary }]}
           onPress={handleCancel}
@@ -770,7 +800,7 @@ export default function EditProfileScreen() {
         
         <TouchableOpacity
           style={[
-            tw`px-6 py-3 rounded-lg flex-row items-center`,
+            tw`flex-row items-center px-6 py-3 rounded-lg`,
             { 
               backgroundColor: canSave() && !isSaving ? Colors.primary.blue : '#D1D5DB',
               opacity: canSave() && !isSaving ? 1 : 0.6
@@ -784,7 +814,7 @@ export default function EditProfileScreen() {
           ) : (
             <>
               <Save size={16} color={canSave() ? "white" : "#6B7280"} />
-              <Text style={[tw`font-semibold text-sm ml-2`, { color: canSave() ? Colors.text.white : '#6B7280' }]}>Save</Text>
+              <Text style={[tw`ml-2 text-sm font-semibold`, { color: canSave() ? Colors.text.white : '#6B7280' }]}>Save</Text>
             </>
           )}
         </TouchableOpacity>
@@ -796,9 +826,9 @@ export default function EditProfileScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 56 + (insets.bottom || 0) + 20 }}
       >
         {/* Profile Photo Section */}
-        <View style={[tw`bg-white mx-4 mt-4 p-6 rounded-lg`, cardStyle]}>
+        <View style={[tw`p-6 mx-4 mt-4 bg-white rounded-lg`, cardStyle]}>
           <View style={tw`flex-row items-center mb-4`}>
-            <View style={[tw`w-8 h-8 rounded-lg flex items-center justify-center mr-3`, sectionHeaderStyle]}>
+            <View style={[tw`flex items-center justify-center w-8 h-8 mr-3 rounded-lg`, sectionHeaderStyle]}>
               <User size={18} color={Colors.text.secondary} />
             </View>
             <Text style={[tw`text-lg font-bold`, { color: Colors.text.primary }]}>Profile Photo</Text>
@@ -808,7 +838,7 @@ export default function EditProfileScreen() {
             <View style={tw`relative`}>
               {(selectedImageUri || editFormData.profile_photo || profileData.profile_photo) ? (
                 <View style={[
-                  tw`w-24 h-24 rounded-full mb-3 overflow-hidden`,
+                  tw`w-24 h-24 mb-3 overflow-hidden rounded-full`,
                   { backgroundColor: Colors.background.tertiary }
                 ]}>
                   <Image
@@ -835,7 +865,7 @@ export default function EditProfileScreen() {
               )}
               {isUploadingPhoto && (
                 <View style={[
-                  tw`absolute inset-0 rounded-full flex items-center justify-center`,
+                  tw`absolute inset-0 flex items-center justify-center rounded-full`,
                   { backgroundColor: 'rgba(0,0,0,0.5)' }
                 ]}>
                   <ActivityIndicator size="large" color="white" />
@@ -843,10 +873,10 @@ export default function EditProfileScreen() {
               )}
             </View>
             
-            <View style={tw`flex-row items-center justify-center mt-4 px-4`}>
+            <View style={tw`flex-row items-center justify-center px-4 mt-4`}>
               <TouchableOpacity
                 style={[
-                  tw`flex-row items-center justify-center px-4 py-3 rounded-lg mr-2`,
+                  tw`flex-row items-center justify-center px-4 py-3 mr-2 rounded-lg`,
                   { 
                     backgroundColor: Colors.primary.blue,
                     flex: 1,
@@ -857,7 +887,7 @@ export default function EditProfileScreen() {
                 disabled={isUploadingPhoto}
               >
                 <Camera size={16} color="white" />
-                <Text style={[tw`text-sm font-medium ml-2`, { color: Colors.text.white }]}>
+                <Text style={[tw`ml-2 text-sm font-medium`, { color: Colors.text.white }]}>
                   Change
                 </Text>
               </TouchableOpacity>
@@ -865,7 +895,7 @@ export default function EditProfileScreen() {
               {(selectedImageUri || editFormData.profile_photo) && (
                 <TouchableOpacity
                   style={[
-                    tw`flex-row items-center justify-center px-4 py-3 rounded-lg ml-2`,
+                    tw`flex-row items-center justify-center px-4 py-3 ml-2 rounded-lg`,
                     { 
                       backgroundColor: Colors.status.error,
                       flex: 1,
@@ -876,7 +906,7 @@ export default function EditProfileScreen() {
                   disabled={isUploadingPhoto}
                 >
                   <X size={16} color="white" />
-                  <Text style={[tw`text-sm font-medium ml-2`, { color: Colors.text.white }]}>
+                  <Text style={[tw`ml-2 text-sm font-medium`, { color: Colors.text.white }]}>
                     Remove
                   </Text>
                 </TouchableOpacity>
@@ -886,18 +916,18 @@ export default function EditProfileScreen() {
         </View>
 
         {/* Personal Information Section */}
-        <View style={[tw`bg-white mx-4 mt-4 p-6 rounded-lg`, cardStyle]}>
+        <View style={[tw`p-6 mx-4 mt-4 bg-white rounded-lg`, cardStyle]}>
           <View style={tw`flex-row items-center mb-4`}>
-            <View style={[tw`w-8 h-8 rounded-lg flex items-center justify-center mr-3`, sectionHeaderStyle]}>
+            <View style={[tw`flex items-center justify-center w-8 h-8 mr-3 rounded-lg`, sectionHeaderStyle]}>
               <User size={18} color={Colors.text.secondary} />
             </View>
             <Text style={[tw`text-lg font-bold`, { color: Colors.text.primary }]}>Personal Information</Text>
           </View>
 
           <View style={tw`mb-5`}>
-            <Text style={tw`text-sm font-semibold text-gray-700 mb-2`}>Full Name *</Text>
+            <Text style={tw`mb-2 text-sm font-semibold text-gray-700`}>Full Name *</Text>
             <TextInput
-              style={tw`border border-gray-300 rounded-xl px-4 py-4 text-base bg-gray-50 h-14`}
+              style={tw`px-4 py-4 text-base border border-gray-300 rounded-xl bg-gray-50 h-14`}
               value={editFormData.full_name}
               onChangeText={(text: string) => setEditFormData(prev => ({ ...prev, full_name: text }))}
               placeholder="Enter your full name"
@@ -906,10 +936,10 @@ export default function EditProfileScreen() {
           </View>
 
           <View style={tw`mb-5`}>
-            <Text style={tw`text-sm font-semibold text-gray-700 mb-2`}>Username *</Text>
+            <Text style={tw`mb-2 text-sm font-semibold text-gray-700`}>Username *</Text>
             <TextInput
               style={[
-                tw`border rounded-xl px-4 py-4 text-base bg-gray-50 h-14`,
+                tw`px-4 py-4 text-base border rounded-xl bg-gray-50 h-14`,
                 {
                   borderColor: usernameAvailable === true ? '#10B981' : 
                               usernameAvailable === false ? '#EF4444' : '#D1D5DB'
@@ -949,29 +979,29 @@ export default function EditProfileScreen() {
             {usernameChecking && (
               <View style={tw`flex-row items-center mt-2`}>
                 <ActivityIndicator size="small" color="#3B82F6" style={tw`mr-2`} />
-                <Text style={tw`text-blue-600 text-sm`}>Checking availability...</Text>
+                <Text style={tw`text-sm text-blue-600`}>Checking availability...</Text>
               </View>
             )}
             {!usernameChecking && usernameAvailable === true && (
               <View style={tw`flex-row items-center mt-2`}>
-                <View style={tw`w-2 h-2 rounded-full bg-green-500 mr-2`} />
-                <Text style={tw`text-green-600 text-sm font-medium`}>Username is available</Text>
+                <View style={tw`w-2 h-2 mr-2 bg-green-500 rounded-full`} />
+                <Text style={tw`text-sm font-medium text-green-600`}>Username is available</Text>
               </View>
             )}
             {!usernameChecking && usernameAvailable === false && usernameError && (
               <View style={tw`flex-row items-center mt-2`}>
-                <View style={tw`w-2 h-2 rounded-full bg-red-500 mr-2`} />
-                <Text style={tw`text-red-600 text-sm`}>{usernameError}</Text>
+                <View style={tw`w-2 h-2 mr-2 bg-red-500 rounded-full`} />
+                <Text style={tw`text-sm text-red-600`}>{usernameError}</Text>
               </View>
             )}
           </View>
 
           <View style={tw`mb-5`}>
-            <Text style={tw`text-sm font-semibold text-gray-700 mb-2`}>Email Address *</Text>
+            <Text style={tw`mb-2 text-sm font-semibold text-gray-700`}>Email Address *</Text>
             <View style={tw`flex-row items-center`}>
               <TextInput
                 style={[
-                  tw`flex-1 border rounded-xl px-4 py-4 text-base bg-gray-50 h-14`,
+                  tw`flex-1 px-4 py-4 text-base border rounded-xl bg-gray-50 h-14`,
                   {
                     borderColor: emailAvailable === true ? '#10B981' : 
                                 emailAvailable === false ? '#EF4444' : '#D1D5DB'
@@ -1015,7 +1045,7 @@ export default function EditProfileScreen() {
               />
               <TouchableOpacity
                 style={[
-                  tw`ml-2 px-4 rounded-lg flex items-center justify-center`,
+                  tw`flex items-center justify-center px-4 ml-2 rounded-lg`,
                   { 
                     backgroundColor: editFormData.email !== profileData.email && emailAvailable === true
                       ? Colors.primary.blue 
@@ -1031,7 +1061,7 @@ export default function EditProfileScreen() {
                   <ActivityIndicator size="small" color="white" />
                 ) : (
                   <Text style={[
-                    tw`font-semibold text-sm text-center`,
+                    tw`text-sm font-semibold text-center`,
                     { 
                       color: editFormData.email !== profileData.email && emailAvailable === true ? 'white' : '#6B7280',
                       textAlign: 'center',
@@ -1046,33 +1076,33 @@ export default function EditProfileScreen() {
             {emailChecking && (
               <View style={tw`flex-row items-center mt-2`}>
                 <ActivityIndicator size="small" color="#3B82F6" style={tw`mr-2`} />
-                <Text style={tw`text-blue-600 text-sm`}>Checking availability...</Text>
+                <Text style={tw`text-sm text-blue-600`}>Checking availability...</Text>
               </View>
             )}
             {emailVerified && (
               <View style={tw`flex-row items-center mt-2`}>
-                <View style={tw`w-2 h-2 rounded-full bg-green-500 mr-2`} />
-                <Text style={tw`text-green-600 text-sm font-medium`}>✓ Email verified - ready to save</Text>
+                <View style={tw`w-2 h-2 mr-2 bg-green-500 rounded-full`} />
+                <Text style={tw`text-sm font-medium text-green-600`}>✓ Email verified - ready to save</Text>
               </View>
             )}
             {!emailVerified && !emailChecking && emailAvailable === true && (
               <View style={tw`flex-row items-center mt-2`}>
-                <View style={tw`w-2 h-2 rounded-full bg-green-500 mr-2`} />
-                <Text style={tw`text-green-600 text-sm font-medium`}>{emailError || "Email is available"}</Text>
+                <View style={tw`w-2 h-2 mr-2 bg-green-500 rounded-full`} />
+                <Text style={tw`text-sm font-medium text-green-600`}>{emailError || "Email is available"}</Text>
               </View>
             )}
             {!emailChecking && emailAvailable === false && emailError && (
               <View style={tw`flex-row items-center mt-2`}>
-                <View style={tw`w-2 h-2 rounded-full bg-red-500 mr-2`} />
-                <Text style={tw`text-red-600 text-sm`}>{emailError}</Text>
+                <View style={tw`w-2 h-2 mr-2 bg-red-500 rounded-full`} />
+                <Text style={tw`text-sm text-red-600`}>{emailError}</Text>
               </View>
             )}
           </View>
 
           <View style={tw`mb-2`}>
-            <Text style={tw`text-sm font-semibold text-gray-700 mb-2`}>Birth Date</Text>
+            <Text style={tw`mb-2 text-sm font-semibold text-gray-700`}>Birth Date</Text>
             <TextInput
-              style={tw`border border-gray-300 rounded-xl px-4 py-4 text-base bg-gray-50 h-14`}
+              style={tw`px-4 py-4 text-base border border-gray-300 rounded-xl bg-gray-50 h-14`}
               value={editFormData.birthdate}
               onChangeText={(text: string) => setEditFormData(prev => ({ ...prev, birthdate: text }))}
               placeholder="YYYY-MM-DD"
@@ -1084,27 +1114,27 @@ export default function EditProfileScreen() {
 
       {/* Confirmation Modal */}
       {showConfirmModal && (
-        <View style={tw`absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50`}>
-          <View style={tw`bg-white rounded-xl p-6 mx-4 w-full max-w-sm`}>
-            <Text style={tw`text-lg font-bold text-gray-900 mb-3 text-center`}>
+        <View style={tw`absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50`}>
+          <View style={tw`w-full max-w-sm p-6 mx-4 bg-white rounded-xl`}>
+            <Text style={tw`mb-3 text-lg font-bold text-center text-gray-900`}>
               Confirm Changes
             </Text>
-            <Text style={tw`text-sm text-gray-600 mb-6 text-center`}>
+            <Text style={tw`mb-6 text-sm text-center text-gray-600`}>
               Are you sure you want to save these changes to your profile?
             </Text>
             
             <View style={tw`flex-row justify-between`}>
               <TouchableOpacity
-                style={tw`flex-1 mr-2 px-4 py-3 bg-gray-200 rounded-lg`}
+                style={tw`flex-1 px-4 py-3 mr-2 bg-gray-200 rounded-lg`}
                 onPress={() => setShowConfirmModal(false)}
                 disabled={isSaving}
               >
-                <Text style={tw`text-gray-700 font-medium text-center`}>Cancel</Text>
+                <Text style={tw`font-medium text-center text-gray-700`}>Cancel</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
                 style={[
-                  tw`flex-1 ml-2 px-4 py-3 rounded-lg flex-row items-center justify-center`,
+                  tw`flex-row items-center justify-center flex-1 px-4 py-3 ml-2 rounded-lg`,
                   { backgroundColor: Colors.primary.blue }
                 ]}
                 onPress={confirmSave}
@@ -1113,7 +1143,7 @@ export default function EditProfileScreen() {
                 {isSaving ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
-                  <Text style={tw`text-white font-medium`}>Save</Text>
+                  <Text style={tw`font-medium text-white`}>Save</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1127,16 +1157,16 @@ export default function EditProfileScreen() {
           tw`absolute inset-0 flex items-center justify-center`,
           { backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 9999 }
         ]}>
-          <View style={[tw`bg-white rounded-xl p-6 mx-4`, { width: '90%', maxWidth: 400 }]}>
-            <Text style={tw`text-lg font-bold text-gray-900 mb-3 text-center`}>
+          <View style={[tw`p-6 mx-4 bg-white rounded-xl`, { width: '90%', maxWidth: 400 }]}>
+            <Text style={tw`mb-3 text-lg font-bold text-center text-gray-900`}>
               Verify Email Change
             </Text>
-            <Text style={tw`text-sm text-gray-600 mb-4 text-center`}>
+            <Text style={tw`mb-4 text-sm text-center text-gray-600`}>
               We sent a verification code to {newEmail}
             </Text>
             
             <TextInput
-              style={tw`border border-gray-300 rounded-lg px-4 py-3 text-base text-center mb-2`}
+              style={tw`px-4 py-3 mb-2 text-base text-center border border-gray-300 rounded-lg`}
               value={otpCode}
               onChangeText={setOtpCode}
               placeholder="Enter 6-digit code"
@@ -1146,14 +1176,14 @@ export default function EditProfileScreen() {
             />
             
             {otpError && (
-              <Text style={tw`text-red-600 text-sm text-center mb-4`}>
+              <Text style={tw`mb-4 text-sm text-center text-red-600`}>
                 {otpError}
               </Text>
             )}
             
             <View style={tw`flex-row justify-between mt-4`}>
               <TouchableOpacity
-                style={tw`flex-1 mr-2 px-4 py-3 bg-gray-200 rounded-lg`}
+                style={tw`flex-1 px-4 py-3 mr-2 bg-gray-200 rounded-lg`}
                 onPress={() => {
                   setShowOTPModal(false);
                   setOtpCode("");
@@ -1161,12 +1191,12 @@ export default function EditProfileScreen() {
                 }}
                 disabled={otpLoading}
               >
-                <Text style={tw`text-gray-700 font-medium text-center`}>Cancel</Text>
+                <Text style={tw`font-medium text-center text-gray-700`}>Cancel</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
                 style={[
-                  tw`flex-1 ml-2 px-4 py-3 rounded-lg flex-row items-center justify-center`,
+                  tw`flex-row items-center justify-center flex-1 px-4 py-3 ml-2 rounded-lg`,
                   { backgroundColor: Colors.primary.blue }
                 ]}
                 onPress={handleVerifyOTP}
@@ -1175,7 +1205,7 @@ export default function EditProfileScreen() {
                 {otpLoading ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
-                  <Text style={tw`text-white font-medium`}>Verify</Text>
+                  <Text style={tw`font-medium text-white`}>Verify</Text>
                 )}
               </TouchableOpacity>
             </View>

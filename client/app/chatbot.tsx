@@ -18,7 +18,6 @@ import {
   Animated,
   Easing,
   StatusBar,
-  Keyboard,
   KeyboardAvoidingView,
   } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -1336,7 +1335,7 @@ export default function ChatbotScreen() {
             <View style={tw`mr-3`}>
               <Image
                 source={require("../assets/images/logo.png")}
-                style={{ width: 32, height: 32, marginTop: 4 }}
+                style={{ width: 40, height: 40, marginTop: 4 }}
                 resizeMode="contain"
               />
             </View>
@@ -1674,7 +1673,7 @@ export default function ChatbotScreen() {
               <View style={tw`mb-6`}>
                 <Image
                   source={require("../assets/images/logo.png")}
-                  style={{ width: '20%', height: undefined, aspectRatio: 1, maxWidth: 88, maxHeight: 88 }}
+                  style={{ width: '20%', height: undefined, aspectRatio: 1, maxWidth: 120, maxHeight: 120 }}
                   resizeMode="contain"
                 />
               </View>
@@ -1842,7 +1841,7 @@ export default function ChatbotScreen() {
             <View style={tw`mr-2.5`}>
               <Image
                 source={require("../assets/images/logo.png")}
-                style={{ width: 34, height: 34, marginTop: 2 }}
+                style={{ width: 40, height: 40, marginTop: 2 }}
                 resizeMode="contain"
               />
             </View>

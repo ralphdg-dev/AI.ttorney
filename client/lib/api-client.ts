@@ -213,21 +213,21 @@ class ApiClient {
 
   // Forgot Password endpoints
   async sendPasswordResetOTP(email: string): Promise<ApiResponse> {
-    return this.request('/auth/forgot-password', {
+    return this.request('/api/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email }),
     });
   }
 
   async verifyResetOTP(email: string, otpCode: string): Promise<ApiResponse> {
-    return this.request('/auth/verify-reset-otp', {
+    return this.request('/api/auth/verify-reset-otp', {
       method: 'POST',
       body: JSON.stringify({ email, otpCode }),
     });
   }
 
   async resetPasswordWithToken(token: string, newPassword: string): Promise<ApiResponse> {
-    return this.request('/auth/reset-password', {
+    return this.request('/api/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify({ passwordResetToken: token, newPassword }),
     });

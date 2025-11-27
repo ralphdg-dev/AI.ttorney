@@ -20,9 +20,6 @@ import { NetworkConfig } from "../utils/networkConfig";
 import tw from "tailwind-react-native-classnames";
 import Colors from "../constants/Colors";
 import Header from "@/components/Header";
-import Navbar from "@/components/Navbar";
-import { GuestNavbar } from "@/components/guest";
-import { SidebarWrapper } from "@/components/AppSidebar";
 import UnifiedSearchBar from "@/components/common/UnifiedSearchBar";
 import { useGuest } from "../contexts/GuestContext";
 
@@ -317,7 +314,8 @@ export default function HelpAndSupport() {
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <Header
         title="Help & Support"
-        showMenu={true}
+        showBackButton={isGuestMode}
+        showMenu={!isGuestMode}
       />
 
       <View style={{ paddingHorizontal: 20 }}>
@@ -337,7 +335,7 @@ export default function HelpAndSupport() {
       >
         <ScrollView
           style={tw`flex-1`}
-          contentContainerStyle={[tw`px-6`, { paddingBottom: Math.max(56, insets.bottom + 36) }]}
+          contentContainerStyle={[tw`px-6`, { paddingBottom: 36 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -500,14 +498,6 @@ export default function HelpAndSupport() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Bottom Navigation */}
-      {isGuestMode ? (
-        <GuestNavbar activeTab="learn" />
-      ) : (
-        <Navbar />
-      )}
-      <SidebarWrapper />
 
       {/* EMAIL FORM MODAL */}
       <Modal

@@ -35,7 +35,7 @@ const avatarStyle = tva({
 });
 
 const avatarFallbackTextStyle = tva({
-  base: 'text-typography-0 font-semibold overflow-hidden text-transform:uppercase web:cursor-default',
+  base: 'text-typography-0 font-semibold text-transform:uppercase web:cursor-default text-center',
 
   parentVariants: {
     size: {
@@ -115,6 +115,23 @@ const AvatarBadge = React.forwardRef<
   );
 });
 
+// Helper function to generate initials from full name
+const getInitials = (name: string) => {
+  if (!name || typeof name !== 'string') {
+    return 'U'; // Default to 'U' for User
+  }
+  
+  const initials = name
+    .trim()
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+  
+  return initials || 'U'; // Fallback to 'U' if no initials
+};
+
 type IAvatarFallbackTextProps = React.ComponentPropsWithoutRef<
   typeof UIAvatar.FallbackText
 > &
@@ -122,8 +139,11 @@ type IAvatarFallbackTextProps = React.ComponentPropsWithoutRef<
 const AvatarFallbackText = React.forwardRef<
   React.ComponentRef<typeof UIAvatar.FallbackText>,
   IAvatarFallbackTextProps
->(function AvatarFallbackText({ className, size, ...props }, ref) {
+>(function AvatarFallbackText({ className, size, children, ...props }, ref) {
   const { size: parentSize } = useStyleContext(SCOPE);
+
+  // Convert full name to initials if needed
+  const displayText = typeof children === 'string' ? getInitials(children) : children;
 
   return (
     <UIAvatar.FallbackText
@@ -136,7 +156,9 @@ const AvatarFallbackText = React.forwardRef<
         size,
         class: className,
       })}
-    />
+    >
+      {displayText}
+    </UIAvatar.FallbackText>
   );
 });
 

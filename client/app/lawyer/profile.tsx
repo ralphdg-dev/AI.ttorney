@@ -401,7 +401,9 @@ const LawyerProfilePage: React.FC = () => {
       } else if (error.message?.includes("Database error")) {
         errorMessage = "Database error. Please contact support if this persists.";
       } else if (error.message?.includes("Failed to create lawyer record")) {
-        errorMessage = "Account setup incomplete. Please complete your profile first.";
+        errorMessage = error.message; // Show the actual error message instead of generic one
+      } else if (error.message?.includes("Lawyer profile update failed")) {
+        errorMessage = error.message; // Show the actual lawyer profile error
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -777,8 +779,9 @@ const LawyerProfilePage: React.FC = () => {
       }
 
       if (lawyerInfoError) {
-        console.error("Error updating lawyer_info:", lawyerInfoError);
-        return { success: false, error: lawyerInfoError.message };
+        console.error("❌ Error updating lawyer_info:", lawyerInfoError);
+        console.error("❌ Full error details:", JSON.stringify(lawyerInfoError, null, 2));
+        return { success: false, error: `Lawyer profile update failed: ${lawyerInfoError.message}` };
       }
 
       console.log("Lawyer profile updated successfully");
@@ -900,7 +903,7 @@ const LawyerProfilePage: React.FC = () => {
       >
         <View style={tw`p-4 bg-white border-b border-gray-200`}>
           <View style={tw`flex-row items-center`}>
-            <View style={tw`relative mr-4`}>
+            <View style={[tw`relative mr-4`, { overflow: 'visible' }]}>
               {profileData.avatar && !profileData.avatar.includes('unsplash') ? (
                 <Image
                   source={{ uri: profileData.avatar }}
