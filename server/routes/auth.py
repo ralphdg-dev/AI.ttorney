@@ -261,7 +261,7 @@ async def verify_token(current_user: Dict[str, Any] = Depends(get_current_user))
                
 @router.post("/send-otp", response_model=OTPResponse)
 @rate_limit_auth("10/minute")  # Increased for mobile network variability
-async def send_otp(otp_request: SendOTPRequest):
+async def send_otp(request: Request, otp_request: SendOTPRequest):
     """Send OTP for email verification or password reset"""
     logger.info("="*80)
     logger.info("📨 SEND OTP ENDPOINT CALLED")
