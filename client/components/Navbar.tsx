@@ -92,6 +92,8 @@ const Navbar: React.FC<NavbarProps> = ({
         router.push('/home');
         break;
       case 'learn':
+        // Both logged-in users and guests go to /glossary
+        // The page shows toggle for logged-in users, no toggle for guests
         console.log('[Navbar] Pushing to /glossary');
         router.push('/glossary');
         break;

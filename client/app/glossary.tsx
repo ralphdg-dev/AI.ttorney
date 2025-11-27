@@ -76,6 +76,15 @@ export default function GlossaryScreen() {
   const [isSearchingArticles] = useState<boolean>(false);
   const { isBookmarked, toggleBookmark } = useBookmarks();
   
+  // Debug: Log articles state
+  useEffect(() => {
+    console.log('[Glossary] Articles state:', {
+      count: legalArticles.length,
+      loading: articlesLoading,
+      error: articlesError
+    });
+  }, [legalArticles, articlesLoading, articlesError]);
+  
   // Animation and layout
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const flatListRef = useRef<FlatList>(null);
@@ -96,12 +105,16 @@ export default function GlossaryScreen() {
     { id: "guides", label: "Legal Guides" },
   ];
 
-  // Initialize articles display
+  // Initialize articles display - set all articles when they're loaded
   useEffect(() => {
-    if (activeTab === "guides" && legalArticles.length > 0) {
+    console.log('[Glossary] Articles loaded from hook:', legalArticles.length);
+    if (legalArticles.length > 0) {
       setDisplayArticles(legalArticles);
+      console.log('[Glossary] DisplayArticles set to:', legalArticles.length, 'articles');
+    } else {
+      console.log('[Glossary] No articles to display yet');
     }
-  }, [legalArticles, activeTab]);
+  }, [legalArticles]);
 
   // Network check
   useEffect(() => {
@@ -244,18 +257,22 @@ export default function GlossaryScreen() {
   // Articles filter with client-side filtering
   useEffect(() => {
     if (activeTab === "guides") {
+      console.log('[Glossary] Filtering guides - legalArticles count:', legalArticles.length);
       const trimmedQuery = debouncedSearch.trim();
       
       if (trimmedQuery && trimmedQuery.length >= 2) {
         // Client-side search
         const searchResults = searchArticles(trimmedQuery, activeCategory !== "all" ? activeCategory : undefined);
+        console.log('[Glossary] Search results:', searchResults.length);
         setDisplayArticles(searchResults);
       } else {
         // Client-side category filter
         if (activeCategory === "all") {
+          console.log('[Glossary] Showing all articles:', legalArticles.length);
           setDisplayArticles(legalArticles);
         } else {
           const byCat = getArticlesByCategory(activeCategory);
+          console.log('[Glossary] Category filtered articles:', byCat.length);
           setDisplayArticles(byCat);
         }
       }
