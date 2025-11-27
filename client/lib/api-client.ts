@@ -89,13 +89,31 @@ class ApiClient {
 
       if (!response.ok) {
         const errorMessage = (data && (data.detail || data.message)) || text || `Request failed (${response.status})`;
-        if (__DEV__) {
-          console.log('🔍 DEBUG: API Error Response');
-          console.log('🔍 DEBUG: Response status:', response.status);
-          console.log('🔍 DEBUG: Response data:', data);
-          console.log('🔍 DEBUG: Response text:', text);
-          console.log('🔍 DEBUG: Error message:', errorMessage);
+        
+        // COMPREHENSIVE ERROR LOGGING
+        console.error('❌❌❌ CLIENT: API Error Response');
+        console.error('❌ CLIENT: Response status:', response.status);
+        console.error('❌ CLIENT: Response statusText:', response.statusText);
+        console.error('❌ CLIENT: Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
+        console.error('❌ CLIENT: Response data:', JSON.stringify(data, null, 2));
+        console.error('❌ CLIENT: Response text:', text);
+        console.error('❌ CLIENT: Error message:', errorMessage);
+        console.error('❌ CLIENT: Data type:', typeof data);
+        console.error('❌ CLIENT: Data keys:', data ? Object.keys(data) : 'null');
+        
+        if (data && data.detail) {
+          console.error('❌ CLIENT: Error detail:', data.detail);
+          console.error('❌ CLIENT: Error detail type:', typeof data.detail);
+          
+          // Check if it's a validation error
+          if (Array.isArray(data.detail)) {
+            console.error('❌ CLIENT: VALIDATION ERROR ARRAY:', JSON.stringify(data.detail, null, 2));
+            data.detail.forEach((err: any, index: number) => {
+              console.error(`❌ CLIENT: Validation error ${index}:`, JSON.stringify(err, null, 2));
+            });
+          }
         }
+        
         const errorResponse: ApiResponse = {
           success: false,
           error: errorMessage,
@@ -319,6 +337,8 @@ class ApiClient {
     otp_type: 'email_verification' | 'password_reset';
     user_name?: string;
   }): Promise<ApiResponse> {
+    console.log('🚀🚀🚀 CLIENT: sendOTP called with:', JSON.stringify(data, null, 2));
+    
     const payload: any = {
       email: data.email,
       otp_type: data.otp_type,
@@ -326,21 +346,53 @@ class ApiClient {
     if (data.user_name) {
       payload.user_name = data.user_name;
     }
+    
+    console.log('📦 CLIENT: Request payload:', JSON.stringify(payload, null, 2));
+    console.log('📦 CLIENT: Payload keys:', Object.keys(payload));
+    console.log('📦 CLIENT: Payload values:', Object.values(payload));
+    console.log('📦 CLIENT: email type:', typeof payload.email);
+    console.log('📦 CLIENT: otp_type type:', typeof payload.otp_type);
+    console.log('📦 CLIENT: user_name type:', typeof payload.user_name);
+    console.log('📦 CLIENT: user_name value:', payload.user_name);
+    
     try {
-      console.log('🔗 Base URL:', await this.getBaseUrl());
+      const baseUrl = await this.getBaseUrl();
+      console.log('🔗 CLIENT: Base URL:', baseUrl);
+      console.log('🔗 CLIENT: Full endpoint: /auth/send-otp');
+      console.log('🔗 CLIENT: Full URL:', baseUrl + '/auth/send-otp');
+      
+      console.log('📤 CLIENT: Sending request...');
       const response = await this.request('/auth/send-otp', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
       
-      // If the email was sent but we got an error response, log it but don't fail the request
+      console.log('📥 CLIENT: Response received:', JSON.stringify(response, null, 2));
+      console.log('📥 CLIENT: Response type:', typeof response);
+      console.log('📥 CLIENT: Response keys:', Object.keys(response));
+      console.log('📥 CLIENT: Response.success:', response.success);
+      console.log('📥 CLIENT: Response.error:', response.error);
+      console.log('📥 CLIENT: Response.message:', response.message);
+      
+      // If the email was sent but we got an error response, log it
       if (response.error) {
-        console.log('🔍 DEBUG: API Error Response', response.error);
+        console.error('❌ CLIENT: API returned error:', response.error);
+        console.error('❌ CLIENT: Full error response:', JSON.stringify(response, null, 2));
+      }
+      
+      if (response.success) {
+        console.log('✅ CLIENT: OTP request successful!');
       }
       
       return response;
     } catch (error) {
-      console.error('🚨 Send OTP error:', error);
+      console.error('🚨🚨🚨 CLIENT: Send OTP exception:', error);
+      console.error('🚨 CLIENT: Error type:', typeof error);
+      console.error('🚨 CLIENT: Error instanceof Error:', error instanceof Error);
+      if (error instanceof Error) {
+        console.error('🚨 CLIENT: Error message:', error.message);
+        console.error('🚨 CLIENT: Error stack:', error.stack);
+      }
       // Return a structured error response
       return {
         success: false,
