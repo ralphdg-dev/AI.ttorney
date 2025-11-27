@@ -80,7 +80,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   const [, setError] = useState<string | null>(null);
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -212,12 +212,12 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     }
   }, [session?.access_token]);
 
-  // Optimized loadPosts with retry logic and better error handling
-  const loadPosts = useCallback(async (force = false, retryCount = 0) => {
+  // Optimized loadPosts with retry logic and proper pagination
+  const loadPosts = useCallback(async (force = false, retryCount = 0, loadMore = false) => {
     const MAX_RETRIES = 2;
     
-    // Check cache first (only for initial load)
-    if (!force && isCacheValid()) {
+    // Check cache first (only for initial load, not for load more)
+    if (!force && !loadMore && isCacheValid()) {
       const cachedPosts = getCachedPosts();
       if (cachedPosts && cachedPosts.length > 0) {
         if (__DEV__) console.log('Timeline: Using cached posts, skipping fetch');
@@ -229,7 +229,9 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
     }
 
     // Close any open dropdown menus when refreshing
-    setOpenMenuPostId(null);
+    if (!loadMore) {
+      setOpenMenuPostId(null);
+    }
 
     if (!isAuthenticated) {
       if (__DEV__) console.warn('Timeline: User not authenticated, clearing posts');
@@ -243,12 +245,18 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
 
     // Set loading state before making request
     if (retryCount === 0) {
-      setRefreshing(true);
-      refreshingRef.current = true;
+      if (loadMore) {
+        setLoadingMore(true);
+        loadingMoreRef.current = true;
+      } else {
+        setRefreshing(true);
+        refreshingRef.current = true;
+        // Reset pagination for fresh load
+        setCurrentPage(1);
+        setHasMore(true);
+        hasMoreRef.current = true;
+      }
     }
-    setCurrentPage(0);
-    setHasMore(false);
-    hasMoreRef.current = false;
 
     const now = Date.now();
     setLastFetchTime(now);
@@ -260,11 +268,14 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
 
+      // Calculate page for API call
+      const pageToFetch = loadMore ? currentPage + 1 : 1;
+
       if (__DEV__) {
-        console.log(`Timeline: Fetching posts (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
+        console.log(`Timeline: Fetching posts page ${pageToFetch} (attempt ${retryCount + 1}/${MAX_RETRIES + 1}), loadMore: ${loadMore}`);
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent`, {
+      const response = await fetch(`${API_BASE_URL}/api/forum/posts/recent?page=${pageToFetch}&limit=15`, {
         method: 'GET',
         headers,
         signal: controller.signal,
@@ -290,6 +301,8 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
         console.log('Timeline: Raw API response:', {
           success: data?.success,
           dataLength: Array.isArray(data?.data) ? data.data.length : 'not array',
+          hasMore: data?.hasMore,
+          page: data?.page,
         });
       }
 
@@ -307,11 +320,21 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
 
       // Only update if component is still mounted
       if (isComponentMounted.current) {
-        setPosts(mapped);
-        setCachedPosts(mapped);
-        setCurrentPage(0);
-        setHasMore(false);
-        hasMoreRef.current = false;
+        if (loadMore) {
+          // Append new posts to existing ones
+          setPosts(prevPosts => [...prevPosts, ...mapped]);
+          setCurrentPage(pageToFetch);
+        } else {
+          // Replace posts for fresh load
+          setPosts(mapped);
+          setCachedPosts(mapped);
+          setCurrentPage(pageToFetch);
+        }
+        
+        // Update hasMore based on API response
+        const hasMorePosts = data?.hasMore === true;
+        setHasMore(hasMorePosts);
+        hasMoreRef.current = hasMorePosts;
         setError(null);
 
         if (mapped.length === 0 && __DEV__) {
@@ -531,7 +554,7 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
       }
 
       if (__DEV__) console.log('Timeline: Loading more posts...', { currentPage, hasMore: hasMoreRef.current });
-      loadPosts(false); // Don't force refresh
+      loadPosts(false, 0, true); // loadMore = true
     }, 300); // 300ms debounce
   }, [loadPosts, currentPage]);
 

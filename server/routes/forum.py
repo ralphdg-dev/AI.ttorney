@@ -311,6 +311,10 @@ async def create_post(
 class ListPostsResponse(BaseModel):
     success: bool
     data: list
+    hasMore: bool
+    total: Optional[int] = None
+    page: int
+    limit: int
 
 
 @router.get("/posts", response_model=ListPostsResponse)
@@ -615,7 +619,16 @@ async def list_recent_posts(
             
             final_posts.append(post_copy)
         
-        return ListPostsResponse(success=True, data=final_posts)
+        # Check if there are more posts available
+        has_more = len(base_posts) == limit
+        
+        return ListPostsResponse(
+            success=True, 
+            data=final_posts,
+            hasMore=has_more,
+            page=page,
+            limit=limit
+        )
     except HTTPException:
         raise
     except Exception as e:
