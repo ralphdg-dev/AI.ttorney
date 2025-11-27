@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Alert, useWindowDimensions, SafeAreaView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
+import { Alert, useWindowDimensions, TouchableOpacity, TextInput, ActivityIndicator, View } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Calendar, Clock, Mail, Phone, MessageSquare, Video, MapPin, User, Check, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2 } from "lucide-react-native";
 import Colors from "../../constants/Colors";
@@ -762,7 +762,7 @@ export default function LawyerBookingView() {
     lawyerData.bio && lawyerData.bio.length > bioMaxLength;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }}>
+    <View style={{ flex: 1, backgroundColor: Colors.background.primary }}>
       <Box className="flex-1" style={{ backgroundColor: Colors.background.secondary }}>
         <Header title="Book Consultation" showMenu={true} showBackButton={true} onBackPress={handleBackPress} />
 
@@ -772,7 +772,7 @@ export default function LawyerBookingView() {
         showsVerticalScrollIndicator={false}
       >
         {/* Lawyer Profile Card - Modern Design */}
-        <VStack className={`${isSmallScreen ? 'mx-3 p-5' : 'mx-4 p-6'} mt-4 mb-3 bg-white rounded-2xl`} style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }}>
+        <VStack className={`${isSmallScreen ? 'mx-3 p-5' : 'mx-4 p-6'} mt-2 mb-3 bg-white rounded-2xl`} style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }}>
           <HStack className="items-start mb-5">
             <Box
               className={`${
@@ -1467,6 +1467,6 @@ export default function LawyerBookingView() {
         <Navbar activeTab="find" />
       )}
       <SidebarWrapper />
-    </SafeAreaView>
+    </View>
   );
 }
