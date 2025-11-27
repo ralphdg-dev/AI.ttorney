@@ -363,6 +363,7 @@ export default function ChatbotScreen() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const isStreamingRef = useRef<boolean>(false); // Track if currently streaming
+  const isInitializingRef = useRef<boolean>(false); // Track initialization to prevent duplicate calls
   const messages = localMessages; // Same state for everyone
   
   // Refs for tutorial targets
@@ -587,9 +588,14 @@ export default function ChatbotScreen() {
   }, [isGenerating]);
 
   useEffect(() => {
-    initializeConversation();
+    // Only re-initialize if user actually changes (not just token refresh)
+    // Prevents conversation reset during authentication state updates
+    if (user && !isInitializingRef.current) {
+      console.log('🔄 User changed, reinitializing conversation');
+      initializeConversation();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user?.id]); // Only depend on user ID, not full user object
 
   // FAANG Best Practice: Initialize guest session only after loading completes
   // This prevents race conditions and unnecessary session creation
@@ -612,6 +618,14 @@ export default function ChatbotScreen() {
   }, [isGuestMode, isGuestLoading, guestSession?.id, startGuestSession]);
 
   const initializeConversation = useCallback(async () => {
+    // Prevent duplicate initializations
+    if (isInitializingRef.current) {
+      console.log('🔄 Initialization already in progress, skipping');
+      return;
+    }
+    
+    isInitializingRef.current = true;
+    
     try {
       console.log('🔄 Initializing conversation - always starting fresh');
       console.log('   Setting isFirstMessage to true for new conversation');
@@ -631,6 +645,8 @@ export default function ChatbotScreen() {
       setCurrentConversationId("");
       setMessages([]);
       setConversationHistory([]);
+    } finally {
+      isInitializingRef.current = false;
     }
   }, [user?.id, setMessages]);
 

@@ -35,7 +35,6 @@ export interface Conversation {
 
 const CURRENT_CONVERSATION_KEY = '@current_conversation_id';
 const ACTIVE_CONVERSATIONS_KEY = '@active_conversations';
-const CACHE_DURATION = 30000; // 30 seconds cache
 
 /**
  * Chat History Service
@@ -46,7 +45,7 @@ export class ChatHistoryService {
   private static conversationsCache: { data: Conversation[]; timestamp: number } | null = null;
   
   private static async getHeaders(token?: string): Promise<Record<string, string>> {
-    // Try provided token first
+    // Always use the provided token (should be fresh from AuthContext)
     if (token) {
       return {
         'Content-Type': 'application/json',
@@ -54,19 +53,8 @@ export class ChatHistoryService {
       };
     }
     
-    // Fallback to AsyncStorage token
-    try {
-      const storedToken = await AsyncStorage.getItem('access_token');
-      if (storedToken) {
-        return {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${storedToken}`
-        };
-      }
-    } catch (error) {
-      console.warn('Failed to get token from AsyncStorage:', error);
-    }
-    
+    // No token provided - return headers without authorization
+    // This will trigger 401 errors which are handled gracefully
     return {
       'Content-Type': 'application/json'
     };
@@ -222,22 +210,13 @@ export class ChatHistoryService {
   }
 
   static async getConversationsList(userId?: string, includeArchived: boolean = false, token?: string, forceRefresh: boolean = false): Promise<Conversation[]> {
+    const startTime = Date.now();
+    
     try {
-      // Check cache first (only for non-archived requests)
-      if (!includeArchived && !forceRefresh && this.conversationsCache) {
-        const cacheAge = Date.now() - this.conversationsCache.timestamp;
-        if (cacheAge < CACHE_DURATION) {
-          console.log('⚡ Using cached conversations (age:', Math.round(cacheAge / 1000), 'seconds)');
-          return this.conversationsCache.data;
-        }
-      }
-
-      console.log('📜 Fetching conversations list for user:', userId);
-      const startTime = Date.now();
+      const apiUrl = await NetworkConfig.getBestApiUrl();
       const headers = await this.getHeaders(token);
       
       // Optimized request with reasonable timeout and page size
-      const apiUrl = await NetworkConfig.getBestApiUrl();
       const response = await axios.get(
         `${apiUrl}/api/chat-history/sessions`,
         { 
@@ -274,25 +253,24 @@ export class ChatHistoryService {
       console.warn('⚠️  No sessions in response');
       return [];
     } catch (error: any) {
-      const loadTime = Date.now() - (error.config?.metadata?.startTime || Date.now());
-      console.error(`❌ Error getting conversations list (${loadTime}ms):`, error.message);
+      console.error('❌ Error fetching conversations:', error.message);
       
-      if (error.code === 'ECONNABORTED') {
-        console.error('   Request timed out after 3 seconds');
+      // Handle authentication errors gracefully
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        console.warn('🔐 Authentication failed for chat history - user may need to re-login');
+        // Return empty array instead of throwing error to prevent app crashes
+        return [];
       }
       
+      if (error.code === 'ECONNABORTED') {
+        console.error('   Request timed out after 10 seconds');
+      }
       if (error.response) {
         console.error('   Status:', error.response.status);
         console.error('   Data:', error.response.data);
       }
       
-      // Return cached data if available, even if stale
-      if (this.conversationsCache && !includeArchived) {
-        console.log('⚠️  Returning stale cache due to error');
-        return this.conversationsCache.data;
-      }
-      
-      // Return empty array on error - let UI handle gracefully
+      // Return empty array as fallback to prevent app crashes
       return [];
     }
   }

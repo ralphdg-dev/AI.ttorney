@@ -263,11 +263,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Check account status (banned/deactivated) - only redirect on initial sign-in
       if (profile && shouldNavigate) {
+        const currentRoute = getCurrentRoute();
+        
+        // Skip redirects if user is already on a valid page (chatbot, guides, etc.)
+        const validPages = ['/chatbot', '/guides', '/glossary', '/article', '/help', '/about', '/settings'];
+        const isValidPage = validPages.some(page => currentRoute.includes(page));
+        
+        if (isValidPage && currentRoute !== '/login' && currentRoute !== '/') {
+          console.log('🔐 User is on a valid page, skipping redirect:', currentRoute);
+          setIsLoading(false);
+          clearTimeout(timeoutId);
+          return;
+        }
+        
         // ALWAYS check if user is deactivated - this takes priority over everything
         if (profile.account_status === 'deactivated') {
           console.log('🔐 User is deactivated, checking current route');
           // Only redirect if not already on deactivated page to prevent infinite loops
-          const currentRoute = getCurrentRoute();
           if (!currentRoute.includes('/deactivated')) {
             console.log('🔐 Redirecting to deactivated page');
             setIsLoading(false);
