@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Dimensions, Platform, Image } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Dimensions, Platform, Image, Easing } from "react-native";
 import { useRouter } from "expo-router";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useBookmarks } from "../contexts/BookmarksContext";
@@ -138,17 +138,25 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   // Animation effect - SIMPLE and CLEAN with smooth slide-back
-  useEffect(() => {
-    const slideConfig = {
-      duration: ANIMATION_DURATION,
-      useNativeDriver: shouldUseNativeDriver('transform'),
-    };
+  // Performance optimization: Memoize animation configs to prevent recreation
+  const slideConfig = React.useMemo(() => ({
+    duration: ANIMATION_DURATION,
+    useNativeDriver: shouldUseNativeDriver('transform'),
+    // Add easing for smoother animation
+    easing: Easing.out(Easing.cubic),
+  }), []);
 
-    const overlayConfig = {
-      duration: ANIMATION_DURATION,
-      useNativeDriver: shouldUseNativeDriver('opacity'),
-    };
+  const overlayConfig = React.useMemo(() => ({
+    duration: ANIMATION_DURATION,
+    useNativeDriver: shouldUseNativeDriver('opacity'),
+    // Add easing for smoother animation
+    easing: Easing.out(Easing.ease),
+  }), []);
 
+  // Performance optimization: Use layout effect for animations
+  // This runs synchronously after all DOM mutations
+  React.useLayoutEffect(() => {
+    // Prevent animation on initial render
     if (isVisible) {
       // Animate in - slide sidebar and fade in overlay
       Animated.parallel([
@@ -180,22 +188,29 @@ const Sidebar: React.FC<SidebarProps> = ({
       slideAnim.stopAnimation();
       overlayAnim.stopAnimation();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isVisible]);
+  }, [isVisible, slideAnim, overlayAnim, slideConfig, overlayConfig]);
 
-  // FAANG OPTIMIZATION: Direct Set.size and primitive access - O(1) constant time
+  // Performance optimization: Use primitive values instead of accessing Set.size repeatedly
+  // This prevents unnecessary re-renders and calculations
+  const favoriteTermsCount = favoriteTermIds.size;
+  const bookmarkedPostsCount = bookmarkedPostIds.size;
+  const bookmarkedGuidesCount = bookmarkedGuideIds.size;
+  
+  // FAANG OPTIMIZATION: Direct primitive access - O(1) constant time
   // All data pre-loaded from contexts, zero API calls on sidebar open
   // Instant badge updates with no network latency
   const badgeCounts = React.useMemo(() => ({
-    favoriteTerms: favoriteTermIds.size,
-    bookmarkedPosts: bookmarkedPostIds.size,
-    bookmarkedGuides: bookmarkedGuideIds.size,
+    favoriteTerms: favoriteTermsCount,
+    bookmarkedPosts: bookmarkedPostsCount,
+    bookmarkedGuides: bookmarkedGuidesCount,
     acceptedConsultations: consultationsCount,
-  }), [favoriteTermIds.size, bookmarkedPostIds.size, bookmarkedGuideIds.size, consultationsCount]);
+  }), [favoriteTermsCount, bookmarkedPostsCount, bookmarkedGuidesCount, consultationsCount]);
 
   const { user } = useAuth();
-  const isLawyer = user?.role === 'verified_lawyer';
 
+  // Performance optimization: Memoize user role check
+  const isLawyerMemo = React.useMemo(() => user?.role === 'verified_lawyer', [user?.role]);
+  
   // Memoize menu items to prevent recreating on every render
   const menuItems: MenuItem[] = React.useMemo(() => [
     // Bookmarked Posts - Available for both users and lawyers (same page)
@@ -207,7 +222,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       badge: badgeCounts.bookmarkedPosts || undefined,
     },
     // Favorite Terms - Only for regular users
-    ...(!isLawyer ? [{
+    ...(!isLawyerMemo ? [{
       id: "bookmarks",
       label: "Favorite Terms",
       icon: Star,
@@ -215,7 +230,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       badge: badgeCounts.favoriteTerms || undefined,
     }] : []),
     // Bookmarked Guides - Only for regular users
-    ...(!isLawyer ? [{
+    ...(!isLawyerMemo ? [{
       id: "bookmarked-guides",
       label: "Bookmarked Guides",
       icon: Bookmark,
@@ -225,9 +240,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     // Consultations - Different routes for users vs lawyers
     {
       id: "consultations",
-      label: isLawyer ? "Consultation Requests" : "Consultations",
+      label: isLawyerMemo ? "Consultation Requests" : "Consultations",
       icon: Calendar,
-      route: isLawyer ? "lawyer/consult" : "consultations",
+      route: isLawyerMemo ? "lawyer/consult" : "consultations",
       badge: badgeCounts.acceptedConsultations || undefined,
     },
     {
@@ -255,9 +270,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       divider: true,
     },
     // Apply to be a Lawyer - Only for regular users
-    ...(!isLawyer ? [{
+    ...(!isLawyerMemo ? [{
       id: "apply-lawyer",
-      label: "Apply to be a Lawyer",
+      label: "Apply as Lawyer",
       icon: Briefcase,
       route: "apply-lawyer",
     }] : []),
@@ -287,16 +302,16 @@ const Sidebar: React.FC<SidebarProps> = ({
         setShowSignoutModal(true);
       },
     },
-  ], [badgeCounts, isLawyer]);
+  ], [badgeCounts, isLawyerMemo]);
 
-  const handleMenuItemPress = (item: MenuItem) => {
+  const handleMenuItemPress = useCallback((item: MenuItem) => {
     if (item.action) {
       item.action();
     } else if (item.route && onNavigate) {
       onNavigate(item.route);
       onClose();
     }
-  };
+  }, [onNavigate, onClose]);
 
   const renderMenuItem = (item: MenuItem) => {
     if (item.divider) {
@@ -466,6 +481,9 @@ export const SidebarWrapper: React.FC<{
   const router = useRouter();
   const { user } = useAuth();
 
+  // Performance optimization: Memoize user role check
+  const isLawyerRole = React.useMemo(() => user?.role === 'verified_lawyer', [user?.role]);
+  
   // Memoize navigation handler to prevent recreation on every render
   const handleNavigate = useCallback(async (route: string) => {
     console.log(`Navigate to ${route}`);
@@ -475,6 +493,11 @@ export const SidebarWrapper: React.FC<{
         router.push("/favorite-terms");
         break;
       case "bookmarked-posts":
+        // Fast navigation to Bookmarked Posts
+        console.log('[AppSidebar] Navigating to Bookmarked Posts');
+        // Close sidebar first for better perceived performance
+        closeSidebar();
+        // Use push for reliable navigation
         router.push("/bookmarked-posts");
         break;
       case "consultations":
@@ -496,6 +519,11 @@ export const SidebarWrapper: React.FC<{
         router.push("/settings");
         break;
       case "about":
+        // Fast navigation to About page
+        console.log('[AppSidebar] Navigating to About page');
+        // Close sidebar first for better perceived performance
+        closeSidebar();
+        // Use push for reliable navigation
         router.push("/about");
         break;
       case "apply-lawyer":
@@ -504,7 +532,7 @@ export const SidebarWrapper: React.FC<{
         break;
       case "profile":
         // Route lawyers to lawyer profile, regular users to regular profile
-        if (user?.role === 'verified_lawyer') {
+        if (isLawyerRole) {
           router.push("/lawyer/profile");
         } else {
           router.push("/profile");
@@ -513,14 +541,19 @@ export const SidebarWrapper: React.FC<{
       default:
         console.log(`Route ${route} not implemented yet`);
     }
-  }, [router, user?.role]);
+  }, [router, isLawyerRole]);
 
+  // Performance optimization: Extract primitive values to prevent unnecessary re-renders
+  const userName = user?.full_name || "User";
+  const userEmail = user?.email || "user@example.com";
+  const userAvatar = user?.profile_photo || userInfo?.avatar;
+  
   // Memoize user info to prevent object recreation on every render
   const actualUserInfo = React.useMemo(() => ({
-    name: user?.full_name || "User",
-    email: user?.email || "user@example.com",
-    avatar: user?.profile_photo || userInfo?.avatar || undefined,
-  }), [user?.full_name, user?.email, user?.profile_photo, userInfo?.avatar]);
+    name: userName,
+    email: userEmail,
+    avatar: userAvatar,
+  }), [userName, userEmail, userAvatar]);
 
   return (
     <Sidebar
@@ -562,6 +595,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     zIndex: LAYOUT.Z_INDEX.drawer,
     elevation: Platform.OS === 'android' ? 8 : undefined,
+    // Performance optimization: Add hardware acceleration for Android
+    ...(Platform.OS === 'android' ? {
+      backfaceVisibility: 'hidden',
+      transform: [{ perspective: 1000 }],
+    } : {}),
   },
   header: {
     flexDirection: "row",

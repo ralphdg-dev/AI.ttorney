@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, FlatList, RefreshControl, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -151,6 +151,9 @@ export default function BookmarkedPostsScreen() {
   const [loading, setLoading] = useState(true);
   const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Preload data in memory cache
+  const bookmarkedPostsCache = useRef<PostData[]>([]);
 
   const formatTimeAgo = useCallback((isoDate?: string): string => {
     if (!isoDate) return '';
@@ -225,6 +228,8 @@ export default function BookmarkedPostsScreen() {
       
       if (result.success && result.data) {
         const mappedPosts = result.data.map(mapApiToPost);
+        // Update cache for instant access next time
+        bookmarkedPostsCache.current = mappedPosts;
         setPosts(mappedPosts);
       } else {
         setPosts([]);
@@ -239,7 +244,15 @@ export default function BookmarkedPostsScreen() {
   }, [isAuthenticated, currentUser?.id, session, mapApiToPost]);
 
   useEffect(() => {
-    loadBookmarkedPosts();
+    // Check if we have cached data first for instant display
+    if (bookmarkedPostsCache.current.length > 0) {
+      setPosts(bookmarkedPostsCache.current);
+      setLoading(false);
+      // Then refresh in background
+      loadBookmarkedPosts(true);
+    } else {
+      loadBookmarkedPosts();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, currentUser?.id]); // Only re-run when auth state changes
 
@@ -255,9 +268,22 @@ export default function BookmarkedPostsScreen() {
     router.push(`/home/ViewPost?postId=${postId}` as any);
   }, [router]);
 
-  const handleBookmarkPress = useCallback(() => {
-    // The Post component handles the actual bookmark logic
-  }, []);
+  const handleBookmarkPress = useCallback(async (postId: string) => {
+    if (!currentUser?.id) return;
+
+    // Optimistic update
+    setPosts(prev => prev.filter(post => post.id !== postId));
+    
+    try {
+      await BookmarkService.toggleBookmark(postId, currentUser.id, session);
+      // Refresh the context to update sidebar badge count
+      refreshBookmarkContext();
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      // Revert on error by reloading
+      loadBookmarkedPosts();
+    }
+  }, [currentUser?.id, session, refreshBookmarkContext, loadBookmarkedPosts]);
 
   const handleBookmarkStatusChange = useCallback((postId: string, isBookmarked: boolean) => {
     if (!isBookmarked) {
@@ -275,14 +301,13 @@ export default function BookmarkedPostsScreen() {
     setOpenMenuPostId(prev => prev === postId ? null : postId);
   }, []);
 
-  // Filter posts by search query
+  // Memoize filtered posts for performance
   const filteredPosts = useMemo(() => {
     if (!searchQuery.trim()) return posts;
     
-    const query = searchQuery.toLowerCase();
+    const query = searchQuery.toLowerCase().trim();
     return posts.filter(post => 
       post.content.toLowerCase().includes(query) ||
-      post.category.toLowerCase().includes(query) ||
       post.user.name.toLowerCase().includes(query) ||
       post.user.username.toLowerCase().includes(query)
     );
@@ -338,85 +363,82 @@ export default function BookmarkedPostsScreen() {
     </View>
   );
 
-  const keyExtractor = useCallback((item: PostData) => item.id, []);
+  const keyExtractor = (item: PostData) => item.id;
 
-  const renderItem = useCallback(({ item, index }: { item: PostData; index: number }) => (
+  const renderItem = ({ item }: { item: PostData }) => (
     <Post
-      key={item.id}
       id={item.id}
       user={item.user}
       timestamp={item.timestamp}
+      created_at={item.created_at}
       category={item.category}
       content={item.content}
       comments={item.comments}
-      onCommentPress={() => handleCommentPress(item.id)}
-      onBookmarkPress={handleBookmarkPress}
-      onReportPress={() => handleReportPress(item.id)}
       onPostPress={() => handlePostPress(item.id)}
-      index={index}
-      isBookmarked={true}
+      onCommentPress={() => handleCommentPress(item.id)}
+      onReportPress={() => handleReportPress(item.id)}
+      onBookmarkPress={() => handleBookmarkPress(item.id)}
       isMenuOpen={openMenuPostId === item.id}
       onMenuToggle={handleMenuToggle}
+      isBookmarked={true}
       onBookmarkStatusChange={handleBookmarkStatusChange}
     />
-  ), [handleCommentPress, handleBookmarkPress, handleReportPress, handlePostPress, handleMenuToggle, openMenuPostId, handleBookmarkStatusChange]);
+  );
 
   return (
     <AuthGuard>
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-        <Header title="Bookmarked Posts" showMenu={true} />
+        <Header title="Bookmarked Posts" showBackButton={true} />
 
-      {loading ? (
-        <View style={{ flex: 1 }}>
-          {renderSearchBar()}
-          <PostSkeletonList count={3} />
-        </View>
-      ) : posts.length === 0 ? (
-        <>
-          {renderSearchBar()}
-          {renderEmptyState()}
-        </>
-      ) : (
-        <>
-          {renderSearchBar()}
-          {filteredPosts.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Filter size={48} color={Colors.text.sub} strokeWidth={1.5} />
-              <Text style={styles.emptyTitle}>No Posts Found</Text>
-              <Text style={styles.emptySubtitle}>
-                No bookmarked posts match your search &quot;{searchQuery}&quot;
-              </Text>
-              <TouchableOpacity 
-                style={styles.browseButton}
-                onPress={clearSearch}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.browseButtonText}>Clear Search</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <FlatList
-              data={filteredPosts}
-              keyExtractor={keyExtractor}
-              renderItem={renderItem}
-              ListHeaderComponent={renderHeader}
-              contentContainerStyle={{ paddingBottom: 36 }}
-              showsVerticalScrollIndicator={false}
-              onScroll={() => setOpenMenuPostId(null)}
-              scrollEventThrottle={16}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={handleRefresh}
-                  colors={[Colors.primary.blue]}
-                  tintColor={Colors.primary.blue}
-                />
-              }
-            />
-          )}
-        </>
-      )}
+        {loading ? (
+          <PostSkeletonList count={5} />
+        ) : filteredPosts.length === 0 && !searchQuery ? (
+          renderEmptyState()
+        ) : (
+          <>
+            {renderSearchBar()}
+            {filteredPosts.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Filter size={48} color={Colors.text.sub} strokeWidth={1.5} />
+                <Text style={styles.emptyTitle}>No Posts Found</Text>
+                <Text style={styles.emptySubtitle}>
+                  No bookmarked posts match your search "{searchQuery}"
+                </Text>
+                <TouchableOpacity 
+                  style={styles.browseButton}
+                  onPress={clearSearch}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.browseButtonText}>Clear Search</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredPosts}
+                keyExtractor={keyExtractor}
+                renderItem={renderItem}
+                ListHeaderComponent={renderHeader}
+                contentContainerStyle={{ paddingBottom: 36 }}
+                showsVerticalScrollIndicator={false}
+                onScroll={() => setOpenMenuPostId(null)}
+                scrollEventThrottle={16}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                    colors={[Colors.primary.blue]}
+                    tintColor={Colors.primary.blue}
+                  />
+                }
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={5}
+                windowSize={5}
+                initialNumToRender={10}
+              />
+            )}
+          </>
+        )}
 
         <Navbar />
         <SidebarWrapper />

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
@@ -25,6 +25,9 @@ const LawyerNavbar: React.FC<LawyerNavbarProps> = ({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
+  
+  // Navigation guard to prevent spam clicking
+  const isNavigatingRef = useRef(false);
 
   // Auto-detect active tab based on current route if not provided
   const getActiveTab = (): 'home' | 'forum' | 'consult' | 'chatbot' | 'profile' | null => {
@@ -51,6 +54,20 @@ const LawyerNavbar: React.FC<LawyerNavbarProps> = ({
       onTabPress(tabId);
       return;
     }
+    
+    // Prevent spam clicking - ignore if already navigating
+    if (isNavigatingRef.current) {
+      console.log(`[LawyerNavbar] Navigation already in progress, ignoring ${tabId} click`);
+      return;
+    }
+
+    // Prevent navigation to the same tab
+    if (currentTab === tabId) {
+      console.log(`[LawyerNavbar] Already on ${tabId} tab, ignoring navigation`);
+      return;
+    }
+    
+    isNavigatingRef.current = true;
 
     // Default navigation behavior
     switch (tabId) {
@@ -72,8 +89,13 @@ const LawyerNavbar: React.FC<LawyerNavbarProps> = ({
       default:
         console.log(`Unknown tab: ${tabId}`);
     }
+    
+    // Reset navigation guard after a delay to allow next navigation
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 500);
   };
-
+  
   const currentTab = getActiveTab();
 
   const tabs = [

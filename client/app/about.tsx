@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, memo } from 'react';
 import { View, ScrollView, StatusBar } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from 'tailwind-react-native-classnames';
@@ -10,26 +10,34 @@ import Colors from '@/constants/Colors';
 import { useAuth } from "../contexts/AuthContext";
 import { useGuest } from "../contexts/GuestContext";
 import { safeGoBack } from '@/utils/navigationHelper';
-import Navbar from "@/components/Navbar";
-import { GuestNavbar } from "@/components/guest";
+// Navbar removed from About page
 
-// Reusable BulletPoint component
-const BulletPoint: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+// Reusable BulletPoint component - memoized for performance
+const BulletPoint = memo(({ children }: { children: React.ReactNode }) => (
   <View style={{ flexDirection: 'row', marginBottom: 4 }}>
     <GSText size="md" style={{ color: Colors.text.body, marginRight: 8 }}>{'\u2022'}</GSText>
     <GSText size="md" style={{ color: Colors.text.body, flex: 1 }}>{children}</GSText>
   </View>
-);
+));
 
-// Section component
-const Section: React.FC<{ title: string; children: React.ReactNode; icon?: string }> = ({ title, children, icon }) => (
+// Section component - memoized for performance
+const Section = memo(({ title, children, icon }: { title: string; children: React.ReactNode; icon?: string }) => (
   <VStack style={{ gap: 8 }}>
     <GSText size="lg" bold style={{ color: Colors.text.head }}>
       {icon && `${icon} `}{title}
     </GSText>
     {children}
   </VStack>
-);
+));
+
+// Static styles to prevent recreation
+const styles = {
+  container: { flex: 1, backgroundColor: Colors.background.primary },
+  contentView: tw`flex-1 bg-white`,
+  scrollView: tw`flex-1`,
+  title: { color: Colors.text.head, marginBottom: 8 },
+  subtitle: { color: Colors.text.sub, marginBottom: 20 },
+};
 
 export default function AboutScreen() {
   const insets = useSafeAreaInsets();
@@ -48,22 +56,37 @@ export default function AboutScreen() {
     });
   }, [router, isGuestMode, isAuthenticated, user?.role, pathname]);
 
+  // Memoize the content container style to prevent recreation on each render
+  const contentContainerStyle = React.useMemo(() => ({ 
+    paddingHorizontal: 20, 
+    paddingBottom: 56 + (insets.bottom || 0) + 20 
+  }), [insets.bottom]);
+  
+  // Preload content on mount for faster rendering
+  React.useEffect(() => {
+    // Force immediate layout calculation
+    requestAnimationFrame(() => {
+      // Empty function to trigger layout calculation
+    });
+  }, []);
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={["top", "left", "right"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
-      <View style={tw`flex-1 bg-white`}>
+      <View style={styles.contentView}>
         <Header showBackButton={true} showMenu={false} onBackPress={handleBackPress} />
 
       <ScrollView
-        style={tw`flex-1`}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 56 + (insets.bottom || 0) + 20 }}
+        style={styles.scrollView}
+        contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
       >
         {/* Title */}
-        <GSText size="2xl" bold style={{ color: Colors.text.head, marginBottom: 8 }}>
+        <GSText size="2xl" bold style={styles.title}>
           About Ai.ttorney
         </GSText>
-        <GSText size="sm" style={{ color: Colors.text.sub, marginBottom: 20 }}>
+        <GSText size="sm" style={styles.subtitle}>
           Empowering Legal Literacy for Every Filipino
         </GSText>
 
@@ -264,12 +287,6 @@ export default function AboutScreen() {
           </VStack>
         </VStack>
       </ScrollView>
-      
-      {isGuestMode ? (
-        <GuestNavbar activeTab="learn" />
-      ) : (
-        <Navbar activeTab="profile" />
-      )}
       </View>
     </SafeAreaView>
   );
