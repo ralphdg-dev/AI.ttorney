@@ -8,6 +8,7 @@ import {
   Animated,
   ActivityIndicator,
   Dimensions,
+  Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Rect, Defs, Mask } from 'react-native-svg';
@@ -37,8 +38,7 @@ const RegisteredOnboardingOverlay: React.FC = () => {
     height: 120,
   });
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const isEligible = useMemo(() => {
     if (!user) return false;
@@ -103,32 +103,35 @@ const RegisteredOnboardingOverlay: React.FC = () => {
     ];
   }, [isLawyer]);
 
-  const animateIn = useCallback(() => {
-    fadeAnim.setValue(0);
-    scaleAnim.setValue(0.95);
-    Animated.parallel([
+  const transitionToStep = useCallback((nextStep: number) => {
+    if (nextStep === currentStep) return;
+    fadeAnim.stopAnimation();
+    Animated.timing(fadeAnim, {
+      toValue: 0.85,
+      duration: 70,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentStep(nextStep);
+      fadeAnim.setValue(0.9);
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 250,
+        duration: 90,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [fadeAnim, scaleAnim]);
+      }).start();
+    });
+  }, [fadeAnim, currentStep]);
 
   useEffect(() => {
     if (isEligible) {
       setVisible(true);
       setCurrentStep(0);
-      animateIn();
+      fadeAnim.setValue(1);
     } else {
       setVisible(false);
     }
-  }, [isEligible, animateIn]);
+  }, [isEligible, fadeAnim]);
 
   useEffect(() => {
     if (!visible) return;
@@ -138,29 +141,43 @@ const RegisteredOnboardingOverlay: React.FC = () => {
 
     switch (step.position) {
       case 'bottom':
+        const baseNavHeight = 120; // generous base height to cover thick Android nav bars
+        const navBarHeight = baseNavHeight + insets.bottom;
+        const navTop = screenHeight - navBarHeight;
+
         if (step.id === 'chat') {
-          // Focus spotlight on the center Ask AI nav button (tighter circle)
-          const navHeight = 80;
-          const navTop = screenHeight - (navHeight + insets.bottom);
-          const size = 56;
+          // Focus spotlight ONLY on the floating Ask AI nav button (tight circle)
+          const size = 46;
           const x = (screenWidth - size) / 2;
-          const y = navTop + navHeight / 2 - size / 2;
+          const bottomOverlap = 24; // allow overlap beyond screen bottom for tighter focus
+          const y = screenHeight - size + bottomOverlap;
           spotlight = {
             x,
             y,
             width: size,
             height: size,
           };
-        } else {
-          // Default: bottom navigation bar with visible rounded corners
-          const navHeight = 80;
-          const navTop = screenHeight - (navHeight + insets.bottom);
-          const horizontalInset = 12;
+        } else if (step.id === 'nav') {
+          // First slide: highlight only the nav icon row with a shorter, lower spotlight
+          const navHighlightHeight = 44;
+          const horizontalInset = 14;
+          const bottomOffset = -34; // deeper overlap to eliminate visible gap
+          const y = screenHeight - navHighlightHeight - bottomOffset;
           spotlight = {
             x: horizontalInset,
-            y: navTop,
+            y,
             width: screenWidth - horizontalInset * 2,
-            height: navHeight,
+            height: navHighlightHeight,
+          };
+        } else {
+          // Default: bottom navigation bar - highlight entire bar area down to the screen edge
+          const horizontalInset = 12;
+          const y = navTop;
+          spotlight = {
+            x: horizontalInset,
+            y,
+            width: screenWidth - horizontalInset * 2,
+            height: navBarHeight,
           };
         }
         break;
@@ -231,8 +248,7 @@ const RegisteredOnboardingOverlay: React.FC = () => {
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
-      setCurrentStep(prev => prev + 1);
-      animateIn();
+      transitionToStep(currentStep + 1);
     } else {
       handleComplete();
     }
@@ -240,8 +256,7 @@ const RegisteredOnboardingOverlay: React.FC = () => {
 
   const handlePrevious = () => {
     if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1);
-      animateIn();
+      transitionToStep(currentStep - 1);
     }
   };
 
@@ -258,12 +273,26 @@ const RegisteredOnboardingOverlay: React.FC = () => {
     let top: number;
 
     if (step.position === 'bottom') {
-      // For bottom navigation spotlight, always prefer card ABOVE the nav
-      top = spotlight.y - cardHeight - margin;
-      if (top < insets.top + 32) {
-        top = insets.top + 32;
+      const spaceAbove = spotlight.y - insets.top - 32;
+      const spaceBelow = screenHeight - spotlight.y - spotlight.height - insets.bottom - 24;
+      const estimatedCardHeight = cardHeight + margin * 2;
+      const spacingFromSpotlight = 80; // Extra spacing to prevent overlap
+      const additionalLiftForBottomSteps = step.position === 'bottom' ? 5 : 0;
+
+      if (spaceAbove >= estimatedCardHeight + spacingFromSpotlight) {
+        // Enough space above - position above spotlight
+        top = spotlight.y - estimatedCardHeight - spacingFromSpotlight - additionalLiftForBottomSteps;
+      } else if (spaceBelow >= estimatedCardHeight + spacingFromSpotlight) {
+        // Not enough space above, position below spotlight
+        top = spotlight.y + spotlight.height + spacingFromSpotlight;
+      } else {
+        // Not enough space above or below, position at top with margin
+        top = margin;
       }
-      cardBelowHighlight = false;
+
+      if (top < margin) {
+        top = margin;
+      }
     } else {
       // For middle/top steps, prefer card BELOW the highlighted area
       top = spotlight.y + spotlight.height + margin;
@@ -298,7 +327,12 @@ const RegisteredOnboardingOverlay: React.FC = () => {
   const pointerDirection: 'up' | 'down' = cardBelowHighlight ? 'up' : 'down';
 
   const renderSpotlightMask = () => {
-    const padding = 12;
+    const padding = (() => {
+      if (step.position === 'bottom') {
+        return step.id === 'chat' ? 8 : 12;
+      }
+      return 12;
+    })();
     const { x, y, width, height } = spotlightPosition;
 
     const cornerRadius = (() => {
@@ -314,19 +348,29 @@ const RegisteredOnboardingOverlay: React.FC = () => {
       return 16;
     })();
 
+    // CRITICAL: Extend overlay height to cover Android navbar (same as guest tutorial)
+    const overlayHeight = screenHeight + 100; // Extra 100px to cover bottom navbar
+    const overlayExtraWidth = 40;
+    const overlayWidth = screenWidth + overlayExtraWidth;
+    const overlayXOffset = overlayExtraWidth / 2;
+
     return (
-      <Svg style={StyleSheet.absoluteFill} width={screenWidth} height={screenHeight}>
+      <Svg
+        style={[StyleSheet.absoluteFill, { left: -overlayXOffset, right: -overlayXOffset }]}
+        width={overlayWidth}
+        height={overlayHeight}
+      >
         <Defs>
           <Mask
             id="registered-spotlight-mask"
             x="0"
             y="0"
-            width={screenWidth}
-            height={screenHeight}
+            width={overlayWidth}
+            height={overlayHeight}
           >
-            <Rect x="0" y="0" width={screenWidth} height={screenHeight} fill="white" />
+            <Rect x="0" y="0" width={overlayWidth} height={overlayHeight} fill="white" />
             <Rect
-              x={x - padding}
+              x={(x + overlayXOffset) - padding}
               y={y - padding}
               width={width + padding * 2}
               height={height + padding * 2}
@@ -339,8 +383,8 @@ const RegisteredOnboardingOverlay: React.FC = () => {
         <Rect
           x="0"
           y="0"
-          width={screenWidth}
-          height={screenHeight}
+          width={overlayWidth}
+          height={overlayHeight}
           fill="rgba(0, 0, 0, 0.7)"
           mask="url(#registered-spotlight-mask)"
         />
@@ -362,7 +406,6 @@ const RegisteredOnboardingOverlay: React.FC = () => {
             cardPositionStyle,
             {
               opacity: fadeAnim,
-              transform: [{ scale: scaleAnim }],
             },
           ]}
         >
@@ -406,22 +449,13 @@ const RegisteredOnboardingOverlay: React.FC = () => {
                 ) : currentStep === steps.length - 1 ? (
                   <>
                     <Text style={styles.nextText}>Get Started</Text>
-                    <ArrowRight size={16} color="#FFFFFF" />
+                    <ArrowRight size={16} color="#1E40AF" />
                   </>
                 ) : (
-                  <ChevronRight size={16} color="#FFFFFF" />
+                  <ChevronRight size={16} color="#1E40AF" />
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-
-          <View
-            style={[
-              styles.pointerContainer,
-              pointerDirection === 'up' ? styles.pointerUp : styles.pointerDown,
-            ]}
-          >
-            <View style={styles.pointerInner} />
           </View>
         </Animated.View>
       </View>
@@ -435,45 +469,50 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   card: {
-    backgroundColor: '#1F2937',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: '#1E40AF',
+    borderRadius: 18,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 12,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 18,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   title: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#F9FAFB',
-    marginBottom: 6,
+    color: '#FFFFFF',
+    marginBottom: 10,
+    textAlign: 'center',
   },
   description: {
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '400',
     color: '#FFFFFF',
-    lineHeight: 18,
-    marginBottom: 12,
+    lineHeight: 21,
+    marginBottom: 18,
+    textAlign: 'center',
   },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 4,
   },
   backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 999,
-    backgroundColor: '#374151',
+    minWidth: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   backButtonPlaceholder: {
-    width: 32,
-    height: 32,
+    minWidth: 40,
+    height: 40,
   },
   dotsRow: {
     flexDirection: 'row',
@@ -482,51 +521,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginHorizontal: 3,
-    backgroundColor: 'rgba(75, 85, 99, 0.3)',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
   },
   dotActive: {
     width: 24,
-    backgroundColor: '#4B5563',
+    backgroundColor: '#FFFFFF',
   },
   nextButton: {
-    flexDirection: 'row',
+    minWidth: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 10,
-    height: 32,
-    borderRadius: 999,
-    backgroundColor: '#374151',
+    paddingHorizontal: 12,
+    flexDirection: 'row',
   },
   nextText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
+    color: '#1E40AF',
+    fontSize: 14,
+    fontWeight: '700',
     marginRight: 6,
-  },
-  pointerContainer: {
-    position: 'absolute',
-    left: '50%',
-    marginLeft: -8,
-  },
-  pointerUp: {
-    top: -8,
-  },
-  pointerDown: {
-    bottom: -8,
-  },
-  pointerInner: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderBottomWidth: 10,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: '#1F2937',
   },
 });
 

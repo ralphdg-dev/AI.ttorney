@@ -167,6 +167,13 @@ export default function VerifyOTP() {
         console.log('✅ Email verified successfully!');
         console.log('🔍 Debug - Success result:', result);
 
+        // Show success alert
+        Alert.alert(
+          "✓ Email Verified",
+          "Your email has been successfully verified!",
+          [{ text: "OK" }]
+        );
+
         // Store verified email so we can reference it later (e.g., role selection)
         await AsyncStorage.setItem('user_email', email);
         console.log('📱 Stored email in AsyncStorage');

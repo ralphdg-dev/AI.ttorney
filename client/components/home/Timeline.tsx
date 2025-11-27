@@ -65,8 +65,8 @@ const Timeline = forwardRef<TimelineHandle, TimelineProps>(({ context = 'user' }
   // Responsive sizing for plus button
   const buttonSize = getResponsiveValue(screenWidth, 50, 56, 60);
   const iconSize = getResponsiveValue(screenWidth, 22, 24, 26);
-  // Updated to sit deep into the navbar area (safe area adds final clearance)
-  const bottomOffset = getResponsiveValue(screenWidth, -32, -30, -28); // Strong negative offsets pull button well below timeline edge
+  // Slight positive offset so the button floats clearly above the navbar
+  const bottomOffset = getResponsiveValue(screenWidth, 16, 18, 20);
   const rightOffset = getResponsiveValue(screenWidth, 16, 20, 24);
 
   const router = useRouter();
