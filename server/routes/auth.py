@@ -177,10 +177,10 @@ async def check_email_exists(request: Dict[str, str] = Body(...)):
 
 @router.post("/forgot-password")
 @rate_limit_auth("5/minute")  # Increased for mobile network variability
-async def forgot_password(http_request: Request, request: Dict[str, str] = Body(...)):
+async def forgot_password(request: Request, body: Dict[str, str] = Body(...)):
     """Send OTP for password reset - only to registered users"""
     try:
-        email = request.get("email")
+        email = body.get("email")
         if not email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
