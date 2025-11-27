@@ -95,8 +95,8 @@ if not OPENAI_API_KEY:
 
 EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4o-mini"                                           
-TOP_K_RESULTS = 2  # Reduced for faster retrieval - quality over quantity
-MIN_CONFIDENCE_SCORE = 0.4  # Higher threshold for better quality, faster results                                              
+TOP_K_RESULTS = 1  # Minimal local results - prioritize web search (90% web, 10% local)
+MIN_CONFIDENCE_SCORE = 0.5  # Higher threshold to trigger web search more often                                              
 
                                                
 PROHIBITED_PATTERNS = [
