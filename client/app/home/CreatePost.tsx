@@ -40,7 +40,18 @@ const CreatePost: React.FC = () => {
   }, [isContentValid, categoryId, isPosting]);
 
   const handlePostSubmit = async () => {
-    if (isPostDisabled) return;
+    console.log('🔘 POST BUTTON PRESSED - handlePostSubmit called');
+    console.log('🔘 isPostDisabled:', isPostDisabled);
+    console.log('🔘 content:', content);
+    console.log('🔘 categoryId:', categoryId);
+    console.log('🔘 isAnonymous:', isAnonymous);
+    
+    if (isPostDisabled) {
+      console.log('🔘 POST BLOCKED - isPostDisabled is true');
+      return;
+    }
+    
+    console.log('🔘 POST PROCEEDING - clearing form and calling createPost');
     
     // Clear form immediately for better UX
     const originalContent = content;
@@ -52,8 +63,15 @@ const CreatePost: React.FC = () => {
     setIsAnonymous(false);
     
     try {
+      console.log('🔘 CALLING createPost with:', {
+        content: originalContent,
+        category: originalCategory,
+        anonymous: originalAnonymous
+      });
       await createPost(originalContent, originalCategory, originalAnonymous);
+      console.log('🔘 createPost completed successfully');
     } catch (error) {
+      console.log('🔘 createPost failed with error:', error);
       // If post fails, restore form data
       setContent(originalContent);
       setCategoryId(originalCategory);
@@ -62,7 +80,7 @@ const CreatePost: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
@@ -95,7 +113,28 @@ const CreatePost: React.FC = () => {
             <CategoryScroller
               activeCategory={categoryId}
               onCategoryChange={setCategoryId}
-              includeAllOption={false}
+            />
+          </View>
+
+          {/* Content Input */}
+          <View style={styles.contentWrapper}>
+            <View style={styles.contentHeader}>
+              <Text style={styles.contentHeaderText}>What&apos;s happening?</Text>
+              <Text style={styles.contentLengthText}>
+                {content.length}/{MAX_CONTENT_LENGTH}
+              </Text>
+            </View>
+            
+            <TextInput
+              style={styles.contentInput}
+              multiline
+              placeholder="Share your thoughts..."
+              placeholderTextColor="#536471"
+              value={content}
+              onChangeText={setContent}
+              maxLength={MAX_CONTENT_LENGTH}
+              textAlignVertical="top"
+              autoFocus
             />
           </View>
 
@@ -104,28 +143,10 @@ const CreatePost: React.FC = () => {
             <Text style={styles.anonLabel}>Post anonymously</Text>
             <CustomToggle value={isAnonymous} onValueChange={setIsAnonymous} size="md" />
           </View>
-
-          {/* Composer */}
-          <View style={styles.editorContainer}>
-            <TextInput
-              style={styles.editorInput}
-              placeholder="What's your legal question or situation?"
-              placeholderTextColor="#9CA3AF"
-              value={content}
-              onChangeText={setContent}
-              multiline
-              textAlignVertical="top"
-            />
-            <View style={styles.counterRow}>
-              <Text style={[styles.counterText, content.length > MAX_CONTENT_LENGTH && styles.counterTextExceeded]}>
-                {content.length}/{MAX_CONTENT_LENGTH}
-              </Text>
-            </View>
-          </View>
         </View>
       </KeyboardAvoidingView>
       
-      {/* Moderation Warning Banner - Fixed at bottom */}
+      {/* Moderation Warning Banner - Fixed at bottom, outside KeyboardAvoidingView */}
       {moderationStatus && (
         <View style={styles.bottomBannerContainer}>
           <ModerationWarningBanner
@@ -136,7 +157,6 @@ const CreatePost: React.FC = () => {
           />
         </View>
       )}
-      
     </SafeAreaView>
   );
 };
@@ -272,6 +292,34 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 16,
     zIndex: 10,
+  },
+  contentWrapper: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  contentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  contentHeaderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0F1419',
+  },
+  contentLengthText: {
+    fontSize: 14,
+    color: '#536471',
+  },
+  contentInput: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#0F1419',
+    minHeight: 120,
+    textAlignVertical: 'top',
   },
 });
 

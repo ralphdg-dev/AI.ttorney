@@ -44,11 +44,23 @@ const LawyerCreatePost: React.FC = () => {
   }, [isContentValid, categoryId, isPosting]);
 
   const handlePostSubmit = async () => {
-    if (isPostDisabled) return;
+    console.log('🔘 LAWYER POST BUTTON PRESSED - handlePostSubmit called');
+    console.log('🔘 isPostDisabled:', isPostDisabled);
+    console.log('🔘 content:', content);
+    console.log('🔘 categoryId:', categoryId);
+    console.log('🔘 isAnonymous:', false);
+    
+    if (isPostDisabled) {
+      console.log('🔘 LAWYER POST BLOCKED - isPostDisabled is true');
+      return;
+    }
+    
+    console.log('🔘 LAWYER POST PROCEEDING - validating content');
     
     // Validate content for prohibited material (links, promotional content)
     const validation = validatePostContent(content);
     if (!validation.isValid) {
+      console.log('🔘 LAWYER POST BLOCKED - content validation failed:', validation.reason);
       showContentValidationToast(
         toast,
         'error',
@@ -59,6 +71,8 @@ const LawyerCreatePost: React.FC = () => {
       return;
     }
     
+    console.log('🔘 LAWYER POST VALIDATION PASSED - clearing form and calling createPost');
+    
     // Clear form immediately for better UX
     const originalContent = content;
     const originalCategory = categoryId;
@@ -67,9 +81,16 @@ const LawyerCreatePost: React.FC = () => {
     setCategoryId('');
     
     try {
+      console.log('🔘 LAWYER CALLING createPost with:', {
+        content: originalContent,
+        category: originalCategory,
+        anonymous: false
+      });
       // Lawyers always post non-anonymously
       await createPost(originalContent, originalCategory, false);
+      console.log('🔘 LAWYER createPost completed successfully');
     } catch (error) {
+      console.log('🔘 LAWYER createPost failed with error:', error);
       // If post fails, restore form data
       setContent(originalContent);
       setCategoryId(originalCategory);
@@ -77,7 +98,7 @@ const LawyerCreatePost: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background.primary }} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
@@ -121,32 +142,34 @@ const LawyerCreatePost: React.FC = () => {
             <CategoryScroller
               activeCategory={categoryId}
               onCategoryChange={setCategoryId}
-              includeAllOption={false}
             />
           </View>
 
-          {/* Composer */}
-          <View style={styles.editorContainer}>
-            <Text style={styles.editorTitle}>Share your legal insight</Text>
-            <TextInput
-              style={styles.editorInput}
-              placeholder="Share your expertise..."
-              placeholderTextColor="#9CA3AF"
-              value={content}
-              onChangeText={setContent}
-              multiline
-              textAlignVertical="top"
-            />
-            <View style={styles.counterRow}>
-              <Text style={[styles.counterText, content.length > MAX_CONTENT_LENGTH && styles.counterTextExceeded]}>
+          {/* Content Input */}
+          <View style={styles.contentWrapper}>
+            <View style={styles.contentHeader}>
+              <Text style={styles.contentHeaderText}>What&apos;s happening?</Text>
+              <Text style={styles.contentLengthText}>
                 {content.length}/{MAX_CONTENT_LENGTH}
               </Text>
             </View>
+            
+            <TextInput
+              style={styles.contentInput}
+              multiline
+              placeholder="Share your legal insights..."
+              placeholderTextColor="#536471"
+              value={content}
+              onChangeText={setContent}
+              maxLength={MAX_CONTENT_LENGTH}
+              textAlignVertical="top"
+              autoFocus
+            />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
       
-      {/* Moderation Warning Banner - Fixed at bottom */}
+      {/* Moderation Warning Banner - Fixed at bottom, outside KeyboardAvoidingView */}
       {moderationStatus && (
         <View style={styles.bottomBannerContainer}>
           <ModerationWarningBanner
@@ -276,6 +299,34 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 16,
     zIndex: 10,
+  },
+  contentWrapper: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  contentHeader: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: 12,
+  },
+  contentHeaderText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#0F1419',
+  },
+  contentLengthText: {
+    fontSize: 14,
+    color: '#536471',
+  },
+  contentInput: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#0F1419',
+    minHeight: 120,
+    textAlignVertical: 'top' as const,
   },
 });
 

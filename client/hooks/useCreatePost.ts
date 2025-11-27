@@ -5,7 +5,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Alert } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useForumCache } from '@/contexts/ForumCacheContext';
@@ -186,8 +186,11 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
     categoryId: string,
     isAnonymous: boolean
   ): Promise<void> => {
+    console.log('🎯 createPost function called with:', { content, categoryId, isAnonymous });
+    
     // Validation
     if (!isAuthenticated) {
+      console.error('❌ Not authenticated');
       Alert.alert('Authentication Required', 'Please log in to create a post.', [{ text: 'OK' }]);
       return;
     }
@@ -195,6 +198,7 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
     // Validate content for prohibited material (links, promotional content)
     const validation = validatePostContent(content);
     if (!validation.isValid) {
+      console.error('❌ Content validation failed:', validation);
       showContentValidationToast(
         toast,
         'error',
@@ -205,6 +209,7 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
       return;
     }
 
+    console.log('✅ Initial validation passed');
     setIsPosting(true);
 
     const payload: CreatePostPayload = {
@@ -221,6 +226,38 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
     
     try {
       const apiUrl = await NetworkConfig.getBestApiUrl();
+      
+      // Debug logging to identify environment differences
+      console.log('🌐 Create post API URL:', apiUrl);
+      console.log('🌐 Platform:', Platform.OS);
+      console.log('🌐 Is dev:', __DEV__);
+      console.log('📤 Request payload:', payload);
+      
+      // Validation checks before API call
+      if (!payload.body || !payload.body.trim()) {
+        console.error('❌ Validation failed: Empty content');
+        Alert.alert('Error', 'Please enter some content for your post.');
+        return;
+      }
+      
+      if (!payload.category) {
+        console.error('❌ Validation failed: No category selected');
+        Alert.alert('Error', 'Please select a category for your post.');
+        return;
+      }
+      
+      const authHeaders = getAuthHeaders() as Record<string, string>;
+      console.log('🔑 Auth headers:', Object.keys(authHeaders));
+      
+      if (!authHeaders.Authorization) {
+        console.error('❌ Validation failed: No auth token');
+        Alert.alert('Error', 'You must be logged in to create a post.');
+        return;
+      }
+      
+      console.log('🚀 About to make fetch request...');
+      const startTime = Date.now();
+      
       const response = await fetch(`${apiUrl}/api/forum/posts`, {
         method: 'POST',
         headers: {
@@ -231,6 +268,8 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
         signal: AbortSignal.timeout(REQUEST_TIMEOUT),
       });
 
+      const fetchTime = Date.now() - startTime;
+      console.log(`✅ Fetch completed in ${fetchTime}ms, status: ${response.status}`);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -250,10 +289,17 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
       }
 
       const resp = await response.json();
+      
+      // Debug logging to identify the issue
+      console.log('🔍 Create post response:', resp);
+      console.log('🔍 Response success field:', resp.success);
+      console.log('🔍 Response status:', response.status);
+      
       console.log(`[CreatePost:${userType}] Post created successfully`);
 
       if (!resp.success) {
-        console.error('Failed to create post', resp.error);
+        console.error('❌ Failed to create post - resp.success is false:', resp);
+        console.error('❌ Response details:', resp);
         removeOptimisticPost(optimisticId);
         Alert.alert('Error', 'Failed to create post. Please try again.', [{ text: 'OK' }]);
         return;
@@ -265,22 +311,31 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
         if (resp?.post_id) {
           confirmOptimisticPost(optimisticId, { id: String(resp.post_id) });
         } else {
-          confirmOptimisticPost(optimisticId);
+          console.error('❌ No post_id in response:', resp);
         }
-        // No need to navigate back - already navigated
       }, OPTIMISTIC_CONFIRM_DELAY);
-
-    } catch (e: any) {
-      console.error(`[CreatePost:${userType}] Error:`, e);
-      removeOptimisticPost(optimisticId);
-      clearCache();
-
-      if (e.name === 'AbortError') {
-        Alert.alert('Timeout', 'Request timed out. Please check your connection and try again.', [{ text: 'OK' }]);
-      } else {
-        Alert.alert('Error', 'Something went wrong. Please try again.', [{ text: 'OK' }]);
+      
+    } catch (error) {
+      // Comprehensive error handling for preview builds
+      console.error('❌ Create post failed:', error);
+      console.error('❌ Error type:', error instanceof Error ? error.constructor.name : 'Unknown');
+      console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      
+      // Show detailed error to user in preview builds
+      Alert.alert(
+        'Create Post Error', 
+        `Error: ${error instanceof Error ? error.message : 'Unknown error'}\n\nType: ${error instanceof Error ? error.constructor.name : 'Unknown'}`,
+        [{ text: 'OK' }]
+      );
+      
+      // Restore form data and remove optimistic post
+      if (optimisticId) {
+        removeOptimisticPost(optimisticId);
       }
+      
     } finally {
+      // Always reset posting state
       setIsPosting(false);
     }
   }, [
