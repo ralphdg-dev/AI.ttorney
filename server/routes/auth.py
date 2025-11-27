@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
+from fastapi.responses import JSONResponse
 from auth.models import UserSignUp, UserSignIn, OTPRequest, VerifyOTPRequest, OTPResponse, PasswordReset, SendOTPRequest
 from auth.service import AuthService, clear_auth_cache
 from services.otp_service import OTPService
@@ -291,10 +292,13 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
             
             if not user_check.data or len(user_check.data) == 0:
                 # Return success without sending OTP for security
-                return OTPResponse(
-                    success=True,
-                    message="If the email exists, a reset code has been sent.",
-                    expires_in_minutes=10
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "success": True,
+                        "message": "If the email exists, a reset code has been sent.",
+                        "expires_in_minutes": 10
+                    }
                 )
             
             # Use provided name or fall back to database name or default
@@ -333,17 +337,17 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
             if expires_in_minutes is not None:
                 expires_in_minutes = int(expires_in_minutes)
             
-            logger.info(f"� Constructing response - message: '{message}', expires_in_minutes: {expires_in_minutes} (type: {type(expires_in_minutes)})")
+            logger.info(f"📋 Constructing response - message: '{message}', expires_in_minutes: {expires_in_minutes} (type: {type(expires_in_minutes)})")
             
-            # Return as dict to avoid Pydantic serialization issues
-            response_dict = {
+            # Use JSONResponse for explicit JSON serialization
+            response_content = {
                 "success": True,
                 "message": str(message),
                 "expires_in_minutes": expires_in_minutes
             }
             
-            logger.info(f"✅ Response constructed successfully: {response_dict}")
-            return response_dict
+            logger.info(f"✅ Response constructed successfully: {response_content}")
+            return JSONResponse(status_code=200, content=response_content)
             
         except Exception as response_error:
             logger.error(f"❌ Error constructing OTP response: {str(response_error)}")
@@ -352,12 +356,15 @@ async def send_otp(http_request: Request, request: SendOTPRequest):
             logger.error(f"❌ Response construction traceback: {traceback.format_exc()}")
             logger.error(f"❌ Result that caused error: {result}")
             
-            # Fallback to a minimal valid response as dict
-            return {
-                "success": True,
-                "message": "Verification code sent successfully",
-                "expires_in_minutes": 2
-            }
+            # Fallback to a minimal valid response
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "message": "Verification code sent successfully",
+                    "expires_in_minutes": 2
+                }
+            )
         
     except HTTPException as http_exc:
         logger.error(f"🔴 HTTPException in send_otp: {http_exc.detail}")
