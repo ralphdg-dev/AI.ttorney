@@ -14,6 +14,9 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 
+# Load environment variables BEFORE importing services that use them
+load_dotenv()
+
 # Import all routers
 from routes.auth import router as auth_router
 from routes.legalTerms import router as legalTerms
@@ -25,8 +28,6 @@ from routes.route_validation import router as route_validation_router
 from routes.support import router as support
 from routes.auth_reset import router as auth_reset_router
 from routes.forum import router as forum_router
-
-load_dotenv()
 
 # Industry-grade logging configuration
 logging.basicConfig(
