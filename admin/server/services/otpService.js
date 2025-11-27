@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const fetch = require("node-fetch");
+const nodemailer = require("nodemailer");
 
 // In-memory OTP storage (consider Redis for production)
 const otpStore = new Map();
@@ -20,13 +21,34 @@ setInterval(() => {
 
 class OTPService {
   constructor() {
-    // Email configuration (Resend API)
-    this.resendApiKey = process.env.RESEND_API_KEY || "";
-    this.fromEmail = process.env.FROM_EMAIL || "noreply@ai.ttorney.com";
+    // Email configuration (SMTP)
+    this.smtpServer = process.env.SMTP_SERVER || "smtp.gmail.com";
+    this.smtpPort = parseInt(process.env.SMTP_PORT || "587", 10);
+    this.smtpUsername = process.env.SMTP_USERNAME || "";
+    this.smtpPassword = process.env.SMTP_PASSWORD || "";
+    this.fromEmail =
+      process.env.FROM_EMAIL || this.smtpUsername || "noreply@ai.ttorney.com";
     this.fromName = process.env.FROM_NAME || "AI.ttorney Admin";
     this.OTP_TTL_SECONDS = 120; // 2 minutes
     this.MAX_ATTEMPTS = 5;
     this.LOCKOUT_DURATION = 900; // 15 minutes in seconds
+
+    if (this.smtpUsername && this.smtpPassword) {
+      this.transporter = nodemailer.createTransport({
+        host: this.smtpServer,
+        port: this.smtpPort,
+        secure: this.smtpPort === 465,
+        auth: {
+          user: this.smtpUsername,
+          pass: this.smtpPassword,
+        },
+      });
+    } else {
+      this.transporter = null;
+      console.warn(
+        "SMTP credentials not fully configured. Admin OTP emails will not be sent."
+      );
+    }
   }
 
   /**
@@ -55,10 +77,11 @@ class OTPService {
    */
   async sendOTPEmail(email, otpCode, adminName = "Admin") {
     try {
-      if (!this.resendApiKey) {
-        console.error("❌ RESEND_API_KEY not configured in environment");
+      if (!this.transporter) {
+        console.error(
+          "❌ SMTP transporter not configured for admin OTP emails"
+        );
         console.log("\n📧 For testing, the OTP code is:", otpCode);
-        console.log("⚠️  Configure RESEND_API_KEY to send real emails\n");
         return {
           success: false,
           error:
@@ -66,41 +89,23 @@ class OTPService {
         };
       }
 
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.resendApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: `"${this.fromName}" <${this.fromEmail}>`,
-          to: [email],
-          subject: "Admin Login Verification Code",
-          html: this.getEmailTemplate(otpCode, adminName),
-        }),
-      });
+      const mailOptions = {
+        from: `"${this.fromName}" <${this.fromEmail}>`,
+        to: email,
+        subject: "Admin Login Verification Code",
+        html: this.getEmailTemplate(otpCode, adminName),
+      };
 
-      if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        console.error("❌ Resend OTP email failed:", response.status, text);
-        console.log("\n📧 For testing, the OTP code is:", otpCode);
-        return {
-          success: false,
-          error:
-            "Failed to send OTP email via Resend. Check server logs for OTP code.",
-        };
-      }
+      await this.transporter.sendMail(mailOptions);
 
-      console.log(`✅ OTP email sent successfully via Resend to ${email}`);
+      console.log(`✅ OTP email sent successfully via SMTP to ${email}`);
       return { success: true };
     } catch (error) {
-      console.error("❌ Send OTP email error (Resend):", error.message);
+      console.error("❌ Send OTP email error (SMTP):", error.message);
       console.log("\n📧 For testing, the OTP code is:", otpCode);
-      console.log("⚠️  Configure RESEND_API_KEY to send real emails\n");
       return {
         success: false,
-        error:
-          "Failed to send email via Resend. Check server logs for OTP code.",
+        error: "Failed to send email via SMTP. Check server logs for OTP code.",
       };
     }
   }
@@ -110,13 +115,14 @@ class OTPService {
    */
   async sendPasswordResetEmail(email, otpCode, adminName = "Admin") {
     try {
-      if (!this.resendApiKey) {
-        console.error("❌ RESEND_API_KEY not configured in environment");
+      if (!this.transporter) {
+        console.error(
+          "❌ SMTP transporter not configured for admin password reset emails"
+        );
         console.log(
           "\n📧 For testing, the password reset OTP code is:",
           otpCode
         );
-        console.log("⚠️  Configure RESEND_API_KEY to send real emails\n");
         return {
           success: false,
           error:
@@ -124,45 +130,22 @@ class OTPService {
         };
       }
 
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.resendApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: `"${this.fromName}" <${this.fromEmail}>`,
-          to: [email],
-          subject: "Admin Password Reset Code",
-          html: this.getPasswordResetEmailTemplate(otpCode, adminName),
-        }),
-      });
+      const mailOptions = {
+        from: `"${this.fromName}" <${this.fromEmail}>`,
+        to: email,
+        subject: "Admin Password Reset Code",
+        html: this.getPasswordResetEmailTemplate(otpCode, adminName),
+      };
 
-      if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        console.error(
-          "❌ Resend Password Reset email failed:",
-          response.status,
-          text
-        );
-        console.log(
-          "\n📧 For testing, the password reset OTP code is:",
-          otpCode
-        );
-        return {
-          success: false,
-          error:
-            "Failed to send password reset email via Resend. Check server logs for OTP code.",
-        };
-      }
+      await this.transporter.sendMail(mailOptions);
 
       console.log(
-        `✅ Password reset OTP email sent successfully via Resend to ${email}`
+        `✅ Password reset OTP email sent successfully via SMTP to ${email}`
       );
       return { success: true };
     } catch (error) {
       console.error(
-        "❌ Send Password Reset email error (Resend):",
+        "❌ Send Password Reset email error (SMTP):",
         error.message
       );
       console.log("\n📧 For testing, the password reset OTP code is:", otpCode);
@@ -170,7 +153,7 @@ class OTPService {
       return {
         success: false,
         error:
-          "Failed to send password reset email via Resend. Check server logs for OTP code.",
+          "Failed to send password reset email via SMTP. Check server logs for OTP code.",
       };
     }
   }
