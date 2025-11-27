@@ -349,7 +349,7 @@ export default function GlossaryScreen() {
 
   // Render functions
   const renderListHeader = useCallback(() => (
-    <View style={{ marginBottom: isDesktop ? 28 : isTablet ? 24 : 20, paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }}>
+    <View style={{ marginBottom: isDesktop ? 24 : isTablet ? 20 : 16 }}>
       <HStack className="items-center" style={{ marginBottom: isDesktop ? 16 : 12 }}>
         <Ionicons name="pricetags" size={16} color={Colors.text.sub} />
         <GSText size="sm" className="ml-2 font-semibold text-gray-600">
@@ -361,7 +361,7 @@ export default function GlossaryScreen() {
         onCategoryChange={handleCategoryChange}
       />
     </View>
-  ), [activeCategory, handleCategoryChange, isDesktop, isTablet, insets.top, insets.left, insets.right]);
+  ), [activeCategory, handleCategoryChange, isDesktop, isTablet]);
 
   // Memoized pagination components for better performance
   const PageNumber = React.memo(({ page, isActive, onPress }: { page: number, isActive: boolean, onPress: () => void }) => (
@@ -667,7 +667,7 @@ export default function GlossaryScreen() {
           placeholder={`Search ${activeTab === "terms" ? "legal terms" : "articles"}...`}
           loading={termsLoading || articlesLoading}
           showFilterIcon={false}
-          containerClassName="pt-6 pb-4"
+          containerClassName="pt-4 pb-2"
         />
       </View>
 
