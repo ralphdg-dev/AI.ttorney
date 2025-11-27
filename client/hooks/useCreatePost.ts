@@ -258,63 +258,75 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
       console.log('🚀 About to make fetch request...');
       const startTime = Date.now();
       
-      const response = await fetch(`${apiUrl}/api/forum/posts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-      });
+      // Create an AbortController for request timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+      
+      try {
+        const response = await fetch(`${apiUrl}/api/forum/posts`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
 
-      const fetchTime = Date.now() - startTime;
-      console.log(`✅ Fetch completed in ${fetchTime}ms, status: ${response.status}`);
+        const fetchTime = Date.now() - startTime;
+        console.log(`✅ Fetch completed in ${fetchTime}ms, status: ${response.status}`);
+        
+        // Clear the timeout since request completed
+        clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[CreatePost:${userType}] Failed: ${response.status}`, errorText);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[CreatePost:${userType}] Failed: ${response.status}`, errorText);
 
-        // Handle 403 Forbidden
-        if (response.status === 403) {
-          await handle403Error(errorText, optimisticId);
+          // Handle 403 Forbidden
+          if (response.status === 403) {
+            await handle403Error(errorText, optimisticId);
+            return;
+          }
+
+          // Handle moderation errors
+          const handled = await handleModerationError(errorText, optimisticId);
+          if (handled) return;
+
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        const resp = await response.json();
+        
+        // Debug logging to identify the issue
+        console.log('🔍 Create post response:', resp);
+        console.log('🔍 Response success field:', resp.success);
+        console.log('🔍 Response status:', response.status);
+        
+        console.log(`[CreatePost:${userType}] Post created successfully`);
+
+        if (!resp.success) {
+          console.error('❌ Failed to create post - resp.success is false:', resp);
+          console.error('❌ Response details:', resp);
+          removeOptimisticPost(optimisticId);
+          Alert.alert('Error', 'Failed to create post. Please try again.', [{ text: 'OK' }]);
           return;
         }
 
-        // Handle moderation errors
-        const handled = await handleModerationError(errorText, optimisticId);
-        if (handled) return;
-
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+        // Clear cache and confirm optimistic post after delay, promoting with real post id
+        clearCache();
+        timeoutRef.current = setTimeout(() => {
+          if (resp?.post_id) {
+            confirmOptimisticPost(optimisticId, { id: String(resp.post_id) });
+          } else {
+            console.error('❌ No post_id in response:', resp);
+          }
+        }, OPTIMISTIC_CONFIRM_DELAY);
+      } catch (innerError) {
+        // Clear the timeout if there was an error
+        clearTimeout(timeoutId);
+        throw innerError; // Re-throw to be caught by outer catch
       }
-
-      const resp = await response.json();
-      
-      // Debug logging to identify the issue
-      console.log('🔍 Create post response:', resp);
-      console.log('🔍 Response success field:', resp.success);
-      console.log('🔍 Response status:', response.status);
-      
-      console.log(`[CreatePost:${userType}] Post created successfully`);
-
-      if (!resp.success) {
-        console.error('❌ Failed to create post - resp.success is false:', resp);
-        console.error('❌ Response details:', resp);
-        removeOptimisticPost(optimisticId);
-        Alert.alert('Error', 'Failed to create post. Please try again.', [{ text: 'OK' }]);
-        return;
-      }
-
-      // Clear cache and confirm optimistic post after delay, promoting with real post id
-      clearCache();
-      timeoutRef.current = setTimeout(() => {
-        if (resp?.post_id) {
-          confirmOptimisticPost(optimisticId, { id: String(resp.post_id) });
-        } else {
-          console.error('❌ No post_id in response:', resp);
-        }
-      }, OPTIMISTIC_CONFIRM_DELAY);
-      
     } catch (error) {
       // Comprehensive error handling for preview builds
       console.error('❌ Create post failed:', error);
@@ -333,7 +345,6 @@ export const useCreatePost = ({ userType, globalActionsKey }: UseCreatePostOptio
       if (optimisticId) {
         removeOptimisticPost(optimisticId);
       }
-      
     } finally {
       // Always reset posting state
       setIsPosting(false);

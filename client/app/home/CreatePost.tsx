@@ -82,9 +82,11 @@ const CreatePost: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background.primary} />
+      
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
       >
         <View style={{ flex: 1, paddingBottom: 16 }}>
           {/* Header */}
@@ -113,6 +115,7 @@ const CreatePost: React.FC = () => {
             <CategoryScroller
               activeCategory={categoryId}
               onCategoryChange={setCategoryId}
+              includeAllOption={false}
             />
           </View>
 
@@ -146,9 +149,9 @@ const CreatePost: React.FC = () => {
         </View>
       </KeyboardAvoidingView>
       
-      {/* Moderation Warning Banner - Fixed at bottom, outside KeyboardAvoidingView */}
+      {/* Moderation Warning Banner - Fixed at bottom but raised up */}
       {moderationStatus && (
-        <View style={styles.bottomBannerContainer}>
+        <View style={styles.bottomRaisedBannerContainer}>
           <ModerationWarningBanner
             strikeCount={moderationStatus.strike_count}
             suspensionCount={moderationStatus.suspension_count}
@@ -288,10 +291,12 @@ const styles = StyleSheet.create({
   counterTextExceeded: {
     color: '#DC2626',
   },
-  bottomBannerContainer: {
+  bottomRaisedBannerContainer: {
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 60, // Raised up from the bottom to avoid navigation area on Android
     zIndex: 10,
+    position: 'relative',
+    elevation: 5,
   },
   contentWrapper: {
     paddingHorizontal: 16,
